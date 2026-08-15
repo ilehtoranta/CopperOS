@@ -1,0 +1,8 @@
+# Local build and test output
+**/bin/
+**/obj/
+**/__pycache__/
+
+# IDE user state
+*.user
+*.suo

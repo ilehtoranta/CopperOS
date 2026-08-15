@@ -1,0 +1,21 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <!-- The local CopperSharp tree may be under active generated-ABI work.
+         Use it explicitly for native qualification; the pinned package keeps
+         CopperOS host tests isolated from unrelated sibling edits. -->
+    <CopperOSUseLocalCopperSharp Condition="'$(CopperOSUseLocalCopperSharp)' == ''">false</CopperOSUseLocalCopperSharp>
+    <CopperSharp68kRoot Condition="'$(CopperSharp68kRoot)' == ''">$(MSBuildThisFileDirectory)..\CopperSharp68k</CopperSharp68kRoot>
+    <CopperSharpSdkAmigaVersion Condition="'$(CopperSharpSdkAmigaVersion)' == ''">0.1.0-preview.1-g16</CopperSharpSdkAmigaVersion>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(CopperOSUseLocalCopperSharp)' == 'true' and Exists('$(CopperSharp68kRoot)\Sdk.Amiga\CopperSharp.Sdk.Amiga.csproj')">
+    <ProjectReference Include="$(CopperSharp68kRoot)\Sdk.Amiga\CopperSharp.Sdk.Amiga.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(CopperOSUseLocalCopperSharp)' != 'true' or !Exists('$(CopperSharp68kRoot)\Sdk.Amiga\CopperSharp.Sdk.Amiga.csproj')">
+    <PackageReference Include="CopperSharp.Sdk.Amiga" Version="$(CopperSharpSdkAmigaVersion)" />
+  </ItemGroup>
+</Project>
