@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- CopperStart.Dos and this standalone native shell unit use the local
+         SDK ABI. The host-only CopperOS.Shell project remains package-based. -->
+    <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <Import Project="..\..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <AssemblyName>CopperOS.Shell.Dos</AssemblyName>
+    <RootNamespace>CopperOS.Shell.Dos</RootNamespace>
+    <ImplicitUsings>false</ImplicitUsings>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Build the DOS-native shell as one coherent SDK-ABI unit. Referencing
+         the host Shell binary would pull its pinned package ABI alongside the
+         local CopperStart ABI. -->
+    <Compile Include="*.cs" Exclude="DosShellPlatform.cs;DosShellNativeEntrypoints.cs;DosShellNativeParkEntrypoint.cs" />
+    <Compile Include="DosShellPlatform.cs;DosShellNativeEntrypoints.cs;DosShellNativeParkEntrypoint.cs" />
+    <ProjectReference Include="..\..\..\..\CopperStart\src\CopperStart.Dos\CopperStart.Dos.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'CopperOS.Shell.Dos'">
+    <BaseIntermediateOutputPath>obj\CopperOS.Shell.Dos\</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>obj\CopperOS.Shell.Dos\</MSBuildProjectExtensionsPath>
+  </PropertyGroup>
+</Project>
