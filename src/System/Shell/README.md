@@ -129,7 +129,8 @@ does not own the registry.
 `WINDOW,FROM` template and copy both values before `FreeArgs`. The platform
 boundary receives a `ShellLaunchKind`, leaving child-CLI inheritance,
 console/window ownership, startup-script execution, and scheduler cleanup in
-DOS/Shell rather than in command code.
+DOS/Shell rather than in command code. The native DOS adapter accepts bounded
+`CON:` WINDOW specifications and transfers duplicated child streams.
 Both launch commands now pass a fixed-width `ShellChildInheritance` record
 with the parent input, output, error, and current-directory handles. `Run`
 uses the same record for background process creation; DOS remains responsible

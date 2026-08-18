@@ -39,6 +39,17 @@ public static class DosShellNativeEntrypoints
 		APTR.ExportAddress("copperos.shell.execute-begin");
 	public static APTR AddressOfExecutePoll() =>
 		APTR.ExportAddress("copperos.shell.execute-poll");
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	[M68kExport("copperos.shell.child")]
+	[return: M68kRegister(M68kRegister.D0)]
+	public static uint ShellChildEntry(
+		[M68kRegister(M68kRegister.A6)] uint execBase) =>
+		DosShellNativeChildCore.RunFromCurrentTask(
+			APTR.FromPointer(execBase));
+
+	public static APTR AddressOfShellChild() =>
+		APTR.ExportAddress("copperos.shell.child");
 	public static APTR AddressOfExecutePark() =>
 		DosShellNativeParkEntrypoint.AddressOfExecutePark();
 

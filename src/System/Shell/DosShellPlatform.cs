@@ -309,6 +309,7 @@ public struct DosShellPlatform<TDosPlatform> : IShellPlatform,
 		var runnerValue = new DosShellScriptRunnerRecord
 		{
 			Cli = cli, Frame = frame, Input = input, Line = line,
+			InputOwned = 1,
 			CommandName = commandName, Token = token, First = first,
 			Second = second, Third = third, Fourth = fourth,
 			ErrorCodes = errorCodes, RedirectionCommand = redirectionCommand,

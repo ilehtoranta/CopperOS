@@ -116,9 +116,9 @@ public static class EchoCommand
         uint toLength = 0;
         if (toValue.IsNotNull)
         {
-            toLength = ReadCStringLength(ref platform, toValue,
-                MaximumArgumentLength);
-            if (toLength == uint.MaxValue || toLength >= toCapacity)
+            if (!CStringCodec.TryReadLength(ref platform, toValue,
+                    MaximumArgumentLength, out toLength) ||
+                toLength >= toCapacity)
             {
                 platform.FreeArgs(rdArgs);
                 return (int)ShellCommandResult.Error;
@@ -211,9 +211,9 @@ public static class EchoCommand
                 return uint.MaxValue;
             var item = APTR.FromPointer(platform.ReadUInt32(list, index * 4));
             if (item.IsNull) break;
-            var length = ReadCStringLength(ref platform, item,
-                MaximumArgumentLength);
-            if (length == uint.MaxValue || output > capacity - 1 ||
+            if (!CStringCodec.TryReadLength(ref platform, item,
+                    MaximumArgumentLength, out var length) ||
+                output > capacity - 1 ||
                 length > capacity - 1 - output)
                 return uint.MaxValue;
             if (output != 0)
@@ -224,21 +224,6 @@ public static class EchoCommand
         if (output >= capacity) return uint.MaxValue;
         platform.WriteUInt8(destination, (int)output, 0);
         return output;
-    }
-
-    private static uint ReadCStringLength<TPlatform>(ref TPlatform platform,
-        APTR value, uint maximum) where TPlatform : struct, IShellPlatform
-    {
-        if (value.IsNull) return uint.MaxValue;
-        for (var index = 0u; index < maximum; index++)
-        {
-            if (value.Raw > uint.MaxValue - index)
-                return uint.MaxValue;
-            var current = APTR.FromPointer(value.Raw + index);
-            if (!platform.IsMapped(current, 1)) return uint.MaxValue;
-            if (platform.ReadUInt8(current) == 0) return index;
-        }
-        return uint.MaxValue;
     }
 
     /// <summary>

@@ -9,21 +9,8 @@ namespace CopperOS.Shell;
 /// boundary explicitly.  The production contract has no managed stream,
 /// allocator, callback, or exception dependency.
 /// </summary>
-public interface IShellPlatform
+public interface IShellPlatform : IAmigaGuestMemory
 {
-    // This is a Shell-owned guest-memory capability boundary, not a second
-    // public Amiga ABI declaration.  CopperSharp.Sdk.Amiga remains the owner
-    // of APTR/BPTR and DOS/Exec ABI types.
-    byte ReadUInt8(APTR address, int offset = 0);
-    ushort ReadUInt16(APTR address, int offset = 0);
-    uint ReadUInt32(APTR address, int offset = 0);
-    void WriteUInt8(APTR address, int offset, byte value);
-    void WriteUInt16(APTR address, int offset, ushort value);
-    void WriteUInt32(APTR address, int offset, uint value);
-    void Clear(APTR address, uint byteCount);
-    void Copy(APTR source, APTR destination, uint byteCount);
-    bool IsMapped(APTR address, uint byteSize);
-
     /// <summary>
     /// Reads the current CLI's default stack for future child commands.  This
     /// capability deliberately does not expose the already-running task stack.

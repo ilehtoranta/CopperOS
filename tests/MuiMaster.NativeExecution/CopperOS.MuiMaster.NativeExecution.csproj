@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>CopperOS.MuiMaster.NativeExecution</AssemblyName>
+    <RootNamespace>CopperOS.MuiMaster.NativeExecution</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <CopperModRoot Condition="'$(CopperModRoot)' == ''">$(MSBuildThisFileDirectory)..\..\..\CopperMod</CopperModRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(CopperModRoot)\Copper68k\Copper68k.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <AssemblyName>CopperOS.MuiMaster.NativeRoot</AssemblyName>
+    <RootNamespace>CopperOS.MuiMaster.NativeRoot</RootNamespace>
+    <ImplicitUsings>false</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <!-- Native qualification must compile against the local SDK that owns the
+         Amiga attributes and guest-memory contracts. -->
+    <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\Libraries\muimaster.library\*.cs"
+             Exclude="..\..\src\Libraries\muimaster.library\obj\**\*;..\..\src\Libraries\muimaster.library\bin\**\*"
+             Link="Production\%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

@@ -27,7 +27,8 @@ directly to the DOS-owned record and is included in the fixed-width native
 qualification root; the Begin/Poll entrypoints now use a four-byte DOS-state
 context. Aggregate DOS item and resident record builders use scalar codecs,
 and the full Begin/Poll/Park export set is qualification-green for MC68000,
-MC68020, and MC68040 with no managed allocation sites. Child Process
+MC68020, and MC68040 with no managed allocation sites; the fixed-width
+child-shell export is qualified alongside them. Child Process
 termination completes its matching foreground continuation before DOS release
 and wakes the prepared parent wait through Exec. The native adapter now also
 has a scalar file-backed `Run` launch handoff: it validates the HUNK entry,
@@ -35,13 +36,19 @@ creates a Process-sized task, publishes a DOS-owned CLI, and records the
 segment list without managed records. Resident `Run` uses a scalar resident
 registry lookup/acquire/release handoff and binds the use count to the child
 Process. The native Execute runner now uses the same scalar image/Process/CLI
-handoff for external script commands and keeps the continuation record in the
-DOS frame.
-Native provider callbacks still need to provide private stream/lock duplication;
-the interim native handoff keeps
-inherited records shared and parent-owned. The native provider now calls the
+handoff for file and resident external script commands and keeps the
+continuation record in the DOS frame.
+Native NewCLI/NewShell now use a fixed-width child-shell export for bounded
+`FROM` scripts, inherited-console input, or a bounded `CON:` WINDOW
+specification: the child owns its CLI, duplicates
+standard DOS handles/locks, converts the CLI BSTR into a bounded C string when
+present, and drives the DOS runner through prepared waits. The native provider
+opens inherited `CON:` handles through DOS vectors and supplies byte-oriented
+console reads/writes for the interactive loop.
+The native provider now duplicates inherited stream/lock records for child
+ownership and calls the
 scalar DOS vectors directly for file/lock open, close, duplication, seek, byte
-I/O, parent, and name operations; relative-lock, console, packet, and requester
+I/O, parent, and name operations; relative-lock, packet, and requester
 capabilities remain explicit fail-closed boundaries. The adapter consumes
 MorphOS `SIGBREAKF_CTRL_C`/`SIGBREAKF_CTRL_D` and maps them to Shell
 break/Ctrl-C/Ctrl-D events without clearing unrelated signals. Requester

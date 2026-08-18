@@ -49,36 +49,18 @@ public static class UnsetenvCommand
                 : (int)ShellCommandResult.Ok;
         }
 
-        var nameLength = ReadCStringLength(ref platform, name, 65536);
-        if (nameLength < 0)
+        if (!CStringCodec.TryReadLength(ref platform, name, 65536,
+                out var nameLength))
         {
             platform.FreeArgs(rdArgs);
             return (int)ShellCommandResult.Fail;
         }
 
         var removed = platform.TryRemoveGlobalVariable(name,
-            (uint)nameLength, save);
+            nameLength, save);
         platform.FreeArgs(rdArgs);
         return removed
             ? (int)ShellCommandResult.Ok
             : (int)ShellCommandResult.Fail;
-    }
-
-    private static int ReadCStringLength<TPlatform>(
-        ref TPlatform platform,
-        APTR value,
-        uint maximum)
-        where TPlatform : struct, IShellPlatform
-    {
-        if (value.IsNull) return -1;
-        for (var index = 0u; index < maximum; index++)
-        {
-            if (value.Raw > uint.MaxValue - index ||
-                !platform.IsMapped(value, index + 1))
-                return -1;
-            if (platform.ReadUInt8(value, (int)index) == 0)
-                return (int)index;
-        }
-        return -1;
     }
 }

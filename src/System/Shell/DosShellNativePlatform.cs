@@ -342,6 +342,33 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 		var input = DosShellNativeBridge.OpenScript(ref dos, State, file,
 			fileLength);
 		if (input.IsNull) return ShellScriptExecutionStatus.Failed;
+		return StartScriptRunner(cli, input, 1, out result);
+	}
+
+	/// <summary>
+	/// Starts a shell reader on the CLI's inherited input stream.  The stream is
+	/// borrowed from the child Process and therefore remains open when the
+	/// runner reaches EOF or fails.
+	/// </summary>
+	public ShellScriptExecutionStatus TryStartInteractiveScript(APTR cli,
+		out int result)
+	{
+		var dos = CreateDos();
+		result = (int)ShellCommandResult.Error;
+		if (cli.IsNull || !DosCommandLineInterfaceCodec.IsMapped(ref dos, cli))
+			return ShellScriptExecutionStatus.Failed;
+		var cliValue = DosCommandLineInterfaceCodec.Read(ref dos, cli);
+		var input = cliValue.CurrentInput.IsNotNull ? cliValue.CurrentInput :
+			cliValue.StandardInput;
+		if (input.IsNull) return ShellScriptExecutionStatus.Failed;
+		return StartScriptRunner(cli, input, 0, out result);
+	}
+
+	private ShellScriptExecutionStatus StartScriptRunner(APTR cli, BPTR input,
+		uint inputOwned, out int result)
+	{
+		var dos = CreateDos();
+		result = (int)ShellCommandResult.Error;
 		var frame = dos.AllocateGuest(ShellScriptFrameCodec.Size);
 		var line = dos.AllocateGuest(ScriptLineCapacity);
 		var commandName = dos.AllocateGuest(ScriptCommandNameCapacity);
@@ -360,6 +387,7 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 		var runnerValue = new DosShellScriptRunnerRecord
 		{
 			Cli = cli, Frame = frame, Input = input, Line = line,
+			InputOwned = inputOwned,
 			CommandName = commandName, Token = token, First = first,
 			Second = second, Third = third, Fourth = fourth,
 			ErrorCodes = errorCodes, RedirectionCommand = redirectionCommand,
@@ -644,10 +672,11 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 		APTR continuation, APTR window,
 		uint windowLength, APTR from, uint fromLength)
 	{
-		_ = parentCli; _ = kind; _ = input; _ = output; _ = error;
-		_ = currentDirectory; _ = continuation; _ = window;
-		_ = windowLength; _ = from; _ = fromLength;
-		return false;
+		var dos = CreateDos();
+		return DosShellNativeLaunchCore.TryCreateShell(dos, State,
+			DosShellNativeContextCore.ReadExecBase(ref dos, State), parentCli,
+			kind, input, output, error, currentDirectory, continuation, window,
+			windowLength, from, fromLength);
 	}
 
 	public bool TryPollShellContinuation(APTR cli, APTR continuation,

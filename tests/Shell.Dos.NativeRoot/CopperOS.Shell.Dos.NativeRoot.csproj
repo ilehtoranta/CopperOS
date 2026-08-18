@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <AssemblyName>CopperOS.Shell.Dos.NativeRoot</AssemblyName>
+    <RootNamespace>CopperOS.Shell.Dos.NativeRoot</RootNamespace>
+    <ImplicitUsings>false</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>1591</NoWarn>
+    <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="DosShellNativeRoots.cs" />
+    <Compile Include="..\..\src\System\Shell\DosShellNativeEntrypoints.cs"
+             Link="Production\DosShellNativeEntrypoints.cs" />
+    <Compile Include="..\..\src\System\Shell\DosShellNativeParkEntrypoint.cs"
+             Link="Production\DosShellNativeParkEntrypoint.cs" />
+    <Compile Include="..\..\src\System\Shell\*.cs"
+             Exclude="..\..\src\System\Shell\obj\**\*;..\..\src\System\Shell\bin\**\*;..\..\src\System\Shell\DosShellNativeEntrypoints.cs;..\..\src\System\Shell\DosShellNativeParkEntrypoint.cs"
+             Link="Production\%(Filename)%(Extension)" />
+    <ProjectReference Include="..\..\..\CopperStart\src\CopperStart.Dos\CopperStart.Dos.csproj" />
+  </ItemGroup>
+</Project>

@@ -34,15 +34,15 @@ public static class GetenvCommand
             return (int)ShellCommandResult.Error;
 
         var nameAddress = APTR.FromPointer(platform.ReadUInt32(resultArray));
-        var nameLength = ReadCStringLength(ref platform, nameAddress, 65536);
-        if (nameLength < 0)
+        if (!CStringCodec.TryReadLength(ref platform, nameAddress, 65536,
+                out var nameLength))
         {
             platform.FreeArgs(rdArgs);
             return (int)ShellCommandResult.Fail;
         }
 
         uint valueLength;
-        if (!platform.TryGetGlobalVariable(nameAddress, (uint)nameLength,
+        if (!platform.TryGetGlobalVariable(nameAddress, nameLength,
                 valueBuffer, valueCapacity, out valueLength))
         {
             platform.FreeArgs(rdArgs);
@@ -63,23 +63,5 @@ public static class GetenvCommand
         return platform.WriteByte(invocation.Output, (byte)'\n') < 0
             ? (int)ShellCommandResult.Error
             : (int)ShellCommandResult.Ok;
-    }
-
-    private static int ReadCStringLength<TPlatform>(
-        ref TPlatform platform,
-        APTR value,
-        uint maximum)
-        where TPlatform : struct, IShellPlatform
-    {
-        if (value.IsNull) return -1;
-        for (var index = 0u; index < maximum; index++)
-        {
-            if (value.Raw > uint.MaxValue - index ||
-                !platform.IsMapped(value, index + 1))
-                return -1;
-            if (platform.ReadUInt8(value, (int)index) == 0)
-                return (int)index;
-        }
-        return -1;
     }
 }

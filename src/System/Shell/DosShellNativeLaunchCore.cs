@@ -16,6 +16,63 @@ internal static class DosShellNativeLaunchCore
 	private const uint DefaultStack = 4096;
 	private const uint MaximumStack = 16u * 1024u * 1024u;
 
+	public static bool TryCreateShell(
+		CopperSharpNativeDosPlatform dos, APTR state, APTR execBase,
+		APTR parentCli, ShellLaunchKind kind, BPTR input, BPTR output,
+		BPTR error, BPTR currentDirectory, APTR continuation, APTR window,
+		uint windowLength, APTR from, uint fromLength)
+	{
+		_ = error;
+		if (execBase.IsNull || state.IsNull || parentCli.IsNull ||
+			(kind != ShellLaunchKind.NewCli && kind != ShellLaunchKind.NewShell) ||
+			(window.IsNull ? windowLength != 0 : windowLength == 0) ||
+			(from.IsNull && fromLength != 0) || fromLength > 255 ||
+			(from.IsNotNull && (from.Raw > uint.MaxValue - fromLength - 1 ||
+				!dos.IsMapped(from, fromLength + 1) ||
+				dos.ReadUInt8(from, unchecked((int)fromLength)) != 0)))
+			return false;
+		var windowHandleRaw = 0u;
+		if (window.IsNotNull)
+		{
+			windowHandleRaw = DosCore.OpenNativeConsole(state, window,
+				windowLength);
+			if (windowHandleRaw == 0) return false;
+		}
+		var childEntry = DosShellNativeEntrypoints.AddressOfShellChild();
+		if (childEntry.IsNull)
+		{
+			DosCore.CloseNativeHandle(state, windowHandleRaw);
+			return false;
+		}
+		const uint tagBytes = TagItem.Size * 5;
+		var tags = dos.AllocateGuest(tagBytes);
+		if (tags.IsNull || !dos.IsMapped(tags, tagBytes))
+		{
+			Free(ref dos, tags, tagBytes);
+			DosCore.CloseNativeHandle(state, windowHandleRaw);
+			return false;
+		}
+		dos.Clear(tags, tagBytes);
+		WriteTag(ref dos, tags, 0, ExecConstants.TaskTagProgramCounter,
+			childEntry.Raw);
+		WriteTag(ref dos, tags, 1, ExecConstants.TaskTagM68kStackSize,
+			DefaultStack);
+		WriteTag(ref dos, tags, 2, ExecConstants.TagDone, 0);
+		WriteTag(ref dos, tags, 3, ExecConstants.TagDone, 0);
+		WriteTag(ref dos, tags, 4, ExecConstants.TagDone, 0);
+		var startup = new DosChildCliStartup(APTR.Null, 0, APTR.Null, 0,
+			from, fromLength, APTR.Null, 0);
+		var launchInputRaw = windowHandleRaw != 0 ? windowHandleRaw : input.Raw;
+		var launchOutputRaw = windowHandleRaw != 0 ? windowHandleRaw : output.Raw;
+		var task = DosChildProcessLaunchCore.CreateShellNative(dos, execBase,
+			state, tags, continuation, BPTR.FromRaw(launchInputRaw),
+			BPTR.FromRaw(launchOutputRaw),
+			currentDirectory, startup);
+		Free(ref dos, tags, tagBytes);
+		DosCore.CloseNativeHandle(state, windowHandleRaw);
+		return task.IsNotNull;
+	}
+
 	public static bool TryRunCommand(
 		CopperSharpNativeDosPlatform dos, APTR state, APTR execBase,
 		APTR cli, BPTR input, BPTR output, BPTR error, BPTR currentDirectory,
