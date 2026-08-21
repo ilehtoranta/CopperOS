@@ -22,6 +22,27 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 	private const uint IffPosition = 0x0004E008;
 	private const uint IffData = 0x0004E100;
 	private const uint IffCapacity = 0x00000F00;
+	private const uint WindowTabletMessages = 0x0004F030;
+	private const uint WindowBorderScrollerBottom = 0x0004F034;
+	private const uint WindowBorderScrollerLeft = 0x0004F038;
+	private const uint WindowBorderScrollerRight = 0x0004F03C;
+	private const uint WindowAlternateHeight = 0x0004F040;
+	private const uint WindowAlternateWidth = 0x0004F044;
+	private const uint WindowAlternateLeft = 0x0004F048;
+	private const uint WindowAlternateTop = 0x0004F04C;
+	private const uint WindowGeometryHeight = 0x0004F050;
+	private const uint WindowGeometryWidth = 0x0004F054;
+	private const uint WindowGeometryLeft = 0x0004F058;
+	private const uint WindowGeometryTop = 0x0004F05C;
+	private const uint WindowGadgetClose = 0x0004F060;
+	private const uint WindowGadgetDepth = 0x0004F064;
+	private const uint WindowGadgetDrag = 0x0004F068;
+	private const uint WindowGadgetSize = 0x0004F06C;
+	private const uint WindowGadgetSizeRight = 0x0004F070;
+	private const uint WindowModeAppWindow = 0x0004F074;
+	private const uint WindowModeBackdrop = 0x0004F078;
+	private const uint WindowModeBorderless = 0x0004F07C;
+	private const uint WindowModePanelWindow = 0x0004F080;
 
 	public void Reset()
 	{
@@ -31,6 +52,27 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 		APTR.WriteUInt32(APTR.FromPointer(SettingsFilePosition), 0, 0);
 		APTR.WriteUInt32(APTR.FromPointer(IffLength), 0, 0);
 		APTR.WriteUInt32(APTR.FromPointer(IffPosition), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowTabletMessages), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowBorderScrollerBottom), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowBorderScrollerLeft), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowBorderScrollerRight), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowAlternateHeight), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowAlternateWidth), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowAlternateLeft), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowAlternateTop), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowGeometryHeight), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowGeometryWidth), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowGeometryLeft), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowGeometryTop), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowGadgetClose), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowGadgetDepth), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowGadgetDrag), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowGadgetSize), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowGadgetSizeRight), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowModeAppWindow), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowModeBackdrop), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowModeBorderless), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowModePanelWindow), 0, 0);
 	}
 
 	public APTR Allocate(uint byteSize, uint flags)
@@ -78,7 +120,25 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 		return result;
 	}
 
-	public uint DoMethod(APTR obj, APTR message) => 1;
+	public uint DoMethod(APTR obj, APTR message)
+	{
+		return APTR.ReadUInt32(message, 0) == 0x90000077 ? 0x77u : 1u;
+	}
+	public uint CoerceMethod(APTR classPointer, APTR obj, APTR message)
+	{
+		// Native qualification breadcrumbs make the explicit MorphOS class path
+		// observable without a managed callback or runtime service.
+		var method = APTR.ReadUInt32(message, 0);
+		var inputMessage = APTR.ReadUInt32(message, 4);
+		APTR.WriteUInt32(APTR.FromPointer(0x0004F020), 0, classPointer.Raw);
+		APTR.WriteUInt32(APTR.FromPointer(0x0004F024), 0, obj.Raw);
+		APTR.WriteUInt32(APTR.FromPointer(0x0004F028), 0, method);
+		// MUIM_HandleEvent carries the test method selector as InputMessage;
+		// ordinary method packets keep their selector in the first word.
+		return method == 0x90000077 ||
+			(method == 0x80426D66 && inputMessage == 0x90000077) ?
+			0x77u : 1u;
+	}
 	public void DisposeObject(APTR obj)
 	{
 	}
@@ -215,6 +275,85 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 		nativeWindow.IsNotNull;
 	public uint ReadWindowEvent(APTR nativeWindow, APTR eventStorage) => 0;
 	public bool ActivateMuiWindow(APTR nativeWindow) => nativeWindow.IsNotNull;
+	public bool SetMuiWindowBusy(APTR nativeWindow, bool busy) =>
+		nativeWindow.IsNotNull;
+	public bool SetMuiWindowTabletMessages(APTR nativeWindow, bool enabled)
+	{
+		if (nativeWindow.IsNull) return false;
+		APTR.WriteUInt32(APTR.FromPointer(WindowTabletMessages), 0,
+			enabled ? 1u : 0u);
+		return true;
+	}
+	public bool SetMuiWindowBorderScrollers(APTR nativeWindow, bool useBottom,
+		bool useLeft, bool useRight)
+	{
+		if (nativeWindow.IsNull) return false;
+		APTR.WriteUInt32(APTR.FromPointer(WindowBorderScrollerBottom), 0,
+			useBottom ? 1u : 0u);
+		APTR.WriteUInt32(APTR.FromPointer(WindowBorderScrollerLeft), 0,
+			useLeft ? 1u : 0u);
+		APTR.WriteUInt32(APTR.FromPointer(WindowBorderScrollerRight), 0,
+			useRight ? 1u : 0u);
+		return true;
+	}
+	public bool ConfigureMuiWindowAlternateGeometry(APTR nativeWindow,
+		MuiWindowPublicCore.MuiWindowAlternateGeometry geometry)
+	{
+		if (nativeWindow.IsNull) return false;
+		APTR.WriteUInt32(APTR.FromPointer(WindowAlternateHeight), 0,
+			unchecked((uint)geometry.Height));
+		APTR.WriteUInt32(APTR.FromPointer(WindowAlternateWidth), 0,
+			unchecked((uint)geometry.Width));
+		APTR.WriteUInt32(APTR.FromPointer(WindowAlternateLeft), 0,
+			unchecked((uint)geometry.LeftEdge));
+		APTR.WriteUInt32(APTR.FromPointer(WindowAlternateTop), 0,
+			unchecked((uint)geometry.TopEdge));
+		return true;
+	}
+	public bool ConfigureMuiWindowGeometry(APTR nativeWindow,
+		MuiWindowPublicCore.MuiWindowGeometry geometry)
+	{
+		if (nativeWindow.IsNull) return false;
+		APTR.WriteUInt32(APTR.FromPointer(WindowGeometryHeight), 0,
+			unchecked((uint)geometry.Height));
+		APTR.WriteUInt32(APTR.FromPointer(WindowGeometryWidth), 0,
+			unchecked((uint)geometry.Width));
+		APTR.WriteUInt32(APTR.FromPointer(WindowGeometryLeft), 0,
+			unchecked((uint)geometry.LeftEdge));
+		APTR.WriteUInt32(APTR.FromPointer(WindowGeometryTop), 0,
+			unchecked((uint)geometry.TopEdge));
+		return true;
+	}
+	public bool ConfigureMuiWindowGadgets(APTR nativeWindow,
+		MuiWindowPublicCore.MuiWindowGadgetPolicy policy)
+	{
+		if (nativeWindow.IsNull) return false;
+		APTR.WriteUInt32(APTR.FromPointer(WindowGadgetClose), 0,
+			policy.CloseGadget);
+		APTR.WriteUInt32(APTR.FromPointer(WindowGadgetDepth), 0,
+			policy.DepthGadget);
+		APTR.WriteUInt32(APTR.FromPointer(WindowGadgetDrag), 0,
+			policy.DragBar);
+		APTR.WriteUInt32(APTR.FromPointer(WindowGadgetSize), 0,
+			policy.SizeGadget);
+		APTR.WriteUInt32(APTR.FromPointer(WindowGadgetSizeRight), 0,
+			policy.SizeRight);
+		return true;
+	}
+	public bool ConfigureMuiWindowMode(APTR nativeWindow,
+		MuiWindowPublicCore.MuiWindowModePolicy policy)
+	{
+		if (nativeWindow.IsNull) return false;
+		APTR.WriteUInt32(APTR.FromPointer(WindowModeAppWindow), 0,
+			policy.AppWindow);
+		APTR.WriteUInt32(APTR.FromPointer(WindowModeBackdrop), 0,
+			policy.Backdrop);
+		APTR.WriteUInt32(APTR.FromPointer(WindowModeBorderless), 0,
+			policy.Borderless);
+		APTR.WriteUInt32(APTR.FromPointer(WindowModePanelWindow), 0,
+			policy.PanelWindow);
+		return true;
+	}
 	public bool MoveMuiWindow(APTR nativeWindow, bool toFront) =>
 		nativeWindow.IsNotNull;
 	public bool MoveMuiScreen(APTR nativeWindow, bool toFront) =>

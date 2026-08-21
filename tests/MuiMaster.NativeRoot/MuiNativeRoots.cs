@@ -121,6 +121,31 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Focused ABI proof for the named MUIM_Family_GetChild packet codec. The
+	// selector and reference fields round-trip as a struct, while a truncated
+	// guest record is rejected before any Family topology is consulted.
+	public static uint FamilyGetChildMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00036580;
+		const uint reference = 0x000365A0;
+		var packet = default(MuiFamilyGetChildMessage);
+		packet.MethodId = MuiFamilyGetChildMessageCodec.Method;
+		packet.Number = MuiFamilyGetChildCore.Next;
+		packet.Reference = APTR.FromPointer(reference);
+		var storage = APTR.FromPointer(packetAddress);
+		if (!MuiFamilyGetChildMessageCodec.Write(ref platform, storage, packet))
+			return 1;
+		if (!MuiFamilyGetChildMessageCodec.TryRead(ref platform, storage,
+			out var decoded) || decoded.MethodId != packet.MethodId ||
+			decoded.Number != packet.Number || decoded.Reference.Raw != reference)
+			return 2;
+		if (MuiFamilyGetChildMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 3;
+		return 42;
+	}
+
 	// Focused MorphOS Family mutation closure. AddHead/AddTail/Remove share the
 	// named {MethodID, object} packet; Insert and Transfer use their complete
 	// named records. The guest projection keeps qualification independent of
@@ -238,6 +263,45 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Focused ABI proof for the fixed Family child/insert/transfer packet codec.
+	// Reorder/sort headers and their trailing vectors remain covered by the
+	// broader FamilyChildPacketsRoot as the explicit array ABI boundary.
+	public static uint FamilyMutationMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint childAddress = 0x00036580;
+		const uint insertAddress = 0x00036590;
+		const uint transferAddress = 0x000365A0;
+		const uint objectAddress = 0x000365D0;
+		const uint predecessorAddress = 0x000365E0;
+		var childStorage = APTR.FromPointer(childAddress);
+		var child = default(MuiFamilyChildMessage);
+		child.MethodId = MuiFamilyMutationCore.AddHeadMethod;
+		child.Object = APTR.FromPointer(objectAddress);
+		if (!MuiFamilyMutationMessageCodec.WriteChild(ref platform, childStorage,
+			MuiFamilyMutationCore.AddHeadMethod, child.Object) ||
+			!MuiFamilyMutationMessageCodec.TryReadChild(ref platform, childStorage,
+			MuiFamilyMutationCore.AddHeadMethod, out var decodedChild) ||
+			decodedChild.Object.Raw != objectAddress) return 1;
+		if (!MuiFamilyMutationMessageCodec.WriteInsert(ref platform,
+			APTR.FromPointer(insertAddress), APTR.FromPointer(objectAddress),
+			APTR.FromPointer(predecessorAddress)) ||
+			!MuiFamilyMutationMessageCodec.TryReadInsert(ref platform,
+			APTR.FromPointer(insertAddress), out var decodedInsert) ||
+			decodedInsert.Object.Raw != objectAddress ||
+			decodedInsert.Predecessor.Raw != predecessorAddress) return 2;
+		if (!MuiFamilyMutationMessageCodec.WriteTransfer(ref platform,
+			APTR.FromPointer(transferAddress), APTR.FromPointer(objectAddress)) ||
+			!MuiFamilyMutationMessageCodec.TryReadTransfer(ref platform,
+			APTR.FromPointer(transferAddress), out var decodedTransfer) ||
+			decodedTransfer.Family.Raw != objectAddress) return 3;
+		if (MuiFamilyMutationMessageCodec.TryReadChild(ref platform,
+			APTR.FromPointer(0x00050FFF), MuiFamilyMutationCore.AddHeadMethod,
+			out _)) return 4;
+		return 42;
+	}
+
 	// Packet-only MorphOS Datamap/Objectmap qualification. The host suite
 	// exercises live store behavior; this closure keeps the native proof at the
 	// fixed ABI boundary so no managed allocator or key/value container enters
@@ -332,11 +396,29 @@ public static class MuiNativeRoots
 		if (!MuiFamilyDoChildMethodsCore.WriteRecord(ref platform,
 			APTR.FromPointer(packet)) ||
 			MuiFamilyDoChildMethodsCore.DispatchRecord(ref platform,
-				APTR.FromPointer(firstNode), APTR.FromPointer(thirdNode),
-				APTR.FromPointer(packet)) != 3) return 4;
+			APTR.FromPointer(firstNode), APTR.FromPointer(thirdNode),
+			APTR.FromPointer(packet)) != 3) return 4;
 		const uint truncated = 0x00050FFF;
 		if (MuiFamilyDoChildMethodsCore.DispatchRecord(ref platform,
 			APTR.Null, APTR.Null, APTR.FromPointer(truncated)) != 0) return 5;
+		return 42;
+	}
+
+	// Focused ABI proof for the fixed MUIM_Family_DoChildMethods codec. The
+	// packet contains only MethodID, so this root isolates the mapping check and
+	// rejects a truncated guest word without entering the child walk.
+	public static uint FamilyDoChildMethodsMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00036580;
+		var storage = APTR.FromPointer(packetAddress);
+		if (!MuiFamilyDoChildMethodsMessageCodec.Write(ref platform, storage))
+			return 1;
+		if (!MuiFamilyDoChildMethodsMessageCodec.IsValid(ref platform, storage))
+			return 2;
+		if (MuiFamilyDoChildMethodsMessageCodec.IsValid(ref platform,
+			APTR.FromPointer(0x00050FFF))) return 3;
 		return 42;
 	}
 
@@ -365,6 +447,28 @@ public static class MuiNativeRoots
 		if (MuiCallHookCore.DispatchRecord(ref platform,
 			APTR.FromPointer(objectAddress), APTR.FromPointer(truncated)) != 0)
 			return 3;
+		return 42;
+	}
+
+	// Focused ABI proof for the named CallHook packet codec. Variadic tail
+	// handling and callback capability behavior remain outside this packet seam.
+	public static uint CallHookMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint hook = 0x00050D00;
+		var packet = default(MuiCallHookMessage);
+		packet.MethodId = MuiCallHookMessageCodec.Method;
+		packet.Hook = APTR.FromPointer(hook);
+		packet.Param1 = 0xCAFEBABEu;
+		if (!MuiCallHookMessageCodec.TryWrite(ref platform,
+			APTR.FromPointer(packetAddress), packet) ||
+			!MuiCallHookMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(packetAddress), out var decoded) ||
+			decoded.Hook.Raw != hook || decoded.Param1 != packet.Param1) return 1;
+		if (MuiCallHookMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FF5), out _)) return 2;
 		return 42;
 	}
 
@@ -438,6 +542,95 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Focused ABI proof for the Dataspace superclass packet codec. The public
+	// dispatcher root above covers behavior; this root keeps the named-record
+	// read/write boundary independently inspectable.
+	public static uint DataspaceMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packet = 0x00050F20;
+		const uint data = 0x00050D00;
+		const uint storage = 0x00050E00;
+		var add = default(MuiDataspaceAddMessage);
+		add.MethodId = MuiDataspaceMessageCodec.AddMethod;
+		add.Data = APTR.FromPointer(data);
+		add.Length = -4;
+		add.Id = 19;
+		if (!MuiDataspaceMessageCodec.TryWriteAdd(ref platform,
+			APTR.FromPointer(packet), add) ||
+			!MuiDataspaceMessageCodec.TryReadAdd(ref platform,
+			APTR.FromPointer(packet), out var decodedAdd) ||
+			decodedAdd.Data.Raw != data || decodedAdd.Length != -4 ||
+			decodedAdd.Id != 19) return 1;
+		var get = default(MuiDataspaceGetMessage);
+		get.MethodId = MuiDataspaceMessageCodec.GetMethod;
+		get.Id = 19;
+		get.SizeStorage = APTR.FromPointer(storage);
+		if (!MuiDataspaceMessageCodec.TryWriteGet(ref platform,
+			APTR.FromPointer(packet), get) ||
+			!MuiDataspaceMessageCodec.TryReadGet(ref platform,
+			APTR.FromPointer(packet), out var decodedGet) ||
+			decodedGet.SizeStorage.Raw != storage) return 2;
+		var merge = default(MuiDataspaceMergeMessage);
+		merge.MethodId = MuiDataspaceMessageCodec.MergeMethod;
+		merge.Dataspace = APTR.FromPointer(data);
+		if (!MuiDataspaceMessageCodec.TryWriteMerge(ref platform,
+			APTR.FromPointer(packet), merge) ||
+			!MuiDataspaceMessageCodec.TryReadMerge(ref platform,
+			APTR.FromPointer(packet), out var decodedMerge) ||
+			decodedMerge.Dataspace.Raw != data) return 3;
+		var remove = default(MuiDataspaceRemoveMessage);
+		remove.MethodId = MuiDataspaceMessageCodec.RemoveMethod;
+		remove.Id = 19;
+		if (!MuiDataspaceMessageCodec.TryWriteRemove(ref platform,
+			APTR.FromPointer(packet), remove) ||
+			!MuiDataspaceMessageCodec.TryReadRemove(ref platform,
+			APTR.FromPointer(packet), out var decodedRemove) ||
+			decodedRemove.Id != 19) return 4;
+		var clear = default(MuiDataspaceClearMessage);
+		clear.MethodId = MuiDataspaceMessageCodec.ClearMethod;
+		if (!MuiDataspaceMessageCodec.TryWriteClear(ref platform,
+			APTR.FromPointer(packet), clear) ||
+			!MuiDataspaceMessageCodec.TryReadClear(ref platform,
+			APTR.FromPointer(packet), out _)) return 5;
+		if (MuiDataspaceMessageCodec.TryReadAdd(ref platform,
+			APTR.FromPointer(0x00050FF5), out _)) return 6;
+		return 42;
+	}
+
+	// Focused ABI proof for the two Dataspace IFF packet records. Stream I/O
+	// remains capability-backed and is deliberately outside this packet seam.
+	public static uint DataspaceIffMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packet = 0x00050F20;
+		const uint handle = 0x00050D00;
+		var read = default(MuiDataspaceReadIffMessage);
+		read.MethodId = MuiDataspaceIffMessageCodec.ReadIffMethod;
+		read.Handle = APTR.FromPointer(handle);
+		if (!MuiDataspaceIffMessageCodec.TryWriteReadIff(ref platform,
+			APTR.FromPointer(packet), read) ||
+			!MuiDataspaceIffMessageCodec.TryReadReadIff(ref platform,
+			APTR.FromPointer(packet), out var decodedRead) ||
+			decodedRead.Handle.Raw != handle) return 1;
+		var write = default(MuiDataspaceWriteIffMessage);
+		write.MethodId = MuiDataspaceIffMessageCodec.WriteIffMethod;
+		write.Handle = APTR.FromPointer(handle);
+		write.Type = 0x464F524D;
+		write.Id = 0x44415441;
+		if (!MuiDataspaceIffMessageCodec.TryWriteWriteIff(ref platform,
+			APTR.FromPointer(packet), write) ||
+			!MuiDataspaceIffMessageCodec.TryReadWriteIff(ref platform,
+			APTR.FromPointer(packet), out var decodedWrite) ||
+			decodedWrite.Handle.Raw != handle ||
+			decodedWrite.Type != write.Type || decodedWrite.Id != write.Id) return 2;
+		if (MuiDataspaceIffMessageCodec.TryReadWriteIff(ref platform,
+			APTR.FromPointer(0x00050FF5), out _)) return 3;
+		return 42;
+	}
+
 	// Focused MorphOS Notify memory-write packet closure.  The packet records
 	// are represented by named structs; the live guest-memory writes remain in
 	// the host dispatcher seam and are covered by its bounded-copy test.
@@ -466,6 +659,40 @@ public static class MuiNativeRoots
 			MuiNotifyWriteCore.WriteLongMethod);
 		if (MuiNotifyWriteCore.DispatchRecord(ref platform,
 			APTR.FromPointer(truncated)) != 0) return 3;
+		return 42;
+	}
+
+	// Focused ABI proof for the named Notify write packet codec. The live copy
+	// operations remain in the broader host dispatcher and are not imported.
+	public static uint NotifyWriteMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint source = 0x00050D00;
+		const uint memory = 0x00050E00;
+		var writeLong = default(MuiWriteLongMessage);
+		writeLong.MethodId = MuiNotifyWriteMessageCodec.WriteLongMethod;
+		writeLong.Value = 0xAABBCCDD;
+		writeLong.Memory = APTR.FromPointer(memory);
+		if (!MuiNotifyWriteMessageCodec.TryWriteWriteLong(ref platform,
+			APTR.FromPointer(packetAddress), writeLong) ||
+			!MuiNotifyWriteMessageCodec.TryReadWriteLong(ref platform,
+			APTR.FromPointer(packetAddress), out var decodedLong) ||
+			decodedLong.Value != writeLong.Value ||
+			decodedLong.Memory.Raw != memory) return 1;
+		var writeString = default(MuiWriteStringMessage);
+		writeString.MethodId = MuiNotifyWriteMessageCodec.WriteStringMethod;
+		writeString.String = APTR.FromPointer(source);
+		writeString.Memory = APTR.FromPointer(memory);
+		if (!MuiNotifyWriteMessageCodec.TryWriteWriteString(ref platform,
+			APTR.FromPointer(packetAddress), writeString) ||
+			!MuiNotifyWriteMessageCodec.TryReadWriteString(ref platform,
+			APTR.FromPointer(packetAddress), out var decodedString) ||
+			decodedString.String.Raw != source ||
+			decodedString.Memory.Raw != memory) return 2;
+		if (MuiNotifyWriteMessageCodec.TryReadWriteString(ref platform,
+			APTR.FromPointer(0x00050FF5), out _)) return 3;
 		return 42;
 	}
 
@@ -515,6 +742,91 @@ public static class MuiNativeRoots
 			MuiBoopsiQueryCore.Method);
 		if (MuiBoopsiQueryCore.DispatchRecord(ref platform,
 			APTR.FromPointer(truncated)) != 0) return 3;
+		return 42;
+	}
+
+	// Focused ABI proof for the named BoopsiQuery record codec.  Keep this
+	// closure separate from the broader packet root so the fixed struct
+	// boundary can be inspected without pulling in the surrounding service.
+	public static uint BoopsiQueryMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packet = 0x00050F20;
+		var record = new MuiBoopsiQueryMessage
+		{
+			MethodId = MuiBoopsiQueryMessage.Method,
+			Screen = APTR.FromPointer(0x00050D00),
+			Flags = 0x000000A5,
+			MinWidth = 8,
+			MinHeight = 9,
+			MaxWidth = 640,
+			MaxHeight = 480,
+			DefaultWidth = 320,
+			DefaultHeight = 200,
+			RenderInfo = APTR.FromPointer(0x00050E00)
+		};
+		if (!MuiBoopsiQueryMessageCodec.TryWrite(ref platform,
+			APTR.FromPointer(packet), record) ||
+			!MuiBoopsiQueryMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(packet), out var decoded) ||
+			decoded.Screen.Raw != record.Screen.Raw ||
+			decoded.MaxHeight != record.MaxHeight ||
+			decoded.RenderInfo.Raw != record.RenderInfo.Raw) return 1;
+		const uint truncated = 0x00050FF5;
+		if (MuiBoopsiQueryMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(truncated), out _)) return 2;
+		return 42;
+	}
+
+	// Focused MG09 ABI proof for the fixed Boopsi/Dtpic wrapper messages. Named
+	// OM_GET/SET/UPDATE and Area-method records are round-tripped through the
+	// codec; guest offsets remain outside wrapper consumers.
+	public static uint ExternalWrapperMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint storage = 0x00050F80;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiExternalWrapperMessageCodec.WriteUpdate(ref platform, packet,
+			0x00050D00, 0x00050D20, 3) ||
+			!MuiExternalWrapperMessageCodec.TryReadUpdate(ref platform, packet,
+				out var update) || update.AttributeList != 0x00050D00 ||
+			update.GadgetInfo != 0x00050D20 || update.Flags != 3) return 1;
+		if (!MuiExternalWrapperMessageCodec.WriteGet(ref platform, packet, 7,
+			storage) || !MuiExternalWrapperMessageCodec.TryReadGet(ref platform,
+			packet, out var get) || get.Attribute != 7 ||
+			get.Storage != storage) return 2;
+		if (!MuiExternalWrapperMessageCodec.WriteSet(ref platform, packet,
+			MuiExternalWrapperMessageCodec.MethodSet, 9, 11) ||
+			!MuiExternalWrapperMessageCodec.TryReadSet(ref platform, packet,
+				MuiExternalWrapperMessageCodec.MethodSet, out var set) ||
+			set.Attribute != 9 || set.Value != 11) return 3;
+		if (!MuiExternalWrapperMessageCodec.WriteRenderInfo(ref platform, packet,
+			MuiExternalWrapperMessageCodec.Setup, 0x00050D40) ||
+			!MuiExternalWrapperMessageCodec.TryReadRenderInfo(ref platform, packet,
+				MuiExternalWrapperMessageCodec.Setup, out var setup) ||
+			setup.RenderInfo != 0x00050D40) return 4;
+		if (!MuiExternalWrapperMessageCodec.WriteAskMinMax(ref platform, packet,
+			storage) || !MuiExternalWrapperMessageCodec.TryReadAskMinMax(
+			ref platform, packet, out var askMinMax) ||
+			askMinMax.Storage != storage) return 5;
+		if (!MuiExternalWrapperMessageCodec.WriteLayout(ref platform, packet,
+			1, 2, 80, 40) || !MuiExternalWrapperMessageCodec.TryReadLayout(
+			ref platform, packet, out var layout) || layout.Width != 80 ||
+			layout.Height != 40) return 6;
+		if (!MuiExternalWrapperMessageCodec.WriteMethod(ref platform, packet,
+			MuiExternalWrapperMessageCodec.Draw) ||
+			!MuiExternalWrapperMessageCodec.IsValidMethod(ref platform, packet,
+				MuiExternalWrapperMessageCodec.Draw)) return 7;
+		var invalidLayout = default(MuiExternalLayoutMessage);
+		if (MuiExternalWrapperMessageCodec.TryReadLayout(ref platform,
+			APTR.FromPointer(0x00051FFF), out invalidLayout)) return 8;
+		if (MuiExternalWrapperMessageCodec.WriteSet(ref platform, packet,
+			0x80420000u, 1, 2)) return 9;
+		if (MuiExternalWrapperMessageCodec.IsValidMethod(ref platform, packet,
+			0x80420000u)) return 10;
 		return 42;
 	}
 
@@ -607,6 +919,67 @@ public static class MuiNativeRoots
 			APTR.FromPointer(state), source, APTR.FromPointer(truncated)) != 0) return 7;
 		if (!MuiMasterLifecycleCore.Dispose(ref platform,
 			APTR.FromPointer(privateRoot))) return 8;
+		return 42;
+	}
+
+	// Focused Notify packet-codec closure. The broader NotifyPacketRoot proves
+	// live object behavior; this seam isolates all six fixed records so the
+	// native ABI proof does not import the larger notification scheduler.
+	public static uint NotifyPacketCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packet = 0x00036200;
+		const uint truncated = 0x00050FFC;
+		var address = APTR.FromPointer(packet);
+		var request = default(MuiNotifyPacketCodec.PacketAddress);
+		request.Address = address;
+
+		request.Method = MuiNotifyCore.NotifyMethod;
+		APTR.WriteUInt32(address, 0, request.Method);
+		APTR.WriteUInt32(address, 4, 0x80420020);
+		APTR.WriteUInt32(address, 8, 1233727793);
+		APTR.WriteUInt32(address, 12, 0x00036300);
+		APTR.WriteUInt32(address, 16, 2);
+		if (!MuiNotifyPacketCodec.TryReadNotify(ref platform, ref request,
+			out var notify) || notify.TriggerAttribute != 0x80420020 ||
+			notify.FollowCount != 2) return 1;
+
+		request.Method = MuiNotifyCore.KillNotifyMethod;
+		APTR.WriteUInt32(address, 0, request.Method);
+		if (!MuiNotifyPacketCodec.TryReadKillNotify(ref platform, ref request,
+			out var kill) || kill.TriggerAttribute != 0x80420020) return 2;
+
+		request.Method = MuiNotifyCore.KillNotifyObjectMethod;
+		APTR.WriteUInt32(address, 0, request.Method);
+		APTR.WriteUInt32(address, 8, 0x00036300);
+		if (!MuiNotifyPacketCodec.TryReadKillNotifyObject(ref platform,
+			ref request, out var killObject) ||
+			killObject.Destination != 0x00036300) return 3;
+
+		request.Method = MuiNotifyCore.SetMethod;
+		APTR.WriteUInt32(address, 0, request.Method);
+		APTR.WriteUInt32(address, 8, 77);
+		if (!MuiNotifyPacketCodec.TryReadSet(ref platform, ref request,
+			out var set) || set.Value != 77) return 4;
+
+		request.Method = MuiNotifyCore.MultiSetMethod;
+		APTR.WriteUInt32(address, 0, request.Method);
+		APTR.WriteUInt32(address, 12, 0x00036400);
+		if (!MuiNotifyPacketCodec.TryReadMultiSet(ref platform, ref request,
+			out var multiSet) || multiSet.FirstObject != 0x00036400) return 5;
+
+		request.Method = MuiNotifyCore.FindObjectMethod;
+		APTR.WriteUInt32(address, 0, request.Method);
+		APTR.WriteUInt32(address, 4, 0x00036500);
+		if (!MuiNotifyPacketCodec.TryReadFindObject(ref platform, ref request,
+			out var find) || find.FindObject != 0x00036500) return 6;
+
+		request.Method = MuiNotifyCore.NotifyMethod;
+		APTR.WriteUInt32(APTR.FromPointer(truncated), 0, request.Method);
+		request.Address = APTR.FromPointer(truncated);
+		if (MuiNotifyPacketCodec.TryReadNotify(ref platform, ref request,
+			out _)) return 7;
 		return 42;
 	}
 
@@ -1040,6 +1413,28 @@ public static class MuiNativeRoots
 		APTR.WriteUInt32(record, 0, 0xDEADBEEFu);
 		if (MuiObjectPersistenceMessageCore.DispatchRecord(ref platform, record) !=
 			0) return 4;
+		return 42;
+	}
+
+	// Focused ABI proof for the named Export/Import packet codec. Live
+	// persistence ownership remains outside this fixed two-word envelope.
+	public static uint ObjectPersistenceMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00036580;
+		const uint dataspace = 0x000365A0;
+		var record = APTR.FromPointer(packetAddress);
+		if (!MuiObjectPersistenceMessageCore.WriteExportRecord(ref platform,
+			record, APTR.FromPointer(dataspace)) ||
+			MuiObjectPersistenceMessageCore.DispatchRecord(ref platform, record) !=
+			dataspace) return 1;
+		if (!MuiObjectPersistenceMessageCore.WriteImportRecord(ref platform,
+			record, APTR.FromPointer(dataspace)) ||
+			MuiObjectPersistenceMessageCore.DispatchRecord(ref platform, record) !=
+			dataspace) return 2;
+		if (MuiObjectPersistenceMessageCore.DispatchRecord(ref platform,
+			APTR.FromPointer(0x00050FFF)) != 0) return 3;
 		return 42;
 	}
 
@@ -1628,6 +2023,27 @@ public static class MuiNativeRoots
 			tags) != 1) return 4;
 		if (!MuiAslServiceCore.FreeAslRequest(ref platform, state, requester))
 			return 5;
+		return 42;
+	}
+
+	// Focused ABI proof for the standard 8-byte ASL TagItem record. Traversal
+	// control semantics remain covered by AslTagServiceRoot above.
+	public static uint AslTagItemCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint address = 0x00050F20;
+		var record = default(MuiAslTagItemRecord);
+		record.Tag = 0x80009ABCu;
+		record.Data = 42;
+		if (!MuiAslTagItemCodec.Write(ref platform, APTR.FromPointer(address),
+			record) || !MuiAslTagItemCodec.TryRead(ref platform,
+			APTR.FromPointer(address), out var decoded) ||
+			decoded.Tag != record.Tag || decoded.Data != record.Data) return 1;
+		if (MuiAslTagItemCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FF5), out _)) return 2;
+		if (MuiAslTagItemCodec.TryRead(ref platform,
+			APTR.FromPointer(address + 1), out _)) return 3;
 		return 42;
 	}
 
@@ -2390,6 +2806,57 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Focused MG09 ABI proof for the fixed menu specialist packet records.
+	// OM_GET, Set/NoNotifySet, Family pointer/pair verbs, Menustrip_Popup, and
+	// method-only frames round-trip through named structs; malformed and
+	// unsupported packets are rejected without importing the menu state machine.
+	public static uint MenuSpecialistMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint storage = 0x00050D00;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiMenuSpecialistMessageCodec.WriteGet(ref platform, packet,
+			MuiMenuAttributes.Menu_Title, storage) ||
+			!MuiMenuSpecialistMessageCodec.TryReadGet(ref platform, packet,
+				out var get) || get.Attribute != MuiMenuAttributes.Menu_Title ||
+			get.Storage != storage) return 1;
+		if (!MuiMenuSpecialistMessageCodec.WriteSet(ref platform, packet,
+			MuiMenuSpecialistMessageCodec.MethodSet,
+			MuiMenuAttributes.Menu_CopyStrings, 1) ||
+			!MuiMenuSpecialistMessageCodec.TryReadSet(ref platform, packet,
+				MuiMenuSpecialistMessageCodec.MethodSet, out var set) ||
+			set.Attribute != MuiMenuAttributes.Menu_CopyStrings || set.Value != 1)
+			return 2;
+		if (!MuiMenuSpecialistMessageCodec.WritePointer(ref platform, packet,
+			MuiMenuAttributes.Family_AddTail, 0x2200) ||
+			!MuiMenuSpecialistMessageCodec.TryReadPointer(ref platform, packet,
+				MuiMenuAttributes.Family_AddTail, out var pointer) ||
+			pointer.ObjectPointer != 0x2200) return 3;
+		if (!MuiMenuSpecialistMessageCodec.WritePair(ref platform, packet,
+			MuiMenuAttributes.Family_Insert, 0x2200, 0x2300) ||
+			!MuiMenuSpecialistMessageCodec.TryReadPair(ref platform, packet,
+				MuiMenuAttributes.Family_Insert, out var pair) ||
+			pair.First != 0x2200 || pair.Second != 0x2300) return 4;
+		if (!MuiMenuSpecialistMessageCodec.WritePopup(ref platform, packet,
+			0x2400, 10, 20) ||
+			!MuiMenuSpecialistMessageCodec.TryReadPopup(ref platform, packet,
+				out var popup) || popup.Window != 0x2400 || popup.X != 10 ||
+			popup.Y != 20) return 5;
+		if (!MuiMenuSpecialistMessageCodec.WriteMethod(ref platform, packet,
+			MuiMenuAttributes.Menustrip_InitChange) ||
+			!MuiMenuSpecialistMessageCodec.IsValidMethod(ref platform, packet,
+				MuiMenuAttributes.Menustrip_InitChange)) return 6;
+		if (MuiMenuSpecialistMessageCodec.WritePointer(ref platform, packet,
+			0x80420000u, 1)) return 7;
+		if (MuiMenuSpecialistMessageCodec.TryReadPopup(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 8;
+		if (MuiMenuSpecialistMessageCodec.IsValidMethod(ref platform, packet,
+			0x80420000u)) return 9;
+		return 42;
+	}
+
 	// MG09 Process/Slave public service dispatch closure. A factory-created
 	// Process object is routed through the service-capable headless seam, which
 	// claims OM_GET, MUIM_Process_Launch and OM_DISPOSE while the ordinary
@@ -2496,6 +2963,51 @@ public static class MuiNativeRoots
 		if (MuiColorSpecialistDispatcher.Dispatch(ref platform, color,
 			packet) != 1) return 7;
 
+		return 42;
+	}
+
+	// Focused MG09 ABI proof for the fixed pen/color specialist packet records.
+	// OM_GET, Set/NoNotifySet, pointer, RGB, and method-only frames round-trip
+	// through named structs without importing the specialist state machine.
+	public static uint ColorSpecialistMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint storage = 0x00050D00;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiColorSpecialistMessageCodec.WriteGet(ref platform, packet,
+			MuiColorAttributes.PendisplaySpec, storage) ||
+			!MuiColorSpecialistMessageCodec.TryReadGet(ref platform, packet,
+				out var get) || get.Attribute != MuiColorAttributes.PendisplaySpec ||
+			get.Storage != storage) return 1;
+		if (!MuiColorSpecialistMessageCodec.WriteSet(ref platform, packet,
+			MuiColorSpecialistMessageCodec.MethodSet,
+			MuiColorAttributes.PendisplayReference, 0x1234) ||
+			!MuiColorSpecialistMessageCodec.TryReadSet(ref platform, packet,
+				MuiColorSpecialistMessageCodec.MethodSet, out var set) ||
+			set.Attribute != MuiColorAttributes.PendisplayReference ||
+			set.Value != 0x1234) return 2;
+		if (!MuiColorSpecialistMessageCodec.WritePointer(ref platform, packet,
+			MuiColorSpecialistMessageCodec.SetColormap, 7) ||
+			!MuiColorSpecialistMessageCodec.TryReadPointer(ref platform, packet,
+				MuiColorSpecialistMessageCodec.SetColormap, out var pointer) ||
+			pointer.Pointer != 7) return 3;
+		if (!MuiColorSpecialistMessageCodec.WriteRgb(ref platform, packet,
+			0x10, 0x20, 0x30) ||
+			!MuiColorSpecialistMessageCodec.TryReadRgb(ref platform, packet,
+				out var rgb) || rgb.Red != 0x10 || rgb.Green != 0x20 ||
+			rgb.Blue != 0x30) return 4;
+		if (!MuiColorSpecialistMessageCodec.WriteMethod(ref platform, packet,
+			MuiColorSpecialistMessageCodec.OmDispose) ||
+			!MuiColorSpecialistMessageCodec.IsValidMethod(ref platform, packet,
+				MuiColorSpecialistMessageCodec.OmDispose)) return 5;
+		if (MuiColorSpecialistMessageCodec.WriteSet(ref platform, packet,
+			0x80420000u, 1, 2)) return 6;
+		if (MuiColorSpecialistMessageCodec.TryReadRgb(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 7;
+		if (MuiColorSpecialistMessageCodec.IsValidMethod(ref platform, packet,
+			0x80420000u)) return 8;
 		return 42;
 	}
 
@@ -2723,6 +3235,59 @@ public static class MuiNativeRoots
 			serviceState, headlessState, external)) return 8;
 		if (MuiHeadlessObjectCore.FindClassByName(ref platform, headlessState,
 			classId).IsNotNull) return 9;
+		return 42;
+	}
+
+	// Focused MUI_MakeObjectA parameter-vector qualification. The variable
+	// guest prefix is decoded once into a named record; malformed counts,
+	// null pointers, and a truncated vector are rejected at that boundary.
+	public static uint MakeObjectParameterCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint parameters = 0x00050F00;
+		APTR.WriteUInt32(APTR.FromPointer(parameters), 0, 0x11111111);
+		APTR.WriteUInt32(APTR.FromPointer(parameters), 4, 0x22222222);
+		APTR.WriteUInt32(APTR.FromPointer(parameters), 8, 0x33333333);
+		APTR.WriteUInt32(APTR.FromPointer(parameters), 12, 0x44444444);
+		if (!MuiMakeObjectParameterCodec.TryRead(ref platform,
+			APTR.FromPointer(parameters), 4, out var record) ||
+			record.First != 0x11111111 || record.Second != 0x22222222 ||
+			record.Third != 0x33333333 || record.Fourth != 0x44444444) return 1;
+		if (!MuiMakeObjectParameterCodec.TryRead(ref platform, APTR.Null, 0,
+			out var empty) || empty.First != 0 || empty.Second != 0 ||
+			empty.Third != 0 || empty.Fourth != 0) return 2;
+		if (MuiMakeObjectParameterCodec.TryRead(ref platform,
+			APTR.FromPointer(parameters), 5, out _)) return 3;
+		if (MuiMakeObjectParameterCodec.TryRead(ref platform, APTR.Null, 1,
+			out _)) return 4;
+		if (MuiMakeObjectParameterCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FFF), 1, out _)) return 5;
+		return 42;
+	}
+
+	// Focused NewMenu record qualification. The packed 20-byte GadTools entry
+	// is decoded into a named record, including its pointer-sized fields and
+	// flags, while an entry crossing the mapped boundary is rejected.
+	public static uint NewMenuRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint entry = 0x00050F20;
+		APTR.WriteUInt8(APTR.FromPointer(entry), 0, 2);
+		APTR.WriteUInt8(APTR.FromPointer(entry), 1, 0);
+		APTR.WriteUInt32(APTR.FromPointer(entry), 2, 0x00036000);
+		APTR.WriteUInt32(APTR.FromPointer(entry), 6, 0x00036020);
+		APTR.WriteUInt16(APTR.FromPointer(entry), 10, 0x0123);
+		APTR.WriteUInt32(APTR.FromPointer(entry), 12, 0x44556677);
+		APTR.WriteUInt32(APTR.FromPointer(entry), 16, 0x8899AABB);
+		if (!MuiNewMenuRecordCodec.TryRead(ref platform,
+			APTR.FromPointer(entry), out var record) || record.Type != 2 ||
+			record.Label != 0x00036000 || record.CommandKey != 0x00036020 ||
+			record.Flags != 0x0123 || record.MutualExclude != 0x44556677 ||
+			record.UserData != 0x8899AABB) return 1;
+		if (MuiNewMenuRecordCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FF5), out _)) return 2;
 		return 42;
 	}
 
@@ -3555,7 +4120,2356 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG09 MUIM_Application_AboutMUI packet closure. The MorphOS-shaped
+	// MG09 MUIA_Application_Sleep closure. Application sleep is a named
+	// nesting counter over owned windows; windows added after the application
+	// sleeps inherit the complete depth and replay their busy-pointer state on
+	// open.
+	public static uint ApplicationSleepRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036700;
+		const uint state = 0x00036800;
+		const uint name = 0x00036900;
+		const uint packet = 0x00036A00;
+		const uint eventMessage = 0x00036A40;
+		APTR.WriteUInt8(APTR.FromPointer(name), 0, (byte)'A');
+		APTR.WriteUInt8(APTR.FromPointer(name), 1, 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		var first = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		var second = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		if (cl.IsNull || application.IsNull || first.IsNull || second.IsNull)
+			return 2;
+		if (!MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), application, 0) ||
+			!MuiCommonControlPacketCore.WriteMethod(ref platform,
+				APTR.FromPointer(eventMessage), 0x90000001) ||
+			!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				0x80425711, 1) || MuiApplicationDispatcher.DispatchApplicationSleep(
+				ref platform, APTR.FromPointer(state), application,
+				APTR.FromPointer(packet)) != 1)
+			return 3;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), application, 0x80425711, out var appDepth) ||
+			appDepth != 1 || !MuiApplicationWindowCore.AddWindow(ref platform,
+				APTR.FromPointer(state), application, first) ||
+			!MuiApplicationWindowCore.OpenWindow(ref platform,
+				APTR.FromPointer(state), first, 0) ||
+			!MuiApplicationWindowCore.AddWindow(ref platform,
+				APTR.FromPointer(state), application, second) ||
+			!MuiApplicationWindowCore.OpenWindow(ref platform,
+				APTR.FromPointer(state), second, 0)) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), first, 0x8042E7DB, out var sleepDepth) ||
+			sleepDepth != 1 || MuiApplicationWindowCore.DispatchWindowEvent(
+				ref platform, APTR.FromPointer(state), first,
+				APTR.FromPointer(eventMessage), 4) != 0) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			0x80425711, 1) || MuiApplicationDispatcher.DispatchApplicationSleep(
+				ref platform, APTR.FromPointer(state), application,
+				APTR.FromPointer(packet)) != 1) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), application, 0x80425711, out appDepth) ||
+			appDepth != 2 || !MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), first, 0x8042E7DB, out sleepDepth) ||
+			sleepDepth != 2) return 7;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			0x80425711, 0) || MuiApplicationDispatcher.DispatchApplicationSleep(
+				ref platform, APTR.FromPointer(state), application,
+				APTR.FromPointer(packet)) != 1 ||
+			MuiApplicationDispatcher.DispatchApplicationSleep(ref platform,
+				APTR.FromPointer(state), application,
+				APTR.FromPointer(packet)) != 1) return 8;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), application, 0x80425711, out appDepth) ||
+			appDepth != 0 || !MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), first, 0x8042E7DB, out sleepDepth) ||
+			sleepDepth != 0 || !MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), first, 0x80423661, out var disabled) ||
+			disabled != 0) return 9;
+		if (!MuiApplicationWindowCore.RemoveWindow(ref platform,
+			APTR.FromPointer(state), application, first) ||
+			!MuiApplicationWindowCore.RemoveWindow(ref platform,
+				APTR.FromPointer(state), application, second) ||
+			!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 10;
+		return 42;
+	}
+
+	// MG09 MUIA_Application_Iconified closure. Iconification closes currently
+	// native child windows, remembers their named open state, and defers new
+	// OpenWindow requests until the application is uniconified.
+	public static uint ApplicationIconifiedRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036B00;
+		const uint state = 0x00036C00;
+		const uint name = 0x00036D00;
+		const uint packet = 0x00036E00;
+		APTR.WriteUInt8(APTR.FromPointer(name), 0, (byte)'A');
+		APTR.WriteUInt8(APTR.FromPointer(name), 1, 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		var first = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		var second = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		var third = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		if (cl.IsNull || application.IsNull || first.IsNull || second.IsNull ||
+			third.IsNull) return 2;
+		if (!MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), application, 0) ||
+			!MuiApplicationWindowCore.AddWindow(ref platform,
+				APTR.FromPointer(state), application, first) ||
+			!MuiApplicationWindowCore.AddWindow(ref platform,
+				APTR.FromPointer(state), application, second) ||
+			!MuiApplicationWindowCore.OpenWindow(ref platform,
+				APTR.FromPointer(state), first, 0)) return 3;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			0x8042A07F, 1) ||
+			MuiApplicationDispatcher.DispatchApplicationIconified(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+			return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), application, 0x8042A07F, out var iconified) ||
+			iconified != 1 || !MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), first, 0x80428AA0, out var open) || open != 0)
+			return 5;
+		if (!MuiApplicationWindowCore.OpenWindow(ref platform,
+			APTR.FromPointer(state), second, 0) ||
+			!MuiApplicationWindowCore.AddWindow(ref platform,
+				APTR.FromPointer(state), application, third) ||
+			!MuiApplicationWindowCore.OpenWindow(ref platform,
+				APTR.FromPointer(state), third, 0)) return 6;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			0x8042A07F, 0) ||
+			MuiApplicationDispatcher.DispatchApplicationIconified(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+			return 7;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), application, 0x8042A07F, out iconified) ||
+			iconified != 0 || !MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), first, 0x80428AA0, out open) || open != 1 ||
+			!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), second, 0x80428AA0, out open) || open != 1 ||
+			!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), third, 0x80428AA0, out open) || open != 1)
+			return 8;
+		if (!MuiApplicationWindowCore.RemoveWindow(ref platform,
+			APTR.FromPointer(state), application, first) ||
+			!MuiApplicationWindowCore.RemoveWindow(ref platform,
+				APTR.FromPointer(state), application, second) ||
+			!MuiApplicationWindowCore.RemoveWindow(ref platform,
+				APTR.FromPointer(state), application, third) ||
+			!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 9;
+		return 42;
+	}
+
+	// MG09 MUIA_Application_Active closure. MorphOS exposes this as a
+	// commodities-facing BOOL; MUI stores the canonical guest value and does
+	// not perform an external presentation action.
+	public static uint ApplicationActiveRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036B00;
+		const uint state = 0x00036C00;
+		const uint name = 0x00036D00;
+		const uint packet = 0x00036E00;
+		APTR.WriteUInt8(APTR.FromPointer(name), 0, (byte)'A');
+		APTR.WriteUInt8(APTR.FromPointer(name), 1, 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		if (cl.IsNull || application.IsNull) return 2;
+		if (!MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), application, 0)) return 3;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			0x804260AB, 0x12345678) ||
+			MuiApplicationDispatcher.DispatchApplicationActive(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+			return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), application, 0x804260AB, out var active) ||
+			active != 1) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			0x804260AB, 0) ||
+			MuiApplicationDispatcher.DispatchApplicationActive(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+			return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), application, 0x804260AB, out active) ||
+			active != 0) return 7;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			0x80425711, 1) ||
+			MuiApplicationDispatcher.DispatchApplicationActive(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 0)
+			return 8;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 9;
+		return 42;
+	}
+
+	// MG09 MUIA_Application_SingleTask/DoubleStart closure. A second
+	// single-task initializer is rejected during application initialization and
+	// signals the existing guest application through DoubleStart.
+	public static uint ApplicationSingleTaskRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036A00;
+		const uint state = 0x00036B00;
+		const uint name = 0x00036C00;
+		const uint packet = 0x00036D00;
+		const uint singleTask = 0x8042A2C8;
+		const uint doubleStart = 0x80423BC6;
+		APTR.WriteUInt8(APTR.FromPointer(name), 0, (byte)'A');
+		APTR.WriteUInt8(APTR.FromPointer(name), 1, 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var first = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		var second = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		var third = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		if (cl.IsNull || first.IsNull || second.IsNull || third.IsNull) return 2;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			singleTask, 0x12345678) ||
+			MuiApplicationDispatcher.DispatchApplicationSingleTask(ref platform,
+				APTR.FromPointer(state), first, APTR.FromPointer(packet)) != 1)
+			return 3;
+		if (!MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), first, 0)) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), first, singleTask, out var value) || value != 1 ||
+			!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), first, doubleStart, out value) || value != 0)
+			return 5;
+
+		// Simulate an initializer tag on the second object; initialization owns
+		// the conflict decision and keeps the candidate uninitialized.
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), second, singleTask, 1, false) ||
+			MuiApplicationWindowCore.InitializeApplication(ref platform,
+				APTR.FromPointer(state), second, 0)) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), first, doubleStart, out value) || value != 1)
+			return 7;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			doubleStart, 0) ||
+			MuiApplicationDispatcher.DispatchApplicationDoubleStart(ref platform,
+				APTR.FromPointer(state), first, APTR.FromPointer(packet)) != 1)
+			return 8;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), first, doubleStart, out value) || value != 0)
+			return 9;
+		if (MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), second, 0)) return 10;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), first, doubleStart, out value) || value != 1)
+			return 11;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			singleTask, 0) ||
+			MuiApplicationDispatcher.DispatchApplicationSingleTask(ref platform,
+				APTR.FromPointer(state), first, APTR.FromPointer(packet)) != 0)
+			return 12;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), first, singleTask, out value) || value != 1)
+			return 13;
+		if (!MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), third, 0)) return 14;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 15;
+		return 42;
+	}
+
+	// MG09 MUIA_Application_ForceQuit closure. The flag defaults to FALSE,
+	// accepts MorphOS BOOL writes, and remains a guest query state without
+	// invoking a host process-exit path.
+	public static uint ApplicationForceQuitRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036500;
+		const uint state = 0x00036600;
+		const uint name = 0x00036700;
+		const uint packet = 0x00036800;
+		const uint forceQuit = 0x804257DF;
+		APTR.WriteUInt8(APTR.FromPointer(name), 0, (byte)'A');
+		APTR.WriteUInt8(APTR.FromPointer(name), 1, 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		if (cl.IsNull || application.IsNull) return 2;
+		if (!MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), application, 0) ||
+			!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, forceQuit, out var value) ||
+			value != 0) return 3;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			forceQuit, 0xDEADBEEF) ||
+			MuiApplicationDispatcher.DispatchApplicationForceQuit(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+			return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), application, forceQuit, out value) || value != 1)
+			return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			forceQuit, 0) ||
+			MuiApplicationDispatcher.DispatchApplicationForceQuit(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+			return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), application, forceQuit, out value) || value != 0)
+			return 7;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			0x804260AB, 1) ||
+			MuiApplicationDispatcher.DispatchApplicationForceQuit(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 0)
+			return 8;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 9;
+		return 42;
+	}
+
+	// MG09 MUIA_Application_UseRexx closure. The initializer defaults TRUE,
+	// accepts a FALSE initializer, and rejects policy changes after the
+	// application has been initialized.
+	public static uint ApplicationUseRexxRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036900;
+		const uint state = 0x00036A00;
+		const uint name = 0x00036B00;
+		const uint packet = 0x00036C00;
+		const uint useRexx = 0x80422387;
+		APTR.WriteUInt8(APTR.FromPointer(name), 0, (byte)'A');
+		APTR.WriteUInt8(APTR.FromPointer(name), 1, 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		var defaultApplication = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		if (cl.IsNull || application.IsNull || defaultApplication.IsNull) return 2;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			useRexx, 0) ||
+			MuiApplicationDispatcher.DispatchApplicationUseRexx(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+			return 3;
+		if (!MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), application, 0) ||
+			!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, useRexx, out var value) ||
+			value != 0) return 4;
+		if (!MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), defaultApplication, 0) ||
+			!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), defaultApplication, useRexx, out value) ||
+			value != 1) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			useRexx, 0) ||
+			MuiApplicationDispatcher.DispatchApplicationUseRexx(ref platform,
+				APTR.FromPointer(state), defaultApplication,
+				APTR.FromPointer(packet)) != 0) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), defaultApplication, useRexx, out value) ||
+			value != 1) return 7;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 8;
+			return 42;
+		}
+
+		// MG09 MUIA_Application identity strings. These [I.G] attributes retain
+		// bounded caller-owned guest C-string pointers and reject live writes.
+		public static uint ApplicationIdentityStringsRoot()
+		{
+			var platform = new MuiNativeHeadlessPlatform();
+			platform.Reset();
+			const uint privateRoot = 0x00036100;
+			const uint state = 0x00036200;
+			const uint name = 0x00036300;
+			const uint packet = 0x00036400;
+			const uint title = 0x00036500;
+			const uint author = 0x00036600;
+			const uint @base = 0x00036700;
+			const uint copyright = 0x00036800;
+			const uint description = 0x00036900;
+			const uint version = 0x00036A00;
+			const uint applicationTitle = 0x804281B8;
+			const uint applicationAuthor = 0x80424842;
+			const uint applicationBase = 0x8042E07A;
+			const uint applicationCopyright = 0x8042EF4D;
+			const uint applicationDescription = 0x80421FC6;
+			const uint applicationVersion = 0x8042B33F;
+			WriteNativeCString(APTR.FromPointer(name), 'A', 0, 0, 0, 0, 0, 0);
+			WriteNativeCString(APTR.FromPointer(title), 'C', 'o', 'p', 'p', 'e', 'r', 0);
+			WriteNativeCString(APTR.FromPointer(author), 'I', 'l', 'k', 'k', 'a', 0, 0);
+			WriteNativeCString(APTR.FromPointer(@base), 'C', 'O', 'P', 'P', 'E', 'R', 0);
+			WriteNativeCString(APTR.FromPointer(copyright), '2', '0', '2', '6', 0, 0, 0);
+			WriteNativeCString(APTR.FromPointer(description), 'M', 'U', 'I', 0, 0, 0, 0);
+			WriteNativeCString(APTR.FromPointer(version), '$', 'V', 'E', 'R', 0, 0, 0);
+			if (!MuiMasterLifecycleCore.Create(ref platform,
+				APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+			var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+				APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+				APTR.FromPointer(1));
+			var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), cl, APTR.Null);
+			if (application.IsNull) return 2;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				applicationTitle, title) ||
+				MuiApplicationDispatcher.DispatchApplicationTitle(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 3;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				applicationAuthor, author) ||
+				MuiApplicationDispatcher.DispatchApplicationAuthor(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 4;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				applicationBase, @base) ||
+				MuiApplicationDispatcher.DispatchApplicationBase(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 5;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				applicationCopyright, copyright) ||
+				MuiApplicationDispatcher.DispatchApplicationCopyright(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 6;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				applicationDescription, description) ||
+				MuiApplicationDispatcher.DispatchApplicationDescription(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 7;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				applicationVersion, version) ||
+				MuiApplicationDispatcher.DispatchApplicationVersion(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 8;
+		if (!MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), application, 0)) return 9;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform, APTR.FromPointer(state),
+			application, applicationTitle, out var value) || value != title)
+			return 10;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform, APTR.FromPointer(state),
+			application, applicationAuthor, out value) || value != author)
+			return 11;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform, APTR.FromPointer(state),
+			application, applicationBase, out value) || value != @base)
+			return 12;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform, APTR.FromPointer(state),
+			application, applicationCopyright, out value) || value != copyright)
+			return 13;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform, APTR.FromPointer(state),
+			application, applicationDescription, out value) || value != description)
+			return 14;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform, APTR.FromPointer(state),
+			application, applicationVersion, out value) || value != version)
+			return 15;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			applicationTitle, 0) ||
+			MuiApplicationDispatcher.DispatchApplicationTitle(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 0)
+			return 16;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 17;
+			return 42;
+		}
+
+		// MG09 MUIA_Application_Window initializer tags. Each accepted typed
+		// pointer becomes an owned child through AddWindow; live writes reject.
+		public static uint ApplicationWindowInitializerRoot()
+		{
+			var platform = new MuiNativeHeadlessPlatform();
+			platform.Reset();
+			const uint privateRoot = 0x00036B00;
+			const uint state = 0x00036C00;
+			const uint name = 0x00036D00;
+			const uint packet = 0x00036E00;
+			const uint applicationWindow = 0x8042BFE0;
+			APTR.WriteUInt8(APTR.FromPointer(name), 0, (byte)'A');
+			APTR.WriteUInt8(APTR.FromPointer(name), 1, 0);
+			if (!MuiMasterLifecycleCore.Create(ref platform,
+				APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+			var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+				APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+				APTR.FromPointer(1));
+			var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), cl, APTR.Null);
+			var firstWindow = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), cl, APTR.Null);
+			var secondWindow = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), cl, APTR.Null);
+			var lateWindow = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), cl, APTR.Null);
+			if (cl.IsNull || application.IsNull || firstWindow.IsNull ||
+				secondWindow.IsNull || lateWindow.IsNull) return 2;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				applicationWindow, firstWindow.Raw) ||
+				MuiApplicationDispatcher.DispatchApplicationWindow(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 3;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+				applicationWindow, secondWindow.Raw) ||
+				MuiApplicationDispatcher.DispatchApplicationWindow(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 4;
+		if (MuiFamilyCore.GetChild(ref platform, APTR.FromPointer(state),
+			application, 0, APTR.Null) != firstWindow ||
+			MuiFamilyCore.GetChild(ref platform, APTR.FromPointer(state),
+				application, 1, APTR.Null) != secondWindow) return 5;
+		if (!MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), application, 0)) return 6;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			applicationWindow, lateWindow.Raw) ||
+			MuiApplicationDispatcher.DispatchApplicationWindow(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 0)
+			return 7;
+		if (MuiFamilyCore.GetChild(ref platform, APTR.FromPointer(state),
+			application, 2, APTR.Null).IsNotNull) return 8;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 9;
+		return 42;
+	}
+
+		// MG09 MUIA_Application_UsedClasses closure. The named cursor validates a
+		// bounded guest NULL-terminated STRPTR vector without managed copying.
+		public static uint ApplicationUsedClassesRoot()
+		{
+			var platform = new MuiNativeHeadlessPlatform();
+			platform.Reset();
+			const uint privateRoot = 0x00035F00;
+			const uint state = 0x00036000;
+			const uint name = 0x00036100;
+			const uint packet = 0x00036200;
+			const uint vector = 0x00036300;
+			const uint firstName = 0x00036400;
+			const uint secondName = 0x00036500;
+			const uint usedClasses = 0x8042E9A7;
+			WriteNativeCString(APTR.FromPointer(name), 'A', 0, 0, 0, 0, 0, 0);
+			WriteNativeCString(APTR.FromPointer(firstName), 'L', 'i', 's', 't', 0, 0, 0);
+			WriteNativeCString(APTR.FromPointer(secondName), 'B', 'u', 's', 'y', 0, 0, 0);
+			APTR.WriteUInt32(APTR.FromPointer(vector), 0, firstName);
+			APTR.WriteUInt32(APTR.FromPointer(vector), 4, secondName);
+			APTR.WriteUInt32(APTR.FromPointer(vector), 8, 0);
+			if (!MuiMasterLifecycleCore.Create(ref platform,
+				APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+			var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+				APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+				APTR.FromPointer(1));
+			var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), cl, APTR.Null);
+			if (cl.IsNull || application.IsNull) return 2;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				usedClasses, vector) ||
+				MuiApplicationDispatcher.DispatchApplicationUsedClasses(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 3;
+			if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, usedClasses, out var value) ||
+				value != vector) return 4;
+			APTR.WriteUInt32(APTR.FromPointer(vector), 4, 0x00021000);
+			if (MuiApplicationDispatcher.DispatchApplicationUsedClasses(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 0)
+				return 5;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+				usedClasses, 0) ||
+				MuiApplicationDispatcher.DispatchApplicationUsedClasses(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 6;
+			if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, usedClasses, out value) ||
+				value != 0) return 7;
+			if (!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 8;
+			return 42;
+		}
+
+		// MG09 MUIA_Application_IconifyTitle closure. The mutable title is a
+		// caller-owned guest C-string retained by named application state.
+		public static uint ApplicationIconifyTitleRoot()
+		{
+			var platform = new MuiNativeHeadlessPlatform();
+			platform.Reset();
+			const uint privateRoot = 0x00035F00;
+			const uint state = 0x00036000;
+			const uint name = 0x00036100;
+			const uint packet = 0x00036200;
+			const uint title = 0x00036300;
+			const uint iconifyTitle = 0x80422CB8;
+			WriteNativeCString(APTR.FromPointer(name), 'A', 'p', 'p', 0, 0, 0, 0);
+			WriteNativeCString(APTR.FromPointer(title), 'C', 'o', 'p', 'p', 'e', 'r',
+				0);
+			if (!MuiMasterLifecycleCore.Create(ref platform,
+				APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+			var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+				APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+				APTR.FromPointer(1));
+			var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), cl, APTR.Null);
+			if (cl.IsNull || application.IsNull) return 2;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				iconifyTitle, APTR.FromPointer(title)) ||
+				MuiApplicationDispatcher.DispatchApplicationIconifyTitle(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 3;
+			if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, iconifyTitle, out var value) ||
+				value != title) return 4;
+			APTR.WriteUInt8(APTR.FromPointer(title), 5, (byte)'S');
+			if (MuiApplicationDispatcher.DispatchApplicationIconifyTitle(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 5;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+				iconifyTitle, 0x00021000) ||
+				MuiApplicationDispatcher.DispatchApplicationIconifyTitle(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 0)
+				return 6;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+				iconifyTitle, 0) ||
+				MuiApplicationDispatcher.DispatchApplicationIconifyTitle(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 7;
+			if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, iconifyTitle, out value) ||
+				value != 0) return 8;
+			if (!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 9;
+			return 42;
+		}
+
+		// MG09 MUIA_Application_UseScreenNotify closure. The initializer-only
+		// BOOL is retained in named guest state; transport is a platform seam.
+		public static uint ApplicationUseScreenNotifyRoot()
+		{
+			var platform = new MuiNativeHeadlessPlatform();
+			platform.Reset();
+			const uint privateRoot = 0x00035F00;
+			const uint state = 0x00036000;
+			const uint name = 0x00036100;
+			const uint packet = 0x00036200;
+			const uint useScreenNotify = 0x80420861;
+			WriteNativeCString(APTR.FromPointer(name), 'A', 'p', 'p', 0, 0, 0, 0);
+			if (!MuiMasterLifecycleCore.Create(ref platform,
+				APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+			var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+				APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+				APTR.FromPointer(1));
+			var defaultApplication = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), cl, APTR.Null);
+			if (cl.IsNull || defaultApplication.IsNull ||
+				!MuiApplicationWindowCore.InitializeApplication(ref platform,
+					APTR.FromPointer(state), defaultApplication, 0) ||
+				!MuiHeadlessObjectCore.GetAttribute(ref platform,
+					APTR.FromPointer(state), defaultApplication, useScreenNotify,
+					out var defaultValue) || defaultValue != 0) return 2;
+			var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), cl, APTR.Null);
+			if (cl.IsNull || application.IsNull) return 2;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				useScreenNotify, 2) ||
+				MuiApplicationDispatcher.DispatchApplicationUseScreenNotify(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 3;
+			if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, useScreenNotify, out var value) ||
+				value != 1) return 4;
+		if (!MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), application, 0)) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			useScreenNotify, 0) ||
+			MuiApplicationDispatcher.DispatchApplicationUseScreenNotify(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 0)
+			return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), application, useScreenNotify, out value) ||
+			value != 1) return 7;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 8;
+		return 42;
+		}
+
+	// MG09 MUIA_Application_UseCommodities closure. The initializer defaults
+	// TRUE, accepts a FALSE initializer, and rejects policy changes after the
+	// application has been initialized.
+	public static uint ApplicationUseCommoditiesRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036D00;
+		const uint state = 0x00036E00;
+		const uint name = 0x00036C00;
+		const uint packet = 0x00036B00;
+		const uint useCommodities = 0x80425EE5;
+		WriteNativeCString(APTR.FromPointer(name), 'A', 'p', 'p', 0, 0, 0, 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		var defaultApplication = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		if (cl.IsNull || application.IsNull || defaultApplication.IsNull) return 2;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			useCommodities, 0) ||
+			MuiApplicationDispatcher.DispatchApplicationUseCommodities(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+			return 3;
+		if (!MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), application, 0) ||
+			!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, useCommodities,
+				out var value) || value != 0) return 4;
+		if (!MuiApplicationWindowCore.InitializeApplication(ref platform,
+			APTR.FromPointer(state), defaultApplication, 0) ||
+			!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), defaultApplication, useCommodities,
+				out value) || value != 1) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			useCommodities, 0) ||
+			MuiApplicationDispatcher.DispatchApplicationUseCommodities(ref platform,
+				APTR.FromPointer(state), defaultApplication,
+				APTR.FromPointer(packet)) != 0) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), defaultApplication, useCommodities,
+			out value) || value != 1) return 7;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 8;
+		return 42;
+	}
+
+	// MG09 MUIA_Application_WindowList closure. The public value is a typed,
+	// read-only Exec List projection of application-owned windows; an unrelated
+	// Family child is deliberately excluded and topology mutation rebuilds it.
+	public static uint ApplicationWindowListRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint name = 0x00036100;
+		const uint windowList = 0x80429ABE;
+		WriteNativeCString(APTR.FromPointer(name), 'A', 'p', 'p', 0, 0, 0, 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		var first = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		var second = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		var unrelated = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		if (cl.IsNull || application.IsNull || first.IsNull || second.IsNull ||
+			unrelated.IsNull) return 2;
+		if (!MuiApplicationWindowCore.AddWindow(ref platform,
+			APTR.FromPointer(state), application, first) ||
+			!MuiApplicationWindowCore.AddWindow(ref platform,
+				APTR.FromPointer(state), application, second) ||
+			!MuiFamilyCore.AddTail(ref platform, APTR.FromPointer(state),
+				application, unrelated)) return 3;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), application, windowList, out var listRaw))
+			return 4;
+		var list = APTR.FromPointer(listRaw);
+		var cursorRaw = LayersExecListCodec.ReadHead(ref platform, list).Raw;
+		if (MuiApplicationWindowListCore.NextObject(ref platform, list,
+			ref cursorRaw) != first ||
+			MuiApplicationWindowListCore.NextObject(ref platform, list,
+				ref cursorRaw) != second ||
+			!MuiApplicationWindowListCore.NextObject(ref platform, list,
+				ref cursorRaw).IsNull) return 5;
+		if (MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), application, windowList, 0, false)) return 6;
+
+		var third = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		if (third.IsNull || !MuiApplicationWindowCore.AddWindow(ref platform,
+			APTR.FromPointer(state), application, third) ||
+			!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, windowList, out listRaw))
+			return 7;
+		list = APTR.FromPointer(listRaw);
+		cursorRaw = LayersExecListCodec.ReadHead(ref platform, list).Raw;
+		if (MuiApplicationWindowListCore.NextObject(ref platform, list,
+			ref cursorRaw) != first ||
+			MuiApplicationWindowListCore.NextObject(ref platform, list,
+				ref cursorRaw) != second ||
+			MuiApplicationWindowListCore.NextObject(ref platform, list,
+				ref cursorRaw) != third ||
+			!MuiApplicationWindowListCore.NextObject(ref platform, list,
+				ref cursorRaw).IsNull) return 8;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 9;
+		return 42;
+	}
+
+	// MG09 MUIA_Application_Commands closure. A caller-owned, NULL-terminated
+	// MUI_Command table is validated through named fixed-width records; malformed
+	// nested strings are rejected without replacing the installed pointer.
+	public static uint ApplicationCommandsRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint appName = 0x00036100;
+		const uint packet = 0x00036200;
+		const uint table = 0x00036300;
+		const uint firstName = 0x00036400;
+		const uint firstTemplate = 0x00036420;
+		const uint secondName = 0x00036440;
+		WriteNativeCString(APTR.FromPointer(appName), 'A', 'p', 'p', 0, 0, 0, 0);
+		WriteNativeCString(APTR.FromPointer(firstName), 'R', 'E', 'S', 'C', 'A',
+			'N', 0);
+		WriteNativeCString(APTR.FromPointer(firstTemplate), 'P', 'A', 'T', 'T',
+			'E', 'R', 'N');
+		WriteNativeCString(APTR.FromPointer(secondName), 'A', 'B', 'O', 'U', 'T', 0, 0);
+		if (!MuiApplicationCommandRecordCodec.Write(ref platform,
+			APTR.FromPointer(table), new MuiApplicationCommandRecord
+			{
+				Name = APTR.FromPointer(firstName),
+				Template = APTR.FromPointer(firstTemplate),
+				Parameters = 1,
+				Hook = APTR.FromPointer(0x00036500),
+				Reserved2 = 0x1234
+			}) ||
+			!MuiApplicationCommandRecordCodec.Write(ref platform,
+			APTR.FromPointer(table + MuiApplicationCommandRecord.Size),
+			new MuiApplicationCommandRecord
+			{
+				Name = APTR.FromPointer(secondName),
+				Template = APTR.FromPointer(MuiApplicationCommandsCore.MagicTemplate)
+			}) ||
+			!MuiApplicationCommandRecordCodec.Write(ref platform,
+			APTR.FromPointer(table + 2 * MuiApplicationCommandRecord.Size),
+			default)) return 1;
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 2;
+		var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(appName), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), cl, APTR.Null);
+		if (cl.IsNull || application.IsNull) return 3;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			MuiApplicationCommandsCore.Commands, table) ||
+			MuiApplicationDispatcher.DispatchApplicationCommands(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+			return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), application, MuiApplicationCommandsCore.Commands,
+			out var value) || value != table) return 5;
+		APTR.WriteUInt32(APTR.FromPointer(table), 0, 0x00052000);
+		if (MuiApplicationDispatcher.DispatchApplicationCommands(ref platform,
+			APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 0 ||
+			!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application,
+				MuiApplicationCommandsCore.Commands, out value) || value != table)
+			return 6;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			MuiApplicationCommandsCore.Commands, 0) ||
+			MuiApplicationDispatcher.DispatchApplicationCommands(ref platform,
+				APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1 ||
+			!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application,
+				MuiApplicationCommandsCore.Commands, out value) || value != 0)
+			return 7;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 8;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_AppWindow/MUIA_AppMessage closure. The AppWindow flag
+	// uses an initializer-only named state; AppMessage remains a transient
+	// caller-owned Workbench record while notifications execute.
+	public static uint AppMessageRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint appName = 0x00036100;
+		const uint windowName = 0x00036120;
+		const uint packet = 0x00036200;
+		const uint argumentList = 0x00036300;
+		const uint argumentName = 0x00036320;
+		const uint message = 0x00036400;
+		WriteNativeCString(APTR.FromPointer(appName), 'A', 'p', 'p', 0, 0, 0, 0);
+		APTR.WriteUInt8(APTR.FromPointer(windowName), 0, (byte)'W');
+		APTR.WriteUInt8(APTR.FromPointer(windowName), 1, (byte)'i');
+		APTR.WriteUInt8(APTR.FromPointer(windowName), 2, (byte)'n');
+		APTR.WriteUInt8(APTR.FromPointer(windowName), 3, (byte)'d');
+		APTR.WriteUInt8(APTR.FromPointer(windowName), 4, (byte)'o');
+		APTR.WriteUInt8(APTR.FromPointer(windowName), 5, (byte)'w');
+		APTR.WriteUInt8(APTR.FromPointer(windowName), 6, (byte)'.');
+		APTR.WriteUInt8(APTR.FromPointer(windowName), 7, (byte)'m');
+		APTR.WriteUInt8(APTR.FromPointer(windowName), 8, (byte)'u');
+		APTR.WriteUInt8(APTR.FromPointer(windowName), 9, (byte)'i');
+		APTR.WriteUInt8(APTR.FromPointer(windowName), 10, 0);
+		WriteNativeCString(APTR.FromPointer(argumentName), 'd', 'r', 'o', 'p', 0, 0, 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var appClass = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(appName), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var windowClass = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(windowName), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), appClass, APTR.Null);
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), windowClass, APTR.Null);
+		var target = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), appClass, APTR.Null);
+		if (appClass.IsNull || windowClass.IsNull || application.IsNull ||
+			window.IsNull || target.IsNull ||
+			!MuiApplicationWindowCore.InitializeApplication(ref platform,
+				APTR.FromPointer(state), application, 0)) return 2;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			MuiApplicationMessageCore.WindowAppWindow, 1) ||
+			MuiApplicationDispatcher.DispatchWindowAppWindow(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 3;
+		if (!MuiApplicationWindowCore.AddWindow(ref platform,
+			APTR.FromPointer(state), application, window) ||
+			!MuiFamilyCore.AddTail(ref platform, APTR.FromPointer(state), window,
+				target)) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), target,
+			MuiApplicationMessageCore.ApplicationObject, out var applicationValue) ||
+			applicationValue != application.Raw) return 5;
+		if (!MuiWorkbenchArgumentRecordCodec.Write(ref platform,
+			APTR.FromPointer(argumentList), new MuiWorkbenchArgumentRecord
+			{
+				Name = APTR.FromPointer(argumentName)
+			}) ||
+			!MuiAppMessageRecordCodec.Write(ref platform, APTR.FromPointer(message),
+			new MuiAppMessageRecord
+			{
+				Type = 8,
+				NumberOfArguments = 1,
+				ArgumentList = APTR.FromPointer(argumentList)
+			})) return 6;
+		if (MuiApplicationDispatcher.DispatchAppMessage(ref platform,
+			APTR.FromPointer(state), target, APTR.FromPointer(message)) != 1 ||
+			!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), target, MuiApplicationMessageCore.AppMessage,
+				out var cleared) || cleared != 0) return 7;
+		APTR.WriteUInt32(APTR.FromPointer(argumentList + 4), 0, 0x00052000);
+		if (MuiApplicationDispatcher.DispatchAppMessage(ref platform,
+			APTR.FromPointer(state), target, APTR.FromPointer(message)) != 0 ||
+			!MuiApplicationWindowCore.OpenWindow(ref platform,
+				APTR.FromPointer(state), window, 0)) return 8;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			MuiApplicationMessageCore.WindowAppWindow, 0) ||
+			MuiApplicationDispatcher.DispatchWindowAppWindow(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 0)
+			return 9;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 10;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_Window closure. The public getter exposes the opaque
+	// platform-owned window pointer only while the named window is open.
+	public static uint WindowWindowRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036700;
+		const uint state = 0x00036800;
+		const uint className = 0x00036900;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Window,
+			out var beforeOpen) || beforeOpen != 0) return 3;
+		if (MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Window,
+			0x90000000, false)) return 4;
+		if (!MuiApplicationWindowCore.OpenWindow(ref platform,
+			APTR.FromPointer(state), window, 0)) return 5;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Window,
+			out var openWindow) || openWindow == 0) return 6;
+		if (!MuiApplicationWindowCore.CloseWindow(ref platform,
+			APTR.FromPointer(state), window)) return 7;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Window,
+			out var afterClose) || afterClose != 0) return 8;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 9;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_ID closure. The public ULONG identity is routed through
+	// the named Set packet and remains available to Snapshot consumers without
+	// introducing a managed mirror or positional state offsets.
+	public static uint WindowIdRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036A00;
+		const uint state = 0x00036B00;
+		const uint className = 0x00036C00;
+		const uint packet = 0x00036D00;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || window.IsNull) return 2;
+		var message = APTR.FromPointer(packet);
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.Id,
+			0x4D554931) || MuiApplicationDispatcher.DispatchWindowId(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 3;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Id,
+			out var first) || first != 0x4D554931) return 4;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet, MuiWindowPublicCore.Id,
+			0x4D554932) || MuiApplicationDispatcher.DispatchWindowId(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 5;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Id,
+			out var second) || second != 0x4D554932) return 6;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 7;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_CloseRequest closure. Both packet variants reach the
+	// named BOOL state and canonicalize arbitrary non-zero writes to TRUE.
+	public static uint WindowCloseRequestRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036500;
+		const uint state = 0x00036600;
+		const uint className = 0x00036700;
+		const uint packet = 0x00036800;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || window.IsNull) return 2;
+		var message = APTR.FromPointer(packet);
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.CloseRequest,
+			7) || MuiApplicationDispatcher.DispatchWindowCloseRequest(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 3;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.CloseRequest,
+			out var requested) || requested != 1) return 4;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet, MuiWindowPublicCore.CloseRequest,
+			0) || MuiApplicationDispatcher.DispatchWindowCloseRequest(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 5;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.CloseRequest,
+			out var cleared) || cleared != 0) return 6;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 7;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_RootObject closure. The relationship is represented by
+	// the existing guest Family child records, so replacement and clearing do
+	// not require a managed object graph or positional state offsets.
+	public static uint WindowRootObjectRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036000;
+		const uint state = 0x00036100;
+		const uint className = 0x00036200;
+		const uint packet = 0x00036300;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var first = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var second = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || window.IsNull || first.IsNull || second.IsNull)
+			return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.RootObject,
+			out var initial) || initial != 0) return 3;
+		var message = APTR.FromPointer(packet);
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.RootObject,
+			first.Raw) || MuiApplicationDispatcher.DispatchWindowRootObject(
+			ref platform, APTR.FromPointer(state), window, message) != 1) return 4;
+		if (MuiFamilyCore.GetChild(ref platform, APTR.FromPointer(state), window,
+			0, APTR.Null) != first) return 5;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.RootObject,
+			out var firstValue) || firstValue != first.Raw) return 6;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet, MuiWindowPublicCore.RootObject,
+			second.Raw) || MuiApplicationDispatcher.DispatchWindowRootObject(
+			ref platform, APTR.FromPointer(state), window, message) != 1) return 7;
+		if (MuiFamilyCore.GetChild(ref platform, APTR.FromPointer(state), window,
+			0, APTR.Null) != second) return 8;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.RootObject,
+			out var secondValue) || secondValue != second.Raw) return 9;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.RootObject, 0) ||
+			MuiApplicationDispatcher.DispatchWindowRootObject(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 10;
+		if (MuiFamilyCore.GetChild(ref platform, APTR.FromPointer(state), window,
+			0, APTR.Null).IsNotNull) return 11;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.RootObject,
+			out var cleared) || cleared != 0) return 12;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 13;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_NoMenus closure. The public BOOL is retained in the
+	// ordinary named attribute record and both packet variants canonicalize
+	// non-zero values to TRUE; menu presentation stays a platform boundary.
+	public static uint WindowNoMenusRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036400;
+		const uint state = 0x00036500;
+		const uint className = 0x00036600;
+		const uint packet = 0x00036700;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.NoMenus,
+			out var initial) || initial != 0) return 3;
+		var message = APTR.FromPointer(packet);
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.NoMenus, 9) ||
+			MuiApplicationDispatcher.DispatchWindowNoMenus(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.NoMenus,
+			out var disabled) || disabled != 1) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet, MuiWindowPublicCore.NoMenus, 0) ||
+			MuiApplicationDispatcher.DispatchWindowNoMenus(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.NoMenus,
+			out var enabled) || enabled != 0) return 7;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 8;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_HasAlpha closure. The public BOOL is retained in the
+	// ordinary named attribute record and both packet variants canonicalize
+	// non-zero values to TRUE; alpha forwarding stays a platform boundary.
+	public static uint WindowHasAlphaRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036800;
+		const uint state = 0x00036900;
+		const uint className = 0x00036A00;
+		const uint packet = 0x00036B00;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.HasAlpha,
+			out var initial) || initial != 0) return 3;
+		var message = APTR.FromPointer(packet);
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.HasAlpha, 7) ||
+			MuiApplicationDispatcher.DispatchWindowHasAlpha(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.HasAlpha,
+			out var enabled) || enabled != 1) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet, MuiWindowPublicCore.HasAlpha, 0) ||
+			MuiApplicationDispatcher.DispatchWindowHasAlpha(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.HasAlpha,
+			out var disabled) || disabled != 0) return 7;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 8;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_Opacity closure. The bounded 0..255 LONG is retained in
+	// the ordinary named attribute record; malformed values are rejected without
+	// mutating prior state, while Intuition forwarding remains a platform seam.
+	public static uint WindowOpacityRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036C00;
+		const uint state = 0x00036D00;
+		const uint className = 0x00036E00;
+		const uint packet = 0x00036F80;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Opacity,
+			out var initial) || initial != 0) return 3;
+		var message = APTR.FromPointer(packet);
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.Opacity, 128) ||
+			MuiApplicationDispatcher.DispatchWindowOpacity(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Opacity,
+			out var middle) || middle != 128) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet, MuiWindowPublicCore.Opacity, 256) ||
+			MuiApplicationDispatcher.DispatchWindowOpacity(ref platform,
+			APTR.FromPointer(state), window, message) != 0) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Opacity,
+			out var unchanged) || unchanged != 128) return 7;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.Opacity, 0) ||
+			MuiApplicationDispatcher.DispatchWindowOpacity(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 8;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Opacity,
+			out var cleared) || cleared != 0) return 9;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 10;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_Title closure. The caller-owned guest C-string pointer is
+	// retained in named state, malformed pointers are rejected without mutation,
+	// and NULL clears the title without a managed string copy.
+	public static uint WindowTitleRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036000;
+		const uint state = 0x00036100;
+		const uint className = 0x00036200;
+		const uint packet = 0x00036300;
+		const uint title = 0x00036400;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		WriteNativeCString(APTR.FromPointer(title), 'M', 'a', 'i', 'n', 0, 0, 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Title,
+			out var initial) || initial != 0) return 3;
+		var message = APTR.FromPointer(packet);
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.Title, title) ||
+			MuiApplicationDispatcher.DispatchWindowTitle(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Title,
+			out var stored) || stored != title) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet, MuiWindowPublicCore.Title,
+			0x00051001) || MuiApplicationDispatcher.DispatchWindowTitle(
+				ref platform, APTR.FromPointer(state), window, message) != 0) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Title,
+			out var unchanged) || unchanged != title) return 7;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.Title, 0) ||
+			MuiApplicationDispatcher.DispatchWindowTitle(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 8;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Title,
+			out var cleared) || cleared != 0) return 9;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 10;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_ScreenTitle closure. The caller-owned guest C-string
+	// pointer is retained in named state, malformed pointers are rejected
+	// without mutation, and NULL clears the screen title without managed data.
+	public static uint WindowScreenTitleRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036500;
+		const uint state = 0x00036600;
+		const uint className = 0x00036700;
+		const uint packet = 0x00036800;
+		const uint title = 0x00036900;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		WriteNativeCString(APTR.FromPointer(title), 'C', 'o', 'p', 'p', 'e', 'r', 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.ScreenTitle,
+			out var initial) || initial != 0) return 3;
+		var message = APTR.FromPointer(packet);
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.ScreenTitle, title) ||
+			MuiApplicationDispatcher.DispatchWindowScreenTitle(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.ScreenTitle,
+			out var stored) || stored != title) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet, MuiWindowPublicCore.ScreenTitle,
+			0x00051001) || MuiApplicationDispatcher.DispatchWindowScreenTitle(
+				ref platform, APTR.FromPointer(state), window, message) != 0) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.ScreenTitle,
+			out var unchanged) || unchanged != title) return 7;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.ScreenTitle, 0) ||
+			MuiApplicationDispatcher.DispatchWindowScreenTitle(ref platform,
+			APTR.FromPointer(state), window, message) != 1) return 8;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.ScreenTitle,
+			out var cleared) || cleared != 0) return 9;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 10;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_PublicScreen closure. The caller-owned public-screen
+	// name is retained in named state, malformed pointers are rejected without
+	// mutation, and screen lookup remains a platform capability boundary.
+	public static uint WindowPublicScreenRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036A00;
+		const uint state = 0x00036B00;
+		const uint className = 0x00036C00;
+		const uint packet = 0x00036D00;
+		const uint screenName = 0x00036E00;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		WriteNativeCString(APTR.FromPointer(screenName), 'W', 'o', 'r', 'k', 'b', 'e', 'n');
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.PublicScreen,
+			out var initial) || initial != 0) return 3;
+		var message = APTR.FromPointer(packet);
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.PublicScreen,
+			screenName) || MuiApplicationDispatcher.DispatchWindowPublicScreen(
+				ref platform, APTR.FromPointer(state), window, message) != 1) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.PublicScreen,
+			out var stored) || stored != screenName) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet,
+			MuiWindowPublicCore.PublicScreen, 0x00051001) ||
+			MuiApplicationDispatcher.DispatchWindowPublicScreen(ref platform,
+				APTR.FromPointer(state), window, message) != 0) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.PublicScreen,
+			out var unchanged) || unchanged != screenName) return 7;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.PublicScreen, 0) ||
+			MuiApplicationDispatcher.DispatchWindowPublicScreen(ref platform,
+				APTR.FromPointer(state), window, message) != 1) return 8;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.PublicScreen,
+			out var cleared) || cleared != 0) return 9;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 10;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_Screen closure. The caller-selected Screen pointer is
+	// retained in named state, remains hidden while the window is closed, and
+	// becomes observable only across the native OpenWindow lifetime. An invalid
+	// guest pointer is rejected without mutating the prior selection.
+	public static uint WindowScreenRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint className = 0x00036100;
+		const uint packet = 0x00036200;
+		const uint screen = 0x00036300;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Screen,
+			out var initial) || initial != 0) return 3;
+		var message = APTR.FromPointer(packet);
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.Screen, screen) ||
+			MuiApplicationDispatcher.DispatchWindowScreen(ref platform,
+				APTR.FromPointer(state), window, message) != 1) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Screen,
+			out var closed) || closed != 0) return 5;
+		if (!MuiApplicationWindowCore.OpenWindow(ref platform,
+			APTR.FromPointer(state), window, 0)) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Screen,
+			out var open) || open != screen) return 7;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet, MuiWindowPublicCore.Screen,
+			0x00051001) || MuiApplicationDispatcher.DispatchWindowScreen(
+				ref platform, APTR.FromPointer(state), window, message) != 0) return 8;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Screen,
+			out var unchanged) || unchanged != screen) return 9;
+		if (!MuiApplicationWindowCore.CloseWindow(ref platform,
+			APTR.FromPointer(state), window)) return 10;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Screen,
+			out var afterClose) || afterClose != 0) return 11;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 12;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_RefWindow closure. A live guest object is retained as
+	// the relative-placement reference, while self, unmapped, and malformed
+	// targets are rejected without changing the named attribute record.
+	public static uint WindowRefWindowRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint className = 0x00036100;
+		const uint packet = 0x00036200;
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var reference = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || window.IsNull || reference.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.RefWindow,
+			out var initial) || initial != 0) return 3;
+		var message = APTR.FromPointer(packet);
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.RefWindow, reference) ||
+			MuiApplicationDispatcher.DispatchWindowRefWindow(ref platform,
+				APTR.FromPointer(state), window, message) != 1) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.RefWindow,
+			out var stored) || stored != reference) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet, MuiWindowPublicCore.RefWindow,
+			window) || MuiApplicationDispatcher.DispatchWindowRefWindow(
+				ref platform, APTR.FromPointer(state), window, message) != 0) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.RefWindow,
+			out var selfUnchanged) || selfUnchanged != reference) return 7;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet, MuiWindowPublicCore.RefWindow,
+			0x00051001) || MuiApplicationDispatcher.DispatchWindowRefWindow(
+				ref platform, APTR.FromPointer(state), window, message) != 0) return 8;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.RefWindow,
+			out var invalidUnchanged) || invalidUnchanged != reference) return 9;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet, MuiWindowPublicCore.RefWindow, 0) ||
+			MuiApplicationDispatcher.DispatchWindowRefWindow(ref platform,
+				APTR.FromPointer(state), window, message) != 1) return 10;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.RefWindow,
+			out var cleared) || cleared != 0) return 11;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 12;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_VisibleOnMaximize closure. Non-zero writes are
+	// canonicalized to TRUE in the named attribute record; maximize policy is
+	// intentionally left at the platform capability boundary.
+	public static uint WindowVisibleOnMaximizeRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint className = 0x00036100;
+		const uint packet = 0x00036200;
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.VisibleOnMaximize,
+			out var initial) || initial != 0) return 3;
+		var message = APTR.FromPointer(packet);
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.VisibleOnMaximize, 7) ||
+			MuiApplicationDispatcher.DispatchWindowVisibleOnMaximize(ref platform,
+				APTR.FromPointer(state), window, message) != 1) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.VisibleOnMaximize,
+			out var enabled) || enabled != 1) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform, message,
+			MuiCommonControlPacketCore.NoNotifySet,
+			MuiWindowPublicCore.VisibleOnMaximize, 0) ||
+			MuiApplicationDispatcher.DispatchWindowVisibleOnMaximize(ref platform,
+				APTR.FromPointer(state), window, message) != 1) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.VisibleOnMaximize,
+			out var disabled) || disabled != 0) return 7;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 8;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_IsSubWindow closure. The initializer BOOL is accepted
+	// from the creation tag list, rejected after object initialization, and a
+	// flagged child survives disposal of its owning application family.
+	public static uint WindowIsSubWindowRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint className = 0x00036100;
+		const uint tags = 0x00036200;
+		const uint packet = 0x00036220;
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		APTR.WriteUInt32(APTR.FromPointer(tags), 0,
+			MuiWindowPublicCore.IsSubWindow);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 4, 7);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 8, 0);
+		var subWindow = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.FromPointer(tags));
+		var ordinaryWindow = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (classRecord.IsNull || subWindow.IsNull || ordinaryWindow.IsNull ||
+			application.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), subWindow, MuiWindowPublicCore.IsSubWindow,
+			out var initial) || initial != 1) return 3;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			MuiWindowPublicCore.IsSubWindow, 0) ||
+			MuiApplicationDispatcher.DispatchWindowIsSubWindow(ref platform,
+				APTR.FromPointer(state), subWindow, APTR.FromPointer(packet)) != 0)
+			return 4;
+		if (!MuiFamilyCore.AddTail(ref platform, APTR.FromPointer(state),
+			application, subWindow) || !MuiFamilyCore.AddTail(ref platform,
+			APTR.FromPointer(state), application, ordinaryWindow)) return 5;
+		if (!MuiHeadlessObjectCore.DisposeObject(ref platform,
+			APTR.FromPointer(state), application)) return 6;
+		if (MuiHeadlessObjectCore.FindObject(ref platform,
+			APTR.FromPointer(state), subWindow).IsNull ||
+			MuiHeadlessObjectCore.FindObject(ref platform,
+				APTR.FromPointer(state), ordinaryWindow).IsNotNull ||
+			MuiFamilyCore.GetChild(ref platform, APTR.FromPointer(state),
+				application, 0, APTR.Null).IsNotNull) return 7;
+		if (!MuiHeadlessObjectCore.DisposeObject(ref platform,
+			APTR.FromPointer(state), subWindow)) return 8;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 9;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_TabletMessages closure. The initializer BOOL is
+	// accepted from creation tags, rejected after initialization, and forwarded
+	// through the typed platform seam when the window becomes native.
+	public static uint WindowTabletMessagesRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint className = 0x00036100;
+		const uint tags = 0x00036200;
+		const uint packet = 0x00036220;
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		APTR.WriteUInt32(APTR.FromPointer(tags), 0,
+			MuiWindowPublicCore.TabletMessages);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 4, 7);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 8, 0);
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.FromPointer(tags));
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.TabletMessages,
+			out var initial) || initial != 1) return 3;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			MuiWindowPublicCore.TabletMessages, 0) ||
+			MuiApplicationDispatcher.DispatchWindowTabletMessages(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 0)
+			return 4;
+		if (!MuiApplicationWindowCore.OpenWindow(ref platform,
+			APTR.FromPointer(state), window, 0)) return 5;
+		if (APTR.ReadUInt32(APTR.FromPointer(0x0004F030), 0) != 1) return 6;
+		if (!MuiApplicationWindowCore.CloseWindow(ref platform,
+			APTR.FromPointer(state), window)) return 7;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 8;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_*BorderScroller closure. The three mutable BOOLs are
+	// retained in named object state and cross the native boundary together
+	// during OpenWindow and subsequent Set/NoNotifySet updates.
+	public static uint WindowBorderScrollersRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint className = 0x00036100;
+		const uint tags = 0x00036240;
+		const uint packet = 0x00036260;
+		const uint bottomBreadcrumb = 0x0004F034;
+		const uint leftBreadcrumb = 0x0004F038;
+		const uint rightBreadcrumb = 0x0004F03C;
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		APTR.WriteUInt32(APTR.FromPointer(tags), 0,
+			MuiWindowPublicCore.UseBottomBorderScroller);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 4, 7);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 8,
+			MuiWindowPublicCore.UseLeftBorderScroller);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 12, 0);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 16,
+			MuiWindowPublicCore.UseRightBorderScroller);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 20, 9);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 24, 0);
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.FromPointer(tags));
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window,
+			MuiWindowPublicCore.UseBottomBorderScroller,
+			out var bottom) || bottom != 1) return 3;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window,
+			MuiWindowPublicCore.UseLeftBorderScroller,
+			out var left) || left != 0) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window,
+			MuiWindowPublicCore.UseRightBorderScroller,
+			out var right) || right != 1) return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			MuiWindowPublicCore.UseLeftBorderScroller, 7) ||
+			MuiApplicationDispatcher.DispatchWindowUseLeftBorderScroller(
+				ref platform, APTR.FromPointer(state), window,
+				APTR.FromPointer(packet)) != 1)
+			return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window,
+			MuiWindowPublicCore.UseLeftBorderScroller,
+			out left) || left != 1) return 7;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			MuiWindowPublicCore.UseLeftBorderScroller, 0) ||
+			MuiApplicationDispatcher.DispatchWindowUseLeftBorderScroller(
+				ref platform, APTR.FromPointer(state), window,
+				APTR.FromPointer(packet)) != 1) return 8;
+		if (!MuiApplicationWindowCore.OpenWindow(ref platform,
+			APTR.FromPointer(state), window, 0)) return 9;
+		if (APTR.ReadUInt32(APTR.FromPointer(bottomBreadcrumb), 0) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(leftBreadcrumb), 0) != 0 ||
+			APTR.ReadUInt32(APTR.FromPointer(rightBreadcrumb), 0) != 1) return 10;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			MuiWindowPublicCore.UseRightBorderScroller, 0) ||
+			MuiApplicationDispatcher.DispatchWindowUseRightBorderScroller(
+				ref platform, APTR.FromPointer(state), window,
+				APTR.FromPointer(packet)) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(rightBreadcrumb), 0) != 0) return 11;
+		if (!MuiApplicationWindowCore.CloseWindow(ref platform,
+			APTR.FromPointer(state), window)) return 12;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 13;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_Alt* closure. The four signed LONG creation values are
+	// decoded into named guest attributes, reject post-initialization writes,
+	// and cross the native boundary as one alternate-geometry record.
+	public static uint WindowAlternateGeometryRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint className = 0x00036100;
+		const uint tags = 0x00036280;
+		const uint packet = 0x000362B0;
+		const uint heightBreadcrumb = 0x0004F040;
+		const uint widthBreadcrumb = 0x0004F044;
+		const uint leftBreadcrumb = 0x0004F048;
+		const uint topBreadcrumb = 0x0004F04C;
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		APTR.WriteUInt32(APTR.FromPointer(tags), 0,
+			MuiWindowPublicCore.AltHeight);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 4, unchecked((uint)-1));
+		APTR.WriteUInt32(APTR.FromPointer(tags), 8,
+			MuiWindowPublicCore.AltWidth);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 12, 640);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 16,
+			MuiWindowPublicCore.AltLeftEdge);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 20, unchecked((uint)-16));
+		APTR.WriteUInt32(APTR.FromPointer(tags), 24,
+			MuiWindowPublicCore.AltTopEdge);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 28, 24);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 32, 0);
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.FromPointer(tags));
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.AltHeight,
+			out var height) || height != unchecked((uint)-1)) return 3;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.AltWidth,
+			out var width) || width != 640) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.AltLeftEdge,
+			out var left) || left != unchecked((uint)-16)) return 5;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.AltTopEdge,
+			out var top) || top != 24) return 6;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			MuiWindowPublicCore.AltWidth, 800) ||
+			MuiApplicationDispatcher.DispatchWindowAlternateGeometry(
+				ref platform, APTR.FromPointer(state), window,
+				APTR.FromPointer(packet)) != 0) return 7;
+		if (!MuiApplicationWindowCore.OpenWindow(ref platform,
+			APTR.FromPointer(state), window, 0)) return 8;
+		if (APTR.ReadUInt32(APTR.FromPointer(heightBreadcrumb), 0) !=
+			unchecked((uint)-1) ||
+			APTR.ReadUInt32(APTR.FromPointer(widthBreadcrumb), 0) != 640 ||
+			APTR.ReadUInt32(APTR.FromPointer(leftBreadcrumb), 0) !=
+			unchecked((uint)-16) ||
+			APTR.ReadUInt32(APTR.FromPointer(topBreadcrumb), 0) != 24) return 9;
+		if (!MuiApplicationWindowCore.CloseWindow(ref platform,
+			APTR.FromPointer(state), window)) return 10;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 11;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_* geometry closure. The four signed LONG creation values
+	// are decoded into named guest attributes, reject post-initialization
+	// writes, and cross the native boundary as one primary-geometry record.
+	public static uint WindowGeometryRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint className = 0x00036100;
+		const uint tags = 0x000362E0;
+		const uint heightBreadcrumb = 0x0004F050;
+		const uint widthBreadcrumb = 0x0004F054;
+		const uint leftBreadcrumb = 0x0004F058;
+		const uint topBreadcrumb = 0x0004F05C;
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		APTR.WriteUInt32(APTR.FromPointer(tags), 0,
+			MuiWindowPublicCore.Height);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 4, 240);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 8,
+			MuiWindowPublicCore.Width);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 12, 320);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 16,
+			MuiWindowPublicCore.LeftEdge);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 20, unchecked((uint)-2));
+		APTR.WriteUInt32(APTR.FromPointer(tags), 24,
+			MuiWindowPublicCore.TopEdge);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 28, 8);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 32, 0);
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.FromPointer(tags));
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Height,
+			out var height) || height != 240) return 3;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.Width,
+			out var width) || width != 320) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.LeftEdge,
+			out var left) || left != unchecked((uint)-2)) return 5;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.TopEdge,
+			out var top) || top != 8) return 6;
+		var record = MuiHeadlessObjectCore.FindObject(ref platform,
+			APTR.FromPointer(state), window);
+		var handled = false;
+		if (record.IsNull || MuiWindowPublicCore.TrySet(ref platform,
+			APTR.FromPointer(state), record, MuiWindowPublicCore.Width, 900,
+			false, out handled) || !handled) return 7;
+		if (!MuiApplicationWindowCore.OpenWindow(ref platform,
+			APTR.FromPointer(state), window, 0)) return 8;
+		if (APTR.ReadUInt32(APTR.FromPointer(heightBreadcrumb), 0) != 240 ||
+			APTR.ReadUInt32(APTR.FromPointer(widthBreadcrumb), 0) != 320 ||
+			APTR.ReadUInt32(APTR.FromPointer(leftBreadcrumb), 0) !=
+			unchecked((uint)-2) ||
+			APTR.ReadUInt32(APTR.FromPointer(topBreadcrumb), 0) != 8) return 9;
+		if (!MuiApplicationWindowCore.CloseWindow(ref platform,
+			APTR.FromPointer(state), window)) return 10;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 11;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_*Gadget closure. The five initializer BOOLs are
+	// canonicalized into a named policy record and cross the native boundary
+	// together during OpenWindow. Host qualification covers post-init rejection.
+	public static uint WindowGadgetPolicyRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint className = 0x00036100;
+		const uint tags = 0x00036340;
+		const uint closeBreadcrumb = 0x0004F060;
+		const uint depthBreadcrumb = 0x0004F064;
+		const uint dragBreadcrumb = 0x0004F068;
+		const uint sizeBreadcrumb = 0x0004F06C;
+		const uint sizeRightBreadcrumb = 0x0004F070;
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		APTR.WriteUInt32(APTR.FromPointer(tags), 0,
+			MuiWindowPublicCore.CloseGadget);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 4, 7);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 8,
+			MuiWindowPublicCore.DepthGadget);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 12, 0);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 16,
+			MuiWindowPublicCore.DragBar);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 20, 9);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 24,
+			MuiWindowPublicCore.SizeGadget);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 28, 1);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 32,
+			MuiWindowPublicCore.SizeRight);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 36, 0);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 40, 0);
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.FromPointer(tags));
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.CloseGadget,
+			out var closeGadget) || closeGadget != 1) return 3;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.DepthGadget,
+			out var depthGadget) || depthGadget != 0) return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.DragBar,
+			out var dragBar) || dragBar != 1) return 5;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.SizeGadget,
+			out var sizeGadget) || sizeGadget != 1) return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, MuiWindowPublicCore.SizeRight,
+			out var sizeRight) || sizeRight != 0) return 7;
+		var record = MuiHeadlessObjectCore.FindObject(ref platform,
+			APTR.FromPointer(state), window);
+		var handled = false;
+		if (record.IsNull || MuiWindowPublicCore.TrySet(ref platform,
+			APTR.FromPointer(state), record, MuiWindowPublicCore.DragBar, 0,
+			false, out handled) || !handled) return 8;
+		if (!MuiApplicationWindowCore.OpenWindow(ref platform,
+			APTR.FromPointer(state), window, 0)) return 9;
+		if (APTR.ReadUInt32(APTR.FromPointer(closeBreadcrumb), 0) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(depthBreadcrumb), 0) != 0 ||
+			APTR.ReadUInt32(APTR.FromPointer(dragBreadcrumb), 0) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(sizeBreadcrumb), 0) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(sizeRightBreadcrumb), 0) != 0) return 10;
+		if (!MuiApplicationWindowCore.CloseWindow(ref platform,
+			APTR.FromPointer(state), window)) return 11;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 12;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_* mode closure. The four initializer BOOLs are
+	// canonicalized into a named policy record, reject post-initialization
+	// writes, and cross the native boundary together during OpenWindow.
+	public static uint WindowModePolicyRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint className = 0x00036100;
+		const uint tags = 0x000363A0;
+		const uint appWindowBreadcrumb = 0x0004F074;
+		const uint backdropBreadcrumb = 0x0004F078;
+		const uint borderlessBreadcrumb = 0x0004F07C;
+		const uint panelWindowBreadcrumb = 0x0004F080;
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		WriteNativeCString(APTR.FromPointer(className), 'W', 'i', 'n', 'd', 'o', 'w', 0);
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(className), APTR.Null, 0,
+			APTR.FromPointer(1));
+		APTR.WriteUInt32(APTR.FromPointer(tags), 0,
+			MuiWindowPublicCore.AppWindow);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 4, 7);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 8,
+			MuiWindowPublicCore.Backdrop);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 12, 0);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 16,
+			MuiWindowPublicCore.Borderless);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 20, 9);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 24,
+			MuiWindowPublicCore.PanelWindow);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 28, 1);
+		APTR.WriteUInt32(APTR.FromPointer(tags), 32, 0);
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.FromPointer(tags));
+		if (classRecord.IsNull || window.IsNull) return 2;
+		if (!MuiApplicationWindowCore.OpenWindow(ref platform,
+			APTR.FromPointer(state), window, 0)) return 3;
+		if (APTR.ReadUInt32(APTR.FromPointer(appWindowBreadcrumb), 0) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(backdropBreadcrumb), 0) != 0 ||
+			APTR.ReadUInt32(APTR.FromPointer(borderlessBreadcrumb), 0) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(panelWindowBreadcrumb), 0) != 1) return 5;
+		if (!MuiApplicationWindowCore.CloseWindow(ref platform,
+			APTR.FromPointer(state), window)) return 6;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 7;
+		return 42;
+	}
+
+		// MG09 MUIA_Application_DiskObject closure. The caller-owned Workbench
+		// DiskObject record is range-validated and retained as a guest pointer.
+		public static uint ApplicationDiskObjectRoot()
+		{
+			var platform = new MuiNativeHeadlessPlatform();
+			platform.Reset();
+			const uint privateRoot = 0x00035F00;
+			const uint state = 0x00036000;
+			const uint name = 0x00036100;
+			const uint packet = 0x00036200;
+			const uint diskObject = 0x00036300;
+			const uint diskObjectAttribute = 0x804235CB;
+			WriteNativeCString(APTR.FromPointer(name), 'A', 'p', 'p', 0, 0, 0, 0);
+			APTR.WriteUInt8(APTR.FromPointer(diskObject),
+				unchecked((int)Amiga.DiskObject.Size - 1),
+				0xA5);
+			if (!MuiMasterLifecycleCore.Create(ref platform,
+				APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+			var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+				APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+				APTR.FromPointer(1));
+			var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), cl, APTR.Null);
+			if (cl.IsNull || application.IsNull) return 2;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				diskObjectAttribute, APTR.FromPointer(diskObject)) ||
+				MuiApplicationDispatcher.DispatchApplicationDiskObject(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 3;
+			if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, diskObjectAttribute,
+				out var value) || value != diskObject) return 4;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+				diskObjectAttribute, 0x00021000) ||
+				MuiApplicationDispatcher.DispatchApplicationDiskObject(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 0)
+				return 5;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+				diskObjectAttribute, 0) ||
+				MuiApplicationDispatcher.DispatchApplicationDiskObject(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 6;
+			if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, diskObjectAttribute,
+				out value) || value != 0) return 7;
+			if (!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 8;
+			return 42;
+		}
+
+		// MG09 MUIA_Application_DropObject closure. The caller-owned live MUI
+		// object pointer is validated and retained in named application state.
+		public static uint ApplicationDropObjectRoot()
+		{
+			var platform = new MuiNativeHeadlessPlatform();
+			platform.Reset();
+			const uint privateRoot = 0x00035F00;
+			const uint state = 0x00036000;
+			const uint name = 0x00036100;
+			const uint packet = 0x00036200;
+			const uint dropObjectAttribute = 0x80421266;
+			WriteNativeCString(APTR.FromPointer(name), 'A', 'p', 'p', 0, 0, 0, 0);
+			if (!MuiMasterLifecycleCore.Create(ref platform,
+				APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+			var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+				APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+				APTR.FromPointer(1));
+			var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), cl, APTR.Null);
+			var dropObject = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), cl, APTR.Null);
+			if (cl.IsNull || application.IsNull || dropObject.IsNull) return 2;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				dropObjectAttribute, dropObject) ||
+				MuiApplicationDispatcher.DispatchApplicationDropObject(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 3;
+			if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, dropObjectAttribute,
+				out var value) || value != dropObject) return 4;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+				dropObjectAttribute, 0x00021000) ||
+				MuiApplicationDispatcher.DispatchApplicationDropObject(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 0)
+				return 5;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+				dropObjectAttribute, 0) ||
+				MuiApplicationDispatcher.DispatchApplicationDropObject(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 6;
+			if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, dropObjectAttribute,
+				out value) || value != 0) return 7;
+			if (!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 8;
+			return 42;
+		}
+
+		// MG09 MUIA_Application_MenuAction/MenuHelp closure. MenuAction is a
+		// mutable ULONG attribute; MenuHelp is published only by the typed menu
+		// transport and remains read-only to ordinary Set packets.
+		public static uint ApplicationMenuEventStateRoot()
+		{
+			var platform = new MuiNativeHeadlessPlatform();
+			platform.Reset();
+			const uint privateRoot = 0x00035F00;
+			const uint state = 0x00036000;
+			const uint name = 0x00036100;
+			const uint packet = 0x00036200;
+			const uint menuAction = 0x80428961;
+			const uint menuHelp = 0x8042540B;
+			WriteNativeCString(APTR.FromPointer(name), 'A', 'p', 'p', 0, 0, 0, 0);
+			if (!MuiMasterLifecycleCore.Create(ref platform,
+				APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+			var cl = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+				APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+				APTR.FromPointer(1));
+			var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), cl, APTR.Null);
+			if (cl.IsNull || application.IsNull ||
+				!MuiApplicationWindowCore.InitializeApplication(ref platform,
+					APTR.FromPointer(state), application, 0)) return 2;
+			if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, menuAction,
+				out var value) || value != 0) return 3;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				menuAction, 0x0000CAFE) ||
+				MuiApplicationDispatcher.DispatchApplicationMenuAction(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1)
+				return 4;
+			if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, menuAction,
+				out value) || value != 0x0000CAFE) return 5;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+				menuHelp, 0x0000BEEF) ||
+				MuiApplicationDispatcher.DispatchApplicationMenuAction(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 0)
+				return 6;
+			if (!MuiApplicationWindowCore.PublishApplicationMenuHelpValue(
+				ref platform, APTR.FromPointer(state), application, 0x0000BEEF))
+				return 7;
+			if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), application, menuHelp,
+				out value) || value != 0x0000BEEF) return 8;
+			if (!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 9;
+			return 42;
+		}
+
+		// MG09 menu transport closure. A real Menustrip.mui -> Menu.mui ->
+		// Menuitem.mui guest hierarchy is owned by the application; triggering the
+		// item publishes its named UserData through MenuAction/MenuHelp.
+		public static uint ApplicationMenuTransportRoot()
+		{
+			var platform = new MuiNativeHeadlessPlatform();
+			platform.Reset();
+			const uint privateRoot = 0x00035F00;
+			const uint state = 0x00036000;
+			const uint appName = 0x00036100;
+			const uint stripName = 0x00036120;
+			const uint menuName = 0x00036140;
+			const uint itemName = 0x00036160;
+			const uint packet = 0x00036200;
+			const uint menuAction = 0x80428961;
+			const uint menuHelp = 0x8042540B;
+			const uint menuStripAttribute = 0x804252D9;
+			const uint userDataAttribute = 0x80420313;
+			WriteNativeCString(APTR.FromPointer(appName), 'A', 'p', 'p', 0, 0, 0, 0);
+			WriteClassId(APTR.FromPointer(stripName), 'M', 'e', 'n', 'u', 's',
+				't', 'r', 'i', 'p');
+			WriteClassId(APTR.FromPointer(menuName), 'M', 'e', 'n', 'u', '\0', '\0',
+				'\0', '\0', '\0');
+			WriteClassId(APTR.FromPointer(itemName), 'M', 'e', 'n', 'u', 'i',
+				't', 'e', 'm', '\0');
+			if (!MuiMasterLifecycleCore.Create(ref platform,
+				APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+			var appClass = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+				APTR.FromPointer(state), APTR.FromPointer(appName), APTR.Null, 0,
+				APTR.FromPointer(12));
+			var stripClass = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+				APTR.FromPointer(state), APTR.FromPointer(stripName), APTR.Null, 0,
+				APTR.FromPointer(13));
+			var menuClass = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+				APTR.FromPointer(state), APTR.FromPointer(menuName), APTR.Null, 0,
+				APTR.FromPointer(14));
+			var itemClass = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+				APTR.FromPointer(state), APTR.FromPointer(itemName), APTR.Null, 0,
+				APTR.FromPointer(15));
+			var application = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), appClass, APTR.Null);
+			var strip = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), stripClass, APTR.Null);
+			var menu = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), menuClass, APTR.Null);
+			var item = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+				APTR.FromPointer(state), itemClass, APTR.Null);
+			if (appClass.IsNull || stripClass.IsNull || menuClass.IsNull ||
+				itemClass.IsNull || application.IsNull || strip.IsNull ||
+				menu.IsNull || item.IsNull) return 2;
+			if (MuiMenuSpecialistCore.Attach(ref platform, APTR.FromPointer(state),
+				strip, MuiMenuSpecialistClass.Menustrip).IsNull ||
+				MuiMenuSpecialistCore.Attach(ref platform, APTR.FromPointer(state),
+					menu, MuiMenuSpecialistClass.Menu).IsNull ||
+				MuiMenuSpecialistCore.Attach(ref platform, APTR.FromPointer(state),
+					item, MuiMenuSpecialistClass.Menuitem).IsNull) return 3;
+		if (!MuiMenuSpecialistCore.AddChild(ref platform,
+				APTR.FromPointer(state), strip, menu) ||
+				!MuiMenuSpecialistCore.AddChild(ref platform,
+					APTR.FromPointer(state), menu, item) ||
+				!MuiHeadlessObjectCore.SetAttribute(ref platform,
+					APTR.FromPointer(state), item, userDataAttribute, 0x00004242, false))
+				return 4;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				menuStripAttribute, strip) ||
+				MuiApplicationDispatcher.DispatchApplicationMenustrip(ref platform,
+					APTR.FromPointer(state), application, APTR.FromPointer(packet)) != 1 ||
+				!MuiApplicationWindowCore.InitializeApplication(ref platform,
+					APTR.FromPointer(state), application, 0)) return 5;
+		if (!MuiMenuSpecialistCore.TriggerItem(ref platform,
+				APTR.FromPointer(state), item) ||
+				!MuiHeadlessObjectCore.GetAttribute(ref platform,
+					APTR.FromPointer(state), application, menuAction,
+					out var value) || value != 0x00004242) return 6;
+		if (!MuiMenuSpecialistCore.TriggerItem(ref platform,
+				APTR.FromPointer(state), item, true) ||
+				!MuiHeadlessObjectCore.GetAttribute(ref platform,
+					APTR.FromPointer(state), application, menuHelp,
+					out value) || value != 0x00004242) return 7;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 8;
+		return 42;
+		}
+
+		// MG09 MUIM_Application_AboutMUI packet closure. The MorphOS-shaped
 	// {MethodID, refwindow} frame accepts Null or a live MUI Window object,
 	// rejects arbitrary guest pointers before reaching the presentation seam,
 	// and records the last reference/request count in guest-resident state.
@@ -3606,11 +6520,13 @@ public static class MuiNativeRoots
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		const uint privateRoot = 0x00035F00;
-		const uint state = 0x00036000;
-		const uint className = 0x00036100;
-		const uint packet = 0x00036200;
-		const uint helpName = 0x00036300;
-		const uint helpNode = 0x00036340;
+			const uint state = 0x00036000;
+			const uint className = 0x00036100;
+			const uint packet = 0x00036200;
+			const uint helpFilePacket = 0x00036280;
+			const uint helpName = 0x00036300;
+			const uint helpNode = 0x00036340;
+			const uint helpFileAttribute = 0x804293F4;
 		WriteClassId(APTR.FromPointer(className), 'A', 'p', 'p', 'l', 'i', 'c', 'a',
 			't', 'i');
 		APTR.WriteUInt8(APTR.FromPointer(helpName), 0, (byte)'S');
@@ -3645,42 +6561,51 @@ public static class MuiNativeRoots
 			APTR.FromPointer(state), classRecord, APTR.Null);
 		var closedWindow = MuiHeadlessObjectCore.CreateObjectA(ref platform,
 			APTR.FromPointer(state), classRecord, APTR.Null);
-		if (app.IsNull || openWindow.IsNull || closedWindow.IsNull ||
-			!MuiApplicationWindowCore.InitializeApplication(ref platform,
-				APTR.FromPointer(state), app, 0) ||
+			if (app.IsNull || openWindow.IsNull || closedWindow.IsNull ||
+				!MuiApplicationWindowCore.InitializeApplication(ref platform,
+					APTR.FromPointer(state), app, 0) ||
 			!MuiApplicationWindowCore.AddWindow(ref platform,
 				APTR.FromPointer(state), app, openWindow) ||
 			!MuiApplicationWindowCore.AddWindow(ref platform,
 				APTR.FromPointer(state), app, closedWindow) ||
 			!MuiApplicationWindowCore.OpenWindow(ref platform,
-				APTR.FromPointer(state), openWindow, 0)) return 3;
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x80426479);
+					APTR.FromPointer(state), openWindow, 0)) return 3;
+			if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(helpFilePacket), MuiCommonControlPacketCore.Set,
+				helpFileAttribute, helpName) ||
+				MuiApplicationDispatcher.DispatchApplicationHelpFile(ref platform,
+					APTR.FromPointer(state), app, APTR.FromPointer(helpFilePacket)) != 1)
+				return 4;
+			APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x80426479);
 		APTR.WriteUInt32(APTR.FromPointer(packet), 4, uint.MaxValue);
 		APTR.WriteUInt32(APTR.FromPointer(packet), 8, helpName);
 		APTR.WriteUInt32(APTR.FromPointer(packet), 12, helpNode);
 		APTR.WriteUInt32(APTR.FromPointer(packet), 16, unchecked((uint)-3));
-		if (MuiApplicationDispatcher.DispatchShowHelp(ref platform,
-			APTR.FromPointer(state), app, APTR.FromPointer(packet)) != 1) return 4;
+			if (MuiApplicationDispatcher.DispatchShowHelp(ref platform,
+				APTR.FromPointer(state), app, APTR.FromPointer(packet)) != 1) return 5;
 		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
 			APTR.FromPointer(state), app, 0x7FFE0024, out var reference) ||
 			reference != openWindow.Raw ||
 			!MuiHeadlessObjectCore.GetAttribute(ref platform,
 				APTR.FromPointer(state), app, 0x7FFE0028, out var requests) ||
-			requests != 1) return 5;
+				requests != 1) return 6;
 		APTR.WriteUInt32(APTR.FromPointer(packet), 4, 0);
 		APTR.WriteUInt32(APTR.FromPointer(packet), 8, 0);
 		APTR.WriteUInt32(APTR.FromPointer(packet), 12, 0);
 		APTR.WriteUInt32(APTR.FromPointer(packet), 16, 7);
-		if (MuiApplicationDispatcher.DispatchShowHelp(ref platform,
-			APTR.FromPointer(state), app, APTR.FromPointer(packet)) != 1 ||
+			if (MuiApplicationDispatcher.DispatchShowHelp(ref platform,
+				APTR.FromPointer(state), app, APTR.FromPointer(packet)) != 1 ||
 			!MuiHeadlessObjectCore.GetAttribute(ref platform,
 				APTR.FromPointer(state), app, 0x7FFE0024, out reference) ||
 			reference != 0 ||
 			!MuiHeadlessObjectCore.GetAttribute(ref platform,
 				APTR.FromPointer(state), app, 0x7FFE0028, out requests) ||
-			requests != 2) return 6;
-		if (!MuiMasterLifecycleCore.Dispose(ref platform,
-			APTR.FromPointer(privateRoot))) return 7;
+				requests != 2 ||
+				!MuiHeadlessObjectCore.GetAttribute(ref platform,
+					APTR.FromPointer(state), app, 0x7FFE0025, out var helpNameState) ||
+				helpNameState != helpName) return 7;
+			if (!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 8;
 		return 42;
 	}
 
@@ -4142,6 +7067,29 @@ public static class MuiNativeRoots
 		APTR.WriteUInt32(record, 0, 0xDEADBEEFu);
 		if (MuiNotifyConfigMessageCore.DispatchRecord(ref platform, record) != 0)
 			return 3;
+		return 42;
+	}
+
+	// Focused ABI proof for the named GetConfigItem packet codec. It checks the
+	// complete fixed record and a boundary-crossing guest pointer.
+	public static uint GetConfigItemMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint storage = 0x00050E00;
+		var packet = default(MuiGetConfigItemMessage);
+		packet.MethodId = MuiGetConfigItemMessageCodec.Method;
+		packet.ConfigId = 0x24;
+		packet.Storage = APTR.FromPointer(storage);
+		if (!MuiGetConfigItemMessageCodec.TryWrite(ref platform,
+			APTR.FromPointer(packetAddress), packet) ||
+			!MuiGetConfigItemMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(packetAddress), out var decoded) ||
+			decoded.ConfigId != packet.ConfigId ||
+			decoded.Storage.Raw != storage) return 1;
+		if (MuiGetConfigItemMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FF5), out _)) return 2;
 		return 42;
 	}
 
@@ -4870,6 +7818,9 @@ public static class MuiNativeRoots
 		const uint packet = 0x00036200;
 		const uint handler = 0x00036300;
 		const uint eventMessage = 0x00036340;
+		const uint highHandler = 0x00036380;
+		const uint normalHandler = 0x000363C0;
+		const uint negativeHandler = 0x00036400;
 		const uint truncated = 0x00050FFC;
 		const uint unmapped = 0x00052000;
 		WriteClassId(APTR.FromPointer(name), 'W', 'i', 'n', 'd', 'o', 'w',
@@ -4885,41 +7836,1064 @@ public static class MuiNativeRoots
 		var target = MuiHeadlessObjectCore.CreateObjectA(ref platform,
 			APTR.FromPointer(state), classRecord, APTR.Null);
 		if (window.IsNull || target.IsNull) return 3;
-		APTR.WriteUInt16(APTR.FromPointer(handler), 10, 0x8000);
-		APTR.WriteUInt32(APTR.FromPointer(handler), 12, target.Raw);
-		APTR.WriteUInt32(APTR.FromPointer(handler), 20, 4);
+		var classPointer = MuiHeadlessObjectCore.ClassPointer(ref platform,
+			classRecord);
+		if (classPointer.IsNull) return 4;
+		WriteEventHandler(ref platform, APTR.FromPointer(handler), target,
+			classPointer, 0, 4);
 		APTR.WriteUInt32(APTR.FromPointer(eventMessage), 0, 0x90000001);
 		APTR.WriteUInt32(APTR.FromPointer(packet), 0,
 			MuiApplicationDispatcher.WindowAddEventHandlerMethod);
 		APTR.WriteUInt32(APTR.FromPointer(packet), 4, handler);
 		if (MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
-			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1) return 4;
+			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1) return 5;
 		if (MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
-			APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 1) return 5;
+			APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 1) return 6;
+		if (APTR.ReadUInt32(APTR.FromPointer(0x0004F020), 0) != classPointer.Raw ||
+			APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) != target.Raw ||
+			APTR.ReadUInt32(APTR.FromPointer(0x0004F028), 0) != 0x90000001) return 7;
 		APTR.WriteUInt32(APTR.FromPointer(packet), 0,
 			MuiApplicationDispatcher.WindowRemoveEventHandlerMethod);
 		if (MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
-			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1) return 6;
+			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1) return 8;
 		if (MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
-			APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 0) return 7;
+			APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 0) return 9;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), target, 0x80423661, 1, false)) return 10;
+		APTR.WriteUInt32(APTR.FromPointer(packet), 0,
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod);
+		APTR.WriteUInt32(APTR.FromPointer(packet), 4, handler);
+		if (MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1 ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 0)
+			return 11;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), target, 0x80423661, 0, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), target, 0x80429BA8, 0, false) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 0)
+			return 12;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), target, 0x80429BA8, 1, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), target, 0x7FFF0003, 0, false) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 0)
+			return 13;
+		APTR.WriteUInt32(APTR.FromPointer(handler), 20, 0x00040000);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), target, 0x80423661, 1, false) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage),
+				0x00040000) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) != target.Raw)
+			return 14;
+		APTR.WriteUInt32(APTR.FromPointer(packet), 0,
+			MuiApplicationDispatcher.WindowRemoveEventHandlerMethod);
+		if (MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1) return 15;
+		var ancestor = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var group = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (ancestor.IsNull || group.IsNull) return 31;
+		if (!MuiFamilyCore.AddTail(ref platform, APTR.FromPointer(state), window,
+			ancestor) || !MuiFamilyCore.AddTail(ref platform,
+			APTR.FromPointer(state), ancestor, group) ||
+			!MuiFamilyCore.AddTail(ref platform, APTR.FromPointer(state), group,
+				target)) return 32;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), target, 0x80423661, 0, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), target, 0x80429BA8, 1, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), target, 0x7FFF0003, 1, false)) return 33;
+		WriteEventHandler(ref platform, APTR.FromPointer(handler), target,
+			classPointer, 0, 4);
+		APTR.WriteUInt32(APTR.FromPointer(packet), 0,
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod);
+		APTR.WriteUInt32(APTR.FromPointer(packet), 4, handler);
+		if (MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1) return 34;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), ancestor, 0x80423661, 1, false) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 0)
+			return 35;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), ancestor, 0x80423661, 0, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), group, 0x80429BA8, 0, false) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 0)
+			return 36;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), group, 0x80429BA8, 1, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), ancestor, 0x7FFF0003, 0, false) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 0)
+			return 37;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), ancestor, 0x7FFF0003, 1, false) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) != target.Raw)
+			return 38;
+		APTR.WriteUInt32(APTR.FromPointer(packet), 0,
+			MuiApplicationDispatcher.WindowRemoveEventHandlerMethod);
+		if (MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1) return 39;
+		const uint keyNormalHandler = 0x00036440;
+		const uint keyAlwaysHandler = 0x00036480;
+		const uint keyNormalPacket = 0x000364C0;
+		const uint keyAlwaysPacket = 0x00036500;
+		const uint keyEventMessage = 0x00036540;
+		var activeKeyObject = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var normalKeyObject = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var alwaysKeyObject = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (activeKeyObject.IsNull || normalKeyObject.IsNull ||
+			alwaysKeyObject.IsNull) return 43;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), window, 0x80427925, activeKeyObject.Raw,
+			false)) return 44;
+		WriteEventHandler(ref platform, APTR.FromPointer(keyNormalHandler),
+			normalKeyObject, classPointer, 0, 4);
+		WriteEventHandler(ref platform, APTR.FromPointer(keyAlwaysHandler),
+			alwaysKeyObject, classPointer, 0, 4, 0x0003);
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(keyNormalPacket),
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(keyNormalHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window,
+				APTR.FromPointer(keyNormalPacket)) != 1) return 45;
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(keyAlwaysPacket),
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(keyAlwaysHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window,
+				APTR.FromPointer(keyAlwaysPacket)) != 1) return 46;
+		if (!MuiCommonControlPacketCore.WriteHandleEvent(ref platform,
+			APTR.FromPointer(keyEventMessage), 0, 2, 0)) return 47;
+		if (MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+			APTR.FromPointer(state), window, APTR.FromPointer(keyEventMessage),
+			4) != 1 || APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) !=
+			alwaysKeyObject.Raw) return 48;
+		if (!MuiCommonControlPacketCore.WriteHandleEvent(ref platform,
+			APTR.FromPointer(keyEventMessage), 0, -1, 0) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window,
+				APTR.FromPointer(keyEventMessage), 4) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) !=
+			normalKeyObject.Raw) return 49;
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(keyNormalPacket),
+			MuiApplicationDispatcher.WindowRemoveEventHandlerMethod,
+			APTR.FromPointer(keyNormalHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window,
+				APTR.FromPointer(keyNormalPacket)) != 1) return 50;
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(keyAlwaysPacket),
+			MuiApplicationDispatcher.WindowRemoveEventHandlerMethod,
+			APTR.FromPointer(keyAlwaysHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window,
+				APTR.FromPointer(keyAlwaysPacket)) != 1) return 51;
+		const uint pageHandler = 0x00036580;
+		const uint pagePacket = 0x000365C0;
+		const uint pageEventMessage = 0x00036600;
+		var pageGroup = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var firstPage = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var secondPage = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var pageTarget = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (pageGroup.IsNull || firstPage.IsNull || secondPage.IsNull ||
+			pageTarget.IsNull) return 52;
+		if (!MuiFamilyCore.AddTail(ref platform, APTR.FromPointer(state), window,
+			pageGroup) || !MuiFamilyCore.AddTail(ref platform,
+			APTR.FromPointer(state), pageGroup, firstPage) ||
+			!MuiFamilyCore.AddTail(ref platform, APTR.FromPointer(state), pageGroup,
+				secondPage) || !MuiFamilyCore.AddTail(ref platform,
+			APTR.FromPointer(state), secondPage, pageTarget)) return 53;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), pageGroup, 0x80421A5F, 1, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), pageGroup, 0x80424199, 0, false))
+			return 54;
+		WriteEventHandler(ref platform, APTR.FromPointer(pageHandler), pageTarget,
+			classPointer, 0, 4);
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(pagePacket),
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(pageHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(pagePacket)) != 1)
+			return 55;
+		if (!MuiCommonControlPacketCore.WriteMethod(ref platform,
+			APTR.FromPointer(pageEventMessage), 0x90000001) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window,
+				APTR.FromPointer(pageEventMessage), 4) != 0) return 56;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), pageGroup, 0x80424199, 1, false) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window,
+				APTR.FromPointer(pageEventMessage), 4) != 1 ||
+				APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) != pageTarget.Raw)
+			return 57;
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(pagePacket),
+			MuiApplicationDispatcher.WindowRemoveEventHandlerMethod,
+			APTR.FromPointer(pageHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(pagePacket)) != 1)
+			return 58;
+		if (!MuiFamilyCore.Remove(ref platform, APTR.FromPointer(state), window,
+			pageGroup) || !MuiHeadlessObjectCore.DisposeObject(ref platform,
+			APTR.FromPointer(state), pageGroup)) return 59;
+		var highObject = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var normalObject = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var negativeObject = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (highObject.IsNull || normalObject.IsNull || negativeObject.IsNull)
+			return 16;
+		WriteEventHandler(ref platform, APTR.FromPointer(highHandler), highObject,
+			classPointer, 10, 4);
+		WriteEventHandler(ref platform, APTR.FromPointer(normalHandler), normalObject,
+			classPointer, 0, 4);
+		WriteEventHandler(ref platform, APTR.FromPointer(negativeHandler), negativeObject,
+			classPointer, -5, 4);
+		APTR.WriteUInt32(APTR.FromPointer(packet), 0,
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod);
+		APTR.WriteUInt32(APTR.FromPointer(packet), 4, highHandler);
+		if (MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1) return 17;
+		APTR.WriteUInt32(APTR.FromPointer(packet), 4, normalHandler);
+		if (MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1) return 18;
+		APTR.WriteUInt32(APTR.FromPointer(packet), 4, negativeHandler);
+		if (MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1) return 19;
+		if (MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+			APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) != highObject.Raw)
+			return 20;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), window, 0x80427925, negativeObject.Raw, false) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) != negativeObject.Raw)
+			return 21;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), window, 0x80427925, 0, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), window, 0x804294D7, normalObject.Raw, false) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) != normalObject.Raw)
+			return 22;
+		APTR.WriteUInt32(APTR.FromPointer(eventMessage), 0, 0x90000077);
+		if (MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+			APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 0 ||
+			APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) != negativeObject.Raw)
+			return 30;
+		APTR.WriteUInt32(APTR.FromPointer(eventMessage), 0, 0x90000001);
 		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0xDEADBEEFu);
 		if (MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
-			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 0) return 8;
+			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 0) return 23;
 		APTR.WriteUInt32(APTR.FromPointer(truncated), 0,
 			MuiApplicationDispatcher.WindowAddEventHandlerMethod);
 		if (MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
-			APTR.FromPointer(state), window, APTR.FromPointer(truncated)) != 0) return 9;
+			APTR.FromPointer(state), window, APTR.FromPointer(truncated)) != 0) return 24;
 		if (MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
-			APTR.FromPointer(state), window, APTR.FromPointer(unmapped)) != 0) return 10;
+			APTR.FromPointer(state), window, APTR.FromPointer(unmapped)) != 0) return 25;
+		APTR.WriteUInt32(APTR.FromPointer(eventMessage), 0, 0x90000077);
+		APTR.WriteUInt32(APTR.FromPointer(handler), 20, 4);
+		if (MuiApplicationWindowCore.DispatchEventHandlerNode(ref platform,
+			APTR.FromPointer(handler), APTR.FromPointer(eventMessage), 4) != 0x77)
+			return 29;
 		if (!MuiHeadlessObjectCore.DisposeObject(ref platform,
-			APTR.FromPointer(state), window)) return 11;
+			APTR.FromPointer(state), window)) return 26;
 		APTR.WriteUInt32(APTR.FromPointer(packet), 0,
 			MuiApplicationDispatcher.WindowRemoveEventHandlerMethod);
 		if (MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
-			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 0) return 12;
+			APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 0) return 27;
 		if (!MuiMasterLifecycleCore.Dispose(ref platform,
-			APTR.FromPointer(privateRoot))) return 13;
+			APTR.FromPointer(privateRoot))) return 28;
 		return 42;
+	}
+
+	// MG09 virtual-group GUI-mode eligibility closure. The target is first
+	// laid out outside the virtual viewport and then moved inside it; the
+	// typed event walk must refuse and then deliver the same GUI event.
+	public static uint WindowEventHandlerVirtualGroupRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00036800;
+		const uint state = 0x00036900;
+		const uint name = 0x00036A00;
+		const uint packet = 0x00036B00;
+		const uint handler = 0x00036B40;
+		const uint eventMessage = 0x00036B80;
+		WriteClassId(APTR.FromPointer(name), 'V', 'i', 'r', 't', 'G', 'r', 'o',
+			'u', 'p');
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		if (classRecord.IsNull) return 2;
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var virtgroup = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var target = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (window.IsNull || virtgroup.IsNull || target.IsNull) return 3;
+		if (!MuiFamilyCore.AddTail(ref platform, APTR.FromPointer(state), window,
+			virtgroup) || !MuiFamilyCore.AddTail(ref platform,
+			APTR.FromPointer(state), virtgroup, target)) return 4;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), virtgroup, 0x80427C49, 300, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), virtgroup, 0x80423038, 150, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), virtgroup, 0x80429371, 0, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), virtgroup, 0x80425200, 0, false)) return 5;
+		if (!MuiAreaLayoutCore.Layout(ref platform, APTR.FromPointer(state),
+			virtgroup, 10, 20, 100, 60) ||
+			!MuiAreaLayoutCore.Layout(ref platform, APTR.FromPointer(state), target,
+				500, 20, 10, 10)) return 6;
+		var classPointer = MuiHeadlessObjectCore.ClassPointer(ref platform,
+			classRecord);
+		if (classPointer.IsNull) return 7;
+		WriteEventHandler(ref platform, APTR.FromPointer(handler), target,
+			classPointer, 0, 4);
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(packet),
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(handler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 8;
+		if (!MuiCommonControlPacketCore.WriteMethod(ref platform,
+			APTR.FromPointer(eventMessage), 0x90000001) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 0)
+			return 9;
+		if (!MuiAreaLayoutCore.Layout(ref platform, APTR.FromPointer(state), target,
+			50, 20, 10, 10) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 1)
+			return 10;
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(packet),
+			MuiApplicationDispatcher.WindowRemoveEventHandlerMethod,
+			APTR.FromPointer(handler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1 ||
+			!MuiHeadlessObjectCore.DisposeObject(ref platform,
+				APTR.FromPointer(state), window) ||
+			!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 11;
+		return 42;
+	}
+
+	// MG09 MUI_EHF_PRIORITY closure. A temporary object's priority handler must
+	// run before active-object handlers, even with a lower signed ehn_Priority;
+	// a non-eat result then falls through to the active object exactly once.
+	public static uint WindowEventHandlerPriorityRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x0003A800;
+		const uint state = 0x0003A900;
+		const uint name = 0x0003AA00;
+		const uint packet = 0x0003AB00;
+		const uint activeHandler = 0x0003AB40;
+		const uint priorityHandler = 0x0003AB80;
+		const uint eventMessage = 0x0003ABC0;
+		WriteClassId(APTR.FromPointer(name), 'P', 'r', 'i', 'o', 'r', 'i', 't',
+			'y', (char)0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		if (classRecord.IsNull) return 2;
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var active = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var temporary = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (window.IsNull || active.IsNull || temporary.IsNull) return 3;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), window, 0x80427925, active.Raw, false))
+			return 4;
+		var classPointer = MuiHeadlessObjectCore.ClassPointer(ref platform,
+			classRecord);
+		if (classPointer.IsNull) return 5;
+		WriteEventHandler(ref platform, APTR.FromPointer(activeHandler), active,
+			classPointer, 100, 4);
+		WriteEventHandler(ref platform, APTR.FromPointer(priorityHandler),
+			temporary, classPointer, -100, 4, 0x0802);
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(packet),
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(activeHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 6;
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(packet),
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(priorityHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 7;
+		if (!MuiCommonControlPacketCore.WriteMethod(ref platform,
+			APTR.FromPointer(eventMessage), 0x90000001) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) != temporary.Raw)
+			return 8;
+		if (!MuiCommonControlPacketCore.WriteMethod(ref platform,
+			APTR.FromPointer(eventMessage), 0x90000077) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 0 ||
+			APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) != active.Raw)
+			return 9;
+		if (!MuiHeadlessObjectCore.DisposeObject(ref platform,
+			APTR.FromPointer(state), window) ||
+			!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 10;
+		return 42;
+	}
+
+	// MG09 active-parent keyboard routing closure. A MUI key reaches the
+	// active object's parent before the default object; a non-eat walk must not
+	// invoke the parent again in the remaining queue pass.
+	public static uint WindowEventHandlerActiveParentRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x0003B000;
+		const uint state = 0x0003B100;
+		const uint name = 0x0003B200;
+		const uint packet = 0x0003B300;
+		const uint parentHandler = 0x0003B340;
+		const uint defaultHandler = 0x0003B380;
+		const uint eventMessage = 0x0003B3C0;
+		WriteClassId(APTR.FromPointer(name), 'A', 'c', 't', 'P', 'a', 'r', 'e',
+			'n', 't');
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		if (classRecord.IsNull) return 2;
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var parent = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var active = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var defaultObject = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (window.IsNull || parent.IsNull || active.IsNull ||
+			defaultObject.IsNull) return 3;
+		if (!MuiFamilyCore.AddTail(ref platform, APTR.FromPointer(state), window,
+			parent) ||
+			!MuiFamilyCore.AddTail(ref platform, APTR.FromPointer(state), parent,
+				active) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), window, 0x80427925, active.Raw, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), window, 0x804294D7,
+				defaultObject.Raw, false)) return 4;
+		var classPointer = MuiHeadlessObjectCore.ClassPointer(ref platform,
+			classRecord);
+		if (classPointer.IsNull) return 5;
+		WriteEventHandler(ref platform, APTR.FromPointer(parentHandler), parent,
+			classPointer, 0, 4);
+		WriteEventHandler(ref platform, APTR.FromPointer(defaultHandler),
+			defaultObject, classPointer, 0, 4);
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(packet),
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(parentHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 6;
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(packet),
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(defaultHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 7;
+		if (!MuiCommonControlPacketCore.WriteHandleEvent(ref platform,
+			APTR.FromPointer(eventMessage), 0x90000001, 2, 0) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 1 ||
+			APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) != parent.Raw)
+			return 8;
+		if (!MuiCommonControlPacketCore.WriteHandleEvent(ref platform,
+			APTR.FromPointer(eventMessage), 0x90000077, 2, 0)) return 9;
+		var nonEatResult = MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+			APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4);
+		if (nonEatResult != 0) return 10;
+		if (APTR.ReadUInt32(APTR.FromPointer(0x0004F024), 0) != defaultObject.Raw)
+			return 11;
+		if (!MuiHeadlessObjectCore.DisposeObject(ref platform,
+			APTR.FromPointer(state), window) ||
+			!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 12;
+		return 42;
+	}
+
+	// MG09 transient MUI_EHF_ISCALLING closure. The callback observes the
+	// named guest MUI_EventHandlerNode with the state bit set; after return the
+	// same struct is re-read and the bit is cleared without disturbing the
+	// caller-owned node fields.
+	public static uint WindowEventHandlerCallingRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x0003C000;
+		const uint state = 0x0003C100;
+		const uint name = 0x0003C200;
+		const uint handler = 0x0003C240;
+		const uint eventMessage = 0x0003C280;
+		WriteClassId(APTR.FromPointer(name), 'C', 'a', 'l', 'l', 'i', 'n', 'g',
+			(char)0, (char)0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		if (classRecord.IsNull) return 2;
+		var target = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var classPointer = MuiHeadlessObjectCore.ClassPointer(ref platform,
+			classRecord);
+		if (target.IsNull || classPointer.IsNull) return 3;
+		WriteEventHandler(ref platform, APTR.FromPointer(handler), target,
+			classPointer, 0, 4);
+		if (!MuiCommonControlPacketCore.WriteMethod(ref platform,
+			APTR.FromPointer(eventMessage), 0x90000001) ||
+			MuiApplicationWindowCore.DispatchEventHandlerNode(ref platform,
+				APTR.FromPointer(state), APTR.FromPointer(handler),
+				APTR.FromPointer(eventMessage), 4) != 1)
+			return 4;
+		if (!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+			APTR.FromPointer(handler), out var completed) ||
+			(completed.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISCALLING) != 0)
+			return 5;
+		if (!MuiHeadlessObjectCore.DisposeObject(ref platform,
+			APTR.FromPointer(state), target) ||
+			!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 6;
+		return 42;
+	}
+
+	// MG09 MUI_EHF_ISENABLED closure. The read-only state bit is set after a
+	// named handler is accepted by a window queue, cleared after explicit
+	// removal, and also cleared when window cleanup releases the queue wrapper.
+	public static uint WindowEventHandlerEnabledRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x0003D000;
+		const uint state = 0x0003D100;
+		const uint name = 0x0003D200;
+		const uint packet = 0x0003D300;
+		const uint handler = 0x0003D340;
+		WriteClassId(APTR.FromPointer(name), 'E', 'n', 'a', 'b', 'l', 'e', 'd',
+			(char)0, (char)0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		if (classRecord.IsNull) return 2;
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var target = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var classPointer = MuiHeadlessObjectCore.ClassPointer(ref platform,
+			classRecord);
+		if (window.IsNull || target.IsNull || classPointer.IsNull) return 3;
+		WriteEventHandler(ref platform, APTR.FromPointer(handler), target,
+			classPointer, 0, 4);
+		if (!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+			APTR.FromPointer(handler), out var initial) ||
+			(initial.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISENABLED) != 0)
+			return 4;
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(packet),
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(handler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 5;
+		if (!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+			APTR.FromPointer(handler), out var registered) ||
+			(registered.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISENABLED) == 0)
+			return 6;
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(packet),
+			MuiApplicationDispatcher.WindowRemoveEventHandlerMethod,
+			APTR.FromPointer(handler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 7;
+		if (!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+			APTR.FromPointer(handler), out var removed) ||
+			(removed.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISENABLED) != 0)
+			return 8;
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(packet),
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(handler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 9;
+		if (!MuiHeadlessObjectCore.DisposeObject(ref platform,
+			APTR.FromPointer(state), window)) return 10;
+		if (!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+			APTR.FromPointer(handler), out var disposed) ||
+			(disposed.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISENABLED) != 0)
+			return 11;
+		if (!MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 12;
+		return 42;
+	}
+
+	// MG09 MUI_EHF_ISACTIVE closure. MUI maintains the read-only state bit
+	// whenever a registered handler's object is the window's active or default
+	// object; the refresh is observable after an active-object transition.
+	public static uint WindowEventHandlerActiveStateRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x0003E000;
+		const uint state = 0x0003E100;
+		const uint name = 0x0003E200;
+		const uint packet = 0x0003E300;
+		const uint eventMessage = 0x0003E340;
+		const uint activeHandler = 0x0003E380;
+		const uint defaultHandler = 0x0003E3C0;
+		const uint otherHandler = 0x0003E400;
+		WriteClassId(APTR.FromPointer(name), 'A', 'c', 't', 'S', 't', 'a',
+			't', 'e', (char)0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		if (classRecord.IsNull) return 2;
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var active = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var defaultObject = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var other = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var classPointer = MuiHeadlessObjectCore.ClassPointer(ref platform,
+			classRecord);
+		if (window.IsNull || active.IsNull || defaultObject.IsNull ||
+			other.IsNull || classPointer.IsNull) return 3;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), window, 0x80427925, active.Raw, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), window, 0x804294D7, defaultObject.Raw, false))
+			return 4;
+		WriteEventHandler(ref platform, APTR.FromPointer(activeHandler), active,
+			classPointer, 0, 4);
+		WriteEventHandler(ref platform, APTR.FromPointer(defaultHandler),
+			defaultObject, classPointer, 0, 4);
+		WriteEventHandler(ref platform, APTR.FromPointer(otherHandler), other,
+			classPointer, 0, 4);
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(packet), MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(activeHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 5;
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(packet), MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(defaultHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 6;
+		if (!WriteWindowEventHandlerPacket(ref platform,
+			APTR.FromPointer(packet), MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(otherHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 7;
+		if (!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+			APTR.FromPointer(activeHandler), out var activeRecord) ||
+			!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+				APTR.FromPointer(defaultHandler), out var defaultRecord) ||
+			!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+				APTR.FromPointer(otherHandler), out var otherRecord) ||
+			(activeRecord.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISACTIVE) == 0 ||
+			(defaultRecord.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISACTIVE) == 0 ||
+			(otherRecord.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISACTIVE) != 0)
+			return 8;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), window, 0x80427925, other.Raw, false) ||
+			!MuiCommonControlPacketCore.WriteMethod(ref platform,
+				APTR.FromPointer(eventMessage), 0x90000001) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 1)
+			return 9;
+		if (!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+			APTR.FromPointer(activeHandler), out activeRecord) ||
+			!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+				APTR.FromPointer(defaultHandler), out defaultRecord) ||
+			!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+				APTR.FromPointer(otherHandler), out otherRecord) ||
+			(activeRecord.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISACTIVE) != 0 ||
+			(defaultRecord.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISACTIVE) == 0 ||
+			(otherRecord.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISACTIVE) == 0)
+			return 10;
+		if (!MuiHeadlessObjectCore.DisposeObject(ref platform,
+			APTR.FromPointer(state), window) ||
+			!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 11;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_DisableKeys closure. A named window key mask is applied
+	// to the typed MUIP_HandleEvent packet before the handler queue is visited.
+	public static uint WindowEventHandlerDisableKeysRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00040000;
+		const uint state = 0x00040100;
+		const uint name = 0x00040200;
+		const uint packet = 0x00040300;
+		const uint eventMessage = 0x00040340;
+		const uint handler = 0x00040380;
+		WriteClassId(APTR.FromPointer(name), 'D', 'i', 's', 'K', 'e', 'y', 's',
+			(char)0, (char)0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		if (classRecord.IsNull) return 2;
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var target = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var classPointer = MuiHeadlessObjectCore.ClassPointer(ref platform,
+			classRecord);
+		if (window.IsNull || target.IsNull || classPointer.IsNull) return 3;
+		WriteEventHandler(ref platform, APTR.FromPointer(handler), target,
+			classPointer, 0, 4);
+		if (!MuiCommonControlPacketCore.WriteHandleEvent(ref platform,
+			APTR.FromPointer(eventMessage), 0, 2, 0) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), window, 0x80424C36, 1u << 2, false) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform,
+				APTR.FromPointer(state), window, 0x80427925, target.Raw, false) ||
+			!WriteWindowEventHandlerPacket(ref platform,
+				APTR.FromPointer(packet), MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+				APTR.FromPointer(handler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 4;
+		if (MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+			APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 0)
+			return 5;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), window, 0x80424C36, 0, false) ||
+			MuiApplicationWindowCore.DispatchWindowEvent(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(eventMessage), 4) != 1)
+			return 6;
+		if (!MuiHeadlessObjectCore.DisposeObject(ref platform,
+			APTR.FromPointer(state), window) ||
+			!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 7;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_DefaultObject closure. The typed Set packet stores a
+	// valid default target (or NULL) and immediately reconciles handler state;
+	// an unknown target is rejected without changing the stored selection.
+	public static uint WindowEventHandlerDefaultObjectRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00041000;
+		const uint state = 0x00041100;
+		const uint name = 0x00041200;
+		const uint packet = 0x00041300;
+		const uint firstHandler = 0x00041340;
+		const uint secondHandler = 0x00041380;
+		WriteClassId(APTR.FromPointer(name), 'D', 'e', 'f', 'O', 'b', 'j',
+			(char)0, (char)0, (char)0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		if (classRecord.IsNull) return 2;
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var first = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var second = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		var classPointer = MuiHeadlessObjectCore.ClassPointer(ref platform,
+			classRecord);
+		if (window.IsNull || first.IsNull || second.IsNull || classPointer.IsNull)
+			return 3;
+		WriteEventHandler(ref platform, APTR.FromPointer(firstHandler), first,
+			classPointer, 0, 4);
+		WriteEventHandler(ref platform, APTR.FromPointer(secondHandler), second,
+			classPointer, 0, 4);
+		if (!WriteWindowEventHandlerPacket(ref platform, APTR.FromPointer(packet),
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+			APTR.FromPointer(firstHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1 ||
+			!WriteWindowEventHandlerPacket(ref platform, APTR.FromPointer(packet),
+				MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+				APTR.FromPointer(secondHandler)) ||
+			MuiApplicationDispatcher.DispatchWindowEventHandler(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 4;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			0x804294D7, first.Raw) ||
+			MuiApplicationDispatcher.DispatchWindowDefaultObject(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 5;
+		if (!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+			APTR.FromPointer(firstHandler), out var firstRecord) ||
+			!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+				APTR.FromPointer(secondHandler), out var secondRecord) ||
+			(firstRecord.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISACTIVE) == 0 ||
+			(secondRecord.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISACTIVE) != 0)
+			return 6;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			0x804294D7, second.Raw) ||
+			MuiApplicationDispatcher.DispatchWindowDefaultObject(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 7;
+		if (!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+			APTR.FromPointer(firstHandler), out firstRecord) ||
+			!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+				APTR.FromPointer(secondHandler), out secondRecord) ||
+			(firstRecord.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISACTIVE) != 0 ||
+			(secondRecord.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISACTIVE) == 0)
+			return 8;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			0x804294D7, 0) ||
+			MuiApplicationDispatcher.DispatchWindowDefaultObject(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 9;
+		if (!MuiApplicationWindowRecordPacketCore.TryReadEventHandler(ref platform,
+			APTR.FromPointer(secondHandler), out secondRecord) ||
+			(secondRecord.Flags & MuiEventHandlerNodeInput.MUI_EHF_ISACTIVE) != 0)
+			return 10;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			0x804294D7, 0x1F00) ||
+			MuiApplicationDispatcher.DispatchWindowDefaultObject(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 0)
+			return 11;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, 0x804294D7, out var storedDefault) ||
+			storedDefault != 0) return 12;
+		if (!MuiHeadlessObjectCore.DisposeObject(ref platform,
+			APTR.FromPointer(state), window) ||
+			!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 13;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_Activate closure. A TRUE write requires an open native
+	// window and records the state only after activation succeeds; FALSE is a
+	// documented no-op.
+	public static uint WindowActivateRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00042000;
+		const uint state = 0x00042100;
+		const uint name = 0x00042200;
+		const uint packet = 0x00042300;
+		WriteClassId(APTR.FromPointer(name), 'A', 'c', 't', 'i', 'v', 'a',
+			't', 'e', (char)0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		if (classRecord.IsNull) return 2;
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (window.IsNull) return 3;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			0x80428D2F, 1) ||
+			MuiApplicationDispatcher.DispatchWindowActivate(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 0)
+			return 4;
+		if (!MuiApplicationWindowCore.OpenWindow(ref platform,
+			APTR.FromPointer(state), window, 0) ||
+			MuiApplicationDispatcher.DispatchWindowActivate(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 5;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, 0x80428D2F, out var active) ||
+			active != 1) return 6;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			0x80428D2F, 0) ||
+			MuiApplicationDispatcher.DispatchWindowActivate(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 7;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, 0x80428D2F, out active) ||
+			active != 1) return 8;
+		if (!MuiApplicationWindowCore.CloseWindow(ref platform,
+			APTR.FromPointer(state), window) ||
+			!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				0x80428D2F, 1) ||
+			MuiApplicationDispatcher.DispatchWindowActivate(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 0)
+			return 9;
+		if (!MuiHeadlessObjectCore.DisposeObject(ref platform,
+			APTR.FromPointer(state), window) ||
+			!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 10;
+		return 42;
+	}
+
+	// MG09 MUIA_Window_Sleep closure. Sleep requests nest, preserve the prior
+	// disabled state, and suppress window event delivery until the final wake.
+	public static uint WindowSleepRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00043000;
+		const uint state = 0x00043100;
+		const uint name = 0x00043200;
+		const uint packet = 0x00043300;
+		const uint eventMessage = 0x00043340;
+		WriteClassId(APTR.FromPointer(name), 'S', 'l', 'e', 'e', 'p',
+			(char)0, (char)0, (char)0, (char)0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(name), APTR.Null, 0,
+			APTR.FromPointer(1));
+		if (classRecord.IsNull) return 2;
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (window.IsNull || !MuiCommonControlPacketCore.WriteMethod(ref platform,
+			APTR.FromPointer(eventMessage), 0x90000001) ||
+			!MuiApplicationWindowCore.OpenWindow(ref platform,
+				APTR.FromPointer(state), window, 0)) return 3;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			0x8042E7DB, 1) ||
+			MuiApplicationDispatcher.DispatchWindowSleep(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 4;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, 0x8042E7DB, out var depth) ||
+			depth != 1 || !MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), window, 0x80423661, out var disabled) ||
+			disabled != 1 || MuiApplicationWindowCore.DispatchWindowEvent(
+				ref platform, APTR.FromPointer(state), window,
+				APTR.FromPointer(eventMessage), 4) != 0)
+			return 5;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NoNotifySet,
+			0x8042E7DB, 1) ||
+			MuiApplicationDispatcher.DispatchWindowSleep(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 6;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, 0x8042E7DB, out depth) || depth != 2)
+			return 7;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			0x8042E7DB, 0) ||
+			MuiApplicationDispatcher.DispatchWindowSleep(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1 ||
+			MuiApplicationDispatcher.DispatchWindowSleep(ref platform,
+				APTR.FromPointer(state), window, APTR.FromPointer(packet)) != 1)
+			return 8;
+		if (!MuiHeadlessObjectCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), window, 0x8042E7DB, out depth) || depth != 0 ||
+			!MuiHeadlessObjectCore.GetAttribute(ref platform,
+				APTR.FromPointer(state), window, 0x80423661, out disabled) ||
+				disabled != 0)
+			return 9;
+		if (!MuiApplicationWindowCore.CloseWindow(ref platform,
+			APTR.FromPointer(state), window)) return 10;
+		if (!MuiHeadlessObjectCore.DisposeObject(ref platform,
+			APTR.FromPointer(state), window) ||
+			!MuiMasterLifecycleCore.Dispose(ref platform,
+				APTR.FromPointer(privateRoot))) return 11;
+		return 42;
+	}
+
+	private static bool WriteWindowEventHandlerPacket(
+		ref MuiNativeHeadlessPlatform platform, APTR address, uint method,
+		APTR handler)
+	{
+		return MuiWindowEventHandlerPacketCore.Write(ref platform, address,
+			new MuiWindowEventHandlerPacketInput
+			{
+				MethodId = method,
+				Handler = handler
+			});
+	}
+
+	private static void WriteEventHandler(ref MuiNativeHeadlessPlatform platform,
+		APTR address, APTR obj, APTR classPointer, sbyte priority, uint events,
+		ushort flags = 0x0002)
+	{
+		MuiApplicationWindowRecordPacketCore.WriteEventHandler(ref platform,
+			address, new MuiEventHandlerNodeInput
+			{
+				Priority = priority,
+				Flags = flags,
+				Object = obj,
+				Class = classPointer,
+				Events = events
+			});
 	}
 
 	// MG09 Application PushMethod/UnpushMethod packet closure. Push returns a
@@ -5220,6 +9194,7 @@ public static class MuiNativeRoots
 		const uint tags = 0x00036300;
 		const uint stringContents = 0x80428ffdu;
 		const uint scrollWidth = 0x80420fb5u;
+		const uint scrollHeight = 0x8042be8bu;
 		const uint scrollLeft = 0x8042bd0du;
 		const uint scrollVisibleWidth = 0x8042d280u;
 		var cn = APTR.FromPointer(className);
@@ -5235,15 +9210,16 @@ public static class MuiNativeRoots
 		APTR.WriteUInt8(cn, 9, (byte)'i');
 		APTR.WriteUInt8(cn, 10, 0);
 		var source = APTR.FromPointer(text);
-		APTR.WriteUInt8(source, 0, (byte)'a');
-		APTR.WriteUInt8(source, 1, (byte)'b');
-		APTR.WriteUInt8(source, 2, (byte)'c');
-		APTR.WriteUInt8(source, 3, (byte)'d');
-		APTR.WriteUInt8(source, 4, (byte)'e');
-		APTR.WriteUInt8(source, 5, (byte)'f');
-		APTR.WriteUInt8(source, 6, (byte)'g');
-		APTR.WriteUInt8(source, 7, (byte)'h');
-		APTR.WriteUInt8(source, 8, 0);
+		APTR.WriteUInt8(source, 0, 0xC3);
+		APTR.WriteUInt8(source, 1, 0x85);
+		APTR.WriteUInt8(source, 2, 0xCE);
+		APTR.WriteUInt8(source, 3, 0xB2);
+		APTR.WriteUInt8(source, 4, 0xF0);
+		APTR.WriteUInt8(source, 5, 0x9F);
+		APTR.WriteUInt8(source, 6, 0x99);
+		APTR.WriteUInt8(source, 7, 0x82);
+		APTR.WriteUInt8(source, 8, 0x0A);
+		APTR.WriteUInt8(source, 9, 0);
 		var tagList = APTR.FromPointer(tags);
 		APTR.WriteUInt32(tagList, 0, stringContents);
 		APTR.WriteUInt32(tagList, 4, text);
@@ -5258,22 +9234,97 @@ public static class MuiNativeRoots
 			APTR.FromPointer(state), APTR.FromPointer(classRecord), tagList).Raw;
 		if (obj == 0) return 3;
 		if (!MuiAreaLayoutCore.Layout(ref platform, APTR.FromPointer(state),
-			APTR.FromPointer(obj), 0, 0, 24, 10)) return 4;
+			APTR.FromPointer(obj), 0, 0, 16, 10)) return 4;
 		if (!MuiStringScrollAttributeCore.Get(ref platform,
 			APTR.FromPointer(state), APTR.FromPointer(obj), scrollWidth,
-			out var width) || width != 64) return 5;
+			out var width) || width != 24) return 5;
+		if (!MuiStringScrollAttributeCore.Get(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(obj), scrollHeight,
+			out var height) || height != 20) return 6;
 		if (!MuiStringScrollAttributeCore.Get(ref platform,
 			APTR.FromPointer(state), APTR.FromPointer(obj), scrollVisibleWidth,
-			out var visible) || visible != 24) return 6;
+			out var visible) || visible != 16) return 7;
 		if (!MuiCommonControlCore.SetControlAttribute(ref platform,
-			APTR.FromPointer(state), APTR.FromPointer(obj), scrollLeft, 999)) return 7;
+			APTR.FromPointer(state), APTR.FromPointer(obj), scrollLeft, 999)) return 8;
 		if (!MuiStringScrollAttributeCore.Get(ref platform,
 			APTR.FromPointer(state), APTR.FromPointer(obj), scrollLeft,
-			out var left) || left != 40) return 8;
+			out var left) || left != 8) return 9;
 		if (!MuiHeadlessObjectCore.DisposeObject(ref platform,
-			APTR.FromPointer(state), APTR.FromPointer(obj))) return 9;
+			APTR.FromPointer(state), APTR.FromPointer(obj))) return 10;
 		if (!MuiMasterLifecycleCore.Dispose(ref platform,
-			APTR.FromPointer(privateRoot))) return 10;
+			APTR.FromPointer(privateRoot))) return 11;
+		return 42;
+	}
+
+	// Focused MG09 String.mui UTF-8 metric seam.  The guest projection is built
+	// from the named headless state/class/object/attribute records so this root
+	// proves the String scroll attributes without importing the broad common
+	// control construction closure.
+	public static uint StringScrollAttributeUtf8MetricsRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint state = 0x00050000;
+		const uint classes = 0x00050100;
+		const uint objects = 0x00050140;
+		const uint className = 0x00050200;
+		const uint attributes = 0x00050300;
+		const uint widthAttribute = 0x00050310;
+		const uint heightAttribute = 0x00050320;
+		const uint objectAddress = 0x00050400;
+		const uint text = 0x00050500;
+		const uint scrollWidth = 0x80420fb5u;
+		const uint scrollHeight = 0x8042be8bu;
+		const uint stringContents = 0x80428ffdu;
+		var name = APTR.FromPointer(className);
+		APTR.WriteUInt8(name, 0, (byte)'S');
+		APTR.WriteUInt8(name, 1, (byte)'t');
+		APTR.WriteUInt8(name, 2, (byte)'r');
+		APTR.WriteUInt8(name, 3, (byte)'i');
+		APTR.WriteUInt8(name, 4, (byte)'n');
+		APTR.WriteUInt8(name, 5, (byte)'g');
+		APTR.WriteUInt8(name, 6, (byte)'.');
+		APTR.WriteUInt8(name, 7, (byte)'m');
+		APTR.WriteUInt8(name, 8, (byte)'u');
+		APTR.WriteUInt8(name, 9, (byte)'i');
+		APTR.WriteUInt8(name, 10, 0);
+		var source = APTR.FromPointer(text);
+		APTR.WriteUInt8(source, 0, 0xC3);
+		APTR.WriteUInt8(source, 1, 0x85);
+		APTR.WriteUInt8(source, 2, 0xCE);
+		APTR.WriteUInt8(source, 3, 0xB2);
+		APTR.WriteUInt8(source, 4, 0xF0);
+		APTR.WriteUInt8(source, 5, 0x9F);
+		APTR.WriteUInt8(source, 6, 0x99);
+		APTR.WriteUInt8(source, 7, 0x82);
+		APTR.WriteUInt8(source, 8, 0x0A);
+		APTR.WriteUInt8(source, 9, 0);
+		if (!MuiHeadlessStatePacketCore.WriteRecord(ref platform,
+			APTR.FromPointer(state), MuiHeadlessLayout.Magic,
+			MuiHeadlessLayout.Version, APTR.FromPointer(classes),
+			APTR.FromPointer(objects), 1, 0, 0, 0)) return 1;
+		if (!MuiHeadlessClassPacketCore.WriteRecord(ref platform,
+			APTR.FromPointer(classes), APTR.Null, name, APTR.Null, APTR.Null,
+			1, 0, 1)) return 2;
+		if (!MuiHeadlessObjectPacketCore.WriteLinkFieldsA(ref platform,
+			APTR.FromPointer(objects), APTR.Null, APTR.FromPointer(objectAddress),
+			APTR.FromPointer(classes), APTR.FromPointer(attributes), APTR.Null))
+			return 3;
+		if (!MuiHeadlessAttributePacketCore.WriteRecord(ref platform,
+			APTR.FromPointer(attributes), APTR.FromPointer(widthAttribute),
+			stringContents, source.Raw, 1) ||
+			!MuiHeadlessAttributePacketCore.WriteRecord(ref platform,
+				APTR.FromPointer(widthAttribute), APTR.FromPointer(heightAttribute),
+				0x8042b59cu, 40, 2) ||
+			!MuiHeadlessAttributePacketCore.WriteRecord(ref platform,
+				APTR.FromPointer(heightAttribute), APTR.Null, 0x80423237u, 30, 3))
+			return 4;
+		if (!MuiStringScrollAttributeCore.Get(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(objectAddress), scrollWidth,
+			out var width) || width != 24) return 5;
+		if (!MuiStringScrollAttributeCore.Get(ref platform,
+			APTR.FromPointer(state), APTR.FromPointer(objectAddress), scrollHeight,
+			out var height) || height != 20) return 6;
 		return 42;
 	}
 
@@ -5385,13 +9436,12 @@ public static class MuiNativeRoots
 		if (!MuiCommonControlPacketCore.TryReadStringify(ref platform, message,
 			out stringify) || stringify.Value != -42) return 4;
 
-		APTR.WriteUInt32(message, 0, MuiCommonControlPacketCore.HandleEvent);
-		APTR.WriteUInt32(message, 4, 0x00036500);
-		APTR.WriteUInt32(message, 8, unchecked((uint)-1));
-		APTR.WriteUInt32(message, 12, 0xA5A5A5A5);
+		if (!MuiCommonControlPacketCore.WriteHandleEvent(ref platform, message,
+			0x00036500, -1, 0xA5A5A5A5)) return 1;
 		if (!MuiCommonControlPacketCore.TryReadHandleEvent(ref platform, message,
 			out handleEvent) || handleEvent.InputMessage != 0x00036500 ||
-			handleEvent.Qualifier != -1 || handleEvent.Reserved != 0xA5A5A5A5)
+			handleEvent.MuiKey != -1 ||
+			handleEvent.EventHandlerNode != 0xA5A5A5A5)
 			return 5;
 
 		APTR.WriteUInt32(message, 0, MuiCommonControlPacketCore.OmGet);
@@ -5505,13 +9555,12 @@ public static class MuiNativeRoots
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var message = APTR.FromPointer(0x00036400);
-		APTR.WriteUInt32(message, 0, MuiCommonControlPacketCore.HandleEvent);
-		APTR.WriteUInt32(message, 4, 0x00036500);
-		APTR.WriteUInt32(message, 8, unchecked((uint)-1));
-		APTR.WriteUInt32(message, 12, 0xA5A5A5A5);
+		if (!MuiCommonControlPacketCore.WriteHandleEvent(ref platform, message,
+			0x00036500, -1, 0xA5A5A5A5)) return 1;
 		if (!MuiCommonControlPacketCore.TryReadHandleEvent(ref platform, message,
 			out var packet) || packet.InputMessage != 0x00036500 ||
-			packet.Qualifier != -1 || packet.Reserved != 0xA5A5A5A5) return 1;
+			packet.MuiKey != -1 ||
+			packet.EventHandlerNode != 0xA5A5A5A5) return 1;
 		return 42;
 	}
 
@@ -5699,6 +9748,52 @@ public static class MuiNativeRoots
 			out var text) || text.Left != 1 || text.Top != 2 ||
 			text.Width != 80 || text.Height != 16 || text.Text != 0x00036500 ||
 			text.Length != 7 || text.Reserved1 != 0x22) return 1;
+		return 42;
+	}
+
+	// Focused ABI proof for the named Layout packet codec. The existing surface
+	// roots cover dispatcher behavior; this seam isolates all fixed-record reads
+	// and the malformed boundary checks.
+	public static uint LayoutPacketCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		var packet = APTR.FromPointer(packetAddress);
+		APTR.WriteUInt32(packet, 0, MuiLayoutPacketCodec.AskMinMax);
+		APTR.WriteUInt32(packet, 4, 0x00050D00);
+		if (!MuiLayoutPacketCodec.TryReadAskMinMax(ref platform, packet,
+			out var ask) || ask.Storage != 0x00050D00) return 1;
+		APTR.WriteUInt32(packet, 0, MuiLayoutPacketCodec.Relayout);
+		APTR.WriteUInt32(packet, 4, 0xA5A5A5A5);
+		if (!MuiLayoutPacketCodec.TryReadRelayout(ref platform, packet,
+			out var relayout) || relayout.Flags != 0xA5A5A5A5) return 2;
+		APTR.WriteUInt32(packet, 0, MuiLayoutPacketCodec.DrawBackground);
+		APTR.WriteUInt32(packet, 4, 1);
+		APTR.WriteUInt32(packet, 8, 2);
+		APTR.WriteUInt32(packet, 12, 80);
+		APTR.WriteUInt32(packet, 16, 16);
+		APTR.WriteUInt32(packet, 20, 0x11);
+		APTR.WriteUInt32(packet, 24, 0x22);
+		APTR.WriteUInt32(packet, 28, 0x33);
+		if (!MuiLayoutPacketCodec.TryReadRectangle(ref platform, packet,
+			MuiLayoutPacketCodec.DrawBackground, out var rectangle) ||
+			rectangle.Left != 1 || rectangle.BottomOrHeight != 16 ||
+			rectangle.Reserved2 != 0x33) return 3;
+		APTR.WriteUInt32(packet, 0, MuiLayoutPacketCodec.Text);
+		APTR.WriteUInt32(packet, 4, 1);
+		APTR.WriteUInt32(packet, 8, 2);
+		APTR.WriteUInt32(packet, 12, 80);
+		APTR.WriteUInt32(packet, 16, 16);
+		APTR.WriteUInt32(packet, 20, 0x00050E00);
+		APTR.WriteUInt32(packet, 24, 7);
+		APTR.WriteUInt32(packet, 28, 0x11);
+		APTR.WriteUInt32(packet, 32, 0x22);
+		if (!MuiLayoutPacketCodec.TryReadText(ref platform, packet,
+			out var text) || text.Text != 0x00050E00 ||
+			text.Length != 7 || text.Reserved1 != 0x22) return 4;
+		if (MuiLayoutPacketCodec.TryReadText(ref platform,
+			APTR.FromPointer(0x00050FF5), out _)) return 5;
 		return 42;
 	}
 
@@ -7363,47 +11458,494 @@ public static class MuiNativeRoots
 		WriteWord(second, (byte)'b', (byte)'r', (byte)'a', (byte)'v', (byte)'o');
 		WriteWord(third, (byte)'c', (byte)'h', (byte)'a', (byte)'r', (byte)'l');
 
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x80426C87u);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, first);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, unchecked((uint)-3));
-		APTR.WriteUInt32(APTR.FromPointer(packet), 12, 0);
+		if (!MuiCollectionAdvancedMessageCodec.WriteInsert(ref platform,
+			APTR.FromPointer(packet), first, unchecked((uint)-3), 0)) return 4;
 		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
-			APTR.FromPointer(packet), out var result) || result != 1) return 4;
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, second);
-		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
-			APTR.FromPointer(packet), out result) || result != 1) return 5;
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, third);
-		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
-			APTR.FromPointer(packet), out result) || result != 1) return 6;
-
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x804253C2u);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, 0);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, 2);
+			APTR.FromPointer(packet), out var result) || result != 1) return 5;
+		if (!MuiCollectionAdvancedMessageCodec.WriteInsert(ref platform,
+			APTR.FromPointer(packet), second, unchecked((uint)-3), 0)) return 6;
 		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
 			APTR.FromPointer(packet), out result) || result != 1) return 7;
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x8042468Cu);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, 0);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, 1);
-		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
-			APTR.FromPointer(packet), out result) || result != 1) return 8;
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x8042BAABu);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, unchecked((uint)-2));
+		if (!MuiCollectionAdvancedMessageCodec.WriteInsert(ref platform,
+			APTR.FromPointer(packet), third, unchecked((uint)-3), 0)) return 8;
 		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
 			APTR.FromPointer(packet), out result) || result != 1) return 9;
 
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x80429804u);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, imageObject);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, 3);
-		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
-			APTR.FromPointer(packet), out result) || result == 0) return 10;
-		var image = APTR.FromPointer(result);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x80420F58u);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, image.Raw);
+		if (!MuiCollectionAdvancedMessageCodec.WritePair(ref platform,
+			APTR.FromPointer(packet), MuiCollectionAdvancedMessageCodec.Move, 0, 2))
+			return 10;
 		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
 			APTR.FromPointer(packet), out result) || result != 1) return 11;
-		if (!MuiCollectionLifecycle.DisposeObject(ref platform, st, list)) return 12;
+		if (!MuiCollectionAdvancedMessageCodec.WritePair(ref platform,
+			APTR.FromPointer(packet), MuiCollectionAdvancedMessageCodec.Exchange, 0, 1))
+			return 12;
+		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
+			APTR.FromPointer(packet), out result) || result != 1) return 13;
+		if (!MuiCollectionAdvancedMessageCodec.WritePosition(ref platform,
+			APTR.FromPointer(packet), MuiCollectionAdvancedMessageCodec.Jump,
+			unchecked((uint)-2))) return 14;
+		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
+			APTR.FromPointer(packet), out result) || result != 1) return 15;
+
+		if (!MuiCollectionAdvancedMessageCodec.WriteCreateImage(ref platform,
+			APTR.FromPointer(packet), imageObject, 3)) return 16;
+		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
+			APTR.FromPointer(packet), out result) || result == 0) return 17;
+		var image = APTR.FromPointer(result);
+		if (!MuiCollectionAdvancedMessageCodec.WritePointer(ref platform,
+			APTR.FromPointer(packet), MuiCollectionAdvancedMessageCodec.DeleteImage,
+			image.Raw)) return 18;
+		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
+			APTR.FromPointer(packet), out result) || result != 1) return 19;
+		if (!MuiCollectionLifecycle.DisposeObject(ref platform, st, list)) return 20;
 		if (!MuiMasterLifecycleCore.Dispose(ref platform,
-			APTR.FromPointer(privateRoot))) return 13;
+			APTR.FromPointer(privateRoot))) return 21;
+		return 42;
+	}
+
+	// Focused MG09 ABI proof for the fixed List advanced message records. The
+	// root exercises named Insert, pair, position, image, and pointer structs;
+	// guest offsets stay confined to MuiCollectionAdvancedMessageCodec.
+	public static uint CollectionListAdvancedMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint entry = 0x00050D00;
+		const uint image = 0x00050D40;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiCollectionAdvancedMessageCodec.WriteInsert(ref platform, packet,
+			entry, unchecked((uint)-3), 2) ||
+			!MuiCollectionAdvancedMessageCodec.TryReadInsert(ref platform, packet,
+				out var insert) || insert.Entry != entry ||
+			insert.Position != unchecked((uint)-3) || insert.Column != 2) return 1;
+		if (!MuiCollectionAdvancedMessageCodec.WritePair(ref platform, packet,
+			MuiCollectionAdvancedMessageCodec.Move, 0, 2) ||
+			!MuiCollectionAdvancedMessageCodec.TryReadPair(ref platform, packet,
+				MuiCollectionAdvancedMessageCodec.Move, out var move) ||
+			move.First != 0 || move.Second != 2) return 2;
+		if (!MuiCollectionAdvancedMessageCodec.WritePosition(ref platform, packet,
+			MuiCollectionAdvancedMessageCodec.Jump, unchecked((uint)-2)) ||
+			!MuiCollectionAdvancedMessageCodec.TryReadPosition(ref platform, packet,
+				MuiCollectionAdvancedMessageCodec.Jump, out var jump) ||
+			jump.Position != unchecked((uint)-2)) return 3;
+		if (!MuiCollectionAdvancedMessageCodec.WriteCreateImage(ref platform,
+			packet, image, 3) ||
+			!MuiCollectionAdvancedMessageCodec.TryReadCreateImage(ref platform,
+				packet, out var createImage) || createImage.Image != image ||
+			createImage.Flags != 3) return 4;
+		if (!MuiCollectionAdvancedMessageCodec.WritePointer(ref platform, packet,
+			MuiCollectionAdvancedMessageCodec.DeleteImage, image) ||
+			!MuiCollectionAdvancedMessageCodec.TryReadPointer(ref platform, packet,
+				MuiCollectionAdvancedMessageCodec.DeleteImage, out var deleteImage) ||
+			deleteImage.Pointer != image) return 5;
+		if (MuiCollectionAdvancedMessageCodec.TryReadInsert(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 6;
+		return 42;
+	}
+
+	// Focused MG09 ABI proof for the fixed List basic message records. Named
+	// GetEntry, Select, and method fields are round-tripped through the codec;
+	// packed guest offsets remain outside this root's consumers.
+	public static uint CollectionListBasicMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint storage = 0x00050F80;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiCollectionBasicMessageCodec.WriteGetEntry(ref platform, packet,
+			unchecked((uint)-2), storage)) return 11;
+		if (!MuiCollectionBasicMessageCodec.TryReadGetEntry(ref platform, packet,
+			out var getEntry)) return 12;
+		if (getEntry.Position != unchecked((uint)-2) ||
+			getEntry.Storage != storage) return 13;
+		if (!MuiCollectionBasicMessageCodec.WriteSelect(ref platform, packet, 4,
+			2, storage)) return 2;
+		if (!MuiCollectionBasicMessageCodec.TryReadSelect(ref platform, packet,
+			out var select)) return 3;
+		if (select.Position != 4 || select.Select != 2 ||
+			select.Storage != storage) return 4;
+		if (!MuiCollectionBasicMessageCodec.WriteMethod(ref platform, packet,
+			MuiCollectionBasicMessageCodec.Clear) ||
+			!MuiCollectionBasicMessageCodec.IsValidMethod(ref platform, packet,
+				MuiCollectionBasicMessageCodec.Clear)) return 5;
+		if (!MuiCollectionBasicMessageCodec.WriteMethod(ref platform, packet,
+			MuiCollectionBasicMessageCodec.Sort) ||
+			!MuiCollectionBasicMessageCodec.IsValidMethod(ref platform, packet,
+				MuiCollectionBasicMessageCodec.Sort)) return 6;
+		var invalidSelect = default(MuiCollectionSelectMessage);
+		if (MuiCollectionBasicMessageCodec.TryReadSelect(ref platform,
+			APTR.FromPointer(0x00051FFF), out invalidSelect)) return 7;
+		if (MuiCollectionBasicMessageCodec.WriteMethod(ref platform, packet,
+			0x80420000u)) return 8;
+		return 42;
+	}
+
+	// Focused MG09 ABI proof for the fixed collection surface records. Layout,
+	// AskMinMax, Draw, HandleInput, and Set fields are round-tripped as named
+	// structs; raw guest offsets remain confined to the codec.
+	public static uint CollectionSurfaceMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint storage = 0x00050F80;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiCollectionSurfaceMessageCodec.WriteLayout(ref platform, packet,
+			1, 2, 80, 40) ||
+			!MuiCollectionSurfaceMessageCodec.TryReadLayout(ref platform, packet,
+				out var layout) || layout.Left != 1 || layout.Top != 2 ||
+			layout.Width != 80 || layout.Height != 40) return 1;
+		if (!MuiCollectionSurfaceMessageCodec.WriteAskMinMax(ref platform,
+			packet, storage) ||
+			!MuiCollectionSurfaceMessageCodec.TryReadAskMinMax(ref platform, packet,
+				out var askMinMax) || askMinMax.Storage != storage) return 2;
+		if (!MuiCollectionSurfaceMessageCodec.WriteDraw(ref platform, packet, 3) ||
+			!MuiCollectionSurfaceMessageCodec.TryReadDraw(ref platform, packet,
+				out var draw) || draw.Flags != 3) return 3;
+		if (!MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0x00050FA0u, -7) ||
+			!MuiCollectionSurfaceMessageCodec.TryReadHandleInput(ref platform,
+				packet, out var input) || input.IntuiMessage != 0x00050FA0u ||
+			input.MuiKey != -7) return 4;
+		if (!MuiCollectionSurfaceMessageCodec.WriteAttribute(ref platform, packet,
+			MuiCollectionSurfaceMessageCodec.Set, 0x120, 0x456) ||
+			!MuiCollectionSurfaceMessageCodec.TryReadAttribute(ref platform, packet,
+				MuiCollectionSurfaceMessageCodec.Set, out var attribute) ||
+			attribute.Attribute != 0x120 || attribute.Value != 0x456) return 5;
+		var invalidLayout = default(MuiCollectionLayoutMessage);
+		if (MuiCollectionSurfaceMessageCodec.TryReadLayout(ref platform,
+			APTR.FromPointer(0x00051FFF), out invalidLayout)) return 6;
+		var invalidAttribute = default(MuiCollectionAttributeMessage);
+		if (MuiCollectionSurfaceMessageCodec.TryReadAttribute(ref platform, packet,
+			0x80420000u, out invalidAttribute)) return 7;
+		var invalidInput = default(MuiCollectionHandleInputMessage);
+		if (MuiCollectionSurfaceMessageCodec.TryReadHandleInput(ref platform,
+			APTR.FromPointer(0x00051FFF), out invalidInput)) return 8;
+		return 42;
+	}
+
+	// Focused MG09 Listview input proof. The public HandleInput packet is
+	// qualified separately by CollectionSurfaceMessageCodecRoot; this root
+	// isolates the freestanding MUIKEY-to-ListActive selector mapping used by
+	// the live Listview core.
+	public static uint ListviewHandleInputRoot()
+	{
+		if (!MuiListviewCore.TryMapInputKey(2, out var up) || up != -4) return 1;
+		if (!MuiListviewCore.TryMapInputKey(3, out var down) || down != -5) return 2;
+		if (!MuiListviewCore.TryMapInputKey(4, out var pageUp) || pageUp != -6)
+			return 3;
+		if (!MuiListviewCore.TryMapInputKey(5, out var pageDown) || pageDown != -7)
+			return 4;
+		if (!MuiListviewCore.TryMapInputKey(6, out var top) || top != -2)
+			return 5;
+		if (!MuiListviewCore.TryMapInputKey(7, out var bottom) || bottom != -3)
+			return 6;
+		if (MuiListviewCore.TryMapInputKey(8, out _)) return 7;
+		return 42;
+	}
+
+	// Focused proof for the Listview selection-key classifier used by the live
+	// HandleInput path. Guest packet shape is covered by the shared surface
+	// codec root; this keeps the freestanding press/toggle mapping independent
+	// from the full List selection closure.
+	public static uint ListviewSelectionInputRoot()
+	{
+		if (!MuiListviewCore.TryMapSelectionKey(0, out var press) || press)
+			return 1;
+		if (!MuiListviewCore.TryMapSelectionKey(1, out var toggle) || !toggle)
+			return 2;
+		if (MuiListviewCore.TryMapSelectionKey(2, out _)) return 3;
+		return 42;
+	}
+
+	// Focused proof for the MorphOS synthetic MUIKEY_RELEASE cancellation edge.
+	// The full Listview transition is host-qualified; this root keeps the native
+	// closure to the freestanding key classifier and verifies that nearby
+	// navigation values are not misclassified as cancellation.
+	public static uint ListviewDragCancelRoot()
+	{
+		if (!MuiListviewCore.IsDragCancelKey(-2)) return 1;
+		if (MuiListviewCore.IsDragCancelKey(-1)) return 2;
+		if (MuiListviewCore.IsDragCancelKey(0)) return 3;
+		return 42;
+	}
+
+	// Focused MG09 proof for the fixed Area drag method family. Every public
+	// packet crosses a named record codec; malformed/truncated guest storage is
+	// rejected before any Area state transition is considered.
+	public static uint AreaDragMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050D00);
+		if (!MuiAreaDragMessageCodec.WriteBegin(ref platform, packet, 0x00050E00) ||
+			!MuiAreaDragMessageCodec.TryReadBegin(ref platform, packet,
+				out var begin) || begin.Object != 0x00050E00) return 1;
+		if (!MuiAreaDragMessageCodec.WriteDrop(ref platform, packet,
+			0x00050E00, -4, 12, 3) ||
+			!MuiAreaDragMessageCodec.TryReadDrop(ref platform, packet,
+				out var drop) || drop.X != -4 || drop.Y != 12 ||
+			drop.Qualifier != 3) return 2;
+		if (!MuiAreaDragMessageCodec.WriteEvent(ref platform, packet,
+			0x00050F00, 0x00050E00, 0x00050F20, 0x00050F40, -2, 4, 5) ||
+			!MuiAreaDragMessageCodec.TryReadEvent(ref platform, packet,
+				out var dragEvent) || dragEvent.MuiKey != -2 ||
+			dragEvent.Flags != 5) return 3;
+		if (!MuiAreaDragMessageCodec.WriteFinish(ref platform, packet,
+			0x00050E00, 1) ||
+			!MuiAreaDragMessageCodec.TryReadFinish(ref platform, packet,
+				out var finish) || finish.DropFollows != 1) return 4;
+		if (!MuiAreaDragMessageCodec.WriteQuery(ref platform, packet,
+			0x00050E00) ||
+			!MuiAreaDragMessageCodec.TryReadQuery(ref platform, packet,
+				out var query) || query.Object != 0x00050E00) return 5;
+		if (!MuiAreaDragMessageCodec.WriteReport(ref platform, packet,
+			0x00050E00, 8, -9, 2, 7) ||
+			!MuiAreaDragMessageCodec.TryReadReport(ref platform, packet,
+				out var report) || report.X != 8 || report.Y != -9 ||
+			report.Update != 2 || report.Qualifier != 7) return 6;
+		if (MuiAreaDragMessageCodec.TryReadReport(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 7;
+		return 42;
+	}
+
+	// Focused native proof for the guest-resident Area drag state. The state
+	// transition policy is host-qualified; this root keeps the native closure at
+	// the named record boundary and verifies signed coordinates and flags.
+	public static uint AreaDragStateRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var storage = APTR.FromPointer(0x00050D00);
+		var value = default(MuiAreaDragState);
+		value.Magic = MuiAreaDragStateCodec.Cookie;
+		value.Source = 0x00050E00;
+		value.Target = 0x00050F00;
+		value.LastX = -4;
+		value.LastY = 12;
+		value.Qualifier = 3;
+		value.EventFlags = 5;
+		value.Flags = MuiAreaDragState.ActiveFlag |
+			MuiAreaDragState.DroppedFlag;
+		MuiAreaDragStateCodec.Write(ref platform, storage, value);
+		if (!MuiAreaDragStateCodec.TryRead(ref platform, storage,
+			out var roundTrip) || roundTrip.Source != value.Source ||
+			roundTrip.Target != value.Target || roundTrip.LastX != -4 ||
+			roundTrip.LastY != 12 || roundTrip.Flags != value.Flags) return 1;
+		MuiAreaDragStateCodec.Clear(ref platform, storage);
+		if (MuiAreaDragStateCodec.TryRead(ref platform, storage, out _)) return 2;
+		return 42;
+	}
+
+	// Focused MG09 proof for the MorphOS MUIP_GoActive/MUIP_GoInactive packet.
+	// The flags field is retained as a named record value and malformed guest
+	// storage is rejected before activation state is touched.
+	public static uint AreaActivationMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050D00);
+		if (!MuiAreaActivationMessageCodec.Write(ref platform, packet,
+			MuiAreaActivationMessageCodec.GoActive, 7) ||
+			!MuiAreaActivationMessageCodec.TryRead(ref platform, packet,
+				out var active) || active.MethodId !=
+			MuiAreaActivationMessageCodec.GoActive || active.Flags != 7) return 1;
+		if (!MuiAreaActivationMessageCodec.Write(ref platform, packet,
+			MuiAreaActivationMessageCodec.GoInactive, 11) ||
+			!MuiAreaActivationMessageCodec.TryRead(ref platform, packet,
+				out var inactive) || inactive.MethodId !=
+			MuiAreaActivationMessageCodec.GoInactive || inactive.Flags != 11) return 2;
+		if (MuiAreaActivationMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 3;
+		return 42;
+	}
+
+	// Focused MG09 proof for the struct-first Listview pointer envelope and the
+	// public TestPos result record.  The full composite click path is covered by
+	// host tests; this root keeps the native closure limited to fixed record
+	// codecs and verifies signed coordinates/columns without managed runtime.
+	public static uint ListviewPointerInputRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var message = APTR.FromPointer(0x00050E00);
+		if (!MuiIntuiMessageCodec.WritePointer(ref platform, message,
+			1u << 3, 0x0069, 0x0001, 0x00050D00, -4, 12) ||
+			!MuiIntuiMessageCodec.TryReadPointer(ref platform, message,
+				out var pointer) || pointer.Class != (1u << 3) ||
+			pointer.Code != 0x0069 || pointer.Qualifier != 0x0001 ||
+			pointer.IAddress != 0x00050D00 || pointer.MouseX != -4 ||
+			pointer.MouseY != 12) return 1;
+		var result = APTR.FromPointer(0x00050E40);
+		var value = new MuiListTestPosResult
+		{
+			Entry = -1,
+			Column = -1,
+			Flags = 8,
+			XOffset = -3,
+			YOffset = 7
+		};
+		if (!MuiListTestPosResultCodec.Write(ref platform, result, value) ||
+			!MuiListTestPosResultCodec.TryRead(ref platform, result,
+				out var roundTrip) || roundTrip.Entry != -1 ||
+			roundTrip.Column != -1 || roundTrip.Flags != 8 ||
+			roundTrip.XOffset != -3 || roundTrip.YOffset != 7) return 2;
+		if (MuiIntuiMessageCodec.TryReadPointer(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 3;
+		return 42;
+	}
+
+	// Focused native proof for the guest-resident Listview drag state.  The live
+	// pointer dispatcher owns the transition policy; this root verifies that its
+	// source/target/coordinate/flag record is round-trippable without managed
+	// storage or raw offsets escaping the codec.
+	public static uint ListviewDragStateRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var storage = APTR.FromPointer(0x00050EC0);
+		var value = new MuiListviewDragState
+		{
+			Magic = MuiListviewDragStateCodec.Cookie,
+			Source = -1,
+			Target = 2,
+			StartX = -4,
+			StartY = 4,
+			LastX = 12,
+			LastY = 20,
+			Flags = MuiListviewDragState.ActiveFlag |
+				MuiListviewDragState.MovedFlag
+		};
+		MuiListviewDragStateCodec.Write(ref platform, storage, value);
+		if (!MuiListviewDragStateCodec.TryRead(ref platform, storage,
+			out var roundTrip) || roundTrip.Source != -1 ||
+			roundTrip.Target != 2 || roundTrip.StartX != -4 ||
+			roundTrip.LastY != 20 || roundTrip.Flags != value.Flags) return 1;
+		MuiListviewDragStateCodec.Clear(ref platform, storage);
+		if (MuiListviewDragStateCodec.TryRead(ref platform, storage, out _))
+			return 2;
+		return 42;
+	}
+
+	// Focused MG09 ABI proof for the fixed Dirlist/Volumelist packet records.
+	// Set, rename/comment, protection, GetEntry, and method-only messages all
+	// round-trip through named structs; packed guest offsets stay in the codec.
+	public static uint DirlistMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint storage = 0x00050F80;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiDirlistMessageCodec.WriteSet(ref platform, packet,
+			MuiDirlistMessageCodec.Set, 0x8042EA41u, 0x00050D00) ||
+			!MuiDirlistMessageCodec.TryReadSet(ref platform, packet,
+				MuiDirlistMessageCodec.Set, out var set) ||
+			set.Attribute != 0x8042EA41u || set.Value != 0x00050D00) return 1;
+		if (!MuiDirlistMessageCodec.WriteRename(ref platform, packet,
+			MuiDirlistMessageCodec.SetComment, 3, 0x00050D20) ||
+			!MuiDirlistMessageCodec.TryReadRename(ref platform, packet,
+				MuiDirlistMessageCodec.SetComment, out var comment) ||
+			comment.Entry != 3 || comment.Name != 0x00050D20) return 2;
+		if (!MuiDirlistMessageCodec.WriteProtection(ref platform, packet,
+			7, 0x12345678u) ||
+			!MuiDirlistMessageCodec.TryReadProtection(ref platform, packet,
+				out var protection) || protection.Entry != 7 ||
+			protection.Protection != 0x12345678u) return 3;
+		if (!MuiDirlistMessageCodec.WriteGetEntry(ref platform, packet,
+			unchecked((uint)-2), storage) ||
+			!MuiDirlistMessageCodec.TryReadGetEntry(ref platform, packet,
+				out var getEntry) || getEntry.Position != unchecked((uint)-2) ||
+			getEntry.Storage != storage) return 4;
+		if (!MuiDirlistMessageCodec.WriteMethod(ref platform, packet,
+			MuiDirlistMessageCodec.ReRead) ||
+			!MuiDirlistMessageCodec.IsValidMethod(ref platform, packet,
+				MuiDirlistMessageCodec.ReRead)) return 5;
+		if (!MuiDirlistMessageCodec.WriteMethod(ref platform, packet,
+			MuiDirlistMessageCodec.ListClear) ||
+			!MuiDirlistMessageCodec.IsValidMethod(ref platform, packet,
+				MuiDirlistMessageCodec.ListClear)) return 6;
+		if (MuiDirlistMessageCodec.TryReadGetEntry(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 7;
+		if (MuiDirlistMessageCodec.WriteSet(ref platform, packet,
+			0x80420000u, 1, 2)) return 8;
+		if (MuiDirlistMessageCodec.IsValidMethod(ref platform, packet,
+			0x80420000u)) return 9;
+		return 42;
+	}
+
+	// Focused MG09 ABI proof for the fixed external Listtree.mcc packet records.
+	// Every documented fixed envelope round-trips through named structs; packed
+	// guest offsets remain confined to MuiListtreeMessageCodec.
+	public static uint ListtreeMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, 0x80420001u, 7) ||
+			!MuiListtreeMessageCodec.TryReadSet(ref platform, packet,
+				MuiListtreeMessageCodec.Set, out var set) ||
+			set.Attribute != 0x80420001u || set.Value != 7) return 1;
+		if (!MuiListtreeMessageCodec.WriteGet(ref platform, packet, 9,
+			0x00050D00) || !MuiListtreeMessageCodec.TryReadGet(ref platform,
+			packet, out var get) || get.Attribute != 9 ||
+			get.Storage != 0x00050D00) return 2;
+		if (!MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			0x00050D20, 0x00050D40, 0x00050D60, 0x00050D80, 4) ||
+			!MuiListtreeMessageCodec.TryReadInsert(ref platform, packet,
+				out var insert) || insert.Name != 0x00050D20 ||
+			insert.UserData != 0x00050D40 || insert.Flags != 4) return 3;
+		if (!MuiListtreeMessageCodec.WriteRemove(ref platform, packet,
+			0x00050D60, 0x00050DA0, 5) ||
+			!MuiListtreeMessageCodec.TryReadRemove(ref platform, packet,
+				out var remove) || remove.Parent != 0x00050D60 ||
+			remove.Node != 0x00050DA0) return 4;
+		if (!MuiListtreeMessageCodec.WriteGetEntry(ref platform, packet,
+			0x00050D60, unchecked((uint)-2), 6) ||
+			!MuiListtreeMessageCodec.TryReadGetEntry(ref platform, packet,
+				out var entry) || entry.Position != unchecked((uint)-2) ||
+			entry.Flags != 6) return 5;
+		if (!MuiListtreeMessageCodec.WriteOpenClose(ref platform, packet,
+			MuiListtreeMessageCodec.Open, 0x00050D60, 0x00050DA0, 1) ||
+			!MuiListtreeMessageCodec.TryReadOpenClose(ref platform, packet,
+				MuiListtreeMessageCodec.Open, out var open) ||
+			open.Node != 0x00050DA0) return 6;
+		if (!MuiListtreeMessageCodec.WriteSort(ref platform, packet,
+			MuiListtreeMessageCodec.GetNr, 0x00050D60, 2) ||
+			!MuiListtreeMessageCodec.TryReadSort(ref platform, packet,
+				MuiListtreeMessageCodec.GetNr, out var getNr) ||
+			getNr.Flags != 2) return 7;
+		if (!MuiListtreeMessageCodec.WriteMoveExchange(ref platform, packet,
+			MuiListtreeMessageCodec.Move, 0x00050D60, 0x00050DA0,
+			0x00050DC0, 0x00050DE0, 3) ||
+			!MuiListtreeMessageCodec.TryReadMoveExchange(ref platform, packet,
+				MuiListtreeMessageCodec.Move, out var move) ||
+			move.NewParent != 0x00050DC0 || move.Flags != 3) return 8;
+		if (!MuiListtreeMessageCodec.WriteRename(ref platform, packet,
+			0x00050DA0, 0x00050E00, 8) ||
+			!MuiListtreeMessageCodec.TryReadRename(ref platform, packet,
+				out var rename) || rename.Name != 0x00050E00) return 9;
+		if (!MuiListtreeMessageCodec.WriteFindName(ref platform, packet,
+			0x00050D60, 0x00050E00, 9) ||
+			!MuiListtreeMessageCodec.TryReadFindName(ref platform, packet,
+				out var find) || find.Parent != 0x00050D60) return 10;
+		if (!MuiListtreeMessageCodec.WriteDropMark(ref platform, packet, 10,
+			11) || !MuiListtreeMessageCodec.TryReadDropMark(ref platform, packet,
+			out var drop) || drop.Position != 10 || drop.Flags != 11) return 11;
+		if (!MuiListtreeMessageCodec.WriteTestPos(ref platform, packet, 12, 13,
+			0x00050DA0) || !MuiListtreeMessageCodec.TryReadTestPos(ref platform,
+			packet, out var testPos) || testPos.X != 12 ||
+			testPos.Entry != 0x00050DA0) return 12;
+		if (MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			0x80420000u, 1, 2)) return 13;
+		if (MuiListtreeMessageCodec.TryReadInsert(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 14;
+		if (MuiListtreeMessageCodec.TryReadGet(ref platform, packet, out _))
+			return 15;
 		return 42;
 	}
 
@@ -7439,33 +11981,31 @@ public static class MuiNativeRoots
 		WriteWord(second, (byte)'b', (byte)'r', (byte)'a', (byte)'v', (byte)'o');
 
 		// The construct/destruct records carry the entry and pool APTRs.
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x8042D662u);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, first);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, 0);
+		if (!MuiCollectionRecordMessageCodec.WriteEntryPool(ref platform,
+			APTR.FromPointer(packet), MuiCollectionRecordMessageCodec.Construct, first, 0))
+			return 4;
 		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
-			APTR.FromPointer(packet), out var result) || result != first) return 4;
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x80427D51u);
+			APTR.FromPointer(packet), out var result) || result != first) return 5;
+		if (!MuiCollectionRecordMessageCodec.WriteEntryPool(ref platform,
+			APTR.FromPointer(packet), MuiCollectionRecordMessageCodec.Destruct, first, 0))
+			return 6;
 		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
-			APTR.FromPointer(packet), out result) || result != 1) return 5;
+			APTR.FromPointer(packet), out result) || result != 1) return 7;
 
 		// Display publishes the NULL-hook string representation as array[0],
 		// followed by its terminating NULL pointer.
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x80425377u);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, first);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, array);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 12, 0);
+		if (!MuiCollectionRecordMessageCodec.WriteDisplay(ref platform,
+			APTR.FromPointer(packet), first, array, 0)) return 8;
 		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
 			APTR.FromPointer(packet), out result) || result != 1 ||
 			APTR.ReadUInt32(APTR.FromPointer(array), 0) != first ||
-			APTR.ReadUInt32(APTR.FromPointer(array), 4) != 0) return 6;
+			APTR.ReadUInt32(APTR.FromPointer(array), 4) != 0) return 9;
 
 		// NULL-hook comparison is bounded C-string comparison.
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x80421B68u);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, first);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, second);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 12, 0);
+		if (!MuiCollectionRecordMessageCodec.WriteCompare(ref platform,
+			APTR.FromPointer(packet), first, second, 0)) return 10;
 		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
-			APTR.FromPointer(packet), out result) || unchecked((int)result) >= 0) return 7;
+			APTR.FromPointer(packet), out result) || unchecked((int)result) >= 0) return 11;
 
 		// Populate two rows through the struct-backed InsertSingle seam, then
 		// publish geometry and hit-test the first cell.
@@ -7481,18 +12021,59 @@ public static class MuiNativeRoots
 		if (!MuiAreaLayoutCore.Setup(ref platform, st, list,
 			APTR.FromPointer(renderInfo)) ||
 			!MuiListCore.Layout(ref platform, st, list, 0, 0, 80, 16)) return 10;
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x80425F48u);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, 2);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, 5);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 12, resultStorage);
+		if (!MuiCollectionRecordMessageCodec.WriteTestPos(ref platform,
+			APTR.FromPointer(packet), 2, 5, resultStorage)) return 12;
 		if (!MuiCollectionDispatcher.TryDispatchPacket(ref platform, st, list,
-			APTR.FromPointer(packet), out result) || result != 1) return 11;
-		if (APTR.ReadUInt32(APTR.FromPointer(resultStorage), 0) != 0) return 12;
-		if (APTR.ReadUInt16(APTR.FromPointer(resultStorage), 4) != 0) return 13;
+			APTR.FromPointer(packet), out result) || result != 1) return 13;
+		if (APTR.ReadUInt32(APTR.FromPointer(resultStorage), 0) != 0) return 14;
+		if (APTR.ReadUInt16(APTR.FromPointer(resultStorage), 4) != 0) return 15;
 
-		if (!MuiCollectionLifecycle.DisposeObject(ref platform, st, list)) return 14;
+		if (!MuiCollectionLifecycle.DisposeObject(ref platform, st, list)) return 16;
 		if (!MuiMasterLifecycleCore.Dispose(ref platform,
-			APTR.FromPointer(privateRoot))) return 15;
+			APTR.FromPointer(privateRoot))) return 17;
+		return 42;
+	}
+
+	// Focused ABI proof for the fixed MorphOS List record packet codec. The
+	// construct/destruct, display, compare, and TestPos records round-trip as
+	// named structs without bringing the List state machine into this closure.
+	public static uint CollectionListRecordMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint entry = 0x00050D00;
+		const uint second = 0x00050D20;
+		const uint array = 0x00050D40;
+		const uint result = 0x00050D60;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiCollectionRecordMessageCodec.WriteEntryPool(ref platform, packet,
+			MuiCollectionRecordMessageCodec.Construct, entry, 0) ||
+			!MuiCollectionRecordMessageCodec.TryReadEntryPool(ref platform, packet,
+			MuiCollectionRecordMessageCodec.Construct, out var construct) ||
+			construct.Entry != entry || construct.Pool != 0) return 1;
+		if (!MuiCollectionRecordMessageCodec.WriteEntryPool(ref platform, packet,
+			MuiCollectionRecordMessageCodec.Destruct, entry, 0) ||
+			!MuiCollectionRecordMessageCodec.TryReadEntryPool(ref platform, packet,
+			MuiCollectionRecordMessageCodec.Destruct, out var destruct) ||
+			destruct.Entry != entry) return 2;
+		if (!MuiCollectionRecordMessageCodec.WriteDisplay(ref platform, packet,
+			entry, array, 3) ||
+			!MuiCollectionRecordMessageCodec.TryReadDisplay(ref platform, packet,
+			out var display) || display.Entry != entry || display.Array != array ||
+			display.Row != 3) return 3;
+		if (!MuiCollectionRecordMessageCodec.WriteCompare(ref platform, packet,
+			entry, second, 2) ||
+			!MuiCollectionRecordMessageCodec.TryReadCompare(ref platform, packet,
+			out var compare) || compare.Entry1 != entry ||
+			compare.Entry2 != second || compare.Column != 2) return 4;
+		if (!MuiCollectionRecordMessageCodec.WriteTestPos(ref platform, packet,
+			8, 9, result) ||
+			!MuiCollectionRecordMessageCodec.TryReadTestPos(ref platform, packet,
+			out var testPos) || testPos.X != 8 || testPos.Y != 9 ||
+			testPos.Result != result) return 5;
+		if (MuiCollectionRecordMessageCodec.TryReadTestPos(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 6;
 		return 42;
 	}
 
@@ -7628,38 +12209,62 @@ public static class MuiNativeRoots
 		var list = MuiListCore.CreateList(ref platform, st, cls, APTR.Null);
 		if (list.IsNull) return 3;
 
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x804219AEu);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, unchecked((uint)-1));
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, 2);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 12, entry);
+		if (!MuiCollectionEditMessageCodec.WriteCreateEditObject(ref platform,
+			APTR.FromPointer(packet), -1, 2, entry)) return 4;
 		if (!MuiCollectionDispatcher.TryReadCreateEditObjectPacket(ref platform,
 			APTR.FromPointer(packet), out var create) || create.Row != -1 ||
-			create.Column != 2 || create.Entry != entry) return 4;
+			create.Column != 2 || create.Entry != entry) return 5;
 
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x8042843Du);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, unchecked((uint)-1));
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, 3);
+		if (!MuiCollectionEditMessageCodec.WriteEdit(ref platform,
+			APTR.FromPointer(packet), -1, 3)) return 6;
 		if (!MuiCollectionDispatcher.TryReadEditPacket(ref platform,
 			APTR.FromPointer(packet), out var edit) || edit.Row != -1 ||
-			edit.Column != 3) return 5;
+			edit.Column != 3) return 7;
 
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x80423AB3u);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, 4);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, 1);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 12, entry);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 16, editObject);
+		if (!MuiCollectionEditMessageCodec.WriteEditDone(ref platform,
+			APTR.FromPointer(packet), 4, 1, entry, editObject)) return 8;
 		if (!MuiCollectionDispatcher.TryReadEditDonePacket(ref platform,
 			APTR.FromPointer(packet), out var done) || done.Row != 4 ||
 			done.Column != 1 || done.Entry != entry ||
-			done.EditObject != editObject) return 6;
+			done.EditObject != editObject) return 9;
 
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x804203EEu);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, 1);
+		if (!MuiCollectionEditMessageCodec.WriteEndEdit(ref platform,
+			APTR.FromPointer(packet), 1)) return 10;
 		if (!MuiCollectionDispatcher.TryReadEndEditPacket(ref platform,
-			APTR.FromPointer(packet), out var end) || end.Mode != 1) return 7;
-		if (!MuiCollectionLifecycle.DisposeObject(ref platform, st, list)) return 8;
+			APTR.FromPointer(packet), out var end) || end.Mode != 1) return 11;
+		if (!MuiCollectionLifecycle.DisposeObject(ref platform, st, list)) return 12;
 		if (!MuiMasterLifecycleCore.Dispose(ref platform,
-			APTR.FromPointer(privateRoot))) return 9;
+			APTR.FromPointer(privateRoot))) return 13;
+		return 42;
+	}
+
+	// Focused ABI proof for the fixed MorphOS List edit packet codec. The four
+	// records round-trip through one named-record boundary; no List editor or
+	// managed state is pulled into this packet-only closure.
+	public static uint CollectionListEditMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiCollectionEditMessageCodec.WriteCreateEditObject(ref platform,
+			packet, -3, 2, APTR.FromPointer(0x00050D00).Raw) ||
+			!MuiCollectionEditMessageCodec.TryReadCreateEditObject(ref platform,
+			packet, out var create) || create.Row != -3 || create.Column != 2 ||
+			create.Entry != 0x00050D00) return 1;
+		if (!MuiCollectionEditMessageCodec.WriteEdit(ref platform, packet, -1,
+			4) || !MuiCollectionEditMessageCodec.TryReadEdit(ref platform, packet,
+			out var edit) || edit.Row != -1 || edit.Column != 4) return 2;
+		if (!MuiCollectionEditMessageCodec.WriteEditDone(ref platform, packet, 7,
+			1, 0x00050D00, 0x00050D20) ||
+			!MuiCollectionEditMessageCodec.TryReadEditDone(ref platform, packet,
+			out var done) || done.Row != 7 || done.Column != 1 ||
+			done.Entry != 0x00050D00 || done.EditObject != 0x00050D20) return 3;
+		if (!MuiCollectionEditMessageCodec.WriteEndEdit(ref platform, packet, 2) ||
+			!MuiCollectionEditMessageCodec.TryReadEndEdit(ref platform, packet,
+			out var end) || end.Mode != 2) return 4;
+		if (MuiCollectionEditMessageCodec.TryReadEditDone(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 5;
 		return 42;
 	}
 
@@ -8228,7 +12833,130 @@ public static class MuiNativeRoots
 	// copied guest string ownership, bounded layout/min-max metrics, and clamped
 	// pixel scrolling against the freestanding platform without a graphics or
 	// host-runtime dependency.
-	public static uint CollectionStringscrollRoot()
+		public static uint StringscrollUtf8MetricsRoot()
+		{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050D00);
+		APTR.WriteUInt8(text, 0, 0xC3);
+		APTR.WriteUInt8(text, 1, 0x85);
+		APTR.WriteUInt8(text, 2, 0xCE);
+		APTR.WriteUInt8(text, 3, 0xB2);
+		APTR.WriteUInt8(text, 4, 0xF0);
+		APTR.WriteUInt8(text, 5, 0x9F);
+		APTR.WriteUInt8(text, 6, 0x99);
+		APTR.WriteUInt8(text, 7, 0x82);
+		APTR.WriteUInt8(text, 8, 0x0A);
+		APTR.WriteUInt8(text, 9, 0);
+		if (!MuiStringscrollCore.TryMeasureUtf8(ref platform, text,
+			out var columns, out var lines) || columns != 3 || lines != 2)
+			return 1;
+		APTR.WriteUInt8(text, 0, 0xF0);
+		APTR.WriteUInt8(text, 1, 0x28);
+		APTR.WriteUInt8(text, 2, 0x8C);
+		APTR.WriteUInt8(text, 3, 0x28);
+		APTR.WriteUInt8(text, 4, 0);
+		if (!MuiStringscrollCore.TryMeasureUtf8(ref platform, text,
+			out columns, out lines) || columns != 4 || lines != 1) return 2;
+			return 42;
+		}
+
+		// Focused MG09 String.mui cursor seam.  This keeps the native proof on the
+		// freestanding UTF-8 column/byte-boundary helpers used by String.mui input
+		// and drawing, without importing the broad common-control object closure.
+		public static uint StringUtf8CursorRoot()
+		{
+			var platform = new MuiNativeHeadlessPlatform();
+			platform.Reset();
+			var text = APTR.FromPointer(0x00050E00);
+			APTR.WriteUInt8(text, 0, 0xC3);
+			APTR.WriteUInt8(text, 1, 0x85);
+			APTR.WriteUInt8(text, 2, 0xCE);
+			APTR.WriteUInt8(text, 3, 0xB2);
+			APTR.WriteUInt8(text, 4, 0xF0);
+			APTR.WriteUInt8(text, 5, 0x9F);
+			APTR.WriteUInt8(text, 6, 0x99);
+			APTR.WriteUInt8(text, 7, 0x82);
+			APTR.WriteUInt8(text, 8, (byte)'x');
+			APTR.WriteUInt8(text, 9, 0);
+			if (!MuiStringscrollCore.TryCountUtf8Columns(ref platform, text,
+				out var columns) || columns != 4) return 1;
+			if (MuiStringscrollCore.ByteOffsetForColumns(ref platform, text, 0, 9,
+				0) != 0 ||
+				MuiStringscrollCore.ByteOffsetForColumns(ref platform, text, 0, 9,
+					1) != 2 ||
+				MuiStringscrollCore.ByteOffsetForColumns(ref platform, text, 0, 9,
+					2) != 4 ||
+				MuiStringscrollCore.ByteOffsetForColumns(ref platform, text, 0, 9,
+					3) != 8 ||
+				MuiStringscrollCore.ByteOffsetForColumns(ref platform, text, 0, 9,
+					4) != 9) return 2;
+			return 42;
+		}
+
+		// Focused MG09 String.mui printable-input seam. The encoder returns a
+		// named UTF-8 value record, including four-byte scalars, and rejects
+		// surrogate code points before any guest buffer mutation is attempted.
+		public static uint StringUtf8InputRoot()
+		{
+			if (!MuiCommonControlCore.TryEncodeUtf8Input(0x1F642, true,
+				out var emoji) || emoji.Length != 4 || emoji.First != 0xF0 ||
+				emoji.Second != 0x9F || emoji.Third != 0x99 || emoji.Fourth != 0x82)
+				return 1;
+			if (!MuiCommonControlCore.TryEncodeUtf8Input(0x03B2, true,
+				out var beta) || beta.Length != 2 || beta.First != 0xCE ||
+				beta.Second != 0xB2) return 2;
+			if (!MuiCommonControlCore.TryEncodeUtf8Input(0x7F, false,
+				out var ascii) || ascii.Length != 1 || ascii.First != 0x7F) return 3;
+			if (!MuiCommonControlCore.TryEncodeUtf8Input(0xE4, false,
+				out var legacyByte) || legacyByte.Length != 1 ||
+				legacyByte.First != 0xE4) return 4;
+			if (MuiCommonControlCore.TryEncodeUtf8Input(0xD800, true,
+				out _)) return 5;
+			if (MuiCommonControlCore.TryEncodeUtf8Input(0x100, false,
+				out _)) return 6;
+			return 42;
+		}
+
+		// Focused MG09 Unicode Accept/Reject seam. The filter is scanned as UTF-8
+		// codepoints, so a continuation byte cannot satisfy an unrelated scalar.
+		public static uint StringUtf8FilterRoot()
+		{
+			var platform = new MuiNativeHeadlessPlatform();
+			platform.Reset();
+			var filter = APTR.FromPointer(0x00050F00);
+			APTR.WriteUInt8(filter, 0, 0xCE);
+			APTR.WriteUInt8(filter, 1, 0xB2);
+			APTR.WriteUInt8(filter, 2, 0);
+			if (!MuiCommonControlCore.ContainsUtf8CodePoint(ref platform, filter,
+				0x03B2)) return 1;
+			if (MuiCommonControlCore.ContainsUtf8CodePoint(ref platform, filter,
+				0x00C5)) return 2;
+			APTR.WriteUInt8(filter, 0, 0xF0);
+			APTR.WriteUInt8(filter, 1, 0x28);
+			APTR.WriteUInt8(filter, 2, 0x8C);
+			APTR.WriteUInt8(filter, 3, 0x28);
+			APTR.WriteUInt8(filter, 4, 0);
+			if (!MuiCommonControlCore.ContainsUtf8CodePoint(ref platform, filter,
+				0xF0)) return 3;
+			return 42;
+		}
+
+		// Focused MG09 String.mui logical-position seam. Public BufferPos and
+		// DisplayPos writes share this bounded character-column clamp.
+		public static uint StringUtf8PositionRoot()
+		{
+			if (MuiCommonControlCore.ClampStringPosition(99, 4) != 4) return 1;
+			if (MuiCommonControlCore.ClampStringPosition(2, 4) != 2) return 2;
+			if (MuiCommonControlCore.ClampStringPosition(0, 0) != 0) return 3;
+			if (MuiCommonControlCore.StringVisibleOrigin(4, 0, 2) != 2) return 4;
+			if (MuiCommonControlCore.StringVisibleOrigin(1, 2, 2) != 1) return 5;
+			if (MuiCommonControlCore.StringVisibleOrigin(2, 2, 2) != 2) return 6;
+			if (MuiCommonControlCore.StringVisibleOrigin(5, 2, 2) != 3) return 7;
+			return 42;
+		}
+
+		public static uint CollectionStringscrollRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
@@ -8257,23 +12985,16 @@ public static class MuiNativeRoots
 		APTR.WriteUInt8(APTR.FromPointer(className), 15, (byte)'i');
 		APTR.WriteUInt8(APTR.FromPointer(className), 16, 0);
 		var source = APTR.FromPointer(text);
-		APTR.WriteUInt8(source, 0, (byte)'0');
-		APTR.WriteUInt8(source, 1, (byte)'1');
-		APTR.WriteUInt8(source, 2, (byte)'2');
-		APTR.WriteUInt8(source, 3, (byte)'3');
-		APTR.WriteUInt8(source, 4, (byte)'4');
-		APTR.WriteUInt8(source, 5, (byte)'5');
-		APTR.WriteUInt8(source, 6, (byte)'6');
-		APTR.WriteUInt8(source, 7, (byte)'7');
-		APTR.WriteUInt8(source, 8, (byte)'8');
-		APTR.WriteUInt8(source, 9, (byte)'9');
-		APTR.WriteUInt8(source, 10, (byte)'a');
-		APTR.WriteUInt8(source, 11, (byte)'b');
-		APTR.WriteUInt8(source, 12, (byte)'c');
-		APTR.WriteUInt8(source, 13, (byte)'d');
-		APTR.WriteUInt8(source, 14, (byte)'e');
-		APTR.WriteUInt8(source, 15, (byte)'f');
-		APTR.WriteUInt8(source, 16, 0);
+		APTR.WriteUInt8(source, 0, 0xC3);
+		APTR.WriteUInt8(source, 1, 0x85);
+		APTR.WriteUInt8(source, 2, 0xCE);
+		APTR.WriteUInt8(source, 3, 0xB2);
+		APTR.WriteUInt8(source, 4, 0xF0);
+		APTR.WriteUInt8(source, 5, 0x9F);
+		APTR.WriteUInt8(source, 6, 0x99);
+		APTR.WriteUInt8(source, 7, 0x82);
+		APTR.WriteUInt8(source, 8, 0x0A);
+		APTR.WriteUInt8(source, 9, 0);
 		APTR.WriteUInt32(APTR.FromPointer(tags), 0, stringAttribute);
 		APTR.WriteUInt32(APTR.FromPointer(tags), 4, text);
 		APTR.WriteUInt32(APTR.FromPointer(tags), 8, 0);
@@ -8298,10 +13019,12 @@ public static class MuiNativeRoots
 			out var maxX, out var maxY) || x != maxX || y != maxY) return 7;
 		if (!MuiStringscrollCore.AskMinMax(ref platform, APTR.FromPointer(state),
 			APTR.FromPointer(obj), APTR.FromPointer(minMax))) return 8;
+		if (APTR.ReadUInt16(APTR.FromPointer(minMax), 0) != 24 ||
+			APTR.ReadUInt16(APTR.FromPointer(minMax), 2) != 16) return 9;
 		if (!MuiCollectionLifecycle.DisposeObject(ref platform,
-			APTR.FromPointer(state), APTR.FromPointer(obj))) return 9;
+			APTR.FromPointer(state), APTR.FromPointer(obj))) return 10;
 		if (!MuiMasterLifecycleCore.Dispose(ref platform,
-			APTR.FromPointer(privateRoot))) return 10;
+			APTR.FromPointer(privateRoot))) return 11;
 		return 42;
 	}
 
@@ -8320,7 +13043,6 @@ public static class MuiNativeRoots
 		const uint state = 0x00036000;
 		const uint className = 0x00036100; // "Listtree.mcc"
 		const uint boopsi = 0x00036220;    // opaque external class pointer
-		const uint packet = 0x00036300;
 		const uint storage = 0x00036340;
 		const uint nRoot = 0x00036240;
 		const uint nB = 0x00036260;
@@ -8369,19 +13091,16 @@ public static class MuiNativeRoots
 			APTR.FromPointer(state), APTR.FromPointer(cl), APTR.Null).Raw;
 		if (tree == 0) return 4;
 		var t = APTR.FromPointer(tree);
-		// Struct-first public packet boundary for Set/Get is exercised before
-		// topology mutation; the external dispatcher remains self-contained.
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x8042549A);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, MuiListtreeCore.Quiet);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, 1);
-		if (MuiListtreeDispatcher.Dispatch(ref platform,
-			APTR.FromPointer(state), t, APTR.FromPointer(packet)) != 1) return 24;
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, 0x80420371);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, MuiListtreeCore.Quiet);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, storage);
-		if (MuiListtreeDispatcher.Dispatch(ref platform,
-			APTR.FromPointer(state), t, APTR.FromPointer(packet)) != 1 ||
-			APTR.ReadUInt32(APTR.FromPointer(storage), 0) != 1) return 25;
+		// Exercise the external object's typed state directly in this broad
+		// topology closure. The packet boundary is isolated in the focused
+		// ListtreeMessageCodecRoot below so this larger semantic root stays a
+		// compact zero-relocation native gate.
+		if (!MuiListtreeCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), t, MuiListtreeCore.Quiet, 1, true)) return 24;
+		if (!MuiListtreeCore.GetAttribute(ref platform,
+			APTR.FromPointer(state), t, MuiListtreeCore.Quiet, out var quiet) ||
+			quiet != 1) return 25;
+		APTR.WriteUInt32(APTR.FromPointer(storage), 0, quiet);
 
 		var root = MuiListtreeCore.Insert(ref platform, APTR.FromPointer(state), t,
 			APTR.FromPointer(nRoot), APTR.Null, APTR.FromPointer(Root),
@@ -8395,18 +13114,10 @@ public static class MuiNativeRoots
 		if (MuiListtreeCore.TotalNodes(ref platform, APTR.FromPointer(state), t)
 			!= 3) return 7;
 		if (MuiListtreeCore.ChildCount(ref platform, root) != 2) return 8;
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0, MuiListtreeCore.MethodGetNr);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, root.Raw);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, 1u << 15);
-		if (MuiListtreeDispatcher.Dispatch(ref platform,
-			APTR.FromPointer(state), t, APTR.FromPointer(packet)) != 3) return 26;
-		APTR.WriteUInt32(APTR.FromPointer(packet), 0,
-			MuiListtreeCore.MethodGetEntry);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 4, root.Raw);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 8, 0);
-		APTR.WriteUInt32(APTR.FromPointer(packet), 12, 0);
-		if (MuiListtreeDispatcher.Dispatch(ref platform,
-			APTR.FromPointer(state), t, APTR.FromPointer(packet)) != bn.Raw) return 27;
+		if (MuiListtreeCore.GetNr(ref platform, APTR.FromPointer(state), t, root,
+			1u << 15) != 3) return 26;
+		if (MuiListtreeCore.GetEntry(ref platform, APTR.FromPointer(state), t,
+			root, 0, 0).Raw != bn.Raw) return 27;
 		// Inserted order is b, a.
 		if (MuiListtreeCore.GetEntry(ref platform, APTR.FromPointer(state), t, root,
 			0, 0).Raw != bn.Raw) return 9;
@@ -9228,6 +13939,45 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Focused MG09 ABI proof for the fixed Pop* specialist packet records.
+	// OM_GET, Set/NoNotifySet, Popstring_Close, and method-only frames round-trip
+	// through named structs; malformed and unsupported packets are rejected
+	// without importing the Pop state machine. Returns 42 on success.
+	public static uint PopSpecialistMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint storage = 0x00050D00;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiPopSpecialistMessageCodec.WriteGet(ref platform, packet,
+			MuiPopAttributes.Disabled, storage) ||
+			!MuiPopSpecialistMessageCodec.TryReadGet(ref platform, packet,
+				out var get) || get.Attribute != MuiPopAttributes.Disabled ||
+			get.Storage != storage) return 1;
+		if (!MuiPopSpecialistMessageCodec.WriteSet(ref platform, packet,
+			MuiPopSpecialistMessageCodec.MethodSet, MuiPopAttributes.Disabled, 1) ||
+			!MuiPopSpecialistMessageCodec.TryReadSet(ref platform, packet,
+				MuiPopSpecialistMessageCodec.MethodSet, out var set) ||
+			set.Attribute != MuiPopAttributes.Disabled || set.Value != 1) return 2;
+		if (!MuiPopSpecialistMessageCodec.WriteClose(ref platform, packet, 1) ||
+			!MuiPopSpecialistMessageCodec.TryReadClose(ref platform, packet,
+				out var close) || close.Result != 1) return 3;
+		if (!MuiPopSpecialistMessageCodec.WriteMethod(ref platform, packet,
+			MuiPopAttributes.Popstring_Open) ||
+			!MuiPopSpecialistMessageCodec.IsValidMethod(ref platform, packet,
+				MuiPopAttributes.Popstring_Open)) return 4;
+		if (MuiPopSpecialistMessageCodec.WriteSet(ref platform, packet,
+			0x80420000u, 1, 2)) return 5;
+		if (MuiPopSpecialistMessageCodec.TryReadGet(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 6;
+		if (MuiPopSpecialistMessageCodec.TryReadClose(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 7;
+		if (MuiPopSpecialistMessageCodec.IsValidMethod(ref platform, packet,
+			0x80420000u)) return 8;
+		return 42;
+	}
+
 	// Write a short guest C string without relying on managed string storage.
 	private static void WriteGuestString(APTR address, char c0,
 		char c1 = (char)0, char c2 = (char)0, char c3 = (char)0,
@@ -9293,6 +14043,48 @@ public static class MuiNativeRoots
 		APTR.WriteUInt8(address, 15, 0);
 	}
 
+
+	// Focused MG09 ABI proof for the shared Misc specialist packet records.
+	// Standalone and object-aware dispatchers consume these same named records;
+	// malformed and unsupported frames are rejected at one guest boundary.
+	public static uint MiscSpecialistMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050F20);
+		var storage = APTR.FromPointer(0x00050D00);
+		if (!MuiMiscSpecialistMessageCodec.WriteGet(ref platform, packet,
+			MuiMiscAttributes.FSProtectionBits_Flags, storage.Raw) ||
+			!MuiMiscSpecialistMessageCodec.TryReadGet(ref platform, packet,
+				out var get) || get.Attribute != MuiMiscAttributes.FSProtectionBits_Flags ||
+			get.Storage != storage.Raw) return 1;
+		if (!MuiMiscSpecialistMessageCodec.WriteSet(ref platform, packet,
+			MuiMiscSpecialistMessageCodec.MethodSet,
+			MuiMiscAttributes.FSProtectionBits_Flags, 0x55) ||
+			!MuiMiscSpecialistMessageCodec.TryReadSet(ref platform, packet,
+				MuiMiscSpecialistMessageCodec.MethodSet, out var set) ||
+			set.Value != 0x55) return 2;
+		if (!MuiMiscSpecialistMessageCodec.WritePointer(ref platform, packet,
+			MuiMiscAttributes.Title_Close, 0x2200) ||
+			!MuiMiscSpecialistMessageCodec.TryReadPointer(ref platform, packet,
+				MuiMiscAttributes.Title_Close, out var pointer) ||
+			pointer.Pointer != 0x2200) return 3;
+		if (!MuiMiscSpecialistMessageCodec.WritePair(ref platform, packet,
+			MuiMiscAttributes.Panel_Run, 0x2300, 0x2400) ||
+			!MuiMiscSpecialistMessageCodec.TryReadPair(ref platform, packet,
+				MuiMiscAttributes.Panel_Run, out var pair) ||
+			pair.First != 0x2300 || pair.Second != 0x2400) return 4;
+		if (!MuiMiscSpecialistMessageCodec.WriteRegisterGadget(ref platform,
+			packet, 0x2500, 7, 8, 0x2600, 9, 0x2700) ||
+			!MuiMiscSpecialistMessageCodec.TryReadRegisterGadget(ref platform,
+				packet, out var gadget) || gadget.Id != 7 ||
+			gadget.Title != 0x2600 || gadget.Label != 0x2700) return 5;
+		if (MuiMiscSpecialistMessageCodec.TryReadGet(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 6;
+		if (MuiMiscSpecialistMessageCodec.TryReadSet(ref platform, packet,
+			0xDEADBEEFu, out _)) return 7;
+		return 42;
+	}
 
 	// Independent final-MG09 misc specialist closure. Exercises exact class-name
 	// classification for all ten classes, Keyadjust key-copy + allow/force input
@@ -9876,6 +14668,57 @@ public static class MuiNativeRoots
 			return 1;
 		if (MuiProcessSpecialistRecordPacketCore.DispatchRecord(ref platform,
 			address) != 0xCC102655) return 2;
+		return 42;
+	}
+
+	// MG09 Process/Slave fixed packet codec proof. All packet fields cross the
+	// named Process/Slave records; packed guest offsets remain confined to the
+	// central codec. Returns 42 on successful round-trip and rejection checks.
+	public static uint ProcessSpecialistMessageCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x0003B400;
+		const uint storage = 0x0003B500;
+		const uint automagic = 0x0003B600;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiProcessSpecialistMessageCodec.WriteGet(ref platform, packet,
+			MuiProcessAttributes.Process_StackSize, storage) ||
+			!MuiProcessSpecialistMessageCodec.TryReadGet(ref platform, packet,
+				out var get) || get.Attribute != MuiProcessAttributes.Process_StackSize ||
+			get.Storage != storage) return 1;
+		if (!MuiProcessSpecialistMessageCodec.WriteSet(ref platform, packet,
+			MuiProcessSpecialistMessageCodec.MethodSet,
+			MuiProcessAttributes.Process_Priority, 5) ||
+			!MuiProcessSpecialistMessageCodec.TryReadSet(ref platform, packet,
+				MuiProcessSpecialistMessageCodec.MethodSet, out var set) ||
+			set.Attribute != MuiProcessAttributes.Process_Priority || set.Value != 5)
+			return 2;
+		if (!MuiProcessSpecialistMessageCodec.WriteSignal(ref platform, packet,
+			MuiProcessAttributes.Process_Signal, 0x40) ||
+			!MuiProcessSpecialistMessageCodec.TryReadSignal(ref platform, packet,
+				MuiProcessAttributes.Process_Signal, out var signal) ||
+			signal.Signals != 0x40) return 3;
+		if (!MuiProcessSpecialistMessageCodec.WriteError(ref platform, packet, 205) ||
+			!MuiProcessSpecialistMessageCodec.TryReadError(ref platform, packet,
+				out var error) || error.ErrorCode != 205) return 4;
+		if (!MuiProcessSpecialistMessageCodec.WriteDispatch(ref platform, packet,
+			automagic) ||
+			!MuiProcessSpecialistMessageCodec.TryReadDispatch(ref platform, packet,
+				out var dispatch) || dispatch.Packet != automagic) return 5;
+		if (!MuiProcessSpecialistMessageCodec.WriteMethod(ref platform, packet,
+			MuiProcessAttributes.Process_Launch) ||
+			!MuiProcessSpecialistMessageCodec.IsValidMethod(ref platform, packet,
+				MuiProcessAttributes.Process_Launch)) return 6;
+		if (MuiProcessSpecialistMessageCodec.WriteSignal(ref platform, packet,
+			0x80420000u, 1)) return 7;
+		if (MuiProcessSpecialistMessageCodec.TryReadSignal(ref platform,
+			APTR.FromPointer(0x00050FFF), MuiProcessAttributes.Process_Signal,
+			out _)) return 8;
+		if (MuiProcessSpecialistMessageCodec.TryReadError(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 9;
+		if (MuiProcessSpecialistMessageCodec.IsValidMethod(ref platform, packet,
+			0x80420000u)) return 10;
 		return 42;
 	}
 
