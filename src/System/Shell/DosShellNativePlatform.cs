@@ -17,11 +17,7 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 	public APTR State;
 
 	private CopperSharpNativeDosPlatform CreateDos()
-	{
-		var dos = default(CopperSharpNativeDosPlatform);
-		dos.SetExecBase(DosShellNativeContextCore.ReadExecBase(ref dos, State));
-		return dos;
-	}
+		=> new(State.Raw);
 
 	private const uint ScriptLineCapacity = 4096;
 	private const uint ScriptCommandNameCapacity = 256;
@@ -342,7 +338,7 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 		var input = DosShellNativeBridge.OpenScript(ref dos, State, file,
 			fileLength);
 		if (input.IsNull) return ShellScriptExecutionStatus.Failed;
-		return StartScriptRunner(cli, input, 1, out result);
+		return StartScriptRunner(cli, input, input, 1, out result);
 	}
 
 	/// <summary>
@@ -361,11 +357,40 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 		var input = cliValue.CurrentInput.IsNotNull ? cliValue.CurrentInput :
 			cliValue.StandardInput;
 		if (input.IsNull) return ShellScriptExecutionStatus.Failed;
-		return StartScriptRunner(cli, input, 0, out result);
+		return StartScriptRunner(cli, input, input, 0, out result);
 	}
 
-	private ShellScriptExecutionStatus StartScriptRunner(APTR cli, BPTR input,
-		uint inputOwned, out int result)
+	/// <summary>
+	/// Runs one command supplied in Process.pr_Arguments while preserving the
+	/// CLI input stream as the command's standard input.
+	/// </summary>
+	public ShellScriptExecutionStatus TryExecuteCommand(APTR cli, APTR command,
+		uint commandLength, out int result)
+	{
+		var dos = CreateDos();
+		result = (int)ShellCommandResult.Error;
+		if (cli.IsNull || command.IsNull || commandLength == 0 ||
+			commandLength > 65_535 ||
+			!DosCommandLineInterfaceCodec.IsMapped(ref dos, cli))
+			return ShellScriptExecutionStatus.Failed;
+		var existing = DosShellNativeBridge.FindScriptRunner(ref dos, State, cli);
+		if (existing.IsNotNull) return RunScriptRunner(existing, out result);
+		var commandInput = DosCore.CreateCommandInputHandle(ref dos, State,
+			command, commandLength);
+		if (commandInput.IsNull) return ShellScriptExecutionStatus.Failed;
+		var cliValue = DosCommandLineInterfaceCodec.Read(ref dos, cli);
+		var standardInput = cliValue.CurrentInput.IsNotNull ?
+			cliValue.CurrentInput : cliValue.StandardInput;
+		if (standardInput.IsNull)
+		{
+			DosShellNativeBridge.CloseScript(ref dos, State, commandInput);
+			return ShellScriptExecutionStatus.Failed;
+		}
+		return StartScriptRunner(cli, commandInput, standardInput, 1, out result);
+	}
+
+	private ShellScriptExecutionStatus StartScriptRunner(APTR cli,
+		BPTR readerInput, BPTR commandInput, uint inputOwned, out int result)
 	{
 		var dos = CreateDos();
 		result = (int)ShellCommandResult.Error;
@@ -386,7 +411,7 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 		var lookupPath = dos.AllocateGuest(ScriptSmallCapacity);
 		var runnerValue = new DosShellScriptRunnerRecord
 		{
-			Cli = cli, Frame = frame, Input = input, Line = line,
+			Cli = cli, Frame = frame, Input = readerInput, Line = line,
 			InputOwned = inputOwned,
 			CommandName = commandName, Token = token, First = first,
 			Second = second, Third = third, Fourth = fourth,
@@ -413,7 +438,7 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 			? cliValue.CurrentOutput : cliValue.StandardOutput;
 		var initial = new ShellScriptFrameState
 		{
-			Parent = cli, Cli = cli, Input = input, Output = output,
+			Parent = cli, Cli = cli, Input = commandInput, Output = output,
 			Error = output, CurrentDirectory = cliValue.CurrentDirectoryName,
 			CurrentLine = 1, CurrentOffset = 0,
 			FailureLimit = cliValue.FailLevel > 0
