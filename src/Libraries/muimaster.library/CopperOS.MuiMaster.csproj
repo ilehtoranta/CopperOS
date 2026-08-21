@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <AssemblyName>CopperOS.MuiMaster</AssemblyName>
+    <RootNamespace>CopperOS.MuiMaster</RootNamespace>
+    <ImplicitUsings>false</ImplicitUsings>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <IsPackable>true</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>1591</NoWarn>
+    <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\..\..\..\CopperSharp68k\Sdk.Amiga\GuestMemory\IAmigaGuestMemory.cs" Link="GuestMemory\IAmigaGuestMemory.cs" />
+  </ItemGroup>
+</Project>
