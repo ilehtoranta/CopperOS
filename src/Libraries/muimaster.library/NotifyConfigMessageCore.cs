@@ -98,10 +98,24 @@ internal static class MuiGetConfigItemMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Keep native selector admission scalar while the named method record remains
+	// the dispatcher-facing ABI type. Packed offsets stay inside this codec.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiGetConfigItemMethodMessage.Size)) return false;
 		return MuiGetConfigItemPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiGetConfigItemPacketField.MethodId, out packet.MethodId);
+			message, MuiGetConfigItemPacketField.MethodId, out methodId);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -109,16 +123,17 @@ internal static class MuiGetConfigItemMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiGetConfigItemMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != Method) return false;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != Method) return false;
 		if (!MuiGetConfigItemPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiGetConfigItemPacketField.ConfigId, out packet.ConfigId) ||
 			!MuiGetConfigItemPacketFieldCursorCodec.TryReadUInt32(ref platform,
 				message, MuiGetConfigItemPacketField.Storage,
 				out var rawStorage)) return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		packet.Storage = APTR.FromPointer(rawStorage);
 		return true;
 	}

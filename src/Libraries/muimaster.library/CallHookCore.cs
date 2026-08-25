@@ -144,10 +144,24 @@ internal static class MuiCallHookMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Native qualification keeps method-header admission scalar while the
+	// dispatcher-facing overload above retains the named value-type record.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCallHookMethodMessage.Size)) return false;
 		return MuiCallHookPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCallHookPacketField.MethodId, out packet.MethodId);
+			message, MuiCallHookPacketField.MethodId, out methodId);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -155,15 +169,15 @@ internal static class MuiCallHookMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCallHookMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != Method) return false;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != Method || !platform.IsMapped(message,
+			MuiCallHookMessage.Size)) return false;
 		if (!MuiCallHookPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiCallHookPacketField.Hook, out var rawHook) ||
 			!MuiCallHookPacketFieldCursorCodec.TryReadUInt32(ref platform, message,
 				MuiCallHookPacketField.Param1, out packet.Param1)) return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		packet.Hook = APTR.FromPointer(rawHook);
 		return true;
 	}

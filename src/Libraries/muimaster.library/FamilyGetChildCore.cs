@@ -101,10 +101,23 @@ internal static class MuiFamilyGetChildMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Native qualification keeps selector admission scalar while the
+	// dispatcher-facing overload above retains the named value-type record.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiFamilyGetChildMethodMessage.Size)) return false;
 		return MuiFamilyGetChildPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiFamilyGetChildPacketField.MethodId, out packet.MethodId);
+			message, MuiFamilyGetChildPacketField.MethodId, out methodId);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -112,16 +125,17 @@ internal static class MuiFamilyGetChildMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiFamilyGetChildMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != Method) return false;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != Method) return false;
 		if (!MuiFamilyGetChildPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiFamilyGetChildPacketField.Number, out var rawNumber) ||
 			!MuiFamilyGetChildPacketFieldCursorCodec.TryReadUInt32(ref platform,
 				message, MuiFamilyGetChildPacketField.Reference,
 				out var rawReference)) return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		packet.Number = unchecked((int)rawNumber);
 		packet.Reference = APTR.FromPointer(rawReference);
 		return true;

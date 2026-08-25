@@ -184,6 +184,15 @@ public static class MuiVolumelistCore
 			value) : MuiDirlistCore.SetAttribute(ref platform, state, obj, attribute,
 			value);
 
+	public static bool SetRuntimeAttribute<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, uint attribute, uint value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (attribute == ExampleMode) return false;
+		return MuiDirlistCore.SetRuntimeAttribute(ref platform, state, obj,
+			attribute, value);
+	}
+
 	// Re-enumerate the volume set (MUIM_Dirlist_ReRead on a Volumelist).
 	public static bool Populate<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform

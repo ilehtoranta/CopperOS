@@ -18,6 +18,14 @@ public sealed class MuiAreaDragTests
 			out var begin));
 		Assert.Equal(0x3400u, begin.Object);
 
+		Assert.True(MuiAreaDragMessageCodec.WriteDoDrag(ref platform, packet,
+			-17, 23, 1));
+		Assert.True(MuiAreaDragMessageCodec.TryReadDoDrag(ref platform, packet,
+			out var doDrag));
+		Assert.Equal(-17, doDrag.TouchX);
+		Assert.Equal(23, doDrag.TouchY);
+		Assert.Equal(1u, doDrag.Flags);
+
 		Assert.True(MuiAreaDragMessageCodec.WriteDrop(ref platform, packet,
 			0x3400, -4, 12, 3));
 		Assert.True(MuiAreaDragMessageCodec.TryReadDrop(ref platform, packet,
@@ -69,6 +77,9 @@ public sealed class MuiAreaDragTests
 		Assert.True(MuiAreaDragMessageCodec.TryReadMethodId(ref platform, packet,
 			out var header));
 		Assert.Equal(MuiAreaDragMessageCodec.DragBegin, header.MethodId);
+		Assert.True(MuiAreaDragMessageCodec.TryReadMethodIdValue(ref platform,
+			packet, out var methodId));
+		Assert.Equal(MuiAreaDragMessageCodec.DragBegin, methodId);
 		Assert.False(MuiAreaDragMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -170,6 +181,7 @@ public sealed class MuiAreaDragTests
 			MuiAreaDragCore.Draggable, 1, false));
 		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, target,
 			MuiAreaDragCore.Dropable, 1, false));
+		platform.PointerCaptureSampleAvailable = true;
 
 		var packet = APTR.FromPointer(0x1400);
 		Assert.True(MuiAreaDragMessageCodec.WriteBegin(ref platform, packet,
@@ -185,6 +197,12 @@ public sealed class MuiAreaDragTests
 			source.Raw, 10, 11, 3, 5));
 		Assert.Equal(MuiAreaDragCore.ReportContinue,
 			MuiLayoutDispatcher.Dispatch(ref platform, State, target, packet));
+		Assert.Equal(1u, platform.PointerCaptureCount);
+		Assert.Equal(source, platform.LastPointerCaptureObject);
+		Assert.Equal(MuiPointerCaptureKind.AreaDrag,
+			platform.LastPointerCaptureKind);
+		Assert.Equal(10, platform.LastPointerCaptureStartX);
+		Assert.Equal(11, platform.LastPointerCaptureStartY);
 		Assert.True(MuiAreaDragMessageCodec.WriteDrop(ref platform, packet,
 			source.Raw, -4, 12, 7));
 		Assert.Equal(1u, MuiLayoutDispatcher.Dispatch(ref platform, State, target,
@@ -198,10 +216,107 @@ public sealed class MuiAreaDragTests
 			source.Raw, 1));
 		Assert.Equal(1u, MuiLayoutDispatcher.Dispatch(ref platform, State, source,
 			packet));
+		Assert.Equal(1u, platform.PointerReleaseCount);
+		Assert.Equal(source, platform.LastPointerReleaseObject);
+		Assert.Equal(MuiPointerCaptureKind.AreaDrag,
+			platform.LastPointerReleaseKind);
 		Assert.True(MuiAreaDragMessageCodec.WriteReport(ref platform, packet,
 			source.Raw, 1, 2, 1, 0));
 		Assert.Equal(MuiAreaDragCore.ReportAbort,
 			MuiLayoutDispatcher.Dispatch(ref platform, State, source, packet));
+	}
+
+	[Fact]
+	public void AreaDoDragStartsFromReceiverAndPreservesTouchInput()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var source = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, source,
+			MuiAreaDragCore.Draggable, 1, false));
+		platform.DragRouteSampleAvailable = true;
+		var packet = APTR.FromPointer(0x1B00);
+		Assert.True(MuiAreaDragMessageCodec.WriteDoDrag(ref platform, packet,
+			-17, 23, 1));
+
+		Assert.Equal(1u, MuiLayoutDispatcher.Dispatch(ref platform, State, source,
+			packet));
+		Assert.Equal(MuiDragRoutePhase.Begin, platform.LastDragRouteSample.Phase);
+		Assert.Equal(source, platform.LastDragRouteSample.Source);
+		Assert.Equal(-17, platform.LastDragRouteSample.X);
+		Assert.Equal(23, platform.LastDragRouteSample.Y);
+		Assert.Equal(1u, platform.LastDragRouteSample.Flags);
+
+		var stateStorage = APTR.Null;
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, source,
+			MuiAreaDragCore.StateKey, out var rawState));
+		stateStorage = APTR.FromPointer(rawState);
+		Assert.True(MuiAreaDragStateCodec.TryRead(ref platform, stateStorage,
+			out var value));
+		Assert.Equal(source.Raw, value.Source);
+		Assert.True((value.Flags & MuiAreaDragState.ActiveFlag) != 0);
+
+		var nonDraggable = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.Equal(0u, MuiLayoutDispatcher.Dispatch(ref platform, State,
+			nonDraggable, packet));
+	}
+
+	[Fact]
+	public void AreaDragRoutesNamedStructSamplesToNativeCapability()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var source = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var target = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, source,
+			MuiAreaDragCore.Draggable, 1, false));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, target,
+			MuiAreaDragCore.Dropable, 1, false));
+		platform.DragRouteSampleAvailable = true;
+		// A report result of Lock also remains a non-zero success result for the
+		// other MUIM_Drag* phases in this deterministic provider.
+		platform.DragRouteResult = MuiAreaDragCore.ReportLock;
+		var packet = APTR.FromPointer(0x1C00);
+
+		Assert.True(MuiAreaDragMessageCodec.WriteBegin(ref platform, packet,
+			source.Raw));
+		Assert.Equal(1u, MuiLayoutDispatcher.Dispatch(ref platform, State, source,
+			packet));
+		Assert.Equal(MuiDragRoutePhase.Begin, platform.LastDragRouteSample.Phase);
+		Assert.Equal(source, platform.LastDragRouteSample.Source);
+
+		Assert.True(MuiAreaDragMessageCodec.WriteQuery(ref platform, packet,
+			source.Raw));
+		Assert.Equal(MuiAreaDragCore.QueryAccept,
+			MuiLayoutDispatcher.Dispatch(ref platform, State, target, packet));
+		Assert.Equal(MuiDragRoutePhase.Query, platform.LastDragRouteSample.Phase);
+		Assert.Equal(target, platform.LastDragRouteSample.Target);
+
+		Assert.True(MuiAreaDragMessageCodec.WriteReport(ref platform, packet,
+			source.Raw, -3, 8, 2, 9));
+		Assert.Equal(MuiAreaDragCore.ReportLock,
+			MuiLayoutDispatcher.Dispatch(ref platform, State, source, packet));
+		Assert.Equal(MuiDragRoutePhase.Report, platform.LastDragRouteSample.Phase);
+		Assert.Equal(-3, platform.LastDragRouteSample.X);
+		Assert.Equal(8, platform.LastDragRouteSample.Y);
+
+		Assert.True(MuiAreaDragMessageCodec.WriteDrop(ref platform, packet,
+			source.Raw, 4, -5, 7));
+		Assert.Equal(1u, MuiLayoutDispatcher.Dispatch(ref platform, State, target,
+			packet));
+		Assert.True(MuiAreaDragMessageCodec.WriteEvent(ref platform, packet,
+			0x3500, source.Raw, 0x3600, 0x3700, -1, 2, 9));
+		Assert.Equal(1u, MuiLayoutDispatcher.Dispatch(ref platform, State, source,
+			packet));
+		Assert.True(MuiAreaDragMessageCodec.WriteFinish(ref platform, packet,
+			source.Raw, 1));
+		Assert.Equal(1u, MuiLayoutDispatcher.Dispatch(ref platform, State, source,
+			packet));
+		Assert.Equal(MuiDragRoutePhase.Finish, platform.LastDragRouteSample.Phase);
+		Assert.Equal(1, platform.LastDragRouteSample.DropFollows);
+		Assert.Equal(7u, platform.DragRouteCount);
 	}
 
 	[Fact]
@@ -228,6 +343,42 @@ public sealed class MuiAreaDragTests
 	}
 
 	[Fact]
+	public void AreaDragImagePacketsUseNamedCapabilityBoundary()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var packet = APTR.FromPointer(0x1800);
+		Assert.True(MuiAreaDragMessageCodec.WriteCreateDragImage(ref platform,
+			packet, -7, 13, 5));
+		Assert.True(MuiAreaDragMessageCodec.TryReadCreateDragImage(ref platform,
+			packet, out var create));
+		Assert.Equal(-7, create.TouchX);
+		Assert.Equal(13, create.TouchY);
+		Assert.Equal(5u, create.Flags);
+
+		var result = APTR.FromPointer(0x1A00);
+		platform.DragImageCreateSampleAvailable = true;
+		platform.DragImageCreateResult = result;
+		Assert.Equal(result.Raw, MuiLayoutDispatcher.Dispatch(ref platform,
+			State, obj, packet));
+		Assert.Equal(obj, platform.LastDragImageCreateObject);
+		Assert.Equal(-7, platform.LastDragImageCreateTouchX);
+		Assert.Equal(13, platform.LastDragImageCreateTouchY);
+		Assert.Equal(5u, platform.LastDragImageCreateFlags);
+
+		platform.DragImageDeleteSampleAvailable = true;
+		Assert.True(MuiAreaDragMessageCodec.WriteDeleteDragImage(ref platform,
+			packet, result.Raw));
+		Assert.True(MuiAreaDragMessageCodec.TryReadDeleteDragImage(ref platform,
+			packet, out var delete));
+		Assert.Equal(result.Raw, delete.DragImage);
+		Assert.Equal(1u, MuiLayoutDispatcher.Dispatch(ref platform, State, obj,
+			packet));
+		Assert.Equal(result, platform.LastDragImageDeleted);
+	}
+
+	[Fact]
 	public void AreaDragMalformedStateIsReplacedAndFreed()
 	{
 		var platform = CreatePlatform(out var areaClass);
@@ -250,6 +401,38 @@ public sealed class MuiAreaDragTests
 		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, source,
 			MuiAreaDragCore.StateKey, out var replacement));
 		Assert.NotEqual(malformed.Raw, replacement);
+	}
+
+	[Fact]
+	public void AreaDragStateIsFreedWhenObjectIsDisposed()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var source = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, source,
+			MuiAreaDragCore.Draggable, 1, false));
+		var packet = APTR.FromPointer(0x1E00);
+		Assert.True(MuiAreaDragMessageCodec.WriteBegin(ref platform, packet,
+			source.Raw));
+		Assert.Equal(1u, MuiLayoutDispatcher.Dispatch(ref platform, State, source,
+			packet));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			source, MuiAreaDragCore.StateKey, out var rawStorage));
+		var storage = APTR.FromPointer(rawStorage);
+		Assert.True(platform.IsMapped(storage, MuiAreaDragState.Size));
+
+		var freesBeforeDispose = platform.FreeCount;
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			source));
+		Assert.True(platform.FreeCount > freesBeforeDispose);
+		// The deterministic platform retains mapped guest pages after Free; the
+		// cleared typed record proves that the Area state itself was released,
+		// rather than merely losing its attribute node.
+		Assert.Equal(0u, platform.ReadUInt32(storage, 0));
+		Assert.False(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			source, MuiAreaDragCore.StateKey, out _));
+		Assert.True(MuiHeadlessObjectCore.FindObject(ref platform, State, source)
+			.IsNull);
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR areaClass)

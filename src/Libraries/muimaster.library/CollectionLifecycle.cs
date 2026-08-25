@@ -7,10 +7,10 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
-// Keeps MG08 teardown out of the frozen generic object closure. Collection
-// class dispatchers call this entry point for OM_DISPOSE; it pre-cleans every
-// collection object in the owned child tree, then delegates structural object
-// teardown to the shared headless core.
+// Collection class dispatchers call this entry point for OM_DISPOSE; it
+// pre-cleans every collection object in the owned child tree, then delegates
+// structural object teardown to the shared headless core. The headless core
+// also has a per-object fallback for callers that bypass this wrapper.
 public static class MuiCollectionLifecycle
 {
 	public static bool DisposeObject<TPlatform>(ref TPlatform platform,
@@ -46,6 +46,10 @@ public static class MuiCollectionLifecycle
 		else if (MuiListCore.Classify(ref platform, state, obj) ==
 			MuiCollectionClass.Listview)
 			MuiListviewCore.CleanupRecords(ref platform, state, obj);
+		else if (MuiListCore.Classify(ref platform, state, obj) ==
+			MuiCollectionClass.Stringscroll)
+			MuiStringscrollCore.CancelPointerDragForWindow(ref platform, state,
+				obj);
 		else if (MuiListCore.IsListBacked(MuiListCore.Classify(ref platform,
 			state, obj)))
 			MuiListCore.CleanupRecords(ref platform, state, obj);

@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -14,6 +15,66 @@ public struct MuiWindowEventHandlerPacketInput
 	public const uint Size = 8;
 	public uint MethodId;
 	public APTR Handler;
+}
+
+// A platform/input producer supplies the already-resolved object under the
+// pointer together with the caller-owned InputEvent record.  MorphOS exposes
+// the result as two getter-only window attributes; keeping the publication in
+// one named record prevents callers from having to coordinate two independent
+// pointer writes or depend on positional guest offsets.  Pointer coordinates
+// and hit-testing policy deliberately remain on the platform side of this
+// boundary.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+public struct MuiWindowPointerInput
+{
+	public APTR Window;
+	public APTR MouseObject;
+	public APTR InputEvent;
+}
+
+// Caller-owned storage used by the window poller. InputEvent is the standard
+// 22-byte Intuition record; EventMessage is an optional preprocessed
+// MUIP_HandleEvent packet. Keeping both pointers in one named value prevents
+// the event path from reusing one guest block for two incompatible layouts.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+public struct MuiWindowEventPollInput
+{
+	public APTR InputEvent;
+	public APTR EventMessage;
+}
+
+// One native event returned by the platform. The provider receives the
+// caller-owned InputEvent pointer, returns the resolved event class, and may
+// report the producer-owned initial timer delay for IDCMP_INTUITICKS; keeping
+// that exchange in one value avoids a scalar window/event pair that callers
+// could accidentally disagree about.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+public struct MuiWindowEventSample
+{
+	public APTR NativeWindow;
+	public APTR InputEvent;
+	public uint EventClass;
+	// For IDCMP_INTUITICKS the producer reports whether the documented initial
+	// relverify delay has elapsed. Other event classes leave this field zero.
+	public uint TimerDelayElapsed;
+	// The platform may also report a completed double-click decision for the
+	// event.  The target and signed value stay together in a named carrier so
+	// the core never infers click timing from native message offsets.
+	public MuiWindowDoubleClickInput DoubleClick;
+}
+
+// The platform fills this value when it can translate the native event into a
+// MorphOS MUI HandleEvent packet. The core owns Window/InputEvent identity and
+// accepts only the caller's Message pointer; no raw packet offsets or managed
+// event object cross the capability boundary.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+public struct MuiWindowEventInput
+{
+	public APTR Window;
+	public APTR NativeWindow;
+	public APTR InputEvent;
+	public APTR Message;
+	public uint EventClass;
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -30,22 +91,53 @@ internal struct MuiWindowEventHandlerPacket
 // arbitrary first ULONG as an event-handler request.
 internal static class MuiWindowEventHandlerPacketCodec
 {
+	// Selector admission remains a scalar ABI seam; the public packet path
+	// continues to expose the named handler record and pointer field.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiWindowEventHandlerPacketFieldCursorCodec.TryReadUInt32(
+			ref platform, address, MuiWindowEventHandlerPacketKind.Add,
+			MuiWindowEventHandlerPacketField.MethodId, out methodId);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out uint methodId, out APTR handler)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		handler = APTR.Null;
+		if (!TryReadMethodIdValue(ref platform, address, out methodId)) return false;
+		MuiWindowEventHandlerPacketKind packetKind;
+		if (!TryGetPacketKind(methodId, out packetKind))
+		{
+			methodId = 0;
+			return false;
+		}
+		uint handlerValue;
+		if (!MuiWindowEventHandlerPacketFieldCursorCodec.TryReadUInt32(
+			ref platform, address, packetKind,
+			MuiWindowEventHandlerPacketField.Handler, out handlerValue))
+		{
+			methodId = 0;
+			return false;
+		}
+		handler = APTR.FromPointer(handlerValue);
+		return true;
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiWindowEventHandlerPacket packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!MuiApplicationMethodHeaderCodec.TryRead(ref platform, address,
-			out var header) || !IsMethod(header.MethodId) ||
-			!MuiWindowEventHandlerPacketFieldCursorCodec.TryReadUInt32(ref platform,
-				address, header.MethodId ==
-					MuiApplicationDispatcher.WindowAddEventHandlerMethod
-					? MuiWindowEventHandlerPacketKind.Add
-					: MuiWindowEventHandlerPacketKind.Remove,
-				MuiWindowEventHandlerPacketField.Handler, out var handler))
-			return false;
-		packet.MethodId = header.MethodId;
-		packet.Handler = APTR.FromPointer(handler);
+		uint methodId;
+		APTR handler;
+		if (!TryRead(ref platform, address, out methodId, out handler)) return false;
+		packet.MethodId = methodId;
+		packet.Handler = handler;
 		return true;
 	}
 
@@ -53,26 +145,43 @@ internal static class MuiWindowEventHandlerPacketCodec
 		MuiWindowEventHandlerPacket packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsMethod(packet.MethodId) || address.IsNull ||
+		return Write(ref platform, address, packet.MethodId, packet.Handler);
+	}
+
+	// Keep the public input path on direct named values. This avoids an
+	// unnecessary temporary packet copy in freestanding lowering while the
+	// internal record remains available for typed readback.
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		uint methodId, APTR handler)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetPacketKind(methodId, out var packetKind) || address.IsNull ||
 			!MuiWindowEventHandlerPacketFieldCursorCodec.TryWriteUInt32(
-				ref platform, address, packet.MethodId ==
-					MuiApplicationDispatcher.WindowAddEventHandlerMethod
-					? MuiWindowEventHandlerPacketKind.Add
-					: MuiWindowEventHandlerPacketKind.Remove,
-				MuiWindowEventHandlerPacketField.MethodId, packet.MethodId) ||
+				ref platform, address, packetKind,
+				MuiWindowEventHandlerPacketField.MethodId, methodId) ||
 			!MuiWindowEventHandlerPacketFieldCursorCodec.TryWriteUInt32(
-				ref platform, address, packet.MethodId ==
-					MuiApplicationDispatcher.WindowAddEventHandlerMethod
-					? MuiWindowEventHandlerPacketKind.Add
-					: MuiWindowEventHandlerPacketKind.Remove,
-				MuiWindowEventHandlerPacketField.Handler, packet.Handler.Raw))
+				ref platform, address, packetKind,
+				MuiWindowEventHandlerPacketField.Handler, handler.Raw))
 			return false;
 		return true;
 	}
 
-	private static bool IsMethod(uint method) =>
-		method == MuiApplicationDispatcher.WindowAddEventHandlerMethod ||
-		method == MuiApplicationDispatcher.WindowRemoveEventHandlerMethod;
+	private static bool TryGetPacketKind(uint method,
+		out MuiWindowEventHandlerPacketKind packet)
+	{
+		if (method == MuiApplicationDispatcher.WindowAddEventHandlerMethod)
+		{
+			packet = MuiWindowEventHandlerPacketKind.Add;
+			return true;
+		}
+		if (method == MuiApplicationDispatcher.WindowRemoveEventHandlerMethod)
+		{
+			packet = MuiWindowEventHandlerPacketKind.Remove;
+			return true;
+		}
+		packet = MuiWindowEventHandlerPacketKind.Add;
+		return false;
+	}
 }
 
 public static class MuiWindowEventHandlerPacketCore
@@ -81,11 +190,8 @@ public static class MuiWindowEventHandlerPacketCore
 		MuiWindowEventHandlerPacketInput input)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var packet = default(MuiWindowEventHandlerPacket);
-		packet.MethodId = input.MethodId;
-		packet.Handler = input.Handler;
 		return MuiWindowEventHandlerPacketCodec.Write(ref platform, address,
-			packet);
+			input.MethodId, input.Handler);
 	}
 
 	public static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -93,10 +199,12 @@ public static class MuiWindowEventHandlerPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		input = default;
+		uint methodId;
+		APTR handler;
 		if (!MuiWindowEventHandlerPacketCodec.TryRead(ref platform, address,
-			out var packet)) return false;
-		input.MethodId = packet.MethodId;
-		input.Handler = packet.Handler;
+			out methodId, out handler)) return false;
+		input.MethodId = methodId;
+		input.Handler = handler;
 		return true;
 	}
 }
@@ -874,6 +982,7 @@ public static class MuiApplicationWindowCore
 	private const uint EventClassActiveWindow = 0x00040000;
 	private const uint EventClassInactiveWindow = 0x00080000;
 	private const uint EventClassChangeWindow = 0x02000000;
+	private const uint EventClassIntuiTick = 0x00400000;
 	private const uint EventHandlerEat = 1;
 	private const ushort EventHandlerAlwaysKeys =
 		MuiEventHandlerNodeInput.MUI_EHF_ALWAYSKEYS;
@@ -890,6 +999,7 @@ public static class MuiApplicationWindowCore
 	private const uint DispatchPriorityOnly = 0x20000000u;
 	private const uint DispatchPriorityVisited = 2;
 	private const int MuiKeyNone = -1;
+	private const int MuiKeyHelp = MuiHelpTriggerInput.HelpKey;
 	private const uint Disabled = 0x80423661;
 	private const uint ShowMe = 0x80429BA8;
 	private const uint IsShown = 0x7FFF0003;
@@ -977,6 +1087,7 @@ public static class MuiApplicationWindowCore
 	private const uint ApplicationSchedulerStateKey = 0x7F0A0008u;
 	private const uint WindowInteractionStateKey = 0x7F0A0009u;
 	private const uint WindowEventStateKey = 0x7F0A000Au;
+	private const uint WindowEventReuseStateKey = 0x7F0A0037u;
 	private const uint ApplicationHelpStateKey = 0x7F0A000Bu;
 	private const uint ApplicationDefaultConfigStateKey = 0x7F0A000Cu;
 	private const uint ApplicationConfigWindowStateKey = 0x7F0A000Du;
@@ -1913,6 +2024,144 @@ public static class MuiApplicationWindowCore
 		value.CloseRequest = closeRequest != 0 ? 1u : 0u;
 		value.InputEvent = APTR.FromPointer(inputEvent);
 		value.MouseObject = APTR.FromPointer(mouseObject);
+	}
+
+	private static bool TryReadWindowEventReuseStateRecord<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window,
+		out MuiWindowEventReuseStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
+			WindowEventReuseStateKey);
+		if (MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowEventReuseStateKey) !=
+			unchecked((int)MuiWindowEventReuseStateRecord.Size)) return false;
+		return MuiWindowEventReuseStateRecordCodec.TryRead(ref platform, block,
+			out value);
+	}
+
+	private static bool EnsureWindowEventReuseStateRecord<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (TryReadWindowEventReuseStateRecord(ref platform, state, window,
+			out _)) return true;
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiWindowEventReuseStateRecord.Size);
+		if (scratch.IsNull) return false;
+		platform.Clear(scratch, MuiWindowEventReuseStateRecord.Size);
+		var value = default(MuiWindowEventReuseStateRecord);
+		value.Magic = MuiWindowEventReuseStateRecord.Cookie;
+		value.MuiKey = -1;
+		var written = MuiWindowEventReuseStateRecordCodec.Write(ref platform,
+			scratch, value);
+		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
+			window, WindowEventReuseStateKey, scratch,
+			unchecked((int)MuiWindowEventReuseStateRecord.Size));
+		platform.Clear(scratch, MuiWindowEventReuseStateRecord.Size);
+		platform.Free(scratch, MuiWindowEventReuseStateRecord.Size);
+		return added;
+	}
+
+	// Establish the named context used by a String EditHook while one window
+	// event is being routed. The previous value is returned so nested typed
+	// dispatch can restore it without a managed stack or callback object.
+	private static bool BeginWindowEventReuseContext<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window, APTR eventMessage,
+		uint eventClass, out MuiWindowEventReuseStateRecord previous)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
+		previous = default;
+		if (window.IsNull || !EnsureWindowEventReuseStateRecord(ref platform,
+			state, window) || !TryReadWindowEventReuseStateRecord(ref platform,
+			state, window, out previous)) return false;
+		var next = previous;
+		next.Magic = MuiWindowEventReuseStateRecord.Cookie;
+		next.ContextActive = 1;
+		next.EventMessage = eventMessage;
+		next.EventClass = eventClass;
+		next.InputEvent = APTR.Null;
+		next.MuiKey = -1;
+		if (MuiCommonControlPacketCore.TryReadHandleEvent(ref platform,
+			eventMessage, out var packet))
+		{
+			next.InputEvent = APTR.FromPointer(packet.InputMessage);
+			next.MuiKey = packet.MuiKey;
+		}
+		return MuiWindowEventReuseStateRecordCodec.Write(ref platform,
+			MuiStoreCore.DataspaceFind(ref platform, state, window,
+				WindowEventReuseStateKey), next);
+	}
+
+	private static bool EndWindowEventReuseContext<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window,
+		MuiWindowEventReuseStateRecord previous)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
+		if (!TryReadWindowEventReuseStateRecord(ref platform, state, window,
+			out var current)) return false;
+		if (current.Pending != 0)
+		{
+			previous.Pending = current.Pending;
+			previous.EventMessage = current.EventMessage;
+			previous.InputEvent = current.InputEvent;
+			previous.EventClass = current.EventClass;
+			previous.MuiKey = current.MuiKey;
+		}
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
+			WindowEventReuseStateKey);
+		return MuiWindowEventReuseStateRecordCodec.Write(ref platform, block,
+			previous);
+	}
+
+	// Queue one provider-declined reuse request for post-dispatch draining. A
+	// malformed direct HandleEvent call has no event packet context and is
+	// intentionally ignored; native providers can still consume that request.
+	internal static bool QueueWindowEventReuse<TPlatform>(ref TPlatform platform,
+		APTR state, APTR window, APTR inputEvent)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		if (window.IsNull || !TryReadWindowEventReuseStateRecord(ref platform,
+			state, window, out var value) || value.ContextActive == 0 ||
+			value.EventMessage.IsNull || value.InputEvent != inputEvent) return false;
+		if (value.Pending != 0) return true;
+		value.Pending = 1;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
+			WindowEventReuseStateKey);
+		return MuiWindowEventReuseStateRecordCodec.Write(ref platform, block,
+			value);
+	}
+
+	internal static bool TakeWindowEventReuse<TPlatform>(ref TPlatform platform,
+		APTR state, APTR window, out MuiWindowEventReuseStateRecord value)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
+		value = default;
+		if (!TryReadWindowEventReuseStateRecord(ref platform, state, window,
+			out value) || value.Pending == 0) return false;
+		value.Pending = 0;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
+			WindowEventReuseStateKey);
+		if (!MuiWindowEventReuseStateRecordCodec.Write(ref platform, block,
+			value)) return false;
+		return true;
+	}
+
+	internal static uint DrainWindowEventReuse<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
+		uint dispatched = 0;
+		for (var reuseIndex = 0; reuseIndex < 16; reuseIndex++)
+		{
+			if (!TakeWindowEventReuse(ref platform, state, window,
+				out var reuse)) break;
+			if (reuse.EventMessage.IsNull || reuse.EventClass == 0) break;
+			dispatched += DispatchWindowEvent(ref platform, state, window,
+				reuse.EventMessage, reuse.EventClass);
+		}
+		return dispatched;
 	}
 
 	internal static bool TryGetApplicationHelpState<TPlatform>(
@@ -3609,8 +3858,20 @@ public static class MuiApplicationWindowCore
 		APTR state, APTR application, APTR eventStorage)
 		where TPlatform : struct, IMuiApplicationPlatform
 	{
+		var input = default(MuiWindowEventPollInput);
+		input.InputEvent = eventStorage;
+		return PollWindowEvents(ref platform, state, application, input);
+	}
+
+	public static uint PollWindowEvents<TPlatform>(ref TPlatform platform,
+		APTR state, APTR application, MuiWindowEventPollInput input)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
+		var eventStorage = input.InputEvent;
 		if (eventStorage.IsNull || !platform.IsMapped(eventStorage,
 			global::Amiga.InputEvent.Size)) return 0;
+		if (input.EventMessage.IsNotNull && !platform.IsMapped(input.EventMessage,
+			MuiCommonHandleEventMessage.Size)) return 0;
 		uint dispatched = 0;
 		for (var index = 0; index < 65535; index++)
 		{
@@ -3622,21 +3883,106 @@ public static class MuiApplicationWindowCore
 			if (nativeWindow.IsNull) continue;
 			for (var eventIndex = 0; eventIndex < 16; eventIndex++)
 			{
-				var eventClass = platform.ReadWindowEvent(nativeWindow, eventStorage);
-				if (eventClass == 0) break;
-				PublishWindowInputEventValue(ref platform, state, window,
-					eventStorage);
+				var eventSample = default(MuiWindowEventSample);
+				eventSample.NativeWindow = nativeWindow;
+				eventSample.InputEvent = eventStorage;
+				if (!platform.ReadWindowEvent(ref eventSample) ||
+					eventSample.EventClass == 0 ||
+					eventSample.NativeWindow != nativeWindow ||
+					eventSample.InputEvent != eventStorage)
+					break;
+				var eventClass = eventSample.EventClass;
+				var dispatchMessage = eventStorage;
+				if (input.EventMessage.IsNotNull)
+				{
+					var eventInput = default(MuiWindowEventInput);
+					eventInput.Window = window;
+					eventInput.NativeWindow = nativeWindow;
+					eventInput.InputEvent = eventStorage;
+					eventInput.Message = input.EventMessage;
+					eventInput.EventClass = eventClass;
+					if (platform.ReadMuiWindowEvent(ref eventInput) &&
+						eventInput.Message == input.EventMessage &&
+						eventInput.EventClass == eventClass)
+						dispatchMessage = input.EventMessage;
+				}
+				if (!TryPollWindowPointer(ref platform, state, window,
+					nativeWindow, eventStorage))
+					PublishWindowInputEventValue(ref platform, state, window,
+						eventStorage);
+				if ((eventClass & EventClassIntuiTick) != 0)
+					dispatched += ProcessWindowTimerTick(ref platform, state, window,
+						eventSample.TimerDelayElapsed);
+				if (eventSample.DoubleClick.Available != 0)
+					dispatched += ProcessWindowDoubleClick(ref platform, state, window,
+						eventSample.DoubleClick);
 				if (eventClass == 0x00000200)
 				{
 					Set(ref platform, state, window, WindowCloseRequest, 1);
 					PublishWindowEventState(ref platform, state, window, out _);
 				}
 				dispatched += DispatchWindowEvent(ref platform, state, window,
-					eventStorage, eventClass);
+					dispatchMessage, eventClass);
+				// SGA_REUSE is drained only after the current handler walk has
+				// returned. This preserves MorphOS's reuse ordering while keeping
+				// recursion and queue storage entirely guest-resident and bounded.
+				dispatched += DrainWindowEventReuse(ref platform, state, window);
 			}
 		}
 		return dispatched;
 	}
+
+	// Keep the producer's by-ref pointer carrier in a small native-lowered
+	// helper. PollWindowEvents is deliberately broad; isolating this typed
+	// struct handoff prevents its stack lifetime from overlapping event routing.
+	private static bool TryPollWindowPointer<TPlatform>(ref TPlatform platform,
+		APTR state, APTR window, APTR nativeWindow, APTR eventStorage)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
+		var input = default(MuiWindowPointerInput);
+		input.Window = window;
+		input.InputEvent = eventStorage;
+		return platform.ReadMuiWindowPointer(nativeWindow, ref input) &&
+			PublishWindowPointerInput(ref platform, state, ref input);
+	}
+
+	private static uint ProcessWindowTimerTick<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window, uint delayElapsed)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
+		var objectAddress = APTR.FromPointer(Read(ref platform, state, window,
+			MuiWindowPublicCore.MouseObject));
+		if (!MuiAreaTimerCore.TryReadArmed(ref platform, state, objectAddress))
+			return 0;
+		var input = default(MuiAreaTimerEventInput);
+		input.Kind = MuiAreaTimerEventKind.IntuiTick;
+		input.Tick = platform.ReadTicks();
+		input.PointerOver = 1;
+		input.DelayElapsed = delayElapsed == 0 ? 0u : 1u;
+		return MuiAreaTimerPacketCore.ProcessEvent(ref platform, state,
+			objectAddress, input, true) ? 1u : 0u;
+	}
+
+	private static uint ProcessWindowDoubleClick<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window,
+		MuiWindowDoubleClickInput input)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
+		return PublishWindowDoubleClickInput(ref platform, state, window, input) ?
+			1u : 0u;
+	}
+
+	// Publish one producer-owned double-click decision. The input subsystem
+	// owns click timing and hit-testing; this helper only validates the named
+	// target against the live Window parent chain and commits the signed
+	// getter-only Area value. Keeping this boundary public and value-typed lets
+	// native providers qualify it without pulling in the complete event poller.
+	public static bool PublishWindowDoubleClickInput<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window,
+		MuiWindowDoubleClickInput input)
+		where TPlatform : struct, IMuiApplicationPlatform
+		=> MuiWindowDoubleClickProducerCore.Publish(ref platform, state, window,
+			input);
 
 	public static bool AddInputHandler<TPlatform>(ref TPlatform platform,
 		APTR state, APTR application, APTR handler)
@@ -3679,6 +4025,11 @@ public static class MuiApplicationWindowCore
 			MuiEventHandlerNodeRecord.Size) ||
 			!MuiEventHandlerNodeCodec.TryRead(ref platform, handler,
 				out var eventHandler)) return false;
+		// A MUI_EventHandlerNode is caller-owned and may be linked into only
+		// one Window queue at a time.  MorphOS exposes this state through the
+		// read-only ISENABLED bit; reject a second registration instead of
+		// creating a duplicate wrapper or corrupting the named links.
+		if ((eventHandler.Flags & EventHandlerEnabled) != 0) return false;
 		var node = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationWindowNodeRecord.Size);
 		if (node.IsNull) return false;
@@ -3721,11 +4072,31 @@ public static class MuiApplicationWindowCore
 		APTR state, APTR window, APTR eventMessage, uint eventClass)
 		where TPlatform : struct, IMuiApplicationPlatform
 	{
+		var began = BeginWindowEventReuseContext(ref platform, state, window,
+			eventMessage, eventClass, out var previous);
+		var result = DispatchWindowEventCore(ref platform, state, window,
+			eventMessage, eventClass);
+		if (began) EndWindowEventReuseContext(ref platform, state, window,
+			previous);
+		return result;
+	}
+
+	private static uint DispatchWindowEventCore<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window, APTR eventMessage,
+		uint eventClass)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
 		// A sleeping window is disabled until every matching wake request has
 		// arrived. Do this before event-handler reconciliation so sleeping input
 		// cannot trigger callbacks or mutate read-only handler state.
 		if (ReadWindowSleepState(ref platform, state, window).Depth != 0)
 			return 0;
+		// MorphOS invalidates pointer gestures when a window becomes inactive.
+		// Cancel through the typed Listview state seam before callbacks observe the
+		// transition, releasing guest-owned captures and clearing drop marks.
+		if ((eventClass & EventClassInactiveWindow) != 0)
+			_ = MuiListviewCore.CancelPointerDragsInWindow(ref platform, state,
+				window);
 		// Active/default object changes are represented by the window's named
 		// attributes. Reconcile all registered records before routing, without
 		// keeping a managed shadow list.
@@ -3735,11 +4106,19 @@ public static class MuiApplicationWindowCore
 		var defaultObject = APTR.FromPointer(Read(ref platform, state, window,
 			DefaultObject));
 		var keyEvent = IsMuiKeyEvent(ref platform, eventMessage);
+		// MorphOS handles the online-help key before normal object handlers.  The
+		// current object is the window's named MouseObject state; no managed hit
+		// test or guessed raw key code is introduced here.
+		if (keyEvent && IsMuiHelpKey(ref platform, eventMessage) &&
+			HandleHelpKey(ref platform, state, window, eventMessage))
+			return EventHandlerEat;
 		// MorphOS applies MUIA_Window_DisableKeys to preprocessed MUI key
 		// packets before consulting the event-handler queue. The mask is a
 		// named window attribute and only the non-negative key index is used.
 		if (keyEvent && IsWindowKeyDisabled(ref platform, state, window,
 			eventMessage)) return 0;
+		if (APTR.FromPointer(Read(ref platform, state, window, EventHandlers)).IsNull)
+			return 0;
 		var firstEventClass = eventClass | DispatchPriorityProbe;
 		var routeResult = 0u;
 		if (active.IsNotNull)
@@ -3907,6 +4286,14 @@ public static class MuiApplicationWindowCore
 	{
 		return MuiCommonControlPacketCore.TryReadHandleEvent(ref platform,
 			eventMessage, out var packet) && packet.MuiKey != MuiKeyNone;
+	}
+
+	private static bool IsMuiHelpKey<TPlatform>(ref TPlatform platform,
+		APTR eventMessage)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
+		return MuiCommonControlPacketCore.TryReadHandleEvent(ref platform,
+			eventMessage, out var packet) && packet.MuiKey == MuiKeyHelp;
 	}
 
 	private static bool IsWindowKeyDisabled<TPlatform>(ref TPlatform platform,
@@ -4304,6 +4691,93 @@ public static class MuiApplicationWindowCore
 		var target = APTR.FromPointer(value);
 		return IsCycleChainMember(ref platform, state, window, target) &&
 			Activate(ref platform, state, window, target);
+	}
+
+	// Route a String.mui SGWork next/previous action through the same named
+	// cycle-chain and Window_ActiveObject records used by MUIA_Window_ActiveObject.
+	// This layout-level path intentionally does not manufacture a native Window
+	// handle or a managed focus object; native activation remains owned by the
+	// normal window setter when the provider has one.
+	public static bool RouteActiveObjectAction<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, bool forward)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		var window = FindContainingWindow(ref platform, state, obj);
+		if (window.IsNull) return false;
+		var interaction = ReadWindowInteractionState(ref platform, state, window);
+		var chainCount = interaction.CycleChainCount;
+		if (chainCount == 0) return false;
+		var limit = chainCount > MuiHeadlessLayout.MaximumTraversal ?
+			MuiHeadlessLayout.MaximumTraversal : chainCount;
+		var active = APTR.FromPointer(Read(ref platform, state, window,
+			ActiveObject));
+		var node = interaction.CycleChainHead;
+		var first = APTR.Null;
+		var last = APTR.Null;
+		var previous = APTR.Null;
+		var activePrevious = APTR.Null;
+		var activeNext = APTR.Null;
+		var activeFound = false;
+		for (var index = 0u; index < limit; index++)
+		{
+			if (node.IsNull || !MuiApplicationWindowNodeCodec.TryRead(ref platform,
+				node, out var record)) return false;
+			var member = record.Value;
+			if (member.IsNull || MuiHeadlessObjectCore.FindObject(ref platform,
+				state, member).IsNull) return false;
+			if (first.IsNull) first = member;
+			last = member;
+			if (member == active)
+			{
+				activeFound = true;
+				activePrevious = previous;
+				activeNext = record.Next;
+			}
+			previous = member;
+			node = record.Next;
+		}
+		var target = APTR.Null;
+		if (forward)
+		{
+			if (activeFound && activeNext.IsNotNull)
+			{
+				if (!MuiApplicationWindowNodeCodec.TryRead(ref platform, activeNext,
+					out var nextRecord)) return false;
+				target = nextRecord.Value;
+			}
+			if (target.IsNull) target = first;
+		}
+		else
+		{
+			if (activeFound) target = activePrevious;
+			if (target.IsNull) target = last;
+		}
+		if (target.IsNull) return false;
+		var focus = ReadWindowFocusState(ref platform, state, window);
+		var oldActive = focus.ActiveObject;
+		if (!Set(ref platform, state, window, ActiveObject, target.Raw)) return false;
+		if (!PublishWindowFocusState(ref platform, state, window, out _))
+		{
+			Set(ref platform, state, window, ActiveObject, oldActive.Raw);
+			PublishWindowFocusState(ref platform, state, window, out _);
+			return false;
+		}
+		return RefreshEventHandlerActiveFlags(ref platform, state, window);
+	}
+
+	public static APTR FindContainingWindow<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var current = obj;
+		uint visited = 0;
+		while (current.IsNotNull && visited++ < MuiHeadlessLayout.MaximumTraversal)
+		{
+			if (MuiApplicationMessageCore.IsWindowObject(ref platform, state,
+				current)) return current;
+			current = MuiHeadlessObjectCore.ParentObject(ref platform, state,
+				current);
+		}
+		return APTR.Null;
 	}
 
 	private static bool SelectSpatialActive<TPlatform>(ref TPlatform platform,
@@ -5171,21 +5645,88 @@ public static class MuiApplicationWindowCore
 			value);
 	}
 
-	// MUIA_Window_MouseObject is getter-only. A future pointer-tracking seam
-	// may publish the deepest live object through this helper; callers cannot
+	// MUIA_Window_MouseObject is getter-only. The named window-pointer sample
+	// seam publishes the deepest live object through this helper; callers cannot
 	// write it through ordinary SetAttrs-style packets.
 	public static bool PublishWindowMouseObjectValue<TPlatform>(
 		ref TPlatform platform, APTR state, APTR window, APTR value)
-		where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiApplicationPlatform
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, window).IsNull)
 			return false;
 		if (value == window || (value.IsNotNull &&
 			MuiHeadlessObjectCore.FindObject(ref platform, state, value).IsNull))
 			return false;
+		var previous = 0u;
+		MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, window,
+			MuiWindowPublicCore.MouseObject, out previous);
 		if (!Set(ref platform, state, window, MuiWindowPublicCore.MouseObject,
 			value.Raw)) return false;
-		return PublishWindowEventState(ref platform, state, window, out _);
+		if (!PublishWindowEventState(ref platform, state, window, out _))
+			return false;
+		return MuiAreaTimerPacketCore.ProcessPointerTransition(ref platform,
+			state, APTR.FromPointer(previous), value, platform.ReadTicks(), true);
+	}
+
+	// Publish the two getter-only pointer results produced by one pointer
+	// sample.  Validation happens before either attribute is changed, so a
+	// malformed target or InputEvent cannot leave a half-published sample.  The
+	// native producer owns hit testing and supplies the deepest live object;
+	// this core method only validates and records the named guest pointers.
+	public static bool PublishWindowPointerInput<TPlatform>(
+		ref TPlatform platform, APTR state, ref MuiWindowPointerInput input)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
+		var window = input.Window;
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, window);
+		if (record.IsNull)
+			return false;
+		if (input.MouseObject == window || (input.MouseObject.IsNotNull &&
+			MuiHeadlessObjectCore.FindObject(ref platform, state,
+				input.MouseObject).IsNull)) return false;
+		// Copy the named pointer out of the ABI carrier before calling the
+		// platform mapping seam.  Keeping the call independent from the ref
+		// carrier avoids aliasing the producer's by-ref struct on native 68k.
+		var inputEvent = input.InputEvent;
+		if (inputEvent.IsNotNull && !platform.IsMapped(inputEvent,
+			global::Amiga.InputEvent.Size)) return false;
+
+		var oldMouseObject = 0u;
+		var oldInputEvent = 0u;
+		MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, window,
+			MuiWindowPublicCore.MouseObject, out oldMouseObject);
+		MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, window,
+			MuiWindowPublicCore.InputEvent, out oldInputEvent);
+		// These are getter-only publication values. Write the validated named
+		// pointer values directly through the raw attribute store instead of
+		// sending them through ordinary Set/NoNotifySet specialist dispatch.
+		// That keeps the native provider seam independent of mutable attribute
+		// policy while preserving the same guest-resident state and rollback.
+		if (!MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state,
+			record, MuiWindowPublicCore.MouseObject, input.MouseObject.Raw, false) ||
+			!MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state,
+				record, MuiWindowPublicCore.InputEvent, input.InputEvent.Raw, false))
+		{
+			MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state, record,
+				MuiWindowPublicCore.MouseObject, oldMouseObject, false);
+			MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state, record,
+				MuiWindowPublicCore.InputEvent, oldInputEvent, false);
+			return false;
+		}
+		if (PublishWindowEventState(ref platform, state, window, out _))
+		{
+			var previousObject = APTR.FromPointer(oldMouseObject);
+			if (MuiAreaTimerPacketCore.ProcessPointerTransition(ref platform,
+				state, previousObject, input.MouseObject, platform.ReadTicks(), true))
+				return true;
+		}
+
+		MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state, record,
+			MuiWindowPublicCore.MouseObject, oldMouseObject, false);
+		MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state, record,
+			MuiWindowPublicCore.InputEvent, oldInputEvent, false);
+		PublishWindowEventState(ref platform, state, window, out _);
+		return false;
 	}
 
 	// MUIA_Window_InputEvent is a getter-only pointer to the current standard
@@ -5432,6 +5973,70 @@ public static class MuiApplicationWindowCore
 			helpState.HelpRequests + 1)) return false;
 		return PublishApplicationHelpState(ref platform, state, application,
 			out _);
+	}
+
+	// Resolve online-help attributes from the object under the pointer before
+	// entering the existing presentation path.  The window argument remains
+	// the screen/reference window; currentObject is the MUI object whose named
+	// Parent chain supplies MUIA_HelpNode and MUIA_HelpLine.
+	public static bool ShowHelpFromObject<TPlatform>(ref TPlatform platform,
+		APTR state, APTR application, APTR window, APTR currentObject, APTR name)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
+		if (!MuiHelpStateCore.TryResolve(ref platform, state, currentObject,
+			out var help)) return false;
+		return ShowHelp(ref platform, state, application, window, name, help.Node,
+			help.Line);
+	}
+
+	// Typed automatic online-help seam.  MorphOS supplies a preprocessed
+	// MUIKEY_HELP packet and the current object selected by pointer tracking;
+	// this helper validates the value-type request and reuses the same named
+	// Parent-chain resolver as explicit ShowHelpFromObject calls.
+	public static bool HandleHelpTrigger<TPlatform>(ref TPlatform platform,
+		APTR state, MuiHelpTriggerInput trigger)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
+		if (trigger.MuiKey != MuiKeyHelp || trigger.Application.IsNull ||
+			MuiHeadlessObjectCore.FindObject(ref platform, state,
+				trigger.Application).IsNull ||
+			(trigger.Window.IsNotNull && MuiHeadlessObjectCore.FindObject(
+				ref platform, state, trigger.Window).IsNull) ||
+			trigger.CurrentObject.IsNull) return false;
+		// Automatic HELP is enabled only when a help file exists.  A non-null
+		// trigger name is an explicit caller-owned override for typed callers;
+		// otherwise the application's named HelpFile must be present.
+		if (trigger.Name.IsNull &&
+			(!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
+				trigger.Application, ApplicationHelpFile, out var helpFile) ||
+				helpFile == 0)) return false;
+		if (!MuiHelpStateCore.TryResolve(ref platform, state,
+			trigger.CurrentObject, out var help) || help.Node.IsNull) return false;
+		return ShowHelp(ref platform, state, trigger.Application, trigger.Window,
+			trigger.Name, help.Node, help.Line);
+	}
+
+	// Convert the current window's named owner/MouseObject state into the typed
+	// trigger above.  The platform's native event packet remains caller-owned;
+	// only its preprocessed MUIKEY value is decoded at this boundary.
+	public static bool HandleHelpKey<TPlatform>(ref TPlatform platform,
+		APTR state, APTR window, APTR eventMessage)
+		where TPlatform : struct, IMuiApplicationPlatform
+	{
+		if (!MuiCommonControlPacketCore.TryReadHandleEvent(ref platform,
+			eventMessage, out var packet) || packet.MuiKey != MuiKeyHelp)
+			return false;
+		var application = APTR.FromPointer(Read(ref platform, state, window,
+			WindowOwner));
+		var currentObject = APTR.FromPointer(Read(ref platform, state, window,
+			MuiWindowPublicCore.MouseObject));
+		var trigger = default(MuiHelpTriggerInput);
+		trigger.Application = application;
+		trigger.Window = window;
+		trigger.CurrentObject = currentObject;
+		trigger.Name = APTR.Null;
+		trigger.MuiKey = packet.MuiKey;
+		return HandleHelpTrigger(ref platform, state, trigger);
 	}
 
 	// MUIM_Application_DefaultConfigItem. This is an application override hook,
@@ -5751,6 +6356,8 @@ public static class MuiApplicationWindowCore
 		if (listAttribute == EventHandlers &&
 			!MuiEventHandlerNodeCodec.TryRead(ref platform, handler,
 				out eventHandler)) return false;
+		if (listAttribute == EventHandlers &&
+			(eventHandler.Flags & EventHandlerEnabled) != 0) return false;
 		var node = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationWindowNodeRecord.Size);
 		if (node.IsNull) return false;
@@ -5815,6 +6422,8 @@ public static class MuiApplicationWindowCore
 		var current = APTR.FromPointer(Read(ref platform, state, owner,
 			EventHandlers));
 		var previous = APTR.Null;
+		var previousHandler = APTR.Null;
+		var successorHandler = APTR.Null;
 		var priority = eventHandler.Priority;
 		uint visited = 0;
 		while (current.IsNotNull && visited++ < MuiHeadlessLayout.MaximumTraversal)
@@ -5836,11 +6445,26 @@ public static class MuiApplicationWindowCore
 			// priorities stay FIFO.
 			if (priorityHandler != currentPriorityHandler)
 			{
-				if (priorityHandler) break;
+				if (priorityHandler)
+				{
+					successorHandler = currentNode.Value;
+					break;
+				}
 			}
-			else if (currentHandler.Priority < priority) break;
+			else if (currentHandler.Priority < priority)
+			{
+				successorHandler = currentNode.Value;
+				break;
+			}
 			previous = current;
+			previousHandler = currentNode.Value;
 			current = currentNode.Next;
+		}
+		if (current.IsNotNull && visited >= MuiHeadlessLayout.MaximumTraversal)
+		{
+			platform.Clear(node, MuiApplicationWindowNodeRecord.Size);
+			platform.Free(node, MuiApplicationWindowNodeRecord.Size);
+			return false;
 		}
 		var record = default(MuiApplicationWindowNodeRecord);
 		record.Value = handler;
@@ -5853,10 +6477,22 @@ public static class MuiApplicationWindowCore
 			platform.Free(node, MuiApplicationWindowNodeRecord.Size);
 			return false;
 		}
+		// Keep the public MUI_EventHandlerNode's named MinNode links in sync
+		// with the private wrapper queue.  The wrapper is an implementation
+		// detail; callers observe these links through the guest struct itself.
+		if (!LinkEventHandlerNodes(ref platform, handler, previousHandler,
+			successorHandler))
+		{
+			platform.Clear(node, MuiApplicationWindowNodeRecord.Size);
+			platform.Free(node, MuiApplicationWindowNodeRecord.Size);
+			return false;
+		}
 		if (previous.IsNull)
 		{
 			if (Set(ref platform, state, owner, EventHandlers, node.Raw))
 				return true;
+			RestoreEventHandlerLinks(ref platform, handler, previousHandler,
+				successorHandler);
 			platform.Clear(node, MuiApplicationWindowNodeRecord.Size);
 			platform.Free(node, MuiApplicationWindowNodeRecord.Size);
 			return false;
@@ -5864,13 +6500,17 @@ public static class MuiApplicationWindowCore
 		if (!MuiApplicationWindowNodeCodec.TryRead(ref platform, previous,
 			out var previousRecord))
 		{
+			RestoreEventHandlerLinks(ref platform, handler, previousHandler,
+				successorHandler);
 			platform.Clear(node, MuiApplicationWindowNodeRecord.Size);
 			platform.Free(node, MuiApplicationWindowNodeRecord.Size);
 			return false;
 		}
 		previousRecord.Next = node;
 		if (MuiApplicationWindowNodeCodec.Write(ref platform, previous,
-			previousRecord)) return true;
+				previousRecord)) return true;
+		RestoreEventHandlerLinks(ref platform, handler, previousHandler,
+			successorHandler);
 		platform.Clear(node, MuiApplicationWindowNodeRecord.Size);
 		platform.Free(node, MuiApplicationWindowNodeRecord.Size);
 		return false;
@@ -5923,6 +6563,16 @@ public static class MuiApplicationWindowCore
 			if (!MuiApplicationWindowNodeCodec.TryRead(ref platform, item,
 				out var record)) return;
 			var next = record.Next;
+			var successorHandler = APTR.Null;
+			if (next.IsNotNull &&
+				MuiApplicationWindowNodeCodec.TryRead(ref platform, next,
+					out var successorRecord)) successorHandler = successorRecord.Value;
+			if (MuiEventHandlerNodeCodec.TryRead(ref platform, record.Value,
+				out var removedHandler))
+			{
+				RelinkAfterEventHandlerRemoval(ref platform, APTR.Null,
+					successorHandler, record.Value, removedHandler);
+			}
 			SetEventHandlerState(ref platform, record.Value, false, false);
 			platform.Clear(item, MuiApplicationWindowNodeRecord.Size);
 			platform.Free(item, MuiApplicationWindowNodeRecord.Size);
@@ -5956,6 +6606,7 @@ public static class MuiApplicationWindowCore
 			ReadApplicationSchedulerState(ref platform, state, owner).InputHandlers :
 			APTR.FromPointer(Read(ref platform, state, owner, listAttribute));
 		var previous = APTR.Null;
+		var previousHandler = APTR.Null;
 		uint visited = 0;
 		while (current.IsNotNull && visited++ < MuiHeadlessLayout.MaximumTraversal)
 		{
@@ -5964,16 +6615,35 @@ public static class MuiApplicationWindowCore
 			var next = record.Next;
 			if (record.Value == handler)
 			{
-				if (previous.IsNull) Set(ref platform, state, owner, listAttribute,
-					next.Raw);
+				var removedHandler = default(MuiEventHandlerNodeRecord);
+				if (listAttribute == EventHandlers &&
+					!MuiEventHandlerNodeCodec.TryRead(ref platform, handler,
+						out removedHandler)) return false;
+				var successorHandler = APTR.Null;
+				if (next.IsNotNull)
+				{
+					if (!MuiApplicationWindowNodeCodec.TryRead(ref platform, next,
+						out var successorRecord) ||
+						!MuiEventHandlerNodeCodec.TryRead(ref platform,
+							successorRecord.Value, out _)) return false;
+					successorHandler = successorRecord.Value;
+				}
+				if (previous.IsNull)
+				{
+					if (!Set(ref platform, state, owner, listAttribute, next.Raw))
+						return false;
+				}
 				else
 				{
 					if (!MuiApplicationWindowNodeCodec.TryRead(ref platform, previous,
 						out var previousRecord)) return false;
 					previousRecord.Next = next;
-					MuiApplicationWindowNodeCodec.Write(ref platform, previous,
-						previousRecord);
+					if (!MuiApplicationWindowNodeCodec.Write(ref platform, previous,
+						previousRecord)) return false;
 				}
+				if (listAttribute == EventHandlers &&
+					!RelinkAfterEventHandlerRemoval(ref platform, previousHandler,
+						successorHandler, handler, removedHandler)) return false;
 				platform.Clear(current, MuiApplicationWindowNodeRecord.Size);
 				platform.Free(current, MuiApplicationWindowNodeRecord.Size);
 				if (listAttribute == InputHandlers)
@@ -5982,9 +6652,120 @@ public static class MuiApplicationWindowCore
 				return true;
 			}
 			previous = current;
+			if (listAttribute == EventHandlers)
+			{
+				if (!MuiEventHandlerNodeCodec.TryRead(ref platform, record.Value,
+					out _)) return false;
+				previousHandler = record.Value;
+			}
 			current = next;
 		}
 		return false;
+	}
+
+	// The wrapper queue is private implementation state, but MorphOS exposes
+	// the embedded MUI_EventHandlerNode's MinNode links to callers. Keep the
+	// two views coherent through named records instead of publishing wrapper
+	// addresses or relying on numeric field offsets at call sites.
+	private static bool LinkEventHandlerNodes<TPlatform>(ref TPlatform platform,
+		APTR handler, APTR predecessor, APTR successor)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiEventHandlerNodeCodec.TryRead(ref platform, handler,
+			out var linked)) return false;
+		var previous = default(MuiEventHandlerNodeRecord);
+		var next = default(MuiEventHandlerNodeRecord);
+		if (predecessor.IsNotNull &&
+			!MuiEventHandlerNodeCodec.TryRead(ref platform, predecessor,
+				out previous)) return false;
+		if (successor.IsNotNull &&
+			!MuiEventHandlerNodeCodec.TryRead(ref platform, successor,
+				out next)) return false;
+		linked.NodePredecessor = predecessor;
+		linked.NodeSuccessor = successor;
+		if (!MuiEventHandlerNodeCodec.Write(ref platform, handler, linked))
+			return false;
+		if (predecessor.IsNotNull)
+		{
+			previous.NodeSuccessor = handler;
+			if (!MuiEventHandlerNodeCodec.Write(ref platform, predecessor,
+				previous)) return false;
+		}
+		if (successor.IsNotNull)
+		{
+			next.NodePredecessor = handler;
+			if (!MuiEventHandlerNodeCodec.Write(ref platform, successor, next))
+				return false;
+		}
+		return true;
+	}
+
+	private static bool RestoreEventHandlerLinks<TPlatform>(
+		ref TPlatform platform, APTR handler, APTR predecessor, APTR successor)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var previous = default(MuiEventHandlerNodeRecord);
+		var next = default(MuiEventHandlerNodeRecord);
+		if (predecessor.IsNotNull &&
+			!MuiEventHandlerNodeCodec.TryRead(ref platform, predecessor,
+				out previous)) return false;
+		if (successor.IsNotNull &&
+			!MuiEventHandlerNodeCodec.TryRead(ref platform, successor,
+				out next)) return false;
+		if (predecessor.IsNotNull)
+		{
+			previous.NodeSuccessor = successor;
+			if (!MuiEventHandlerNodeCodec.Write(ref platform, predecessor,
+				previous)) return false;
+		}
+		if (successor.IsNotNull)
+		{
+			next.NodePredecessor = predecessor;
+			if (!MuiEventHandlerNodeCodec.Write(ref platform, successor, next))
+				return false;
+		}
+		return ClearEventHandlerLinks(ref platform, handler);
+	}
+
+	private static bool RelinkAfterEventHandlerRemoval<TPlatform>(
+		ref TPlatform platform, APTR predecessor, APTR successor,
+		APTR removedAddress, MuiEventHandlerNodeRecord removed)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var previous = default(MuiEventHandlerNodeRecord);
+		var next = default(MuiEventHandlerNodeRecord);
+		if (predecessor.IsNotNull &&
+			!MuiEventHandlerNodeCodec.TryRead(ref platform, predecessor,
+				out previous)) return false;
+		if (successor.IsNotNull &&
+			!MuiEventHandlerNodeCodec.TryRead(ref platform, successor,
+				out next)) return false;
+		if (predecessor.IsNotNull)
+		{
+			previous.NodeSuccessor = successor;
+			if (!MuiEventHandlerNodeCodec.Write(ref platform, predecessor,
+				previous)) return false;
+		}
+		if (successor.IsNotNull)
+		{
+			next.NodePredecessor = predecessor;
+			if (!MuiEventHandlerNodeCodec.Write(ref platform, successor, next))
+				return false;
+		}
+		removed.NodeSuccessor = APTR.Null;
+		removed.NodePredecessor = APTR.Null;
+		return MuiEventHandlerNodeCodec.Write(ref platform, removedAddress, removed);
+	}
+
+	private static bool ClearEventHandlerLinks<TPlatform>(ref TPlatform platform,
+		APTR handler)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiEventHandlerNodeCodec.TryRead(ref platform, handler,
+			out var cleared)) return false;
+		cleared.NodeSuccessor = APTR.Null;
+		cleared.NodePredecessor = APTR.Null;
+		return MuiEventHandlerNodeCodec.Write(ref platform, handler, cleared);
 	}
 
 	private static bool TryReadEventHandler<TPlatform>(ref TPlatform platform,

@@ -146,3 +146,16 @@ internal static class MuiPropPolicyStateRecordCodec
 				MuiPropPolicyStateField.UseWinBorder, value.UseWinBorder);
 	}
 }
+
+// Preserve the policy wire fields losslessly for malformed-state diagnostics.
+// Horizontal and Slider are canonical MorphOS BOOLs; UseWinBorder is the
+// existing four-state policy domain accepted by Prop/Scrollbar construction;
+// DeltaFactor is an unrestricted ULONG multiplier.
+internal static class MuiPropPolicyStateValidation
+{
+	internal static bool IsValidRecord(MuiPropPolicyStateRecord value) =>
+		value.Horizontal <= 1 && value.Slider <= 1 && value.UseWinBorder <= 3;
+
+	internal static bool IsValidState(MuiPropPolicyState value) =>
+		value.Horizontal <= 1 && value.Slider <= 1 && value.UseWinBorder <= 3;
+}

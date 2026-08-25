@@ -85,6 +85,9 @@ public sealed class MuiWindowEventHandlerTests
 			ref platform, ref request, out var value));
 		Assert.Equal(request.Method, value.MethodId);
 		Assert.Equal(0x1300u, value.Handler);
+		Assert.True(MuiWindowEventHandlerPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, out var methodId));
+		Assert.Equal(request.Method, methodId);
 
 		platform.WriteUInt32(packet, 0, 0xDEADBEEFu);
 		Assert.False(MuiApplicationMenuPacketCodec.TryReadWindowEventHandler(
@@ -168,6 +171,49 @@ public sealed class MuiWindowEventHandlerTests
 			ref platform, handler, out var disposed));
 		Assert.Equal((ushort)0, (ushort)(disposed.Flags &
 			MuiEventHandlerNodeInput.MUI_EHF_ISENABLED));
+	}
+
+	[Fact]
+	public void EventHandlerNodeLinksTrackRegistrationAndRemoval()
+	{
+		var platform = CreatePlatform(out var cl);
+		var window = Object(ref platform, cl);
+		var firstTarget = Object(ref platform, cl);
+		var secondTarget = Object(ref platform, cl);
+		var first = APTR.FromPointer(0x1A00);
+		var second = APTR.FromPointer(0x1A40);
+		WriteHandler(ref platform, first.Raw, firstTarget, 0);
+		WriteHandler(ref platform, second.Raw, secondTarget, 0);
+
+		Assert.True(MuiApplicationWindowCore.AddEventHandler(ref platform,
+			State, window, first));
+		Assert.True(MuiApplicationWindowCore.AddEventHandler(ref platform,
+			State, window, second));
+		Assert.False(MuiApplicationWindowCore.AddEventHandler(ref platform,
+			State, window, second));
+
+		Assert.True(MuiApplicationWindowRecordPacketCore.TryReadEventHandler(
+			ref platform, first, out var firstRecord));
+		Assert.True(MuiApplicationWindowRecordPacketCore.TryReadEventHandler(
+			ref platform, second, out var secondRecord));
+		Assert.Equal(APTR.Null, firstRecord.Predecessor);
+		Assert.Equal(second, firstRecord.Successor);
+		Assert.Equal(first, secondRecord.Predecessor);
+		Assert.Equal(APTR.Null, secondRecord.Successor);
+
+		Assert.True(MuiApplicationWindowCore.RemoveEventHandler(ref platform,
+			State, window, first));
+		Assert.True(MuiApplicationWindowRecordPacketCore.TryReadEventHandler(
+			ref platform, first, out firstRecord));
+		Assert.True(MuiApplicationWindowRecordPacketCore.TryReadEventHandler(
+			ref platform, second, out secondRecord));
+		Assert.Equal(APTR.Null, firstRecord.Predecessor);
+		Assert.Equal(APTR.Null, firstRecord.Successor);
+		Assert.Equal(APTR.Null, secondRecord.Predecessor);
+		Assert.Equal(APTR.Null, secondRecord.Successor);
+
+		Assert.True(MuiApplicationWindowCore.RemoveEventHandler(ref platform,
+			State, window, second));
 	}
 
 	[Fact]

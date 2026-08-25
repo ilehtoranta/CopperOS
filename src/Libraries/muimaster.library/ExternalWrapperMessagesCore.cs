@@ -48,42 +48,49 @@ internal static class MuiExternalWrapperFieldCursorCodec
 	private static bool TryResolve(MuiExternalWrapperPacketKind packet,
 		MuiExternalWrapperField field, out uint offset)
 	{
-		switch (packet)
+		// Keep the packed ABI selector straight-line so native lowering does not
+		// depend on a managed switch/jump-table shape. All offsets remain confined
+		// to this codec; consumers receive the named packet structs below.
+		if (packet == MuiExternalWrapperPacketKind.Update)
 		{
-			case MuiExternalWrapperPacketKind.Update:
-				if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-				if (field == MuiExternalWrapperField.AttributeList) { offset = 4; return true; }
-				if (field == MuiExternalWrapperField.GadgetInfo) { offset = 8; return true; }
-				if (field == MuiExternalWrapperField.Flags) { offset = 12; return true; }
-				break;
-			case MuiExternalWrapperPacketKind.Get:
-				if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-				if (field == MuiExternalWrapperField.Attribute) { offset = 4; return true; }
-				if (field == MuiExternalWrapperField.Storage) { offset = 8; return true; }
-				break;
-			case MuiExternalWrapperPacketKind.Set:
-				if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-				if (field == MuiExternalWrapperField.Attribute) { offset = 4; return true; }
-				if (field == MuiExternalWrapperField.Value) { offset = 8; return true; }
-				break;
-			case MuiExternalWrapperPacketKind.Method:
-				if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-				break;
-			case MuiExternalWrapperPacketKind.RenderInfo:
-				if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-				if (field == MuiExternalWrapperField.RenderInfo) { offset = 4; return true; }
-				break;
-			case MuiExternalWrapperPacketKind.AskMinMax:
-				if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-				if (field == MuiExternalWrapperField.Storage) { offset = 4; return true; }
-				break;
-			case MuiExternalWrapperPacketKind.Layout:
-				if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-				if (field == MuiExternalWrapperField.Left) { offset = 4; return true; }
-				if (field == MuiExternalWrapperField.Top) { offset = 8; return true; }
-				if (field == MuiExternalWrapperField.Width) { offset = 12; return true; }
-				if (field == MuiExternalWrapperField.Height) { offset = 16; return true; }
-				break;
+			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
+			if (field == MuiExternalWrapperField.AttributeList) { offset = 4; return true; }
+			if (field == MuiExternalWrapperField.GadgetInfo) { offset = 8; return true; }
+			if (field == MuiExternalWrapperField.Flags) { offset = 12; return true; }
+		}
+		else if (packet == MuiExternalWrapperPacketKind.Get)
+		{
+			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
+			if (field == MuiExternalWrapperField.Attribute) { offset = 4; return true; }
+			if (field == MuiExternalWrapperField.Storage) { offset = 8; return true; }
+		}
+		else if (packet == MuiExternalWrapperPacketKind.Set)
+		{
+			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
+			if (field == MuiExternalWrapperField.Attribute) { offset = 4; return true; }
+			if (field == MuiExternalWrapperField.Value) { offset = 8; return true; }
+		}
+		else if (packet == MuiExternalWrapperPacketKind.Method)
+		{
+			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
+		}
+		else if (packet == MuiExternalWrapperPacketKind.RenderInfo)
+		{
+			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
+			if (field == MuiExternalWrapperField.RenderInfo) { offset = 4; return true; }
+		}
+		else if (packet == MuiExternalWrapperPacketKind.AskMinMax)
+		{
+			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
+			if (field == MuiExternalWrapperField.Storage) { offset = 4; return true; }
+		}
+		else if (packet == MuiExternalWrapperPacketKind.Layout)
+		{
+			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
+			if (field == MuiExternalWrapperField.Left) { offset = 4; return true; }
+			if (field == MuiExternalWrapperField.Top) { offset = 8; return true; }
+			if (field == MuiExternalWrapperField.Width) { offset = 12; return true; }
+			if (field == MuiExternalWrapperField.Height) { offset = 16; return true; }
 		}
 		offset = 0;
 		return false;
@@ -264,9 +271,10 @@ internal static class MuiExternalWrapperMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsMethod(method) || !TryReadMethodId(ref platform, message,
-			out var header) || header.MethodId != method) return false;
-		packet.MethodId = header.MethodId;
+		uint methodId;
+		if (!IsMethod(method) || !TryReadMethodIdValue(ref platform, message,
+			out methodId) || methodId != method) return false;
+		packet.MethodId = methodId;
 		return true;
 	}
 
@@ -278,18 +286,35 @@ internal static class MuiExternalWrapperMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId)) return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Native qualification keeps method-header admission scalar while the
+	// dispatcher-facing overload above retains the named value-type record.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiExternalMethodMessage.Size)) return false;
 		return MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.Method,
-			MuiExternalWrapperField.MethodId, out packet.MethodId);
+			MuiExternalWrapperField.MethodId, out methodId);
 	}
 
 	internal static bool IsValidMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
-		where TPlatform : struct, IMuiGuestMemory =>
-		IsMethod(method) && TryReadMethodId(ref platform, message,
-			out var header) && header.MethodId == method;
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!IsMethod(method)) return false;
+		uint methodId;
+		return TryReadMethodIdValue(ref platform, message, out methodId) &&
+			methodId == method;
+	}
 
 	internal static bool WriteMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
@@ -413,6 +438,6 @@ internal static class MuiExternalWrapperMessageCodec
 
 	private static bool IsPacket<TPlatform>(ref TPlatform platform, APTR message,
 		uint size, uint method) where TPlatform : struct, IMuiGuestMemory =>
-		TryReadMethodId(ref platform, message, out var header) &&
-		header.MethodId == method && platform.IsMapped(message, size);
+		TryReadMethodIdValue(ref platform, message, out uint methodId) &&
+		methodId == method && platform.IsMapped(message, size);
 }

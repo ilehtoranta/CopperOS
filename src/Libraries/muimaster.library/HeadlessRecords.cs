@@ -175,7 +175,10 @@ internal static class MuiGuestUlongStorageCodec
 
 // Fixed 32-byte header for the guest-resident headless state. The state is
 // intentionally a value record: linked class/object heads are typed APTR
-// fields, while counters retain their fixed-width ABI representation.
+// fields, while counters retain their fixed-width ABI representation. The
+// named Reserved field is also the transient operation-local
+// MUIA_NoNotifyMethod selector while an OM_SET tag list is executing; it is
+// restored before the operation returns and is never exposed as object data.
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiHeadlessStateRecord
 {
@@ -188,6 +191,15 @@ internal struct MuiHeadlessStateRecord
 	internal uint NotifyDepth;
 	internal uint Mutation;
 	internal uint Reserved;
+
+	// Semantic alias for the fixed reserved word while an OM_SET operation is
+	// active. The wire layout remains unchanged; callers use this named field
+	// rather than depending on a byte offset or an anonymous scratch slot.
+	internal uint NotifySuppressionMethod
+	{
+		get { return Reserved; }
+		set { Reserved = value; }
+	}
 }
 
 internal enum MuiHeadlessStateField : byte

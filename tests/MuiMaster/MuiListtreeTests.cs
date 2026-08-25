@@ -37,6 +37,9 @@ public sealed class MuiListtreeTests
 	private const uint ConstructHookString = 0xFFFFFFFFu;
 
 	private const uint InsertFlagsActive = 1u << 13;
+	private const uint InsertFlagsNextNode = 1u << 12;
+	private const uint MethodFlagsVisible = 1u << 14;
+	private const uint MethodFlagsNr = 1u << 15;
 	private const uint GetNrCountAll = 1u << 15;
 	private const uint GetNrCountLevel = 1u << 14;
 	private const uint GetNrCountList = 1u << 13;
@@ -177,20 +180,21 @@ public sealed class MuiListtreeTests
 			MuiListtreeCore.SortHook, 0x1234u, false));
 		Assert.True(MuiListtreeCore.TryGetPolicyStateRecord(ref platform, State,
 			tree, out var policy));
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, tree);
+		Assert.True(record.IsNotNull);
 
 		// A raw compatibility write cannot replace the canonical policy record.
-		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, tree,
-			MuiListtreeCore.DuplicateNodeName, 1, false));
-		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, tree,
-			MuiListtreeCore.Quiet, 0, false));
-		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, tree,
-			MuiListtreeCore.SortHook, 0x5678u, false));
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			record, MuiListtreeCore.DuplicateNodeName, 1, false));
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			record, MuiListtreeCore.Quiet, 0, false));
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			record, MuiListtreeCore.SortHook, 0x5678u, false));
 		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, tree,
 			MuiListtreeCore.DuplicateNodeName, out var duplicate));
 		Assert.Equal(policy.DuplicateNodeName, duplicate);
-		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, tree,
-			MuiListtreeCore.Quiet, out var quiet));
-		Assert.Equal(policy.Quiet, quiet);
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Quiet, out _));
 		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, tree,
 			MuiListtreeCore.SortHook, out var sortHook));
 		Assert.Equal(policy.SortHook.Raw, sortHook);
@@ -204,6 +208,171 @@ public sealed class MuiListtreeTests
 		Assert.True(MuiGuestUlongStorageCodec.TryRead(ref platform, storage,
 			out var result));
 		Assert.Equal(policy.SortHook.Raw, result.Value);
+	}
+
+	[Fact]
+	public void ListtreeQuietIsRuntimeSetOnly()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		Assert.NotEqual(APTR.Null, tree);
+
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Quiet, 1, false));
+		Assert.True(MuiListtreeCore.TryGetPolicyStateRecord(ref platform, State,
+			tree, out var policy));
+		Assert.Equal(1u, policy.Quiet);
+		Assert.False(MuiListtreeCore.GetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Quiet, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Quiet, out _));
+
+		var message = APTR.FromPointer(0x7D00);
+		var storage = APTR.FromPointer(0x7D40);
+		Assert.True(MuiListtreeMessageCodec.WriteGet(ref platform, message,
+			MuiListtreeCore.Quiet, storage.Raw));
+		Assert.Equal(0u, MuiListtreeDispatcher.Dispatch(ref platform, State, tree,
+			message));
+
+		var tags = APTR.FromPointer(0x7D80);
+		platform.WriteUInt32(tags, 0, MuiListtreeCore.Quiet);
+		platform.WriteUInt32(tags, 4, 1);
+		platform.WriteUInt32(tags, 8, 0);
+		var constructionTree = MuiListtreeCore.CreateListtree(ref platform, State,
+			listtreeClass, tags);
+		Assert.Equal(APTR.Null, constructionTree);
+	}
+
+	[Fact]
+	public void ListtreeGenericSetUsesNamedPolicyRecord()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+
+		// Generic SetAttribute is the OM_SET-compatible path. It must reach the
+		// same named policy record as the direct Listtree setter, rather than
+		// leaving a stale raw compatibility scalar behind.
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DuplicateNodeName, 7, false));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DragDropSort, 9, false));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.SortHook, 0x1234u, false));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DuplicateNodeName, out var duplicate));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DragDropSort, out var dragDrop));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, tree,
+			MuiListtreeCore.SortHook, out var sortHook));
+		Assert.Equal(1u, duplicate);
+		Assert.Equal(1u, dragDrop);
+		Assert.Equal(0x1234u, sortHook);
+	}
+
+	[Fact]
+	public void ListtreeConstructionTagsPublishNamedPolicyAndPresentationRecords()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tags = APTR.FromPointer(0x1300);
+		var title = APTR.FromPointer(0x1500);
+		platform.WriteCString(title, "Tagged tree");
+		Assert.True(MuiAslTagItemCodec.Write(ref platform, tags,
+			new MuiAslTagItemRecord
+			{
+				Tag = MuiListtreeCore.DuplicateNodeName,
+				Data = 0
+			}));
+		Assert.True(MuiAslTagItemCodec.Write(ref platform,
+			APTR.FromPointer(tags.Raw + MuiAslTagItemRecord.Size),
+			new MuiAslTagItemRecord
+			{
+				Tag = MuiListtreeCore.DragDropSort,
+				Data = 0
+			}));
+		Assert.True(MuiAslTagItemCodec.Write(ref platform,
+			APTR.FromPointer(tags.Raw + (MuiAslTagItemRecord.Size * 2u)),
+			new MuiAslTagItemRecord
+			{
+				Tag = MuiListtreeCore.Title,
+				Data = title.Raw
+			}));
+		Assert.True(MuiAslTagItemCodec.Write(ref platform,
+			APTR.FromPointer(tags.Raw + (MuiAslTagItemRecord.Size * 3u)),
+			new MuiAslTagItemRecord { Tag = MuiAslTagListCore.TagDone }));
+
+		var tree = MuiListtreeCore.CreateListtree(ref platform, State,
+			listtreeClass, tags);
+		Assert.True(tree.IsNotNull);
+		Assert.True(MuiListtreeCore.TryGetPolicyStateRecord(ref platform, State,
+			tree, out var policy));
+		Assert.True(MuiListtreeCore.TryGetPresentationStateRecord(ref platform,
+			State, tree, out var presentation));
+		Assert.Equal(0u, policy.DuplicateNodeName);
+		Assert.Equal(0u, policy.DragDropSort);
+		// MorphOS treats the historically string-typed Title tag as BOOL:
+		// any nonzero caller value projects to TRUE.
+		Assert.Equal(1u, presentation.Title);
+	}
+
+	[Fact]
+	public void ListtreePresentationAttributesUseNamedRecordAndClassGatedSetGet()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		Assert.True(MuiListtreeCore.TryGetPresentationStateRecord(ref platform,
+			State, tree, out var initial));
+		Assert.Equal(MuiListtreePresentationStateRecord.Cookie, initial.Magic);
+		Assert.Equal(0u, initial.EmptyNodes);
+		Assert.Equal(0u, initial.Format.Raw);
+		Assert.Equal(0u, initial.MultiSelect);
+		Assert.Equal(0u, initial.NList);
+		Assert.Equal(0u, initial.Title);
+		Assert.Equal(0u, initial.TreeColumn);
+
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.EmptyNodes, 7, false));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Format, 0x6100, false));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.MultiSelect, 2, false));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.NList, 3, false));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Title, 0x6200, false));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.TreeColumn, 4, false));
+
+		Assert.True(MuiListtreeCore.TryGetPresentationStateRecord(ref platform,
+			State, tree, out var actual));
+		Assert.Equal(1u, actual.EmptyNodes);
+		Assert.Equal(0x6100u, actual.Format.Raw);
+		Assert.Equal(1u, actual.MultiSelect);
+		Assert.Equal(1u, actual.NList);
+		Assert.Equal(1u, actual.Title);
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Title, 0, false));
+		Assert.True(MuiListtreeCore.GetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Title, out var titleOff));
+		Assert.Equal(0u, titleOff);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Title, 0xFFFFFFFFu, false));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Title, out var titleOn));
+		Assert.Equal(1u, titleOn);
+		Assert.Equal(1u, actual.TreeColumn);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.NList, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, tree,
+			MuiListtreeCore.NList, out var nList));
+		Assert.Equal(0u, nList);
+
+		// A raw compatibility write does not replace the canonical typed getter.
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, tree);
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			record, MuiListtreeCore.Format, 0x6300, false));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Format, out var format));
+		Assert.Equal(0x6100u, format);
 	}
 
 	[Fact]
@@ -537,6 +706,44 @@ public sealed class MuiListtreeTests
 	}
 
 	[Fact]
+	public void VisibleOrdinalInsertionUsesOnlyVisibleChildren()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var parent = InsertName(ref platform, tree, "closed-parent", ListRoot,
+			PrevTail);
+		var first = InsertName(ref platform, tree, "first", (uint)parent.Raw,
+			PrevTail);
+		var second = InsertName(ref platform, tree, "second", (uint)parent.Raw,
+			PrevTail);
+
+		// The parent is closed, so its child list has no visible ordinal zero.
+		// The visible insertion therefore appends instead of anchoring before the
+		// hidden first child.
+		var closedInsert = MuiListtreeCore.Insert(ref platform, State, tree,
+			WriteUniqueString(ref platform, "closed-visible"), APTR.Null, parent,
+			APTR.FromPointer(0), MethodFlagsNr | MethodFlagsVisible);
+		Assert.NotEqual(APTR.Null, closedInsert);
+		Assert.Equal(first, GetEntry(ref platform, tree, (uint)parent.Raw, 0, 0));
+		Assert.Equal(second, GetEntry(ref platform, tree, (uint)parent.Raw, 1, 0));
+		Assert.Equal(closedInsert, GetEntry(ref platform, tree,
+			(uint)parent.Raw, 2, 0));
+
+		Assert.True(MuiListtreeCore.Open(ref platform, State, tree,
+			APTR.FromPointer(ListRoot), parent, 0));
+		var openInsert = MuiListtreeCore.Insert(ref platform, State, tree,
+			WriteUniqueString(ref platform, "open-visible"), APTR.Null, parent,
+			APTR.FromPointer(0), MethodFlagsNr | MethodFlagsVisible |
+				InsertFlagsNextNode);
+		Assert.NotEqual(APTR.Null, openInsert);
+		Assert.Equal(openInsert, GetEntry(ref platform, tree,
+			(uint)parent.Raw, 0, 0));
+		Assert.Equal(first, GetEntry(ref platform, tree, (uint)parent.Raw, 1, 0));
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
 	public void GetNrReportsCounts()
 	{
 		var platform = CreatePlatform(out var listtreeClass);
@@ -660,6 +867,41 @@ public sealed class MuiListtreeTests
 	}
 
 	[Fact]
+	public void MoveResolvesNumericDestinationOrdinalWithVisibleParentRules()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var moving = InsertName(ref platform, tree, "moving", ListRoot, PrevTail);
+		var parent = InsertName(ref platform, tree, "parent", ListRoot, PrevTail);
+		var first = InsertName(ref platform, tree, "first", (uint)parent.Raw,
+			PrevTail);
+		var second = InsertName(ref platform, tree, "second", (uint)parent.Raw,
+			PrevTail);
+
+		// The destination list is closed, so visible ordinal zero has no anchor;
+		// moving therefore appends after the hidden children.
+		Assert.True(MuiListtreeCore.Move(ref platform, State, tree,
+			APTR.FromPointer(ListRoot), APTR.FromPointer(0), parent,
+			APTR.FromPointer(0), MethodFlagsNr | MethodFlagsVisible));
+		Assert.Equal(first, GetEntry(ref platform, tree, (uint)parent.Raw, 0, 0));
+		Assert.Equal(second, GetEntry(ref platform, tree, (uint)parent.Raw, 1, 0));
+		Assert.Equal(moving, GetEntry(ref platform, tree, (uint)parent.Raw, 2, 0));
+
+		Assert.True(MuiListtreeCore.Open(ref platform, State, tree,
+			APTR.FromPointer(ListRoot), parent, 0));
+		// After unlinking, visible ordinal zero names 'first'; Move inserts after
+		// that typed anchor, yielding first, moving, second.
+		Assert.True(MuiListtreeCore.Move(ref platform, State, tree,
+			parent, APTR.FromPointer(2), parent, APTR.FromPointer(0),
+			MethodFlagsNr | MethodFlagsVisible));
+		Assert.Equal(first, GetEntry(ref platform, tree, (uint)parent.Raw, 0, 0));
+		Assert.Equal(moving, GetEntry(ref platform, tree, (uint)parent.Raw, 1, 0));
+		Assert.Equal(second, GetEntry(ref platform, tree, (uint)parent.Raw, 2, 0));
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
 	public void ExchangeSwapsSiblingsAndRejectsAncestors()
 	{
 		var platform = CreatePlatform(out var listtreeClass);
@@ -681,6 +923,32 @@ public sealed class MuiListtreeTests
 		Assert.False(MuiListtreeCore.Exchange(ref platform, State, tree,
 			APTR.FromPointer(ListRoot), APTR.FromPointer(b.Raw),
 			APTR.FromPointer(ListRoot), APTR.FromPointer(child.Raw), 0));
+		// MorphOS relative selectors exchange TreeNode1 with its immediate
+		// sibling. ListNode2 is intentionally ignored for these selectors; the
+		// typed topology record owning TreeNode1 is the authoritative list.
+		Assert.True(MuiListtreeCore.Exchange(ref platform, State, tree,
+			APTR.FromPointer(ListRoot), APTR.FromPointer(b.Raw),
+			APTR.FromPointer(0xDEADBEEFu),
+			APTR.FromPointer(unchecked((uint)MuiListtreeCore.ExchangeTreeNode2Down)),
+			0));
+		Assert.Equal("c", NodeName(ref platform, GetEntry(ref platform, tree,
+			ListRoot, 0, 0)));
+		Assert.Equal("a", NodeName(ref platform, GetEntry(ref platform, tree,
+			ListRoot, 1, 0)));
+		Assert.Equal("b", NodeName(ref platform, GetEntry(ref platform, tree,
+			ListRoot, 2, 0)));
+		Assert.True(MuiListtreeCore.Exchange(ref platform, State, tree,
+			APTR.FromPointer(ListRoot), APTR.FromPointer(b.Raw),
+			APTR.FromPointer(0xDEADBEEFu),
+			APTR.FromPointer(unchecked((uint)MuiListtreeCore.ExchangeTreeNode2Up)),
+			0));
+		Assert.Equal("b", NodeName(ref platform, GetEntry(ref platform, tree,
+			ListRoot, 1, 0)));
+		Assert.False(MuiListtreeCore.Exchange(ref platform, State, tree,
+			APTR.FromPointer(ListRoot), APTR.FromPointer(c.Raw),
+			APTR.FromPointer(0xDEADBEEFu),
+			APTR.FromPointer(unchecked((uint)MuiListtreeCore.ExchangeTreeNode2Up)),
+			0));
 	}
 
 	// =====================================================================
@@ -842,20 +1110,23 @@ public sealed class MuiListtreeTests
 		Assert.True(MuiListtreeMessageCodec.TryReadInsert(ref p, packet,
 			out var insert));
 		Assert.Equal(0x3000u, insert.Name);
-		Assert.Equal(0x3010u, insert.UserData);
+		Assert.Equal(0x3010u, insert.User);
+		Assert.Equal(0x3020u, insert.ListNode);
+		Assert.Equal(0x3030u, insert.PrevNode);
 		Assert.Equal(4u, insert.Flags);
 
 		Assert.True(MuiListtreeMessageCodec.WriteRemove(ref p, packet,
 			0x3020, 0x3040, 5));
 		Assert.True(MuiListtreeMessageCodec.TryReadRemove(ref p, packet,
 			out var remove));
-		Assert.Equal(0x3020u, remove.Parent);
-		Assert.Equal(0x3040u, remove.Node);
+		Assert.Equal(0x3020u, remove.ListNode);
+		Assert.Equal(0x3040u, remove.TreeNode);
 
 		Assert.True(MuiListtreeMessageCodec.WriteGetEntry(ref p, packet,
 			0x3020, unchecked((uint)-2), 6));
 		Assert.True(MuiListtreeMessageCodec.TryReadGetEntry(ref p, packet,
 			out var entry));
+		Assert.Equal(0x3020u, entry.Node);
 		Assert.Equal(unchecked((uint)-2), entry.Position);
 		Assert.Equal(6u, entry.Flags);
 
@@ -863,47 +1134,84 @@ public sealed class MuiListtreeTests
 			MuiListtreeMessageCodec.Open, 0x3020, 0x3040, 1));
 		Assert.True(MuiListtreeMessageCodec.TryReadOpenClose(ref p, packet,
 			MuiListtreeMessageCodec.Open, out var open));
-		Assert.Equal(0x3040u, open.Node);
-		Assert.True(MuiListtreeMessageCodec.WriteSort(ref p, packet,
-			MuiListtreeMessageCodec.GetNr, 0x3020, 2));
-		Assert.True(MuiListtreeMessageCodec.TryReadSort(ref p, packet,
+		Assert.Equal(0x3020u, open.ListNode);
+		Assert.Equal(0x3040u, open.TreeNode);
+		Assert.True(MuiListtreeMessageCodec.WriteGetNr(ref p, packet, 0x3020, 2));
+		Assert.True(MuiListtreeMessageCodec.TryReadGetNr(ref p, packet,
 			MuiListtreeMessageCodec.GetNr, out var getNr));
+		Assert.Equal(0x3020u, getNr.TreeNode);
 		Assert.Equal(2u, getNr.Flags);
 
 		Assert.True(MuiListtreeMessageCodec.WriteMoveExchange(ref p, packet,
 			MuiListtreeMessageCodec.Move, 0x3020, 0x3040, 0x3050, 0x3060, 3));
 		Assert.True(MuiListtreeMessageCodec.TryReadMoveExchange(ref p, packet,
 			MuiListtreeMessageCodec.Move, out var move));
-		Assert.Equal(0x3050u, move.NewParent);
+		Assert.Equal(0x3020u, move.OldListNode);
+		Assert.Equal(0x3040u, move.OldTreeNode);
+		Assert.Equal(0x3050u, move.NewListNode);
+		Assert.Equal(0x3060u, move.NewTreeNode);
 		Assert.Equal(3u, move.Flags);
 
 		Assert.True(MuiListtreeMessageCodec.WriteRename(ref p, packet,
 			0x3040, 0x3070, 8));
 		Assert.True(MuiListtreeMessageCodec.TryReadRename(ref p, packet,
 			out var rename));
-		Assert.Equal(0x3070u, rename.Name);
+		Assert.Equal(0x3040u, rename.TreeNode);
+		Assert.Equal(0x3070u, rename.NewName);
 		Assert.True(MuiListtreeMessageCodec.WriteFindName(ref p, packet,
 			0x3020, 0x3070, 9));
 		Assert.True(MuiListtreeMessageCodec.TryReadFindName(ref p, packet,
 			out var find));
-		Assert.Equal(0x3020u, find.Parent);
+		Assert.Equal(0x3020u, find.ListNode);
 
 		Assert.True(MuiListtreeMessageCodec.WriteDropMark(ref p, packet, 10, 11));
 		Assert.True(MuiListtreeMessageCodec.TryReadDropMark(ref p, packet,
 			out var drop));
-		Assert.Equal(10u, drop.Position);
+		Assert.Equal(10u, drop.Entry);
+		Assert.Equal(11u, drop.Values);
 		Assert.True(MuiListtreeMessageCodec.WriteTestPos(ref p, packet, 12, 13,
 			0x3040));
 		Assert.True(MuiListtreeMessageCodec.TryReadTestPos(ref p, packet,
 			out var testPos));
 		Assert.Equal(12u, testPos.X);
-		Assert.Equal(0x3040u, testPos.Entry);
+		Assert.Equal(13u, testPos.Y);
+		Assert.Equal(0x3040u, testPos.Result);
 
 		Assert.False(MuiListtreeMessageCodec.WriteSet(ref p, packet,
 			0x80420000u, 1, 2));
 		Assert.False(MuiListtreeMessageCodec.TryReadInsert(ref p,
 			APTR.FromPointer(0x80FFF), out _));
+		// The construct-hook packet is a full 24-byte guest record; a boundary
+		// cursor that cannot cover the entire record must be rejected.
+		Assert.False(MuiListtreeMessageCodec.TryReadInsert(ref p,
+			APTR.FromPointer(0x7FFF8), out _));
 		Assert.False(MuiListtreeMessageCodec.TryReadGet(ref p, packet, out _));
+	}
+
+	[Fact]
+	public void ListtreeHookPoolRecordUsesNamedFieldsAndRejectsMalformedBoundary()
+	{
+		var p = new MuiHeadlessTestPlatform(0x1000, 0x80, 0x1080, State);
+		var recordAddress = APTR.FromPointer(0x1020);
+		var value = default(MuiListtreeCore.MuiListtreeHookPoolStateRecord);
+		value.Magic = MuiListtreeCore.MuiListtreeHookPoolStateRecord.Cookie;
+		value.Pool = APTR.FromPointer(0x1040);
+		value.Requirements = 0;
+		value.PuddleSize = 2008;
+		value.ThresholdSize = 1024;
+		value.Owned = 1;
+		Assert.True(MuiListtreeCore.MuiListtreeHookPoolStateRecordCodec.Write(
+			ref p, recordAddress, value));
+		Assert.True(MuiListtreeCore.MuiListtreeHookPoolStateRecordCodec.TryRead(
+			ref p, recordAddress, out var read));
+		Assert.Equal(value.Pool, read.Pool);
+		Assert.Equal(value.PuddleSize, read.PuddleSize);
+		Assert.Equal(value.ThresholdSize, read.ThresholdSize);
+		Assert.False(MuiListtreeCore.MuiListtreeHookPoolStateRecordCodec.TryRead(
+			ref p, APTR.FromPointer(0x1069), out _));
+		p.WriteUInt32(recordAddress, 0, 0);
+		Assert.False(MuiListtreeCore.MuiListtreeHookPoolStateRecordCodec.TryRead(
+			ref p, recordAddress, out _));
 	}
 
 	[Fact]
@@ -916,6 +1224,9 @@ public sealed class MuiListtreeTests
 		Assert.True(MuiListtreeMessageCodec.TryReadMethodId(ref p, packet,
 			out var header));
 		Assert.Equal(MuiListtreeMessageCodec.Insert, header.MethodId);
+		Assert.True(MuiListtreeMessageCodec.TryReadMethodIdValue(ref p, packet,
+			out var methodId));
+		Assert.Equal(MuiListtreeMessageCodec.Insert, methodId);
 		Assert.False(MuiListtreeMessageCodec.TryReadMethodId(ref p,
 			APTR.Null, out _));
 	}
@@ -957,15 +1268,15 @@ public sealed class MuiListtreeTests
 		Assert.True(MuiListtreeFieldCursorCodec.TryGetAddress(ref p, cursor,
 			out address));
 		Assert.Equal(0x2D04u, address.Raw);
-		cursor.Field = MuiListtreeField.UserData;
+		cursor.Field = MuiListtreeField.User;
 		Assert.True(MuiListtreeFieldCursorCodec.TryGetAddress(ref p, cursor,
 			out address));
 		Assert.Equal(0x2D08u, address.Raw);
-		cursor.Field = MuiListtreeField.Parent;
+		cursor.Field = MuiListtreeField.ListNode;
 		Assert.True(MuiListtreeFieldCursorCodec.TryGetAddress(ref p, cursor,
 			out address));
 		Assert.Equal(0x2D0Cu, address.Raw);
-		cursor.Field = MuiListtreeField.Previous;
+		cursor.Field = MuiListtreeField.PrevNode;
 		Assert.True(MuiListtreeFieldCursorCodec.TryGetAddress(ref p, cursor,
 			out address));
 		Assert.Equal(0x2D10u, address.Raw);
@@ -982,12 +1293,12 @@ public sealed class MuiListtreeTests
 			out var position));
 		Assert.Equal(unchecked((uint)-2), position);
 		cursor.Packet = MuiListtreePacketKind.Set;
-		cursor.Field = MuiListtreeField.Node;
+		cursor.Field = MuiListtreeField.TreeNode;
 		Assert.False(MuiListtreeFieldCursorCodec.TryGetAddress(ref p, cursor,
 			out _));
 		cursor.Message = APTR.FromPointer(0xFFFFFFF0u);
 		cursor.Packet = MuiListtreePacketKind.TestPos;
-		cursor.Field = MuiListtreeField.Entry;
+		cursor.Field = MuiListtreeField.Result;
 		Assert.False(MuiListtreeFieldCursorCodec.TryGetAddress(ref p, cursor,
 			out _));
 	}
@@ -1016,6 +1327,1524 @@ public sealed class MuiListtreeTests
 		platform.WriteUInt32(packet, 12, 0);
 		Assert.Equal(node, MuiListtreeDispatcher.Dispatch(ref platform, State, tree,
 			packet));
+	}
+
+	[Fact]
+	public void DispatcherRoutesTypedSetGetAndTreeLifecycle()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var rootName = WriteString(ref platform, 0x2C00, "root");
+		var childName = WriteString(ref platform, 0x2C20, "child");
+		var packet = APTR.FromPointer(0x2D00);
+		var storage = APTR.FromPointer(0x2D40);
+
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, MuiListtreeCore.DuplicateNodeName, 1));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.NoNotifySet, MuiListtreeCore.DuplicateNodeName,
+			1));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteGet(ref platform, packet,
+			MuiListtreeCore.DuplicateNodeName, storage.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(1u, platform.ReadUInt32(storage, 0));
+
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			rootName.Raw, 0, ListRoot, PrevTail, 0));
+		var root = APTR.FromPointer(MuiListtreeDispatcher.Dispatch(ref platform,
+			State, tree, packet));
+		Assert.NotEqual(APTR.Null, root);
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			childName.Raw, 0, root.Raw, PrevTail, 0));
+		var child = APTR.FromPointer(MuiListtreeDispatcher.Dispatch(ref platform,
+			State, tree, packet));
+		Assert.NotEqual(APTR.Null, child);
+
+		Assert.True(MuiListtreeMessageCodec.WriteOpenClose(ref platform, packet,
+			MuiListtreeMessageCodec.Open, ListRoot, root.Raw, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.Dispatch(ref platform, State, tree,
+			packet));
+		Assert.True(MuiListtreeMessageCodec.WriteGetNr(ref platform, packet,
+			root.Raw, GetNrCountAll));
+		Assert.Equal(2u, MuiListtreeDispatcher.Dispatch(ref platform, State, tree,
+			packet));
+		Assert.True(MuiListtreeMessageCodec.WriteGetEntry(ref platform, packet,
+			root.Raw, 0, 0));
+		Assert.Equal(child.Raw, MuiListtreeDispatcher.Dispatch(ref platform, State,
+			tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteSort(ref platform, packet,
+			MuiListtreeMessageCodec.Sort, ListRoot, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.NotEqual(0u, MuiListtreeCore.NodeFlags(ref platform, root) &
+			MuiListtreeCore.TNF_OPEN);
+		Assert.True(MuiListtreeMessageCodec.WriteOpenClose(ref platform, packet,
+			MuiListtreeMessageCodec.Close, ListRoot, root.Raw, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		var renamed = WriteString(ref platform, 0x2D80, "renamed");
+		Assert.True(MuiListtreeMessageCodec.WriteRename(ref platform, packet,
+			root.Raw, renamed.Raw, 1u << 9));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteFindName(ref platform, packet,
+			ListRoot, renamed.Raw, 0));
+		Assert.Equal(root.Raw, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		var p2Name = WriteString(ref platform, 0x2DA0, "p2");
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			p2Name.Raw, 0, ListRoot, PrevTail, 0));
+		var p2 = APTR.FromPointer(MuiListtreeDispatcher.DispatchTreePacket(
+			ref platform, State, tree, packet));
+		Assert.NotEqual(APTR.Null, p2);
+		Assert.True(MuiListtreeMessageCodec.WriteMoveExchange(ref platform, packet,
+			MuiListtreeMessageCodec.Move, root.Raw, child.Raw, p2.Raw,
+			PrevTail, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(p2.Raw, MuiListtreeCore.GetEntry(ref platform, State, tree,
+			child, -5, 0).Raw);
+		Assert.True(MuiListtreeMessageCodec.WriteMoveExchange(ref platform, packet,
+			MuiListtreeMessageCodec.Exchange, ListRoot, root.Raw, ListRoot,
+			p2.Raw, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(p2.Raw, MuiListtreeCore.GetEntry(ref platform, State, tree,
+			APTR.FromPointer(ListRoot), 0, 0).Raw);
+		Assert.True(MuiListtreeMessageCodec.WriteDropMark(ref platform, packet,
+			0, MuiListtreeCore.DropMarkBelow));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		var testPosResult = APTR.FromPointer(0x2DC0);
+		Assert.True(MuiListtreeMessageCodec.WriteTestPos(ref platform, packet,
+			4, 0, testPosResult.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeCore.MuiListtreeTestPosResultCodec.TryRead(
+			ref platform, testPosResult, out var testPos));
+		Assert.Equal(p2.Raw, testPos.TreeNode.Raw);
+		Assert.Equal(0, testPos.ListEntry);
+		Assert.Equal((ushort)MuiListtreeCore.DropMarkOnto, testPos.Flags);
+		Assert.True(MuiListtreeMessageCodec.WriteRemove(ref platform, packet,
+			ListRoot, root.Raw, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.Dispatch(ref platform, State, tree,
+			packet));
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void DispatcherRoutesListtreeLifecycleHooksThroughTypedPolicy()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var rootName = WriteString(ref platform, 0x2E00, "hook-root");
+		var childName = WriteString(ref platform, 0x2E20, "hook-child");
+		var packet = APTR.FromPointer(0x2E80);
+		var hook = APTR.FromPointer(0x2EC0);
+		var hookData = APTR.FromPointer(0x2F00);
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryConstruct);
+		platform.WriteUInt32(hook, 16, hookData.Raw);
+
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, MuiListtreeCore.OpenHook, hook.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, MuiListtreeCore.CloseHook, hook.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			rootName.Raw, 0, ListRoot, PrevTail, 0));
+		var root = APTR.FromPointer(MuiListtreeDispatcher.DispatchTreePacket(
+			ref platform, State, tree, packet));
+		Assert.NotEqual(APTR.Null, root);
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			childName.Raw, 0, root.Raw, PrevTail, 0));
+		Assert.NotEqual(0u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+
+		Assert.True(MuiListtreeMessageCodec.WriteOpenClose(ref platform, packet,
+			MuiListtreeMessageCodec.Open, ListRoot, root.Raw, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(hook, platform.LastHookBase);
+		Assert.Equal(tree, platform.LastHookA2);
+		Assert.Equal(root, platform.LastHookA1);
+		Assert.Equal(hookData, platform.LastHookData);
+
+		Assert.True(MuiListtreeMessageCodec.WriteOpenClose(ref platform, packet,
+			MuiListtreeMessageCodec.Close, ListRoot, root.Raw, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(platform.HookInvokeCount >= 2);
+		Assert.Equal(hook, platform.LastHookBase);
+		Assert.Equal(tree, platform.LastHookA2);
+		Assert.Equal(root, platform.LastHookA1);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void DispatcherRoutesListtreeConstructAndDestructHooksThroughTypedPolicy()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var rootName = WriteString(ref platform, 0x2F20, "construct-root");
+		var user = WriteString(ref platform, 0x2F40, "construct-user");
+		var packet = APTR.FromPointer(0x2F80);
+		var constructHook = APTR.FromPointer(0x2FC0);
+		var constructData = APTR.FromPointer(0x3000);
+		var destructHook = APTR.FromPointer(0x3040);
+		var destructData = APTR.FromPointer(0x3080);
+		platform.WriteUInt32(constructHook, 8,
+			MuiHeadlessTestPlatform.HookEntryConstruct);
+		platform.WriteUInt32(constructHook, 16, constructData.Raw);
+		platform.WriteUInt32(destructHook, 8,
+			MuiHeadlessTestPlatform.HookEntryDestruct);
+		platform.WriteUInt32(destructHook, 16, destructData.Raw);
+
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, MuiListtreeCore.ConstructHook,
+			constructHook.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, MuiListtreeCore.DestructHook,
+			destructHook.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			rootName.Raw, user.Raw, ListRoot, PrevTail, 0));
+		var root = APTR.FromPointer(MuiListtreeDispatcher.DispatchTreePacket(
+			ref platform, State, tree, packet));
+		Assert.NotEqual(APTR.Null, root);
+		Assert.Equal(1u, platform.HookInvokeCount);
+		Assert.Equal(constructHook, platform.LastHookBase);
+		Assert.NotEqual(APTR.Null, platform.LastHookA2);
+		var hookPool = platform.LastHookA2;
+		Assert.Equal(1u, platform.PoolCreateCount);
+		Assert.Equal(0u, platform.LastPoolRequirements);
+		Assert.Equal(2008u, platform.LastPoolPuddleSize);
+		Assert.Equal(1024u, platform.LastPoolThreshold);
+		Assert.True(MuiListtreeCore.TryGetHookPoolStateRecord(ref platform, State,
+			tree, out var hookPoolState));
+		Assert.Equal(hookPool, hookPoolState.Pool);
+		Assert.Equal(1u, hookPoolState.Owned);
+		var pooledScratch = platform.AllocPooled(hookPool, 12);
+		Assert.NotEqual(APTR.Null, pooledScratch);
+		Assert.Equal(1u, platform.PooledAllocationCount);
+		platform.FreePooled(hookPool, pooledScratch, 12);
+		Assert.Equal(1u, platform.PooledFreeCount);
+		Assert.NotEqual(user, platform.LastHookA1);
+		Assert.Equal(platform.LastHookA1, platform.LastConstructMessage);
+		Assert.True(platform.LastConstructMessageValid);
+		Assert.Equal(rootName, platform.LastConstructName);
+		Assert.Equal(user, platform.LastConstructUser);
+		Assert.Equal(APTR.FromPointer(ListRoot), platform.LastConstructListNode);
+		Assert.Equal(APTR.FromPointer(PrevTail), platform.LastConstructPrevNode);
+		Assert.Equal(0u, platform.LastConstructFlags);
+		Assert.Equal(constructData, platform.LastHookData);
+		Assert.Equal(constructData.Raw, platform.ReadUInt32(root,
+			MuiListtreeCore.TreeNodeUserOffset));
+
+		Assert.True(MuiListtreeMessageCodec.WriteRemove(ref platform, packet,
+			ListRoot, root.Raw, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(2u, platform.HookInvokeCount);
+		Assert.Equal(1u, platform.HookDestructCount);
+		Assert.Equal(destructHook, platform.LastHookBase);
+		Assert.Equal(hookPool, platform.LastHookA2);
+		Assert.Equal(constructData, platform.LastHookA1);
+		Assert.Equal(destructData, platform.LastHookData);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+		Assert.Equal(1u, platform.PoolDeleteCount);
+	}
+
+	[Fact]
+	public void DispatcherRoutesListtreeSortHookThroughTypedPolicy()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var firstName = WriteString(ref platform, 0x30C0, "zeta");
+		var secondName = WriteString(ref platform, 0x30E0, "alpha");
+		var packet = APTR.FromPointer(0x3120);
+		var hook = APTR.FromPointer(0x3160);
+		var hookData = APTR.FromPointer(0x31A0);
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryCompare);
+		platform.WriteUInt32(hook, 16, hookData.Raw);
+
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, MuiListtreeCore.SortHook, hook.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			firstName.Raw, 0, ListRoot, PrevTail, 0));
+		Assert.NotEqual(APTR.Null, APTR.FromPointer(
+			MuiListtreeDispatcher.DispatchTreePacket(ref platform, State, tree,
+				packet)));
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			secondName.Raw, 0, ListRoot, PrevTail, 0));
+		Assert.NotEqual(APTR.Null, APTR.FromPointer(
+			MuiListtreeDispatcher.DispatchTreePacket(ref platform, State, tree,
+				packet)));
+
+		Assert.True(MuiListtreeMessageCodec.WriteSort(ref platform, packet,
+			MuiListtreeMessageCodec.Sort, ListRoot, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(platform.HookInvokeCount > 0);
+		Assert.Equal(hook, platform.LastHookBase);
+		Assert.NotEqual(APTR.Null, platform.LastHookA2);
+		Assert.NotEqual(APTR.Null, platform.LastHookA1);
+		Assert.Equal(hookData, platform.LastHookData);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void DispatcherRoutesListtreeDisplayHookThroughTypedDraw()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var rootName = WriteString(ref platform, 0x31E0, "display-root");
+		var childName = WriteString(ref platform, 0x3200, "display-child");
+		var format = WriteString(ref platform, 0x3220, "A,B");
+		var replacement = WriteString(ref platform, 0x3230, "hook-column");
+		var packet = APTR.FromPointer(0x3240);
+		var hook = APTR.FromPointer(0x3280);
+		var hookData = APTR.FromPointer(0x32C0);
+		platform.DisplayHookReplacement = replacement;
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryDisplay);
+		platform.WriteUInt32(hook, 16, hookData.Raw);
+
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, MuiListtreeCore.Format, format.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, MuiListtreeCore.TreeColumn, 1));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, MuiListtreeCore.DisplayHook, hook.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			rootName.Raw, 0, ListRoot, PrevTail, 0));
+		var root = APTR.FromPointer(MuiListtreeDispatcher.DispatchTreePacket(
+			ref platform, State, tree, packet));
+		Assert.NotEqual(APTR.Null, root);
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			childName.Raw, 0, root.Raw, PrevTail, 0));
+		var child = APTR.FromPointer(MuiListtreeDispatcher.DispatchTreePacket(
+			ref platform, State, tree, packet));
+		Assert.NotEqual(APTR.Null, child);
+		Assert.True(MuiListtreeMessageCodec.WriteOpenClose(ref platform, packet,
+			MuiListtreeMessageCodec.Open, ListRoot, root.Raw, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteDraw(ref platform,
+			packet, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(platform.HookInvokeCount >= 2);
+		Assert.Equal(hook, platform.LastHookBase);
+		Assert.Equal(platform.LastDisplayArray, platform.LastHookA2);
+		Assert.Equal(child, platform.LastHookA1);
+		Assert.Equal(child, platform.LastDisplayNode);
+		Assert.Equal(APTR.Null, platform.LastDisplayFirstText);
+		Assert.Equal(APTR.Null, platform.LastDisplaySecondText);
+		Assert.Equal(replacement, platform.LastDisplaySecondTextAfterHook);
+		Assert.Equal(2u, platform.DisplayHookCount);
+		Assert.Equal(hookData, platform.LastHookData);
+		Assert.True(MuiListtreeCore.TryGetDisplaySnapshotStateRecord(ref platform,
+			State, tree, out var snapshot));
+		Assert.Equal(MuiListtreeCore.MuiListtreeDisplaySnapshotState.Cookie,
+			snapshot.Magic);
+		Assert.Equal(child, snapshot.Node);
+		Assert.Equal(2u, snapshot.Columns);
+		Assert.NotEqual(APTR.Null, snapshot.Values);
+		var snapshotCursor = default(MuiListtreeCore.MuiListtreeDisplayColumnCursor);
+		snapshotCursor.Base = snapshot.Values;
+		snapshotCursor.Index = 1;
+		Assert.True(MuiListtreeCore.MuiListtreeDisplayColumnCursorCodec.TryGetEntry(ref platform,
+			snapshotCursor, out var snapshotSlot));
+		Assert.True(MuiListtreeCore.MuiListtreeDisplayColumnCodec.TryRead(ref platform,
+			snapshotSlot, out var snapshotColumn));
+		Assert.Equal(replacement, snapshotColumn.Text);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreeTitleUsesBooleanDisplayHookRowAndTypedSnapshot()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var packet = APTR.FromPointer(0x32E0);
+		var format = WriteString(ref platform, 0x3320, "A,B");
+		var hook = APTR.FromPointer(0x3360);
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryDisplay);
+
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Format, format.Raw, false));
+		// MorphOS accepts this historically pointer-shaped input but stores TRUE.
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Title, 0x7FFFu, false));
+		Assert.True(MuiListtreeCore.GetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Title, out var title));
+		Assert.Equal(1u, title);
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DisplayHook, hook.Raw, false));
+		var root = InsertName(ref platform, tree, "title-row", ListRoot,
+			PrevTail);
+		Assert.NotEqual(APTR.Null, root);
+		Assert.True(MuiListtreeCore.Layout(ref platform, State, tree, 0, 0,
+			80, 16));
+		var minMaxStorage = APTR.FromPointer(0x33C0);
+		Assert.True(MuiListtreeCore.AskMinMax(ref platform, State, tree,
+			minMaxStorage));
+		Assert.True(MuiMinMaxRecordCodec.TryRead(ref platform, minMaxStorage,
+			out var minMax));
+		Assert.Equal((short)32, minMax.DefHeight);
+		Assert.True(MuiListtreeCore.Draw(ref platform, State, tree, 0));
+		// One row is available, so the title consumes it and the data node is not
+		// sent to the hook in this pass. A title hook receives A1 == NULL.
+		Assert.Equal(1u, platform.DisplayHookCount);
+		Assert.Equal(APTR.Null, platform.LastDisplayNode);
+		Assert.Equal(APTR.Null, platform.LastHookA1);
+		Assert.True(MuiListtreeCore.TryGetDisplaySnapshotStateRecord(ref platform,
+			State, tree, out var snapshot));
+		Assert.Equal(APTR.Null, snapshot.Node);
+		Assert.Equal(MuiListtreeCore.MuiListtreeDisplaySnapshotState.DisplayTitle,
+			snapshot.DisplayFlags);
+
+		var result = APTR.FromPointer(0x33A0);
+		Assert.True(MuiListtreeCore.TestPos(ref platform, State, tree, 4, 4,
+			result));
+		Assert.True(MuiListtreeCore.MuiListtreeTestPosResultCodec.TryRead(
+			ref platform, result, out var titlePosition));
+		Assert.Equal(APTR.Null, titlePosition.TreeNode);
+		Assert.Equal(-1, titlePosition.ListEntry);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreeEmptyNodesProjectsIndicatorThroughTypedDisplaySnapshot()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var hook = APTR.FromPointer(0x34B0);
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryDisplay);
+
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DisplayHook, hook.Raw, false));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.EmptyNodes, 1, false));
+		var root = InsertName(ref platform, tree, "empty-node", ListRoot, PrevTail);
+		var child = InsertName(ref platform, tree, "temporary-child",
+			(uint)root.Raw, PrevTail);
+		Assert.NotEqual(APTR.Null, child);
+		Assert.True(MuiListtreeCore.Remove(ref platform, State, tree,
+			root, child, 0));
+
+		Assert.True(MuiListtreeCore.Draw(ref platform, State, tree, 0));
+		Assert.True(MuiListtreeCore.TryGetDisplaySnapshotStateRecord(ref platform,
+			State, tree, out var emptySnapshot));
+		Assert.Equal(MuiListtreeCore.MuiListtreeDisplaySnapshotState.DisplayListNode,
+			emptySnapshot.DisplayFlags &
+			MuiListtreeCore.MuiListtreeDisplaySnapshotState.DisplayListNode);
+		Assert.Equal(0u, emptySnapshot.DisplayFlags &
+			MuiListtreeCore.MuiListtreeDisplaySnapshotState.DisplayIndicator);
+
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.EmptyNodes, 0, false));
+		Assert.True(MuiListtreeCore.Draw(ref platform, State, tree, 0));
+		Assert.True(MuiListtreeCore.TryGetDisplaySnapshotStateRecord(ref platform,
+			State, tree, out var nodeSnapshot));
+		Assert.NotEqual(0u, nodeSnapshot.DisplayFlags &
+			MuiListtreeCore.MuiListtreeDisplaySnapshotState.DisplayIndicator);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreeDrawHonorsNamedViewportOrigin()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var packet = APTR.FromPointer(0x32F0);
+		var rootName = WriteString(ref platform, 0x3320, "draw-viewport-root");
+		var childName = WriteString(ref platform, 0x3350, "draw-viewport-child");
+		var hook = APTR.FromPointer(0x3380);
+		var hookData = APTR.FromPointer(0x33C0);
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryConstruct);
+		platform.WriteUInt32(hook, 16, hookData.Raw);
+
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteLayout(ref platform,
+			packet, 0, 0, 80, 16));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, MuiListtreeCore.DisplayHook, hook.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			rootName.Raw, 0, ListRoot, PrevTail, 0));
+		var root = APTR.FromPointer(MuiListtreeDispatcher.DispatchTreePacket(
+			ref platform, State, tree, packet));
+		Assert.NotEqual(APTR.Null, root);
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			childName.Raw, 0, root.Raw, PrevTail, 0));
+		var child = APTR.FromPointer(MuiListtreeDispatcher.DispatchTreePacket(
+			ref platform, State, tree, packet));
+		Assert.NotEqual(APTR.Null, child);
+		Assert.True(MuiListtreeMessageCodec.WriteOpenClose(ref platform, packet,
+			MuiListtreeMessageCodec.Open, ListRoot, root.Raw, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteDraw(ref platform,
+			packet, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(1u, platform.HookInvokeCount);
+		Assert.Equal(root, platform.LastHookA1);
+
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, MuiListtreeCore.Active, child.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeCore.TryGetSurfaceStateRecord(ref platform, State,
+			tree, out var surface));
+		Assert.Equal(1u, surface.FirstVisible);
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteDraw(ref platform,
+			packet, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(2u, platform.HookInvokeCount);
+		Assert.Equal(child, platform.LastHookA1);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreeViewportTracksActiveRowAcrossTopologyMutations()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var first = InsertName(ref platform, tree, "viewport-first", ListRoot,
+			PrevTail);
+		_ = first;
+		var middle = InsertName(ref platform, tree, "viewport-middle", ListRoot,
+			PrevTail);
+		var active = InsertName(ref platform, tree, "viewport-active", ListRoot,
+			PrevTail);
+		Assert.NotEqual(APTR.Null, middle);
+		Assert.NotEqual(APTR.Null, active);
+		Assert.True(MuiListtreeCore.Layout(ref platform, State, tree, 0, 0,
+			80, 32));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Active, active.Raw, false));
+		Assert.True(MuiListtreeCore.TryGetSurfaceStateRecord(ref platform, State,
+			tree, out var beforeInsert));
+		Assert.Equal(1u, beforeInsert.FirstVisible);
+
+		var inserted = MuiListtreeCore.Insert(ref platform, State, tree,
+			WriteUniqueString(ref platform, "viewport-inserted"), APTR.Null,
+			APTR.FromPointer(ListRoot), active, InsertFlagsNextNode);
+		Assert.NotEqual(APTR.Null, inserted);
+		Assert.True(MuiListtreeCore.TryGetSurfaceStateRecord(ref platform, State,
+			tree, out var afterInsert));
+		Assert.Equal(2u, afterInsert.FirstVisible);
+
+		Assert.True(MuiListtreeCore.Remove(ref platform, State, tree,
+			APTR.FromPointer(ListRoot), inserted, 0));
+		Assert.True(MuiListtreeCore.TryGetSurfaceStateRecord(ref platform, State,
+			tree, out var afterRemove));
+		Assert.Equal(1u, afterRemove.FirstVisible);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreeActiveRejectsHiddenNodeUntilParentIsOpen()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var parent = InsertName(ref platform, tree, "active-parent", ListRoot,
+			PrevTail);
+		var child = InsertName(ref platform, tree, "hidden-child", parent.Raw,
+			PrevTail);
+		Assert.NotEqual(APTR.Null, child);
+		Assert.False(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Active, child.Raw, false));
+		Assert.Equal(APTR.Null, MuiListtreeCore.ActiveNode(ref platform, State,
+			tree));
+
+		Assert.True(MuiListtreeCore.Open(ref platform, State, tree,
+			APTR.FromPointer(ListRoot), parent, 0));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Active, child.Raw, false));
+		Assert.Equal(child, MuiListtreeCore.ActiveNode(ref platform, State, tree));
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void DispatcherRoutesListtreeLayoutAndAskMinMaxThroughTypedSurfacePackets()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var rootName = WriteString(ref platform, 0x32E0, "surface-root");
+		var childName = WriteString(ref platform, 0x3300, "surface-child");
+		var packet = APTR.FromPointer(0x3340);
+		var storage = APTR.FromPointer(0x3360);
+
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteLayout(ref platform,
+			packet, 4, 6, 120, 48));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeCore.TryGetSurfaceStateRecord(ref platform, State,
+			tree, out var surface));
+		Assert.Equal(4, surface.Left);
+		Assert.Equal(6, surface.Top);
+		Assert.Equal(120, surface.Width);
+		Assert.Equal(48, surface.Height);
+		Assert.Equal(16u, surface.RowHeight);
+
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			rootName.Raw, 0, ListRoot, PrevTail, 0));
+		Assert.NotEqual(APTR.Null, APTR.FromPointer(
+			MuiListtreeDispatcher.DispatchTreePacket(ref platform, State, tree,
+				packet)));
+		Assert.True(MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
+			childName.Raw, 0, ListRoot, PrevTail, 0));
+		Assert.NotEqual(APTR.Null, APTR.FromPointer(
+			MuiListtreeDispatcher.DispatchTreePacket(ref platform, State, tree,
+				packet)));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteAskMinMax(ref platform,
+			packet, storage.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiMinMaxRecordCodec.TryRead(ref platform, storage,
+			out var minMax));
+		Assert.Equal((short)1, minMax.MinWidth);
+		Assert.Equal((short)16, minMax.MinHeight);
+		Assert.Equal((short)32, minMax.DefHeight);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void DispatcherRoutesListtreeAreaLifecycleThroughTypedPackets()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var packet = APTR.FromPointer(0x3410);
+		var renderInfo = APTR.FromPointer(0x3440);
+		var renderRecord = default(MuiDrawingRenderInfoRecord);
+		Assert.True(MuiDrawingRenderInfoCodec.Write(ref platform, renderInfo,
+			renderRecord));
+
+		Assert.True(MuiExternalWrapperMessageCodec.WriteRenderInfo(ref platform,
+			packet, MuiListtreeCore.MethodSetup, renderInfo.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeCore.TryGetLifecycleStateRecord(ref platform, State,
+			tree, out var lifecycle));
+		Assert.Equal(renderInfo, lifecycle.RenderInfo);
+		Assert.Equal(1u, lifecycle.Setup);
+		Assert.Equal(1u, lifecycle.Shown);
+
+		platform.WriteUInt32(packet, 0, MuiListtreeCore.MethodHide);
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeCore.TryGetLifecycleStateRecord(ref platform, State,
+			tree, out lifecycle));
+		Assert.Equal(0u, lifecycle.Shown);
+		platform.WriteUInt32(packet, 0, MuiListtreeCore.MethodShow);
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeCore.TryGetLifecycleStateRecord(ref platform, State,
+			tree, out lifecycle));
+		Assert.Equal(1u, lifecycle.Shown);
+		platform.WriteUInt32(packet, 0, MuiListtreeCore.MethodCleanup);
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeCore.TryGetLifecycleStateRecord(ref platform, State,
+			tree, out lifecycle));
+		Assert.Equal(APTR.Null, lifecycle.RenderInfo);
+		Assert.Equal(0u, lifecycle.Setup);
+		Assert.Equal(0u, lifecycle.Shown);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void DispatcherRoutesListtreeHandleInputRightAndLeftThroughTypedPacket()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var packet = APTR.FromPointer(0x34A0);
+		var root = MuiListtreeCore.Insert(ref platform, State, tree,
+			WriteString(ref platform, 0x34D0, "input-root"), APTR.Null,
+			APTR.FromPointer(ListRoot), APTR.FromPointer(PrevTail), 0);
+		Assert.NotEqual(APTR.Null, root);
+		var child = MuiListtreeCore.Insert(ref platform, State, tree,
+			WriteString(ref platform, 0x3500, "input-child"), APTR.Null,
+			root, APTR.FromPointer(PrevTail), 0);
+		Assert.NotEqual(APTR.Null, child);
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Active, root.Raw, false));
+
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 9)); // MUIKEY_RIGHT
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.NotEqual(0u, MuiListtreeCore.NodeFlags(ref platform, root) & TNF_OPEN);
+
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 8)); // MUIKEY_LEFT
+		Assert.Equal(1u, MuiListtreeDispatcher.Dispatch(ref platform, State, tree,
+			packet));
+		Assert.Equal(0u, MuiListtreeCore.NodeFlags(ref platform, root) & TNF_OPEN);
+
+		// Leaves and unsupported keys are left unclaimed, preserving the parent
+		// Listview/input dispatcher contract.
+		Assert.True(MuiListtreeCore.Open(ref platform, State, tree,
+			APTR.FromPointer(ListRoot), root, 0));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Active, child.Raw, false));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 9));
+		Assert.Equal(0u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void DispatcherRoutesListtreeVisibleKeyboardNavigationThroughNamedTreeState()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var packet = APTR.FromPointer(0x3580);
+		var root = MuiListtreeCore.Insert(ref platform, State, tree,
+			WriteString(ref platform, 0x35B0, "nav-root"), APTR.Null,
+			APTR.FromPointer(ListRoot), APTR.FromPointer(PrevTail), 0);
+		var child = MuiListtreeCore.Insert(ref platform, State, tree,
+			WriteString(ref platform, 0x35E0, "nav-child"), APTR.Null, root,
+			APTR.FromPointer(PrevTail), 0);
+		Assert.NotEqual(APTR.Null, root);
+		Assert.NotEqual(APTR.Null, child);
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Active, root.Raw, false));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteLayout(ref platform,
+			packet, 0, 0, 80, 32));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 9)); // MUIKEY_RIGHT
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 3)); // MUIKEY_DOWN
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(child, MuiListtreeCore.ActiveNode(ref platform, State, tree));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 2)); // MUIKEY_UP
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(root, MuiListtreeCore.ActiveNode(ref platform, State, tree));
+
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 7)); // MUIKEY_BOTTOM
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(child, MuiListtreeCore.ActiveNode(ref platform, State, tree));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 6)); // MUIKEY_TOP
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(root, MuiListtreeCore.ActiveNode(ref platform, State, tree));
+
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 5)); // MUIKEY_PAGEDOWN; two visible rows fit one page
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(child, MuiListtreeCore.ActiveNode(ref platform, State, tree));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 4)); // MUIKEY_PAGEUP
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(root, MuiListtreeCore.ActiveNode(ref platform, State, tree));
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreeActiveMaintainsNamedViewportOriginForPointerAndTestPos()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var packet = APTR.FromPointer(0x3610);
+		var intui = APTR.FromPointer(0x3640);
+		var result = APTR.FromPointer(0x3670);
+		var root = MuiListtreeCore.Insert(ref platform, State, tree,
+			WriteString(ref platform, 0x36A0, "viewport-root"), APTR.Null,
+			APTR.FromPointer(ListRoot), APTR.FromPointer(PrevTail), 0);
+		var child = MuiListtreeCore.Insert(ref platform, State, tree,
+			WriteString(ref platform, 0x36D0, "viewport-child"), APTR.Null, root,
+			APTR.FromPointer(PrevTail), 0);
+		Assert.NotEqual(APTR.Null, root);
+		Assert.NotEqual(APTR.Null, child);
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteLayout(ref platform,
+			packet, 0, 0, 80, 16));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteOpenClose(ref platform, packet,
+			MuiListtreeMessageCodec.Open, ListRoot, root.Raw, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, MuiListtreeCore.Active, child.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeCore.TryGetSurfaceStateRecord(ref platform, State,
+			tree, out var surface));
+		Assert.Equal(1u, surface.FirstVisible);
+
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 4, 4));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, -1));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(child, MuiListtreeCore.ActiveNode(ref platform, State, tree));
+
+		Assert.True(MuiListtreeMessageCodec.WriteTestPos(ref platform, packet,
+			4, 0, result.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeCore.MuiListtreeTestPosResultCodec.TryRead(
+			ref platform, result, out var testPos));
+		Assert.Equal(child, testPos.TreeNode);
+
+		Assert.True(MuiListtreeMessageCodec.WriteSet(ref platform, packet,
+			MuiListtreeMessageCodec.Set, MuiListtreeCore.Active, root.Raw));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeCore.TryGetSurfaceStateRecord(ref platform, State,
+			tree, out surface));
+		Assert.Equal(0u, surface.FirstVisible);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreeTestPosUsesLaidOutPixelBoundsAndDropFlags()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var result = APTR.FromPointer(0x3710);
+		var root = InsertName(ref platform, tree, "testpos-root", ListRoot,
+			PrevTail);
+		Assert.NotEqual(APTR.Null, root);
+		Assert.True(MuiListtreeCore.Layout(ref platform, State, tree, 0, 0,
+			80, 16));
+
+		Assert.True(MuiListtreeCore.TestPos(ref platform, State, tree, 4, 1,
+			result));
+		Assert.True(MuiListtreeCore.MuiListtreeTestPosResultCodec.TryRead(
+			ref platform, result, out var above));
+		Assert.Equal(root, above.TreeNode);
+		Assert.Equal((ushort)MuiListtreeCore.DropMarkAbove, above.Flags);
+		Assert.Equal(0, above.ListEntry);
+
+		Assert.True(MuiListtreeCore.TestPos(ref platform, State, tree, 4, 15,
+			result));
+		Assert.True(MuiListtreeCore.MuiListtreeTestPosResultCodec.TryRead(
+			ref platform, result, out var below));
+		Assert.Equal(root, below.TreeNode);
+		Assert.Equal((ushort)MuiListtreeCore.DropMarkBelow, below.Flags);
+
+		// A laid-out TestPos outside the object rectangle must not resolve a
+		// visible row merely because its Y coordinate is valid.
+		Assert.True(MuiListtreeCore.TestPos(ref platform, State, tree, 80, 4,
+			result));
+		Assert.True(MuiListtreeCore.MuiListtreeTestPosResultCodec.TryRead(
+			ref platform, result, out var outside));
+		Assert.Equal(APTR.Null, outside.TreeNode);
+		Assert.Equal((ushort)MuiListtreeCore.DropMarkNone, outside.Flags);
+		Assert.Equal(-1, outside.ListEntry);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void DispatcherRoutesListtreeSelectUpThroughNamedIntuiPointerRecord()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var packet = APTR.FromPointer(0x3540);
+		var intui = APTR.FromPointer(0x3570);
+		var root = MuiListtreeCore.Insert(ref platform, State, tree,
+			WriteString(ref platform, 0x35A0, "pointer-root"), APTR.Null,
+			APTR.FromPointer(ListRoot), APTR.FromPointer(PrevTail), 0);
+		Assert.NotEqual(APTR.Null, root);
+		Assert.NotEqual(APTR.Null, MuiListtreeCore.Insert(ref platform, State,
+			tree, WriteString(ref platform, 0x35D0, "pointer-child"), APTR.Null,
+			root, APTR.FromPointer(PrevTail), 0));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteLayout(ref platform,
+			packet, 0, 0, 80, 32));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 4, 4)); // IDCMP_MOUSEBUTTONS / SELECTUP
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, -1)); // MUIKEY_NONE
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(root, MuiListtreeCore.ActiveNode(ref platform, State, tree));
+
+		// A pointer outside the named viewport is not consumed and cannot change
+		// the active node.
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 4, 40));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, -1));
+		Assert.Equal(0u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.Equal(root, MuiListtreeCore.ActiveNode(ref platform, State, tree));
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreeTimestampedSelectUpHonoursDoubleClickPolicyThroughNamedState()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var intui = APTR.FromPointer(0x38A0);
+		var root = InsertName(ref platform, tree, "double-root", ListRoot, PrevTail);
+		var child = InsertName(ref platform, tree, "double-child",
+			unchecked((uint)root.Raw), PrevTail);
+		Assert.NotEqual(APTR.Null, root);
+		Assert.NotEqual(APTR.Null, child);
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DoubleClick, 0, false));
+		Assert.True(MuiListtreeCore.Layout(ref platform, State, tree, 0, 0,
+			80, 32));
+
+		Assert.True(MuiIntuiMessageCodec.WritePointerWithTime(ref platform, intui,
+			1u << 3, 0x0068, 0, 0, 4, 4, 20, 100000));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiIntuiMessageCodec.WritePointerWithTime(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 4, 4, 20, 100000));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.Equal(0u, MuiListtreeCore.NodeFlags(ref platform, root) & TNF_OPEN);
+		Assert.True(MuiListtreeCore.TryGetClickStateRecord(ref platform, State,
+			tree, out var first));
+		Assert.Equal(1u, first.Clicks);
+		Assert.Equal(0u, first.DoubleClick);
+		Assert.Equal(1u, first.TimestampValid);
+
+		Assert.True(MuiIntuiMessageCodec.WritePointerWithTime(ref platform, intui,
+			1u << 3, 0x0068, 0, 0, 4, 4, 20, 450000));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiIntuiMessageCodec.WritePointerWithTime(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 4, 4, 20, 450000));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.NotEqual(0u, MuiListtreeCore.NodeFlags(ref platform, root) & TNF_OPEN);
+		Assert.True(MuiListtreeCore.TryGetClickStateRecord(ref platform, State,
+			tree, out var second));
+		Assert.Equal(root, second.LastNode);
+		Assert.Equal(2u, second.Clicks);
+		Assert.Equal(1u, second.DoubleClick);
+		Assert.Equal(20u, second.LastSeconds);
+		Assert.Equal(450000u, second.LastMicros);
+
+		// A third timestamped release starts the next pair rather than repeating
+		// the same double-click edge.
+		Assert.True(MuiIntuiMessageCodec.WritePointerWithTime(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 4, 4, 20, 600000));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiListtreeCore.TryGetClickStateRecord(ref platform, State,
+			tree, out var restarted));
+		Assert.Equal(1u, restarted.Clicks);
+		Assert.Equal(0u, restarted.DoubleClick);
+
+		// Reusing the prefix-only writer clears the optional timestamp, so the
+		// next event starts a new click sequence rather than a third pair.
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 4, 4));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiListtreeCore.TryGetClickStateRecord(ref platform, State,
+			tree, out var third));
+		Assert.Equal(1u, third.Clicks);
+		Assert.Equal(0u, third.DoubleClick);
+		Assert.Equal(1u, third.TimestampValid);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreeDoubleClickHonoursMorphosColumnSelectorsAndNamedHitState()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var intui = APTR.FromPointer(0x3A80);
+		var format = WriteString(ref platform, 0x3AC0, "A,B");
+		var root = InsertName(ref platform, tree, "column-root", ListRoot,
+			PrevTail);
+		Assert.NotEqual(APTR.Null, root);
+		Assert.NotEqual(APTR.Null, InsertName(ref platform, tree, "column-child",
+			root.Raw, PrevTail));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Format, format.Raw, false));
+		Assert.True(MuiListtreeCore.Layout(ref platform, State, tree, 0, 0,
+			80, 32));
+
+		void Click(int x, uint seconds, uint micros)
+		{
+			Assert.True(MuiIntuiMessageCodec.WritePointerWithTime(ref platform,
+				intui, 1u << 3, 0x0068, 0, 0, (short)x, 4, seconds, micros));
+			Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+				intui, -1));
+			Assert.True(MuiIntuiMessageCodec.WritePointerWithTime(ref platform,
+				intui, 1u << 3, 0x0069, 0, 0, (short)x, 4, seconds, micros));
+			Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+				intui, -1));
+		}
+
+		// Off rejects the pair even though the pointer hit is still classified.
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DoubleClick,
+			unchecked((uint)MuiListtreeCore.DoubleClickOff), false));
+		Click(10, 1, 100000);
+		Click(10, 1, 300000);
+		Assert.Equal(0u, MuiListtreeCore.NodeFlags(ref platform, root) & TNF_OPEN);
+		Assert.True(MuiListtreeCore.TryGetClickStateRecord(ref platform, State,
+			tree, out var offState));
+		Assert.Equal(0u, offState.DoubleClick);
+
+		// All accepts a pair in either FORMAT column.
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DoubleClick,
+			unchecked((uint)MuiListtreeCore.DoubleClickAll), false));
+		Click(50, 3, 100000);
+		Click(50, 3, 300000);
+		Assert.NotEqual(0u, MuiListtreeCore.NodeFlags(ref platform, root) & TNF_OPEN);
+
+		// Even with All enabled, a different FORMAT column starts a fresh pair.
+		Click(10, 4, 100000);
+		Click(50, 4, 300000);
+		Assert.NotEqual(0u, MuiListtreeCore.NodeFlags(ref platform, root) & TNF_OPEN);
+		Assert.True(MuiListtreeCore.TryGetClickStateRecord(ref platform, State,
+			tree, out var crossColumnState));
+		Assert.Equal(0u, crossColumnState.DoubleClick);
+
+		// A numeric selector recognizes only its named column.
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DoubleClick, 1, false));
+		Click(10, 5, 100000);
+		Click(10, 5, 300000);
+		Assert.NotEqual(0u, MuiListtreeCore.NodeFlags(ref platform, root) & TNF_OPEN);
+		Click(50, 6, 100000);
+		Click(50, 6, 300000);
+		Assert.Equal(0u, MuiListtreeCore.NodeFlags(ref platform, root) & TNF_OPEN);
+
+		// Tree selects the normalized TreeColumn (column one here).
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.TreeColumn, 1, false));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DoubleClick,
+			unchecked((uint)MuiListtreeCore.DoubleClickTree), false));
+		Click(50, 7, 100000);
+		Click(50, 7, 300000);
+		Assert.NotEqual(0u, MuiListtreeCore.NodeFlags(ref platform, root) & TNF_OPEN);
+		Assert.True(MuiListtreeCore.TryGetClickStateRecord(ref platform, State,
+			tree, out var finalState));
+		Assert.Equal(1u, finalState.DoubleClick);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreeDoubleClickNotifiesLeafWithNamedNodeTrigger()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var intui = APTR.FromPointer(0x3C80);
+		var follow = APTR.FromPointer(0x3CC0);
+		var leaf = InsertName(ref platform, tree, "notify-leaf", ListRoot,
+			PrevTail);
+		Assert.NotEqual(APTR.Null, leaf);
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DoubleClick, 0, false));
+		Assert.True(MuiListtreeCore.Layout(ref platform, State, tree, 0, 0,
+			80, 32));
+
+		// The follow vector is a named two-slot message: method followed by the
+		// MUI trigger parameter. Dispatch replaces the trigger slot with the
+		// guest Listtree node pointer.
+		platform.WriteUInt32(follow, 0, 0x90000077);
+		platform.WriteUInt32(follow, 4, 1233727793u); // MUIV_EveryTime
+		Assert.True(MuiNotifyCore.Add(ref platform, State, tree,
+			MuiListtreeCore.DoubleClick, (uint)Value.EveryTime, tree, 2, follow));
+
+		void Click(uint seconds, uint micros)
+		{
+			Assert.True(MuiIntuiMessageCodec.WritePointerWithTime(ref platform,
+				intui, 1u << 3, 0x0068, 0, 0, 4, 4, seconds, micros));
+			Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+				intui, -1));
+			Assert.True(MuiIntuiMessageCodec.WritePointerWithTime(ref platform,
+				intui, 1u << 3, 0x0069, 0, 0, 4, 4, seconds, micros));
+			Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+				intui, -1));
+		}
+
+		var before = platform.DispatchCount;
+		Click(40, 100000);
+		Assert.Equal(before, platform.DispatchCount);
+		Click(40, 300000);
+		Assert.Equal(before + 1, platform.DispatchCount);
+		Assert.Equal(tree, platform.LastDispatchObject);
+		Assert.Equal(0x90000077u, platform.LastDispatchMethod);
+		Assert.Equal(leaf.Raw, platform.LastDispatchArgument);
+		Assert.True(MuiListtreeCore.TryGetClickStateRecord(ref platform, State,
+			tree, out var clickState));
+		Assert.Equal(1u, clickState.DoubleClick);
+		Assert.Equal(0u, MuiListtreeCore.NodeFlags(ref platform, leaf) & TNF_OPEN);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreeDoubleClickNotifiesUnselectedNodeColumn()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var intui = APTR.FromPointer(0x3D80);
+		var format = WriteString(ref platform, 0x3DC0, "A,B");
+		var follow = APTR.FromPointer(0x3E00);
+		var root = InsertName(ref platform, tree, "notify-root", ListRoot,
+			PrevTail);
+		Assert.NotEqual(APTR.Null, root);
+		Assert.NotEqual(APTR.Null, InsertName(ref platform, tree,
+			"notify-child", root.Raw, PrevTail));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Format, format.Raw, false));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DoubleClick, 0, false));
+		Assert.True(MuiListtreeCore.Layout(ref platform, State, tree, 0, 0,
+			80, 32));
+		platform.WriteUInt32(follow, 0, 0x90000078);
+		platform.WriteUInt32(follow, 4, 1233727793u); // MUIV_EveryTime
+		Assert.True(MuiNotifyCore.Add(ref platform, State, tree,
+			MuiListtreeCore.DoubleClick, (uint)Value.EveryTime, tree, 2, follow));
+
+		void Click(uint seconds, uint micros)
+		{
+			Assert.True(MuiIntuiMessageCodec.WritePointerWithTime(ref platform,
+				intui, 1u << 3, 0x0068, 0, 0, 50, 4, seconds, micros));
+			Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+				intui, -1));
+			Assert.True(MuiIntuiMessageCodec.WritePointerWithTime(ref platform,
+				intui, 1u << 3, 0x0069, 0, 0, 50, 4, seconds, micros));
+			Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+				intui, -1));
+		}
+
+		var before = platform.DispatchCount;
+		Click(60, 100000);
+		Click(60, 300000);
+		Assert.Equal(before + 1, platform.DispatchCount);
+		Assert.Equal(tree, platform.LastDispatchObject);
+		Assert.Equal(0x90000078u, platform.LastDispatchMethod);
+		Assert.Equal(root.Raw, platform.LastDispatchArgument);
+		Assert.True(MuiListtreeCore.TryGetClickStateRecord(ref platform, State,
+			tree, out var clickState));
+		Assert.Equal(0u, clickState.DoubleClick);
+		Assert.Equal(0u, MuiListtreeCore.NodeFlags(ref platform, root) & TNF_OPEN);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreeFormatGeometryUsesNamedDeltaAndWeightForHitColumns()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var intui = APTR.FromPointer(0x3C20);
+		var root = InsertName(ref platform, tree, "geometry-root", ListRoot,
+			PrevTail);
+		Assert.NotEqual(APTR.Null, root);
+		// The first FORMAT column is 20 pixels of inter-column gap and has
+		// weight 1; the second has weight 3.  In a 100-pixel surface this
+		// produces 20/20/60 (column/gap/column), unlike equal-width fallback.
+		var format = WriteString(ref platform, 0x3C60,
+			"A DELTA=20 WEIGHT=1,B WEIGHT=3");
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Format, format.Raw, false));
+		Assert.True(MuiListtreeCore.Layout(ref platform, State, tree, 0, 0,
+			100, 16));
+
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 10, 4));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiListtreeCore.TryGetClickColumnStateRecord(ref platform,
+			State, tree, out var first));
+		Assert.Equal(0u, first.LastColumn);
+
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 70, 4));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiListtreeCore.TryGetClickColumnStateRecord(ref platform,
+			State, tree, out var second));
+		Assert.Equal(1u, second.LastColumn);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreeFormatGeometryHonoursPixelMinAndMaxWidths()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var intui = APTR.FromPointer(0x3D20);
+		var root = InsertName(ref platform, tree, "width-root", ListRoot,
+			PrevTail);
+		Assert.NotEqual(APTR.Null, root);
+		Assert.True(MuiListtreeCore.Layout(ref platform, State, tree, 0, 0,
+			100, 16));
+
+		// MAXWIDTH=20px forces the first column to 20 pixels (plus the
+		// default four-pixel gap), so x=30 resolves to column one.
+		var maximum = WriteString(ref platform, 0x3D60,
+			"A MAXWIDTH=20px WEIGHT=1,B WEIGHT=1");
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Format, maximum.Raw, false));
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 30, 4));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiListtreeCore.TryGetClickColumnStateRecord(ref platform,
+			State, tree, out var maxHit));
+		Assert.Equal(1u, maxHit.LastColumn);
+
+		// Without the optional px suffix, MorphOS FORMAT widths are percentages.
+		// MAXWIDTH=25 therefore has the same boundary on this 100-pixel surface.
+		var percentage = WriteString(ref platform, 0x3D80,
+			"A MAXWIDTH=25 WEIGHT=1,B WEIGHT=1");
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Format, percentage.Raw, false));
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 30, 4));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiListtreeCore.TryGetClickColumnStateRecord(ref platform,
+			State, tree, out var percentageHit));
+		Assert.Equal(1u, percentageHit.LastColumn);
+
+		// MINWIDTH=70px expands the first column to 70 pixels, so x=60
+		// remains in column zero even though proportional allocation would
+		// otherwise have placed the boundary near the middle.
+		var minimum = WriteString(ref platform, 0x3DA0,
+			"A MINWIDTH=70px WEIGHT=1,B WEIGHT=1");
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Format, minimum.Raw, false));
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 60, 4));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiListtreeCore.TryGetClickColumnStateRecord(ref platform,
+			State, tree, out var minHit));
+		Assert.Equal(0u, minHit.LastColumn);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreePointerDragTracksNamedCaptureAndDropMark()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var packet = APTR.FromPointer(0x35E0);
+		var intui = APTR.FromPointer(0x3610);
+		var root = InsertName(ref platform, tree, "drag-root", ListRoot, PrevTail);
+		var child = InsertName(ref platform, tree, "drag-child",
+			(uint)root.Raw, PrevTail);
+		Assert.True(MuiListtreeCore.Open(ref platform, State, tree,
+			APTR.FromPointer(ListRoot), root, 0));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteLayout(ref platform,
+			packet, 0, 0, 80, 32));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0068, 0, 0, 4, 4)); // SELECTDOWN on root
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.Equal(root, MuiListtreeCore.ActiveNode(ref platform, State, tree));
+		Assert.True(MuiListtreeCore.TryGetDragStateRecord(ref platform, State,
+			tree, out var drag));
+		Assert.Equal(0, drag.Source);
+		Assert.Equal(0, drag.Target);
+		Assert.NotEqual(0u, drag.Flags & MuiListviewDragState.ActiveFlag);
+
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 4, 0, 0, 0, 4, 30)); // MOUSEMOVE near child bottom edge
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiListtreeCore.TryGetDragStateRecord(ref platform, State,
+			tree, out drag));
+		Assert.Equal(1, drag.Target);
+		Assert.NotEqual(0u, drag.Flags & MuiListviewDragState.MovedFlag);
+		Assert.True(MuiListtreeCore.TryGetHeaderStateRecord(ref platform, State,
+			tree, out var header));
+		Assert.Equal(1, header.DropEntry);
+		Assert.Equal(MuiListtreeCore.DropMarkBelow, header.DropValue);
+
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 4, 30)); // SELECTUP closes capture
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiListtreeCore.TryGetDragStateRecord(ref platform, State,
+			tree, out drag));
+		Assert.Equal(0u, drag.Flags);
+		Assert.True(MuiListtreeCore.TryGetHeaderStateRecord(ref platform, State,
+			tree, out header));
+		Assert.Equal(-1, header.DropEntry);
+		Assert.Equal(MuiListtreeCore.DropMarkNone, header.DropValue);
+		Assert.Equal(root, MuiListtreeCore.ActiveNode(ref platform, State, tree));
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreePointerDragCommitsBelowAboveAndOntoUsingTypedMove()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var packet = APTR.FromPointer(0x3660);
+		var intui = APTR.FromPointer(0x3690);
+		var a = InsertName(ref platform, tree, "a", ListRoot, PrevTail);
+		var b = InsertName(ref platform, tree, "b", ListRoot, PrevTail);
+		var c = InsertName(ref platform, tree, "c", ListRoot, PrevTail);
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteLayout(ref platform,
+			packet, 0, 0, 80, 48));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+
+		// Move a below c: [a,b,c] -> [b,c,a].
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0068, 0, 0, 4, 4));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 4, 0, 0, 0, 4, 47));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 4, 47));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.Equal("b", NodeName(ref platform, GetEntry(ref platform, tree,
+			ListRoot, 0, 0)));
+		Assert.Equal("c", NodeName(ref platform, GetEntry(ref platform, tree,
+			ListRoot, 1, 0)));
+		Assert.Equal("a", NodeName(ref platform, GetEntry(ref platform, tree,
+			ListRoot, 2, 0)));
+
+		// Move a above b: [b,c,a] -> [a,b,c].
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0068, 0, 0, 4, 47));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 4, 0, 0, 0, 4, 0));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 4, 0));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.Equal(a.Raw, MuiListtreeCore.GetEntry(ref platform, State, tree,
+			APTR.FromPointer(ListRoot), 0, 0).Raw);
+		Assert.Equal(b.Raw, MuiListtreeCore.GetEntry(ref platform, State, tree,
+			APTR.FromPointer(ListRoot), 1, 0).Raw);
+
+		// Move c onto b: [a,b,c] -> [a,b(c)].
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0068, 0, 0, 4, 40));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 4, 0, 0, 0, 4, 24));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 4, 24));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.Equal(2u, MuiListtreeCore.RootCount(ref platform, State, tree));
+		Assert.Equal(1u, MuiListtreeCore.ChildCount(ref platform, b));
+		Assert.Equal(c.Raw, MuiListtreeCore.GetEntry(ref platform, State, tree,
+			b, 0, 0).Raw);
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void ListtreePointerSelectionUsesTypedNodeStateAndQualifiers()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var packet = APTR.FromPointer(0x36C0);
+		var intui = APTR.FromPointer(0x3700);
+		var a = InsertName(ref platform, tree, "a", ListRoot, PrevTail);
+		var b = InsertName(ref platform, tree, "b", ListRoot, PrevTail);
+		var c = InsertName(ref platform, tree, "c", ListRoot, PrevTail);
+		var d = InsertName(ref platform, tree, "d", ListRoot, PrevTail);
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.DragDropSort, 0, false));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.MultiSelect, 1, false));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteLayout(ref platform,
+			packet, 0, 0, 80, 64));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+
+		// Plain click is exclusive.
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0, 0, 4, 4));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiListtreeCore.IsNodeSelected(ref platform, a));
+		Assert.Equal(1u, MuiListtreeCore.SelectedCount(ref platform, State, tree));
+
+		// Control extends the selection without losing the first entry.
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0x0008, 0, 4, 20));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.True(MuiListtreeCore.IsNodeSelected(ref platform, a));
+		Assert.True(MuiListtreeCore.IsNodeSelected(ref platform, b));
+		Assert.Equal(2u, MuiListtreeCore.SelectedCount(ref platform, State, tree));
+
+		// Control again toggles the second entry off.
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0x0008, 0, 4, 20));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.False(MuiListtreeCore.IsNodeSelected(ref platform, b));
+		Assert.Equal(1u, MuiListtreeCore.SelectedCount(ref platform, State, tree));
+
+		// Shift extends from the typed anchor (the last control-click) to d.
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			1u << 3, 0x0069, 0x0003, 0, 4, 52));
+		Assert.True(MuiListtreeCore.HandleInput(ref platform, State, tree,
+			intui, -1));
+		Assert.False(MuiListtreeCore.IsNodeSelected(ref platform, a));
+		Assert.True(MuiListtreeCore.IsNodeSelected(ref platform, b));
+		Assert.True(MuiListtreeCore.IsNodeSelected(ref platform, c));
+		Assert.True(MuiListtreeCore.IsNodeSelected(ref platform, d));
+		Assert.Equal(3u, MuiListtreeCore.SelectedCount(ref platform, State, tree));
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
+	}
+
+	[Fact]
+	public void DispatcherRoutesListtreeKeyboardSelectionThroughTypedNodeState()
+	{
+		var platform = CreatePlatform(out var listtreeClass);
+		var tree = Create(ref platform, listtreeClass);
+		var packet = APTR.FromPointer(0x3730);
+		var a = InsertName(ref platform, tree, "key-a", ListRoot, PrevTail);
+		var b = InsertName(ref platform, tree, "key-b", ListRoot, PrevTail);
+		var c = InsertName(ref platform, tree, "key-c", ListRoot, PrevTail);
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.MultiSelect, 1, false));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Active, a.Raw, false));
+
+		// MUIKEY_PRESS selects the active node exclusively.
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeCore.IsNodeSelected(ref platform, a));
+		Assert.Equal(1u, MuiListtreeCore.SelectedCount(ref platform, State, tree));
+
+		// MUIKEY_TOGGLE adds and then removes the active node without disturbing
+		// the typed anchor/selection state of the other node.
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Active, b.Raw, false));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 1));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeCore.IsNodeSelected(ref platform, a));
+		Assert.True(MuiListtreeCore.IsNodeSelected(ref platform, b));
+		Assert.Equal(2u, MuiListtreeCore.SelectedCount(ref platform, State, tree));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 1));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.False(MuiListtreeCore.IsNodeSelected(ref platform, b));
+		Assert.Equal(1u, MuiListtreeCore.SelectedCount(ref platform, State, tree));
+
+		// PRESS remains exclusive after the active node changes.
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Active, c.Raw, false));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 0));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.False(MuiListtreeCore.IsNodeSelected(ref platform, a));
+		Assert.True(MuiListtreeCore.IsNodeSelected(ref platform, c));
+		Assert.Equal(1u, MuiListtreeCore.SelectedCount(ref platform, State, tree));
+
+		// Toggle falls back to exclusive selection when MultiSelect is disabled,
+		// matching the inherited Listview policy.
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.MultiSelect, 0, false));
+		Assert.True(MuiListtreeCore.SetAttribute(ref platform, State, tree,
+			MuiListtreeCore.Active, a.Raw, false));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, 0, 1));
+		Assert.Equal(1u, MuiListtreeDispatcher.DispatchTreePacket(ref platform,
+			State, tree, packet));
+		Assert.True(MuiListtreeCore.IsNodeSelected(ref platform, a));
+		Assert.False(MuiListtreeCore.IsNodeSelected(ref platform, c));
+		Assert.Equal(1u, MuiListtreeCore.SelectedCount(ref platform, State, tree));
+
+		DisposeAndAssertBalanced(ref platform, tree, listtreeClass);
 	}
 
 	[Fact]

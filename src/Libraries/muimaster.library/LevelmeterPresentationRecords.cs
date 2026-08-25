@@ -123,3 +123,15 @@ internal static class MuiLevelmeterPresentationStateRecordCodec
 			value.Horizontal);
 	}
 }
+
+// Keep the wire field lossless for malformed-state diagnostics. Levelmeter's
+// Gauge_Horiz value is a MorphOS BOOL and must be canonical before layout or
+// drawing consumers use the named presentation state.
+internal static class MuiLevelmeterPresentationStateValidation
+{
+	internal static bool IsValidRecord(MuiLevelmeterPresentationStateRecord value) =>
+		value.Horizontal <= 1;
+
+	internal static bool IsValidState(MuiLevelmeterPresentationState value) =>
+		value.Horizontal <= 1;
+}

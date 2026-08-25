@@ -545,6 +545,35 @@ public sealed class MuiPopSpecialistTests
 	}
 
 	[Fact]
+	public void PopaslAttributeAccessModesUseNamedState()
+	{
+		var p = NewPlatform();
+		Assert.True(CreateNamed(ref p, "Popasl.mui", out _));
+
+		// MorphOS exposes Type as [I.G] and MUIFontStyles as [ISG].
+		Assert.True(MuiPopSpecialistCore.SetAttribute(ref p, Instance,
+			MuiPopAttributes.Popasl_Type, 3, true, false, out var typeChanged));
+		Assert.True(typeChanged);
+		Assert.True(MuiPopSpecialistCore.GetAttribute(ref p, Instance,
+			MuiPopAttributes.Popasl_Type, out var type) && type == 3);
+
+		Assert.True(MuiPopSpecialistCore.SetAttribute(ref p, Instance,
+			MuiPopAttributes.Popasl_MUIFontStyles, 1, true, false,
+			out var stylesChanged));
+		Assert.True(stylesChanged);
+		Assert.True(MuiPopSpecialistCore.GetAttribute(ref p, Instance,
+			MuiPopAttributes.Popasl_MUIFontStyles, out var styles) && styles == 1);
+		Assert.True(MuiPopSpecialistCore.SetAttribute(ref p, Instance,
+			MuiPopAttributes.Popasl_MUIFontStyles, 0, false, true,
+			out stylesChanged));
+		Assert.True(stylesChanged);
+		Assert.True(MuiPopSpecialistCore.GetAttribute(ref p, Instance,
+			MuiPopAttributes.Popasl_MUIFontStyles, out styles) && styles == 0);
+		Assert.Equal(MuiPopAttributes.Popasl_MUIFontStyles,
+			MuiPopSpecialistCore.LastNotifiedAttribute(ref p, Instance));
+	}
+
+	[Fact]
 	public void PopaslFailsCleanlyOnMalformedTags()
 	{
 		var p = NewPlatform();
@@ -600,8 +629,10 @@ public sealed class MuiPopSpecialistTests
 		Assert.True(MuiPopSpecialistCore.SetAttribute(ref p, Instance,
 			MuiPopAttributes.Popcolor_ShowAlpha, 1, true, false, out var ch));
 		Assert.True(ch);
-		Assert.True(MuiPopSpecialistCore.GetAttribute(ref p, Instance,
-			MuiPopAttributes.Popcolor_ShowAlpha, out var v) && v == 1);
+		// MorphOS documents ShowAlpha as [I..]: it is accepted at construction
+		// but intentionally has no public getter.
+		Assert.False(MuiPopSpecialistCore.GetAttribute(ref p, Instance,
+			MuiPopAttributes.Popcolor_ShowAlpha, out _));
 		// Popcolor is Popobject-derived, so it honours the object contract too.
 		Assert.True(MuiPopSpecialistCore.GetAttribute(ref p, Instance,
 			MuiPopAttributes.Popobject_Volatile, out var vol) && vol == 1);
@@ -712,6 +743,9 @@ public sealed class MuiPopSpecialistTests
 		Assert.True(MuiPopSpecialistMessageCodec.TryReadMethodId(ref p, Packet,
 			out var packet));
 		Assert.Equal(MuiPopSpecialistMessageCodec.OmDispose, packet.MethodId);
+		Assert.True(MuiPopSpecialistMessageCodec.TryReadMethodIdValue(ref p,
+			Packet, out var methodId));
+		Assert.Equal(MuiPopSpecialistMessageCodec.OmDispose, methodId);
 		Assert.False(MuiPopSpecialistMessageCodec.TryReadMethodId(ref p,
 			APTR.Null, out _));
 	}

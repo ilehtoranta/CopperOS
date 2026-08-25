@@ -15,13 +15,7 @@ public static class MuiObjectDisposalServiceCore
 	public static bool DisposeObject<TPlatform>(ref TPlatform platform,
 		APTR headlessState, APTR obj)
 		where TPlatform : struct, IMuiServicePlatform =>
-		MuiProcessSpecialistCore.Valid(ref platform, headlessState, obj)
-			? MuiProcessSpecialistLifecycle.Dispose(ref platform, headlessState, obj)
-			: MuiMenuSpecialistCore.Valid(ref platform, headlessState, obj)
-				? MuiMenuSpecialistLifecycle.Dispose(ref platform, headlessState, obj)
-			: MuiMiscSpecialistCore.ValidObject(ref platform, headlessState, obj)
-				? MuiMiscSpecialistLifecycle.Dispose(ref platform, headlessState, obj)
-			: MuiHeadlessObjectCore.DisposeObject(ref platform, headlessState, obj);
+		DisposeKnownObject(ref platform, headlessState, obj);
 
 	// Public-vector form with both resident state blocks. Objects created by
 	// the external-aware factory are routed through the lease-aware path;
@@ -55,16 +49,28 @@ public static class MuiObjectDisposalServiceCore
 		if (classPointer.IsNull ||
 			MuiClassServiceCore.ObjectLeaseCount(ref platform, serviceState,
 				classPointer) == 0) return false;
-		var disposed = MuiProcessSpecialistCore.Valid(ref platform, headlessState,
-			obj)
+		var disposed = DisposeKnownObject(ref platform, headlessState, obj);
+		if (!disposed) return false;
+		return MuiClassServiceCore.ReleaseObjectLease(ref platform, serviceState,
+			classPointer);
+	}
+
+	// The public disposal vectors also receive the standalone MG09 wrapper
+	// instances. They are not entries in the generic headless object list, so a
+	// generic fallback would report success=false and strand the wrapper's
+	// external class/picture and owned guest blocks. Keep the routing typed and
+	// centralized so both ordinary and class-service forms have identical
+	// exactly-once teardown semantics.
+	private static bool DisposeKnownObject<TPlatform>(ref TPlatform platform,
+		APTR headlessState, APTR obj)
+		where TPlatform : struct, IMuiServicePlatform =>
+		MuiProcessSpecialistCore.Valid(ref platform, headlessState, obj)
 			? MuiProcessSpecialistLifecycle.Dispose(ref platform, headlessState, obj)
 			: MuiMenuSpecialistCore.Valid(ref platform, headlessState, obj)
 				? MuiMenuSpecialistLifecycle.Dispose(ref platform, headlessState, obj)
 			: MuiMiscSpecialistCore.ValidObject(ref platform, headlessState, obj)
 				? MuiMiscSpecialistLifecycle.Dispose(ref platform, headlessState, obj)
+			: MuiExternalWrapperCore.Valid(ref platform, obj)
+				? MuiExternalWrapperLifecycle.Dispose(ref platform, obj)
 			: MuiHeadlessObjectCore.DisposeObject(ref platform, headlessState, obj);
-		if (!disposed) return false;
-		return MuiClassServiceCore.ReleaseObjectLease(ref platform, serviceState,
-			classPointer);
-	}
 }

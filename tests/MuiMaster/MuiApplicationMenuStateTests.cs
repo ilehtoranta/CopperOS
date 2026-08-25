@@ -23,6 +23,10 @@ public sealed class MuiApplicationMenuStateTests
 		Assert.True(MuiApplicationMenuPacketCodec.TryReadApplicationQuery(
 			ref platform, ref applicationQuery, out var query));
 		Assert.Equal(applicationQuery.Method, query.MethodId);
+		Assert.True(MuiApplicationMenuPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationMenuPacketKind.ApplicationQuery,
+			out var methodId));
+		Assert.Equal(applicationQuery.Method, methodId);
 		platform.WriteUInt32(packet, 0,
 			MuiApplicationDispatcher.WindowSetMenuStateMethod);
 		platform.WriteUInt32(packet, 8, 1);

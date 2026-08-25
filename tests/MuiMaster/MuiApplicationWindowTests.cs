@@ -24,6 +24,10 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationPresentationPacketCodec.TryReadAboutMui(
 			ref platform, ref aboutRequest, out var about));
 		Assert.Equal(aboutMethod, about.MethodId);
+		Assert.True(MuiApplicationPresentationPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationPresentationPacketKind.AboutMui,
+			out var aboutMethodId));
+		Assert.Equal(aboutMethod, aboutMethodId);
 		platform.WriteUInt32(packet, 0, showHelpMethod);
 		platform.WriteUInt32(packet, 4, 0x1300);
 		platform.WriteUInt32(packet, 8, 0x1400);
@@ -121,6 +125,10 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationSettingsPacketCodec.TryReadSetConfigItem(
 			ref platform, ref setRequest, out var set));
 		Assert.Equal(setConfigMethod, set.MethodId);
+		Assert.True(MuiApplicationSettingsPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationSettingsPacketKind.SetConfigItem,
+			out var setMethodId));
+		Assert.Equal(setConfigMethod, setMethodId);
 		platform.WriteUInt32(packet, 0, openConfigMethod);
 		var openRequest = new MuiApplicationSettingsPacketCodec.SettingsPacketAddress
 		{
@@ -130,6 +138,10 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationSettingsPacketCodec.TryReadOpenConfigWindow(
 			ref platform, ref openRequest, out var open));
 		Assert.Equal(openConfigMethod, open.MethodId);
+		Assert.True(MuiApplicationSettingsPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationSettingsPacketKind.OpenConfigWindow,
+			out var openMethodId));
+		Assert.Equal(openConfigMethod, openMethodId);
 		platform.WriteUInt32(packet, 0, buildPanelMethod);
 		var buildRequest = new MuiApplicationSettingsPacketCodec.SettingsPacketAddress
 		{
@@ -139,6 +151,10 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationSettingsPacketCodec.TryReadBuildSettingsPanel(
 			ref platform, ref buildRequest, out var build));
 		Assert.Equal(buildPanelMethod, build.MethodId);
+		Assert.True(MuiApplicationSettingsPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationSettingsPacketKind.BuildSettingsPanel,
+			out var buildMethodId));
+		Assert.Equal(buildPanelMethod, buildMethodId);
 		platform.WriteUInt32(packet, 0, loadMethod);
 		platform.WriteUInt32(packet, 4, 0x1400);
 		var ioRequest = new MuiApplicationSettingsPacketCodec.SettingsPacketAddress
@@ -149,6 +165,10 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationSettingsPacketCodec.TryReadSettingsIo(ref platform,
 			ref ioRequest, out var io));
 		Assert.Equal(loadMethod, io.MethodId);
+		Assert.True(MuiApplicationSettingsPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationSettingsPacketKind.SettingsIo,
+			out var ioMethodId));
+		Assert.Equal(loadMethod, ioMethodId);
 		platform.WriteUInt32(packet, 0, 0xDEADBEEFu);
 		Assert.False(MuiApplicationSettingsPacketCodec.TryReadSettingsIo(
 			ref platform, ref ioRequest, out _));
@@ -381,6 +401,10 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationMethodPacketCodec.TryReadConfigId(ref platform,
 			ref configRequest, out var config));
 		Assert.Equal(configMethod, config.MethodId);
+		Assert.True(MuiApplicationMethodPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationMethodPacketKind.ConfigId,
+			out var configMethodId));
+		Assert.Equal(configMethod, configMethodId);
 		platform.WriteUInt32(packet, 0, refreshMethod);
 		var refreshRequest = new MuiApplicationMethodPacketCodec.MethodPacketAddress
 		{
@@ -390,6 +414,10 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationMethodPacketCodec.TryReadCheckRefresh(
 			ref platform, ref refreshRequest, out var refresh));
 		Assert.Equal(refreshMethod, refresh.MethodId);
+		Assert.True(MuiApplicationMethodPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationMethodPacketKind.CheckRefresh,
+			out var refreshMethodId));
+		Assert.Equal(refreshMethod, refreshMethodId);
 		platform.WriteUInt32(packet, 0, loopMethod);
 		var loopRequest = new MuiApplicationMethodPacketCodec.MethodPacketAddress
 		{
@@ -399,6 +427,10 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationMethodPacketCodec.TryReadLoop(ref platform,
 			ref loopRequest, out var loop));
 		Assert.Equal(loopMethod, loop.MethodId);
+		Assert.True(MuiApplicationMethodPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationMethodPacketKind.Loop,
+			out var loopMethodId));
+		Assert.Equal(loopMethod, loopMethodId);
 		platform.WriteUInt32(packet, 0, windowMethod);
 		var windowRequest = new MuiApplicationMethodPacketCodec.MethodPacketAddress
 		{
@@ -408,6 +440,10 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationMethodPacketCodec.TryReadWindowMethod(
 			ref platform, ref windowRequest, out var window));
 		Assert.Equal(windowMethod, window.MethodId);
+		Assert.True(MuiApplicationMethodPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationMethodPacketKind.WindowMethod,
+			out var windowMethodId));
+		Assert.Equal(windowMethod, windowMethodId);
 		platform.WriteUInt32(packet, 0, snapshotMethod);
 		platform.WriteUInt32(packet, 4, 1);
 		var snapshotRequest = new MuiApplicationMethodPacketCodec.MethodPacketAddress
@@ -419,6 +455,10 @@ public sealed class MuiApplicationWindowTests
 			ref snapshotRequest, out var snapshot));
 		Assert.Equal(snapshotMethod, snapshot.MethodId);
 		Assert.Equal(1u, snapshot.Flags);
+		Assert.True(MuiApplicationMethodPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationMethodPacketKind.Snapshot,
+			out var snapshotMethodId));
+		Assert.Equal(snapshotMethod, snapshotMethodId);
 		platform.WriteUInt32(packet, 0, 0xDEADBEEFu);
 		Assert.False(MuiApplicationMethodPacketCodec.TryReadSnapshot(ref platform,
 			ref snapshotRequest, out _));
@@ -587,6 +627,9 @@ public sealed class MuiApplicationWindowTests
 			ref request, out var value));
 		Assert.Equal(method, value.MethodId);
 		Assert.Equal(0x1300u, value.FirstObject);
+		Assert.True(MuiWindowCycleChainPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, out var methodId));
+		Assert.Equal(method, methodId);
 		platform.WriteUInt32(packet, 0, 0xDEADBEEFu);
 		Assert.False(MuiWindowCycleChainPacketCodec.TryRead(ref platform,
 			ref request, out _));
@@ -1644,6 +1687,55 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiWindowEventStateField)255;
 		Assert.False(MuiWindowEventStateFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void WindowInputEventCodecUsesTheNamedIntuitionRecord()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x2C00);
+		var value = new InputEvent
+		{
+			NextEvent = APTR.FromPointer(0x2C40),
+			Class = InputEventClass.RawMouse,
+			SubClass = InputEventSubClass.Compatible,
+			Code = 0x68,
+			Qualifier = InputEventQualifier.LeftButton,
+			Position = unchecked((int)0xFFFE0003),
+			TimeStamp = new TimeVal { Seconds = 7, Microseconds = 11 },
+		};
+		Assert.True(MuiWindowInputEventCodec.Write(ref platform, address, value));
+		Assert.True(MuiWindowInputEventCodec.TryRead(ref platform, address,
+			out var decoded));
+		Assert.Equal(value.NextEvent, decoded.NextEvent);
+		Assert.Equal(value.Class, decoded.Class);
+		Assert.Equal(value.SubClass, decoded.SubClass);
+		Assert.Equal(value.Code, decoded.Code);
+		Assert.Equal(value.Qualifier, decoded.Qualifier);
+		Assert.Equal(value.Position, decoded.Position);
+		Assert.Equal(value.TimeStamp.Seconds, decoded.TimeStamp.Seconds);
+		Assert.Equal(value.TimeStamp.Microseconds, decoded.TimeStamp.Microseconds);
+		Assert.False(MuiWindowInputEventCodec.TryRead(ref platform,
+			APTR.FromPointer(0x7FFF0), out _));
+	}
+
+	[Fact]
+	public void WindowEventSamplePublishesTypedEventClassAndRecord()
+	{
+		var platform = CreatePlatform(out _);
+		var sample = new MuiWindowEventSample
+		{
+			NativeWindow = APTR.FromPointer(0x2C40),
+			InputEvent = APTR.FromPointer(0x2C80),
+		};
+		platform.PendingWindowEvent = 0x00000200;
+		Assert.True(platform.ReadWindowEvent(ref sample));
+		Assert.Equal(0x00000200u, sample.EventClass);
+		Assert.True(MuiWindowInputEventCodec.TryRead(ref platform,
+			sample.InputEvent, out var input));
+		Assert.Equal(InputEventClass.Event, input.Class);
+		Assert.Equal((ushort)0x0200, input.Code);
+		Assert.False(platform.ReadWindowEvent(ref sample));
 	}
 
 	[Fact]
@@ -6409,6 +6501,215 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
 			MuiWindowPublicCore.MouseObject, out current));
 		Assert.Equal(0u, current);
+	}
+
+	[Fact]
+	public void WindowPointerInputPublishesNamedPointersAsOneSample()
+	{
+		var platform = CreatePlatform(out var cl);
+		var window = Object(ref platform, cl);
+		var target = Object(ref platform, cl);
+		var eventStorage = APTR.FromPointer(0x1480);
+		var input = new MuiWindowPointerInput
+		{
+			Window = window,
+			MouseObject = target,
+			InputEvent = eventStorage,
+		};
+
+		Assert.True(MuiApplicationWindowCore.PublishWindowPointerInput(
+			ref platform, State, ref input));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.MouseObject, out var mouseObject));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.InputEvent, out var inputEvent));
+		Assert.Equal(target.Raw, mouseObject);
+		Assert.Equal(eventStorage.Raw, inputEvent);
+
+		var malformed = input;
+		malformed.InputEvent = APTR.FromPointer(0x7FFF0);
+		Assert.False(MuiApplicationWindowCore.PublishWindowPointerInput(
+			ref platform, State, ref malformed));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.MouseObject, out mouseObject));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.InputEvent, out inputEvent));
+		Assert.Equal(target.Raw, mouseObject);
+		Assert.Equal(eventStorage.Raw, inputEvent);
+
+		input.MouseObject = APTR.Null;
+		input.InputEvent = APTR.Null;
+		Assert.True(MuiApplicationWindowCore.PublishWindowPointerInput(
+			ref platform, State, ref input));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.MouseObject, out mouseObject));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.InputEvent, out inputEvent));
+		Assert.Equal(0u, mouseObject);
+		Assert.Equal(0u, inputEvent);
+	}
+
+	[Fact]
+	public void PollWindowEventsUsesPlatformWindowPointerSample()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var window = Object(ref platform, cl);
+		var target = Object(ref platform, cl);
+		Assert.True(MuiApplicationWindowCore.InitializeApplication(ref platform,
+			State, application, 0x20));
+		Assert.True(MuiApplicationWindowCore.AddWindow(ref platform, State,
+			application, window));
+		Assert.True(MuiApplicationWindowCore.OpenWindow(ref platform, State,
+			window, 0x200));
+
+		platform.PointerSampleAvailable = true;
+		platform.PendingWindowMouseObject = target;
+		platform.PendingWindowEvent = 0x00000200;
+		var eventStorage = APTR.FromPointer(0x14C0);
+		Assert.Equal(0u, MuiApplicationWindowCore.PollWindowEvents(
+			ref platform, State, application, eventStorage));
+		Assert.Equal(1u, platform.PointerSampleCount);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.MouseObject, out var mouseObject));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.InputEvent, out var inputEvent));
+		Assert.Equal(target.Raw, mouseObject);
+		Assert.Equal(eventStorage.Raw, inputEvent);
+	}
+
+	[Fact]
+	public void PollWindowEventsRoutesArmedTimerPointerAndIntuiTickEvents()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var window = Object(ref platform, cl);
+		var other = Object(ref platform, cl);
+		var gadgetName = APTR.FromPointer(0x1500);
+		platform.WriteCString(gadgetName, "Gadget.mui");
+		var gadgetClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			gadgetName, APTR.Null, 1, APTR.FromPointer(1), false);
+		var gadgetTags = APTR.FromPointer(0x1520);
+		platform.WriteUInt32(gadgetTags, 0, MuiCommonControlCore.InputMode);
+		platform.WriteUInt32(gadgetTags, 4, 1);
+		platform.WriteUInt32(gadgetTags, 8, 0);
+		var gadget = MuiCommonControlCore.CreateControl(ref platform, State,
+			gadgetClass, gadgetTags);
+		Assert.NotEqual(APTR.Null, gadget);
+		Assert.True(MuiApplicationWindowCore.InitializeApplication(ref platform,
+			State, application, 0x20));
+		Assert.True(MuiApplicationWindowCore.AddWindow(ref platform, State,
+			application, window));
+		Assert.True(MuiApplicationWindowCore.OpenWindow(ref platform, State,
+			window, 0x200));
+
+		var packet = APTR.FromPointer(0x1540);
+		platform.WriteUInt32(packet, 0, MuiCommonControlPacketCore.HandleEvent);
+		platform.WriteUInt32(packet, 8, 0);
+		platform.Ticks = 11;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform,
+			State, gadget, packet));
+		Assert.True(MuiAreaTimerPacketCore.TryGet(ref platform, State, gadget,
+			out var armed));
+		Assert.Equal(1u, armed.Armed);
+
+		var eventStorage = APTR.FromPointer(0x1580);
+		var pointer = default(MuiWindowPointerInput);
+		pointer.Window = window;
+		pointer.MouseObject = gadget;
+		pointer.InputEvent = eventStorage;
+		Assert.True(MuiApplicationWindowCore.PublishWindowPointerInput(
+			ref platform, State, ref pointer));
+
+		platform.Ticks = 12;
+		platform.PendingWindowTimerDelayElapsed = 0;
+		platform.PendingWindowEvent = 0x00400000;
+		Assert.Equal(1u, MuiApplicationWindowCore.PollWindowEvents(ref platform,
+			State, application, eventStorage));
+		Assert.True(MuiAreaTimerPacketCore.TryGet(ref platform, State, gadget,
+			out var ticked));
+		Assert.Equal(0, ticked.Value);
+		Assert.Equal(1u, ticked.MouseOver);
+
+		platform.Ticks = 13;
+		platform.PendingWindowTimerDelayElapsed = 1;
+		platform.PendingWindowEvent = 0x00400000;
+		Assert.Equal(1u, MuiApplicationWindowCore.PollWindowEvents(ref platform,
+			State, application, eventStorage));
+		Assert.True(MuiAreaTimerPacketCore.TryGet(ref platform, State, gadget,
+			out ticked));
+		Assert.Equal(1, ticked.Value);
+
+		pointer.MouseObject = other;
+		Assert.True(MuiApplicationWindowCore.PublishWindowPointerInput(
+			ref platform, State, ref pointer));
+		Assert.True(MuiAreaTimerPacketCore.TryGet(ref platform, State, gadget,
+			out var left));
+		Assert.Equal(0u, left.MouseOver);
+		Assert.Equal(0u, left.DelayElapsed);
+	}
+
+	[Fact]
+	public void PollWindowEventsPublishesProducerDoubleClickForWindowDescendant()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var window = Object(ref platform, cl);
+		var gadgetName = APTR.FromPointer(0x1600);
+		platform.WriteCString(gadgetName, "Gadget.mui");
+		var gadgetClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			gadgetName, APTR.Null, 1, APTR.FromPointer(1), false);
+		var target = MuiCommonControlCore.CreateControl(ref platform, State,
+			gadgetClass, APTR.Null);
+		Assert.NotEqual(APTR.Null, target);
+		Assert.True(MuiApplicationWindowCore.InitializeApplication(ref platform,
+			State, application, 0x20));
+		Assert.True(MuiApplicationWindowCore.AddWindow(ref platform, State,
+			application, window));
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, window, target));
+		Assert.True(MuiApplicationWindowCore.OpenWindow(ref platform, State,
+			window, 0x200));
+
+		var eventStorage = APTR.FromPointer(0x1640);
+		var direct = default(MuiWindowDoubleClickInput);
+		direct.Object = target;
+		direct.Value = -2;
+		direct.Available = 1;
+		Assert.True(MuiApplicationWindowCore.PublishWindowDoubleClickInput(
+			ref platform, State, window, direct));
+		var validation = default(MuiWindowDoubleClickValidation);
+		validation.Window = window;
+		validation.Target = target;
+		validation.WindowLive = 1;
+		validation.TargetLive = 1;
+		validation.Descendant = 1;
+		Assert.True(MuiWindowDoubleClickProducerCore.Accept(direct, validation));
+		direct.Available = 0;
+		Assert.False(MuiWindowDoubleClickProducerCore.Accept(direct, validation));
+		Assert.True(MuiAreaDoubleClickPacketCore.TryGet(ref platform, State,
+			target, out var directValue));
+		Assert.Equal(-2, directValue.Value);
+
+		platform.PendingWindowEvent = 0x00000008;
+		platform.PendingWindowDoubleClickAvailable = 1;
+		platform.PendingWindowDoubleClickObject = target;
+		platform.PendingWindowDoubleClickValue = -3;
+		Assert.Equal(1u, MuiApplicationWindowCore.PollWindowEvents(ref platform,
+			State, application, eventStorage));
+		Assert.True(MuiAreaDoubleClickPacketCore.TryGet(ref platform, State,
+			target, out var value));
+		Assert.Equal(-3, value.Value);
+
+		var outside = Object(ref platform, cl);
+		platform.PendingWindowEvent = 0x00000008;
+		platform.PendingWindowDoubleClickAvailable = 1;
+		platform.PendingWindowDoubleClickObject = outside;
+		platform.PendingWindowDoubleClickValue = 7;
+		Assert.Equal(0u, MuiApplicationWindowCore.PollWindowEvents(ref platform,
+			State, application, eventStorage));
+		Assert.True(MuiAreaDoubleClickPacketCore.TryGet(ref platform, State,
+			target, out value));
+		Assert.Equal(-3, value.Value);
 	}
 
 	[Fact]

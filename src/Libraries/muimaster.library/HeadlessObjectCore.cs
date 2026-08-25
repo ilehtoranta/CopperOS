@@ -12,6 +12,8 @@ public static class MuiHeadlessObjectCore
 {
 	private const uint ObjectIdAttribute = 0x8042D76E;
 	private const uint UserDataAttribute = 0x80420313;
+	private const uint NoNotifyAttribute = 0x804237F9;
+	private const uint NoNotifyMethodAttribute = 0x80420A74;
 	private const uint ClassPublic = 1;
 	private const uint ClassExternal = 2;
 	private const uint ClassOwned = 4;
@@ -356,6 +358,22 @@ public static class MuiHeadlessObjectCore
 		if ((objectValue.Flags & ObjectDisposing) != 0) return false;
 		objectValue.Flags |= ObjectDisposing;
 		MuiHeadlessObjectCodec.Write(ref platform, record, objectValue);
+		// Notifications may target this object explicitly or through the
+		// MorphOS self/ancestor destination tokens. Remove those recipes while
+		// the full guest object tree is still valid; the notification records
+		// themselves remain guest-resident named records and require no managed
+		// destination table.
+		MuiNotifyCore.RemoveAllToObject(ref platform, state, obj);
+		// External Listview scroller recipes retain destination object pointers
+		// in named guest records. Remove any recipe targeting this object before
+		// its record or child topology can disappear.
+		MuiListviewCore.DisconnectExternalScrollerConnectionsToObject(
+			ref platform, state, obj);
+		// String.mui AttachedList relationships are caller-owned guest pointers;
+		// clear matching typed records before an independently disposed Listview
+		// can leave a stale navigation target behind.
+		MuiCommonControlCore.DisconnectStringAttachedListConnectionsToObject(
+			ref platform, state, obj);
 		// Handled-events state owns its generated guest MUI_EventHandlerNode.
 		// Release that registration while the object and its parent links are
 		// still valid; StoreCore.ClearAll below then only removes the copied
@@ -369,6 +387,26 @@ public static class MuiHeadlessObjectCore
 		MuiGroupChildrenCore.Cleanup(ref platform, state, obj);
 		MuiGroupLayoutHookCore.Cleanup(ref platform, state, obj);
 		MuiApplicationWindowListCore.Cleanup(ref platform, state, obj);
+		// Collection specialists own additional guest-resident records beyond
+		// the generic object Dataspace. Keep this direct-disposal path aligned
+		// with the collection lifecycle wrapper so a caller cannot strand a
+		// Listview/Listtree/List/Stringscroll record by bypassing OM_DISPOSE.
+		var collectionClass = MuiListCore.Classify(ref platform, state, obj);
+		if (MuiListtreeCore.IsListtree(ref platform, state, obj))
+			MuiListtreeCore.CleanupRecords(ref platform, state, obj);
+		else if (collectionClass == MuiCollectionClass.Listview)
+			MuiListviewCore.CleanupRecords(ref platform, state, obj);
+		else if (collectionClass == MuiCollectionClass.Stringscroll)
+			MuiStringscrollCore.Cleanup(ref platform, state, obj);
+		else if (MuiListCore.IsListBacked(collectionClass))
+			MuiListCore.CleanupRecords(ref platform, state, obj);
+		// Area drag owns a guest-resident typed state block behind a private
+		// attribute. Release it before the generic attribute nodes are freed.
+		MuiAreaDragCore.Cleanup(ref platform, state, obj);
+		// A setup Area owns the provider font returned for its CustomFont spec.
+		// Close that opaque handle before the Dataspace records disappear.
+		if (!MuiAreaCustomFontCore.CloseRuntime(ref platform, state, obj))
+			return false;
 		FreeObjectAttributes(ref platform, record);
 		MuiNotifyCore.RemoveAll(ref platform, state, record);
 		MuiStoreCore.ClearAll(ref platform, record);
@@ -415,8 +453,61 @@ public static class MuiHeadlessObjectCore
 	{
 		var record = FindObject(ref platform, state, obj);
 		if (record.IsNull) return false;
-		return SetRecordAttribute(ref platform, state, record, attribute, value,
-			notify);
+		if (!SetRecordAttribute(ref platform, state, record, attribute, value,
+			notify)) return false;
+		// Direct raw setters are also used by construction-independent callers.
+		// Keep the paired Area font choice synchronized even when the higher-level
+		// layout setter is not the entry point.
+		if (attribute == MuiCommonControlCore.Font ||
+			attribute == MuiCommonControlCore.CustomFont)
+		{
+			if (!MuiAreaFontSelectionCore.Mark(ref platform, state, obj,
+				attribute == MuiCommonControlCore.CustomFont && value == 0
+					? MuiAreaFontSelectionKind.None
+					: attribute == MuiCommonControlCore.CustomFont
+						? MuiAreaFontSelectionKind.CustomFont
+						: MuiAreaFontSelectionKind.Font,
+				APTR.FromPointer(value))) return false;
+			return MuiAreaCustomFontCore.Refresh(ref platform, state, obj);
+		}
+		return true;
+	}
+
+	// Apply one BOOPSI OM_SET TagItem list without copying it into host state.
+	// MUIA_NoNotify is a setting-only control tag: when TRUE appears anywhere in
+	// this operation, all effective attribute writes in the same list are made
+	// without dispatching notifications. The control tag itself is never stored
+	// as an object attribute. The list walk and its TAG_* control records stay
+	// guest-resident and are decoded through MuiAslTagItemRecord.
+	internal static bool SetAttributes<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, APTR tags)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var record = FindObject(ref platform, state, obj);
+		if (record.IsNull) return false;
+		if (!TryReadNotificationSettings(ref platform, tags, out var noNotify,
+			out var noNotifyMethod))
+			return false;
+		if (!MuiHeadlessStateCodec.TryRead(ref platform, state,
+			out var stateValue)) return false;
+		var previousNoNotifyMethod = stateValue.NotifySuppressionMethod;
+		if (noNotifyMethod != 0)
+		{
+			// The named NotifySuppressionMethod state field carries the
+			// operation-local MUIA_NoNotifyMethod;
+			// it is restored before returning and is never object state.
+			stateValue.NotifySuppressionMethod = noNotifyMethod;
+			if (!MuiHeadlessStateCodec.Write(ref platform, state, stateValue))
+				return false;
+		}
+		var applied = ApplyTagList(ref platform, state, record, tags,
+			!noNotify, true);
+		if (!MuiHeadlessStateCodec.TryRead(ref platform, state,
+			out stateValue)) return false;
+		stateValue.NotifySuppressionMethod = previousNoNotifyMethod;
+		if (!MuiHeadlessStateCodec.Write(ref platform, state, stateValue))
+			return false;
+		return applied;
 	}
 
 	public static bool GetAttribute<TPlatform>(ref TPlatform platform, APTR state,
@@ -426,17 +517,37 @@ public static class MuiHeadlessObjectCore
 		value = 0;
 		var record = FindObject(ref platform, state, obj);
 		if (record.IsNull) return false;
+		// A Listview owns a named List child. Resolve the public List attribute
+		// family from that typed child before consulting the parent's raw metadata;
+		// otherwise a stale compatibility scalar on the composite can mask the
+		// authoritative List state. Private Listview policy/state attributes stay
+		// on the existing class-specific path below.
+		var collectionClass = MuiListCore.Classify(ref platform, state, obj);
+		if (collectionClass == MuiCollectionClass.Listview &&
+			MuiListviewCore.TryGetChildRelationAttribute(ref platform, state, obj,
+				attribute, out value)) return true;
+		if (collectionClass == MuiCollectionClass.Listview &&
+			MuiListCore.IsPublicGetterAttribute(attribute) &&
+			MuiListviewCore.TryGetForwardedPublicAttribute(ref platform, state, obj,
+				attribute, out value)) return true;
 		if (MuiObjectMetadataCore.TryGet(ref platform, state, obj, attribute,
 			out value)) return true;
+		if (MuiHelpStateCore.IsAttribute(attribute))
+		{
+			if (!MuiHelpStateCore.TryReadState(ref platform, state, obj,
+				out var help)) return false;
+			value = attribute == MuiHelpStateCore.HelpNode ? help.Node.Raw :
+				unchecked((uint)help.Line);
+			return true;
+		}
 		// Collection classes own their public projections, including the
-		// Listview interaction-policy record. Give that typed getter a chance
-		// before the generic attribute list so OM_GET and direct Get share the
-		// same guest-resident struct boundary. ListviewCore falls back to this
-		// method only for forwarded child attributes, so the class-gated call is
-		// non-recursive for its own policy values.
-		if (MuiListCore.Classify(ref platform, state, obj) ==
-			MuiCollectionClass.Listview &&
-			MuiListviewCore.IsInteractionPolicyAttribute(attribute) &&
+		// Listview DragType policy field. Input, MultiSelect, and ScrollerPos are
+		// construction-only [I..] attributes: reject them before the generic raw
+		// attribute list can accidentally turn them into getters.
+		if (collectionClass == MuiCollectionClass.Listview &&
+			MuiListviewCore.IsInitializeOnlyAttribute(attribute)) return false;
+		if (collectionClass == MuiCollectionClass.Listview &&
+			MuiListviewCore.IsGettableInteractionPolicyAttribute(attribute) &&
 			MuiListviewCore.GetAttribute(ref platform, state, obj, attribute,
 				out value)) return true;
 		if (MuiListCore.Classify(ref platform, state, obj) ==
@@ -449,10 +560,13 @@ public static class MuiHeadlessObjectCore
 			MuiStringscrollCore.IsPublicGetterAttribute(attribute) &&
 			MuiStringscrollCore.GetAttribute(ref platform, state, obj, attribute,
 				out value)) return true;
-		if (MuiListtreeCore.IsListtree(ref platform, state, obj) &&
-			MuiListtreeCore.IsPublicGetterAttribute(attribute) &&
-			MuiListtreeCore.GetAttribute(ref platform, state, obj, attribute,
-				out value)) return true;
+		if (MuiListtreeCore.IsListtree(ref platform, state, obj))
+		{
+			if (MuiListtreeCore.IsRuntimeSetOnlyAttribute(attribute)) return false;
+			if (MuiListtreeCore.IsPublicGetterAttribute(attribute) &&
+				MuiListtreeCore.GetAttribute(ref platform, state, obj, attribute,
+					out value)) return true;
+		}
 		var collection = MuiListCore.Classify(ref platform, state, obj);
 		if ((collection == MuiCollectionClass.Dirlist ||
 			collection == MuiCollectionClass.Volumelist) &&
@@ -486,6 +600,16 @@ public static class MuiHeadlessObjectCore
 		if (MuiGroupChildrenCore.TryGetFamily(ref platform, state, obj,
 			attribute, out value, out handled) && handled) return true;
 		if (handled) return false;
+		if (MuiRegisterCore.TryGetAttribute(ref platform, state, obj, attribute,
+			out value)) return true;
+		if (MuiSelectgroupCore.TryGetAttribute(ref platform, state, obj, attribute,
+			out value)) return true;
+		if (MuiScrollgroupCore.TryGetAttribute(ref platform, state, obj, attribute,
+			out value)) return true;
+		if (MuiVirtgroupCore.TryGetAttribute(ref platform, state, obj, attribute,
+			out value)) return true;
+		if (MuiListCore.TryGetAttribute(ref platform, state, obj, attribute,
+			out value)) return true;
 		if (MuiCommonControlCore.TryGet(ref platform, state, obj, attribute,
 			out value, out handled) && handled) return true;
 		if (handled) return false;
@@ -527,9 +651,53 @@ public static class MuiHeadlessObjectCore
 	}
 
 	internal static bool SetRecordAttribute<TPlatform>(ref TPlatform platform,
-		APTR state, APTR record, uint attribute, uint value, bool notify)
+		APTR state, APTR record, uint attribute, uint value, bool notify,
+		bool routeCollectionRuntime = false)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		// These two tags are valid only as operation-local OM_SET controls;
+		// direct MUIM_Set/SetAttribute calls must never turn them into object
+		// attributes.
+		if (attribute == NoNotifyAttribute ||
+			attribute == NoNotifyMethodAttribute) return false;
+		// Construction tags enter this generic BOOPSI setter directly, before
+		// class-aware interactive setters can validate caller-owned strings. Keep
+		// the public STRPTR admission rule at the shared ABI boundary so malformed
+		// constructor values cannot be published or copied as empty strings.
+		var copiedCStringMaximum = MuiCommonControlCore.CopiedCStringMaximum(
+			attribute);
+		if (copiedCStringMaximum != 0 && value != 0 &&
+			!MuiCommonControlCore.IsValidGuestCStringPointer(ref platform,
+				APTR.FromPointer(value), copiedCStringMaximum)) return false;
+		// Listview is a composite: its interaction policy lives in a named
+		// guest record and its ordinary List attributes are owned by the child
+		// List.  Generic BOOPSI OM_SET must therefore enter the same typed
+		// runtime setter as MUIM_Set instead of leaving a stale raw scalar on
+		// the Listview record.  Keep the admission test narrow so unrelated
+		// Area attributes continue through the normal object store.
+		if (routeCollectionRuntime && IsObjectInitialized(ref platform, record) &&
+			MuiHeadlessObjectCodec.TryRead(ref platform, record,
+			out var collectionObject) &&
+			MuiListCore.ClassifyRecord(ref platform, collectionObject.Class) ==
+				MuiCollectionClass.Listview &&
+			(MuiListviewCore.IsPublicAttribute(attribute) ||
+				MuiListCore.IsPublicGetterAttribute(attribute)))
+			return MuiListviewCore.SetRuntimeAttribute(ref platform, state,
+				collectionObject.Boopsi, attribute, value, notify);
+		if (MuiHelpStateCore.IsAttribute(attribute))
+			return MuiHelpStateCore.Set(ref platform, state, record, attribute,
+				value, notify);
+		// Listtree owns named policy and presentation records for its public
+		// attributes. Route the complete class-gated public set here; the
+		// Listtree core writes the raw attribute record directly to avoid
+		// re-entering this seam.
+		if (MuiHeadlessObjectCodec.TryRead(ref platform, record,
+			out var listtreeObject) &&
+			MuiListtreeCore.IsListtree(ref platform, state,
+				listtreeObject.Boopsi) &&
+			MuiListtreeCore.IsPublicSetAttribute(attribute))
+			return MuiListtreeCore.SetAttribute(ref platform, state,
+				listtreeObject.Boopsi, attribute, value, notify);
 		var handled = false;
 		if (MuiWindowPublicCore.TrySet(ref platform, state, record, attribute,
 			value, notify, out handled) && handled) return true;
@@ -544,6 +712,18 @@ public static class MuiHeadlessObjectCore
 			attribute, value, notify, out handled) && handled) return true;
 		if (handled) return false;
 		if (MuiGroupChildrenCore.TrySet(ref platform, state, record, attribute,
+			value, notify, out handled) && handled) return true;
+		if (handled) return false;
+		if (MuiRegisterCore.TrySet(ref platform, state, record, attribute, value,
+			notify, out handled) && handled) return true;
+		if (handled) return false;
+		if (MuiSelectgroupCore.TrySet(ref platform, state, record, attribute,
+			value, notify, out handled) && handled) return true;
+		if (handled) return false;
+		if (MuiScrollgroupCore.TrySet(ref platform, state, record, attribute,
+			value, notify, out handled) && handled) return true;
+		if (handled) return false;
+		if (MuiVirtgroupCore.TrySet(ref platform, state, record, attribute,
 			value, notify, out handled) && handled) return true;
 		if (handled) return false;
 		if (MuiGroupPageCore.TrySet(ref platform, state, record, attribute, value,
@@ -650,8 +830,97 @@ public static class MuiHeadlessObjectCore
 		return true;
 	}
 
+	// Raw attribute view including the guest-store generation.  The generation
+	// is used only to reconstruct MorphOS last-writer precedence for paired
+	// selectors such as MUIA_Font and MUIA_CustomFont; callers still receive the
+	// named semantic state rather than depending on the private Attribute node.
+	internal static bool GetRawAttributeGeneration<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, uint attribute,
+		out uint value, out uint generation)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = 0;
+		generation = 0;
+		var record = FindObject(ref platform, state, obj);
+		if (record.IsNull) return false;
+		if (attribute == ObjectIdAttribute || attribute == UserDataAttribute)
+		{
+			if (!MuiHeadlessObjectCodec.TryRead(ref platform, record,
+				out var objectValue)) return false;
+			value = attribute == ObjectIdAttribute ? objectValue.ObjectId :
+				objectValue.UserData;
+			return true;
+		}
+		var item = FindAttribute(ref platform, record, attribute);
+		if (item.IsNull || !MuiHeadlessAttributeCodec.TryRead(ref platform, item,
+			out var attributeValue)) return false;
+		value = attributeValue.Value;
+		generation = attributeValue.Generation;
+		return true;
+	}
+
 	private static bool ApplyTags<TPlatform>(ref TPlatform platform, APTR state,
 		APTR record, APTR tags) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		// Construction tags are never notification-producing, but the same
+		// setting-only control tag must not become a raw persistent attribute.
+		if (!TryReadNotificationSettings(ref platform, tags, out _, out _))
+			return false;
+		return ApplyTagList(ref platform, state, record, tags, false, false);
+	}
+
+	private static bool TryReadNotificationSettings<TPlatform>(
+		ref TPlatform platform, APTR tags, out bool noNotify,
+		out uint noNotifyMethod)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		noNotify = false;
+		noNotifyMethod = 0;
+		var cursor = default(MuiAslTagItemCursor);
+		cursor.Base = tags;
+		uint visited = 0;
+		while (cursor.Base.IsNotNull && visited++ <
+			MuiHeadlessLayout.MaximumTraversal)
+		{
+			if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
+				out var current) || !MuiAslTagItemCodec.TryRead(ref platform, current,
+				out var item)) return false;
+			var tag = item.Tag;
+			if (tag == MuiAslTagListCore.TagDone) return true;
+			if (tag == MuiAslTagListCore.TagIgnore)
+			{
+				if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
+					return false;
+				continue;
+			}
+			if (tag == MuiAslTagListCore.TagMore)
+			{
+				if (item.Data == 0) return true;
+				cursor.Base = APTR.FromPointer(item.Data);
+				cursor.Index = 0;
+				continue;
+			}
+			if (tag == MuiAslTagListCore.TagSkip)
+			{
+				if (item.Data == uint.MaxValue ||
+					!MuiAslTagItemVectorCodec.TryAdvance(ref cursor,
+						item.Data + 1u)) return false;
+				continue;
+			}
+			if (tag == NoNotifyAttribute &&
+				item.Data != 0) noNotify = true;
+			if (tag == NoNotifyMethodAttribute)
+				noNotifyMethod = item.Data;
+			if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
+				return false;
+		}
+		return cursor.Base.IsNull;
+	}
+
+	private static bool ApplyTagList<TPlatform>(ref TPlatform platform,
+		APTR state, APTR record, APTR tags, bool notify,
+		bool routeCollectionRuntime)
+		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var cursor = default(MuiAslTagItemCursor);
 		cursor.Base = tags;
@@ -673,6 +942,7 @@ public static class MuiHeadlessObjectCore
 			}
 			if (tag == MuiAslTagListCore.TagMore)
 			{
+				if (data == 0) return true;
 				cursor.Base = APTR.FromPointer(data);
 				cursor.Index = 0;
 				continue;
@@ -684,7 +954,14 @@ public static class MuiHeadlessObjectCore
 					return false;
 				continue;
 			}
-			if (!SetRecordAttribute(ref platform, state, record, tag, data, false))
+			if (tag == NoNotifyAttribute || tag == NoNotifyMethodAttribute)
+			{
+				if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
+					return false;
+				continue;
+			}
+			if (!SetRecordAttribute(ref platform, state, record, tag, data, notify,
+				routeCollectionRuntime))
 				return false;
 			if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
 				return false;

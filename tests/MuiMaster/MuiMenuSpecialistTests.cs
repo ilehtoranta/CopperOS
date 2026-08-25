@@ -226,6 +226,35 @@ public sealed class MuiMenuSpecialistTests
 	}
 
 	[Fact]
+	public void MenuitemMenuitemSupportsInitializeRuntimeSetAndGet()
+	{
+		var p = NewPlatform();
+		var item = Item(ref p);
+		var sub = Item(ref p);
+
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Menuitem, sub.Raw, true, false,
+			out var changed));
+		Assert.True(changed);
+		Assert.True(MuiMenuSpecialistCore.GetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Menuitem, out var initialChild));
+		Assert.Equal(sub.Raw, initialChild);
+
+		Assert.True(MuiMenuSpecialistCore.RemoveChild(ref p, State, item, sub));
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Menuitem, sub.Raw, false, true,
+			out changed));
+		Assert.True(changed);
+		Assert.Equal(1u, MuiMenuSpecialistCore.NotificationCount(ref p, State,
+			item));
+		Assert.Equal(MuiMenuAttributes.Menuitem_Menuitem,
+			MuiMenuSpecialistCore.LastNotifiedAttribute(ref p, State, item));
+		Assert.True(MuiMenuSpecialistCore.GetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Menuitem, out var runtimeChild));
+		Assert.Equal(sub.Raw, runtimeChild);
+	}
+
+	[Fact]
 	public void MalformedNestingIsRejected()
 	{
 		var p = NewPlatform();
@@ -397,6 +426,40 @@ public sealed class MuiMenuSpecialistTests
 	}
 
 	[Fact]
+	public void MenuitemTriggerIsRuntimeSettableAndGettable()
+	{
+		var p = NewPlatform();
+		var item = Item(ref p);
+
+		// Trigger [.SG] rejects initialization writes.
+		Assert.False(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Trigger, 0x1234, true, false,
+			out var initChanged));
+		Assert.False(initChanged);
+
+		// A changed runtime token is stored in the named sidecar and notifies.
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Trigger, 0x1234, false, true,
+			out var changed));
+		Assert.True(changed);
+		Assert.Equal(1u, MuiMenuSpecialistCore.NotificationCount(ref p, State,
+			item));
+		Assert.Equal(MuiMenuAttributes.Menuitem_Trigger,
+			MuiMenuSpecialistCore.LastNotifiedAttribute(ref p, State, item));
+		Assert.True(MuiMenuSpecialistCore.GetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Trigger, out var current));
+		Assert.Equal(0x1234u, current);
+
+		// Repeating the same runtime value succeeds but does not notify again.
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Trigger, 0x1234, false, true,
+			out var unchanged));
+		Assert.False(unchanged);
+		Assert.Equal(1u, MuiMenuSpecialistCore.NotificationCount(ref p, State,
+			item));
+	}
+
+	[Fact]
 	public void TriggerPublishesUserDataToOwningApplicationMenuAttributes()
 	{
 		var p = NewPlatform();
@@ -508,25 +571,50 @@ public sealed class MuiMenuSpecialistTests
 			item));
 	}
 
-	// ---- Init-only policy ----------------------------------------------------
+	// ---- Menustrip access policy ----------------------------------------------
 
 	[Fact]
-	public void InitOnlyAttributesAreNotGettableAndNotRuntimeSettable()
+	public void MenustripCaseSensitiveIsGettableAndInitializationOnlySettable()
 	{
 		var p = NewPlatform();
 		var strip = Strip(ref p);
-		// CaseSensitive [I..]: settable at init, not exposed through Get.
+		// CaseSensitive [I.G]: settable at init and exposed through Get.
 		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, strip,
 			MuiMenuAttributes.Menustrip_CaseSensitive, 1, true, false, out _));
 		Assert.True(MuiMenuSpecialistCore.CaseSensitiveFlag(ref p, State, strip));
-		Assert.False(MuiMenuSpecialistCore.GetAttribute(ref p, State, strip,
-			MuiMenuAttributes.Menustrip_CaseSensitive, out _));
-		// A runtime set of an [I..] latch is ignored (no change).
-		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, strip,
+		Assert.True(MuiMenuSpecialistCore.GetAttribute(ref p, State, strip,
+			MuiMenuAttributes.Menustrip_CaseSensitive,
+			out var current));
+		Assert.Equal(1u, current);
+		// A runtime set of an [I.G] latch is rejected before mutation.
+		Assert.False(MuiMenuSpecialistCore.SetAttribute(ref p, State, strip,
 			MuiMenuAttributes.Menustrip_CaseSensitive, 0, false, true,
 			out var changed));
 		Assert.False(changed);
 		Assert.True(MuiMenuSpecialistCore.CaseSensitiveFlag(ref p, State, strip));
+	}
+
+	[Fact]
+	public void MenustripCaseSensitiveCreationTagIsImportedIntoNamedState()
+	{
+		var p = NewPlatform();
+		var classRecord = MuiHeadlessObjectCore.FindClassByName(ref p, State,
+			MenustripName);
+		Assert.True(classRecord.IsNotNull);
+		p.WriteUInt32(Packet, 0, MuiMenuAttributes.Menustrip_CaseSensitive);
+		p.WriteUInt32(Packet, 4, 1);
+		p.WriteUInt32(Packet, 8, MuiAslTagListCore.TagDone);
+		p.WriteUInt32(Packet, 12, 0);
+		var strip = MuiHeadlessObjectCore.CreateObjectA(ref p, State,
+			classRecord, Packet);
+		Assert.True(strip.IsNotNull);
+		Assert.True(MuiMenuSpecialistCore.Attach(ref p, State, strip,
+			MuiMenuSpecialistClass.Menustrip).IsNotNull);
+		Assert.True(MuiMenuSpecialistCore.CaseSensitiveFlag(ref p, State,
+			strip));
+		Assert.True(MuiMenuSpecialistCore.GetAttribute(ref p, State, strip,
+			MuiMenuAttributes.Menustrip_CaseSensitive, out var value));
+		Assert.Equal(1u, value);
 	}
 
 	[Fact]

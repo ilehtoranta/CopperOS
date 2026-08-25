@@ -181,3 +181,32 @@ internal static class MuiTextPresentationStateRecordCodec
 			value.HiCharPresent);
 	}
 }
+
+// MorphOS exposes the text presentation controls as a mixture of BOOL-like
+// switches, byte-valued characters, and the documented shortening selector.
+// Keep this admission check separate from the wire codec so malformed guest
+// records are rejected without normalizing their bytes in place.
+internal static class MuiTextPresentationStateValidation
+{
+	internal static bool IsValidState(MuiTextPresentationState value) =>
+		value.SetMin <= 1 && value.SetMax <= 1 && value.SetVMax <= 1 &&
+		value.ControlChar <= 0xFF && value.Marking <= 1 &&
+		value.Shorten <= 2 && value.HiChar <= 0xFF &&
+		value.HiCharPresent <= 1 &&
+		(value.HiCharPresent != 0 || value.HiChar == 0);
+
+	internal static bool IsValidRecord(MuiTextPresentationStateRecord value)
+	{
+		if (value.Magic != MuiTextPresentationStateRecord.Cookie) return false;
+		var state = default(MuiTextPresentationState);
+		state.SetMin = value.SetMin;
+		state.SetMax = value.SetMax;
+		state.SetVMax = value.SetVMax;
+		state.ControlChar = value.ControlChar;
+		state.Marking = value.Marking;
+		state.Shorten = value.Shorten;
+		state.HiChar = value.HiChar;
+		state.HiCharPresent = value.HiCharPresent;
+		return IsValidState(state);
+	}
+}

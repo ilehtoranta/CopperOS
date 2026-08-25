@@ -43,8 +43,34 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiHeadlessMessageCodec.TryReadMethodId(ref platform, packet,
 			out var header));
 		Assert.Equal(MUIM_Notify, header.MethodId);
+		Assert.True(MuiHeadlessMessageCodec.TryReadMethodIdValue(ref platform,
+			packet, out var methodId));
+		Assert.Equal(MUIM_Notify, methodId);
 		Assert.False(MuiHeadlessMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
+	}
+
+	[Fact]
+	public void OmUpdatePacketUsesNamedFieldsAndRejectsTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1200);
+		var tags = APTR.FromPointer(0x1300);
+		var gadgetInfo = APTR.FromPointer(0x1400);
+		platform.WriteUInt32(packet, 0, 0x00000108u);
+		platform.WriteUInt32(packet, 4, tags.Raw);
+		platform.WriteUInt32(packet, 8, gadgetInfo.Raw);
+		platform.WriteUInt32(packet, 12, 1u);
+
+		Assert.True(MuiHeadlessOmUpdateMessageCodec.TryRead(ref platform,
+			packet, out var update));
+		Assert.Equal(0x00000108u, update.MethodId);
+		Assert.Equal(tags, update.Attributes);
+		Assert.Equal(gadgetInfo, update.GadgetInfo);
+		Assert.Equal(1u, update.Flags);
+		Assert.False(MuiHeadlessOmUpdateMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FF8), out _));
 	}
 
 	[Fact]
@@ -209,6 +235,9 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiDataspaceMessageCodec.TryReadMethodId(ref platform, packet,
 			out var header));
 		Assert.Equal(MuiDataspaceMessageCore.FindMethod, header.MethodId);
+		Assert.True(MuiDataspaceMessageCodec.TryReadMethodIdValue(ref platform,
+			packet, out var methodId));
+		Assert.Equal(MuiDataspaceMessageCore.FindMethod, methodId);
 		Assert.False(MuiDataspaceMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -837,6 +866,9 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiStoreMessageCodec.TryReadMethodId(ref platform, packet,
 			out var header));
 		Assert.Equal(MuiStoreMessageCore.DatamapGetMethod, header.MethodId);
+		Assert.True(MuiStoreMessageCodec.TryReadMethodIdValue(ref platform, packet,
+			out var methodId));
+		Assert.Equal(MuiStoreMessageCore.DatamapGetMethod, methodId);
 		Assert.False(MuiStoreMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -955,6 +987,9 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiDataspaceIffMessageCodec.TryReadMethodId(ref platform,
 			packet, out var header));
 		Assert.Equal(MuiDataspaceIffMessageCore.ReadIffMethod, header.MethodId);
+		Assert.True(MuiDataspaceIffMessageCodec.TryReadMethodIdValue(ref platform,
+			packet, out var methodId));
+		Assert.Equal(MuiDataspaceIffMessageCore.ReadIffMethod, methodId);
 		Assert.False(MuiDataspaceIffMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -1217,6 +1252,9 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiNotifyWriteMessageCodec.TryReadMethodId(ref platform,
 			packet, out var header));
 		Assert.Equal(MuiNotifyWriteCore.WriteLongMethod, header.MethodId);
+		Assert.True(MuiNotifyWriteMessageCodec.TryReadMethodIdValue(ref platform,
+			packet, out var methodId));
+		Assert.Equal(MuiNotifyWriteCore.WriteLongMethod, methodId);
 		Assert.False(MuiNotifyWriteMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -1810,6 +1848,9 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiUpdateConfigCore.TryReadMethodId(ref platform, message,
 			out var header));
 		Assert.Equal(MuiUpdateConfigCore.Method, header.MethodId);
+		Assert.True(MuiUpdateConfigCore.TryReadMethodIdValue(ref platform,
+			message, out var methodId));
+		Assert.Equal(MuiUpdateConfigCore.Method, methodId);
 		Assert.False(MuiUpdateConfigCore.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -2000,6 +2041,9 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiFamilyMutationMessageCodec.TryReadMethodId(ref platform,
 			packet, out var header));
 		Assert.Equal(MuiFamilyMutationCore.AddHeadMethod, header.MethodId);
+		Assert.True(MuiFamilyMutationMessageCodec.TryReadMethodIdValue(ref platform,
+			packet, out var methodId));
+		Assert.Equal(MuiFamilyMutationCore.AddHeadMethod, methodId);
 		Assert.False(MuiFamilyMutationMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -2027,6 +2071,7 @@ public sealed class MuiHeadlessDispatcherTests
 			State);
 		var packet = APTR.FromPointer(0x1200);
 		const uint entry = 0x1300;
+		const uint entries = 0x13C0;
 		const uint image = 0x1340;
 
 		Assert.True(MuiCollectionAdvancedMessageCodec.WriteInsertSingle(ref platform,
@@ -2036,13 +2081,15 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.Equal(entry, single.Entry);
 		Assert.Equal(unchecked((uint)-1), single.Position);
 
+		platform.WriteUInt32(APTR.FromPointer(entries), 0, entry);
+		platform.WriteUInt32(APTR.FromPointer(entries), 4, image);
 		Assert.True(MuiCollectionAdvancedMessageCodec.WriteInsert(ref platform,
-			packet, entry, unchecked((uint)-3), 2));
+			packet, entries, 2, unchecked((uint)-3)));
 		Assert.True(MuiCollectionAdvancedMessageCodec.TryReadInsert(ref platform,
 			packet, out var insert));
-		Assert.Equal(entry, insert.Entry);
+		Assert.Equal(entries, insert.Entries);
+		Assert.Equal(2u, insert.Count);
 		Assert.Equal(unchecked((uint)-3), insert.Position);
-		Assert.Equal(2u, insert.Column);
 
 		Assert.True(MuiCollectionAdvancedMessageCodec.WritePair(ref platform, packet,
 			MuiCollectionAdvancedMessageCodec.Move, 1, 3));
@@ -2056,6 +2103,12 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiCollectionAdvancedMessageCodec.TryReadPosition(ref platform,
 			packet, MuiCollectionAdvancedMessageCodec.Jump, out var jump));
 		Assert.Equal(unchecked((uint)-2), jump.Position);
+		Assert.True(MuiCollectionAdvancedMessageCodec.WriteRedraw(ref platform,
+			packet, unchecked((uint)-3), entry));
+		Assert.True(MuiCollectionAdvancedMessageCodec.TryReadRedraw(ref platform,
+			packet, out var redraw));
+		Assert.Equal(unchecked((uint)-3), redraw.Position);
+		Assert.Equal(entry, redraw.Entry);
 
 		Assert.True(MuiCollectionAdvancedMessageCodec.WritePointer(ref platform,
 			packet, MuiCollectionAdvancedMessageCodec.DeleteImage, image));
@@ -2092,15 +2145,15 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiCollectionAdvancedFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out var address));
 		Assert.Equal(0x1200u, address.Raw);
-		cursor.Field = MuiCollectionAdvancedField.Entry;
+		cursor.Field = MuiCollectionAdvancedField.Entries;
 		Assert.True(MuiCollectionAdvancedFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out address));
 		Assert.Equal(0x1204u, address.Raw);
-		cursor.Field = MuiCollectionAdvancedField.Position;
+		cursor.Field = MuiCollectionAdvancedField.Count;
 		Assert.True(MuiCollectionAdvancedFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out address));
 		Assert.Equal(0x1208u, address.Raw);
-		cursor.Field = MuiCollectionAdvancedField.Column;
+		cursor.Field = MuiCollectionAdvancedField.Position;
 		Assert.True(MuiCollectionAdvancedFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out address));
 		Assert.Equal(0x120Cu, address.Raw);
@@ -2543,6 +2596,9 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiFamilyGetChildMessageCodec.TryReadMethodId(ref platform,
 			packet, out var header));
 		Assert.Equal(MUIM_Family_GetChild, header.MethodId);
+		Assert.True(MuiFamilyGetChildMessageCodec.TryReadMethodIdValue(ref platform,
+			packet, out var methodId));
+		Assert.Equal(MUIM_Family_GetChild, methodId);
 		Assert.False(MuiFamilyGetChildMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -2647,6 +2703,9 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiFamilyDoChildMethodsMessageCodec.TryReadMethodId(
 			ref platform, packet, out var header));
 		Assert.Equal(MuiFamilyDoChildMethodsCore.Method, header.MethodId);
+		Assert.True(MuiFamilyDoChildMethodsMessageCodec.TryReadMethodIdValue(
+			ref platform, packet, out var methodId));
+		Assert.Equal(MuiFamilyDoChildMethodsCore.Method, methodId);
 		Assert.False(MuiFamilyDoChildMethodsMessageCodec.TryReadMethodId(
 			ref platform, APTR.Null, out _));
 	}
@@ -2769,6 +2828,9 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiGroupChangeMessageCodec.TryReadMethodId(ref platform,
 			packet, out var header));
 		Assert.Equal(MuiGroupChangeCore.InitChangeMethod, header.MethodId);
+		Assert.True(MuiGroupChangeMessageCodec.TryReadMethodIdValue(ref platform,
+			packet, out var methodId));
+		Assert.Equal(MuiGroupChangeCore.InitChangeMethod, methodId);
 		Assert.True(MuiGroupChangeCore.WriteExitChange2Record(ref platform,
 			packet, 0xA5));
 		Assert.True(MuiGroupChangeMessageCodec.TryReadMethodId(ref platform,
@@ -2845,6 +2907,9 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiGroupOrderingMessageCodec.TryReadMethodId(ref platform,
 			packet, out var header));
 		Assert.Equal(MuiGroupOperationsCore.SortMethod, header.MethodId);
+		Assert.True(MuiGroupOrderingMessageCodec.TryReadMethodIdValue(ref platform,
+			packet, out var methodId));
+		Assert.Equal(MuiGroupOperationsCore.SortMethod, methodId);
 		Assert.False(MuiGroupOrderingMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}

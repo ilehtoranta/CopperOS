@@ -25,6 +25,33 @@ internal struct MuiGroupLayoutPolicyStateRecord
 	internal uint PageMode;
 }
 
+internal static class MuiGroupLayoutPolicyStateValidation
+{
+	private const int DefaultSpacing = -100;
+	private const int MaximumPixelSpacing = 10000;
+
+	private static bool IsBool(uint value) => value <= 1;
+
+	private static bool IsSpacing(uint raw)
+	{
+		var value = unchecked((int)raw);
+		if (value >= 0) return value <= MaximumPixelSpacing;
+		// MorphOS encodes the documented default and percentage spacing inputs as
+		// signed LONG values.  -100 is the default sentinel; the remaining
+		// negative range represents percentages from 1 through 100.
+		return value >= DefaultSpacing;
+	}
+
+	internal static bool IsValidRecord(MuiGroupLayoutPolicyStateRecord value) =>
+		value.Magic == MuiGroupLayoutPolicyStateRecord.Cookie &&
+		IsBool(value.Horizontal) && IsSpacing(value.HorizontalSpacing) &&
+		IsSpacing(value.VerticalSpacing) && IsBool(value.SameWidth) &&
+		IsBool(value.SameHeight) && IsBool(value.PageMode);
+
+	internal static bool IsValidState(MuiGroupLayoutPolicyStateRecord value) =>
+		IsValidRecord(value);
+}
+
 internal enum MuiGroupLayoutPolicyField : byte
 {
 	Magic,

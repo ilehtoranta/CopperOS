@@ -26,6 +26,10 @@ public sealed class MuiApplicationInputBufferedTests
 			ref pushRequest, out var push));
 		Assert.Equal(pushMethod, push.MethodId);
 		Assert.Equal(0x1300u, push.Destination);
+		Assert.True(MuiApplicationQueuePacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationQueuePacketKind.PushMethod,
+			out var pushMethodId));
+		Assert.Equal(pushMethod, pushMethodId);
 		platform.WriteUInt32(packet, 0, unpushMethod);
 		platform.WriteUInt32(packet, 4, 0x1400);
 		platform.WriteUInt32(packet, 8, 0x90000001);

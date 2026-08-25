@@ -117,11 +117,25 @@ internal static class MuiAreaActivationMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Keep native selector admission scalar while the named method record remains
+	// the dispatcher-facing ABI type. Packed offsets stay inside this codec.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiAreaActivationMethodMessage.Size)) return false;
 		return MuiAreaActivationFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiAreaActivationPacketKind.Method,
-			MuiAreaActivationField.MethodId, out packet.MethodId);
+			MuiAreaActivationField.MethodId, out methodId);
 	}
 
 	internal static bool IsMethod(uint method) => method == GoActive ||
@@ -132,13 +146,13 @@ internal static class MuiAreaActivationMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiAreaActivationMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			!IsMethod(header.MethodId)) return false;
-		return MuiAreaActivationFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiAreaActivationPacketKind.Activation,
-			MuiAreaActivationField.MethodId, out packet.MethodId) &&
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			!IsMethod(methodId)) return false;
+		packet.MethodId = methodId;
+		return
 			MuiAreaActivationFieldCursorCodec.TryReadUInt32(ref platform, message,
 				MuiAreaActivationPacketKind.Activation,
 				MuiAreaActivationField.Flags, out packet.Flags);

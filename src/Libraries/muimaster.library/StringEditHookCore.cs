@@ -17,9 +17,38 @@ public struct MuiStringEditHookState
 	public uint LonelyEditHook;
 }
 
+// Named platform request for SGWork's beep action. The provider resolves the
+// owning screen/window from the MUI object; the guest hook never receives a
+// host UI object or a managed callback. InputEvent remains the caller-owned
+// Intuition message supplied to the edit hook.
+public struct MuiStringEditBeepRequest
+{
+	public APTR Object;
+	public APTR InputEvent;
+	public uint Accepted;
+}
+
+// Named platform request for SGWork's SGA_REUSE action. Reuse is valid only
+// together with SGA_END; a provider may consume the caller-owned event after
+// the current gadget has been deactivated and any next/previous focus
+// selection has been applied. When it declines, the core queues the event in
+// the owning Window's named guest record. Window and MuiKey are named context
+// from the current MUI dispatch, allowing either path without offset guesses.
+public struct MuiStringEditReuseRequest
+{
+	public APTR Object;
+	public APTR Window;
+	public APTR InputEvent;
+	public int MuiKey;
+	public ushort Code;
+	public uint Accepted;
+}
+
 // Fixed guest SGWork record passed to MUIA_String_EditHook. The fields mirror
 // intuition/sghooks.h in guest order; only the callback codec knows the wire
-// layout, while consumers use named fields.
+// layout, while consumers use named fields. BufferPos and NumChars are logical
+// character counts (including in Unicode mode); WorkBuffer itself remains a
+// guest C string whose UTF-8 byte length is a separate concern.
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiStringEditWorkRecord
 {

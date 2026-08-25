@@ -7,6 +7,9 @@ public sealed class MuiMultiSetTests
 {
 	private static readonly APTR State = APTR.FromPointer(0x1000);
 	private const uint Attribute = 0x80420030;
+	private const uint PropEntries = 0x8042FBDB;
+	private const uint PropFirst = 0x8042D4B2;
+	private const uint PropVisible = 0x8042FEA6;
 
 	[Fact]
 	public void MultiSetTargetCodecUsesNamedPointerField()
@@ -136,6 +139,50 @@ public sealed class MuiMultiSetTests
 			Attribute, out _));
 	}
 
+	[Fact]
+	public void MultiSetProjectsPropRangeThroughNamedRecordsAndClampsFirst()
+	{
+		var platform = CreatePlatform(out var executorClass);
+		var propName = APTR.FromPointer(0x1140);
+		platform.WriteCString(propName, "Prop.mui");
+		var propClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			propName, APTR.Null, 0, APTR.FromPointer(1), false);
+		var executor = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			executorClass, APTR.Null);
+		var first = MuiCommonControlCore.CreateControl(ref platform, State,
+			propClass, APTR.Null);
+		var second = MuiCommonControlCore.CreateControl(ref platform, State,
+			propClass, APTR.Null);
+		Assert.NotEqual(APTR.Null, first);
+		Assert.NotEqual(APTR.Null, second);
+		foreach (var prop in new[] { first, second })
+		{
+			Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+				prop, PropEntries, 100, false));
+			Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+				prop, PropVisible, 10, false));
+			Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+				prop, PropFirst, 80, false));
+		}
+
+		var vector = APTR.FromPointer(0x1300);
+		platform.WriteUInt32(vector, 0, second.Raw);
+		platform.WriteUInt32(vector, 4, 0);
+		Assert.True(MuiNotifyCore.MultiSet(ref platform, State, executor,
+			PropVisible, 30, first, vector));
+
+		Assert.True(MuiCommonControlCore.TryGetPropRangeStateRecord(ref platform,
+			State, first, out var firstRecord));
+		Assert.True(MuiCommonControlCore.TryGetPropRangeStateRecord(ref platform,
+			State, second, out var secondRecord));
+		Assert.Equal(30u, firstRecord.Visible);
+		Assert.Equal(70u, firstRecord.First);
+		Assert.Equal(30u, secondRecord.Visible);
+		Assert.Equal(70u, secondRecord.First);
+		Assert.Equal(70u, Get(ref platform, first, PropFirst));
+		Assert.Equal(70u, Get(ref platform, second, PropFirst));
+	}
+
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR cl)
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -146,5 +193,14 @@ public sealed class MuiMultiSetTests
 		cl = MuiHeadlessObjectCore.RegisterClass(ref platform, State, name,
 			APTR.Null, 0, APTR.FromPointer(1), false);
 		return platform;
+	}
+
+	private static uint Get(ref MuiHeadlessTestPlatform platform, APTR obj,
+		uint attribute)
+	{
+		Assert.True(MuiCommonControlCore.TryGet(ref platform, State, obj, attribute,
+			out var value, out var handled));
+		Assert.True(handled);
+		return value;
 	}
 }

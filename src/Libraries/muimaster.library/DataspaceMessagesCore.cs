@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -186,6 +187,17 @@ internal static class MuiDataspaceMessageCodec
 	internal const uint MergeMethod = 0x80423E2B;
 	internal const uint RemoveMethod = 0x8042DCE1;
 
+	// Keep scalar method admission at the guest ABI boundary; Dataspace
+	// consumers continue to use the named fixed-width method record.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiDataspacePacketKind.Method, MuiDataspaceField.MethodId, out methodId);
+	}
+
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceMethodMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
@@ -193,9 +205,9 @@ internal static class MuiDataspaceMessageCodec
 		packet = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiDataspaceMethodMessage.Size)) return false;
-		return MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
-			MuiDataspacePacketKind.Method, MuiDataspaceField.MethodId,
-			out packet.MethodId);
+		if (!TryReadMethodIdValue(ref platform, message, out packet.MethodId))
+			return false;
+		return true;
 	}
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,

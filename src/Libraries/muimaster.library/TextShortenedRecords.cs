@@ -123,3 +123,15 @@ internal static class MuiTextShortenedStateRecordCodec
 				address, MuiTextShortenedStateField.Shortened, value.Shortened);
 	}
 }
+
+// Keep the wire value lossless for malformed-state diagnostics. The renderer's
+// MUIA_Text_Shortened status is a MorphOS BOOL and must be canonical before
+// getter or status consumers use the named record.
+internal static class MuiTextShortenedStateValidation
+{
+	internal static bool IsValidRecord(MuiTextShortenedStateRecord value) =>
+		value.Shortened <= 1;
+
+	internal static bool IsValidState(MuiTextShortenedState value) =>
+		value.Shortened <= 1;
+}

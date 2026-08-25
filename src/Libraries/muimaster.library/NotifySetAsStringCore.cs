@@ -140,10 +140,24 @@ internal static class MuiSetAsStringMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Keep native selector admission scalar while the named method record remains
+	// the dispatcher-facing ABI type. Packed offsets stay inside this codec.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiSetAsStringMethodMessage.Size)) return false;
 		return MuiSetAsStringPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiSetAsStringPacketField.MethodId, out packet.MethodId);
+			message, MuiSetAsStringPacketField.MethodId, out methodId);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR message,
@@ -151,17 +165,18 @@ internal static class MuiSetAsStringMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiSetAsStringMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != Method) return false;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != Method) return false;
 		if (!MuiSetAsStringPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiSetAsStringPacketField.Attribute, out packet.Attribute) ||
 			!MuiSetAsStringPacketFieldCursorCodec.TryReadUInt32(ref platform,
 				message, MuiSetAsStringPacketField.Format, out var rawFormat) ||
 			!MuiSetAsStringPacketFieldCursorCodec.TryReadUInt32(ref platform,
 				message, MuiSetAsStringPacketField.Value, out packet.Value)) return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		packet.Format = APTR.FromPointer(rawFormat);
 		return true;
 	}

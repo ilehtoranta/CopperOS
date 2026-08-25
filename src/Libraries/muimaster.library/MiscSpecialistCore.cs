@@ -8,6 +8,51 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
+// Fixed-width host-side input description shared by the Keyadjust policy
+// recorder and its future MUIP_HandleInput adapter. The values are ULONG-sized
+// deliberately: this record is not a managed tuple or a guest object layout,
+// and it keeps the eventual 68k bridge independent from C# bool packing.
+public struct MuiKeyadjustInputRecord
+{
+	public APTR KeyText;
+	public uint IsMouse;
+	public uint ClickCount;
+	public uint MultiKey;
+}
+
+// Platform-owned metadata for one MorphOS MUIP_HandleInput sample. The core
+// supplies the caller-owned IntuiMessage and MUI key; a native provider fills
+// only the named policy facts needed by Keyadjust. This keeps click timing and
+// multi-key interpretation out of the freestanding guest core.
+public struct MuiKeyadjustInputSample
+{
+	public APTR IntuiMessage;
+	public int MuiKey;
+	public uint IsMouse;
+	public uint ClickCount;
+	public uint MultiKey;
+}
+
+// Platform-owned text result for one MorphOS MUIP_HandleInput sample. The
+// provider fills a named result rather than returning a bare translated code,
+// so the freestanding core has one value-type boundary for the caller message,
+// source MUI key, and bounded text-code validity.
+public struct MuiKeyadjustTextInputSample
+{
+	public APTR IntuiMessage;
+	public int MuiKey;
+	public int TextCode;
+	public uint Available;
+}
+
+// MorphOS declares MUIA_Keyadjust_ForceKeyCode as an ULONG rather than a
+// BOOL. Keep that value in a named state shape so the ABI preserves every bit
+// while the eventual input conversion remains a separate qualification.
+public struct MuiKeyadjustPolicyState
+{
+	public uint ForceKeyCode;
+}
+
 // Fixed guest-memory layout for the final MG09 "misc" specialist family:
 // Keyadjust.mui, Panel.mui, Filepanel.mui, Fontdisplay.mui, the private
 // Scrmodelist.mui, Argstring.mui, Aboutmui.mui, Mccprefs.mui,
@@ -36,6 +81,7 @@ internal static class MuiMiscSpecialistLayout
 
 	// Keyadjust.mui : Group  (owns the Key description string).
 	// The string slots are addressed by MuiMiscOwnedStringField below.
+	public const int KeyadjustPolicyStateOffset = 184;
 
 	// Argstring.mui : String  (owns Template and Contents).
 
@@ -68,7 +114,6 @@ internal static class MuiMiscSpecialistLayout
 	public const uint FlagKaDoubleClick = 1u << 2;
 	public const uint FlagKaTripleClick = 1u << 3;
 	public const uint FlagKaMouseEvents = 1u << 4;
-	public const uint FlagKaForceKeyCode = 1u << 5;
 
 	// Filepanel init booleans + runtime ASL state.
 	public const uint FlagFpDoMultiSelect = 1u << 8;
@@ -80,7 +125,6 @@ internal static class MuiMiscSpecialistLayout
 	public const uint FlagFpAslActive = 1u << 14;
 
 	// Title flags.
-	public const uint FlagTiClickable = 1u << 16;
 	public const uint FlagTiClosable = 1u << 17;
 	public const uint FlagTiNewable = 1u << 18;
 	public const uint FlagTiSortable = 1u << 19;
@@ -120,6 +164,7 @@ internal static class MuiMiscSpecialistLayout
 // check.
 internal enum MuiMiscStateRegion : byte
 {
+	KeyadjustPolicy,
 	Title,
 	FilepanelService,
 	Mccprefs,
@@ -145,6 +190,9 @@ internal static class MuiMiscStateCursorCodec
 		uint offset;
 		switch (cursor.Region)
 		{
+			case MuiMiscStateRegion.KeyadjustPolicy:
+				offset = unchecked((uint)MuiMiscSpecialistLayout.KeyadjustPolicyStateOffset);
+				break;
 			case MuiMiscStateRegion.Title:
 				offset = unchecked((uint)MuiMiscSpecialistLayout.TitleStateOffset);
 				break;
@@ -197,6 +245,7 @@ internal struct MuiMiscSpecialistHeader
 internal enum MuiMiscRecordKind : byte
 {
 	Header,
+	KeyadjustPolicy,
 	Title,
 	FilepanelService,
 	OwnedStringSlot,
@@ -214,6 +263,7 @@ internal enum MuiMiscRecordField : byte
 	Magic,
 	Class,
 	Flags,
+	ForceKeyCode,
 	NotifyAttribute,
 	NotifyValue,
 	NotifyCount,
@@ -224,6 +274,7 @@ internal enum MuiMiscRecordField : byte
 	Position,
 	EventPriority,
 	OnLastClose,
+	Clickable,
 	FilterFunc,
 	AslState,
 	Rows,
@@ -299,6 +350,15 @@ internal static class MuiMiscRecordFieldCursorCodec
 						return true;
 				}
 				break;
+			case MuiMiscRecordKind.KeyadjustPolicy:
+				switch (field)
+				{
+					case MuiMiscRecordField.ForceKeyCode:
+						offset = 0;
+						size = MuiKeyadjustPolicyStateRecord.Size;
+						return true;
+				}
+				break;
 			case MuiMiscRecordKind.Title:
 				switch (field)
 				{
@@ -328,6 +388,10 @@ internal static class MuiMiscRecordFieldCursorCodec
 						return true;
 					case MuiMiscRecordField.OnLastClose:
 						offset = 24;
+						size = MuiMiscTitleState.Size;
+						return true;
+					case MuiMiscRecordField.Clickable:
+						offset = 28;
 						size = MuiMiscTitleState.Size;
 						return true;
 				}
@@ -536,6 +600,42 @@ internal static class MuiMiscRecordFieldCursorCodec
 	}
 }
 
+// Guest-resident Keyadjust policy record. The state is deliberately separate
+// from the shared header flags because ForceKeyCode is an ULONG-valued
+// attribute, not a BOOL bit.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiKeyadjustPolicyStateRecord
+{
+	internal const uint Size = 4;
+	internal uint ForceKeyCode;
+}
+
+internal static class MuiKeyadjustPolicyStateCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiKeyadjustPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiKeyadjustPolicyStateRecord.Size)) return false;
+		return MuiMiscRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			MuiMiscRecordKind.KeyadjustPolicy, MuiMiscRecordField.ForceKeyCode,
+			out value.ForceKeyCode);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiKeyadjustPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiKeyadjustPolicyStateRecord.Size)) return false;
+		return MuiMiscRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiMiscRecordKind.KeyadjustPolicy, MuiMiscRecordField.ForceKeyCode,
+			value.ForceKeyCode);
+	}
+}
+
 internal static class MuiMiscSpecialistHeaderCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -597,14 +697,15 @@ internal static class MuiMiscSpecialistHeaderCodec
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiMiscTitleState
 {
-	internal const uint Size = 28;
+	internal const uint Size = 32;
 	internal APTR Pages;
 	internal uint PageCount;
 	internal uint ActivePage;
 	internal uint PageSequence;
-	internal uint Position;
-	internal uint EventPriority;
-	internal uint OnLastClose;
+	internal int Position;
+	internal int EventPriority;
+	internal int OnLastClose;
+	internal int Clickable;
 }
 
 internal static class MuiMiscTitleStateCodec
@@ -629,14 +730,21 @@ internal static class MuiMiscTitleStateCodec
 				out value.PageSequence) ||
 			!MuiMiscRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiMiscRecordKind.Title, MuiMiscRecordField.Position,
-				out value.Position) ||
+				out var position) ||
 			!MuiMiscRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiMiscRecordKind.Title, MuiMiscRecordField.EventPriority,
-				out value.EventPriority) ||
+				out var eventPriority) ||
 			!MuiMiscRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiMiscRecordKind.Title, MuiMiscRecordField.OnLastClose,
-				out value.OnLastClose)) return false;
+				out var onLastClose) ||
+			!MuiMiscRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+				MuiMiscRecordKind.Title, MuiMiscRecordField.Clickable,
+				out var clickable)) return false;
 		value.Pages = APTR.FromPointer(pages);
+		value.Position = unchecked((int)position);
+		value.EventPriority = unchecked((int)eventPriority);
+		value.OnLastClose = unchecked((int)onLastClose);
+		value.Clickable = unchecked((int)clickable);
 		return true;
 	}
 
@@ -655,17 +763,20 @@ internal static class MuiMiscTitleStateCodec
 				MuiMiscRecordKind.Title, MuiMiscRecordField.ActivePage,
 				value.ActivePage) &&
 			MuiMiscRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.PageSequence,
+			MuiMiscRecordKind.Title, MuiMiscRecordField.PageSequence,
 				value.PageSequence) &&
 			MuiMiscRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
 				MuiMiscRecordKind.Title, MuiMiscRecordField.Position,
-				value.Position) &&
+				unchecked((uint)value.Position)) &&
 			MuiMiscRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
 				MuiMiscRecordKind.Title, MuiMiscRecordField.EventPriority,
-				value.EventPriority) &&
+				unchecked((uint)value.EventPriority)) &&
 			MuiMiscRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.OnLastClose,
-				value.OnLastClose);
+			MuiMiscRecordKind.Title, MuiMiscRecordField.OnLastClose,
+			unchecked((uint)value.OnLastClose)) &&
+			MuiMiscRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+				MuiMiscRecordKind.Title, MuiMiscRecordField.Clickable,
+				unchecked((uint)value.Clickable));
 	}
 }
 
@@ -1698,6 +1809,9 @@ public static class MuiMiscSpecialistCore
 		var header = default(MuiMiscSpecialistHeader);
 		header.Magic = MuiMiscSpecialistHeader.Cookie;
 		header.Class = (uint)cls;
+		if (cls == MuiMiscSpecialistClass.Keyadjust &&
+			!WriteKeyadjustPolicy(ref platform, instance, default))
+			return false;
 		var filepanelState = default(MuiMiscFilepanelServiceState);
 		filepanelState.AslState = aslState;
 		filepanelState.HookMsg = hookMsg;
@@ -1711,7 +1825,7 @@ public static class MuiMiscSpecialistCore
 			header.Flags = MuiMiscSpecialistLayout.FlagTiNewable |
 				MuiMiscSpecialistLayout.FlagTiSortable;
 			var titleState = default(MuiMiscTitleState);
-			titleState.Position = MuiMiscAttributes.Title_Position_Top;
+			titleState.Position = unchecked((int)MuiMiscAttributes.Title_Position_Top);
 			if (!WriteTitleState(ref platform, instance, titleState)) return false;
 		}
 		return MuiMiscSpecialistHeaderCodec.Write(ref platform, instance, header);
@@ -1795,9 +1909,8 @@ public static class MuiMiscSpecialistCore
 					MuiMiscSpecialistLayout.FlagKaMouseEvents, attribute, value,
 					isInit, notify, out changed);
 			case MuiMiscAttributes.Keyadjust_ForceKeyCode:
-				return SetKeyadjustFlag(ref platform, instance, cls,
-					MuiMiscSpecialistLayout.FlagKaForceKeyCode, attribute, value,
-					isInit, notify, out changed);
+				return SetKeyadjustForceKeyCode(ref platform, instance, cls,
+					attribute, value, isInit, notify, out changed);
 
 			// -- Argstring [ISG] --
 			case MuiMiscAttributes.Argstring_Template:
@@ -1819,16 +1932,13 @@ public static class MuiMiscSpecialistCore
 
 			// -- Aboutmui [I.G] Application --
 			case MuiMiscAttributes.Aboutmui_Application:
-				if (cls != MuiMiscSpecialistClass.Aboutmui) return false;
-				if (isInit)
-				{
-					if (!TryReadWindowPanelState(ref platform, instance,
-						out var aboutState)) return false;
-					aboutState.Application = APTR.FromPointer(value);
-					if (!WriteWindowPanelState(ref platform, instance,
-						aboutState)) return false;
-					changed = true;
-				}
+				if (cls != MuiMiscSpecialistClass.Aboutmui || !isInit) return false;
+				if (!TryReadWindowPanelState(ref platform, instance,
+					out var aboutState)) return false;
+				aboutState.Application = APTR.FromPointer(value);
+				if (!WriteWindowPanelState(ref platform, instance,
+					aboutState)) return false;
+				changed = true;
 				return true;
 
 			// -- FSProtectionBits [ISG] Flags --
@@ -1846,42 +1956,55 @@ public static class MuiMiscSpecialistCore
 
 			// -- Title [ISG] --
 			case MuiMiscAttributes.Title_Position:
-				if (cls != MuiMiscSpecialistClass.Title || value > 3) return false;
+				var requestedPosition = unchecked((int)value);
+				if (cls != MuiMiscSpecialistClass.Title || requestedPosition < 0 ||
+					requestedPosition > 3) return false;
 				if (!TryReadTitleState(ref platform, instance, out var positionState))
 					return false;
-				changed = positionState.Position != value;
-				positionState.Position = value;
+				changed = positionState.Position != requestedPosition;
+				positionState.Position = requestedPosition;
 				if (changed && !WriteTitleState(ref platform, instance,
 					positionState)) return false;
 				Notify(ref platform, instance, attribute, value, isInit, notify,
 					changed);
 				return true;
 			case MuiMiscAttributes.Title_OnLastClose:
-				if (cls != MuiMiscSpecialistClass.Title || value > 1) return false;
+				var requestedOnLastClose = unchecked((int)value);
+				if (cls != MuiMiscSpecialistClass.Title || requestedOnLastClose < 0 ||
+					requestedOnLastClose > 1) return false;
 				if (!TryReadTitleState(ref platform, instance, out var closeState))
 					return false;
-				changed = closeState.OnLastClose != value;
-				closeState.OnLastClose = value;
+				changed = closeState.OnLastClose != requestedOnLastClose;
+				closeState.OnLastClose = requestedOnLastClose;
 				if (changed && !WriteTitleState(ref platform, instance,
 					closeState)) return false;
 				Notify(ref platform, instance, attribute, value, isInit, notify,
 					changed);
 				return true;
 			case MuiMiscAttributes.Title_EventHandlerPriority:
-				if (cls != MuiMiscSpecialistClass.Title) return false;
+				if (cls != MuiMiscSpecialistClass.Title || !isInit) return false;
 				if (!TryReadTitleState(ref platform, instance, out var priorityState))
 					return false;
-				changed = priorityState.EventPriority != value;
-				priorityState.EventPriority = value;
+				var requestedPriority = unchecked((int)value);
+				changed = priorityState.EventPriority != requestedPriority;
+				priorityState.EventPriority = requestedPriority;
 				if (changed && !WriteTitleState(ref platform, instance,
 					priorityState)) return false;
 				Notify(ref platform, instance, attribute, value, isInit, notify,
 					changed);
 				return true;
 			case MuiMiscAttributes.Title_Clickable:
-				return SetTitleFlag(ref platform, instance, cls,
-					MuiMiscSpecialistLayout.FlagTiClickable, attribute, value,
-					isInit, notify, out changed);
+				if (cls != MuiMiscSpecialistClass.Title || !isInit) return false;
+				if (!TryReadTitleState(ref platform, instance,
+					out var clickableState)) return false;
+				var requestedClickable = unchecked((int)value);
+				changed = clickableState.Clickable != requestedClickable;
+				clickableState.Clickable = requestedClickable;
+				if (changed && !WriteTitleState(ref platform, instance,
+					clickableState)) return false;
+				Notify(ref platform, instance, attribute, value, isInit, notify,
+					changed);
+				return true;
 			case MuiMiscAttributes.Title_Closable:
 				return SetTitleFlag(ref platform, instance, cls,
 					MuiMiscSpecialistLayout.FlagTiClosable, attribute, value,
@@ -1994,8 +2117,8 @@ public static class MuiMiscSpecialistCore
 				return GetFlag(ref platform, cls, MuiMiscSpecialistClass.Keyadjust,
 					flags, MuiMiscSpecialistLayout.FlagKaMouseEvents, out value);
 			case MuiMiscAttributes.Keyadjust_ForceKeyCode:
-				return GetFlag(ref platform, cls, MuiMiscSpecialistClass.Keyadjust,
-					flags, MuiMiscSpecialistLayout.FlagKaForceKeyCode, out value);
+				return GetKeyadjustForceKeyCode(ref platform, instance, cls,
+					out value);
 
 			// -- Argstring --
 			case MuiMiscAttributes.Argstring_Template:
@@ -2015,11 +2138,9 @@ public static class MuiMiscSpecialistCore
 
 			// -- Aboutmui --
 			case MuiMiscAttributes.Aboutmui_Application:
-				if (cls != MuiMiscSpecialistClass.Aboutmui) return false;
-				if (!TryReadWindowPanelState(ref platform, instance,
-					out var aboutState)) return false;
-				value = aboutState.Application.Raw;
-				return true;
+				// MorphOS documents this as [I..]: it binds the application during
+				// construction but is not a public Get projection.
+				return false;
 
 			// -- FSProtectionBits --
 			case MuiMiscAttributes.FSProtectionBits_Flags:
@@ -2034,23 +2155,19 @@ public static class MuiMiscSpecialistCore
 				if (cls != MuiMiscSpecialistClass.Title) return false;
 				if (!TryReadTitleState(ref platform, instance, out var positionState))
 					return false;
-				value = positionState.Position;
+				value = unchecked((uint)positionState.Position);
 				return true;
 			case MuiMiscAttributes.Title_OnLastClose:
-				if (cls != MuiMiscSpecialistClass.Title) return false;
-				if (!TryReadTitleState(ref platform, instance, out var closeState))
-					return false;
-				value = closeState.OnLastClose;
-				return true;
+				// MorphOS exposes OnLastClose as [IS.] (no generic getter).
+				return false;
 			case MuiMiscAttributes.Title_EventHandlerPriority:
-				if (cls != MuiMiscSpecialistClass.Title) return false;
-				if (!TryReadTitleState(ref platform, instance, out var priorityState))
-					return false;
-				value = priorityState.EventPriority;
-				return true;
+				// MorphOS exposes EventHandlerPriority as [I..] (no Set/Get
+				// after initialization and no generic getter).
+				return false;
 			case MuiMiscAttributes.Title_Clickable:
-				return GetFlag(ref platform, cls, MuiMiscSpecialistClass.Title,
-					flags, MuiMiscSpecialistLayout.FlagTiClickable, out value);
+				// MorphOS exposes Clickable as initialize-only [I..], so it has
+				// no generic getter projection.
+				return false;
 			case MuiMiscAttributes.Title_Closable:
 				return GetFlag(ref platform, cls, MuiMiscSpecialistClass.Title,
 					flags, MuiMiscSpecialistLayout.FlagTiClosable, out value);
@@ -2112,11 +2229,12 @@ public static class MuiMiscSpecialistCore
 	// rejected unless the matching AllowDoubleClick/AllowTripleClick; a
 	// multi-key chord is rejected unless AllowMultipleKeys. On acceptance the
 	// Key description is stored as a class-owned copy and MUIA_Keyadjust_Key is
-	// notified. ForceKeyCode is an observable policy the recorder honors by
-	// accepting a raw key code even when a symbolic name is unavailable.
+	// notified. The ForceKeyCode ULONG is retained in its named policy record;
+	// converting that value into a Key description is intentionally left to the
+	// qualified input adapter rather than inferred here.
 	// Returns whether the event was accepted.
 	public static bool RecordInput<TPlatform>(ref TPlatform platform,
-		APTR instance, APTR keyText, bool isMouse, uint clickCount, bool multiKey)
+		APTR instance, MuiKeyadjustInputRecord input)
 		where TPlatform : struct, IMuiServicePlatform
 	{
 		if (Classify(ref platform, instance) != MuiMiscSpecialistClass.Keyadjust)
@@ -2125,20 +2243,81 @@ public static class MuiMiscSpecialistCore
 			out var header)) return false;
 		var flags = header.Flags;
 		if ((flags & MuiMiscSpecialistLayout.FlagDisabled) != 0) return false;
-		if (isMouse && (flags & MuiMiscSpecialistLayout.FlagKaMouseEvents) == 0)
+		if (input.IsMouse != 0 &&
+			(flags & MuiMiscSpecialistLayout.FlagKaMouseEvents) == 0)
 			return false;
-		if (clickCount >= 3 &&
+		if (input.ClickCount >= 3 &&
 			(flags & MuiMiscSpecialistLayout.FlagKaTripleClick) == 0) return false;
-		if (clickCount == 2 &&
+		if (input.ClickCount == 2 &&
 			(flags & MuiMiscSpecialistLayout.FlagKaDoubleClick) == 0) return false;
-		if (multiKey && (flags & MuiMiscSpecialistLayout.FlagKaMultipleKeys) == 0)
+		if (input.MultiKey != 0 &&
+			(flags & MuiMiscSpecialistLayout.FlagKaMultipleKeys) == 0)
 			return false;
 		if (!SetOwnedString(ref platform, instance,
-			MuiMiscOwnedStringField.Key, keyText.Raw, out var changed))
+			MuiMiscOwnedStringField.Key, input.KeyText.Raw, out var changed))
 			return false;
 		Notify(ref platform, instance, MuiMiscAttributes.Keyadjust_Key,
-			keyText.Raw, false, true, changed);
+			input.KeyText.Raw, false, true, changed);
 		return true;
+	}
+
+	// Compatibility wrapper for existing callers. New code should pass the
+	// named record so input policy and future packet adapters share one shape.
+	public static bool RecordInput<TPlatform>(ref TPlatform platform,
+		APTR instance, APTR keyText, bool isMouse, uint clickCount, bool multiKey)
+		where TPlatform : struct, IMuiServicePlatform
+	{
+		var input = default(MuiKeyadjustInputRecord);
+		input.KeyText = keyText;
+		input.IsMouse = isMouse ? 1u : 0u;
+		input.ClickCount = clickCount;
+		input.MultiKey = multiKey ? 1u : 0u;
+		return RecordInput(ref platform, instance, input);
+	}
+
+	// Translate the fixed MUIP_HandleInput keyboard path into the named
+	// Keyadjust input record. MorphOS supplies either a MUI key or an Intuition
+	// message that the platform translates; the bounded core materializes only
+	// a two-byte guest C string for RecordInput, then releases that scratch
+	// storage. Mouse/click/multi-key metadata remains a separate platform input
+	// capability and is deliberately not guessed from private message offsets.
+	public static bool HandleInput<TPlatform>(ref TPlatform platform,
+		APTR instance, APTR intuiMessage, int muiKey)
+		where TPlatform : struct, IMuiServicePlatform
+	{
+		var sample = default(MuiKeyadjustInputSample);
+		sample.IntuiMessage = intuiMessage;
+		sample.MuiKey = muiKey;
+		var hasSample = platform.ReadMuiKeyadjustInput(ref sample);
+		if (hasSample && (sample.IntuiMessage != intuiMessage ||
+			sample.MuiKey != muiKey)) return false;
+		var textSample = default(MuiKeyadjustTextInputSample);
+		textSample.IntuiMessage = intuiMessage;
+		textSample.MuiKey = muiKey;
+		var hasTextSample = platform.ReadMuiKeyadjustTextInput(ref textSample);
+		if (hasTextSample && (textSample.IntuiMessage != intuiMessage ||
+			textSample.MuiKey != muiKey)) return false;
+		var translated = muiKey == -1 ?
+			(hasTextSample && textSample.Available != 0 ? textSample.TextCode :
+				platform.TranslateTextInput(intuiMessage)) :
+			(muiKey >= 32 && muiKey <= 255 ? muiKey : -1);
+		if (translated < 0 || translated > 255) return false;
+		var keyText = MuiHeadlessMemory.Allocate(ref platform, 2);
+		if (keyText.IsNull) return false;
+		platform.WriteUInt8(keyText, 0, unchecked((byte)translated));
+		platform.WriteUInt8(keyText, 1, 0);
+		var input = default(MuiKeyadjustInputRecord);
+		input.KeyText = keyText;
+		if (hasSample)
+		{
+			input.IsMouse = sample.IsMouse;
+			input.ClickCount = sample.ClickCount;
+			input.MultiKey = sample.MultiKey;
+		}
+		var accepted = RecordInput(ref platform, instance, input);
+		platform.Clear(keyText, 2);
+		platform.Free(keyText, 2);
+		return accepted;
 	}
 
 	// ---- Argstring formatting/mutation ---------------------------------------
@@ -2852,6 +3031,34 @@ public static class MuiMiscSpecialistCore
 		return true;
 	}
 
+	private static bool SetKeyadjustForceKeyCode<TPlatform>(
+		ref TPlatform platform, APTR instance, MuiMiscSpecialistClass cls,
+		uint attribute, uint value, bool isInit, bool notify, out bool changed)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		changed = false;
+		if (cls != MuiMiscSpecialistClass.Keyadjust ||
+			!TryReadKeyadjustPolicy(ref platform, instance, out var policy))
+			return false;
+		changed = policy.ForceKeyCode != value;
+		policy.ForceKeyCode = value;
+		if (!WriteKeyadjustPolicy(ref platform, instance, policy)) return false;
+		Notify(ref platform, instance, attribute, value, isInit, notify, changed);
+		return true;
+	}
+
+	private static bool GetKeyadjustForceKeyCode<TPlatform>(
+		ref TPlatform platform, APTR instance, MuiMiscSpecialistClass cls,
+		out uint value) where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (cls != MuiMiscSpecialistClass.Keyadjust ||
+			!TryReadKeyadjustPolicy(ref platform, instance, out var policy))
+			return false;
+		value = policy.ForceKeyCode;
+		return true;
+	}
+
 	private static bool SetTitleFlag<TPlatform>(ref TPlatform platform,
 		APTR instance, MuiMiscSpecialistClass cls, uint bit, uint attribute,
 		uint value, bool isInit, bool notify, out bool changed)
@@ -2881,12 +3088,18 @@ public static class MuiMiscSpecialistCore
 		where TPlatform : struct, IMuiServicePlatform
 	{
 		changed = false;
-		if (cls != MuiMiscSpecialistClass.Filepanel) return false;
+		if (cls != MuiMiscSpecialistClass.Filepanel ||
+			(IsFilepanelInitializeOnlyString(field) && !isInit)) return false;
 		if (!SetOwnedString(ref platform, instance, field, value,
 			out changed)) return false;
 		Notify(ref platform, instance, attribute, value, isInit, notify, changed);
 		return true;
 	}
+
+	private static bool IsFilepanelInitializeOnlyString(
+		MuiMiscOwnedStringField field) =>
+		field == MuiMiscOwnedStringField.FilepanelAcceptPattern ||
+		field == MuiMiscOwnedStringField.FilepanelRejectPattern;
 
 	private static bool GetFilepanelField<TPlatform>(ref TPlatform platform,
 		APTR instance, MuiMiscSpecialistClass cls,
@@ -2919,6 +3132,29 @@ public static class MuiMiscSpecialistCore
 		return MuiMiscStateCursorCodec.TryGetAddress(cursor, out var address)
 			? address : APTR.Null;
 	}
+
+	private static APTR KeyadjustPolicyAddress(APTR instance)
+	{
+		var cursor = default(MuiMiscStateCursor);
+		cursor.Instance = instance;
+		cursor.Region = MuiMiscStateRegion.KeyadjustPolicy;
+		return MuiMiscStateCursorCodec.TryGetAddress(cursor, out var address)
+			? address : APTR.Null;
+	}
+
+	private static bool TryReadKeyadjustPolicy<TPlatform>(
+		ref TPlatform platform, APTR instance,
+		out MuiKeyadjustPolicyStateRecord policy)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiKeyadjustPolicyStateCodec.TryRead(ref platform,
+			KeyadjustPolicyAddress(instance), out policy);
+
+	private static bool WriteKeyadjustPolicy<TPlatform>(
+		ref TPlatform platform, APTR instance,
+		MuiKeyadjustPolicyStateRecord policy)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiKeyadjustPolicyStateCodec.Write(ref platform,
+			KeyadjustPolicyAddress(instance), policy);
 
 	private static bool TryReadTitleState<TPlatform>(ref TPlatform platform,
 		APTR instance, out MuiMiscTitleState state)

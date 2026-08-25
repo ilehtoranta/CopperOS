@@ -44,6 +44,23 @@ public sealed class MuiListviewFloattextTests
 	private const uint FtSkipChars = 0x80425c7du;
 	private const uint FtTabSize = 0x80427d17u;
 	private const uint FtAppend = 0x8042a221u;
+	private const uint FloattextTextKey = 0x0F100001u;
+	private const uint FloattextPolicyKey = 0x0F100004u;
+	private const uint ListviewInteractionPolicyKey = 0x7F090005u;
+	private const uint ListviewSelectionSignalKey = 0x7F090006u;
+	private const uint ListviewClickStateKey = 0x7F090001u;
+	private const uint ListviewDragStateKey = 0x7F090002u;
+	private const uint ListviewScrollerDragStateKey = 0x7F090003u;
+	private const uint ListviewHorizontalScrollerDragStateKey = 0x7F090004u;
+	private const uint ListviewScrollerStateKey = 0x7F09000Au;
+	private const uint ListviewHorizontalScrollerStateKey = 0x7F09000Bu;
+	private const uint ListHScrollerStateKey = 0x7F08000Du;
+	private const uint ListviewRenderStateKey = 0x7F090009u;
+	private const uint ListviewLayoutStateKey = 0x7F090008u;
+	private const uint ListviewChildStateKey = 0x7F090007u;
+	private const uint ListviewOwnerKey = 0x7F08000Eu;
+	private const uint ListSelectionSignalKey = 0x7F080017u;
+	private const uint ListActiveStateKey = 0x7F08000Fu;
 	private const uint ListCreateImage = 0x80429804u;
 	private const uint ListDeleteImage = 0x80420f58u;
 	private const uint Width = 0x8042B59Cu;
@@ -264,6 +281,33 @@ public sealed class MuiListviewFloattextTests
 	}
 
 	[Fact]
+	public void ListviewOwnerStateCodecUsesNamedFields()
+	{
+		var platform = CreatePlatform(out _, out _, out _, out _, 0x80000);
+		var address = APTR.FromPointer(0x7D00);
+		var owner = APTR.FromPointer(0x4400);
+		var expected = default(MuiListviewOwnerState);
+		expected.Magic = MuiListviewOwnerState.Cookie;
+		expected.Owner = owner;
+		Assert.True(MuiListviewOwnerStateCodec.Write(ref platform, address,
+			expected));
+		Assert.True(MuiListviewOwnerStateCodec.TryRead(ref platform, address,
+			out var actual));
+		Assert.Equal(expected.Magic, actual.Magic);
+		Assert.Equal(owner, actual.Owner);
+
+		var cursor = default(MuiListviewOwnerStateFieldCursor);
+		cursor.Record = address;
+		cursor.Field = MuiListviewOwnerStateField.Owner;
+		Assert.True(MuiListviewOwnerStateFieldCursorCodec.TryGetAddress(
+			ref platform, cursor, out var fieldAddress));
+		Assert.Equal(APTR.FromPointer(0x7D04), fieldAddress);
+		Assert.False(MuiListviewOwnerStateFieldCursorCodec.TryReadUInt32(
+			ref platform, address, unchecked((MuiListviewOwnerStateField)255),
+			out _));
+	}
+
+	[Fact]
 	public void ListviewLayoutUsesNamedGuestRecord()
 	{
 		var platform = CreatePlatform(out var listClass, out var listviewClass,
@@ -386,11 +430,22 @@ public sealed class MuiListviewFloattextTests
 		Assert.True(MuiListviewCore.GetAttribute(ref platform, State, listview,
 			LvList, out var exposed));
 		Assert.Equal(list.Raw, exposed);
+		Assert.Equal(list.Raw, Get(ref platform, listview, LvList));
+		// The adopted child relation is a named Listview state record. A direct
+		// raw compatibility write must not make generic Get/OM_GET report a stale
+		// parent pointer.
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State,
+			listview, LvList, 0, false));
+		Assert.Equal(list.Raw, Get(ref platform, listview, LvList));
 		// Documented defaults: read/write input, prefs multi-select, default
-		// scroller position, no drag.
-		Assert.Equal(1u, Get(ref platform, listview, LvInput));
-		Assert.Equal(1u, Get(ref platform, listview, LvMultiSelect));
-		Assert.Equal(0u, Get(ref platform, listview, LvScrollerPos));
+		// scroller position, no drag. The first three are [I..] and therefore
+		// remain observable only through the typed policy record, not Get/OM_GET.
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			listview, LvInput, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			listview, LvMultiSelect, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			listview, LvScrollerPos, out _));
 		Assert.Equal(0u, Get(ref platform, listview, LvDragType));
 		Assert.True(MuiListviewCore.TryGetInteractionPolicy(ref platform, State,
 			listview, out var policy));
@@ -408,16 +463,19 @@ public sealed class MuiListviewFloattextTests
 		// DragType remains coherent with the owned List projection.
 		Assert.True(MuiListviewCore.SetAttribute(ref platform, State, listview,
 			LvInput, 9, false));
-		Assert.Equal(1u, Get(ref platform, listview, LvInput));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			listview, LvInput, out _));
 		Assert.True(MuiListviewCore.SetAttribute(ref platform, State, listview,
 			LvMultiSelect, 9, false));
-		Assert.Equal(1u, Get(ref platform, listview, LvMultiSelect));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			listview, LvMultiSelect, out _));
 		Assert.True(MuiListviewCore.TryGetInteractionPolicy(ref platform, State,
 			listview, out policy));
 		Assert.Equal(1u, policy.MultiSelect);
 		Assert.True(MuiListviewCore.SetAttribute(ref platform, State, listview,
 			LvScrollerPos, 9, false));
-		Assert.Equal(0u, Get(ref platform, listview, LvScrollerPos));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			listview, LvScrollerPos, out _));
 		Assert.True(MuiListviewCore.SetAttribute(ref platform, State, listview,
 			LvDragType, 9, false));
 		Assert.Equal(0u, Get(ref platform, listview, LvDragType));
@@ -428,6 +486,247 @@ public sealed class MuiListviewFloattextTests
 		Assert.Equal(1u, policy.MultiSelect);
 		Assert.Equal(0u, policy.ScrollerPos);
 		Assert.Equal(0u, policy.DragType);
+	}
+
+	[Fact]
+	public void ListviewMalformedChildStateFailsClosedBeforeRawChildFallback()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.NotEqual(APTR.Null, child);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewChildStateKey, out var childRaw));
+		Assert.NotEqual(0u, childRaw);
+
+		// A published child link is typed state. Corrupting its cookie must not
+		// let ChildList or MUIA_Listview_List fall back to the raw parent alias.
+		platform.WriteUInt32(APTR.FromPointer(childRaw), 0, 0);
+		Assert.False(MuiListviewCore.TryGetChildState(ref platform, State,
+			listview, out _));
+		Assert.Equal(APTR.Null, MuiListviewCore.ChildList(ref platform, State,
+			listview));
+		Assert.False(MuiListviewCore.GetAttribute(ref platform, State, listview,
+			LvList, out _));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewChildStateKey, out var childAfter));
+		Assert.Equal(childRaw, childAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewStaleChildPointerFailsClosedBeforeRawChildFallback()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewChildStateKey, out var childRaw));
+		Assert.NotEqual(0u, childRaw);
+
+		// The cookie remains valid, but the named Child field points outside the
+		// live object registry. Admission must reject it before raw List fallback.
+		Assert.True(MuiListviewCore.MuiListviewChildStateFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(childRaw),
+				MuiListviewCore.MuiListviewChildStateField.Child,
+				0xDEAD0000u));
+		Assert.False(MuiListviewCore.TryGetChildState(ref platform, State,
+			listview, out _));
+		Assert.Equal(APTR.Null, MuiListviewCore.ChildList(ref platform, State,
+			listview));
+		Assert.False(MuiListviewCore.GetAttribute(ref platform, State, listview,
+			LvList, out _));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewChildStateKey, out var childAfter));
+		Assert.Equal(childRaw, childAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewMalformedOwnerStateFailsClosedBeforeSelectionForwarding()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, ListviewOwnerKey, out var ownerRaw));
+		Assert.NotEqual(0u, ownerRaw);
+		Assert.True(MuiListCore.TryGetListviewOwner(ref platform, State, child,
+			out var owner));
+		Assert.Equal(listview, owner.Owner);
+
+		// The reverse relationship is typed guest state. Corrupting its cookie
+		// must not let child selection consult the raw owner alias and toggle the
+		// parent Listview signal.
+		platform.WriteUInt32(APTR.FromPointer(ownerRaw), 0, 0);
+		Assert.False(MuiListCore.TryGetListviewOwner(ref platform, State, child,
+			out _));
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x5368000), InsertBottom));
+		Assert.True(MuiListCore.Select(ref platform, State, child, 0, SelectOn,
+			APTR.Null));
+		Assert.True(MuiListviewCore.GetAttribute(ref platform, State, listview,
+			ListSelectChange, out var parentSignal));
+		Assert.Equal(0u, parentSignal);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, ListviewOwnerKey, out var ownerAfter));
+		Assert.Equal(ownerRaw, ownerAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewStaleOwnerPointerFailsClosedBeforeSelectionForwarding()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, ListviewOwnerKey, out var ownerRaw));
+		Assert.True(MuiListCore.TryGetListviewOwner(ref platform, State, child,
+			out var owner));
+		Assert.Equal(listview, owner.Owner);
+
+		// Keep the owner cookie valid but replace the named Owner pointer with an
+		// unmapped guest address. Reverse-owner admission must reject it before a
+		// List selection can publish into the stale parent relationship.
+		Assert.True(MuiListviewOwnerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(ownerRaw),
+			MuiListviewOwnerStateField.Owner, 0xDEAD0000u));
+		Assert.False(MuiListCore.TryGetListviewOwner(ref platform, State, child,
+			out _));
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x536A000), InsertBottom));
+		Assert.True(MuiListCore.Select(ref platform, State, child, 0, SelectOn,
+			APTR.Null));
+		Assert.True(MuiListviewCore.GetAttribute(ref platform, State, listview,
+			ListSelectChange, out var parentSignal));
+		Assert.Equal(0u, parentSignal);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, ListviewOwnerKey, out var ownerAfter));
+		Assert.Equal(ownerRaw, ownerAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListMalformedSelectionSignalFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, ListSelectionSignalKey, out var signalRaw));
+		Assert.NotEqual(0u, signalRaw);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x5369000), InsertBottom));
+
+		// A published selection record is typed state. Corrupting its cookie must
+		// not let Get or a selection transition silently rebuild it from the raw
+		// SelectChange scalar.
+		platform.WriteUInt32(APTR.FromPointer(signalRaw), 0, 0);
+		Assert.False(MuiListCore.TryGetSelectionSignal(ref platform, State, child,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, child,
+			ListSelectChange, out _));
+		Assert.True(MuiListCore.Select(ref platform, State, child, 0, SelectOn,
+			APTR.Null));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, ListSelectionSignalKey, out var signalAfter));
+		Assert.Equal(signalRaw, signalAfter);
+		Assert.Equal(0u, Get(ref platform, child, ListSelectChange));
+		Assert.True(MuiListviewCore.GetAttribute(ref platform, State, listview,
+			ListSelectChange, out var parentSignal));
+		Assert.Equal(0u, parentSignal);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListMalformedActiveStateFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x536A000), InsertBottom));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, ListActiveStateKey, out var activeRaw));
+		Assert.NotEqual(0u, activeRaw);
+		Assert.True(MuiListCore.TryGetActiveState(ref platform, State, child,
+			out var activeBefore));
+		Assert.Equal(MuiListCore.MuiListActiveState.Cookie,
+			activeBefore.Magic);
+
+		// A published active cursor is typed state. Corrupting its cookie must
+		// not let getters or an Active setter silently rebuild it from the raw
+		// compatibility scalar.
+		platform.WriteUInt32(APTR.FromPointer(activeRaw), 0, 0);
+		Assert.False(MuiListCore.TryGetActiveState(ref platform, State, child,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, child,
+			ListActive, out _));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, child,
+			ListActive, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, ListActiveStateKey, out var activeAfter));
+		Assert.Equal(activeRaw, activeAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewChildRelationshipReturnsNullAfterDirectChildDisposal()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.NotEqual(APTR.Null, child);
+
+		// A supplied List can be disposed by its owner independently of the
+		// Listview.  The named child record remains in the parent until normal
+		// teardown, but it must no longer be trusted as a live object pointer.
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, child));
+		Assert.Equal(APTR.Null, MuiListviewCore.ChildList(ref platform, State,
+			listview));
+
+		// Generic relationship and forwarded List getters are handled by the
+		// Listview boundary and expose neutral NULL/zero values instead of the
+		// stale raw compatibility scalar.
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			listview, LvList, out var exposedChild));
+		Assert.Equal(0u, exposedChild);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			listview, ListEntries, out var exposedEntries));
+		Assert.Equal(0u, exposedEntries);
+		Assert.False(MuiListviewCore.SetAttribute(ref platform, State, listview,
+			ListEntries, 3, false));
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			listview));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listviewClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			floattextClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
 	}
 
 	[Fact]
@@ -451,6 +750,9 @@ public sealed class MuiListviewFloattextTests
 			LvScrollerPos, ScrollerPosNone, false));
 		Assert.True(MuiListviewCore.SetAttribute(ref platform, State, listview,
 			LvDragType, 1, false));
+		Assert.True(MuiListviewCore.TryGetInteractionPolicy(ref platform, State,
+			listview, out var policyBeforeRaw));
+		Assert.Equal(0u, policyBeforeRaw.Input);
 		// Diverge the legacy scalar projection only after all typed setters have
 		// completed; subsequent policy updates must not rebuild the record from
 		// these deliberately stale values.
@@ -462,16 +764,21 @@ public sealed class MuiListviewFloattextTests
 			LvScrollerPos, 0, false));
 		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, listview,
 			LvDragType, 0, false));
+		Assert.True(MuiListviewCore.SetAttribute(ref platform, State, listview,
+			LvDragType, 1, false));
+		Assert.True(MuiListviewCore.TryGetInteractionPolicy(ref platform, State,
+			listview, out var policyAfterTypedUpdate));
+		Assert.Equal(0u, policyAfterTypedUpdate.Input);
+		Assert.Equal(MultiSelectAlways, policyAfterTypedUpdate.MultiSelect);
+		Assert.Equal(ScrollerPosNone, policyAfterTypedUpdate.ScrollerPos);
+		Assert.Equal(1u, policyAfterTypedUpdate.DragType);
 
-		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, listview,
-			LvInput, out var input));
-		Assert.Equal(0u, input);
-		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, listview,
-			LvMultiSelect, out var multiSelect));
-		Assert.Equal(MultiSelectAlways, multiSelect);
-		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, listview,
-			LvScrollerPos, out var scrollerPos));
-		Assert.Equal(ScrollerPosNone, scrollerPos);
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			listview, LvInput, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			listview, LvMultiSelect, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			listview, LvScrollerPos, out _));
 		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, listview,
 			LvDragType, out var dragType));
 		Assert.Equal(1u, dragType);
@@ -487,15 +794,15 @@ public sealed class MuiListviewFloattextTests
 		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
 			getMessage, MuiCommonPacketKind.Get, MuiCommonField.Storage,
 			getStorage.Raw));
+		platform.WriteUInt32(getStorage, 0, 0xA5A5A5A5u);
 		Assert.True(MuiCommonControlPacketCore.TryReadGet(ref platform,
 			getMessage, out var getPacket));
 		Assert.Equal(LvInput, getPacket.Attribute);
-		Assert.True(MuiListviewCore.GetAttribute(ref platform, State, listview,
-			LvInput, out var directPolicyInput));
-		Assert.Equal(0u, directPolicyInput);
-		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State,
+		Assert.False(MuiListviewCore.GetAttribute(ref platform, State, listview,
+			LvInput, out _));
+		Assert.Equal(0u, MuiCollectionDispatcher.Dispatch(ref platform, State,
 			listview, getMessage));
-		Assert.Equal(0u, platform.ReadUInt32(getStorage, 0));
+		Assert.Equal(0xA5A5A5A5u, platform.ReadUInt32(getStorage, 0));
 
 		Assert.True(MuiListviewCore.TryGetInteractionPolicy(ref platform, State,
 			listview, out var policy));
@@ -503,6 +810,860 @@ public sealed class MuiListviewFloattextTests
 		Assert.Equal(MultiSelectAlways, policy.MultiSelect);
 		Assert.Equal(ScrollerPosNone, policy.ScrollerPos);
 		Assert.Equal(1u, policy.DragType);
+		// DragType shares its numeric ID with MUIA_List_DragType, but the
+		// Listview policy remains authoritative if the child projection changes.
+		Assert.True(MuiListCore.SetAttribute(ref platform, State,
+			MuiListviewCore.ChildList(ref platform, State, listview),
+			ListDragType, 0, false));
+		Assert.Equal(1u, Get(ref platform, listview, LvDragType));
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewMalformedInteractionPolicyFailsClosedBeforeSetterMutation()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewInteractionPolicyKey, out var policyRaw));
+		Assert.NotEqual(0u, policyRaw);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, LvInput, out var inputBefore));
+
+		// A non-NULL policy pointer is published typed state. Corrupting its
+		// cookie must not let a setter replace it from legacy scalar aliases.
+		platform.WriteUInt32(APTR.FromPointer(policyRaw), 0, 0);
+		Assert.False(MuiListviewCore.TryGetInteractionPolicy(ref platform, State,
+			listview, out _));
+		Assert.False(MuiListviewCore.SetAttribute(ref platform, State, listview,
+			LvInput, 0, false));
+		Assert.False(MuiListviewCore.GetAttribute(ref platform, State, listview,
+			LvDragType, out _));
+		Assert.False(MuiListviewCore.HandleInput(ref platform, State, listview,
+			APTR.Null, KeyDown));
+
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewInteractionPolicyKey, out var policyAfter));
+		Assert.Equal(policyRaw, policyAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, LvInput, out var inputAfter));
+		Assert.Equal(inputBefore, inputAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewInteractionPolicyInvalidNamedValuesFailClosedBeforeSetterMutation()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewInteractionPolicyKey, out var policyRaw));
+		Assert.NotEqual(0u, policyRaw);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, LvMultiSelect, out var multiSelectBefore));
+
+		// The named policy row is authoritative after publication. Use its typed
+		// field cursor to inject an impossible MorphOS enum value; admission must
+		// reject it instead of letting EnsureInteractionPolicy normalize it away.
+		Assert.True(MuiListviewCore.MuiListviewInteractionPolicyFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(policyRaw),
+				MuiListviewCore.MuiListviewInteractionPolicyField.MultiSelect, 9));
+		Assert.False(MuiListviewCore.TryGetInteractionPolicy(ref platform, State,
+			listview, out _));
+		Assert.False(MuiListviewCore.SetAttribute(ref platform, State, listview,
+			LvInput, 0, false));
+		Assert.False(MuiListviewCore.GetAttribute(ref platform, State, listview,
+			LvDragType, out _));
+
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewInteractionPolicyKey, out var policyAfter));
+		Assert.Equal(policyRaw, policyAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, LvMultiSelect, out var multiSelectAfter));
+		Assert.Equal(multiSelectBefore, multiSelectAfter);
+		Assert.True(MuiListviewCore.MuiListviewInteractionPolicyFieldCursorCodec
+			.TryReadUInt32(ref platform, APTR.FromPointer(policyRaw),
+				MuiListviewCore.MuiListviewInteractionPolicyField.MultiSelect,
+				out var invalidValue));
+		Assert.Equal(9u, invalidValue);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewMalformedSelectionSignalFailsClosedBeforeToggleMutation()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewSelectionSignalKey, out var signalRaw));
+		Assert.NotEqual(0u, signalRaw);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListSelectChange, out var rawBefore));
+
+		// A published signal block is typed state. Corrupting its cookie must not
+		// let ToggleSelectionSignal replace it and publish a phantom edge.
+		platform.WriteUInt32(APTR.FromPointer(signalRaw), 0, 0);
+		Assert.False(MuiListviewCore.TryGetSelectionSignal(ref platform, State,
+			listview, out _));
+		Assert.False(MuiListviewCore.ToggleSelectionSignal(ref platform, State,
+			listview));
+		Assert.False(MuiListviewCore.GetAttribute(ref platform, State, listview,
+			ListSelectChange, out _));
+
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewSelectionSignalKey, out var signalAfter));
+		Assert.Equal(signalRaw, signalAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListSelectChange, out var rawAfter));
+		Assert.Equal(rawBefore, rawAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewSelectionSignalInvalidValueFailsClosedBeforeToggleMutation()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewSelectionSignalKey, out var signalRaw));
+		Assert.NotEqual(0u, signalRaw);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListSelectChange, out var rawBefore));
+
+		// Corrupt the published BOOL through its named field cursor. Admission
+		// must reject it before ToggleSelectionSignal publishes another edge.
+		Assert.True(MuiListviewCore.MuiListviewSelectionSignalFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(signalRaw),
+				MuiListviewCore.MuiListviewSelectionSignalField.Value, 9));
+		Assert.False(MuiListviewCore.TryGetSelectionSignal(ref platform, State,
+			listview, out _));
+		Assert.False(MuiListviewCore.ToggleSelectionSignal(ref platform, State,
+			listview));
+		Assert.False(MuiListviewCore.GetAttribute(ref platform, State, listview,
+			ListSelectChange, out _));
+
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewSelectionSignalKey, out var signalAfter));
+		Assert.Equal(signalRaw, signalAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListSelectChange, out var rawAfter));
+		Assert.Equal(rawBefore, rawAfter);
+		Assert.True(MuiListviewCore.MuiListviewSelectionSignalFieldCursorCodec
+			.TryReadUInt32(ref platform, APTR.FromPointer(signalRaw),
+				MuiListviewCore.MuiListviewSelectionSignalField.Value,
+				out var invalidValue));
+		Assert.Equal(9u, invalidValue);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewMalformedClickStateFailsClosedBeforeSelectionMutation()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x6400), InsertBottom));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewClickStateKey, out var clickRaw));
+		Assert.NotEqual(0u, clickRaw);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, ListActive, out var activeBefore));
+
+		// A published click block is typed state. Corrupting its cookie must be
+		// detected before HandleClick mutates the child selection/active records.
+		platform.WriteUInt32(APTR.FromPointer(clickRaw), 0, 0);
+		Assert.False(MuiListviewCore.TryGetClickState(ref platform, State,
+			listview, out _));
+		Assert.False(MuiListviewCore.GetAttribute(ref platform, State, listview,
+			LvClickColumn, out _));
+		Assert.False(MuiListviewCore.HandleClick(ref platform, State, listview,
+			0, 1, 2, false));
+
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewClickStateKey, out var clickAfter));
+		Assert.Equal(clickRaw, clickAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, ListActive, out var activeAfter));
+		Assert.Equal(activeBefore, activeAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewClickStateInvalidFlagsFailClosedBeforeSelectionMutation()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x6400), InsertBottom));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewClickStateKey, out var clickRaw));
+		Assert.NotEqual(0u, clickRaw);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, ListActive, out var activeBefore));
+
+		// Corrupt the named BOOL through its typed field cursor.  The codec must
+		// preserve the value, while admission rejects it before HandleClick or a
+		// setter can mutate the child selection/active records.
+		Assert.True(MuiListviewCore.MuiListviewClickStateFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(clickRaw),
+				MuiListviewCore.MuiListviewClickStateField.DoubleClick, 9));
+		Assert.False(MuiListviewCore.TryGetClickState(ref platform, State,
+			listview, out _));
+		Assert.False(MuiListviewCore.GetAttribute(ref platform, State, listview,
+			LvClickColumn, out _));
+		Assert.False(MuiListviewCore.HandleClick(ref platform, State, listview,
+			0, 1, 2, false));
+
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewClickStateKey, out var clickAfter));
+		Assert.Equal(clickRaw, clickAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, ListActive, out var activeAfter));
+		Assert.Equal(activeBefore, activeAfter);
+		Assert.True(MuiListviewCore.MuiListviewClickStateFieldCursorCodec
+			.TryReadUInt32(ref platform, APTR.FromPointer(clickRaw),
+				MuiListviewCore.MuiListviewClickStateField.DoubleClick,
+				out var invalidValue));
+		Assert.Equal(9u, invalidValue);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewMalformedScrollerDragStateFailsClosedBeforePointerArm()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		for (var index = 0u; index < 12; index++)
+			Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+				APTR.FromPointer(0x6500u + index * 0x20u), InsertBottom));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			40, 40));
+
+		var down = default(MuiIntuiPointerMessage);
+		down.Class = IdcmpMouseButtons;
+		down.Code = SelectDown;
+		down.MouseX = 32;
+		down.MouseY = 8;
+		Assert.True(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewScrollerDragStateKey, out var dragRaw));
+		Assert.NotEqual(0u, dragRaw);
+
+		// A published drag block is typed state. Corrupting its cookie must not
+		// let the next SELECTDOWN free it and arm a replacement pointer grab.
+		platform.WriteUInt32(APTR.FromPointer(dragRaw), 0, 0);
+		Assert.False(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewScrollerDragStateKey, out var dragAfter));
+		Assert.Equal(dragRaw, dragAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewIncoherentScrollerDragFlagsFailClosedBeforePointerArm()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		for (var index = 0u; index < 12; index++)
+			Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+				APTR.FromPointer(0x6C00u + index * 0x20u), InsertBottom));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			40, 40));
+
+		var down = default(MuiIntuiPointerMessage);
+		down.Class = IdcmpMouseButtons;
+		down.Code = SelectDown;
+		down.MouseX = 32;
+		down.MouseY = 8;
+		Assert.True(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewScrollerDragStateKey, out var dragRaw));
+		Assert.NotEqual(0u, dragRaw);
+
+		// The named drag record admits only Active/Captured flags. An unknown
+		// transition bit must not arm a replacement grab or move the thumb.
+		Assert.True(MuiListviewScrollerDragStateFieldCursorCodec.TryWrite(
+			ref platform, APTR.FromPointer(dragRaw),
+			MuiListviewScrollerDragStateField.Flags,
+			MuiListviewScrollerDragState.ActiveFlag | 4u));
+		Assert.False(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewScrollerDragStateKey, out var dragAfter));
+		Assert.Equal(dragRaw, dragAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewMalformedHorizontalScrollerDragStateFailsClosedBeforePointerArm()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x6700), InsertBottom));
+		Assert.True(MuiListCore.SetHScrollerViewport(ref platform, State, child,
+			200, 1));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 40));
+
+		var down = default(MuiIntuiPointerMessage);
+		down.Class = IdcmpMouseButtons;
+		down.Code = SelectDown;
+		down.MouseX = 10;
+		down.MouseY = 30;
+		Assert.True(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewHorizontalScrollerDragStateKey, out var dragRaw));
+		Assert.NotEqual(0u, dragRaw);
+
+		// A published horizontal drag block is typed state. Corrupting its cookie
+		// must not let the next SELECTDOWN free it and arm a replacement grab.
+		platform.WriteUInt32(APTR.FromPointer(dragRaw), 0, 0);
+		Assert.False(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewHorizontalScrollerDragStateKey,
+			out var dragAfter));
+		Assert.Equal(dragRaw, dragAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewIncoherentHorizontalScrollerDragFlagsFailClosedBeforePointerArm()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x6D00), InsertBottom));
+		Assert.True(MuiListCore.SetHScrollerViewport(ref platform, State, child,
+			200, 1));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 40));
+
+		var down = default(MuiIntuiPointerMessage);
+		down.Class = IdcmpMouseButtons;
+		down.Code = SelectDown;
+		down.MouseX = 10;
+		down.MouseY = 30;
+		Assert.True(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewHorizontalScrollerDragStateKey,
+			out var dragRaw));
+		Assert.NotEqual(0u, dragRaw);
+
+		// The named horizontal drag record admits only Active/Captured flags.
+		// An unknown transition bit must not arm another grab or alter ScrollX.
+		Assert.True(MuiListviewHorizontalScrollerDragStateCodec.TryWrite(
+			ref platform, APTR.FromPointer(dragRaw),
+			MuiListviewHorizontalScrollerDragStateField.Flags,
+			MuiListviewHorizontalScrollerDragState.ActiveFlag | 4u));
+		Assert.False(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewHorizontalScrollerDragStateKey,
+			out var dragAfter));
+		Assert.Equal(dragRaw, dragAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewMalformedDragStateFailsClosedBeforePointerArm()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, child,
+			ListDragSortable, 1));
+		Assert.True(MuiListviewCore.SetAttribute(ref platform, State, listview,
+			LvDragType, 1, false));
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x6900), InsertBottom));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 16));
+
+		var down = default(MuiIntuiPointerMessage);
+		down.Class = IdcmpMouseButtons;
+		down.Code = SelectDown;
+		down.MouseX = 4;
+		down.MouseY = 4;
+		Assert.True(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewDragStateKey, out var dragRaw));
+		Assert.NotEqual(0u, dragRaw);
+
+		// A published list drag block is typed state. Corrupting its cookie must
+		// not let the next SELECTDOWN free it and arm a replacement drag.
+		platform.WriteUInt32(APTR.FromPointer(dragRaw), 0, 0);
+		Assert.False(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		var move = down;
+		move.Class = IdcmpMouseMove;
+		Assert.False(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, move));
+		var up = down;
+		up.Code = SelectUp;
+		_ = MuiListviewCore.HandlePointer(ref platform, State, listview, child, up);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewDragStateKey, out var dragAfter));
+		Assert.Equal(dragRaw, dragAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewIncoherentDragFlagsFailClosedBeforePointerArm()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, child,
+			ListDragSortable, 1));
+		Assert.True(MuiListviewCore.SetAttribute(ref platform, State, listview,
+			LvDragType, 1, false));
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x6A00), InsertBottom));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 16));
+
+		var down = default(MuiIntuiPointerMessage);
+		down.Class = IdcmpMouseButtons;
+		down.Code = SelectDown;
+		down.MouseX = 4;
+		down.MouseY = 4;
+		Assert.True(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewDragStateKey, out var dragRaw));
+		Assert.NotEqual(0u, dragRaw);
+
+		// The record is a named state machine. An unknown flag must not be
+		// accepted as a capture/reorder transition or replaced by a new gesture.
+		Assert.True(MuiListInputRecordFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(dragRaw),
+			MuiListInputRecordKind.DragState, MuiListInputRecordField.Flags,
+			MuiListviewDragState.ActiveFlag | 8u));
+		Assert.False(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewDragStateKey, out var dragAfter));
+		Assert.Equal(dragRaw, dragAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewMalformedScrollerStateFailsClosedBeforeRecompute()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		for (var index = 0u; index < 8; index++)
+			Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+				APTR.FromPointer(0x6B00u + index * 0x20u), InsertBottom));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			40, 24));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewScrollerStateKey, out var scrollerRaw));
+		Assert.NotEqual(0u, scrollerRaw);
+
+		// A published viewport block is typed state. Corrupting its cookie must
+		// not let a geometry recompute free it and publish a replacement record.
+		platform.WriteUInt32(APTR.FromPointer(scrollerRaw), 0, 0);
+		Assert.False(MuiListviewCore.TryGetScrollerState(ref platform, State,
+			listview, out _));
+		Assert.False(MuiListviewCore.GetScrollerState(ref platform, State,
+			listview, out _, out _, out _, out _));
+		Assert.False(MuiListviewCore.SetScrollerFirst(ref platform, State,
+			listview, 1));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewScrollerStateKey, out var scrollerAfter));
+		Assert.Equal(scrollerRaw, scrollerAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewImpossibleScrollerRangeFailsClosedBeforeRecompute()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		for (var index = 0u; index < 8; index++)
+			Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+				APTR.FromPointer(0x6C00u + index * 0x20u), InsertBottom));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			40, 24));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewScrollerStateKey, out var scrollerRaw));
+		Assert.NotEqual(0u, scrollerRaw);
+		Assert.True(MuiListviewCore.MuiListviewScrollerFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(scrollerRaw),
+			MuiListviewCore.MuiListviewScrollerField.First, 7));
+		Assert.True(MuiListviewCore.MuiListviewScrollerFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(scrollerRaw),
+			MuiListviewCore.MuiListviewScrollerField.MaxFirst, 2));
+
+		// A mapped record with an impossible First/MaxFirst range is malformed
+		// present state, not absence. Geometry and first-position setters must
+		// fail closed without replacing the guest record.
+		Assert.False(MuiListviewCore.TryGetScrollerState(ref platform, State,
+			listview, out _));
+		Assert.False(MuiListviewCore.GetScrollerState(ref platform, State,
+			listview, out _, out _, out _, out _));
+		Assert.False(MuiListviewCore.SetScrollerFirst(ref platform, State,
+			listview, 1));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewScrollerStateKey, out var scrollerAfter));
+		Assert.Equal(scrollerRaw, scrollerAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewMalformedHorizontalScrollerStateFailsClosedBeforeRecompute()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x6D00), InsertBottom));
+		Assert.True(MuiListCore.SetHScrollerViewport(ref platform, State, child,
+			200, 1));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 40));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewHorizontalScrollerStateKey, out var scrollerRaw));
+		Assert.NotEqual(0u, scrollerRaw);
+
+		// A published horizontal viewport block is typed state. Corrupting its
+		// cookie must not let a later layout pass free it and publish a replacement.
+		platform.WriteUInt32(APTR.FromPointer(scrollerRaw), 0, 0);
+		Assert.False(MuiListviewCore.TryGetHorizontalScrollerState(ref platform,
+			State, listview, out _));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 40));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewHorizontalScrollerStateKey, out var scrollerAfter));
+		Assert.Equal(scrollerRaw, scrollerAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewHiddenHScrollerDoesNotFreeMalformedNamedProjection()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x96000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.SetHScrollerViewport(ref platform, State, child,
+			200, 1));
+		var renderInfo = APTR.FromPointer(0x95000);
+		platform.WriteUInt32(renderInfo, 20, 0x95040);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, listview,
+			renderInfo));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 40));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewHorizontalScrollerStateKey, out var scrollerRaw));
+		Assert.NotEqual(0u, scrollerRaw);
+		Assert.True(MuiListviewHorizontalScrollerFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(scrollerRaw),
+			MuiListviewHorizontalScrollerField.Magic, 0));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, ListHScrollerStateKey, out var childScrollerRaw));
+		Assert.NotEqual(0u, childScrollerRaw);
+		// Hide the valid child projection through its named field while retaining
+		// the malformed parent projection. The hidden geometry path must not free
+		// that parent record as if it were an ordinary retired projection.
+		Assert.True(MuiListHScrollerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(childScrollerRaw),
+			MuiListHScrollerStateField.Visible, 0));
+		Assert.True(MuiListCore.TryGetHScrollerState(ref platform, State, child,
+			out var hidden));
+		Assert.Equal(0u, hidden.Visible);
+
+		Assert.True(MuiListviewCore.Draw(ref platform, State, listview, 0));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewHorizontalScrollerStateKey, out var scrollerAfter));
+		Assert.Equal(scrollerRaw, scrollerAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewImpossibleHorizontalScrollRangeFailsClosedBeforeRecompute()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x82000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x6E00), InsertBottom));
+		Assert.True(MuiListCore.SetHScrollerViewport(ref platform, State, child,
+			200, 1));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 40));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewHorizontalScrollerStateKey, out var scrollerRaw));
+		Assert.NotEqual(0u, scrollerRaw);
+		Assert.True(MuiListviewHorizontalScrollerFieldCursorCodec.TryReadUInt32(
+			ref platform, APTR.FromPointer(scrollerRaw),
+			MuiListviewHorizontalScrollerField.MaxScrollX, out var maxScroll));
+		Assert.True(MuiListviewHorizontalScrollerFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(scrollerRaw),
+			MuiListviewHorizontalScrollerField.ScrollX, maxScroll + 1));
+
+		// A mapped horizontal projection with ScrollX beyond MaxScrollX is
+		// malformed present state. It must not be treated as absent or replaced
+		// by the next layout pass.
+		Assert.False(MuiListviewCore.TryGetHorizontalScrollerState(ref platform,
+			State, listview, out _));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 40));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewHorizontalScrollerStateKey, out var scrollerAfter));
+		Assert.Equal(scrollerRaw, scrollerAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewMalformedRenderStateFailsClosedBeforeLayoutRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var renderInfo = APTR.FromPointer(0x6F00);
+		platform.WriteUInt32(renderInfo, 20, 0x6F40);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, listview,
+			renderInfo));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			48, 24));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewRenderStateKey, out var renderRaw));
+		Assert.NotEqual(0u, renderRaw);
+
+		// A published render block is typed state. Corrupting its cookie must not
+		// let layout or draw fallback code replace it from the raw RenderInfo alias.
+		platform.WriteUInt32(APTR.FromPointer(renderRaw), 0, 0);
+		Assert.False(MuiListviewCore.TryGetRenderState(ref platform, State,
+			listview, out _));
+		Assert.False(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			48, 24));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewRenderStateKey, out var renderAfter));
+		Assert.Equal(renderRaw, renderAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewIncoherentRenderStateFailsClosedBeforeLayoutRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x84000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var renderInfo = APTR.FromPointer(0x6500);
+		var rastPort = APTR.FromPointer(0x6540);
+		platform.WriteUInt32(renderInfo, 20, rastPort.Raw);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, listview,
+			renderInfo));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			48, 24));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewRenderStateKey, out var renderRaw));
+		Assert.NotEqual(0u, renderRaw);
+		Assert.True(MuiListviewCore.MuiListviewRenderFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(renderRaw),
+				MuiListviewCore.MuiListviewRenderField.RastPort, 0));
+
+		// A mapped render record whose RastPort no longer matches RenderInfo is
+		// malformed present state, not a request to rebuild from the raw alias.
+		Assert.False(MuiListviewCore.TryGetRenderState(ref platform, State,
+			listview, out _));
+		Assert.False(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			48, 24));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewRenderStateKey, out var renderAfter));
+		Assert.Equal(renderRaw, renderAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewMalformedLayoutStateFailsClosedBeforeGeometryRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 2, 3,
+			48, 24));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewLayoutStateKey, out var layoutRaw));
+		Assert.NotEqual(0u, layoutRaw);
+
+		// A published layout block is typed state. Corrupting its cookie must not
+		// let a subsequent geometry pass free it and publish a replacement.
+		platform.WriteUInt32(APTR.FromPointer(layoutRaw), 0, 0);
+		Assert.False(MuiListviewCore.TryGetLayoutState(ref platform, State,
+			listview, out _));
+		Assert.False(MuiListviewCore.Layout(ref platform, State, listview, 2, 3,
+			48, 24));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewLayoutStateKey, out var layoutAfter));
+		Assert.Equal(layoutRaw, layoutAfter);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewLayoutStateInvalidExtentFailsClosedBeforeGeometryRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 2, 3,
+			48, 24));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewLayoutStateKey, out var layoutRaw));
+		Assert.NotEqual(0u, layoutRaw);
+
+		// Corrupt the published named extent through the struct field cursor. A
+		// negative width must not be normalized or replaced from Area aliases.
+		Assert.True(MuiListviewCore.MuiListviewLayoutFieldCursorCodec
+			.TryWriteInt32(ref platform, APTR.FromPointer(layoutRaw),
+				MuiListviewCore.MuiListviewLayoutField.Width, -1));
+		Assert.False(MuiListviewCore.TryGetLayoutState(ref platform, State,
+			listview, out _));
+		Assert.False(MuiListviewCore.Layout(ref platform, State, listview, 2, 3,
+			48, 24));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewLayoutStateKey, out var layoutAfter));
+		Assert.Equal(layoutRaw, layoutAfter);
+		Assert.True(MuiListviewCore.MuiListviewLayoutFieldCursorCodec
+			.TryReadInt32(ref platform, APTR.FromPointer(layoutRaw),
+				MuiListviewCore.MuiListviewLayoutField.Width, out var invalidWidth));
+		Assert.Equal(-1, invalidWidth);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewOmSetAndOmUpdateUseNamedPolicyAndForwardListAttributes()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		Assert.NotEqual(APTR.Null, listview);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x70000), InsertBottom));
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+			APTR.FromPointer(0x70040), InsertBottom));
+
+		// Generic BOOPSI OM_SET must use the same named Listview policy and child
+		// List seams as MUIM_Set; a raw compatibility attribute alone would leave
+		// input code observing the old DragType and the child at the old Active row.
+		var tags = APTR.FromPointer(0x5600);
+		platform.WriteUInt32(tags, 0, LvDragType);
+		platform.WriteUInt32(tags, 4, 1);
+		platform.WriteUInt32(tags, 8, ListActive);
+		platform.WriteUInt32(tags, 12, 1);
+		platform.WriteUInt32(tags, 16, 0);
+		var packet = APTR.FromPointer(0x5700);
+		platform.WriteUInt32(packet, 0, 0x00000103u); // OM_SET
+		platform.WriteUInt32(packet, 4, tags.Raw);
+		platform.WriteUInt32(packet, 8, 0);
+
+		Assert.Equal(1u, MuiHeadlessDispatcher.Dispatch(ref platform, State,
+			listview, packet));
+		Assert.True(MuiListviewCore.TryGetInteractionPolicy(ref platform, State,
+			listview, out var policy));
+		Assert.Equal(1u, policy.DragType);
+		Assert.Equal(1u, Get(ref platform, listview, LvDragType));
+		Assert.Equal(1u, Get(ref platform, child, ListDragType));
+		Assert.Equal(2u, MuiListCore.EntryCount(ref platform, State, child));
+		Assert.Equal(1, MuiListCore.ActiveRow(ref platform, State, child));
+		Assert.Equal(1u, Get(ref platform, child, ListActive));
+		Assert.Equal(1u, Get(ref platform, listview, ListActive));
+		Assert.Equal(2u, Get(ref platform, listview, ListEntries));
+
+		// OM_UPDATE uses the named opUpdate packet, but must enter the same
+		// struct-backed Listview policy and child List runtime boundary.
+		platform.WriteUInt32(tags, 4, 0);
+		platform.WriteUInt32(tags, 12, 0);
+		platform.WriteUInt32(packet, 0, 0x00000108u); // OM_UPDATE
+		platform.WriteUInt32(packet, 12, 1); // OPUF_INTERIM
+		Assert.Equal(1u, MuiHeadlessDispatcher.Dispatch(ref platform, State,
+			listview, packet));
+		Assert.True(MuiListviewCore.TryGetInteractionPolicy(ref platform, State,
+			listview, out policy));
+		Assert.Equal(0u, policy.DragType);
+		Assert.Equal(0u, Get(ref platform, child, ListDragType));
+		Assert.Equal(0u, Get(ref platform, child, ListActive));
+		Assert.Equal(0u, Get(ref platform, listview, ListActive));
+		Assert.Equal(2u, Get(ref platform, listview, ListEntries));
+
 		DisposeListview(ref platform, listview, listClass, listviewClass,
 			floattextClass, otherClass);
 	}
@@ -563,7 +1724,8 @@ public sealed class MuiListviewFloattextTests
 		// A listview attribute stays on the listview and does not leak to child.
 		Assert.True(MuiListviewCore.SetAttribute(ref platform, State, listview,
 			LvInput, 0, false));
-		Assert.Equal(0u, Get(ref platform, listview, LvInput));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			listview, LvInput, out _));
 		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, child,
 			LvInput, out _));
 	}
@@ -587,6 +1749,12 @@ public sealed class MuiListviewFloattextTests
 			LvDoubleClick, 1, false));
 		Assert.False(MuiListviewCore.SetAttribute(ref platform, State, listview,
 			ListSelectChange, 1, false));
+		Assert.False(MuiListviewCore.SetRuntimeAttribute(ref platform, State,
+			listview, LvInput, 0, false));
+		Assert.False(MuiListviewCore.SetRuntimeAttribute(ref platform, State,
+			listview, LvMultiSelect, 0, false));
+		Assert.False(MuiListviewCore.SetRuntimeAttribute(ref platform, State,
+			listview, LvScrollerPos, ScrollerPosNone, false));
 		Assert.Equal(0u, Get(ref platform, listview, LvClickColumn));
 		Assert.Equal(0u, Get(ref platform, listview, LvAgainClick));
 		Assert.Equal(0u, Get(ref platform, listview, LvDoubleClick));
@@ -1146,6 +2314,40 @@ public sealed class MuiListviewFloattextTests
 	}
 
 	[Fact]
+	public void ListviewScrollerFirstRejectsUnavailableViewportWithoutLatentCursor()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x90000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		for (var i = 0u; i < 6; i++)
+			Assert.True(MuiListCore.InsertSingle(ref platform, State, child,
+				APTR.FromPointer(0xC8000 + i), InsertBottom));
+
+		// A zero-height composite publishes MorphOS's hidden viewport sentinel.
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 0));
+		Assert.True(MuiListviewCore.GetScrollerState(ref platform, State, listview,
+			out _, out var visible, out var first, out _));
+		Assert.Equal(MuiListCore.VisibleOff, visible);
+		Assert.Equal(MuiListCore.VisibleOff, first);
+		Assert.False(MuiListviewCore.SetScrollerFirst(ref platform, State, listview,
+			3));
+		Assert.Equal(MuiListCore.VisibleOff, Get(ref platform, child, ListFirst));
+
+		// Once a viewport exists again, the same typed setter is usable and starts
+		// from the normalized visible cursor rather than a latent hidden write.
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 24));
+		Assert.True(MuiListviewCore.SetScrollerFirst(ref platform, State, listview,
+			2));
+		Assert.Equal(16u, Get(ref platform, child, ListTopPixel));
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
 	public void ListviewHandleInputSelectUpUsesTypedIntuiMessageHitTest()
 	{
 		var platform = CreatePlatform(out var listClass, out var listviewClass,
@@ -1314,6 +2516,155 @@ public sealed class MuiListviewFloattextTests
 			APTR.Null));
 		Assert.Equal(alpha, MuiListCore.GetEntry(ref platform, State, child, 2,
 			APTR.Null));
+	}
+
+	[Fact]
+	public void ListviewPointerDragUsesNamedCaptureCapability()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, child,
+			ListDragSortable, 1));
+		Assert.True(MuiListviewCore.SetAttribute(ref platform, State, listview,
+			LvDragType, 1, false));
+		var text = APTR.FromPointer(0x5B00);
+		platform.WriteCString(text, "capture");
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child, text,
+			InsertBottom));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 16));
+
+		platform.PointerCaptureSampleAvailable = true;
+		var down = default(MuiIntuiPointerMessage);
+		down.Class = IdcmpMouseButtons;
+		down.Code = SelectDown;
+		down.MouseX = 4;
+		down.MouseY = 4;
+		Assert.True(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.Equal(1u, platform.PointerCaptureCount);
+		Assert.Equal(APTR.FromPointer(listview.Raw),
+			platform.LastPointerCaptureObject);
+		Assert.Equal(MuiPointerCaptureKind.ListDrag,
+			platform.LastPointerCaptureKind);
+		Assert.Equal(4, platform.LastPointerCaptureStartX);
+		Assert.Equal(4, platform.LastPointerCaptureStartY);
+
+		var up = default(MuiIntuiPointerMessage);
+		up.Class = IdcmpMouseButtons;
+		up.Code = SelectUp;
+		up.MouseX = 4;
+		up.MouseY = 4;
+		Assert.True(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, up));
+		Assert.Equal(1u, platform.PointerReleaseCount);
+		Assert.Equal(listview, platform.LastPointerReleaseObject);
+		Assert.Equal(MuiPointerCaptureKind.ListDrag,
+			platform.LastPointerReleaseKind);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewPointerCaptureIsReleasedByDirectHeadlessDisposal()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x82000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, child,
+			ListDragSortable, 1));
+		Assert.True(MuiListviewCore.SetAttribute(ref platform, State, listview,
+			LvDragType, 1, false));
+		var text = APTR.FromPointer(0x5C00);
+		platform.WriteCString(text, "direct-dispose");
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child, text,
+			InsertBottom));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 16));
+
+		platform.PointerCaptureSampleAvailable = true;
+		var down = default(MuiIntuiPointerMessage);
+		down.Class = IdcmpMouseButtons;
+		down.Code = SelectDown;
+		down.MouseX = 4;
+		down.MouseY = 4;
+		Assert.True(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.Equal(1u, platform.PointerCaptureCount);
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			listview));
+		Assert.Equal(1u, platform.PointerReleaseCount);
+		Assert.Equal(listview, platform.LastPointerReleaseObject);
+		Assert.Equal(MuiPointerCaptureKind.ListDrag,
+			platform.LastPointerReleaseKind);
+		Assert.Equal(4, platform.LastPointerReleaseStartX);
+		Assert.Equal(4, platform.LastPointerReleaseStartY);
+
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listviewClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			floattextClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListviewPointerDragIsCancelledWhenOwningWindowBecomesInactive()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x81000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, child,
+			ListDragSortable, 1));
+		Assert.True(MuiListviewCore.SetAttribute(ref platform, State, listview,
+			LvDragType, 1, false));
+		var text = APTR.FromPointer(0x5B80);
+		platform.WriteCString(text, "focus-loss");
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child, text,
+			InsertBottom));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			100, 16));
+
+		// Group.mui is a Family-compatible owning root in the headless guest
+		// topology. The window dispatcher consumes the same child walk used by a
+		// real Window.mui object, without introducing a host-side object list.
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			otherClass, APTR.Null);
+		Assert.True(window.IsNotNull);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, window, listview));
+
+		platform.PointerCaptureSampleAvailable = true;
+		var down = default(MuiIntuiPointerMessage);
+		down.Class = IdcmpMouseButtons;
+		down.Code = SelectDown;
+		down.MouseX = 4;
+		down.MouseY = 4;
+		Assert.True(MuiListviewCore.HandlePointer(ref platform, State, listview,
+			child, down));
+		Assert.Equal(1u, platform.PointerCaptureCount);
+
+		Assert.Equal(0u, MuiApplicationWindowCore.DispatchWindowEvent(
+			ref platform, State, window, APTR.Null, 0x00080000));
+		Assert.Equal(1u, platform.PointerReleaseCount);
+		Assert.Equal(listview, platform.LastPointerReleaseObject);
+		Assert.Equal(MuiPointerCaptureKind.ListDrag,
+			platform.LastPointerReleaseKind);
+		Assert.Equal(unchecked((uint)-1), Get(ref platform, child, ListDropMark));
+
+		Assert.True(MuiFamilyCore.Remove(ref platform, State, window, listview));
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			window));
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
 	}
 
 	[Fact]
@@ -1694,6 +3045,10 @@ public sealed class MuiListviewFloattextTests
 		// listview will recompute the viewport width from its actual layout.
 		Assert.True(MuiListCore.SetHScrollerViewport(ref platform, State, child,
 			200, 1));
+		var renderInfo = APTR.FromPointer(0x6800);
+		platform.WriteUInt32(renderInfo, 20, 0x6840);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, listview,
+			renderInfo));
 		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
 			100, 40));
 		Assert.Equal(24u, Get(ref platform, child, 0x80423237u)); // 40 - 16
@@ -1703,10 +3058,6 @@ public sealed class MuiListviewFloattextTests
 		Assert.Equal(84u, hState.ViewWidth); // vertical reserve leaves 84px
 		Assert.Equal(1u, hState.Visible);
 
-		var renderInfo = APTR.FromPointer(0x6800);
-		platform.WriteUInt32(renderInfo, 20, 0x6840);
-		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, listview,
-			renderInfo));
 		var before = platform.FillCount;
 		Assert.True(MuiListviewCore.Draw(ref platform, State, listview, 0));
 		// Vertical and horizontal tracks each emit a neutral track and thumb.
@@ -1722,6 +3073,10 @@ public sealed class MuiListviewFloattextTests
 		var child = MuiListviewCore.ChildList(ref platform, State, listview);
 		Assert.True(MuiListCore.SetHScrollerViewport(ref platform, State, child,
 			200, 1));
+		var renderInfo = APTR.FromPointer(0x92800);
+		platform.WriteUInt32(renderInfo, 20, 0x92840);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, listview,
+			renderInfo));
 		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
 			100, 40));
 		Assert.True(MuiListviewCore.TryGetHorizontalScrollerState(ref platform,
@@ -1740,10 +3095,6 @@ public sealed class MuiListviewFloattextTests
 			State, listview, out record));
 		// The public record is refreshed by the next composite geometry pass;
 		// drawing is that same pass and consumes only the typed projection.
-		var renderInfo = APTR.FromPointer(0x92800);
-		platform.WriteUInt32(renderInfo, 20, 0x92840);
-		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, listview,
-			renderInfo));
 		Assert.True(MuiListviewCore.Draw(ref platform, State, listview, 0));
 		Assert.True(MuiListviewCore.TryGetHorizontalScrollerState(ref platform,
 			State, listview, out record));
@@ -1919,6 +3270,89 @@ public sealed class MuiListviewFloattextTests
 			out record));
 		Assert.Equal(replacement.Raw, record.RenderInfo.Raw);
 		Assert.Equal(replacementRastPort.Raw, record.RastPort.Raw);
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewPublishedNullRenderPairDoesNotFallBackToRawAlias()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x90000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		Assert.True(MuiListCore.SetHScrollerViewport(ref platform, State, child,
+			200, 1));
+		var renderInfo = APTR.FromPointer(0x8D000);
+		platform.WriteUInt32(renderInfo, 20, 0x8D040);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, listview,
+			renderInfo));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			40, 40));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewRenderStateKey, out var renderRaw));
+		Assert.NotEqual(0u, renderRaw);
+		var before = platform.FillCount;
+		Assert.True(MuiListviewCore.Draw(ref platform, State, listview, 0));
+		Assert.True(platform.FillCount >= before + 2);
+
+		// A published named null pair is a valid pre-setup projection. It must
+		// suppress scrollbar drawing even while the raw Area alias remains valid.
+		Assert.True(MuiListviewCore.MuiListviewRenderFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(renderRaw),
+				MuiListviewCore.MuiListviewRenderField.RenderInfo, 0));
+		Assert.True(MuiListviewCore.MuiListviewRenderFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(renderRaw),
+				MuiListviewCore.MuiListviewRenderField.RastPort, 0));
+		Assert.True(MuiListviewCore.TryGetRenderState(ref platform, State,
+			listview, out var published));
+		Assert.True(published.RenderInfo.IsNull);
+		Assert.True(published.RastPort.IsNull);
+		Assert.True(MuiListviewCore.Draw(ref platform, State, listview, 0));
+		// The child Area draw may still fill its own rectangle, but the
+		// scrollbar thumb (pen 6) must not be revived from the raw alias.
+		Assert.NotEqual(6u, platform.LastPen);
+
+		DisposeListview(ref platform, listview, listClass, listviewClass,
+			floattextClass, otherClass);
+	}
+
+	[Fact]
+	public void ListviewPublishedNullRenderPairDoesNotBindChildFromRawAlias()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0xA0000);
+		var listview = CreateListviewWith(ref platform, listClass, listviewClass);
+		var child = MuiListviewCore.ChildList(ref platform, State, listview);
+		var first = APTR.FromPointer(0x8E400);
+		platform.WriteCString(first, "alpha");
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, child, first,
+			InsertBottom));
+		var renderInfo = APTR.FromPointer(0x8F000);
+		platform.WriteUInt32(renderInfo, 20, 0x8F040);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, listview,
+			renderInfo));
+		Assert.True(MuiListviewCore.Layout(ref platform, State, listview, 0, 0,
+			40, 20));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			listview, ListviewRenderStateKey, out var renderRaw));
+		Assert.NotEqual(0u, renderRaw);
+
+		// Keep the raw parent alias valid but publish a named null pair. Clearing
+		// the child alias makes any raw-alias fallback observable at Draw time.
+		Assert.True(MuiListviewCore.MuiListviewRenderFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(renderRaw),
+				MuiListviewCore.MuiListviewRenderField.RenderInfo, 0));
+		Assert.True(MuiListviewCore.MuiListviewRenderFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(renderRaw),
+				MuiListviewCore.MuiListviewRenderField.RastPort, 0));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, child,
+			0x7fff0001u, 0, false));
+		Assert.False(MuiListviewCore.Draw(ref platform, State, listview, 0));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, 0x7fff0001u, out var childRenderInfo));
+		Assert.Equal(0u, childRenderInfo);
+
 		DisposeListview(ref platform, listview, listClass, listviewClass,
 			floattextClass, otherClass);
 	}
@@ -2183,7 +3617,8 @@ public sealed class MuiListviewFloattextTests
 	[Fact]
 	public void FloattextSplitsParagraphsIntoRows()
 	{
-		var platform = CreatePlatform(out _, out _, out var floattextClass, out _,
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass,
 			0x80000);
 		var text = APTR.FromPointer(0x4000);
 		platform.WriteCString(text, "alpha\nbravo\ncharlie");
@@ -2347,6 +3782,79 @@ public sealed class MuiListviewFloattextTests
 	}
 
 	[Fact]
+	public void FloattextMalformedPolicyFailsClosedBeforeSetterMutation()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var text = APTR.FromPointer(0x4680);
+		var replacement = APTR.FromPointer(0x46C0);
+		platform.WriteCString(text, "original floattext");
+		platform.WriteCString(replacement, "replacement floattext");
+		var floattext = CreateFloattext(ref platform, floattextClass, text, 0, 4,
+			0);
+		Assert.NotEqual(APTR.Null, floattext);
+		Assert.True(MuiFloattextCore.TryGetPolicyState(ref platform, State,
+			floattext, out var policyBefore));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			floattext, FtText, out var original));
+		Assert.Equal(original, MuiStoreCore.DataspaceFind(ref platform, State,
+			floattext, FloattextTextKey).Raw);
+
+		// A present policy block is authoritative typed state.  Shrinking it
+		// simulates malformed guest state; setters must not let EnsurePolicyState
+		// replace that block and then mutate the copied text.
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, floattext,
+			FloattextPolicyKey, 4));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			floattext, FtText, out var afterResize));
+		Assert.Equal(original, MuiStoreCore.DataspaceFind(ref platform, State,
+			floattext, FloattextTextKey).Raw);
+		Assert.Equal(original, afterResize);
+		Assert.False(MuiFloattextCore.TryReadState(ref platform, State, floattext,
+			out _));
+		Assert.False(MuiFloattextCore.GetAttribute(ref platform, State, floattext,
+			FtText, out _));
+		Assert.False(MuiFloattextCore.SetAttribute(ref platform, State, floattext,
+			FtText, replacement.Raw, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			floattext, FtText, out var after));
+		Assert.Equal(original, after);
+
+		// Restore the record and corrupt only the named Justify BOOL. The codec
+		// must preserve the raw value, while policy admission rejects it rather
+		// than normalizing 2 to TRUE.
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, floattext,
+			FloattextPolicyKey, unchecked((int)MuiFloattextPolicyState.Size)));
+		var policyBlock = MuiStoreCore.DataspaceFind(ref platform, State, floattext,
+			FloattextPolicyKey);
+		Assert.True(MuiFloattextPolicyStateCodec.Write(ref platform, policyBlock,
+			policyBefore));
+		Assert.True(MuiFloattextPolicyFieldCursorCodec.TryWriteUInt32(
+			ref platform, policyBlock, MuiFloattextPolicyField.Justify, 2));
+		Assert.False(MuiFloattextCore.TryReadState(ref platform, State, floattext,
+			out _));
+		Assert.False(MuiFloattextCore.GetAttribute(ref platform, State, floattext,
+			FtJustify, out _));
+		Assert.False(MuiFloattextCore.SetAttribute(ref platform, State, floattext,
+			FtText, replacement.Raw, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			floattext, FtText, out var afterInvalid));
+		Assert.Equal(original, afterInvalid);
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			floattext));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listviewClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			floattextClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.True(platform.AllocationCount == platform.FreeCount,
+			$"alloc={platform.AllocationCount} free={platform.FreeCount}");
+	}
+
+	[Fact]
 	public void FloattextPolicyGettersPreferNamedRecord()
 	{
 		var platform = CreatePlatform(out var listClass, out var listviewClass,
@@ -2456,6 +3964,56 @@ public sealed class MuiListviewFloattextTests
 		Assert.Equal("one", Row(ref platform, floattext, 0));
 		Assert.Equal("two", Row(ref platform, floattext, 1));
 		Assert.Equal("three", Row(ref platform, floattext, 2));
+	}
+
+	[Fact]
+	public void FloattextWidthGetterUsesAreaGeometryRecordThroughGetAndOmGet()
+	{
+		var platform = CreatePlatform(out var listClass, out var listviewClass,
+			out var floattextClass, out var otherClass, 0x80000);
+		var text = APTR.FromPointer(0x4B00);
+		platform.WriteCString(text, "one two three");
+		var floattext = CreateFloattextWithWidth(ref platform, floattextClass,
+			text, 0, 0);
+		Assert.NotEqual(APTR.Null, floattext);
+		Assert.True(MuiFloattextCore.GetAttribute(ref platform, State, floattext,
+			Width, out var initialWidth));
+		Assert.Equal(0u, initialWidth);
+
+		// Area layout updates the named geometry record, while the Floattext
+		// policy record still contains the construction-time width. The public
+		// getter must follow the current typed geometry.
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, floattext, 0, 0,
+			40, 20));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			floattext, Width, out var directWidth));
+		Assert.Equal(40u, directWidth);
+
+		var getMessage = APTR.FromPointer(0x4B80);
+		var getStorage = APTR.FromPointer(0x4BC0);
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			getMessage, MuiCommonPacketKind.Get, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.OmGet));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			getMessage, MuiCommonPacketKind.Get, MuiCommonField.Attribute, Width));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			getMessage, MuiCommonPacketKind.Get, MuiCommonField.Storage,
+			getStorage.Raw));
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State,
+			floattext, getMessage));
+		Assert.Equal(40u, platform.ReadUInt32(getStorage, 0));
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			floattext));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listviewClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			floattextClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
 	}
 
 	[Fact]

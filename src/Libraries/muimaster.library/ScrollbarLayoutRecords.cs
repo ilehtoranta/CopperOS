@@ -129,3 +129,20 @@ internal static class MuiScrollbarLayoutStateRecordCodec
 			address, MuiScrollbarLayoutStateField.Type, value.Type);
 	}
 }
+
+// Keep the Scrollbar layout wire record lossless for malformed-state
+// diagnostics, but admit only MorphOS's canonical Group_Horiz BOOL and the
+// documented default/bottom/top/symmetric/none type values.
+internal static class MuiScrollbarLayoutStateValidation
+{
+	internal static bool IsValidRecord(MuiScrollbarLayoutStateRecord value)
+	{
+		var state = default(MuiScrollbarLayoutState);
+		state.Horizontal = value.Horizontal;
+		state.Type = value.Type;
+		return IsValidState(state);
+	}
+
+	internal static bool IsValidState(MuiScrollbarLayoutState value) =>
+		value.Horizontal <= 1 && value.Type <= 4;
+}

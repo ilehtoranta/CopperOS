@@ -58,6 +58,15 @@ internal struct MuiMiscSpecialistPairMessage
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiMiscHandleInputMessage
+{
+	public const uint Size = 12;
+	public uint MethodId;
+	public uint IntuiMessage;
+	public int MuiKey;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiMiscSpecialistRegisterGadgetMessage
 {
 	public const uint Size = 28;
@@ -84,6 +93,17 @@ internal struct MuiMiscSpecialistRegisterGadgetMessage
 // (MUIP_Panel_Run, MUIP_Filepanel_AddRow, MUIP_Mccprefs_*, MUIP_Title_*).
 public static class MuiMiscSpecialistDispatcher
 {
+	// Typed packet seam for the MorphOS MUIP_HandleInput frame. The dispatcher
+	// routes the keyboard subset through the named Keyadjust input record; event
+	// metadata that requires a native Intuition interpretation remains a separate
+	// platform capability rather than a private-offset guess.
+	internal static bool TryReadHandleInputPacket<TPlatform>(
+		ref TPlatform platform, APTR message,
+		out MuiMiscHandleInputMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMiscSpecialistMessageCodec.TryReadHandleInput(ref platform, message,
+			out packet);
+
 	public static uint Dispatch<TPlatform>(ref TPlatform platform, APTR instance,
 		APTR message) where TPlatform : struct, IMuiServicePlatform
 	{
@@ -108,6 +128,14 @@ public static class MuiMiscSpecialistDispatcher
 					MuiMiscSpecialistMessageCodec.OmDispose,
 					out _)) return true;
 				result = MuiMiscSpecialistLifecycle.Dispose(ref platform, instance)
+					? 1u : 0u;
+				return true;
+
+			case MuiMiscSpecialistMessageCodec.HandleInput:
+				if (!MuiMiscSpecialistMessageCodec.TryReadHandleInput(ref platform,
+					message, out var handleInput)) return true;
+				result = MuiMiscSpecialistCore.HandleInput(ref platform, instance,
+					APTR.FromPointer(handleInput.IntuiMessage), handleInput.MuiKey)
 					? 1u : 0u;
 				return true;
 

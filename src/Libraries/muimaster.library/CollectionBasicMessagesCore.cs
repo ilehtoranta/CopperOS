@@ -114,11 +114,12 @@ internal static class MuiCollectionBasicMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionGetEntryMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != GetEntry) return false;
-		packet.MethodId = header.MethodId;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != GetEntry) return false;
+		packet.MethodId = methodId;
 		return MuiCollectionBasicFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionBasicPacketKind.GetEntry,
 			MuiCollectionBasicField.Position, out packet.Position) &&
@@ -149,11 +150,12 @@ internal static class MuiCollectionBasicMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionSelectMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != Select) return false;
-		packet.MethodId = header.MethodId;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != Select) return false;
+		packet.MethodId = methodId;
 		return MuiCollectionBasicFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionBasicPacketKind.Select,
 			MuiCollectionBasicField.Position, out packet.Position) &&
@@ -190,9 +192,10 @@ internal static class MuiCollectionBasicMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!TryReadMethodId(ref platform, message, out var header) ||
-			!IsMethod(header.MethodId) || header.MethodId != method) return false;
-		packet.MethodId = header.MethodId;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			!IsMethod(methodId) || methodId != method) return false;
+		packet.MethodId = methodId;
 		return true;
 	}
 
@@ -204,11 +207,26 @@ internal static class MuiCollectionBasicMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId)) return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Keep the dispatcher-facing method header as a named struct, but provide a
+	// scalar admission path for native closures that only need to validate the
+	// selector before decoding a larger named packet. Packed field knowledge
+	// remains confined to the cursor codec above.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionMethodMessage.Size)) return false;
 		return MuiCollectionBasicFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionBasicPacketKind.Method,
-			MuiCollectionBasicField.MethodId, out packet.MethodId);
+			MuiCollectionBasicField.MethodId, out methodId);
 	}
 
 	// Native consumers that only need method validation use this scalar-return
@@ -217,8 +235,8 @@ internal static class MuiCollectionBasicMessageCodec
 	internal static bool IsValidMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory =>
-		TryReadMethodId(ref platform, message, out var header) &&
-		IsMethod(header.MethodId) && header.MethodId == method;
+		TryReadMethodIdValue(ref platform, message, out var methodId) &&
+		IsMethod(methodId) && methodId == method;
 
 	internal static bool WriteMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)

@@ -16,8 +16,10 @@ public sealed class MuiStringScrollAttributeTests
 	private const uint StringScrollVisibleHeight = 0x8042791Eu;
 	private const uint StringScrollVisibleWidth = 0x8042D280u;
 	private const uint StringScrollWidth = 0x80420FB5u;
+	private const uint MetricsStateKey = MuiStringScrollAttributeCore.MetricsStateKey;
 	private const uint MethodSet = 0x8042549Au;
 	private const uint OmGet = 0x00000104u;
+	private const uint EveryTime = 1233727793u;
 
 	[Fact]
 	public void MetricsArePixelBasedAndOffsetsClampToTheLaidOutViewport()
@@ -115,6 +117,51 @@ public sealed class MuiStringScrollAttributeTests
 	}
 
 	[Fact]
+	public void LayoutAndContentChangesNotifyTypedScrollMetricsOnlyWhenChanged()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1100, "String.mui");
+		var contents = APTR.FromPointer(0x1850);
+		platform.WriteCString(contents, "abcdefghij");
+		var obj = Create(ref platform, stringClass, contents);
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, obj, 0, 0,
+			40, 10));
+		var destination = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			stringClass, APTR.Null);
+		var follow = APTR.FromPointer(0x1B00);
+		platform.WriteUInt32(follow, 0, 0x90000010u);
+		platform.WriteUInt32(follow, 4, EveryTime);
+		Assert.True(MuiNotifyCore.Add(ref platform, State, obj,
+			StringScrollWidth, EveryTime, destination, 2, follow));
+		Assert.True(MuiNotifyCore.Add(ref platform, State, obj,
+			StringScrollVisibleWidth, EveryTime, destination, 2, follow));
+
+		var before = platform.DispatchCount;
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, obj, 0, 0,
+			40, 10));
+		Assert.Equal(before, platform.DispatchCount);
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, obj, 0, 0,
+			24, 10));
+		Assert.Equal(before + 1, platform.DispatchCount);
+		Assert.Equal(24u, platform.LastDispatchArgument);
+
+		var replacement = APTR.FromPointer(0x1900);
+		platform.WriteCString(replacement, "abc");
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			obj, StringContents, replacement.Raw));
+		Assert.Equal(before + 2, platform.DispatchCount);
+		Assert.Equal(0x90000010u, platform.LastDispatchMethod);
+		Assert.Equal(24u, platform.LastDispatchArgument);
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			destination));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
 	public void OmGetAndOmSetExposeTheScrollAttributes()
 	{
 		var platform = NewPlatform();
@@ -184,6 +231,45 @@ public sealed class MuiStringScrollAttributeTests
 			ref platform, State, obj, out record));
 		Assert.Equal(40u, record.Left);
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+	}
+
+	[Fact]
+	public void MalformedMetricsRecordFailsBeforeClampingRawOffsets()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1100, "String.mui");
+		var contents = APTR.FromPointer(0x1D80);
+		platform.WriteCString(contents, "abcdefghij");
+		var obj = Create(ref platform, stringClass, contents);
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, obj, 0, 0,
+			40, 10));
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			obj, StringScrollLeft, 40));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, obj,
+			StringScrollLeft, out var originalLeft));
+
+		// Change the raw contents without refreshing the named metrics. The next
+		// typed read would clamp the old offset to the shorter content, but a
+		// malformed present record must reject before that raw mutation.
+		var replacement = APTR.FromPointer(0x1DC0);
+		platform.WriteCString(replacement, "x");
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, obj,
+			StringContents, replacement.Raw, false));
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			MetricsStateKey, 4));
+
+		Assert.False(MuiStringScrollAttributeCore.Get(ref platform, State, obj,
+			StringScrollLeft, out _));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, obj,
+			StringScrollLeft, out var after));
+		Assert.Equal(originalLeft, after);
+		Assert.False(MuiStringScrollAttributeCore.TryReadMetricsState(
+			ref platform, State, obj, out _));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
 	}
 
 	private static APTR Create(ref MuiHeadlessTestPlatform platform, APTR classRecord,

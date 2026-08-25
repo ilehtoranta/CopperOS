@@ -47,6 +47,38 @@ internal struct MuiLayoutRectangleMessage
 	public uint Reserved0;
 	public uint Reserved1;
 	public uint Reserved2;
+
+	// The packet remains ABI-compatible with MorphOS while exposing the
+	// operation-specific trailing words as named values to the core.
+	public int XOffset
+	{
+		get => unchecked((int)Reserved0);
+		set => Reserved0 = unchecked((uint)value);
+	}
+
+	public int YOffset
+	{
+		get => unchecked((int)Reserved1);
+		set => Reserved1 = unchecked((uint)value);
+	}
+
+	public uint Auxiliary
+	{
+		get => Reserved2;
+		set => Reserved2 = value;
+	}
+
+	public uint DrawBackgroundFlags
+	{
+		get => Auxiliary;
+		set => Auxiliary = value;
+	}
+
+	public int BackfillBrightness
+	{
+		get => unchecked((int)Auxiliary);
+		set => Auxiliary = unchecked((uint)value);
+	}
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -60,8 +92,8 @@ internal struct MuiLayoutTextMessage
 	public uint Height;
 	public uint Text;
 	public uint Length;
-	public uint Reserved0;
-	public uint Reserved1;
+	public uint PreParse;
+	public uint Flags;
 }
 
 internal enum MuiLayoutPacketKind : byte
@@ -94,6 +126,8 @@ internal enum MuiLayoutField : byte
 	Text,
 	Length,
 	RenderInfo,
+	PreParse,
+	TextFlags,
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -109,63 +143,73 @@ internal static class MuiLayoutFieldCursorCodec
 	private static bool TryResolve(MuiLayoutPacketKind packet,
 		MuiLayoutField field, out uint offset)
 	{
-		switch (packet)
+		// Keep this as a straight-line selector instead of a switch/jump table.
+		// The native compiler can then lower every packet kind (including the
+		// later TextDimensions/Layout variants) without importing a managed
+		// dispatch helper.
+		if (packet == MuiLayoutPacketKind.Method)
 		{
-			case MuiLayoutPacketKind.Method:
-				if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
-				break;
-			case MuiLayoutPacketKind.AskMinMax:
-				if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
-				if (field == MuiLayoutField.Storage) { offset = 4; return true; }
-				break;
-			case MuiLayoutPacketKind.Relayout:
-				if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
-				if (field == MuiLayoutField.Flags) { offset = 4; return true; }
-				break;
-			case MuiLayoutPacketKind.Rectangle:
-				if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
-				if (field == MuiLayoutField.Left) { offset = 4; return true; }
-				if (field == MuiLayoutField.Top) { offset = 8; return true; }
-				if (field == MuiLayoutField.RightOrWidth) { offset = 12; return true; }
-				if (field == MuiLayoutField.BottomOrHeight) { offset = 16; return true; }
-				if (field == MuiLayoutField.Reserved0) { offset = 20; return true; }
-				if (field == MuiLayoutField.Reserved1) { offset = 24; return true; }
-				if (field == MuiLayoutField.Reserved2) { offset = 28; return true; }
-				break;
-			case MuiLayoutPacketKind.Text:
-				if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
-				if (field == MuiLayoutField.Left) { offset = 4; return true; }
-				if (field == MuiLayoutField.Top) { offset = 8; return true; }
-				if (field == MuiLayoutField.Width) { offset = 12; return true; }
-				if (field == MuiLayoutField.Height) { offset = 16; return true; }
-				if (field == MuiLayoutField.Text) { offset = 20; return true; }
-				if (field == MuiLayoutField.Length) { offset = 24; return true; }
-				if (field == MuiLayoutField.Reserved0) { offset = 28; return true; }
-				if (field == MuiLayoutField.Reserved1) { offset = 32; return true; }
-				break;
-			case MuiLayoutPacketKind.RenderInfo:
-				if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
-				if (field == MuiLayoutField.RenderInfo) { offset = 4; return true; }
-				break;
-			case MuiLayoutPacketKind.Flags:
-				if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
-				if (field == MuiLayoutField.Flags) { offset = 4; return true; }
-				break;
-			case MuiLayoutPacketKind.TextDimensions:
-				if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
-				if (field == MuiLayoutField.Text) { offset = 4; return true; }
-				if (field == MuiLayoutField.Length) { offset = 8; return true; }
-				if (field == MuiLayoutField.Reserved0) { offset = 12; return true; }
-				if (field == MuiLayoutField.Reserved1) { offset = 16; return true; }
-				break;
-			case MuiLayoutPacketKind.Layout:
-				if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
-				if (field == MuiLayoutField.Left) { offset = 4; return true; }
-				if (field == MuiLayoutField.Top) { offset = 8; return true; }
-				if (field == MuiLayoutField.Width) { offset = 12; return true; }
-				if (field == MuiLayoutField.Height) { offset = 16; return true; }
-				if (field == MuiLayoutField.Flags) { offset = 20; return true; }
-				break;
+			if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
+		}
+		else if (packet == MuiLayoutPacketKind.AskMinMax)
+		{
+			if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
+			if (field == MuiLayoutField.Storage) { offset = 4; return true; }
+		}
+		else if (packet == MuiLayoutPacketKind.Relayout)
+		{
+			if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
+			if (field == MuiLayoutField.Flags) { offset = 4; return true; }
+		}
+		else if (packet == MuiLayoutPacketKind.Rectangle)
+		{
+			if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
+			if (field == MuiLayoutField.Left) { offset = 4; return true; }
+			if (field == MuiLayoutField.Top) { offset = 8; return true; }
+			if (field == MuiLayoutField.RightOrWidth) { offset = 12; return true; }
+			if (field == MuiLayoutField.BottomOrHeight) { offset = 16; return true; }
+			if (field == MuiLayoutField.Reserved0) { offset = 20; return true; }
+			if (field == MuiLayoutField.Reserved1) { offset = 24; return true; }
+			if (field == MuiLayoutField.Reserved2) { offset = 28; return true; }
+		}
+		else if (packet == MuiLayoutPacketKind.Text)
+		{
+			if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
+			if (field == MuiLayoutField.Left) { offset = 4; return true; }
+			if (field == MuiLayoutField.Top) { offset = 8; return true; }
+			if (field == MuiLayoutField.Width) { offset = 12; return true; }
+			if (field == MuiLayoutField.Height) { offset = 16; return true; }
+			if (field == MuiLayoutField.Text) { offset = 20; return true; }
+			if (field == MuiLayoutField.Length) { offset = 24; return true; }
+			if (field == MuiLayoutField.PreParse) { offset = 28; return true; }
+			if (field == MuiLayoutField.TextFlags) { offset = 32; return true; }
+		}
+		else if (packet == MuiLayoutPacketKind.RenderInfo)
+		{
+			if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
+			if (field == MuiLayoutField.RenderInfo) { offset = 4; return true; }
+		}
+		else if (packet == MuiLayoutPacketKind.Flags)
+		{
+			if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
+			if (field == MuiLayoutField.Flags) { offset = 4; return true; }
+		}
+		else if (packet == MuiLayoutPacketKind.TextDimensions)
+		{
+			if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
+			if (field == MuiLayoutField.Text) { offset = 4; return true; }
+			if (field == MuiLayoutField.Length) { offset = 8; return true; }
+			if (field == MuiLayoutField.PreParse) { offset = 12; return true; }
+			if (field == MuiLayoutField.TextFlags) { offset = 16; return true; }
+		}
+		else if (packet == MuiLayoutPacketKind.Layout)
+		{
+			if (field == MuiLayoutField.MethodId) { offset = 0; return true; }
+			if (field == MuiLayoutField.Left) { offset = 4; return true; }
+			if (field == MuiLayoutField.Top) { offset = 8; return true; }
+			if (field == MuiLayoutField.Width) { offset = 12; return true; }
+			if (field == MuiLayoutField.Height) { offset = 16; return true; }
+			if (field == MuiLayoutField.Flags) { offset = 20; return true; }
 		}
 		offset = 0;
 		return false;
@@ -197,6 +241,19 @@ internal static class MuiLayoutFieldCursorCodec
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
+
+	internal static bool TryReadAt<TPlatform>(ref TPlatform platform,
+		APTR message, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (message.IsNull || message.Raw > uint.MaxValue - offset)
+			return false;
+		var address = APTR.FromPointer(message.Raw + offset);
+		if (!platform.IsMapped(address, 4)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
 }
 
 // Central codec for the fixed MorphOS layout packets. Consumers use the
@@ -213,14 +270,27 @@ internal static class MuiLayoutPacketCodec
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiLayoutMethodMessage packet)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId)) return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Keep the native lowering path scalar while the public/internal consumer
+	// surface remains the named MuiLayoutMethodMessage record above.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiLayoutMethodMessage.Size)) return false;
 		return MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiLayoutPacketKind.Method, MuiLayoutField.MethodId,
-			out packet.MethodId);
+			out methodId);
 	}
 
 	internal static bool TryReadAskMinMax<TPlatform>(ref TPlatform platform,
@@ -314,11 +384,11 @@ internal static class MuiLayoutPacketCodec
 									MuiLayoutPacketKind.Text, MuiLayoutField.Length,
 									out packet.Length) &&
 									MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
-										MuiLayoutPacketKind.Text, MuiLayoutField.Reserved0,
-										out packet.Reserved0) &&
-									MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
-									MuiLayoutPacketKind.Text, MuiLayoutField.Reserved1,
-									out packet.Reserved1);
+						MuiLayoutPacketKind.Text, MuiLayoutField.PreParse,
+						out packet.PreParse) &&
+					MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
+					MuiLayoutPacketKind.Text, MuiLayoutField.TextFlags,
+					out packet.Flags);
 	}
 
 	internal static bool TryReadRenderInfo<TPlatform>(ref TPlatform platform,
@@ -358,21 +428,21 @@ internal static class MuiLayoutPacketCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiLayoutTextDimensionsMessage.Size,
 			TextDim)) return false;
-		return MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
-			MuiLayoutPacketKind.TextDimensions, MuiLayoutField.MethodId,
-			out packet.MethodId) &&
-			MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiLayoutPacketKind.TextDimensions, MuiLayoutField.Text,
-				out packet.Text) &&
-				MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiLayoutPacketKind.TextDimensions, MuiLayoutField.Length,
-					out packet.Length) &&
-					MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
-						MuiLayoutPacketKind.TextDimensions, MuiLayoutField.Reserved0,
-						out packet.Reserved0) &&
-						MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
-							MuiLayoutPacketKind.TextDimensions, MuiLayoutField.Reserved1,
-							out packet.Reserved1);
+	return MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
+		MuiLayoutPacketKind.TextDimensions, MuiLayoutField.MethodId,
+		out packet.MethodId) &&
+		MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiLayoutPacketKind.TextDimensions, MuiLayoutField.Text,
+			out packet.Text) &&
+		MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiLayoutPacketKind.TextDimensions, MuiLayoutField.Length,
+			out packet.Length) &&
+		MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiLayoutPacketKind.TextDimensions, MuiLayoutField.PreParse,
+			out packet.PreParse) &&
+		MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiLayoutPacketKind.TextDimensions, MuiLayoutField.TextFlags,
+			out packet.Flags);
 	}
 
 	internal static bool TryReadLayout<TPlatform>(ref TPlatform platform,
@@ -382,29 +452,34 @@ internal static class MuiLayoutPacketCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiLayoutMessage.Size, Layout))
 			return false;
-		return MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
-			MuiLayoutPacketKind.Layout, MuiLayoutField.MethodId,
-			out packet.MethodId) &&
-			MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiLayoutPacketKind.Layout, MuiLayoutField.Left, out packet.Left) &&
-				MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiLayoutPacketKind.Layout, MuiLayoutField.Top, out packet.Top) &&
-					MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
-						MuiLayoutPacketKind.Layout, MuiLayoutField.Width,
-						out packet.Width) &&
-						MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
-							MuiLayoutPacketKind.Layout, MuiLayoutField.Height,
-							out packet.Height) &&
-							MuiLayoutFieldCursorCodec.TryReadUInt32(ref platform, message,
-								MuiLayoutPacketKind.Layout, MuiLayoutField.Flags,
-								out packet.Flags);
+		uint methodId;
+		uint left;
+		uint top;
+		uint width;
+		uint height;
+		uint flags;
+		if (!MuiLayoutFieldCursorCodec.TryReadAt(ref platform, message, 0,
+			out methodId) || !MuiLayoutFieldCursorCodec.TryReadAt(ref platform,
+			message, 4, out left) || !MuiLayoutFieldCursorCodec.TryReadAt(
+			ref platform, message, 8, out top) ||
+			!MuiLayoutFieldCursorCodec.TryReadAt(ref platform, message, 12,
+				out width) || !MuiLayoutFieldCursorCodec.TryReadAt(ref platform,
+				message, 16, out height) || !MuiLayoutFieldCursorCodec.TryReadAt(
+				ref platform, message, 20, out flags)) return false;
+		packet.MethodId = methodId;
+		packet.Left = left;
+		packet.Top = top;
+		packet.Width = width;
+		packet.Height = height;
+		packet.Flags = flags;
+		return true;
 	}
 
 	private static bool IsPacket<TPlatform>(ref TPlatform platform,
 		APTR message, uint size, uint method)
 		where TPlatform : struct, IMuiGuestMemory =>
-		TryReadMethodId(ref platform, message, out var header) &&
-		header.MethodId == method && platform.IsMapped(message, size);
+		TryReadMethodIdValue(ref platform, message, out uint methodId) &&
+		methodId == method && platform.IsMapped(message, size);
 }
 
 public static class MuiLayoutPacketCore

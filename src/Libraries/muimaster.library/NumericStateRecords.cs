@@ -153,3 +153,16 @@ internal static class MuiNumericStateRecordCodec
 			MuiNumericStateField.Reverse, value.Reverse);
 	}
 }
+
+// Keep the ULONG wire field lossless for corruption inspection, but admit the
+// named state only when the MorphOS BOOL projection is canonical. Range
+// relationships remain consumer-specific because Numeric clips values at the
+// public operation boundary.
+internal static class MuiNumericStateValidation
+{
+	internal static bool IsValidRecord(MuiNumericStateRecord value) =>
+		value.Reverse <= 1;
+
+	internal static bool IsValidState(MuiNumericState value) =>
+		value.Reverse <= 1;
+}

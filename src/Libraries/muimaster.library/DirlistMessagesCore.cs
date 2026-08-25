@@ -3,6 +3,7 @@
 - SPDX-License-Identifier: MIT
 */
 
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -149,9 +150,19 @@ internal static class MuiDirlistMessageCodec
 		packet = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiDirlistMethodMessage.Size)) return false;
+		return TryReadMethodIdValue(ref platform, message, out packet.MethodId);
+	}
+
+	// Keep scalar selector admission at the guest ABI boundary; callers retain
+	// the named method-header and operation records.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		return MuiDirlistFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiDirlistPacketKind.Method, MuiDirlistField.MethodId,
-			out packet.MethodId);
+			out methodId);
 	}
 
 	// Keep method-only validation scalar for native roots and dispatcher switch

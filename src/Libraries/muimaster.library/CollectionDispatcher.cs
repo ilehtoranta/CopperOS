@@ -29,9 +29,12 @@ internal struct MuiCollectionInsertMessage
 {
 	public const uint Size = 16;
 	public uint MethodId;
-	public uint Entry;
+	// MorphOS MUIP_List_Insert: APTR *entries, LONG count, LONG pos.
+	// Keep the guest LONGs as raw words at the ABI boundary; the dispatcher
+	// applies the signed interpretation before entering ListCore.
+	public uint Entries;
+	public uint Count;
 	public uint Position;
-	public uint Column;
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -59,6 +62,16 @@ internal struct MuiCollectionPositionMessage
 	public const uint Size = 8;
 	public uint MethodId;
 	public uint Position;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiCollectionRedrawMessage
+{
+	public const uint Size = 12;
+	public uint MethodId;
+	// MorphOS MUIP_List_Redraw: LONG pos, APTR entry.
+	public uint Position;
+	public uint Entry;
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -364,9 +377,9 @@ public static class MuiCollectionDispatcher
 				if (!TryReadInsert(ref platform, message, out var insert))
 					return true;
 				result = MuiListCore.Insert(ref platform, state, obj,
-					APTR.FromPointer(insert.Entry),
-					unchecked((int)insert.Position),
-					unchecked((int)insert.Column)) ? 1u : 0u;
+					APTR.FromPointer(insert.Entries),
+					unchecked((int)insert.Count),
+					unchecked((int)insert.Position)) ? 1u : 0u;
 				return true;
 			case ListGetEntry:
 				if (!TryReadGetEntry(ref platform, message,
@@ -420,14 +433,17 @@ public static class MuiCollectionDispatcher
 					? 1u : 0u;
 				return true;
 			case ListJump:
-			case ListRedraw:
 				if (!TryReadPosition(ref platform, message, method,
 					out var position)) return true;
-				result = (method == ListJump
-					? MuiListCore.Jump(ref platform, state, obj,
-						unchecked((int)position.Position))
-					: MuiListCore.Redraw(ref platform, state, obj,
-						unchecked((int)position.Position))) ? 1u : 0u;
+				result = MuiListCore.Jump(ref platform, state, obj,
+					unchecked((int)position.Position)) ? 1u : 0u;
+				return true;
+			case ListRedraw:
+				if (!TryReadRedraw(ref platform, message, out var redraw))
+					return true;
+				result = MuiListCore.Redraw(ref platform, state, obj,
+					unchecked((int)redraw.Position),
+					APTR.FromPointer(redraw.Entry)) ? 1u : 0u;
 				return true;
 			case ListCreateImage:
 				if (!TryReadCreateImage(ref platform, message,
@@ -585,9 +601,9 @@ public static class MuiCollectionDispatcher
 				if (!TryReadAttribute(ref platform, message, method,
 					out var attribute)) return true;
 				result = (cls == MuiCollectionClass.Listview
-					? MuiListviewCore.SetAttribute(ref platform, state, obj,
+					? MuiListviewCore.SetRuntimeAttribute(ref platform, state, obj,
 						attribute.Attribute, attribute.Value, method == Set)
-					: MuiStringscrollCore.SetAttribute(ref platform, state, obj,
+					: MuiStringscrollCore.SetRuntimeAttribute(ref platform, state, obj,
 						attribute.Attribute, attribute.Value, method == Set))
 					? 1u : 0u;
 				return true;
@@ -667,6 +683,12 @@ public static class MuiCollectionDispatcher
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiCollectionAdvancedMessageCodec.TryReadPosition(ref platform,
 			message, method, out packet);
+
+	private static bool TryReadRedraw<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionRedrawMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiCollectionAdvancedMessageCodec.TryReadRedraw(ref platform,
+			message, out packet);
 
 	private static bool TryReadPointer<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, out MuiCollectionPointerMessage packet)

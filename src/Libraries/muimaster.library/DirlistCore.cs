@@ -1660,6 +1660,21 @@ public static class MuiDirlistCore
 			attribute, value, false);
 	}
 
+	// Keep OM_SET distinct from the internal policy setter. MorphOS publishes
+	// counters, status and Path as getters only, while ExAllType is an
+	// initializer/getter. Rejecting them here prevents the generic raw store
+	// from accepting writes that the named scan records would never consume.
+	public static bool SetRuntimeAttribute<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, uint attribute, uint value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (attribute == ExAllType || attribute == NumBytes ||
+			attribute == NumBytes64 || attribute == NumDrawers ||
+			attribute == NumFiles || attribute == Path || attribute == Status)
+			return false;
+		return SetAttribute(ref platform, state, obj, attribute, value);
+	}
+
 	private static bool SetDirectory<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, APTR directory) where TPlatform : struct, IMuiHeadlessPlatform
 	{

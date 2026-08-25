@@ -60,6 +60,27 @@ internal struct MuiMultiSetMessage
 	public uint FirstObject;
 }
 
+// Internal semantic request for the live MUIM_MultiSet walk. The guest packet
+// keeps ULONG fields for ABI compatibility; production mutation code receives
+// named APTR fields instead of a high-arity scalar argument list.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiMultiSetRequest
+{
+	internal APTR Executor;
+	internal uint Attribute;
+	internal uint Value;
+	internal APTR FirstObject;
+	internal APTR Vector;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiMultiSetDispatchRequest
+{
+	internal APTR State;
+	internal APTR Executor;
+	internal APTR Message;
+}
+
 // The Notify and MultiSet packets each carry a caller-owned inline ULONG
 // vector immediately after their fixed header. A semantic kind keeps those
 // two ABI boundaries named while sharing one overflow-safe address adapter.
@@ -129,35 +150,46 @@ internal struct MuiMultiSetTargetVectorCursor
 
 internal static class MuiMultiSetTargetVectorCodec
 {
+	internal static APTR GetEntryAddress(MuiMultiSetTargetVectorCursor cursor)
+	{
+		if (cursor.Base.IsNull || cursor.Index >=
+			MuiMultiSetTargetVectorCursor.MaximumEntries || cursor.Index >
+			(uint.MaxValue - cursor.Base.Raw) /
+			MuiMultiSetTargetVectorCursor.EntrySize) return APTR.Null;
+		var offset = cursor.Index *
+			MuiMultiSetTargetVectorCursor.EntrySize;
+		if (cursor.Base.Raw > uint.MaxValue - offset) return APTR.Null;
+		return APTR.FromPointer(cursor.Base.Raw + offset);
+	}
+
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiMultiSetTargetVectorCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >=
-			MuiMultiSetTargetVectorCursor.MaximumEntries || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiMultiSetTargetVectorCursor.EntrySize) return false;
-		var offset = cursor.Index *
-			MuiMultiSetTargetVectorCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
-		return platform.IsMapped(address,
+		address = GetEntryAddress(cursor);
+		return address.IsNotNull && platform.IsMapped(address,
 			MuiMultiSetTargetVectorCursor.EntrySize);
 	}
 }
 
 internal static class MuiMultiSetTargetEntryCodec
 {
+	internal static bool TryReadInto<TPlatform>(ref TPlatform platform,
+		APTR address, ref MuiMultiSetTargetEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiMultiSetTargetEntry.Size)) return false;
+		value.Target = APTR.FromPointer(platform.ReadUInt32(address, 0));
+		return true;
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiMultiSetTargetEntry value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMultiSetTargetEntry.Size)) return false;
-		value.Target = APTR.FromPointer(platform.ReadUInt32(address, 0));
-		return true;
+		return TryReadInto(ref platform, address, ref value);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
@@ -415,11 +447,25 @@ internal static class MuiNotifyPacketCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
+		if (!TryReadMethodIdValue(ref platform, address, out var methodId))
+			return false;
+		value.MethodId = methodId;
+		return true;
+	}
+
+	// Native selector admission stays scalar so compiler paths do not need to
+	// materialize a temporary one-field record. Public packet consumers still
+	// receive the named struct above.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiNotifyMethodMessage.Size)) return false;
 		return MuiNotifyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			address, MuiNotifyPacketKind.Notify, MuiNotifyPacketField.MethodId,
-			out value.MethodId);
+			out methodId);
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -428,8 +474,8 @@ internal static class MuiNotifyPacketCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryReadMethodId(ref platform, request.Address, out var header) ||
-			header.MethodId != request.Method || !platform.IsMapped(request.Address,
+		if (!TryReadMethodIdValue(ref platform, request.Address, out var methodId) ||
+			methodId != request.Method || !platform.IsMapped(request.Address,
 			MuiNotifyMessage.Size)) return false;
 		if (!MuiNotifyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			request.Address, MuiNotifyPacketKind.Notify,
@@ -443,7 +489,7 @@ internal static class MuiNotifyPacketCodec
 			!MuiNotifyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 				request.Address, MuiNotifyPacketKind.Notify,
 				MuiNotifyPacketField.FollowCount, out value.FollowCount)) return false;
-		value.MethodId = header.MethodId;
+		value.MethodId = methodId;
 		return true;
 	}
 
@@ -454,14 +500,14 @@ internal static class MuiNotifyPacketCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryReadMethodId(ref platform, request.Address, out var header) ||
-			header.MethodId != request.Method || !platform.IsMapped(request.Address,
+		if (!TryReadMethodIdValue(ref platform, request.Address, out var methodId) ||
+			methodId != request.Method || !platform.IsMapped(request.Address,
 			MuiKillNotifyMessage.Size)) return false;
 		if (!MuiNotifyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			request.Address, MuiNotifyPacketKind.KillNotify,
 			MuiNotifyPacketField.TriggerAttribute, out value.TriggerAttribute))
 			return false;
-		value.MethodId = header.MethodId;
+		value.MethodId = methodId;
 		return true;
 	}
 
@@ -472,8 +518,8 @@ internal static class MuiNotifyPacketCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryReadMethodId(ref platform, request.Address, out var header) ||
-			header.MethodId != request.Method || !platform.IsMapped(request.Address,
+		if (!TryReadMethodIdValue(ref platform, request.Address, out var methodId) ||
+			methodId != request.Method || !platform.IsMapped(request.Address,
 			MuiKillNotifyObjectMessage.Size)) return false;
 		if (!MuiNotifyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			request.Address, MuiNotifyPacketKind.KillNotifyObject,
@@ -481,7 +527,7 @@ internal static class MuiNotifyPacketCodec
 			!MuiNotifyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 				request.Address, MuiNotifyPacketKind.KillNotifyObject,
 				MuiNotifyPacketField.Destination, out value.Destination)) return false;
-		value.MethodId = header.MethodId;
+		value.MethodId = methodId;
 		return true;
 	}
 
@@ -491,8 +537,8 @@ internal static class MuiNotifyPacketCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryReadMethodId(ref platform, request.Address, out var header) ||
-			header.MethodId != request.Method || !platform.IsMapped(request.Address,
+		if (!TryReadMethodIdValue(ref platform, request.Address, out var methodId) ||
+			methodId != request.Method || !platform.IsMapped(request.Address,
 			MuiSetAttributeMessage.Size) ||
 			(request.Method != MuiNotifyCore.SetMethod &&
 				request.Method != MuiNotifyCore.NoNotifySetMethod)) return false;
@@ -502,7 +548,7 @@ internal static class MuiNotifyPacketCodec
 			!MuiNotifyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 				request.Address, MuiNotifyPacketKind.Set,
 				MuiNotifyPacketField.Value, out value.Value)) return false;
-		value.MethodId = header.MethodId;
+		value.MethodId = methodId;
 		return true;
 	}
 
@@ -512,8 +558,8 @@ internal static class MuiNotifyPacketCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryReadMethodId(ref platform, request.Address, out var header) ||
-			header.MethodId != request.Method || !platform.IsMapped(request.Address,
+		if (!TryReadMethodIdValue(ref platform, request.Address, out var methodId) ||
+			methodId != request.Method || !platform.IsMapped(request.Address,
 			MuiMultiSetMessage.Size) ||
 			request.Method != MuiNotifyCore.MultiSetMethod) return false;
 		if (!MuiNotifyPacketFieldCursorCodec.TryReadUInt32(ref platform,
@@ -525,7 +571,7 @@ internal static class MuiNotifyPacketCodec
 			!MuiNotifyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 				request.Address, MuiNotifyPacketKind.MultiSet,
 				MuiNotifyPacketField.FirstObject, out value.FirstObject)) return false;
-		value.MethodId = header.MethodId;
+		value.MethodId = methodId;
 		return true;
 	}
 
@@ -535,14 +581,14 @@ internal static class MuiNotifyPacketCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryReadMethodId(ref platform, request.Address, out var header) ||
-			header.MethodId != request.Method || !platform.IsMapped(request.Address,
+		if (!TryReadMethodIdValue(ref platform, request.Address, out var methodId) ||
+			methodId != request.Method || !platform.IsMapped(request.Address,
 			MuiFindObjectMessage.Size) ||
 			request.Method != MuiNotifyCore.FindObjectMethod) return false;
 		if (!MuiNotifyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			request.Address, MuiNotifyPacketKind.FindObject,
 			MuiNotifyPacketField.FindObject, out value.FindObject)) return false;
-		value.MethodId = header.MethodId;
+		value.MethodId = methodId;
 		return true;
 	}
 
@@ -666,20 +712,166 @@ public static class MuiNotifyCore
 		APTR executor, uint attribute, uint value, APTR firstObject,
 		APTR vector) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (MuiHeadlessObjectCore.FindObject(ref platform, state, executor).IsNull)
+		var request = default(MuiMultiSetRequest);
+		request.Executor = executor;
+		request.Attribute = attribute;
+		request.Value = value;
+		request.FirstObject = firstObject;
+		request.Vector = vector;
+		return ApplyMultiSet(ref platform, state, request);
+	}
+
+	private static bool SetMultiSetAttribute<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, uint attribute, uint value, bool notify)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiCommonControlCore.TrySetHeadlessPropAttribute(ref platform, state,
+			obj, attribute, value, notify, out var handled)) return false;
+		return handled || MuiHeadlessObjectCore.SetAttribute(ref platform, state,
+			obj, attribute, value, notify);
+	}
+
+	internal static bool ApplyMultiSet<TPlatform>(ref TPlatform platform,
+		APTR state, MuiMultiSetRequest request)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
+			request.Executor).IsNull)
 			return false;
-		if (firstObject.IsNull || vector.IsNull) return false;
-		if (!CountMultiSetTargets(ref platform, state, firstObject, vector,
-			out var count)) return false;
-		for (var index = 0u; index < count; index++)
+		if (request.FirstObject.IsNull || request.Vector.IsNull) return false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
+			request.FirstObject).IsNull) return false;
+		var count = 1u;
+		var cursor = default(MuiMultiSetTargetVectorCursor);
+		cursor.Base = request.Vector;
+		cursor.Index = 0;
+		MuiMultiSetTargetEntry targetEntry = default;
+		if (!MuiMultiSetTargetVectorCodec.TryGetEntry(ref platform, cursor,
+			out var targetSlot) ||
+			!MuiMultiSetTargetEntryCodec.TryReadInto(ref platform, targetSlot,
+				ref targetEntry)) return false;
+		var target = targetEntry.Target;
+		if (target.IsNotNull)
 		{
-			var target = firstObject;
-			if (index != 0 && !TryReadMultiSetTarget(ref platform, vector,
-				index - 1, out target)) return false;
-			if (target.IsNull ||
-				(target.Raw != executor.Raw &&
-					!MuiHeadlessObjectCore.SetAttribute(ref platform, state, target,
-						attribute, value, true))) return false;
+			if (MuiHeadlessObjectCore.FindObject(ref platform, state,
+				target).IsNull) return false;
+			count = 2;
+			while (count <= MaximumMultiSetTargets)
+			{
+				cursor.Index = count - 1;
+				targetEntry = default;
+				if (!MuiMultiSetTargetVectorCodec.TryGetEntry(ref platform, cursor,
+					out targetSlot) ||
+					!MuiMultiSetTargetEntryCodec.TryReadInto(ref platform, targetSlot,
+						ref targetEntry)) return false;
+				target = targetEntry.Target;
+				if (target.IsNull) break;
+				if (count == MaximumMultiSetTargets ||
+					MuiHeadlessObjectCore.FindObject(ref platform, state,
+						target).IsNull) return false;
+				count++;
+			}
+		}
+		if (count == 0 || count > MaximumMultiSetTargets) return false;
+		if (request.FirstObject.Raw != request.Executor.Raw &&
+			!SetMultiSetAttribute(ref platform, state, request.FirstObject,
+				request.Attribute, request.Value, true))
+			return false;
+		for (var index = 1u; index < count; index++)
+		{
+			MuiMultiSetTargetEntry mutationEntry = default;
+			cursor.Index = index - 1;
+			if (!MuiMultiSetTargetVectorCodec.TryGetEntry(ref platform, cursor,
+				out var mutationSlot) ||
+				!MuiMultiSetTargetEntryCodec.TryReadInto(ref platform, mutationSlot,
+					ref mutationEntry) ||
+				mutationEntry.Target.IsNull) return false;
+			var mutationTarget = mutationEntry.Target;
+			if (mutationTarget.Raw != request.Executor.Raw &&
+				!SetMultiSetAttribute(ref platform, state, mutationTarget,
+					request.Attribute, request.Value, true)) return false;
+		}
+		return true;
+	}
+
+	// Keep the public packet-facing route struct-first at one boundary. The
+	// fixed message is decoded once into MuiMultiSetMessage; the mutation walk
+	// then consumes its named fields and the named inline target-vector base.
+	internal static bool DispatchMultiSet<TPlatform>(ref TPlatform platform,
+		APTR state, APTR executor, APTR message)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var dispatch = default(MuiMultiSetDispatchRequest);
+		dispatch.State = state;
+		dispatch.Executor = executor;
+		dispatch.Message = message;
+		return DispatchMultiSet(ref platform, dispatch);
+	}
+
+	internal static bool DispatchMultiSet<TPlatform>(ref TPlatform platform,
+		MuiMultiSetDispatchRequest dispatch)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadMultiSet(ref platform, dispatch.Message, MultiSetMethod,
+			out var packet)) return false;
+		var firstObject = APTR.FromPointer(packet.FirstObject);
+		// The inline vector starts immediately after the typed fixed header. This
+		// is the guest ABI boundary; the target slots themselves remain typed
+		// records below.
+		var vector = APTR.FromPointer(dispatch.Message.Raw +
+			MuiMultiSetMessage.Size);
+		if (MuiHeadlessObjectCore.FindObject(ref platform, dispatch.State,
+			dispatch.Executor).IsNull ||
+			firstObject.IsNull || vector.IsNull) return false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, dispatch.State,
+			firstObject).IsNull) return false;
+		var count = 1u;
+		var cursor = default(MuiMultiSetTargetVectorCursor);
+		cursor.Base = vector;
+		cursor.Index = 0;
+		MuiMultiSetTargetEntry entry = default;
+		if (!MuiMultiSetTargetVectorCodec.TryGetEntry(ref platform, cursor,
+			out var targetSlot) ||
+			!MuiMultiSetTargetEntryCodec.TryReadInto(ref platform, targetSlot,
+				ref entry)) return false;
+		var target = entry.Target;
+		if (target.IsNotNull)
+		{
+			if (MuiHeadlessObjectCore.FindObject(ref platform, dispatch.State,
+				target).IsNull) return false;
+			count = 2;
+			while (count <= MaximumMultiSetTargets)
+			{
+				cursor.Index = count - 1;
+				entry = default;
+				if (!MuiMultiSetTargetVectorCodec.TryGetEntry(ref platform, cursor,
+					out targetSlot) ||
+					!MuiMultiSetTargetEntryCodec.TryReadInto(ref platform, targetSlot,
+						ref entry)) return false;
+				target = entry.Target;
+				if (target.IsNull) break;
+				if (count == MaximumMultiSetTargets ||
+					MuiHeadlessObjectCore.FindObject(ref platform, dispatch.State,
+						target).IsNull) return false;
+				count++;
+			}
+		}
+		if (count == 0 || count > MaximumMultiSetTargets) return false;
+		if (firstObject.Raw != dispatch.Executor.Raw &&
+			!SetMultiSetAttribute(ref platform, dispatch.State, firstObject,
+				packet.Attribute, packet.Value, true)) return false;
+		for (var index = 1u; index < count; index++)
+		{
+			MuiMultiSetTargetEntry mutationEntry = default;
+			cursor.Index = index - 1;
+			if (!MuiMultiSetTargetVectorCodec.TryGetEntry(ref platform, cursor,
+				out var mutationSlot) ||
+				!MuiMultiSetTargetEntryCodec.TryReadInto(ref platform, mutationSlot,
+					ref mutationEntry) || mutationEntry.Target.IsNull) return false;
+			var mutationTarget = mutationEntry.Target;
+			if (mutationTarget.Raw != dispatch.Executor.Raw &&
+				!SetMultiSetAttribute(ref platform, dispatch.State, mutationTarget,
+					packet.Attribute, packet.Value, true)) return false;
 		}
 		return true;
 	}
@@ -715,39 +907,6 @@ public static class MuiNotifyCore
 		return false;
 	}
 
-	private static bool CountMultiSetTargets<TPlatform>(ref TPlatform platform,
-		APTR state, APTR firstObject, APTR vector, out uint count)
-		where TPlatform : struct, IMuiHeadlessPlatform
-	{
-		count = 0;
-		var current = firstObject;
-		while (count < MaximumMultiSetTargets && current.IsNotNull)
-		{
-			if (MuiHeadlessObjectCore.FindObject(ref platform, state, current).IsNull)
-				return false;
-			count++;
-			if (!TryReadMultiSetTarget(ref platform, vector, count - 1,
-				out current)) return false;
-		}
-		return count != 0 && current.IsNull;
-	}
-
-	private static bool TryReadMultiSetTarget<TPlatform>(ref TPlatform platform,
-		APTR vector, uint index, out APTR target)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		target = APTR.Null;
-		var cursor = default(MuiMultiSetTargetVectorCursor);
-		cursor.Base = vector;
-		cursor.Index = index;
-		if (!MuiMultiSetTargetVectorCodec.TryGetEntry(ref platform, cursor,
-			out var slot)) return false;
-		if (!MuiMultiSetTargetEntryCodec.TryRead(ref platform, slot,
-			out var entry)) return false;
-		target = entry.Target;
-		return true;
-	}
-
 	// MUIM_GetConfigItem (V11).  MorphOS currently exposes only
 	// MUICFG_PublicScreen through this method.  The result is written to the
 	// caller-owned ULONG exactly once after the live-object, storage, and
@@ -771,7 +930,10 @@ public static class MuiNotifyCore
 		uint followCount, APTR followParameters)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, source);
+		var notificationSource = ResolveNotificationSource(ref platform, state,
+			source, triggerAttribute);
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, state,
+			notificationSource);
 		if (record.IsNull || destination.IsNull || followCount == 0 ||
 			followCount > 256 || followParameters.IsNull) return false;
 		if (!MuiHeadlessObjectCodec.TryRead(ref platform, record,
@@ -819,7 +981,10 @@ public static class MuiNotifyCore
 		APTR source, uint triggerAttribute, APTR destination, bool matchDestination)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, source);
+		var notificationSource = ResolveNotificationSource(ref platform, state,
+			source, triggerAttribute);
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, state,
+			notificationSource);
 		if (record.IsNull) return 0;
 		if (!MuiHeadlessObjectCodec.TryRead(ref platform, record,
 			out var sourceValue)) return 0;
@@ -861,6 +1026,101 @@ public static class MuiNotifyCore
 		return removed;
 	}
 
+	// Remove notifications whose resolved destination is the object being
+	// disposed.  Destination values are not always literal guest pointers:
+	// MorphOS also permits self/ancestor destination tokens.  Resolve each
+	// named notification against its still-live source record before unlinking
+	// it, so disposing a parent cannot leave a child notification that would
+	// later cross the platform callback seam with a stale target.
+	internal static uint RemoveAllToObject<TPlatform>(ref TPlatform platform,
+		APTR state, APTR destination)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (destination.IsNull || !MuiHeadlessStateCodec.TryRead(ref platform,
+			state, out var stateValue)) return 0;
+		var currentRecord = stateValue.Objects;
+		uint removed = 0;
+		uint visited = 0;
+		while (currentRecord.IsNotNull && visited++ <
+			MuiHeadlessLayout.MaximumTraversal)
+		{
+			if (!MuiHeadlessObjectCodec.TryRead(ref platform, currentRecord,
+				out var sourceValue)) break;
+			var nextRecord = sourceValue.Next;
+			removed += RemoveDestinationFromSource(ref platform, state,
+				currentRecord, destination);
+			currentRecord = nextRecord;
+		}
+		if (removed != 0) MuiHeadlessMemory.Mutated(ref platform, state);
+		return removed;
+	}
+
+	private static uint RemoveDestinationFromSource<TPlatform>(
+		ref TPlatform platform, APTR state, APTR sourceRecord,
+		APTR destination) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiHeadlessObjectCodec.TryRead(ref platform, sourceRecord,
+			out var sourceValue)) return 0;
+		uint removed = 0;
+		uint visited = 0;
+		var current = sourceValue.Notifications;
+		var previous = APTR.Null;
+		while (current.IsNotNull && visited++ <
+			MuiHeadlessLayout.MaximumTraversal)
+		{
+			if (!MuiHeadlessNotificationCodec.TryRead(ref platform, current,
+				out var notification)) break;
+			var next = notification.Next;
+			var resolved = ResolveDestination(ref platform, sourceRecord,
+				notification.Destination);
+			if (resolved.Raw == destination.Raw)
+			{
+				if (previous.IsNull) sourceValue.Notifications = next;
+				else
+				{
+					if (!MuiHeadlessNotificationCodec.TryRead(ref platform, previous,
+						out var previousNotification)) break;
+					previousNotification.Next = next;
+					if (!MuiHeadlessNotificationCodec.Write(ref platform, previous,
+						previousNotification)) break;
+				}
+				FreeNotification(ref platform, current);
+				removed++;
+			}
+			else previous = current;
+			current = next;
+		}
+		if (removed != 0 && !MuiHeadlessObjectCodec.Write(ref platform,
+			sourceRecord, sourceValue)) return 0;
+		return removed;
+	}
+
+	// A Listview exposes the child List as its public List attribute surface.
+	// Notifications installed on those forwarded attributes therefore belong to
+	// the child record, while Listview-owned click and selection signals remain
+	// on the composite record. No shadow notification table or private offset is
+	// needed; removal resolves the same named source deterministically.
+	private static APTR ResolveNotificationSource<TPlatform>(
+		ref TPlatform platform, APTR state, APTR source, uint attribute)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		// Keep the APTR result in one named local. Besides making the guest
+		// ownership rule explicit, this avoids a conditional-expression merge
+		// that the freestanding MC68000 lowering cannot represent when the
+		// generic collection classifier is inlined.
+		var resolved = source;
+		if (MuiListviewCore.IsForwardedNotificationAttribute(attribute))
+		{
+			var collection = MuiListCore.Classify(ref platform, state, source);
+			if (collection == MuiCollectionClass.Listview)
+			{
+				var child = MuiListviewCore.ChildList(ref platform, state, source);
+				if (child.IsNotNull) resolved = child;
+			}
+		}
+		return resolved;
+	}
+
 	internal static void DispatchAttributeChange<TPlatform>(ref TPlatform platform,
 		APTR state, APTR sourceRecord, uint attribute, uint value)
 		where TPlatform : struct, IMuiHeadlessPlatform
@@ -868,6 +1128,11 @@ public static class MuiNotifyCore
 		if (!MuiHeadlessStateCodec.TryRead(ref platform, state,
 			out var stateValue)) return;
 		var depth = stateValue.NotifyDepth;
+		// The state record's named NotifySuppressionMethod field is used as a transient,
+		// operation-local MUIA_NoNotifyMethod selector while an OM_SET tag list
+		// is being applied. A zero value means that every matching notification
+		// method remains eligible.
+		var suppressedMethod = stateValue.NotifySuppressionMethod;
 		if (depth >= MuiHeadlessLayout.MaximumNotificationDepth) return;
 		stateValue.NotifyDepth = depth + 1;
 		if (!MuiHeadlessStateCodec.Write(ref platform, state, stateValue)) return;
@@ -892,18 +1157,21 @@ public static class MuiNotifyCore
 			var destinationValue = notification.Destination;
 			var destination = ResolveDestination(ref platform, sourceRecord,
 				destinationValue);
-			if (destination.IsNull || followCount == 0 || followCount > 256)
+			// Notification destinations are guest object pointers.  Reject stale
+			// or malformed destinations before crossing the platform callback seam;
+			// this keeps a bad notification from turning into an unmapped bus read.
+			if (destination.IsNull || !platform.IsMapped(destination, 1) ||
+				followCount == 0 || followCount > 256)
 				continue;
 			var bytes = followCount * 4u;
+			if (!MuiHeadlessNotificationCodec.TryGetPayload(ref platform, item,
+				bytes, out var payload)) continue;
+			if (suppressedMethod != 0 &&
+				MuiNotifyFollowParameterSlotCodec.TryRead(ref platform, payload,
+					out var methodSlot) && methodSlot.Value == suppressedMethod)
+				continue;
 			var message = MuiHeadlessMemory.Allocate(ref platform, bytes);
 			if (message.IsNull) continue;
-			if (!MuiHeadlessNotificationCodec.TryGetPayload(ref platform, item,
-				bytes, out var payload))
-			{
-				platform.Clear(message, bytes);
-				platform.Free(message, bytes);
-				continue;
-			}
 			platform.Copy(payload, message, bytes);
 			var cursor = default(MuiNotifyFollowParameterVectorCursor);
 			cursor.Base = message;

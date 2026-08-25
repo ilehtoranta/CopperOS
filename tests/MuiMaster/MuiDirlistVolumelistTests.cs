@@ -115,6 +115,9 @@ public sealed class MuiDirlistVolumelistTests
 		Assert.True(MuiDirlistMessageCodec.TryReadMethodId(ref platform, address,
 			out var packet));
 		Assert.Equal(MuiDirlistMessageCodec.ReRead, packet.MethodId);
+		Assert.True(MuiDirlistMessageCodec.TryReadMethodIdValue(ref platform,
+			address, out var methodId));
+		Assert.Equal(MuiDirlistMessageCodec.ReRead, methodId);
 		Assert.False(MuiDirlistMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -453,6 +456,48 @@ public sealed class MuiDirlistVolumelistTests
 		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, volumes,
 			ExampleMode, out var exampleMode));
 		Assert.Equal(1u, exampleMode);
+	}
+
+	[Fact]
+	public void DirlistRuntimeSetRejectsGetterAndInitializerProjections()
+	{
+		var platform = CreatePlatform(out var dirlistClass, out var volumelistClass,
+			out _);
+		var dirlist = CreateDirlist(ref platform, dirlistClass, "Data:");
+		Assert.False(MuiDirlistCore.SetRuntimeAttribute(ref platform, State, dirlist,
+			Status, 99));
+		Assert.False(MuiDirlistCore.SetRuntimeAttribute(ref platform, State, dirlist,
+			NumFiles, 99));
+		Assert.False(MuiDirlistCore.SetRuntimeAttribute(ref platform, State, dirlist,
+			NumDrawers, 99));
+		Assert.False(MuiDirlistCore.SetRuntimeAttribute(ref platform, State, dirlist,
+			NumBytes, 99));
+		Assert.False(MuiDirlistCore.SetRuntimeAttribute(ref platform, State, dirlist,
+			NumBytes64, 0x7800));
+		Assert.False(MuiDirlistCore.SetRuntimeAttribute(ref platform, State, dirlist,
+			PathAttr, 0x7800));
+		Assert.True(MuiDirlistCore.GetAttribute(ref platform, State, dirlist,
+			Status, out var status));
+		Assert.Equal(StatusValid, status);
+		Assert.True(MuiDirlistCore.GetAttribute(ref platform, State, dirlist,
+			NumFiles, out var files));
+		Assert.NotEqual(99u, files);
+
+		var volumes = MuiVolumelistCore.CreateVolumelist(ref platform, State,
+			volumelistClass, APTR.Null);
+		Assert.NotEqual(APTR.Null, volumes);
+		Assert.False(MuiVolumelistCore.SetRuntimeAttribute(ref platform, State,
+			volumes, ExampleMode, 1));
+
+		var message = APTR.FromPointer(0x7B00);
+		Assert.True(MuiDirlistMessageCodec.WriteSet(ref platform, message,
+			MuiDirlistMessageCodec.Set, NumFiles, 99));
+		Assert.Equal(0u, MuiDirlistDispatcher.Dispatch(ref platform, State,
+			dirlist, message));
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			dirlist));
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			volumes));
 	}
 
 	[Fact]

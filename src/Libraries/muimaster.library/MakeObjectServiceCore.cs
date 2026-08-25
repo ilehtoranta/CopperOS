@@ -761,14 +761,7 @@ public static class MuiMakeObjectServiceCore
 		else if (type == MUIO_BarTitle) AddTag(ref platform, tags, ref index,
 			RectangleBarTitle, p0);
 		else if (type == MUIO_Button)
-		{
-			AddTag(ref platform, tags, ref index, Frame, ButtonFrame);
-			AddTag(ref platform, tags, ref index, Font, ButtonFont);
-			AddTag(ref platform, tags, ref index, TextContents, p0);
-			AddTag(ref platform, tags, ref index, TextPreParse, preParse.Raw);
-			AddTag(ref platform, tags, ref index, InputMode, InputModeRelVerify);
-			AddTag(ref platform, tags, ref index, Background, ButtonBackground);
-		}
+			return WriteButtonTagRecords(ref platform, tags, p0, preParse);
 		else if (type == MUIO_Checkmark)
 		{
 			AddTag(ref platform, tags, ref index, Frame, ImageButtonFrame);
@@ -868,6 +861,25 @@ public static class MuiMakeObjectServiceCore
 				AddTag(ref platform, tags, ref index, 0x8042120B, key);
 			}
 		}
+		WriteTagDone(ref platform, tags, index);
+		return true;
+	}
+
+	// Shared generated-TagItem seam for the button form of MUI_MakeObjectA.
+	// Keeping this small typed route separate lets native qualification prove
+	// the generated records without pulling the complete object factory into a
+	// freestanding closure.
+	internal static bool WriteButtonTagRecords<TPlatform>(ref TPlatform platform,
+		APTR tags, uint text, APTR preParse)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var index = 0u;
+		AddTag(ref platform, tags, ref index, Frame, ButtonFrame);
+		AddTag(ref platform, tags, ref index, Font, ButtonFont);
+		AddTag(ref platform, tags, ref index, TextContents, text);
+		AddTag(ref platform, tags, ref index, TextPreParse, preParse.Raw);
+		AddTag(ref platform, tags, ref index, InputMode, InputModeRelVerify);
+		AddTag(ref platform, tags, ref index, Background, ButtonBackground);
 		WriteTagDone(ref platform, tags, index);
 		return true;
 	}

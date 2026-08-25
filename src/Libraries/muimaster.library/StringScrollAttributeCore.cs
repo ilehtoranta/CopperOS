@@ -24,7 +24,11 @@ public static class MuiStringScrollAttributeCore
 	private const uint Height = 0x80423237u;
 	private const uint CharacterWidth = 8;
 	private const uint CharacterHeight = 10;
-	private const uint MetricsStateKey = 0x7F070037u;
+	// Keep the String.mui metrics record in its own dataspace-key namespace.
+	// 0x7F070037 is already owned by CommonControlCore's Text Unicode record;
+	// sharing a key would make a valid String record appear malformed whenever
+	// both state seams are materialised on the same object.
+	internal const uint MetricsStateKey = 0x7F070070u;
 
 	public static bool IsScrollAttribute(uint attribute) =>
 		attribute == ScrollHeight || attribute == ScrollLeft ||
@@ -35,6 +39,46 @@ public static class MuiStringScrollAttributeCore
 		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		return TryReadMetricsState(ref platform, state, obj, out _);
+	}
+
+	// Recompute and optionally publish the String.mui scroll metric transition.
+	// The previous and current values are named guest-record fields; no managed
+	// shadow tuple or object-layout offset is used. Getter paths continue to use
+	// TryReadMetricsState directly, so reading an attribute never raises a
+	// notification. Layout/content mutation paths call this seam with notify
+	// enabled to drive MorphOS-style Prop connections.
+	internal static bool Refresh<TPlatform>(ref TPlatform platform, APTR state,
+		APTR obj, bool notify)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		if (MuiCommonControlCore.Classify(ref platform, state, obj) !=
+			MuiControlClass.String) return false;
+		var hasPrevious = TryGetMetricsStateRecord(ref platform, state, obj,
+			out var previous);
+		if (!TryReadMetricsState(ref platform, state, obj, out var current))
+			return false;
+		if (!notify || !hasPrevious) return true;
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
+		if (record.IsNull) return false;
+		if (previous.Width != current.Width)
+			MuiNotifyCore.DispatchAttributeChange(ref platform, state, record,
+				ScrollWidth, current.Width);
+		if (previous.Height != current.Height)
+			MuiNotifyCore.DispatchAttributeChange(ref platform, state, record,
+				ScrollHeight, current.Height);
+		if (previous.VisibleWidth != current.VisibleWidth)
+			MuiNotifyCore.DispatchAttributeChange(ref platform, state, record,
+				ScrollVisibleWidth, current.VisibleWidth);
+		if (previous.VisibleHeight != current.VisibleHeight)
+			MuiNotifyCore.DispatchAttributeChange(ref platform, state, record,
+				ScrollVisibleHeight, current.VisibleHeight);
+		if (previous.Left != current.Left)
+			MuiNotifyCore.DispatchAttributeChange(ref platform, state, record,
+				ScrollLeft, current.Left);
+		if (previous.Top != current.Top)
+			MuiNotifyCore.DispatchAttributeChange(ref platform, state, record,
+				ScrollTop, current.Top);
+		return true;
 	}
 
 	public static bool Set<TPlatform>(ref TPlatform platform, APTR state, APTR obj,
@@ -88,24 +132,45 @@ public static class MuiStringScrollAttributeCore
 		result = default;
 		if (MuiCommonControlCore.Classify(ref platform, state, obj) !=
 			MuiControlClass.String) return false;
+		// A malformed present record is not the same as an absent record.  Admit
+		// the named struct before clamping raw projections so a failed typed
+		// transition cannot silently mutate ScrollLeft/ScrollTop.
+		if (!TryReadMetricsAdmission(ref platform, state, obj, out _,
+			out _)) return false;
 		Metrics(ref platform, state, obj, out var contentWidth,
 			out var contentHeight, out var visibleWidth, out var visibleHeight);
 		var maxLeft = contentWidth > visibleWidth ? contentWidth - visibleWidth : 0u;
 		var maxTop = contentHeight > visibleHeight ? contentHeight - visibleHeight : 0u;
 		var left = ReadRaw(ref platform, state, obj, ScrollLeft, 0);
 		var top = ReadRaw(ref platform, state, obj, ScrollTop, 0);
+		var previousLeft = left;
+		var previousTop = top;
 		if (left > maxLeft) left = maxLeft;
 		if (top > maxTop) top = maxTop;
 		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
-			ScrollLeft, left, false) || !MuiHeadlessObjectCore.SetAttribute(
-			ref platform, state, obj, ScrollTop, top, false)) return false;
+			ScrollLeft, left, false)) return false;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			ScrollTop, top, false))
+		{
+			MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+				ScrollLeft, previousLeft, false);
+			return false;
+		}
 		result.Width = contentWidth;
 		result.Height = contentHeight;
 		result.VisibleWidth = visibleWidth;
 		result.VisibleHeight = visibleHeight;
 		result.Left = left;
 		result.Top = top;
-		return PublishMetricsState(ref platform, state, obj, result);
+		if (PublishMetricsState(ref platform, state, obj, result)) return true;
+		// Keep the public scalar projections atomic with the named metrics
+		// publication.  This is a value-type rollback; no managed shadow state
+		// or positional object field is involved.
+		MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj, ScrollLeft,
+			previousLeft, false);
+		MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj, ScrollTop,
+			previousTop, false);
+		return false;
 	}
 
 	internal static bool TryGetMetricsStateRecord<TPlatform>(
@@ -113,11 +178,26 @@ public static class MuiStringScrollAttributeCore
 		out MuiStringScrollMetricsStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		return TryReadMetricsAdmission(ref platform, state, obj, out value,
+			out var present) && present;
+	}
+
+	// Shared admission keeps the absent-record construction path distinct from
+	// malformed present state.  Only the former may be materialised by the
+	// publisher; every consumer fails closed for the latter.
+	private static bool TryReadMetricsAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiStringScrollMetricsStateRecord value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			MetricsStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			MetricsStateKey) != unchecked((int)MuiStringScrollMetricsStateRecord.Size))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			MetricsStateKey);
+		present = block.IsNotNull || length != 0;
+		if (!present) return true;
+		if (block.IsNull || length != unchecked((int)MuiStringScrollMetricsStateRecord.Size))
 			return false;
 		return MuiStringScrollMetricsStateRecordCodec.TryRead(ref platform, block,
 			out value);

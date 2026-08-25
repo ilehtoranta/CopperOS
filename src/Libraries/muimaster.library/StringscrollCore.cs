@@ -167,9 +167,11 @@ internal static class MuiStringscrollStateRecordCodec
 	}
 }
 
-// Stringscroll policy flags are all public BOOL attributes. Keeping the
-// complete policy together prevents bar/layout/input consumers from silently
-// disagreeing about a canonical value.
+// Stringscroll policy flags are the public BOOL attributes that control
+// minimum-size, border, and input behavior. HorizBar and VertBar are
+// initializer-only object pointers and live in the separate typed scrollbar
+// record below. Keeping the BOOL policy together prevents layout/input
+// consumers from silently disagreeing about a canonical value.
 public struct MuiStringscrollPolicyState
 {
 	public uint HorizBar;
@@ -181,10 +183,11 @@ public struct MuiStringscrollPolicyState
 	public uint VertScrollerOnly;
 }
 
-// Guest-resident canonical policy for Stringscroll. The public BOOL attributes
-// are mirrored for ABI compatibility, while all policy consumers use this
-// named record after construction. Keeping the seven flags together prevents
-// input, layout, and scrollbar drawing from drifting across raw words.
+// Guest-resident canonical BOOL policy for Stringscroll. The public policy
+// attributes are mirrored for ABI compatibility, while all policy consumers
+// use this named record after construction. Keeping the flags together
+// prevents input, layout, and scrollbar drawing from drifting across raw
+// words; object-pointer identity is kept by MuiStringscrollScrollbarRecord.
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiStringscrollPolicyRecord
 {
@@ -338,6 +341,315 @@ internal static class MuiStringscrollPolicyRecordCodec
 			MuiStringscrollPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
 				address, MuiStringscrollPolicyField.VertScrollerOnly,
 				value.VertScrollerOnly);
+	}
+}
+
+// The named policy stores normalized MorphOS BOOL projections. The codec keeps
+// wire fields lossless for corruption tests, while semantic admission rejects
+// values outside the canonical 0/1 domain before policy consumers normalize or
+// act on them.
+internal static class MuiStringscrollPolicyValidation
+{
+	internal static bool IsValidRecord(MuiStringscrollPolicyRecord value) =>
+		value.HorizBar <= 1 && value.NoInput <= 1 && value.SetMin <= 1 &&
+		value.SetVMin <= 1 && value.UseWinBorder <= 1 && value.VertBar <= 1 &&
+		value.VertScrollerOnly <= 1;
+
+	internal static bool IsValidState(MuiStringscrollPolicyState value) =>
+		value.HorizBar <= 1 && value.NoInput <= 1 && value.SetMin <= 1 &&
+		value.SetVMin <= 1 && value.UseWinBorder <= 1 && value.VertBar <= 1 &&
+		value.VertScrollerOnly <= 1;
+}
+
+// Stringscroll's HorizBar and VertBar attributes are initializer-only
+// scrollbar object pointers in MorphOS MUI. Keep those APTR values in their
+// own named guest-resident record; the policy record below continues to hold
+// normalized BOOL enable flags for layout and input decisions.
+public struct MuiStringscrollScrollbarState
+{
+	public APTR HorizBar;
+	public APTR VertBar;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiStringscrollScrollbarRecord
+{
+	internal const uint Size = 12;
+	internal const uint Cookie = 0x53534252u; // 'SSBR'
+
+	internal uint Magic;
+	internal APTR HorizBar;
+	internal APTR VertBar;
+}
+
+internal enum MuiStringscrollScrollbarField : byte
+{
+	Magic,
+	HorizBar,
+	VertBar,
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiStringscrollScrollbarFieldCursor
+{
+	internal APTR Record;
+	internal MuiStringscrollScrollbarField Field;
+}
+
+internal static class MuiStringscrollScrollbarFieldCursorCodec
+{
+	private static bool TryResolve(MuiStringscrollScrollbarField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiStringscrollScrollbarField.Magic: offset = 0; return true;
+			case MuiStringscrollScrollbarField.HorizBar: offset = 4; return true;
+			case MuiStringscrollScrollbarField.VertBar: offset = 8; return true;
+		}
+		offset = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringscrollScrollbarFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
+			cursor.Record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(cursor.Record, MuiStringscrollScrollbarRecord.Size))
+			return false;
+		address = APTR.FromPointer(cursor.Record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollScrollbarField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		var cursor = default(MuiStringscrollScrollbarFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollScrollbarField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiStringscrollScrollbarFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
+internal static class MuiStringscrollScrollbarRecordCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiStringscrollScrollbarRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiStringscrollScrollbarRecord.Size) ||
+			!MuiStringscrollScrollbarFieldCursorCodec.TryReadUInt32(ref platform,
+				address, MuiStringscrollScrollbarField.Magic, out var magic) ||
+			magic != MuiStringscrollScrollbarRecord.Cookie)
+			return false;
+		value.Magic = magic;
+		if (!MuiStringscrollScrollbarFieldCursorCodec.TryReadUInt32(ref platform,
+			address, MuiStringscrollScrollbarField.HorizBar, out var horizBar) ||
+			!MuiStringscrollScrollbarFieldCursorCodec.TryReadUInt32(ref platform,
+				address, MuiStringscrollScrollbarField.VertBar, out var vertBar))
+			return false;
+		value.HorizBar = APTR.FromPointer(horizBar);
+		value.VertBar = APTR.FromPointer(vertBar);
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiStringscrollScrollbarRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiStringscrollScrollbarRecord.Size) || value.Magic !=
+			MuiStringscrollScrollbarRecord.Cookie) return false;
+		return MuiStringscrollScrollbarFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiStringscrollScrollbarField.Magic, value.Magic) &&
+			MuiStringscrollScrollbarFieldCursorCodec.TryWriteUInt32(ref platform,
+				address, MuiStringscrollScrollbarField.HorizBar,
+				value.HorizBar.Raw) &&
+			MuiStringscrollScrollbarFieldCursorCodec.TryWriteUInt32(ref platform,
+				address, MuiStringscrollScrollbarField.VertBar,
+				value.VertBar.Raw);
+	}
+}
+
+// The optional child scrollbar objects are kept in a separate named record.
+// Supplied MorphOS scrollbar pointers are caller-owned; automatically-created
+// children are marked in OwnedMask and retired by Stringscroll cleanup.
+public struct MuiStringscrollCompositionState
+{
+	public APTR Horizontal;
+	public APTR Vertical;
+	public uint OwnedMask;
+
+	public const uint HorizontalOwned = 1u;
+	public const uint VerticalOwned = 2u;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiStringscrollCompositionRecord
+{
+	internal const uint Size = 24;
+	internal const uint Cookie = 0x53534350u; // 'SSCP'
+
+	internal uint Magic;
+	internal APTR Horizontal;
+	internal APTR Vertical;
+	internal uint OwnedMask;
+	internal uint LastHorizontalFirst;
+	internal uint LastVerticalFirst;
+}
+
+internal enum MuiStringscrollCompositionField : byte
+{
+	Magic,
+	Horizontal,
+	Vertical,
+	OwnedMask,
+	LastHorizontalFirst,
+	LastVerticalFirst,
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiStringscrollCompositionFieldCursor
+{
+	internal APTR Record;
+	internal MuiStringscrollCompositionField Field;
+}
+
+internal static class MuiStringscrollCompositionFieldCursorCodec
+{
+	private static bool TryResolve(MuiStringscrollCompositionField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiStringscrollCompositionField.Magic: offset = 0; return true;
+			case MuiStringscrollCompositionField.Horizontal: offset = 4; return true;
+			case MuiStringscrollCompositionField.Vertical: offset = 8; return true;
+			case MuiStringscrollCompositionField.OwnedMask: offset = 12; return true;
+			case MuiStringscrollCompositionField.LastHorizontalFirst: offset = 16; return true;
+			case MuiStringscrollCompositionField.LastVerticalFirst: offset = 20; return true;
+		}
+		offset = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringscrollCompositionFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
+			cursor.Record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(cursor.Record, MuiStringscrollCompositionRecord.Size))
+			return false;
+		address = APTR.FromPointer(cursor.Record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollCompositionField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		var cursor = default(MuiStringscrollCompositionFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollCompositionField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiStringscrollCompositionFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
+internal static class MuiStringscrollCompositionRecordCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiStringscrollCompositionRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiStringscrollCompositionRecord.Size) ||
+			!MuiStringscrollCompositionFieldCursorCodec.TryReadUInt32(ref platform,
+				address, MuiStringscrollCompositionField.Magic, out var magic) ||
+			magic != MuiStringscrollCompositionRecord.Cookie)
+			return false;
+		value.Magic = magic;
+		if (!MuiStringscrollCompositionFieldCursorCodec.TryReadUInt32(ref platform,
+			address, MuiStringscrollCompositionField.Horizontal,
+			out var horizontal) ||
+			!MuiStringscrollCompositionFieldCursorCodec.TryReadUInt32(ref platform,
+				address, MuiStringscrollCompositionField.Vertical, out var vertical) ||
+			!MuiStringscrollCompositionFieldCursorCodec.TryReadUInt32(ref platform,
+				address, MuiStringscrollCompositionField.OwnedMask,
+				out value.OwnedMask) ||
+			!MuiStringscrollCompositionFieldCursorCodec.TryReadUInt32(ref platform,
+				address, MuiStringscrollCompositionField.LastHorizontalFirst,
+				out value.LastHorizontalFirst) ||
+			!MuiStringscrollCompositionFieldCursorCodec.TryReadUInt32(ref platform,
+				address, MuiStringscrollCompositionField.LastVerticalFirst,
+				out value.LastVerticalFirst)) return false;
+		value.Horizontal = APTR.FromPointer(horizontal);
+		value.Vertical = APTR.FromPointer(vertical);
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiStringscrollCompositionRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiStringscrollCompositionRecord.Size) || value.Magic !=
+			MuiStringscrollCompositionRecord.Cookie) return false;
+		return MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiStringscrollCompositionField.Magic, value.Magic) &&
+			MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(ref platform,
+				address, MuiStringscrollCompositionField.Horizontal,
+				value.Horizontal.Raw) &&
+			MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(ref platform,
+				address, MuiStringscrollCompositionField.Vertical,
+				value.Vertical.Raw) &&
+			MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(ref platform,
+				address, MuiStringscrollCompositionField.OwnedMask,
+				value.OwnedMask) &&
+			MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(ref platform,
+				address, MuiStringscrollCompositionField.LastHorizontalFirst,
+				value.LastHorizontalFirst) &&
+			MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(ref platform,
+				address, MuiStringscrollCompositionField.LastVerticalFirst,
+				value.LastVerticalFirst);
 	}
 }
 
@@ -849,13 +1161,36 @@ internal struct MuiStringscrollBarGeometry
 	internal int ThumbBottom;
 }
 
-// Stringscroll.mui (MorphOS 3.20). This is a deliberately bounded first
+// Input geometry for either the legacy neutral track or a composed
+// Scrollbar child. The axis ranges are named so pointer routing never has to
+// rediscover arrow/Prop/thumb positions from raw attributes.
+internal struct MuiStringscrollInputBarGeometry
+{
+	internal int TrackStart;
+	internal int TrackEnd;
+	internal int ThumbStart;
+	internal int ThumbEnd;
+	internal int FirstArrowStart;
+	internal int FirstArrowEnd;
+	internal int SecondArrowStart;
+	internal int SecondArrowEnd;
+	internal int CrossStart;
+	internal int CrossEnd;
+	internal int FirstDelta;
+	internal int SecondDelta;
+	internal uint Horizontal;
+	internal uint HasArrows;
+}
+
+// Stringscroll.mui (MorphOS 3.20). This is a deliberately bounded
 // implementation of the scrolling string gadget. The string is copied into
 // guest-owned dataspace, its content metrics are derived without a managed
 // text object, and the visible text is clipped and drawn through the existing
-// graphics seam. Scroll offsets are pixel based and remain clamped whenever
-// the string, layout, or scrolling policy changes. No managed allocations,
-// exceptions, delegates, or host services are used here.
+// graphics seam. Optional Scrollbar children are also guest objects with
+// named ownership/state records; caller-supplied bars are never disposed.
+// Scroll offsets are pixel based and remain clamped whenever the string,
+// layout, or scrolling policy changes. No managed allocations, exceptions,
+// delegates, or host services are used here.
 public static class MuiStringscrollCore
 {
 	// ---- Public attributes (mui.h / MorphOS Stringscroll.mui) ---------------
@@ -891,12 +1226,19 @@ public static class MuiStringscrollCore
 	private const uint LayoutStateKey = 0x0f110009u;
 	private const uint RenderStateKey = 0x0f11000au;
 	private const uint ViewportStateKey = 0x0f11000bu;
+	private const uint ScrollbarStateKey = 0x0f11000cu;
+	private const uint CompositionStateKey = 0x0f11000du;
 
 	private const uint MaximumStringLength = 65536;
 	private const uint CharacterWidth = 8;
 	private const uint CharacterHeight = 8;
 	private const int ScrollerExtent = 12;
 	private const uint MaximumDimension = 10000;
+	// Scrollbar type values shared by the typed Scrollbar layout record. Keep
+	// these symbolic so input routing does not depend on unexplained offsets.
+	private const uint ScrollbarTypeBottom = 1u;
+	private const uint ScrollbarTypeTop = 2u;
+	private const uint ScrollbarTypeNone = 4u;
 
 	// Intuition mouse-button envelope values used by the pointer part of
 	// MUIM_HandleInput.  Stringscroll commits a track click on SELECTUP; the
@@ -927,7 +1269,7 @@ public static class MuiStringscrollCore
 		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, state,
 			classRecord, tags);
 		if (obj.IsNull) return APTR.Null;
-		if (!Setup(ref platform, state, obj))
+		if (!Setup(ref platform, state, obj, tags))
 		{
 			MuiCollectionLifecycle.DisposeObject(ref platform, state, obj);
 			return APTR.Null;
@@ -936,10 +1278,15 @@ public static class MuiStringscrollCore
 	}
 
 	private static bool Setup<TPlatform>(ref TPlatform platform, APTR state,
-		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
+		APTR obj, APTR tags) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
 		if (record.IsNull) return false;
+		var horizontalBar = APTR.Null;
+		var verticalBar = APTR.Null;
+		if (!TryGetInitializerPointer(ref platform, tags, HorizBar,
+			out horizontalBar) || !TryGetInitializerPointer(ref platform, tags,
+			VertBar, out verticalBar)) return false;
 		EnsureDefault(ref platform, state, record, HorizBar, 1);
 		EnsureDefault(ref platform, state, record, NoInput, 0);
 		EnsureDefault(ref platform, state, record, SetMin, 0);
@@ -947,8 +1294,12 @@ public static class MuiStringscrollCore
 		EnsureDefault(ref platform, state, record, UseWinBorder, 0);
 		EnsureDefault(ref platform, state, record, VertBar, 1);
 		EnsureDefault(ref platform, state, record, VertScrollerOnly, 0);
+		if (!EnsureScrollbarRecord(ref platform, state, obj, horizontalBar,
+			verticalBar))
+			return false;
 		if (!NormalizePolicyState(ref platform, state, record)) return false;
 		if (!EnsurePolicyRecord(ref platform, state, obj, record)) return false;
+		if (!EnsureCompositionRecord(ref platform, state, obj)) return false;
 		SetRaw(ref platform, state, record, ScrollXKey, 0, false);
 		SetRaw(ref platform, state, record, ScrollYKey, 0, false);
 
@@ -962,6 +1313,44 @@ public static class MuiStringscrollCore
 		if (!EnsureLayoutRecord(ref platform, state, obj)) return false;
 		if (!EnsureRenderRecord(ref platform, state, obj)) return false;
 		return Recompute(ref platform, state, obj);
+	}
+
+	private static bool TryGetInitializerPointer<TPlatform>(ref TPlatform platform,
+		APTR tags, uint requested, out APTR value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = APTR.Null;
+		var cursor = default(MuiAslTagItemCursor);
+		cursor.Base = tags;
+		uint visited = 0;
+		while (cursor.Base.IsNotNull && visited++ < MuiAslTagListCore.MaximumSteps)
+		{
+			if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
+				out var current) || !MuiAslTagItemCodec.TryRead(ref platform, current,
+				out var item)) return false;
+			if (item.Tag == MuiAslTagListCore.TagDone) return true;
+			if (item.Tag == MuiAslTagListCore.TagMore)
+			{
+				if (item.Data == 0) return true;
+				cursor.Base = APTR.FromPointer(item.Data);
+				cursor.Index = 0;
+				continue;
+			}
+			if (item.Tag == MuiAslTagListCore.TagSkip)
+			{
+				if (item.Data == uint.MaxValue ||
+					!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, item.Data + 1))
+					return false;
+				continue;
+			}
+			if (item.Tag != MuiAslTagListCore.TagIgnore && item.Tag == requested)
+			{
+				value = APTR.FromPointer(item.Data);
+				return true;
+			}
+		if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1)) return false;
+		}
+		return tags.IsNull;
 	}
 
 	private static bool OwnString<TPlatform>(ref TPlatform platform, APTR state,
@@ -1004,8 +1393,13 @@ public static class MuiStringscrollCore
 		var obj = objectValue.Boopsi;
 		if (attribute == String)
 		{
-			value = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-				StringKey).Raw;
+			// The public String getter must use the canonical named state rather
+			// than exposing the private ownership key directly.  This keeps a
+			// malformed present record from leaking a stale pointer and verifies
+			// that the object-owned copy and its typed projection still agree.
+			if (!TryReadOwnedString(ref platform, state, obj, out var owned))
+				return false;
+			value = owned.Raw;
 			return true;
 		}
 		if (!IsPolicyAttribute(attribute) ||
@@ -1038,9 +1432,36 @@ public static class MuiStringscrollCore
 			MuiCollectionClass.Stringscroll)
 			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 				attribute, value, notify);
-		return SetKnown(ref platform, state, record, obj, attribute, value, notify) ||
-			MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj, attribute,
-				value, notify);
+		// A recognized Stringscroll attribute must not fall through to the raw
+		// object store when its typed transition fails.  Falling through would
+		// report success while bypassing the named state and could publish a
+		// replacement pointer after malformed-state rejection.
+		if (IsKnownAttribute(attribute))
+			return SetKnown(ref platform, state, record, obj, attribute, value,
+				notify);
+		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj, attribute,
+			value, notify);
+	}
+
+	private static bool IsKnownAttribute(uint attribute) =>
+		attribute == String || IsPolicyAttribute(attribute) || attribute == Width ||
+		attribute == Height || attribute == RenderInfo || attribute == Font;
+
+	// Public OM_SET is narrower than the internal class-aware setter. MorphOS
+	// exposes the Stringscroll text as a getter and all scrollbar/input policy
+	// attributes as construction-only; keep those writes on the initialization
+	// path while allowing unrelated Area attributes to use the generic store.
+	public static bool SetRuntimeAttribute<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, uint attribute, uint value, bool notify = false)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiListCore.Classify(ref platform, state, obj) !=
+			MuiCollectionClass.Stringscroll)
+			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+				attribute, value, notify);
+		if (attribute == String || IsPolicyAttribute(attribute)) return false;
+		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			attribute, value, notify);
 	}
 
 	public static bool GetAttribute<TPlatform>(ref TPlatform platform, APTR state,
@@ -1050,6 +1471,10 @@ public static class MuiStringscrollCore
 		value = 0;
 		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
 		if (record.IsNull) return false;
+		var isStringscroll = MuiListCore.Classify(ref platform, state, obj) ==
+			MuiCollectionClass.Stringscroll;
+		if (isStringscroll && IsPublicGetterAttribute(attribute))
+			return TryGetAttribute(ref platform, state, record, attribute, out value);
 		if (TryGetAttribute(ref platform, state, record, attribute, out value))
 			return true;
 		return MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj,
@@ -1062,6 +1487,34 @@ public static class MuiStringscrollCore
 	{
 		if (attribute == String)
 		{
+			// String replacement is a named-state transition.  Validate the current
+			// guest record before allocating or publishing a replacement so malformed
+			// state cannot lose the live owned buffer as a side effect of a failed set.
+			// TryReadState intentionally has a raw-store fallback for compatibility
+			// with objects created before the typed record existed.  Once a record is
+			// present, however, a malformed length or payload is an admission failure,
+			// not permission to fall back to raw state.
+			var stateRecord = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StateRecordKey);
+			var stateRecordLength = MuiStoreCore.DataspaceLength(ref platform, state,
+				obj, StateRecordKey);
+			if (stateRecord.IsNotNull || stateRecordLength != 0)
+			{
+				if (stateRecordLength != unchecked((int)MuiStringscrollStateRecord.Size) ||
+					!MuiStringscrollStateRecordCodec.TryRead(ref platform, stateRecord,
+						out _)) return false;
+			}
+			if (!TryReadState(ref platform, state, obj, out var currentState))
+				return false;
+			if (!currentState.String.IsNull && !CStringCodec.TryReadLength(
+				ref platform, currentState.String, MaximumStringLength, out _))
+				return false;
+			// Recompute consumes the named layout and composition records after the
+			// owned string has been replaced.  Admit those value-type inputs before
+			// OwnString can retire the previous guest buffer; a malformed dependent
+			// record must not turn a failed setter into a successful ownership
+			// transition followed by a false return.
+			if (!ValidateRecomputeInputs(ref platform, state, obj)) return false;
 			var source = APTR.FromPointer(value);
 			if (source.IsNull)
 			{
@@ -1084,38 +1537,157 @@ public static class MuiStringscrollCore
 			attribute == SetVMin || attribute == UseWinBorder || attribute == VertBar ||
 			attribute == VertScrollerOnly)
 		{
+			// Policy reads retain a raw-store fallback for compatibility with older
+			// objects.  Once the named policy record exists, malformed state must be
+			// rejected before WritePolicyState can publish a partial raw projection.
+			var policyBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				PolicyStateKey);
+			var policyLength = MuiStoreCore.DataspaceLength(ref platform, state,
+				obj, PolicyStateKey);
+			if (policyBlock.IsNotNull || policyLength != 0)
+			{
+				if (policyLength != unchecked((int)MuiStringscrollPolicyRecord.Size) ||
+					!MuiStringscrollPolicyRecordCodec.TryRead(ref platform, policyBlock,
+						out _)) return false;
+			}
 			if (!TryReadPolicyState(ref platform, state, obj, out var policy))
 				return false;
+			var scrollbars = default(MuiStringscrollScrollbarState);
+			if ((attribute == HorizBar || attribute == VertBar) &&
+				!TryReadScrollbarState(ref platform, state, obj,
+					out scrollbars)) return false;
+			if (attribute == HorizBar || attribute == VertBar)
+			{
+				// Changing a scrollbar policy also reconciles the dependent child
+				// composition.  A present composition record must therefore validate
+				// before any policy or scrollbar projection is published; absence is
+				// retained as the lazy-construction case handled by ReconcileComposition.
+				var compositionBlock = MuiStoreCore.DataspaceFind(ref platform, state,
+					obj, CompositionStateKey);
+				var compositionLength = MuiStoreCore.DataspaceLength(ref platform,
+					state, obj, CompositionStateKey);
+				if (compositionBlock.IsNotNull || compositionLength != 0)
+				{
+					if (compositionLength != unchecked((int)
+						MuiStringscrollCompositionRecord.Size) ||
+						!MuiStringscrollCompositionRecordCodec.TryRead(ref platform,
+							compositionBlock, out _)) return false;
+				}
+			}
+			// Every policy transition ends in Recompute.  Admit the same named
+			// layout/composition inputs before publishing policy projections so a
+			// malformed dependent record cannot leave a policy change visible after
+			// the recompute path returns failure.
+			if (!ValidateRecomputeInputs(ref platform, state, obj)) return false;
 			var normalized = value == 0 ? 0u : 1u;
-			if (attribute == HorizBar) policy.HorizBar = normalized;
+			if (attribute == HorizBar)
+			{
+				policy.HorizBar = normalized;
+				scrollbars.HorizBar = APTR.FromPointer(value);
+			}
 			else if (attribute == NoInput) policy.NoInput = normalized;
 			else if (attribute == SetMin) policy.SetMin = normalized;
 			else if (attribute == SetVMin) policy.SetVMin = normalized;
 			else if (attribute == UseWinBorder) policy.UseWinBorder = normalized;
-			else if (attribute == VertBar) policy.VertBar = normalized;
+			else if (attribute == VertBar)
+			{
+				policy.VertBar = normalized;
+				scrollbars.VertBar = APTR.FromPointer(value);
+			}
 			else policy.VertScrollerOnly = normalized;
 			if (!WritePolicyState(ref platform, state, record, policy, attribute,
 				notify)) return false;
+			if ((attribute == HorizBar || attribute == VertBar) &&
+				!WriteScrollbarState(ref platform, state, obj, scrollbars))
+				return false;
 			if (!WritePolicyRecord(ref platform, state, obj, policy)) return false;
+			if ((attribute == HorizBar || attribute == VertBar) &&
+				!ReconcileComposition(ref platform, state, obj, scrollbars, policy))
+				return false;
 			return Recompute(ref platform, state, obj);
 		}
 		if (attribute == Width || attribute == Height)
 		{
+			// Geometry is a named-state transition.  An existing layout record must
+			// be valid before the public Area projection is changed; otherwise a
+			// malformed record could leave raw Width/Height ahead of typed state.
+			var layoutBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				LayoutStateKey);
+			var layoutLength = MuiStoreCore.DataspaceLength(ref platform, state,
+				obj, LayoutStateKey);
+			var hasLayoutRecord = layoutBlock.IsNotNull || layoutLength != 0;
+			var previousLayout = default(MuiStringscrollLayoutStateRecord);
+			if (hasLayoutRecord && (layoutLength !=
+				unchecked((int)MuiStringscrollLayoutStateRecord.Size) ||
+				!MuiStringscrollLayoutStateRecordCodec.TryRead(ref platform, layoutBlock,
+					out previousLayout))) return false;
+			var previousRaw = ReadRaw(ref platform, record, attribute, 0);
 			if (!SetRaw(ref platform, state, record, attribute, value, notify))
 				return false;
-			if (!SyncLayoutRecord(ref platform, state, obj)) return false;
+			if (!SyncLayoutRecord(ref platform, state, obj))
+			{
+				SetRaw(ref platform, state, record, attribute, previousRaw, false);
+				if (hasLayoutRecord)
+					MuiStringscrollLayoutStateRecordCodec.Write(ref platform,
+						layoutBlock, previousLayout);
+				return false;
+			}
 			return Recompute(ref platform, state, obj);
 		}
 		if (attribute == RenderInfo || attribute == Font)
 		{
+			// Render context follows the same named-record admission rule as
+			// geometry.  Keep the public pointer and decoded RastPort record
+			// coherent if a malformed existing record is encountered.
+			var renderBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				RenderStateKey);
+			var renderLength = MuiStoreCore.DataspaceLength(ref platform, state,
+				obj, RenderStateKey);
+			var hasRenderRecord = renderBlock.IsNotNull || renderLength != 0;
+			var previousRender = default(MuiStringscrollRenderStateRecord);
+			if (hasRenderRecord && (renderLength !=
+				unchecked((int)MuiStringscrollRenderStateRecord.Size) ||
+				!MuiStringscrollRenderStateRecordCodec.TryRead(ref platform, renderBlock,
+					out previousRender))) return false;
+			var previousRaw = ReadRaw(ref platform, record, attribute, 0);
 			if (!SetRaw(ref platform, state, record, attribute, value, notify))
 				return false;
-			return SyncRenderRecord(ref platform, state, obj);
+			if (!SyncRenderRecord(ref platform, state, obj))
+			{
+				SetRaw(ref platform, state, record, attribute, previousRaw, false);
+				if (hasRenderRecord)
+					MuiStringscrollRenderStateRecordCodec.Write(ref platform,
+						renderBlock, previousRender);
+				return false;
+			}
+			return true;
 		}
 		return false;
 	}
 
 	// ---- Metrics and bounded scrolling ---------------------------------------
+
+	private static bool ValidateRecomputeInputs<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadLayoutState(ref platform, state, obj, out _)) return false;
+		if (!TryReadCompositionAdmission(ref platform, state, obj,
+			out var composition, out var present)) return false;
+		if (!present) return true;
+		return ValidateCompositionChild(ref platform, state, composition.Horizontal) &&
+			ValidateCompositionChild(ref platform, state, composition.Vertical);
+	}
+
+	private static bool ValidateCompositionChild<TPlatform>(ref TPlatform platform,
+		APTR state, APTR child)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (child.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			child).IsNull) return true;
+		return MuiCommonControlCore.TryReadPropRangeState(ref platform, state,
+			child, out _);
+	}
 
 	public static bool Recompute<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
@@ -1127,6 +1699,8 @@ public static class MuiStringscrollCore
 			return false;
 		scrollState.ContentWidth = SaturatingDimension(maxWidth * CharacterWidth);
 		scrollState.ContentHeight = SaturatingDimension(lines * CharacterHeight);
+		if (!AdoptCompositionScrollOffsets(ref platform, state, obj,
+			ref scrollState)) return false;
 		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
 		if (record.IsNull || !TryReadLayoutState(ref platform, state, obj,
 			out var layout)) return false;
@@ -1138,7 +1712,90 @@ public static class MuiStringscrollCore
 			scrollState.ScrollX = viewport.MaxScrollX;
 		if (scrollState.ScrollY > viewport.MaxScrollY)
 			scrollState.ScrollY = viewport.MaxScrollY;
+		if (!SyncCompositionChildren(ref platform, state, obj, scrollState,
+			viewport)) return false;
 		return WriteState(ref platform, state, obj, scrollState, false);
+	}
+
+	private static bool SyncCompositionChildren<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiStringscrollState scrollState,
+		MuiStringscrollViewportState viewport)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadCompositionAdmission(ref platform, state, obj,
+			out var composition, out var present)) return false;
+		if (!present) return true;
+		if (!SyncCompositionChild(ref platform, state, composition.Horizontal,
+			viewport.HorizontalVisible != 0, scrollState.ContentWidth,
+			unchecked((uint)viewport.ViewportWidth), scrollState.ScrollX,
+			out composition.LastHorizontalFirst)) return false;
+		if (!SyncCompositionChild(ref platform, state, composition.Vertical,
+			viewport.VerticalVisible != 0, scrollState.ContentHeight,
+			unchecked((uint)viewport.ViewportHeight), scrollState.ScrollY,
+			out composition.LastVerticalFirst)) return false;
+		return WriteCompositionRecord(ref platform, state, obj, composition);
+	}
+
+	private static bool AdoptCompositionScrollOffsets<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		ref MuiStringscrollState scrollState)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadCompositionAdmission(ref platform, state, obj,
+			out var composition, out var present)) return false;
+		if (!present) return true;
+		var horizontal = scrollState.ScrollX;
+		var vertical = scrollState.ScrollY;
+		if (!AdoptCompositionChildFirst(ref platform, state, composition.Horizontal,
+			composition.LastHorizontalFirst, scrollState.ScrollX,
+			out horizontal) ||
+			!AdoptCompositionChildFirst(ref platform, state, composition.Vertical,
+			composition.LastVerticalFirst, scrollState.ScrollY,
+			out vertical)) return false;
+		scrollState.ScrollX = horizontal;
+		scrollState.ScrollY = vertical;
+		return true;
+	}
+
+	private static bool AdoptCompositionChildFirst<TPlatform>(
+		ref TPlatform platform, APTR state, APTR child, uint lastPublished,
+		uint parentFirst, out uint result)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		result = parentFirst;
+		if (child.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			child).IsNull) return true;
+		if (!MuiCommonControlCore.TryReadPropRangeState(ref platform, state, child,
+			out var range)) return false;
+		if (range.First != lastPublished && range.First != parentFirst)
+			result = range.First;
+		return true;
+	}
+
+	private static bool SyncCompositionChild<TPlatform>(ref TPlatform platform,
+		APTR state, APTR child, bool shown, uint entries, uint visible,
+		uint first, out uint effectiveFirst)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		effectiveFirst = first;
+		if (child.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			child).IsNull) return true;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, child,
+			MuiCommonControlCore.ShowMe, shown ? 1u : 0u, false)) return false;
+		var handled = false;
+		if (!MuiCommonControlCore.TrySetHeadlessPropAttribute(ref platform, state,
+			child, MuiCommonControlCore.PropEntries, entries, true,
+			out handled) || !handled) return false;
+		if (!MuiCommonControlCore.TrySetHeadlessPropAttribute(ref platform, state,
+			child, MuiCommonControlCore.PropVisible, visible, true,
+			out handled) || !handled) return false;
+		if (!MuiCommonControlCore.TrySetHeadlessPropAttribute(ref platform, state,
+			child, MuiCommonControlCore.PropFirst, first, true, out handled) ||
+			!handled) return false;
+		if (!MuiCommonControlCore.TryReadPropRangeState(ref platform, state, child,
+			out var range)) return false;
+		effectiveFirst = range.First;
+		return true;
 	}
 
 	// Shared UTF-8 metric seam used by Recompute and the focused native
@@ -1224,6 +1881,12 @@ public static class MuiStringscrollCore
 		if ((uint)targetY > maxY) targetY = unchecked((int)maxY);
 		scrollState.ScrollX = unchecked((uint)targetX);
 		scrollState.ScrollY = unchecked((uint)targetY);
+		// SetScroll writes the updated offsets directly (so notification semantics
+		// remain one-shot). Synchronize any composed Scrollbar children from this
+		// same typed state before publishing it, rather than requiring a later
+		// Layout or Draw pass to repair PropFirst.
+		if (!SyncCompositionChildren(ref platform, state, obj, scrollState,
+			viewport)) return false;
 		return WriteState(ref platform, state, obj, scrollState, true);
 	}
 
@@ -1295,8 +1958,245 @@ public static class MuiStringscrollCore
 		if (!TryReadPointerState(ref platform, state, obj, out var value) ||
 			(value.Flags & MuiStringscrollPointerState.ActiveFlag) == 0)
 			return false;
+		ReleasePointerIfCaptured(ref platform, obj, value);
 		return MuiStoreCore.DataspaceRemove(ref platform, state, obj,
 			PointerStateKey);
+	}
+
+	// Window deactivation is a cancellation edge for a thumb gesture just as
+	// MUIKEY_RELEASE is. Keep the public window hook on the typed state path so
+	// it can clear only an active guest record and never infer a private offset.
+	internal static bool CancelPointerDragForWindow<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		CancelPointerDrag(ref platform, state, obj);
+
+	// Direct headless disposal is a terminal path as well as the collection
+	// lifecycle wrapper. Remove any typed pointer state before StoreCore.ClearAll
+	// reclaims the object's Dataspace, releasing optional native capture through
+	// the same named record used by normal cancellation.
+	internal static bool Cleanup<TPlatform>(ref TPlatform platform, APTR state,
+		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var compositionValid = TryReadCompositionAdmission(ref platform, state, obj,
+			out var composition, out var compositionPresent);
+		if (compositionValid && compositionPresent)
+		{
+			DisposeOwnedScrollbar(ref platform, state, composition.Horizontal,
+				(composition.OwnedMask & MuiStringscrollCompositionState.HorizontalOwned) != 0);
+			DisposeOwnedScrollbar(ref platform, state, composition.Vertical,
+				(composition.OwnedMask & MuiStringscrollCompositionState.VerticalOwned) != 0);
+			MuiStoreCore.DataspaceRemove(ref platform, state, obj,
+				CompositionStateKey);
+		}
+		if (!TryReadPointerState(ref platform, state, obj, out var value))
+			return compositionValid;
+		ReleasePointerIfCaptured(ref platform, obj, value);
+		return compositionValid && MuiStoreCore.DataspaceRemove(ref platform, state,
+			obj, PointerStateKey);
+	}
+
+	private static MuiPointerCaptureKind CaptureKind(uint axis) =>
+		axis == MuiStringscrollPointerState.VerticalAxis ?
+			MuiPointerCaptureKind.VerticalScroller :
+			MuiPointerCaptureKind.HorizontalScroller;
+
+	private static bool CapturePointer<TPlatform>(ref TPlatform platform,
+		APTR obj, uint axis, int startX, int startY)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var sample = default(MuiPointerCaptureSample);
+		sample.Object = obj;
+		sample.Kind = CaptureKind(axis);
+		sample.StartX = startX;
+		sample.StartY = startY;
+		return platform.CaptureMuiPointer(ref sample);
+	}
+
+	private static void ReleasePointer<TPlatform>(ref TPlatform platform,
+		APTR obj, MuiStringscrollPointerState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var sample = default(MuiPointerCaptureSample);
+		sample.Object = obj;
+		sample.Kind = CaptureKind(value.Axis);
+		sample.StartX = value.StartX;
+		sample.StartY = value.StartY;
+		_ = platform.ReleaseMuiPointer(ref sample);
+	}
+
+	private static void ReleasePointerIfCaptured<TPlatform>(ref TPlatform platform,
+		APTR obj, MuiStringscrollPointerState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if ((value.Flags & MuiStringscrollPointerState.CapturedFlag) != 0)
+			ReleasePointer(ref platform, obj, value);
+	}
+
+	private static bool ReleasePointerDrag<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadPointerState(ref platform, state, obj, out var value) ||
+			(value.Flags & MuiStringscrollPointerState.ActiveFlag) == 0)
+			return false;
+		ReleasePointerIfCaptured(ref platform, obj, value);
+		return MuiStoreCore.DataspaceRemove(ref platform, state, obj,
+			PointerStateKey);
+	}
+
+	private static bool TryBuildInputBarGeometry<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		MuiStringscrollState scrollState, MuiStringscrollViewportState viewport,
+		MuiStringscrollLayoutState layout, uint axis,
+		out MuiStringscrollInputBarGeometry result)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		result = default;
+		var horizontal = axis == MuiStringscrollPointerState.HorizontalAxis;
+		if (horizontal)
+		{
+			if (viewport.HorizontalVisible == 0 || layout.Height < ScrollerExtent)
+				return false;
+		}
+		else if (viewport.VerticalVisible == 0 || layout.Width < ScrollerExtent)
+			return false;
+		if (!TryReadCompositionAdmission(ref platform, state, obj,
+			out var composition, out var compositionPresent)) return false;
+		var child = horizontal ? composition.Horizontal : composition.Vertical;
+		var hasChild = compositionPresent && child.IsNotNull &&
+			MuiHeadlessObjectCore.FindObject(ref platform, state, child).IsNotNull;
+		if (!hasChild)
+		{
+			var legacyHorizontal = default(MuiStringscrollBarGeometry);
+			var legacyVertical = default(MuiStringscrollBarGeometry);
+			if (horizontal && !TryBuildHorizontalBar(scrollState, viewport,
+				layout.Left, layout.Top, layout.Height, out legacyHorizontal))
+				return false;
+			if (!horizontal && !TryBuildVerticalBar(scrollState, viewport,
+				layout.Left, layout.Top, layout.Width, out legacyVertical))
+				return false;
+			if (horizontal)
+			{
+				result.TrackStart = legacyHorizontal.TrackLeft;
+				result.TrackEnd = legacyHorizontal.TrackRight;
+				result.ThumbStart = legacyHorizontal.ThumbLeft;
+				result.ThumbEnd = legacyHorizontal.ThumbRight;
+				result.CrossStart = legacyHorizontal.TrackTop;
+				result.CrossEnd = legacyHorizontal.TrackBottom;
+				result.Horizontal = 1;
+			}
+			else
+			{
+				result.TrackStart = legacyVertical.TrackTop;
+				result.TrackEnd = legacyVertical.TrackBottom;
+				result.ThumbStart = legacyVertical.ThumbTop;
+				result.ThumbEnd = legacyVertical.ThumbBottom;
+				result.CrossStart = legacyVertical.TrackLeft;
+				result.CrossEnd = legacyVertical.TrackRight;
+			}
+			return true;
+		}
+
+		if (!MuiCommonControlCore.TryReadScrollbarLayoutState(ref platform, state,
+			child, out var scrollbarLayout) ||
+			!MuiCommonControlCore.TryReadPropRangeState(ref platform, state, child,
+			out var range)) return false;
+		var childHorizontal = scrollbarLayout.Horizontal != 0;
+		if (childHorizontal != horizontal) return false;
+		var origin = horizontal ? layout.Left : layout.Top;
+		var crossStart = horizontal ? layout.Top + layout.Height - ScrollerExtent :
+			layout.Left + layout.Width - ScrollerExtent;
+		var total = horizontal ? viewport.ViewportWidth : viewport.ViewportHeight;
+		if (total <= 0) return false;
+		var arrows = scrollbarLayout.Type != ScrollbarTypeNone;
+		var arrowExtent = arrows ? 16 : 0;
+		var propLength = total - (scrollbarLayout.Type == ScrollbarTypeBottom ||
+			scrollbarLayout.Type == ScrollbarTypeTop ? arrowExtent : arrowExtent * 2);
+		if (propLength < 0) propLength = 0;
+		var propStart = origin;
+		var firstStart = origin;
+		var secondStart = origin;
+		if (arrows)
+		{
+			if (scrollbarLayout.Type == ScrollbarTypeBottom)
+			{
+				firstStart = origin + propLength;
+				secondStart = firstStart + arrowExtent;
+			}
+			else if (scrollbarLayout.Type == ScrollbarTypeTop)
+			{
+				firstStart = origin;
+				secondStart = origin + arrowExtent;
+				propStart = origin + arrowExtent * 2;
+			}
+			else
+			{
+				firstStart = origin;
+				propStart = origin + arrowExtent;
+				secondStart = propStart + propLength;
+			}
+		}
+		var knob = range.Entries == 0 ? propLength :
+			unchecked((int)(range.Visible * (uint)propLength / range.Entries));
+		var offset = range.Entries == 0 ? 0 :
+			unchecked((int)(range.First * (uint)propLength / range.Entries));
+		if (knob <= 0 && propLength > 0) knob = 1;
+		if (offset < 0) offset = 0;
+		if (offset + knob > propLength) offset = propLength - knob;
+		if (offset < 0) offset = 0;
+		result.TrackStart = propStart;
+		result.TrackEnd = propStart + propLength - 1;
+		if (horizontal)
+		{
+			result.ThumbStart = propStart + offset;
+			result.ThumbEnd = result.ThumbStart + knob - 1;
+			result.CrossStart = crossStart;
+			result.CrossEnd = crossStart + ScrollerExtent - 1;
+		}
+		else
+		{
+			result.ThumbStart = propStart + propLength - offset - knob;
+			result.ThumbEnd = result.ThumbStart + knob - 1;
+			result.CrossStart = crossStart;
+			result.CrossEnd = crossStart + ScrollerExtent - 1;
+		}
+		result.Horizontal = horizontal ? 1u : 0u;
+		result.HasArrows = arrows ? 1u : 0u;
+		if (arrows)
+		{
+			result.FirstArrowStart = firstStart;
+			result.FirstArrowEnd = firstStart + arrowExtent - 1;
+			result.SecondArrowStart = secondStart;
+			result.SecondArrowEnd = secondStart + arrowExtent - 1;
+			result.FirstDelta = scrollbarLayout.Type == ScrollbarTypeBottom ? 1 : -1;
+			result.SecondDelta = scrollbarLayout.Type == ScrollbarTypeTop ? -1 : 1;
+		}
+		return true;
+	}
+
+	private static bool ContainsInputBar(MuiStringscrollInputBarGeometry geometry,
+		int x, int y, int start, int end)
+	{
+		var axis = geometry.Horizontal != 0 ? x : y;
+		var cross = geometry.Horizontal != 0 ? y : x;
+		return axis >= start && axis <= end && cross >= geometry.CrossStart &&
+			cross <= geometry.CrossEnd;
+	}
+
+	private static bool ContainsInputBarAny(MuiStringscrollInputBarGeometry geometry,
+		int x, int y)
+	{
+		var start = geometry.TrackStart;
+		var end = geometry.TrackEnd;
+		if (geometry.HasArrows != 0)
+		{
+			if (geometry.FirstArrowStart < start) start = geometry.FirstArrowStart;
+			if (geometry.SecondArrowStart < start) start = geometry.SecondArrowStart;
+			if (geometry.FirstArrowEnd > end) end = geometry.FirstArrowEnd;
+			if (geometry.SecondArrowEnd > end) end = geometry.SecondArrowEnd;
+		}
+		return ContainsInputBar(geometry, x, y, start, end);
 	}
 
 	// SELECTDOWN on a thumb arms a guest-resident drag record; MOUSEMOVE updates
@@ -1323,9 +2223,7 @@ public static class MuiStringscrollCore
 		{
 			UpdatePointerDrag(ref platform, state, obj, pointer, scrollState,
 				viewport, layout, oldX, oldY);
-			MuiStoreCore.DataspaceRemove(ref platform, state, obj,
-				PointerStateKey);
-			return true;
+			return ReleasePointerDrag(ref platform, state, obj);
 		}
 		return HandleTrackClick(ref platform, state, obj, pointer, scrollState,
 			viewport, layout, oldX, oldY);
@@ -1337,32 +2235,71 @@ public static class MuiStringscrollCore
 		MuiStringscrollLayoutState layout, int oldX, int oldY)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (viewport.VerticalVisible != 0 && layout.Width >= ScrollerExtent &&
-			TryBuildVerticalBar(scrollState, viewport, layout.Left, layout.Top,
-				layout.Width, out var vertical) &&
-			Contains(vertical.TrackLeft, vertical.TrackTop, vertical.TrackRight,
-				vertical.TrackBottom, pointer.MouseX, pointer.MouseY))
+		if (TryBuildInputBarGeometry(ref platform, state, obj, scrollState,
+			viewport, layout, MuiStringscrollPointerState.VerticalAxis,
+			out var vertical) && ContainsInputBarAny(vertical, pointer.MouseX,
+			pointer.MouseY))
 		{
-			var targetY = TrackPosition(pointer.MouseY, vertical.TrackTop,
-				vertical.TrackBottom, vertical.ThumbTop, vertical.ThumbBottom,
+			if (vertical.HasArrows != 0)
+			{
+				var axis = pointer.MouseY;
+				if (axis >= vertical.FirstArrowStart && axis <= vertical.FirstArrowEnd)
+					return SetScroll(ref platform, state, obj, oldX,
+						oldY + vertical.FirstDelta * StepForScrollbar(ref platform,
+							state, obj, false));
+				if (axis >= vertical.SecondArrowStart && axis <= vertical.SecondArrowEnd)
+					return SetScroll(ref platform, state, obj, oldX,
+						oldY + vertical.SecondDelta * StepForScrollbar(ref platform,
+							state, obj, false));
+			}
+			if (!ContainsInputBar(vertical, pointer.MouseX, pointer.MouseY,
+				vertical.TrackStart, vertical.TrackEnd)) return false;
+			var targetY = TrackPosition(pointer.MouseY, vertical.TrackStart,
+				vertical.TrackEnd, vertical.ThumbStart, vertical.ThumbEnd,
 				viewport.MaxScrollY);
 			if (targetY == oldY) return false;
 			return SetScroll(ref platform, state, obj, oldX, targetY);
 		}
-		if (viewport.HorizontalVisible != 0 && layout.Height >= ScrollerExtent &&
-			TryBuildHorizontalBar(scrollState, viewport, layout.Left, layout.Top,
-				layout.Height, out var horizontal) &&
-			Contains(horizontal.TrackLeft, horizontal.TrackTop,
-				horizontal.TrackRight, horizontal.TrackBottom, pointer.MouseX,
-				pointer.MouseY))
+		if (TryBuildInputBarGeometry(ref platform, state, obj, scrollState,
+			viewport, layout, MuiStringscrollPointerState.HorizontalAxis,
+			out var horizontal) && ContainsInputBarAny(horizontal, pointer.MouseX,
+			pointer.MouseY))
 		{
-			var targetX = TrackPosition(pointer.MouseX, horizontal.TrackLeft,
-				horizontal.TrackRight, horizontal.ThumbLeft, horizontal.ThumbRight,
+			if (horizontal.HasArrows != 0)
+			{
+				var axis = pointer.MouseX;
+				if (axis >= horizontal.FirstArrowStart && axis <= horizontal.FirstArrowEnd)
+					return SetScroll(ref platform, state, obj,
+						oldX + horizontal.FirstDelta * StepForScrollbar(ref platform,
+							state, obj, true), oldY);
+				if (axis >= horizontal.SecondArrowStart && axis <= horizontal.SecondArrowEnd)
+					return SetScroll(ref platform, state, obj,
+						oldX + horizontal.SecondDelta * StepForScrollbar(ref platform,
+							state, obj, true), oldY);
+			}
+			if (!ContainsInputBar(horizontal, pointer.MouseX, pointer.MouseY,
+				horizontal.TrackStart, horizontal.TrackEnd)) return false;
+			var targetX = TrackPosition(pointer.MouseX, horizontal.TrackStart,
+				horizontal.TrackEnd, horizontal.ThumbStart, horizontal.ThumbEnd,
 				viewport.MaxScrollX);
 			if (targetX == oldX) return false;
 			return SetScroll(ref platform, state, obj, targetX, oldY);
 		}
 		return false;
+	}
+
+	private static int StepForScrollbar<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, bool horizontal)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadCompositionAdmission(ref platform, state, obj,
+			out var composition, out var present) || !present) return 1;
+		var child = horizontal ? composition.Horizontal : composition.Vertical;
+		if (child.IsNull || !MuiCommonControlCore.TryReadPropPolicyState(
+			ref platform, state, child, out var policy) || policy.DeltaFactor == 0)
+			return 1;
+		return policy.DeltaFactor > int.MaxValue ? int.MaxValue :
+			unchecked((int)policy.DeltaFactor);
 	}
 
 	private static bool BeginPointerDrag<TPlatform>(ref TPlatform platform,
@@ -1373,22 +2310,19 @@ public static class MuiStringscrollCore
 	{
 		uint axis;
 		int coordinate;
-		MuiStringscrollBarGeometry geometry;
-		if (viewport.VerticalVisible != 0 && layout.Width >= ScrollerExtent &&
-			TryBuildVerticalBar(scrollState, viewport, layout.Left, layout.Top,
-				layout.Width, out geometry) && Contains(geometry.ThumbLeft,
-				geometry.ThumbTop, geometry.ThumbRight, geometry.ThumbBottom,
-				pointer.MouseX, pointer.MouseY))
+		MuiStringscrollInputBarGeometry geometry;
+		if (TryBuildInputBarGeometry(ref platform, state, obj, scrollState,
+			viewport, layout, MuiStringscrollPointerState.VerticalAxis,
+			out geometry) && ContainsInputBar(geometry, pointer.MouseX,
+			pointer.MouseY, geometry.ThumbStart, geometry.ThumbEnd))
 		{
 			axis = MuiStringscrollPointerState.VerticalAxis;
 			coordinate = pointer.MouseY;
 		}
-		else if (viewport.HorizontalVisible != 0 &&
-			layout.Height >= ScrollerExtent &&
-			TryBuildHorizontalBar(scrollState, viewport, layout.Left, layout.Top,
-				layout.Height, out geometry) && Contains(geometry.ThumbLeft,
-				geometry.ThumbTop, geometry.ThumbRight, geometry.ThumbBottom,
-				pointer.MouseX, pointer.MouseY))
+		else if (TryBuildInputBarGeometry(ref platform, state, obj, scrollState,
+			viewport, layout, MuiStringscrollPointerState.HorizontalAxis,
+			out geometry) && ContainsInputBar(geometry, pointer.MouseX,
+			pointer.MouseY, geometry.ThumbStart, geometry.ThumbEnd))
 		{
 			axis = MuiStringscrollPointerState.HorizontalAxis;
 			coordinate = pointer.MouseX;
@@ -1400,15 +2334,18 @@ public static class MuiStringscrollCore
 		var value = default(MuiStringscrollPointerState);
 		value.Magic = MuiStringscrollPointerState.Cookie;
 		value.Axis = axis;
-		value.GrabOffset = coordinate - (axis ==
-			MuiStringscrollPointerState.VerticalAxis ? geometry.ThumbTop :
-			geometry.ThumbLeft);
+		value.GrabOffset = coordinate - geometry.ThumbStart;
 		value.StartScroll = axis == MuiStringscrollPointerState.VerticalAxis ?
 			unchecked((int)scrollState.ScrollY) : unchecked((int)scrollState.ScrollX);
+		value.StartX = pointer.MouseX;
+		value.StartY = pointer.MouseY;
 		value.LastPointer = coordinate;
 		value.Flags = MuiStringscrollPointerState.ActiveFlag;
+		if (CapturePointer(ref platform, obj, axis, pointer.MouseX,
+			pointer.MouseY)) value.Flags |= MuiStringscrollPointerState.CapturedFlag;
 		if (MuiStringscrollPointerStateCodec.Write(ref platform, block, value))
 			return true;
+		ReleasePointerIfCaptured(ref platform, obj, value);
 		MuiStoreCore.DataspaceRemove(ref platform, state, obj, PointerStateKey);
 		return false;
 	}
@@ -1424,30 +2361,16 @@ public static class MuiStringscrollCore
 			return false;
 		var coordinate = value.Axis == MuiStringscrollPointerState.VerticalAxis ?
 			pointer.MouseY : pointer.MouseX;
-		int trackStart;
-		int trackEnd;
-		int thumbLength;
+		if (!TryBuildInputBarGeometry(ref platform, state, obj, scrollState,
+			viewport, layout, value.Axis, out var geometry)) return false;
+		var trackStart = geometry.TrackStart;
+		var trackEnd = geometry.TrackEnd;
+		var thumbLength = geometry.ThumbEnd - geometry.ThumbStart + 1;
 		uint maximum;
 		if (value.Axis == MuiStringscrollPointerState.VerticalAxis)
-		{
-			if (viewport.VerticalVisible == 0 || layout.Width < ScrollerExtent ||
-				!TryBuildVerticalBar(scrollState, viewport, layout.Left, layout.Top,
-					layout.Width, out var geometry)) return false;
-			trackStart = geometry.TrackTop;
-			trackEnd = geometry.TrackBottom;
-			thumbLength = geometry.ThumbBottom - geometry.ThumbTop + 1;
 			maximum = viewport.MaxScrollY;
-		}
 		else if (value.Axis == MuiStringscrollPointerState.HorizontalAxis)
-		{
-			if (viewport.HorizontalVisible == 0 || layout.Height < ScrollerExtent ||
-				!TryBuildHorizontalBar(scrollState, viewport, layout.Left, layout.Top,
-					layout.Height, out var geometry)) return false;
-			trackStart = geometry.TrackLeft;
-			trackEnd = geometry.TrackRight;
-			thumbLength = geometry.ThumbRight - geometry.ThumbLeft + 1;
 			maximum = viewport.MaxScrollX;
-		}
 		else return false;
 		var target = TrackPositionFromGrab(coordinate, trackStart, trackEnd,
 			thumbLength, value.GrabOffset, maximum);
@@ -1545,8 +2468,19 @@ public static class MuiStringscrollCore
 		result = default;
 		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
 		if (record.IsNull) return false;
-		if (TryReadStateRecord(ref platform, state, obj, out var stored))
+		// Preserve the legacy raw fallback only when the named record is absent.
+		// Once a record exists, a wrong length or invalid cookie is malformed
+		// typed state and must fail closed before scrolling or recomputation can
+		// publish derived raw values.
+		var stateBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			StateRecordKey);
+		var stateLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateRecordKey);
+		if (stateBlock.IsNotNull || stateLength != 0)
 		{
+			if (stateLength != unchecked((int)MuiStringscrollStateRecord.Size) ||
+				!MuiStringscrollStateRecordCodec.TryRead(ref platform, stateBlock,
+					out var stored)) return false;
 			result.String = stored.String;
 			result.ContentWidth = stored.ContentWidth;
 			result.ContentHeight = stored.ContentHeight;
@@ -1570,8 +2504,15 @@ public static class MuiStringscrollCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadLayoutRecord(ref platform, state, obj, out var stored))
+		var layoutBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			LayoutStateKey);
+		var layoutLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			LayoutStateKey);
+		if (layoutBlock.IsNotNull || layoutLength != 0)
 		{
+			if (layoutLength != unchecked((int)MuiStringscrollLayoutStateRecord.Size) ||
+				!MuiStringscrollLayoutStateRecordCodec.TryRead(ref platform, layoutBlock,
+					out var stored)) return false;
 			result.Left = stored.Left;
 			result.Top = stored.Top;
 			result.Width = stored.Width;
@@ -1605,8 +2546,15 @@ public static class MuiStringscrollCore
 		result = default;
 		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
 		if (record.IsNull) return false;
-		if (TryReadRenderRecord(ref platform, state, obj, out var stored))
+		var renderBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			RenderStateKey);
+		var renderLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			RenderStateKey);
+		if (renderBlock.IsNotNull || renderLength != 0)
 		{
+			if (renderLength != unchecked((int)MuiStringscrollRenderStateRecord.Size) ||
+				!MuiStringscrollRenderStateRecordCodec.TryRead(ref platform, renderBlock,
+					out var stored)) return false;
 			if (!MuiDrawingRenderInfoCodec.TryRead(ref platform, stored.RenderInfo,
 				out var info) || info.RastPort.IsNull || stored.RastPort.Raw !=
 				info.RastPort.Raw) return false;
@@ -1643,8 +2591,16 @@ public static class MuiStringscrollCore
 		result = default;
 		if (!TryReadState(ref platform, state, obj, out var scrollState))
 			return false;
-		if (TryReadViewportStateRecord(ref platform, state, obj, out var stored))
+		var viewportBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ViewportStateKey);
+		var viewportLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ViewportStateKey);
+		if (viewportBlock.IsNotNull || viewportLength != 0)
 		{
+			if (viewportLength != unchecked((int)
+				MuiStringscrollViewportStateRecord.Size) ||
+				!MuiStringscrollViewportStateRecordCodec.TryRead(ref platform,
+					viewportBlock, out var stored)) return false;
 			result.ViewportWidth = stored.ViewportWidth;
 			result.ViewportHeight = stored.ViewportHeight;
 			result.HorizontalVisible = stored.HorizontalVisible;
@@ -1962,8 +2918,19 @@ public static class MuiStringscrollCore
 		result = default;
 		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
 		if (record.IsNull) return false;
-		if (TryReadPolicyRecord(ref platform, state, obj, out var stored))
+		// Keep the raw compatibility projection only for a truly absent named
+		// policy record. A present malformed record must not silently redefine
+		// policy for scrolling or input consumers.
+		var policyBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			PolicyStateKey);
+		var policyLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			PolicyStateKey);
+		if (policyBlock.IsNotNull || policyLength != 0)
 		{
+			if (policyLength != unchecked((int)MuiStringscrollPolicyRecord.Size) ||
+				!MuiStringscrollPolicyRecordCodec.TryRead(ref platform, policyBlock,
+					out var stored) ||
+				!MuiStringscrollPolicyValidation.IsValidRecord(stored)) return false;
 			result.HorizBar = stored.HorizBar;
 			result.NoInput = stored.NoInput;
 			result.SetMin = stored.SetMin;
@@ -1987,7 +2954,7 @@ public static class MuiStringscrollCore
 			PolicyStateKey) != unchecked((int)MuiStringscrollPolicyRecord.Size))
 			return false;
 		return MuiStringscrollPolicyRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiStringscrollPolicyValidation.IsValidRecord(value);
 	}
 
 	private static bool EnsurePolicyRecord<TPlatform>(ref TPlatform platform,
@@ -2024,6 +2991,7 @@ public static class MuiStringscrollCore
 		APTR state, APTR obj, MuiStringscrollPolicyState policy)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!MuiStringscrollPolicyValidation.IsValidState(policy)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			PolicyStateKey);
 		var value = default(MuiStringscrollPolicyRecord);
@@ -2042,6 +3010,278 @@ public static class MuiStringscrollCore
 		APTR state, APTR obj, out MuiStringscrollPolicyRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform =>
 		TryReadPolicyRecord(ref platform, state, obj, out value);
+
+	public static bool TryReadScrollbarState<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, out MuiStringscrollScrollbarState result)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		result = default;
+		if (!TryReadScrollbarRecord(ref platform, state, obj, out var stored))
+			return false;
+		result.HorizBar = stored.HorizBar;
+		result.VertBar = stored.VertBar;
+		return true;
+	}
+
+	private static bool TryReadScrollbarRecord<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, out MuiStringscrollScrollbarRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ScrollbarStateKey);
+		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ScrollbarStateKey) != unchecked((int)MuiStringscrollScrollbarRecord.Size))
+			return false;
+		return MuiStringscrollScrollbarRecordCodec.TryRead(ref platform, block,
+			out value);
+	}
+
+	private static bool EnsureScrollbarRecord<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, APTR horizontalBar, APTR verticalBar)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (TryReadScrollbarRecord(ref platform, state, obj, out _)) return true;
+		var value = default(MuiStringscrollScrollbarRecord);
+		value.Magic = MuiStringscrollScrollbarRecord.Cookie;
+		value.HorizBar = horizontalBar;
+		value.VertBar = verticalBar;
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiStringscrollScrollbarRecord.Size);
+		if (scratch.IsNull) return false;
+		platform.Clear(scratch, MuiStringscrollScrollbarRecord.Size);
+		var written = MuiStringscrollScrollbarRecordCodec.Write(ref platform,
+			scratch, value);
+		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
+			ScrollbarStateKey, scratch,
+			unchecked((int)MuiStringscrollScrollbarRecord.Size));
+		platform.Clear(scratch, MuiStringscrollScrollbarRecord.Size);
+		platform.Free(scratch, MuiStringscrollScrollbarRecord.Size);
+		return added;
+	}
+
+	private static bool WriteScrollbarState<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiStringscrollScrollbarState scrollbars)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ScrollbarStateKey);
+		var value = default(MuiStringscrollScrollbarRecord);
+		value.Magic = MuiStringscrollScrollbarRecord.Cookie;
+		value.HorizBar = scrollbars.HorizBar;
+		value.VertBar = scrollbars.VertBar;
+		return MuiStringscrollScrollbarRecordCodec.Write(ref platform, block, value);
+	}
+
+	internal static bool TryGetScrollbarRecord<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, out MuiStringscrollScrollbarRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		TryReadScrollbarRecord(ref platform, state, obj, out value);
+
+	public static bool TryReadCompositionState<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, out MuiStringscrollCompositionState result)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		result = default;
+		if (!TryReadCompositionAdmission(ref platform, state, obj,
+			out var stored, out var present) || !present)
+			return false;
+		result.Horizontal = stored.Horizontal;
+		result.Vertical = stored.Vertical;
+		result.OwnedMask = stored.OwnedMask;
+		return true;
+	}
+
+	private static bool TryReadCompositionRecord<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiStringscrollCompositionRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		return TryReadCompositionAdmission(ref platform, state, obj, out value,
+			out var present) && present;
+	}
+
+	// Admission distinguishes an absent composition record from a malformed
+	// present record. Consumers may fall back only for absence; malformed state
+	// must fail closed instead of silently disabling composition.
+	private static bool TryReadCompositionAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiStringscrollCompositionRecord value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			CompositionStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			CompositionStateKey);
+		present = block.IsNotNull || length != 0;
+		if (!present) return true;
+		if (block.IsNull || length != unchecked((int)MuiStringscrollCompositionRecord.Size))
+			return false;
+		return MuiStringscrollCompositionRecordCodec.TryRead(ref platform, block,
+			out value);
+	}
+
+	private static bool WriteCompositionRecord<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiStringscrollCompositionRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			CompositionStateKey);
+		return MuiStringscrollCompositionRecordCodec.Write(ref platform, block,
+			value);
+	}
+
+	private static bool EnsureCompositionRecord<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadCompositionAdmission(ref platform, state, obj, out _,
+			out var present)) return false;
+		if (present) return true;
+		if (!TryReadScrollbarState(ref platform, state, obj, out var scrollbars) ||
+			!TryReadPolicyState(ref platform, state, obj, out var policy)) return false;
+		var value = default(MuiStringscrollCompositionRecord);
+		value.Magic = MuiStringscrollCompositionRecord.Cookie;
+		value.Horizontal = scrollbars.HorizBar;
+		value.Vertical = scrollbars.VertBar;
+		if (value.Horizontal.IsNull && policy.HorizBar != 0)
+		{
+			value.Horizontal = CreateAutomaticScrollbar(ref platform, state, obj,
+				true);
+			if (value.Horizontal.IsNotNull)
+				value.OwnedMask |= MuiStringscrollCompositionState.HorizontalOwned;
+		}
+		if (value.Vertical.IsNull && policy.VertBar != 0)
+		{
+			value.Vertical = CreateAutomaticScrollbar(ref platform, state, obj,
+				false);
+			if (value.Vertical.IsNotNull)
+				value.OwnedMask |= MuiStringscrollCompositionState.VerticalOwned;
+		}
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiStringscrollCompositionRecord.Size);
+		if (scratch.IsNull)
+		{
+			DisposeOwnedScrollbar(ref platform, state, value.Horizontal,
+				(value.OwnedMask & MuiStringscrollCompositionState.HorizontalOwned) != 0);
+			DisposeOwnedScrollbar(ref platform, state, value.Vertical,
+				(value.OwnedMask & MuiStringscrollCompositionState.VerticalOwned) != 0);
+			return false;
+		}
+		platform.Clear(scratch, MuiStringscrollCompositionRecord.Size);
+		var written = MuiStringscrollCompositionRecordCodec.Write(ref platform,
+			scratch, value);
+		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
+			CompositionStateKey, scratch,
+			unchecked((int)MuiStringscrollCompositionRecord.Size));
+		platform.Clear(scratch, MuiStringscrollCompositionRecord.Size);
+		platform.Free(scratch, MuiStringscrollCompositionRecord.Size);
+		if (added) return true;
+		DisposeOwnedScrollbar(ref platform, state, value.Horizontal,
+			(value.OwnedMask & MuiStringscrollCompositionState.HorizontalOwned) != 0);
+		DisposeOwnedScrollbar(ref platform, state, value.Vertical,
+			(value.OwnedMask & MuiStringscrollCompositionState.VerticalOwned) != 0);
+		return false;
+	}
+
+	private static bool ReconcileComposition<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiStringscrollScrollbarState scrollbars,
+		MuiStringscrollPolicyState policy)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadCompositionAdmission(ref platform, state, obj,
+			out var value, out var present)) return false;
+		if (!present)
+			return EnsureCompositionRecord(ref platform, state, obj);
+		ReconcileCompositionAxis(ref platform, state, obj, ref value.Horizontal,
+			ref value.OwnedMask, MuiStringscrollCompositionState.HorizontalOwned,
+			scrollbars.HorizBar, policy.HorizBar != 0, true);
+		ReconcileCompositionAxis(ref platform, state, obj, ref value.Vertical,
+			ref value.OwnedMask, MuiStringscrollCompositionState.VerticalOwned,
+			scrollbars.VertBar, policy.VertBar != 0, false);
+		return WriteCompositionRecord(ref platform, state, obj, value);
+	}
+
+	private static void ReconcileCompositionAxis<TPlatform>(ref TPlatform platform,
+		APTR state, APTR owner, ref APTR current, ref uint ownedMask,
+		uint ownedFlag, APTR supplied, bool enabled, bool horizontal)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var owned = (ownedMask & ownedFlag) != 0;
+		if (!enabled)
+		{
+			DisposeOwnedScrollbar(ref platform, state, current, owned);
+			current = APTR.Null;
+			ownedMask &= ~ownedFlag;
+			return;
+		}
+		if (supplied.IsNotNull)
+		{
+			if (owned && current.Raw != supplied.Raw)
+				DisposeOwnedScrollbar(ref platform, state, current, true);
+			current = supplied;
+			ownedMask &= ~ownedFlag;
+			return;
+		}
+		if (current.IsNotNull && owned) return;
+		if (current.IsNotNull) return;
+		current = CreateAutomaticScrollbar(ref platform, state, owner, horizontal);
+		if (current.IsNotNull) ownedMask |= ownedFlag;
+	}
+
+	private static APTR FindScrollbarClass<TPlatform>(ref TPlatform platform,
+		APTR state) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var name = MuiHeadlessMemory.Allocate(ref platform, 14);
+		if (name.IsNull) return APTR.Null;
+		platform.WriteUInt8(name, 0, (byte)'s');
+		platform.WriteUInt8(name, 1, (byte)'c');
+		platform.WriteUInt8(name, 2, (byte)'r');
+		platform.WriteUInt8(name, 3, (byte)'o');
+		platform.WriteUInt8(name, 4, (byte)'l');
+		platform.WriteUInt8(name, 5, (byte)'l');
+		platform.WriteUInt8(name, 6, (byte)'b');
+		platform.WriteUInt8(name, 7, (byte)'a');
+		platform.WriteUInt8(name, 8, (byte)'r');
+		platform.WriteUInt8(name, 9, (byte)'.');
+		platform.WriteUInt8(name, 10, (byte)'m');
+		platform.WriteUInt8(name, 11, (byte)'u');
+		platform.WriteUInt8(name, 12, (byte)'i');
+		platform.WriteUInt8(name, 13, 0);
+		var classRecord = MuiHeadlessObjectCore.FindClassByName(ref platform, state,
+			name);
+		platform.Clear(name, 14);
+		platform.Free(name, 14);
+		return classRecord;
+	}
+
+	private static APTR CreateAutomaticScrollbar<TPlatform>(
+		ref TPlatform platform, APTR state, APTR owner, bool horizontal)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var classRecord = FindScrollbarClass(ref platform, state);
+		if (classRecord.IsNull) return APTR.Null;
+		var tags = MuiHeadlessMemory.Allocate(ref platform, 12);
+		if (tags.IsNull) return APTR.Null;
+		platform.WriteUInt32(tags, 0, MuiCommonControlCore.GroupHoriz);
+		platform.WriteUInt32(tags, 4, horizontal ? 1u : 0u);
+		platform.WriteUInt32(tags, 8, 0);
+		var child = MuiCommonControlCore.CreateControl(ref platform, state,
+			classRecord, tags);
+		platform.Clear(tags, 12);
+		platform.Free(tags, 12);
+		return child;
+	}
+
+	private static void DisposeOwnedScrollbar<TPlatform>(ref TPlatform platform,
+		APTR state, APTR child, bool owned)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!owned || child.IsNull || MuiHeadlessObjectCore.FindObject(ref platform,
+			state, child).IsNull) return;
+		MuiHeadlessObjectCore.DisposeObject(ref platform, state, child);
+	}
 
 	private static bool TryReadPolicyState<TPlatform>(ref TPlatform platform,
 		APTR record, out MuiStringscrollPolicyState result)
@@ -2062,6 +3302,29 @@ public static class MuiStringscrollCore
 			0u : 1u;
 		result.VertScrollerOnly = ReadRaw(ref platform, record,
 			VertScrollerOnly, 0) == 0 ? 0u : 1u;
+		return true;
+	}
+
+	private static bool TryReadOwnedString<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, out APTR value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = APTR.Null;
+		if (!TryReadState(ref platform, state, obj, out var stateValue))
+			return false;
+		var owned = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			StringKey);
+		if (stateValue.String.IsNull)
+		{
+			// NULL is the valid empty state.  A non-NULL ownership block beside it
+			// would indicate a broken typed transition, so reject the divergence.
+			if (owned.IsNotNull) return false;
+			return true;
+		}
+		if (owned.IsNull || owned.Raw != stateValue.String.Raw ||
+			!CStringCodec.TryReadLength(ref platform, owned, MaximumStringLength,
+				out _)) return false;
+		value = owned;
 		return true;
 	}
 
@@ -2233,10 +3496,44 @@ public static class MuiStringscrollCore
 
 	public static bool Layout<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, int left, int top, int width, int height)
-		where TPlatform : struct, IMuiLayoutPlatform =>
-		MuiAreaLayoutCore.Layout(ref platform, state, obj, left, top, width, height) &&
-		SyncLayoutRecord(ref platform, state, obj) &&
-		Recompute(ref platform, state, obj);
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		if (!MuiAreaLayoutCore.Layout(ref platform, state, obj, left, top, width,
+			height) || !SyncLayoutRecord(ref platform, state, obj) ||
+			!Recompute(ref platform, state, obj)) return false;
+		return LayoutCompositionChildren(ref platform, state, obj);
+	}
+
+	private static bool LayoutCompositionChildren<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj) where TPlatform : struct, IMuiLayoutPlatform
+	{
+		if (!TryReadCompositionAdmission(ref platform, state, obj,
+			out var composition, out var present)) return false;
+		if (!present ||
+			!TryReadLayoutState(ref platform, state, obj, out var layout) ||
+			!TryReadViewportState(ref platform, state, obj, out var viewport))
+			return true;
+		if (!LayoutCompositionChild(ref platform, state, composition.Horizontal,
+			layout.Left, layout.Top + layout.Height - ScrollerExtent,
+			viewport.ViewportWidth, ScrollerExtent,
+			viewport.HorizontalVisible != 0)) return false;
+		return LayoutCompositionChild(ref platform, state, composition.Vertical,
+			layout.Left + layout.Width - ScrollerExtent, layout.Top,
+			ScrollerExtent, viewport.ViewportHeight,
+			viewport.VerticalVisible != 0);
+	}
+
+	private static bool LayoutCompositionChild<TPlatform>(ref TPlatform platform,
+		APTR state, APTR child, int left, int top, int width, int height,
+		bool shown) where TPlatform : struct, IMuiLayoutPlatform
+	{
+		if (child.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			child).IsNull) return true;
+		var resolvedWidth = shown ? width : 0;
+		var resolvedHeight = shown ? height : 0;
+		return MuiCommonControlCore.LayoutScrollbar(ref platform, state, child,
+			left, top, resolvedWidth, resolvedHeight);
+	}
 
 	public static bool Draw<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, uint flags) where TPlatform : struct, IMuiLayoutPlatform
@@ -2258,9 +3555,18 @@ public static class MuiStringscrollCore
 		var height = layout.Height;
 		if (!TryComputeViewportState(ref platform, record, scrollState, layout,
 			out var viewport)) return false;
+		MuiAreaTextColorCore.Apply(ref platform, state, obj, rastPort);
 		var viewportWidth = viewport.ViewportWidth;
 		var viewportHeight = viewport.ViewportHeight;
-		if (width <= 0 || height <= 0 || !platform.LockLayer(rastPort)) return false;
+		if (width <= 0 || height <= 0) return false;
+		var hasHorizontalChild = HasLiveCompositionChild(ref platform, state, obj,
+			true);
+		var hasVerticalChild = HasLiveCompositionChild(ref platform, state, obj,
+			false);
+		if ((hasHorizontalChild || hasVerticalChild) &&
+			!DrawCompositionChildren(ref platform, state, obj, renderState,
+				viewport)) return false;
+		if (!platform.LockLayer(rastPort)) return false;
 		if (!platform.BeginUpdate(rastPort))
 		{
 			platform.UnlockLayer(rastPort);
@@ -2306,7 +3612,8 @@ public static class MuiStringscrollCore
 			}
 		}
 		platform.SetPen(rastPort, 4);
-		if (viewport.HorizontalVisible != 0 && height >= ScrollerExtent)
+		if (!hasHorizontalChild && viewport.HorizontalVisible != 0 &&
+			height >= ScrollerExtent)
 		{
 			var horizontal = default(MuiStringscrollBarGeometry);
 			if (TryBuildHorizontalBar(scrollState, viewport, left, top, height,
@@ -2321,7 +3628,8 @@ public static class MuiStringscrollCore
 					horizontal.ThumbBottom);
 			}
 		}
-		if (viewport.VerticalVisible != 0 && width >= ScrollerExtent)
+		if (!hasVerticalChild && viewport.VerticalVisible != 0 &&
+			width >= ScrollerExtent)
 		{
 			var vertical = default(MuiStringscrollBarGeometry);
 			if (TryBuildVerticalBar(scrollState, viewport, left, top, width,
@@ -2341,6 +3649,47 @@ public static class MuiStringscrollCore
 		platform.EndUpdate(rastPort, true);
 		platform.UnlockLayer(rastPort);
 		return true;
+	}
+
+	private static bool HasLiveCompositionChild<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, bool horizontal)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadCompositionAdmission(ref platform, state, obj,
+			out var composition, out var present) || !present)
+			return false;
+		var child = horizontal ? composition.Horizontal : composition.Vertical;
+		return child.IsNotNull && MuiHeadlessObjectCore.FindObject(ref platform,
+			state, child).IsNotNull;
+	}
+
+	private static bool DrawCompositionChildren<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiStringscrollRenderState renderState,
+		MuiStringscrollViewportState viewport)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		if (!TryReadCompositionAdmission(ref platform, state, obj,
+			out var composition, out var present)) return false;
+		if (!present)
+			return true;
+		if (viewport.HorizontalVisible != 0 && composition.Horizontal.IsNotNull &&
+			!DrawCompositionChild(ref platform, state, composition.Horizontal,
+				renderState)) return false;
+		if (viewport.VerticalVisible != 0 && composition.Vertical.IsNotNull &&
+			!DrawCompositionChild(ref platform, state, composition.Vertical,
+				renderState)) return false;
+		return true;
+	}
+
+	private static bool DrawCompositionChild<TPlatform>(ref TPlatform platform,
+		APTR state, APTR child, MuiStringscrollRenderState renderState)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, child).IsNull)
+			return true;
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, child,
+			RenderInfo, renderState.RenderInfo.Raw, false)) return false;
+		return MuiCommonControlCore.DrawControl(ref platform, state, child, 0);
 	}
 
 	// Build a proportional horizontal thumb from the already-normalized

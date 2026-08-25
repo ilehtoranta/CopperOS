@@ -20,6 +20,31 @@ internal struct MuiGroupForwardState
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiGroupForwardTraversalState
+{
+	public const uint Size = 12;
+	public uint Remaining;
+	public uint Visited;
+	public uint Exhausted;
+}
+
+internal static class MuiGroupForwardTraversalCore
+{
+	internal static bool TryVisit(ref MuiGroupForwardTraversalState state)
+	{
+		if (state.Remaining == 0)
+		{
+			state.Exhausted = 1;
+			return false;
+		}
+		state.Remaining--;
+		state.Visited = state.Visited == uint.MaxValue
+			? uint.MaxValue : state.Visited + 1;
+		return true;
+	}
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiGroupChildListState
 {
 	public const uint Magic = 0x47434C53; // "GCLS"
@@ -618,8 +643,11 @@ public static class MuiGroupChildrenCore
 		if (!TryReadForwardState(ref platform, record, out var forward) ||
 			forward.Forward == 0) return false;
 		handled = true;
+		var traversal = default(MuiGroupForwardTraversalState);
+		if (forward.ForwardDepth != 0)
+			traversal.Remaining = MuiHeadlessLayout.MaximumTraversal;
 		return ForwardAttribute(ref platform, state, obj, attribute, value,
-			notify, forward.ForwardDepth != 0);
+			notify, forward.ForwardDepth != 0, ref traversal);
 	}
 
 	internal static bool TryGet<TPlatform>(ref TPlatform platform, APTR state,
@@ -652,8 +680,12 @@ public static class MuiGroupChildrenCore
 			value = attribute == Forward ? forward.Forward : forward.ForwardDepth;
 			return true;
 		}
-		return MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-			attribute, out value);
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			attribute, out var raw)) return false;
+		// Compatibility writes can predate the typed forwarding record. Keep the
+		// public BOOL projection canonical even in that raw-only state.
+		value = raw == 0 ? 0u : 1u;
+		return true;
 	}
 
 	// Struct-first native qualification seam for the forward state record.
@@ -800,7 +832,8 @@ public static class MuiGroupChildrenCore
 
 	private static bool ForwardAttribute<TPlatform>(ref TPlatform platform,
 		APTR state, APTR group, uint attribute, uint value, bool notify,
-		bool recursive) where TPlatform : struct, IMuiHeadlessPlatform
+		bool recursive, ref MuiGroupForwardTraversalState traversal)
+		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var count = CountChildren(ref platform, state, group);
 		var success = true;
@@ -808,12 +841,14 @@ public static class MuiGroupChildrenCore
 		{
 			var child = MuiFamilyCore.GetChild(ref platform, state, group,
 				unchecked((int)index), APTR.Null);
+			if (recursive && !MuiGroupForwardTraversalCore.TryVisit(
+				ref traversal)) break;
 			if (child.IsNull || !MuiHeadlessObjectCore.SetAttribute(ref platform,
 				state, child, attribute, value, notify)) success = false;
 			if (recursive && child.IsNotNull &&
 				MuiGroupChangeCore.IsGroupObject(ref platform, state, child) &&
 				!ForwardAttribute(ref platform, state, child, attribute, value,
-					notify, true)) success = false;
+					notify, true, ref traversal)) success = false;
 		}
 		if (TryReadForwardState(ref platform,
 			MuiHeadlessObjectCore.FindObject(ref platform, state, group),

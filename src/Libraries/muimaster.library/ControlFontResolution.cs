@@ -1,0 +1,220 @@
+/*
+- Copyright (C) 2026 Ilkka Lehtoranta
+- SPDX-License-Identifier: MIT
+*/
+
+using Amiga;
+using System.Runtime.InteropServices;
+
+namespace CopperOS.MuiMaster;
+
+// MorphOS uses a zero MUIA_Font value (MUIV_Font_Inherit) when an Area does
+// not select its own font.  Keep the resolved result as a named value type so
+// callers can distinguish an inherited font from an explicit local value
+// without constructing a managed object hierarchy.
+public struct MuiControlFontResolution
+{
+	public bool Present;
+	public bool Inherited;
+	public uint Depth;
+	public APTR Font;
+	// A valid CustomFont selection is reported separately from the fallback
+	// TextFont pointer. This lets a renderer consume the parsed value later
+	// without replacing the native ABI pointer with a managed font object.
+	public uint Custom;
+	public MuiCustomFontSpec CustomSpec;
+}
+
+// A bounded guest projection used by native qualification and future render
+// caches. The resolver itself remains uncached because Family mutations can
+// change the effective parent font at any time.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+public struct MuiControlFontResolutionRecord
+{
+	public const uint Size = 20;
+	public const uint Cookie = 0x4D434652u; // 'MCFR'
+
+	public uint Magic;
+	public uint Present;
+	public uint Inherited;
+	public uint Depth;
+	public APTR Font;
+}
+
+public static class MuiControlFontResolutionRecordCodec
+{
+	public static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiControlFontResolutionRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiControlFontResolutionRecord.Size)) return false;
+		value.Magic = platform.ReadUInt32(address, 0);
+		value.Present = platform.ReadUInt32(address, 4);
+		value.Inherited = platform.ReadUInt32(address, 8);
+		value.Depth = platform.ReadUInt32(address, 12);
+		value.Font = APTR.FromPointer(platform.ReadUInt32(address, 16));
+		return value.Magic == MuiControlFontResolutionRecord.Cookie &&
+			value.Present <= 1 && value.Inherited <= 1;
+	}
+
+	public static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiControlFontResolutionRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiControlFontResolutionRecord.Size) ||
+			value.Magic != MuiControlFontResolutionRecord.Cookie ||
+			value.Present > 1 || value.Inherited > 1) return false;
+		platform.WriteUInt32(address, 0, value.Magic);
+		platform.WriteUInt32(address, 4, value.Present);
+		platform.WriteUInt32(address, 8, value.Inherited);
+		platform.WriteUInt32(address, 12, value.Depth);
+		platform.WriteUInt32(address, 16, value.Font.Raw);
+		return true;
+	}
+}
+
+public static class MuiControlFontResolutionCore
+{
+	public const uint MUIV_Font_Inherit = 0;
+	private const uint Font = 0x8042BE50;
+
+	// Resolve the effective Area font through guest-resident Family Parent
+	// links. MUIA_Font and MUIA_CustomFont use the named last-writer record; a
+	// valid CustomFont spec is returned as a value and its TextFont pointer
+	// remains a safe fallback until the graphics font capability can open the
+	// requested family. No managed tree or exception path is involved.
+	public static bool TryResolve<TPlatform>(ref TPlatform platform, APTR state,
+		APTR obj, out MuiControlFontResolution result)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+
+		var current = obj;
+		var inherited = false;
+		uint depth = 0;
+		while (current.IsNotNull && depth < MuiHeadlessLayout.MaximumTraversal)
+		{
+			if (MuiAreaFontSelectionCore.TryReadState(ref platform, state, current,
+				out var selection) && selection.Active ==
+				MuiAreaFontSelectionKind.CustomFont && selection.Source.IsNotNull &&
+				MuiCustomFontSpecCore.TryParse(ref platform, selection.Source,
+					out var customSpec))
+			{
+				result.Present = true;
+				result.Inherited = inherited;
+				result.Depth = depth;
+				result.Custom = 1;
+				result.CustomSpec = customSpec;
+				TryResolveBaseFont(ref platform, state, current,
+					out result.Font);
+				if (MuiAreaCustomFontCore.TryGetRuntime(ref platform, state, current,
+					out var runtime) && runtime.Active != 0 && runtime.Font.IsNotNull)
+					result.Font = runtime.Font;
+				return true;
+			}
+			if (TryReadBaseFontAt(ref platform, state, current, out var font))
+			{
+				result.Present = true;
+				result.Inherited = inherited;
+				result.Depth = depth;
+				result.Font = font;
+				return true;
+			}
+
+			var parent = MuiHeadlessObjectCore.ParentObject(ref platform, state,
+				current);
+			if (parent.IsNull || parent.Raw == current.Raw) break;
+			current = parent;
+			inherited = true;
+			depth++;
+		}
+
+		result.Inherited = inherited;
+		result.Depth = depth;
+		return true;
+	}
+
+	private static bool TryReadBaseFontAt<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, out APTR font)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		font = APTR.Null;
+		// MUIA_BuiltinFont is the selector form of MUIA_Font. An explicit zero
+		// selector means inherit and suppresses a stale raw Font scalar on the
+		// same object; non-zero selectors are concrete ABI values.
+		if (MuiAreaBuiltinFontCore.TryReadState(ref platform, state, obj,
+			out var builtin) && builtin.Present != 0)
+		{
+			if (builtin.Selector == MUIV_Font_Inherit) return false;
+			font = APTR.FromPointer(builtin.Selector);
+			return true;
+		}
+		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			Font, out var rawFont) && rawFont != MUIV_Font_Inherit)
+		{
+			font = APTR.FromPointer(rawFont);
+			return true;
+		}
+		return false;
+	}
+
+	private static void TryResolveBaseFont<TPlatform>(ref TPlatform platform,
+		APTR state, APTR start, out APTR font)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		font = APTR.Null;
+		var current = start;
+		uint depth = 0;
+		while (current.IsNotNull && depth < MuiHeadlessLayout.MaximumTraversal)
+		{
+			if (TryReadBaseFontAt(ref platform, state, current, out font)) return;
+			var parent = MuiHeadlessObjectCore.ParentObject(ref platform, state,
+				current);
+			if (parent.IsNull || parent.Raw == current.Raw) return;
+			current = parent;
+			depth++;
+		}
+	}
+
+	internal static bool TryResolveBaseFontForOpen<TPlatform>(
+		ref TPlatform platform, APTR state, APTR start, out APTR font)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		TryResolveBaseFont(ref platform, state, start, out font);
+		return true;
+	}
+
+	internal static bool TryResolveCustomSourceForOpen<TPlatform>(
+		ref TPlatform platform, APTR state, APTR start, out APTR source)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		source = APTR.Null;
+		var current = start;
+		uint depth = 0;
+		while (current.IsNotNull && depth < MuiHeadlessLayout.MaximumTraversal)
+		{
+			if (MuiAreaFontSelectionCore.TryReadState(ref platform, state, current,
+				out var selection))
+			{
+				if (selection.Active == MuiAreaFontSelectionKind.CustomFont &&
+					selection.Source.IsNotNull)
+				{
+					source = selection.Source;
+					return true;
+				}
+				if (selection.Active == MuiAreaFontSelectionKind.Font) return false;
+			}
+			var parent = MuiHeadlessObjectCore.ParentObject(ref platform, state,
+				current);
+			if (parent.IsNull || parent.Raw == current.Raw) return false;
+			current = parent;
+			depth++;
+		}
+		return false;
+	}
+}

@@ -148,11 +148,25 @@ internal static class MuiNotifyUserDataMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Keep native selector admission scalar while the named method record remains
+	// the dispatcher-facing ABI type. Packed offsets stay inside this codec.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiNotifyUserDataMethodMessage.Size)) return false;
 		return MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiNotifyUserDataPacketKind.Find,
-			MuiNotifyUserDataPacketField.MethodId, out packet.MethodId);
+			MuiNotifyUserDataPacketField.MethodId, out methodId);
 	}
 }
 
@@ -418,13 +432,14 @@ internal static class MuiNotifyUserDataCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message, MuiFindUDataMessage.Size) ||
-			!MuiNotifyUserDataMessageCodec.TryReadMethodId(ref platform, message,
-				out var header) || header.MethodId != method) return false;
+			!MuiNotifyUserDataMessageCodec.TryReadMethodIdValue(ref platform, message,
+				out methodId) || methodId != method) return false;
 		if (!MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiNotifyUserDataPacketKind.Find,
 			MuiNotifyUserDataPacketField.UserData, out packet.UserData)) return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		return true;
 	}
 
@@ -433,9 +448,10 @@ internal static class MuiNotifyUserDataCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message, MuiGetUDataMessage.Size) ||
-			!MuiNotifyUserDataMessageCodec.TryReadMethodId(ref platform, message,
-				out var header) || header.MethodId != method) return false;
+			!MuiNotifyUserDataMessageCodec.TryReadMethodIdValue(ref platform, message,
+				out methodId) || methodId != method) return false;
 		if (!MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiNotifyUserDataPacketKind.Get,
 			MuiNotifyUserDataPacketField.UserData, out packet.UserData) ||
@@ -445,7 +461,7 @@ internal static class MuiNotifyUserDataCore
 			!MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
 				message, MuiNotifyUserDataPacketKind.Get,
 				MuiNotifyUserDataPacketField.Storage, out packet.Storage)) return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		return true;
 	}
 
@@ -454,9 +470,10 @@ internal static class MuiNotifyUserDataCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message, MuiSetUDataMessage.Size) ||
-			!MuiNotifyUserDataMessageCodec.TryReadMethodId(ref platform, message,
-				out var header) || header.MethodId != method) return false;
+			!MuiNotifyUserDataMessageCodec.TryReadMethodIdValue(ref platform, message,
+				out methodId) || methodId != method) return false;
 		if (!MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiNotifyUserDataPacketKind.Set,
 			MuiNotifyUserDataPacketField.UserData, out packet.UserData) ||
@@ -466,7 +483,7 @@ internal static class MuiNotifyUserDataCore
 			!MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
 				message, MuiNotifyUserDataPacketKind.Set,
 				MuiNotifyUserDataPacketField.Value, out packet.Value)) return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		return true;
 	}
 

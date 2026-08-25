@@ -45,36 +45,42 @@ internal static class MuiMenuSpecialistFieldCursorCodec
 	private static bool TryResolve(MuiMenuSpecialistPacketKind packet,
 		MuiMenuSpecialistField field, out uint offset)
 	{
-		switch (packet)
+		// Keep packed ABI selection straight-line for freestanding native
+		// lowering. The offset table remains confined to this codec; all
+		// dispatch-facing values are the named packet structs below.
+		if (packet == MuiMenuSpecialistPacketKind.Method)
 		{
-			case MuiMenuSpecialistPacketKind.Method:
-				if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
-				break;
-			case MuiMenuSpecialistPacketKind.Get:
-				if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
-				if (field == MuiMenuSpecialistField.Attribute) { offset = 4; return true; }
-				if (field == MuiMenuSpecialistField.Storage) { offset = 8; return true; }
-				break;
-			case MuiMenuSpecialistPacketKind.Set:
-				if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
-				if (field == MuiMenuSpecialistField.Attribute) { offset = 4; return true; }
-				if (field == MuiMenuSpecialistField.Value) { offset = 8; return true; }
-				break;
-			case MuiMenuSpecialistPacketKind.Pointer:
-				if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
-				if (field == MuiMenuSpecialistField.ObjectPointer) { offset = 4; return true; }
-				break;
-			case MuiMenuSpecialistPacketKind.Pair:
-				if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
-				if (field == MuiMenuSpecialistField.First) { offset = 4; return true; }
-				if (field == MuiMenuSpecialistField.Second) { offset = 8; return true; }
-				break;
-			case MuiMenuSpecialistPacketKind.Popup:
-				if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
-				if (field == MuiMenuSpecialistField.Window) { offset = 4; return true; }
-				if (field == MuiMenuSpecialistField.X) { offset = 8; return true; }
-				if (field == MuiMenuSpecialistField.Y) { offset = 12; return true; }
-				break;
+			if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
+		}
+		else if (packet == MuiMenuSpecialistPacketKind.Get)
+		{
+			if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
+			if (field == MuiMenuSpecialistField.Attribute) { offset = 4; return true; }
+			if (field == MuiMenuSpecialistField.Storage) { offset = 8; return true; }
+		}
+		else if (packet == MuiMenuSpecialistPacketKind.Set)
+		{
+			if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
+			if (field == MuiMenuSpecialistField.Attribute) { offset = 4; return true; }
+			if (field == MuiMenuSpecialistField.Value) { offset = 8; return true; }
+		}
+		else if (packet == MuiMenuSpecialistPacketKind.Pointer)
+		{
+			if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
+			if (field == MuiMenuSpecialistField.ObjectPointer) { offset = 4; return true; }
+		}
+		else if (packet == MuiMenuSpecialistPacketKind.Pair)
+		{
+			if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
+			if (field == MuiMenuSpecialistField.First) { offset = 4; return true; }
+			if (field == MuiMenuSpecialistField.Second) { offset = 8; return true; }
+		}
+		else if (packet == MuiMenuSpecialistPacketKind.Popup)
+		{
+			if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
+			if (field == MuiMenuSpecialistField.Window) { offset = 4; return true; }
+			if (field == MuiMenuSpecialistField.X) { offset = 8; return true; }
+			if (field == MuiMenuSpecialistField.Y) { offset = 12; return true; }
 		}
 		offset = 0;
 		return false;
@@ -137,9 +143,10 @@ internal static class MuiMenuSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsMethod(method) || !TryReadMethodId(ref platform, message,
-			out var header) || header.MethodId != method) return false;
-		packet.MethodId = header.MethodId;
+		uint methodId;
+		if (!IsMethod(method) || !TryReadMethodIdValue(ref platform, message,
+			out methodId) || methodId != method) return false;
+		packet.MethodId = methodId;
 		return true;
 	}
 
@@ -151,18 +158,36 @@ internal static class MuiMenuSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Native qualification keeps method-header admission scalar while the
+	// dispatcher-facing overload above retains the named value-type record.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiMenuSpecialistMethodMessage.Size)) return false;
 		return MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiMenuSpecialistPacketKind.Method,
-			MuiMenuSpecialistField.MethodId, out packet.MethodId);
+			MuiMenuSpecialistField.MethodId, out methodId);
 	}
 
 	internal static bool IsValidMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
-		where TPlatform : struct, IMuiGuestMemory =>
-		IsMethod(method) && TryReadMethodId(ref platform, message,
-			out var header) && header.MethodId == method;
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!IsMethod(method)) return false;
+		uint methodId;
+		return TryReadMethodIdValue(ref platform, message, out methodId) &&
+			methodId == method;
+	}
 
 	internal static bool WriteMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
@@ -371,6 +396,6 @@ internal static class MuiMenuSpecialistMessageCodec
 
 	private static bool IsPacket<TPlatform>(ref TPlatform platform, APTR message,
 		uint size, uint method) where TPlatform : struct, IMuiGuestMemory =>
-		TryReadMethodId(ref platform, message, out var header) &&
-		header.MethodId == method && platform.IsMapped(message, size);
+		TryReadMethodIdValue(ref platform, message, out uint methodId) &&
+		methodId == method && platform.IsMapped(message, size);
 }

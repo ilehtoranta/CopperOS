@@ -138,12 +138,25 @@ internal static class MuiGroupChangeMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
+		if (!TryReadMethodIdValue(ref platform, address, out var methodId))
+			return false;
+		value.MethodId = methodId;
+		return true;
+	}
+
+	// Native selector admission stays scalar so compiler paths do not need to
+	// materialize a temporary one-field record. Public packet consumers still
+	// receive the named struct above.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiGroupChangeMessage.Size)) return false;
-		if (!MuiGroupChangeRecordFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiGroupChangeRecordFieldCursorCodec.TryReadUInt32(ref platform,
 			address, MuiGroupChangeRecordKind.Message,
-			MuiGroupChangeRecordField.MethodId, out value.MethodId)) return false;
-		return true;
+			MuiGroupChangeRecordField.MethodId, out methodId);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
@@ -163,9 +176,9 @@ internal static class MuiGroupChangeMessageCodec
 		value = default;
 		if (method != MuiGroupChangeCore.InitChangeMethod &&
 			method != MuiGroupChangeCore.ExitChangeMethod ||
-			!TryReadMethodId(ref platform, address, out var header) ||
-			header.MethodId != method) return false;
-		value.MethodId = header.MethodId;
+			!TryReadMethodIdValue(ref platform, address, out var methodId) ||
+			methodId != method) return false;
+		value.MethodId = methodId;
 		return true;
 	}
 }
@@ -190,11 +203,11 @@ internal static class MuiGroupExitChange2MessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiGroupChangeMessageCodec.TryReadMethodId(ref platform, address,
-			out var header) ||
-			header.MethodId != method || !platform.IsMapped(address,
+		if (!MuiGroupChangeMessageCodec.TryReadMethodIdValue(ref platform,
+			address, out var methodId) ||
+			methodId != method || !platform.IsMapped(address,
 			MuiGroupExitChange2Message.Size)) return false;
-		value.MethodId = header.MethodId;
+		value.MethodId = methodId;
 		if (!MuiGroupChangeRecordFieldCursorCodec.TryReadUInt32(ref platform,
 			address, MuiGroupChangeRecordKind.ExitChange2,
 			MuiGroupChangeRecordField.Flags, out value.Flags)) return false;
@@ -208,11 +221,11 @@ internal static class MuiGroupPacketDispatchCodec
 		APTR address, uint initMethod, uint exitMethod, uint exit2Method)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGroupChangeMessageCodec.TryReadMethodId(ref platform, address,
-			out var header)) return 0;
-		if (header.MethodId == initMethod || header.MethodId == exitMethod)
+		if (!MuiGroupChangeMessageCodec.TryReadMethodIdValue(ref platform,
+			address, out var methodId)) return 0;
+		if (methodId == initMethod || methodId == exitMethod)
 			return 1;
-		if (header.MethodId != exit2Method ||
+		if (methodId != exit2Method ||
 			!MuiGroupExitChange2MessageCodec.TryRead(ref platform, address,
 				exit2Method, out var packet)) return 0;
 		return packet.Flags;

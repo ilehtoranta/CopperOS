@@ -97,11 +97,25 @@ internal static class MuiObjectPersistenceMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Keep native selector admission scalar while the named method record remains
+	// the dispatcher-facing ABI type. Packed offsets stay inside this codec.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiObjectPersistenceMethodMessage.Size)) return false;
 		return MuiObjectPersistencePacketFieldCursorCodec.TryReadUInt32(
 			ref platform, message, MuiObjectPersistencePacketField.MethodId,
-			out packet.MethodId);
+			out methodId);
 	}
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
@@ -109,8 +123,7 @@ internal static class MuiObjectPersistenceMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		method = 0;
-		if (!TryReadMethodId(ref platform, message, out var packet)) return false;
-		method = packet.MethodId;
+		if (!TryReadMethodIdValue(ref platform, message, out method)) return false;
 		return true;
 	}
 
@@ -119,15 +132,16 @@ internal static class MuiObjectPersistenceMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if ((method != ExportMethod && method != ImportMethod) ||
 			message.IsNull || !platform.IsMapped(message,
 			MuiObjectPersistenceMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != method) return false;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != method) return false;
 		if (!MuiObjectPersistencePacketFieldCursorCodec.TryReadUInt32(
 			ref platform, message, MuiObjectPersistencePacketField.Dataspace,
 			out var rawDataspace)) return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		packet.Dataspace = APTR.FromPointer(rawDataspace);
 		return true;
 	}

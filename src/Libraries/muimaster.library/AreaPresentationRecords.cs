@@ -156,3 +156,25 @@ internal static class MuiAreaPresentationStateRecordCodec
 			value.CustomBackfill);
 	}
 }
+
+// MorphOS presents Disabled, ShowMe, and CustomBackfill as BOOL-like ULONGs.
+// Background and Frame remain unrestricted ULONG selectors/pointers and must
+// therefore be preserved losslessly. Keep validation separate from the codec
+// so malformed guest state is rejected rather than normalized in place.
+internal static class MuiAreaPresentationStateValidation
+{
+	internal static bool IsValidState(MuiAreaPresentationState value) =>
+		value.Disabled <= 1 && value.ShowMe <= 1 && value.CustomBackfill <= 1;
+
+	internal static bool IsValidRecord(MuiAreaPresentationStateRecord value)
+	{
+		if (value.Magic != MuiAreaPresentationStateRecord.Cookie) return false;
+		var state = default(MuiAreaPresentationState);
+		state.Disabled = value.Disabled;
+		state.ShowMe = value.ShowMe;
+		state.Background = value.Background;
+		state.Frame = value.Frame;
+		state.CustomBackfill = value.CustomBackfill;
+		return IsValidState(state);
+	}
+}

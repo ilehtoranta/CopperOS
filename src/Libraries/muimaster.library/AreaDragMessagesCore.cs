@@ -28,6 +28,34 @@ internal struct MuiAreaDragBeginMessage
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiAreaDoDragMessage
+{
+	public const uint Size = 16;
+	public uint MethodId;
+	public int TouchX;
+	public int TouchY;
+	public uint Flags;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiAreaCreateDragImageMessage
+{
+	public const uint Size = 16;
+	public uint MethodId;
+	public int TouchX;
+	public int TouchY;
+	public uint Flags;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiAreaDeleteDragImageMessage
+{
+	public const uint Size = 8;
+	public uint MethodId;
+	public uint DragImage;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiAreaDragDropMessage
 {
 	public const uint Size = 20;
@@ -85,11 +113,14 @@ internal enum MuiAreaDragPacketKind : byte
 {
 	Method,
 	Begin,
+	DoDrag,
 	Drop,
 	Event,
 	Finish,
 	Query,
 	Report,
+	CreateImage,
+	DeleteImage,
 }
 
 internal enum MuiAreaDragField : byte
@@ -107,6 +138,8 @@ internal enum MuiAreaDragField : byte
 	Qualifier,
 	DropFollows,
 	Update,
+	TouchX,
+	TouchY,
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -130,6 +163,12 @@ internal static class MuiAreaDragFieldCursorCodec
 			case MuiAreaDragPacketKind.Begin:
 				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
 				if (field == MuiAreaDragField.Object) { offset = 4; return true; }
+				break;
+			case MuiAreaDragPacketKind.DoDrag:
+				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
+				if (field == MuiAreaDragField.TouchX) { offset = 4; return true; }
+				if (field == MuiAreaDragField.TouchY) { offset = 8; return true; }
+				if (field == MuiAreaDragField.Flags) { offset = 12; return true; }
 				break;
 			case MuiAreaDragPacketKind.Drop:
 				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
@@ -164,6 +203,16 @@ internal static class MuiAreaDragFieldCursorCodec
 				if (field == MuiAreaDragField.Y) { offset = 12; return true; }
 				if (field == MuiAreaDragField.Update) { offset = 16; return true; }
 				if (field == MuiAreaDragField.Qualifier) { offset = 20; return true; }
+				break;
+			case MuiAreaDragPacketKind.CreateImage:
+				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
+				if (field == MuiAreaDragField.TouchX) { offset = 4; return true; }
+				if (field == MuiAreaDragField.TouchY) { offset = 8; return true; }
+				if (field == MuiAreaDragField.Flags) { offset = 12; return true; }
+				break;
+			case MuiAreaDragPacketKind.DeleteImage:
+				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
+				if (field == MuiAreaDragField.DragImage) { offset = 4; return true; }
 				break;
 		}
 		offset = 0;
@@ -214,28 +263,50 @@ internal static class MuiAreaDragFieldCursorCodec
 
 internal static class MuiAreaDragMessageCodec
 {
+	// MorphOS MUIV_DoDrag_Async requests provider-owned asynchronous drag
+	// scheduling. The core remains freestanding and records the flag in the
+	// typed route sample; no managed task or exception path is introduced.
+	internal const uint DoDragAsync = 1u;
+	internal const uint DoDrag = 0x804216BBu;
 	internal const uint DragBegin = 0x8042C03Au;
 	internal const uint DragDrop = 0x8042C555u;
 	internal const uint DragEvent = 0x8042B774u;
 	internal const uint DragFinish = 0x804251F0u;
 	internal const uint DragQuery = 0x80420261u;
 	internal const uint DragReport = 0x8042EDADu;
+	internal const uint CreateDragImage = 0x8042EB6Fu;
+	internal const uint DeleteDragImage = 0x80423037u;
 
-	internal static bool IsMethod(uint method) => method == DragBegin ||
+	internal static bool IsMethod(uint method) => method == DoDrag ||
+		method == DragBegin ||
 		method == DragDrop || method == DragEvent || method == DragFinish ||
-		method == DragQuery || method == DragReport;
+		method == DragQuery || method == DragReport ||
+		method == CreateDragImage || method == DeleteDragImage;
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiAreaDragMethodMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Native selector admission stays scalar so compiler paths do not need to
+	// materialize a temporary one-field record. Public packet consumers still
+	// receive the named struct above.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiAreaDragMethodMessage.Size)) return false;
-		if (!MuiAreaDragFieldCursorCodec.TryReadUInt32(ref platform, message,
+		return MuiAreaDragFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiAreaDragPacketKind.Method, MuiAreaDragField.MethodId,
-			out packet.MethodId)) return false;
-		return true;
+			out methodId);
 	}
 
 	internal static bool TryReadBegin<TPlatform>(ref TPlatform platform,
@@ -261,6 +332,116 @@ internal static class MuiAreaDragMessageCodec
 			MuiAreaDragPacketKind.Begin, MuiAreaDragField.MethodId, DragBegin) &&
 			MuiAreaDragFieldCursorCodec.TryWriteUInt32(ref platform, message,
 				MuiAreaDragPacketKind.Begin, MuiAreaDragField.Object, source);
+	}
+
+	internal static bool TryReadDoDrag<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiAreaDoDragMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!IsPacket(ref platform, message, MuiAreaDoDragMessage.Size,
+			DoDrag)) return false;
+		packet.MethodId = DoDrag;
+		if (!MuiAreaDragFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiAreaDragPacketKind.DoDrag, MuiAreaDragField.TouchX,
+			out var rawX) ||
+			!MuiAreaDragFieldCursorCodec.TryReadUInt32(ref platform, message,
+				MuiAreaDragPacketKind.DoDrag, MuiAreaDragField.TouchY,
+				out var rawY) ||
+			!MuiAreaDragFieldCursorCodec.TryReadUInt32(ref platform, message,
+				MuiAreaDragPacketKind.DoDrag, MuiAreaDragField.Flags,
+				out packet.Flags)) return false;
+		packet.TouchX = unchecked((int)rawX);
+		packet.TouchY = unchecked((int)rawY);
+		return true;
+	}
+
+	internal static bool WriteDoDrag<TPlatform>(ref TPlatform platform,
+		APTR message, int touchX, int touchY, uint flags)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!IsStorage(ref platform, message, MuiAreaDoDragMessage.Size))
+			return false;
+		return MuiAreaDragFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiAreaDragPacketKind.DoDrag, MuiAreaDragField.MethodId, DoDrag) &&
+			MuiAreaDragFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiAreaDragPacketKind.DoDrag, MuiAreaDragField.TouchX,
+				unchecked((uint)touchX)) &&
+			MuiAreaDragFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiAreaDragPacketKind.DoDrag, MuiAreaDragField.TouchY,
+				unchecked((uint)touchY)) &&
+			MuiAreaDragFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiAreaDragPacketKind.DoDrag, MuiAreaDragField.Flags, flags);
+	}
+
+	internal static bool TryReadCreateDragImage<TPlatform>(
+		ref TPlatform platform, APTR message,
+		out MuiAreaCreateDragImageMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!IsPacket(ref platform, message,
+			MuiAreaCreateDragImageMessage.Size, CreateDragImage)) return false;
+		packet.MethodId = CreateDragImage;
+		if (!MuiAreaDragFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiAreaDragPacketKind.CreateImage, MuiAreaDragField.TouchX,
+			out var rawX) ||
+			!MuiAreaDragFieldCursorCodec.TryReadUInt32(ref platform, message,
+				MuiAreaDragPacketKind.CreateImage, MuiAreaDragField.TouchY,
+				out var rawY) ||
+			!MuiAreaDragFieldCursorCodec.TryReadUInt32(ref platform, message,
+				MuiAreaDragPacketKind.CreateImage, MuiAreaDragField.Flags,
+				out packet.Flags)) return false;
+		packet.TouchX = unchecked((int)rawX);
+		packet.TouchY = unchecked((int)rawY);
+		return true;
+	}
+
+	internal static bool WriteCreateDragImage<TPlatform>(
+		ref TPlatform platform, APTR message, int touchX, int touchY,
+		uint flags) where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!IsStorage(ref platform, message,
+			MuiAreaCreateDragImageMessage.Size)) return false;
+		return MuiAreaDragFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiAreaDragPacketKind.CreateImage, MuiAreaDragField.MethodId,
+			CreateDragImage) &&
+			MuiAreaDragFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiAreaDragPacketKind.CreateImage, MuiAreaDragField.TouchX,
+				unchecked((uint)touchX)) &&
+			MuiAreaDragFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiAreaDragPacketKind.CreateImage, MuiAreaDragField.TouchY,
+				unchecked((uint)touchY)) &&
+			MuiAreaDragFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiAreaDragPacketKind.CreateImage, MuiAreaDragField.Flags, flags);
+	}
+
+	internal static bool TryReadDeleteDragImage<TPlatform>(
+		ref TPlatform platform, APTR message,
+		out MuiAreaDeleteDragImageMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!IsPacket(ref platform, message,
+			MuiAreaDeleteDragImageMessage.Size, DeleteDragImage)) return false;
+		packet.MethodId = DeleteDragImage;
+		return MuiAreaDragFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiAreaDragPacketKind.DeleteImage, MuiAreaDragField.DragImage,
+			out packet.DragImage);
+	}
+
+	internal static bool WriteDeleteDragImage<TPlatform>(
+		ref TPlatform platform, APTR message, uint dragImage)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!IsStorage(ref platform, message,
+			MuiAreaDeleteDragImageMessage.Size)) return false;
+		return MuiAreaDragFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiAreaDragPacketKind.DeleteImage, MuiAreaDragField.MethodId,
+			DeleteDragImage) &&
+			MuiAreaDragFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiAreaDragPacketKind.DeleteImage, MuiAreaDragField.DragImage,
+				dragImage);
 	}
 
 	internal static bool TryReadDrop<TPlatform>(ref TPlatform platform,
@@ -482,8 +663,8 @@ internal static class MuiAreaDragMessageCodec
 		uint size, uint method) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!IsStorage(ref platform, message, size) ||
-			!TryReadMethodId(ref platform, message, out var header)) return false;
-		return header.MethodId == method;
+			!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		return methodId == method;
 	}
 
 	private static bool IsStorage<TPlatform>(ref TPlatform platform, APTR message,

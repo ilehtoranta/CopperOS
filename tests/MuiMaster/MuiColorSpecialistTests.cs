@@ -329,59 +329,70 @@ public sealed class MuiColorSpecialistTests
 	}
 
 	[Fact]
-	public void ColoradjustShowAlphaIsInitOnly()
+	public void ColoradjustShowAlphaIsRuntimeSettable()
 	{
 		var p = NewPlatform();
 		Create(ref p, Instance, "Coloradjust.mui");
-		// Runtime set is a claimed no-op; the value stays at its default (false).
+		// MorphOS exposes ShowAlpha as [ISG], including runtime Set.
 		Assert.True(MuiColorSpecialistCore.SetAttribute(ref p, Instance,
 			MuiColorAttributes.ColoradjustShowAlpha, 1, false, true, out var changed));
-		Assert.False(changed);
-		Assert.Equal(0u, Get(ref p, MuiColorAttributes.ColoradjustShowAlpha));
-		// Init set honours it.
-		Assert.True(MuiColorSpecialistCore.SetAttribute(ref p, Instance,
-			MuiColorAttributes.ColoradjustShowAlpha, 1, true, false, out changed));
 		Assert.True(changed);
 		Assert.Equal(1u, Get(ref p, MuiColorAttributes.ColoradjustShowAlpha));
+		Assert.Equal(MuiColorAttributes.ColoradjustShowAlpha,
+			MuiColorSpecialistCore.LastNotifiedAttribute(ref p, Instance));
+		// Initialization and runtime paths share the same named flag state.
+		Assert.True(MuiColorSpecialistCore.SetAttribute(ref p, Instance,
+			MuiColorAttributes.ColoradjustShowAlpha, 0, true, false, out changed));
+		Assert.True(changed);
+		Assert.Equal(0u, Get(ref p, MuiColorAttributes.ColoradjustShowAlpha));
 	}
 
 	// ---- Palette obsolete-but-supported / Penadjust private -------------------
 
 	[Fact]
-	public void PaletteEntriesAndNamesAreInitOnlyReferencesGroupableGettable()
+	public void PaletteAccessModesUseNamedState()
 	{
 		var p = NewPlatform();
 		Create(ref p, Instance, "Palette.mui");
-		// Entries/Names are [I..]: honoured at init, ignored at runtime, not
-		// gettable (no placeholder value is fabricated).
+		// MorphOS exposes Entries as [I.G], and Names/Groupable as [ISG].
 		Assert.True(MuiColorSpecialistCore.SetAttribute(ref p, Instance,
 			MuiColorAttributes.PaletteEntries, 0x9000, true, false, out _));
-		Assert.False(MuiColorSpecialistCore.GetAttribute(ref p, Instance,
-			MuiColorAttributes.PaletteEntries, out _));
+		Assert.Equal(0x9000u, Get(ref p, MuiColorAttributes.PaletteEntries));
+		Assert.False(MuiColorSpecialistCore.SetAttribute(ref p, Instance,
+			MuiColorAttributes.PaletteEntries, 0x9100, false, true, out var changed));
+		Assert.False(changed);
+		Assert.Equal(0x9000u, Get(ref p, MuiColorAttributes.PaletteEntries));
 		Assert.True(MuiColorSpecialistCore.SetAttribute(ref p, Instance,
 			MuiColorAttributes.PaletteNames, 0x9100, true, false, out _));
-		// Groupable is [I.G]: init toggles, runtime set is ignored.
+		Assert.Equal(0x9100u, Get(ref p, MuiColorAttributes.PaletteNames));
+		Assert.True(MuiColorSpecialistCore.SetAttribute(ref p, Instance,
+			MuiColorAttributes.PaletteNames, 0x9200, false, true, out changed));
+		Assert.True(changed);
+		Assert.Equal(0x9200u, Get(ref p, MuiColorAttributes.PaletteNames));
 		Assert.True(MuiColorSpecialistCore.SetAttribute(ref p, Instance,
 			MuiColorAttributes.PaletteGroupable, 0, true, false, out _));
 		Assert.Equal(0u, Get(ref p, MuiColorAttributes.PaletteGroupable));
 		Assert.True(MuiColorSpecialistCore.SetAttribute(ref p, Instance,
-			MuiColorAttributes.PaletteGroupable, 1, false, true, out var changed));
-		Assert.False(changed);
-		Assert.Equal(0u, Get(ref p, MuiColorAttributes.PaletteGroupable));
+			MuiColorAttributes.PaletteGroupable, 1, false, true, out changed));
+		Assert.True(changed);
+		Assert.Equal(1u, Get(ref p, MuiColorAttributes.PaletteGroupable));
 	}
 
 	[Fact]
-	public void PenadjustPsiModeStoresAndReports()
+	public void PenadjustPsiModeIsInitializationOnly()
 	{
 		var p = NewPlatform();
 		Create(ref p, Instance, "Penadjust.mui");
 		Assert.True(MuiColorSpecialistCore.SetAttribute(ref p, Instance,
-			MuiColorAttributes.PenadjustPsiMode, 1, false, false, out var changed));
+			MuiColorAttributes.PenadjustPsiMode, 1, true, false, out var changed));
 		Assert.True(changed);
-		// PSIMode is private, exercised only through the core.
-		Assert.True(MuiColorSpecialistCore.SetAttribute(ref p, Instance,
-			MuiColorAttributes.PenadjustPsiMode, 1, false, false, out changed));
+		// MorphOS documents PSIMode as [I..]: runtime Set must not claim it.
+		Assert.False(MuiColorSpecialistCore.SetAttribute(ref p, Instance,
+			MuiColorAttributes.PenadjustPsiMode, 0, false, true, out changed));
 		Assert.False(changed);
+		Assert.True(MuiColorSpecialistStateCodec.TryRead(ref p, Instance,
+			out var state));
+		Assert.NotEqual(0u, state.Flags & MuiColorSpecialistLayout.FlagPSIMode);
 	}
 
 	[Fact]
@@ -740,6 +751,9 @@ public sealed class MuiColorSpecialistTests
 		Assert.True(MuiColorSpecialistMessageCodec.TryReadMethodId(ref p, Packet,
 			out var packet));
 		Assert.Equal(MuiColorSpecialistMessageCodec.OmDispose, packet.MethodId);
+		Assert.True(MuiColorSpecialistMessageCodec.TryReadMethodIdValue(ref p,
+			Packet, out var methodId));
+		Assert.Equal(MuiColorSpecialistMessageCodec.OmDispose, methodId);
 		Assert.False(MuiColorSpecialistMessageCodec.TryReadMethodId(ref p,
 			APTR.Null, out _));
 	}
@@ -860,6 +874,64 @@ public sealed class MuiColorSpecialistTests
 		Assert.Equal(1u, MuiColorSpecialistDispatcher.Dispatch(ref p, Instance,
 			Packet));
 		Assert.False(MuiColorSpecialistCore.Valid(ref p, Instance));
+	}
+
+	[Fact]
+	public void ColoradjustShowAlphaDispatcherUsesRuntimeNamedState()
+	{
+		var p = NewPlatform();
+		Assert.Equal(MuiColorSpecialistClass.Coloradjust,
+			Create(ref p, Instance, "Coloradjust.mui"));
+
+		Assert.True(MuiColorSpecialistMessageCodec.WriteSet(ref p, Packet,
+			MuiColorSpecialistMessageCodec.MethodSet,
+			MuiColorAttributes.ColoradjustShowAlpha, 1));
+		Assert.Equal(1u, MuiColorSpecialistDispatcher.Dispatch(ref p, Instance,
+			Packet));
+
+		Assert.True(MuiColorSpecialistMessageCodec.WriteGet(ref p, Packet,
+			MuiColorAttributes.ColoradjustShowAlpha, Storage.Raw));
+		Assert.Equal(1u, MuiColorSpecialistDispatcher.Dispatch(ref p, Instance,
+			Packet));
+		Assert.Equal(1u, p.ReadUInt32(Storage, 0));
+	}
+
+	[Fact]
+	public void PaletteAccessModesDispatcherUsesNamedPointersAndFlags()
+	{
+		var p = NewPlatform();
+		Assert.Equal(MuiColorSpecialistClass.Palette,
+			Create(ref p, Instance, "Palette.mui"));
+		Assert.True(MuiColorSpecialistCore.SetAttribute(ref p, Instance,
+			MuiColorAttributes.PaletteEntries, 0x9000, true, false, out _));
+
+		Assert.True(MuiColorSpecialistMessageCodec.WriteSet(ref p, Packet,
+			MuiColorSpecialistMessageCodec.MethodSet,
+			MuiColorAttributes.PaletteEntries, 0x9100));
+		Assert.Equal(0u, MuiColorSpecialistDispatcher.Dispatch(ref p, Instance,
+			Packet));
+		Assert.True(MuiColorSpecialistMessageCodec.WriteGet(ref p, Packet,
+			MuiColorAttributes.PaletteEntries, Storage.Raw));
+		Assert.Equal(1u, MuiColorSpecialistDispatcher.Dispatch(ref p, Instance,
+			Packet));
+		Assert.Equal(0x9000u, p.ReadUInt32(Storage, 0));
+
+		Assert.True(MuiColorSpecialistMessageCodec.WriteSet(ref p, Packet,
+			MuiColorSpecialistMessageCodec.MethodSet,
+			MuiColorAttributes.PaletteNames, 0x9100));
+		Assert.Equal(1u, MuiColorSpecialistDispatcher.Dispatch(ref p, Instance,
+			Packet));
+
+		Assert.True(MuiColorSpecialistMessageCodec.WriteSet(ref p, Packet,
+			MuiColorSpecialistMessageCodec.MethodSet,
+			MuiColorAttributes.PaletteGroupable, 0));
+		Assert.Equal(1u, MuiColorSpecialistDispatcher.Dispatch(ref p, Instance,
+			Packet));
+		Assert.True(MuiColorSpecialistMessageCodec.WriteGet(ref p, Packet,
+			MuiColorAttributes.PaletteGroupable, Storage.Raw));
+		Assert.Equal(1u, MuiColorSpecialistDispatcher.Dispatch(ref p, Instance,
+			Packet));
+		Assert.Equal(0u, p.ReadUInt32(Storage, 0));
 	}
 
 	[Fact]

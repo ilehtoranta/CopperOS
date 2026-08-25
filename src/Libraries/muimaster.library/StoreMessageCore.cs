@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -180,6 +181,17 @@ internal static class MuiStoreFieldCursorCodec
 
 internal static class MuiStoreMessageCodec
 {
+	// Scalar selector admission remains at the guest ABI boundary; callers
+	// continue to receive the named store method-header struct.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiStoreFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiStorePacketKind.Method, MuiStoreField.MethodId, out methodId);
+	}
+
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiStoreMethodMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
@@ -187,8 +199,9 @@ internal static class MuiStoreMessageCodec
 		packet = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiStoreMethodMessage.Size)) return false;
-		return MuiStoreFieldCursorCodec.TryReadUInt32(ref platform, message,
-			MuiStorePacketKind.Method, MuiStoreField.MethodId, out packet.MethodId);
+		if (!TryReadMethodIdValue(ref platform, message, out packet.MethodId))
+			return false;
+		return true;
 	}
 }
 

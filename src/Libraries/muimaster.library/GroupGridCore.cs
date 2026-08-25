@@ -202,6 +202,7 @@ internal static class MuiGroupGridCore
 	private const uint VerticalCenter = 0x8042C008;
 	private const uint StateKey = 0x0D100014u;
 	private const uint MaximumAxis = 256;
+	private const int NoDisappearPriority = 0;
 
 	internal static bool IsGridAttribute(uint attribute) =>
 		attribute == Columns || attribute == Rows ||
@@ -333,8 +334,8 @@ internal static class MuiGroupGridCore
 			out value.VerticalCenter);
 		value.Columns = ClampAxis(value.Columns);
 		value.Rows = ClampAxis(value.Rows);
-		value.HorizontalSpacing = ClampSpacing(value.HorizontalSpacing);
-		value.VerticalSpacing = ClampSpacing(value.VerticalSpacing);
+		value.HorizontalSpacing = NormalizeSpacing(value.HorizontalSpacing);
+		value.VerticalSpacing = NormalizeSpacing(value.VerticalSpacing);
 		value.HorizontalCenter = ClampCenter(value.HorizontalCenter);
 		value.VerticalCenter = ClampCenter(value.VerticalCenter);
 	}
@@ -368,8 +369,8 @@ internal static class MuiGroupGridCore
 			out result.VerticalCenter);
 		result.Columns = ClampAxis(result.Columns);
 		result.Rows = ClampAxis(result.Rows);
-		result.HorizontalSpacing = ClampSpacing(result.HorizontalSpacing);
-		result.VerticalSpacing = ClampSpacing(result.VerticalSpacing);
+		result.HorizontalSpacing = NormalizeSpacing(result.HorizontalSpacing);
+		result.VerticalSpacing = NormalizeSpacing(result.VerticalSpacing);
 		result.HorizontalCenter = ClampCenter(result.HorizontalCenter);
 		result.VerticalCenter = ClampCenter(result.VerticalCenter);
 		return result;
@@ -392,18 +393,191 @@ internal static class MuiGroupGridCore
 	internal static bool IsEnabled(MuiGroupGridSpec spec, int count) =>
 		count > 0 && (spec.Columns != 0 || spec.Rows != 0);
 
+	private static bool IsShown<TPlatform>(ref TPlatform platform, APTR state,
+		APTR child) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiAreaLayoutCore.TryReadLayoutPolicyState(ref platform, state,
+			child, out var policy)) return true;
+		return policy.ShowMe != 0;
+	}
+
+	private static int ReadDisappearPriority<TPlatform>(ref TPlatform platform,
+		APTR state, APTR child, bool horizontal)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiAreaDisappearCore.TryReadState(ref platform, state, child,
+			out var disappear)) return NoDisappearPriority;
+		return horizontal ? disappear.HorizDisappear : disappear.VertDisappear;
+	}
+
+	private static bool IsHidden<TPlatform>(ref TPlatform platform, APTR state,
+		APTR child, bool horizontal, int hiddenPriority)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!IsShown(ref platform, state, child)) return true;
+		if (hiddenPriority <= NoDisappearPriority) return false;
+		var priority = ReadDisappearPriority(ref platform, state, child,
+			horizontal);
+		return priority > NoDisappearPriority && priority <= hiddenPriority;
+	}
+
+	private static int CountCandidates<TPlatform>(ref TPlatform platform,
+		APTR state, APTR group, int count, bool horizontal)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var result = 0;
+		for (var index = 0; index < count; index++)
+		{
+			var child = MuiFamilyCore.GetChild(ref platform, state, group, index,
+				APTR.Null);
+			if (child.IsNull || !IsShown(ref platform, state, child)) continue;
+			if (ReadDisappearPriority(ref platform, state, child, horizontal) >
+				NoDisappearPriority) result++;
+		}
+		return result;
+	}
+
+	private static int CountVisible<TPlatform>(ref TPlatform platform,
+		APTR state, APTR group, int count, bool horizontal, int hiddenPriority)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var result = 0;
+		for (var index = 0; index < count; index++)
+		{
+			var child = MuiFamilyCore.GetChild(ref platform, state, group, index,
+				APTR.Null);
+			if (child.IsNull || IsHidden(ref platform, state, child, horizontal,
+				hiddenPriority)) continue;
+			result++;
+		}
+		return result;
+	}
+
+	private static int FindNextPriority<TPlatform>(ref TPlatform platform,
+		APTR state, APTR group, int count, bool horizontal, int after)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var next = int.MaxValue;
+		var found = false;
+		for (var index = 0; index < count; index++)
+		{
+			var child = MuiFamilyCore.GetChild(ref platform, state, group, index,
+				APTR.Null);
+			if (child.IsNull || !IsShown(ref platform, state, child)) continue;
+			var priority = ReadDisappearPriority(ref platform, state, child,
+				horizontal);
+			if (priority > after && priority > NoDisappearPriority &&
+				(!found || priority < next))
+			{
+				next = priority;
+				found = true;
+			}
+		}
+		return found ? next : NoDisappearPriority;
+	}
+
+	private static MuiGroupDisappearSelection ResolveAxisSelection<TPlatform>(
+		ref TPlatform platform, APTR state, APTR group, int count, int columns,
+		int rows, bool horizontal, int available, int spacing)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var selection = default(MuiGroupDisappearSelection);
+		selection.Axis = horizontal ? MuiGroupDisappearAxis.Horizontal :
+			MuiGroupDisappearAxis.Vertical;
+		selection.Available = available < 0 ? 0 : available;
+		selection.Spacing = spacing < 0 ? 0 : spacing;
+		selection.HiddenPriority = NoDisappearPriority;
+		selection.CandidateCount = CountCandidates(ref platform, state, group,
+			count, horizontal);
+		selection.VisibleCount = CountVisible(ref platform, state, group, count,
+			horizontal, selection.HiddenPriority);
+		while (selection.CandidateCount > 0 && selection.VisibleCount > 0 &&
+			RequiredExtent(ref platform, state, group, count, columns, rows,
+				horizontal, selection.HiddenPriority, selection.Spacing) >
+			selection.Available)
+		{
+			var next = FindNextPriority(ref platform, state, group, count,
+				horizontal, selection.HiddenPriority);
+			if (next <= NoDisappearPriority) break;
+			selection.HiddenPriority = next;
+			selection.VisibleCount = CountVisible(ref platform, state, group,
+				count, horizontal, selection.HiddenPriority);
+		}
+		return selection;
+	}
+
+	private static MuiGroupGridDisappearSelection ResolveDisappearSelection<TPlatform>(
+		ref TPlatform platform, APTR state, APTR group, int count, int columns,
+		int rows, int width, int height, int horizontalSpacing,
+		int verticalSpacing)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var selection = default(MuiGroupGridDisappearSelection);
+		selection.Horizontal = ResolveAxisSelection(ref platform, state, group,
+			count, columns, rows, true, width, horizontalSpacing);
+		selection.Vertical = ResolveAxisSelection(ref platform, state, group,
+			count, columns, rows, false, height, verticalSpacing);
+		return selection;
+	}
+
+	private static int RequiredExtent<TPlatform>(ref TPlatform platform,
+		APTR state, APTR group, int count, int columns, int rows,
+		bool horizontal, int hiddenPriority, int spacing)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var extent = 0;
+		if (horizontal)
+		{
+			for (var column = 0; column < columns; column++)
+			{
+				var values = ColumnValues(ref platform, state, group, count,
+					columns, rows, column, true, hiddenPriority);
+				extent = AddExtent(extent, values.MinWidth);
+			}
+			if (columns > 1) extent = AddExtent(extent, spacing * (columns - 1));
+		}
+		else
+		{
+			for (var row = 0; row < rows; row++)
+			{
+				var values = RowValues(ref platform, state, group, count, columns,
+					rows, row, true, hiddenPriority);
+				extent = AddExtent(extent, values.MinHeight);
+			}
+			if (rows > 1) extent = AddExtent(extent, spacing * (rows - 1));
+		}
+		return extent;
+	}
+
+	private static int AddExtent(int value, int addition)
+	{
+		if (addition <= 0) return value;
+		return value > int.MaxValue - addition ? int.MaxValue : value + addition;
+	}
+
+	private static short ClampMinimum(int value) => unchecked((short)(value >
+		10000 ? 10000 : value));
+
 	internal static MuiMinMaxValues ComputeMinMax<TPlatform>(
 		ref TPlatform platform, APTR state, APTR group, MuiGroupGridSpec spec,
 		int count) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		ResolveDimensions(spec, count, out var columns, out var rows);
+		var dimensions = ResolveDimensionPolicy(spec, count);
+		var columns = dimensions.Columns;
+		var rows = dimensions.Rows;
+		var horizontalSpacing = MuiGroupSpacingCore.ResolveForMinMax(
+			spec.HorizontalSpacing);
+		var verticalSpacing = MuiGroupSpacingCore.ResolveForMinMax(
+			spec.VerticalSpacing);
 		var result = default(MuiMinMaxValues);
+		var horizontalMaximum = default(MuiGroupMaximumSumState);
+		var verticalMaximum = default(MuiGroupMaximumSumState);
 		for (var column = 0; column < columns; column++)
 		{
 			var values = ColumnValues(ref platform, state, group, count,
 				columns, rows, column);
 			result.MinWidth = Add(result.MinWidth, values.MinWidth);
-			result.MaxWidth = Add(result.MaxWidth, values.MaxWidth);
+			horizontalMaximum.Include(values.MaxWidth);
 			result.DefWidth = Add(result.DefWidth, values.DefWidth);
 		}
 		for (var row = 0; row < rows; row++)
@@ -411,23 +585,33 @@ internal static class MuiGroupGridCore
 			var values = RowValues(ref platform, state, group, count, columns,
 				rows, row);
 			result.MinHeight = Add(result.MinHeight, values.MinHeight);
-			result.MaxHeight = Add(result.MaxHeight, values.MaxHeight);
+			verticalMaximum.Include(values.MaxHeight);
 			result.DefHeight = Add(result.DefHeight, values.DefHeight);
 		}
 		if (columns > 1)
 		{
-			var gaps = (int)spec.HorizontalSpacing * (columns - 1);
+			var gaps = horizontalSpacing * (columns - 1);
 			result.MinWidth = Add(result.MinWidth, gaps);
-			result.MaxWidth = Add(result.MaxWidth, gaps);
+			horizontalMaximum.IncludeGap(gaps);
 			result.DefWidth = Add(result.DefWidth, gaps);
 		}
 		if (rows > 1)
 		{
-			var gaps = (int)spec.VerticalSpacing * (rows - 1);
+			var gaps = verticalSpacing * (rows - 1);
 			result.MinHeight = Add(result.MinHeight, gaps);
-			result.MaxHeight = Add(result.MaxHeight, gaps);
+			verticalMaximum.IncludeGap(gaps);
 			result.DefHeight = Add(result.DefHeight, gaps);
 		}
+		result.MaxWidth = horizontalMaximum.Value;
+		result.MaxHeight = verticalMaximum.Value;
+		// A positive vertical/horizontal disappearance priority can satisfy the
+		// corresponding minimum, while Def/Max retain the full grid aggregate.
+		result.MinWidth = ClampMinimum(RequiredExtent(ref platform, state, group,
+			count, columns, rows, true, int.MaxValue,
+			horizontalSpacing));
+		result.MinHeight = ClampMinimum(RequiredExtent(ref platform, state, group,
+			count, columns, rows, false, int.MaxValue,
+			verticalSpacing));
 		return result;
 	}
 
@@ -436,13 +620,30 @@ internal static class MuiGroupGridCore
 		MuiGroupGridSpec spec, int count)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
-		ResolveDimensions(spec, count, out var columns, out var rows);
-		var horizontalGaps = (int)spec.HorizontalSpacing * (columns - 1);
-		var verticalGaps = (int)spec.VerticalSpacing * (rows - 1);
+		var dimensions = ResolveDimensionPolicy(spec, count);
+		var columns = dimensions.Columns;
+		var rows = dimensions.Rows;
+		var spacing = MuiGroupSpacingCore.ResolveSelection(spec.HorizontalSpacing,
+			spec.VerticalSpacing, width, height);
+		var horizontalSpacing = spacing.Horizontal.Pixels;
+		var verticalSpacing = spacing.Vertical.Pixels;
+		var selection = ResolveDisappearSelection(ref platform, state, group,
+			count, columns, rows, width, height, horizontalSpacing,
+			verticalSpacing);
+		var horizontalGaps = horizontalSpacing * (columns - 1);
+		var verticalGaps = verticalSpacing * (rows - 1);
 		var availableWidth = width - horizontalGaps;
 		var availableHeight = height - verticalGaps;
 		if (availableWidth < 0) availableWidth = 0;
 		if (availableHeight < 0) availableHeight = 0;
+		var equalWidth = spec.SameWidth == 0 ? default :
+			ResolveEqualGridExtent(ref platform, state, group, count,
+				columns == 0 ? availableWidth : availableWidth / columns,
+				true);
+		var equalHeight = spec.SameHeight == 0 ? default :
+			ResolveEqualGridExtent(ref platform, state, group, count,
+				rows == 0 ? availableHeight : availableHeight / rows,
+				false);
 		for (var index = 0; index < count; index++)
 		{
 			var row = index / columns;
@@ -450,19 +651,38 @@ internal static class MuiGroupGridCore
 			var child = MuiFamilyCore.GetChild(ref platform, state, group,
 				index, APTR.Null);
 			if (child.IsNull) return false;
+			if (IsHidden(ref platform, state, child, true,
+				selection.Horizontal.HiddenPriority) ||
+				IsHidden(ref platform, state, child, false,
+					selection.Vertical.HiddenPriority))
+			{
+				if (!MuiAreaLayoutCore.Layout(ref platform, state, child, left, top,
+					0, 0)) return false;
+				continue;
+			}
 			var childWidth = AxisExtent(ref platform, state, group, count,
-				columns, rows, column, availableWidth, spec, true);
+				columns, rows, column, availableWidth, spec,
+				0, true);
 			var childHeight = AxisExtent(ref platform, state, group, count,
-				columns, rows, row, availableHeight, spec, false);
+				columns, rows, row, availableHeight, spec,
+				0, false);
 			var childLeft = left + AxisOffset(ref platform, state, group, count,
-				columns, rows, column, availableWidth, spec, true);
+				columns, rows, column, availableWidth, spec, horizontalSpacing,
+				0, true);
 			var childTop = top + AxisOffset(ref platform, state, group, count,
-				columns, rows, row, availableHeight, spec, false);
+				columns, rows, row, availableHeight, spec, verticalSpacing,
+				0, false);
 			var minMax = MuiAreaLayoutCore.ComputeMinMax(ref platform, state, child);
 			var placedWidth = Preferred(minMax.DefWidth, minMax.MinWidth,
 				minMax.MaxWidth, childWidth);
 			var placedHeight = Preferred(minMax.DefHeight, minMax.MinHeight,
 				minMax.MaxHeight, childHeight);
+			if (spec.SameWidth != 0 && equalWidth.VisibleCount > 0)
+				placedWidth = EqualPreferred(equalWidth.EqualExtent,
+					minMax.MinWidth, minMax.MaxWidth, childWidth);
+			if (spec.SameHeight != 0 && equalHeight.VisibleCount > 0)
+				placedHeight = EqualPreferred(equalHeight.EqualExtent,
+					minMax.MinHeight, minMax.MaxHeight, childHeight);
 			childLeft += Align(childWidth - placedWidth, spec.HorizontalCenter);
 			childTop += Align(childHeight - placedHeight, spec.VerticalCenter);
 			if (!MuiAreaLayoutCore.Layout(ref platform, state, child, childLeft,
@@ -473,7 +693,8 @@ internal static class MuiGroupGridCore
 	}
 
 	private static MuiMinMaxValues ColumnValues<TPlatform>(ref TPlatform platform,
-		APTR state, APTR group, int count, int columns, int rows, int column)
+		APTR state, APTR group, int count, int columns, int rows, int column,
+		bool filterDisappear = false, int hiddenPriority = 0)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var result = default(MuiMinMaxValues);
@@ -484,6 +705,8 @@ internal static class MuiGroupGridCore
 			if (index >= count) break;
 			var child = MuiFamilyCore.GetChild(ref platform, state, group, index,
 				APTR.Null);
+			if (filterDisappear && IsHidden(ref platform, state, child, true,
+				hiddenPriority)) continue;
 			var values = MuiAreaLayoutCore.ComputeMinMax(ref platform, state, child);
 			if (!any)
 			{
@@ -501,7 +724,8 @@ internal static class MuiGroupGridCore
 	}
 
 	private static MuiMinMaxValues RowValues<TPlatform>(ref TPlatform platform,
-		APTR state, APTR group, int count, int columns, int rows, int row)
+		APTR state, APTR group, int count, int columns, int rows, int row,
+		bool filterDisappear = false, int hiddenPriority = 0)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var result = default(MuiMinMaxValues);
@@ -512,6 +736,8 @@ internal static class MuiGroupGridCore
 			if (index >= count) break;
 			var child = MuiFamilyCore.GetChild(ref platform, state, group, index,
 				APTR.Null);
+			if (filterDisappear && IsHidden(ref platform, state, child, false,
+				hiddenPriority)) continue;
 			var values = MuiAreaLayoutCore.ComputeMinMax(ref platform, state, child);
 			if (!any)
 			{
@@ -530,71 +756,141 @@ internal static class MuiGroupGridCore
 
 	private static int AxisExtent<TPlatform>(ref TPlatform platform, APTR state,
 		APTR group, int count, int columns, int rows, int axis, int available,
-		MuiGroupGridSpec spec, bool horizontal)
+		MuiGroupGridSpec spec, int hiddenPriority, bool horizontal)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var axes = horizontal ? columns : rows;
+		if (axes <= 0 || axis < 0 || axis >= axes) return 0;
 		if (axis == axes - 1) return available - AxisTotalBefore(ref platform,
 			state, group, count, columns, rows, axes - 1, available, spec,
-			horizontal);
+			hiddenPriority, horizontal);
 		if ((horizontal && spec.SameWidth != 0) ||
 			(!horizontal && spec.SameHeight != 0)) return available / axes;
-		var totalWeight = AxisWeightTotal(ref platform, state, group, count,
-			columns, rows, axes, horizontal);
-		var weight = AxisWeight(ref platform, state, group, count, columns, rows,
-			axis, horizontal);
-		return (int)((uint)available * weight / totalWeight);
+		return ResolveAxisExtent(ref platform, state, group, count, columns, rows,
+			axis, available, spec, hiddenPriority, horizontal);
 	}
 
 	private static int AxisOffset<TPlatform>(ref TPlatform platform, APTR state,
 		APTR group, int count, int columns, int rows, int axis, int available,
-		MuiGroupGridSpec spec, bool horizontal)
+		MuiGroupGridSpec spec, int spacing, int hiddenPriority, bool horizontal)
 		where TPlatform : struct, IMuiHeadlessPlatform =>
 		AxisTotalBefore(ref platform, state, group, count, columns, rows, axis,
-			available, spec, horizontal) + (horizontal ? (int)spec.HorizontalSpacing :
-			(int)spec.VerticalSpacing) * axis;
+			available, spec, hiddenPriority, horizontal) + spacing * axis;
 
 	private static int AxisTotalBefore<TPlatform>(ref TPlatform platform,
 		APTR state, APTR group, int count, int columns, int rows, int axis,
-		int available, MuiGroupGridSpec spec, bool horizontal)
+		int available, MuiGroupGridSpec spec, int hiddenPriority, bool horizontal)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var total = 0;
 		for (var index = 0; index < axis; index++)
 		{
 			total += AxisExtentNonLast(ref platform, state, group, count,
-				columns, rows, index, available, spec, horizontal);
+				columns, rows, index, available, spec, hiddenPriority, horizontal);
 		}
 		return total;
 	}
 
 	private static int AxisExtentNonLast<TPlatform>(ref TPlatform platform,
 		APTR state, APTR group, int count, int columns, int rows, int axis,
-		int available, MuiGroupGridSpec spec, bool horizontal)
+		int available, MuiGroupGridSpec spec, int hiddenPriority, bool horizontal)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var axes = horizontal ? columns : rows;
 		if ((horizontal && spec.SameWidth != 0) ||
 			(!horizontal && spec.SameHeight != 0)) return available / axes;
-		var totalWeight = AxisWeightTotal(ref platform, state, group, count,
-			columns, rows, axes, horizontal);
-		var weight = AxisWeight(ref platform, state, group, count, columns, rows,
-			axis, horizontal);
-		return (int)((uint)available * weight / totalWeight);
+		return ResolveAxisExtent(ref platform, state, group, count, columns, rows,
+			axis, available, spec, hiddenPriority, horizontal);
 	}
+
+	// Resolve one Grid column or row through the same named allocation state as
+	// an ordinary Group.  Aggregate min/max values come from the typed column /
+	// row records and therefore preserve minimum floors, finite caps, and the
+	// MorphOS zero-max unbounded sentinel without a parallel offset table.
+	private static int ResolveAxisExtent<TPlatform>(ref TPlatform platform,
+		APTR state, APTR group, int count, int columns, int rows, int axis,
+		int available, MuiGroupGridSpec spec, int hiddenPriority, bool horizontal)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var axes = horizontal ? columns : rows;
+		if (axes <= 0 || axis < 0 || axis >= axes) return 0;
+		var totalWeight = AxisWeightTotal(ref platform, state, group, count,
+			columns, rows, axes, hiddenPriority, horizontal);
+		var totalMinimum = AxisMinimumTotal(ref platform, state, group, count,
+			columns, rows, axes, hiddenPriority, horizontal);
+		// A rectangle smaller than the aggregate minimum cannot satisfy every
+		// Grid axis. MorphOS still keeps the original cells in that case, so
+		// fall back to weighted sharing instead of letting the first minimum
+		// consume the whole axis and collapsing its siblings.
+		var enforceMinimum = totalMinimum <= available;
+		var allocation = MuiGroupAxisAllocationCore.Begin(available,
+			totalWeight, enforceMinimum ? totalMinimum : 0);
+		for (var index = 0; index <= axis; index++)
+		{
+			var values = AxisValues(ref platform, state, group, count, columns,
+				rows, index, hiddenPriority, horizontal);
+			var weight = AxisWeight(ref platform, state, group, count, columns,
+				rows, index, hiddenPriority, horizontal);
+			var minimum = horizontal ? values.MinWidth : values.MinHeight;
+			var maximum = horizontal ? values.MaxWidth : values.MaxHeight;
+			// A fixed-size child still occupies a normal Grid cell; its own
+			// placement is centered inside that cell below. Do not collapse the
+			// cell to the same fixed extent merely because min == max.
+			if (maximum > 0 && maximum <= minimum) maximum = 0;
+			if (!enforceMinimum) minimum = 0;
+			MuiGroupAxisAllocationCore.Take(ref allocation, weight, minimum,
+				maximum, index == axes - 1);
+		}
+		return allocation.Slot;
+	}
+
+	private static int AxisMinimumTotal<TPlatform>(ref TPlatform platform,
+		APTR state, APTR group, int count, int columns, int rows, int axes,
+		int hiddenPriority, bool horizontal)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var total = 0;
+		for (var axis = 0; axis < axes; axis++)
+		{
+			var values = AxisValues(ref platform, state, group, count, columns,
+				rows, axis, hiddenPriority, horizontal);
+			var minimum = horizontal ? values.MinWidth : values.MinHeight;
+			if (minimum > 0)
+				total = total > int.MaxValue - minimum ? int.MaxValue :
+					total + minimum;
+		}
+		return total;
+	}
+
+	private static MuiMinMaxValues AxisValues<TPlatform>(ref TPlatform platform,
+		APTR state, APTR group, int count, int columns, int rows, int axis,
+		int hiddenPriority, bool horizontal)
+		where TPlatform : struct, IMuiHeadlessPlatform => horizontal ?
+			ColumnValues(ref platform, state, group, count, columns, rows, axis,
+				true, hiddenPriority) :
+			RowValues(ref platform, state, group, count, columns, rows, axis,
+				true, hiddenPriority);
 
 	private static uint AxisWeightTotal<TPlatform>(ref TPlatform platform,
 		APTR state, APTR group, int count, int columns, int rows, int axes,
-		bool horizontal) where TPlatform : struct, IMuiHeadlessPlatform
+		int hiddenPriority, bool horizontal)
+		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		uint total = 0;
 		for (var axis = 0; axis < axes; axis++) total += AxisWeight(ref platform,
-			state, group, count, columns, rows, axis, horizontal);
+			state, group, count, columns, rows, axis, hiddenPriority, horizontal);
 		return total == 0 ? (uint)axes : total;
 	}
 
 	private static uint AxisWeight<TPlatform>(ref TPlatform platform, APTR state,
 		APTR group, int count, int columns, int rows, int axis, bool horizontal)
+		where TPlatform : struct, IMuiHeadlessPlatform
+		=> AxisWeight(ref platform, state, group, count, columns, rows, axis, 0,
+			horizontal);
+
+	private static uint AxisWeight<TPlatform>(ref TPlatform platform, APTR state,
+		APTR group, int count, int columns, int rows, int axis,
+		int hiddenPriority, bool horizontal)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		uint total = 0;
@@ -606,6 +902,8 @@ internal static class MuiGroupGridCore
 				if (index >= count) break;
 				var child = MuiFamilyCore.GetChild(ref platform, state, group,
 					index, APTR.Null);
+				if (child.IsNull || IsHidden(ref platform, state, child, true,
+					hiddenPriority)) continue;
 				total += NormalizedWeight(MuiAreaLayoutCore.HorizontalWeight(
 					ref platform, state, child));
 			}
@@ -618,6 +916,8 @@ internal static class MuiGroupGridCore
 				if (index >= count) break;
 				var child = MuiFamilyCore.GetChild(ref platform, state, group,
 					index, APTR.Null);
+				if (child.IsNull || IsHidden(ref platform, state, child, false,
+					hiddenPriority)) continue;
 				total += NormalizedWeight(MuiAreaLayoutCore.VerticalWeight(
 					ref platform, state, child));
 			}
@@ -627,9 +927,64 @@ internal static class MuiGroupGridCore
 
 	private static uint NormalizedWeight(uint value) => value == 0 ? 1u : value;
 
+	private static MuiGroupEqualExtentSelection ResolveEqualGridExtent<TPlatform>(
+		ref TPlatform platform, APTR state, APTR group, int count, int available,
+		bool horizontal) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var selection = default(MuiGroupEqualExtentSelection);
+		selection.Available = available < 0 ? 0 : available;
+		var finiteMaximum = false;
+		for (var index = 0; index < count; index++)
+		{
+			var child = MuiFamilyCore.GetChild(ref platform, state, group, index,
+				APTR.Null);
+			if (child.IsNull || !IsShown(ref platform, state, child)) continue;
+			var values = MuiAreaLayoutCore.ComputeMinMax(ref platform, state,
+				child);
+			var minimum = horizontal ? values.MinWidth : values.MinHeight;
+			var maximum = horizontal ? values.MaxWidth : values.MaxHeight;
+			var preferred = horizontal ? values.DefWidth : values.DefHeight;
+			if (minimum > selection.MinimumExtent)
+				selection.MinimumExtent = minimum;
+			if (preferred > selection.DefaultExtent)
+				selection.DefaultExtent = preferred;
+			if (maximum > 0 && (!finiteMaximum ||
+				maximum < selection.MaximumExtent))
+			{
+				selection.MaximumExtent = maximum;
+				finiteMaximum = true;
+			}
+			selection.VisibleCount++;
+		}
+		selection.HasFiniteMaximum = finiteMaximum ? 1u : 0u;
+		if (selection.VisibleCount == 0) return selection;
+		var equal = selection.Available;
+		if (equal < selection.MinimumExtent) equal = selection.MinimumExtent;
+		if (finiteMaximum && equal > selection.MaximumExtent)
+			equal = selection.MaximumExtent;
+		selection.EqualExtent = equal < 0 ? 0 : equal;
+		selection.TailExtent = selection.EqualExtent;
+		return selection;
+	}
+
+	private static int EqualPreferred(int equal, short minimum, short maximum,
+		int cell)
+	{
+		var value = equal;
+		if (value < minimum) value = minimum;
+		if (maximum > 0 && value > maximum) value = maximum;
+		if (value < 0) value = 0;
+		return value > cell ? cell : value;
+	}
+
 	private static int Preferred(short def, short min, short max, int cell)
 	{
-		if (def == 0 && min == 0 && max == 0) return cell;
+		// A child with no preferred or minimum extent is free to occupy its
+		// complete Grid cell unless it declares a finite maximum. Area policy
+		// publishes an unbounded maximum (the 10000 sentinel) when no explicit
+		// maximum was supplied, so only a positive bound narrows this path.
+		if (def == 0 && min == 0)
+			return max > 0 && max < cell ? max : cell;
 		var value = def == 0 ? min : def;
 		if (value < min) value = min;
 		if (max != 0 && value > max) value = max;
@@ -640,29 +995,62 @@ internal static class MuiGroupGridCore
 	private static int Align(int free, uint center) => center == 0 ? 0 :
 		center == 2 ? free : free / 2;
 
-	private static void ResolveDimensions(MuiGroupGridSpec spec, int count,
-		out int columns, out int rows)
+	internal static MuiGroupGridDimensionPolicy ResolveDimensionPolicy(
+		MuiGroupGridSpec spec, int count)
 	{
-		columns = (int)spec.Columns;
-		rows = (int)spec.Rows;
+		var policy = default(MuiGroupGridDimensionPolicy);
+		policy.Count = count < 0 ? 0 : count;
+		policy.ExplicitColumns = spec.Columns;
+		policy.ExplicitRows = spec.Rows;
+		var columns = (int)spec.Columns;
+		var rows = (int)spec.Rows;
+		policy.Divisible = 1;
 		if (columns == 0 && rows == 0)
 		{
 			columns = 1;
-			rows = count;
+			rows = policy.Count;
 		}
 		else if (columns == 0)
 		{
-			rows = rows > count ? count : rows;
-			columns = (count + rows - 1) / rows;
+			rows = rows > policy.Count ? policy.Count : rows;
+			columns = rows == 0 ? 1 : (policy.Count + rows - 1) / rows;
+			if (policy.Count > 0 && policy.Count % rows != 0)
+			{
+				policy.Divisible = 0;
+				policy.Remainder = policy.Count % rows;
+			}
 		}
 		else
 		{
-			columns = columns > count ? count : columns;
-			var requiredRows = (count + columns - 1) / columns;
+			columns = columns > policy.Count ? policy.Count : columns;
+			var requiredRows = columns == 0 ? 1 :
+				(policy.Count + columns - 1) / columns;
 			rows = rows < requiredRows ? requiredRows : rows;
+			if (policy.Count > 0 && policy.Count % columns != 0)
+			{
+				policy.Divisible = 0;
+				policy.Remainder = policy.Count % columns;
+			}
 		}
 		if (columns < 1) columns = 1;
 		if (rows < 1) rows = 1;
+		if (policy.Count > 0 && spec.Columns != 0 &&
+			policy.Count % (int)spec.Columns != 0)
+		{
+			policy.Divisible = 0;
+			if (policy.Remainder == 0)
+				policy.Remainder = policy.Count % (int)spec.Columns;
+		}
+		if (policy.Count > 0 && spec.Rows != 0 &&
+			policy.Count % (int)spec.Rows != 0)
+		{
+			policy.Divisible = 0;
+			if (policy.Remainder == 0)
+				policy.Remainder = policy.Count % (int)spec.Rows;
+		}
+		policy.Columns = columns;
+		policy.Rows = rows;
+		return policy;
 	}
 
 	private static void ReadValue<TPlatform>(ref TPlatform platform, APTR state,
@@ -676,7 +1064,8 @@ internal static class MuiGroupGridCore
 	private static uint ClampAxis(uint value) => value > MaximumAxis ?
 		MaximumAxis : value;
 
-	private static uint ClampSpacing(uint value) => value > 10000 ? 10000 : value;
+	private static uint NormalizeSpacing(uint value) =>
+		MuiGroupSpacingCore.NormalizeRaw(value);
 
 	private static uint ClampCenter(uint value) => value > 2 ? 1 : value;
 

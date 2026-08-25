@@ -131,11 +131,25 @@ internal static class MuiProcessSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Native selector admission stays scalar so compiler paths do not need to
+	// materialize a temporary one-field record. Public packet consumers still
+	// receive the named struct above.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiProcessSpecialistMethodMessage.Size)) return false;
 		return MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Method,
-			MuiProcessSpecialistField.MethodId, out packet.MethodId);
+			MuiProcessSpecialistField.MethodId, out methodId);
 	}
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
@@ -155,8 +169,8 @@ internal static class MuiProcessSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		return IsMethod(method) &&
-			TryReadMethodId(ref platform, message, out var header) &&
-			header.MethodId == method;
+			TryReadMethodIdValue(ref platform, message, out var methodId) &&
+			methodId == method;
 	}
 
 	internal static bool WriteMethod<TPlatform>(ref TPlatform platform,
@@ -177,8 +191,8 @@ internal static class MuiProcessSpecialistMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiProcessSpecialistGetMessage.Size,
 			OmGet)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Get,
 			MuiProcessSpecialistField.Attribute, out packet.Attribute) &&
@@ -211,8 +225,8 @@ internal static class MuiProcessSpecialistMessageCodec
 		packet = default;
 		if (!IsSetMethod(method) || !IsPacket(ref platform, message,
 			MuiProcessSpecialistSetMessage.Size, method)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Set,
 			MuiProcessSpecialistField.Attribute, out packet.Attribute) &&
@@ -245,8 +259,8 @@ internal static class MuiProcessSpecialistMessageCodec
 		packet = default;
 		if (!IsSignalMethod(method) || !IsPacket(ref platform, message,
 			MuiProcessSpecialistSignalMessage.Size, method)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Signal,
 			MuiProcessSpecialistField.Signals, out packet.Signals);
@@ -273,8 +287,8 @@ internal static class MuiProcessSpecialistMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiProcessSpecialistErrorMessage.Size,
 			MuiProcessAttributes.Slave_Error)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Error,
 			MuiProcessSpecialistField.ErrorCode, out packet.ErrorCode);
@@ -303,8 +317,8 @@ internal static class MuiProcessSpecialistMessageCodec
 		if (!IsPacket(ref platform, message,
 			MuiProcessSpecialistDispatchMessage.Size,
 			MuiProcessAttributes.Slave_Dispatch)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Dispatch,
 			MuiProcessSpecialistField.Packet, out packet.Packet);
@@ -348,7 +362,7 @@ internal static class MuiProcessSpecialistMessageCodec
 		uint size, uint method) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (message.IsNull || !platform.IsMapped(message, size) ||
-			!TryReadMethodId(ref platform, message, out var header)) return false;
-		return header.MethodId == method;
+			!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		return methodId == method;
 	}
 }

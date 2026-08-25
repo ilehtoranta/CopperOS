@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -129,6 +130,18 @@ internal static class MuiNotifyWriteMessageCodec
 	internal const uint WriteLongMethod = 0x80428D86;
 	internal const uint WriteStringMethod = 0x80424BF4;
 
+	// Selector admission remains a scalar ABI seam; Notify consumers continue
+	// to receive the named fixed-width method-header record.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiNotifyWritePacketFieldCursorCodec.TryReadUInt32(ref platform,
+			message, MuiNotifyWritePacketKind.WriteLong,
+			MuiNotifyWritePacketField.MethodId, out methodId);
+	}
+
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiNotifyWriteMethodMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
@@ -136,9 +149,7 @@ internal static class MuiNotifyWriteMessageCodec
 		packet = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiNotifyWriteMethodMessage.Size)) return false;
-		return MuiNotifyWritePacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiNotifyWritePacketKind.WriteLong,
-			MuiNotifyWritePacketField.MethodId, out packet.MethodId);
+		return TryReadMethodIdValue(ref platform, message, out packet.MethodId);
 	}
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,

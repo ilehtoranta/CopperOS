@@ -8,6 +8,8 @@ public sealed class MuiNotifyPacketTests
 	private static readonly APTR State = APTR.FromPointer(0x1000);
 	private const uint Attribute = 0x80420020;
 	private const uint EveryTime = 1233727793;
+	private const uint NoNotifyAttribute = 0x804237F9;
+	private const uint NoNotifyMethodAttribute = 0x80420A74;
 
 	[Fact]
 	public void NotifyMethodHeaderUsesNamedField()
@@ -18,8 +20,31 @@ public sealed class MuiNotifyPacketTests
 		Assert.True(MuiNotifyPacketCodec.TryReadMethodId(ref platform, packet,
 			out var header));
 		Assert.Equal(MuiNotifyCore.NotifyMethod, header.MethodId);
+		Assert.True(MuiNotifyPacketCodec.TryReadMethodIdValue(ref platform,
+			packet, out var methodId));
+		Assert.Equal(MuiNotifyCore.NotifyMethod, methodId);
 		Assert.False(MuiNotifyPacketCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
+	}
+
+	[Fact]
+	public void NotifyTypedReadersUseNamedMethodHeader()
+	{
+		var platform = CreatePlatform(out _);
+		var packet = APTR.FromPointer(0x1200);
+		platform.WriteUInt32(packet, 0, MuiNotifyCore.NotifyMethod);
+		platform.WriteUInt32(packet, 4, Attribute);
+		platform.WriteUInt32(packet, 8, EveryTime);
+		platform.WriteUInt32(packet, 12, 0x1300);
+		platform.WriteUInt32(packet, 16, 1);
+		var request = default(MuiNotifyPacketCodec.PacketAddress);
+		request.Address = packet;
+		request.Method = MuiNotifyCore.NotifyMethod;
+
+		Assert.True(MuiNotifyPacketCodec.TryReadNotify(ref platform,
+			ref request, out var message));
+		Assert.Equal(MuiNotifyCore.NotifyMethod, message.MethodId);
+		Assert.Equal(Attribute, message.TriggerAttribute);
 	}
 
 	[Fact]
@@ -210,6 +235,128 @@ public sealed class MuiNotifyPacketTests
 		Assert.Equal(1u, MuiHeadlessDispatcher.DispatchNotify(ref platform, State,
 			source, packet));
 		Assert.Equal(1u, platform.DispatchCount);
+	}
+
+	[Fact]
+	public void DisposingNotificationDestinationRemovesGuestRecipe()
+	{
+		var platform = CreatePlatform(out var cl);
+		var source = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
+			APTR.Null);
+		var destination = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			cl, APTR.Null);
+		var follow = APTR.FromPointer(0x1380);
+		platform.WriteUInt32(follow, 0, 0x90000001);
+
+		Assert.True(MuiNotifyCore.Add(ref platform, State, source, Attribute,
+			EveryTime, destination, 1, follow));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State,
+			source, Attribute, 7, true));
+		Assert.Equal(1u, platform.DispatchCount);
+
+		// Teardown resolves the named destination before its guest object is
+		// released, so a later source mutation cannot dispatch into stale memory.
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			destination));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State,
+			source, Attribute, 8, true));
+		Assert.Equal(1u, platform.DispatchCount);
+	}
+
+	[Fact]
+	public void OmSetMUIANoNotifySuppressesOnlyThatTagOperation()
+	{
+		var platform = CreatePlatform(out var cl);
+		var source = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
+			APTR.Null);
+		var destination = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			cl, APTR.Null);
+		var follow = APTR.FromPointer(0x1380);
+		platform.WriteUInt32(follow, 0, 0x90000001);
+		platform.WriteUInt32(follow, 4, EveryTime);
+		Assert.True(MuiNotifyCore.Add(ref platform, State, source, Attribute,
+			EveryTime, destination, 2, follow));
+
+		var tags = APTR.FromPointer(0x1400);
+		platform.WriteUInt32(tags, 0, NoNotifyAttribute);
+		platform.WriteUInt32(tags, 4, 1);
+		platform.WriteUInt32(tags, 8, Attribute);
+		platform.WriteUInt32(tags, 12, 55);
+		platform.WriteUInt32(tags, 16, 0);
+		platform.WriteUInt32(tags, 20, 0);
+		var packet = APTR.FromPointer(0x1200);
+		platform.WriteUInt32(packet, 0, 0x00000103u); // OM_SET
+		platform.WriteUInt32(packet, 4, tags.Raw);
+		platform.WriteUInt32(packet, 8, 0);
+
+		Assert.Equal(1u, MuiHeadlessDispatcher.Dispatch(ref platform, State,
+			source, packet));
+		Assert.Equal(0u, platform.DispatchCount);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, source,
+			Attribute, out var stored));
+		Assert.Equal(55u, stored);
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, source,
+			NoNotifyAttribute, out _));
+
+		// The control is operation-local. Clearing it on the next tag list makes
+		// the ordinary attribute write notify the original destination.
+		platform.WriteUInt32(tags, 4, 0);
+		platform.WriteUInt32(tags, 12, 66);
+		Assert.Equal(1u, MuiHeadlessDispatcher.Dispatch(ref platform, State,
+			source, packet));
+		Assert.Equal(1u, platform.DispatchCount);
+		Assert.Equal(66u, platform.LastDispatchArgument);
+	}
+
+	[Fact]
+	public void OmSetMUIANoNotifyMethodSuppressesOnlyMatchingFollowMethod()
+	{
+		var platform = CreatePlatform(out var cl);
+		var source = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
+			APTR.Null);
+		var destination = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			cl, APTR.Null);
+		var setFollow = APTR.FromPointer(0x1380);
+		var writeFollow = APTR.FromPointer(0x13A0);
+		platform.WriteUInt32(setFollow, 0, MuiNotifyCore.SetMethod);
+		platform.WriteUInt32(setFollow, 4, 0xAAAA);
+		platform.WriteUInt32(writeFollow, 0, 0x80428D86u); // MUIM_WriteLong
+		platform.WriteUInt32(writeFollow, 4, 0xBBBB);
+		Assert.True(MuiNotifyCore.Add(ref platform, State, source, Attribute,
+			EveryTime, destination, 2, setFollow));
+		Assert.True(MuiNotifyCore.Add(ref platform, State, source, Attribute,
+			EveryTime, destination, 2, writeFollow));
+
+		var tags = APTR.FromPointer(0x1400);
+		platform.WriteUInt32(tags, 0, NoNotifyMethodAttribute);
+		platform.WriteUInt32(tags, 4, MuiNotifyCore.SetMethod);
+		platform.WriteUInt32(tags, 8, Attribute);
+		platform.WriteUInt32(tags, 12, 77);
+		platform.WriteUInt32(tags, 16, 0);
+		var packet = APTR.FromPointer(0x1200);
+		platform.WriteUInt32(packet, 0, 0x00000103u); // OM_SET
+		platform.WriteUInt32(packet, 4, tags.Raw);
+		platform.WriteUInt32(packet, 8, 0);
+
+		Assert.Equal(1u, MuiHeadlessDispatcher.Dispatch(ref platform, State,
+			source, packet));
+		Assert.Equal(1u, platform.DispatchCount);
+		Assert.Equal(0xBBBBu, platform.LastDispatchArgument);
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			source, NoNotifyMethodAttribute, out _));
+
+		// The method selector is one-shot. With it cleared, both follow methods
+		// are eligible again for the next OM_SET operation.
+		platform.WriteUInt32(tags, 4, 0);
+		platform.WriteUInt32(tags, 12, 88);
+		Assert.Equal(1u, MuiHeadlessDispatcher.Dispatch(ref platform, State,
+			source, packet));
+		Assert.Equal(3u, platform.DispatchCount);
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			destination));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			source));
 	}
 
 	[Fact]

@@ -14,7 +14,7 @@ namespace CopperOS.MuiMaster;
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiAreaRenderPolicyStateRecord
 {
-	internal const uint Size = 28;
+	internal const uint Size = 36;
 	internal const uint Cookie = 0x41525052u; // 'ARPR'
 
 	internal uint Magic;
@@ -24,6 +24,8 @@ internal struct MuiAreaRenderPolicyStateRecord
 	internal uint Font;
 	internal uint FrameVisible;
 	internal uint FramePhantomHoriz;
+	internal APTR FrameTitle;
+	internal uint FrameDynamic;
 }
 
 internal enum MuiAreaRenderPolicyStateField : byte
@@ -35,6 +37,8 @@ internal enum MuiAreaRenderPolicyStateField : byte
 	Font,
 	FrameVisible,
 	FramePhantomHoriz,
+	FrameTitle,
+	FrameDynamic,
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -58,6 +62,8 @@ internal static class MuiAreaRenderPolicyStateFieldCursorCodec
 			case MuiAreaRenderPolicyStateField.Font:
 			case MuiAreaRenderPolicyStateField.FrameVisible:
 			case MuiAreaRenderPolicyStateField.FramePhantomHoriz:
+			case MuiAreaRenderPolicyStateField.FrameTitle:
+			case MuiAreaRenderPolicyStateField.FrameDynamic:
 				offset = (uint)field * 4;
 				return true;
 		}
@@ -130,9 +136,16 @@ internal static class MuiAreaRenderPolicyStateRecordCodec
 				out value.FrameVisible) ||
 			!MuiAreaRenderPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
 				address, MuiAreaRenderPolicyStateField.FramePhantomHoriz,
-				out value.FramePhantomHoriz))
+				out value.FramePhantomHoriz) ||
+			!MuiAreaRenderPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
+				address, MuiAreaRenderPolicyStateField.FrameTitle,
+				out var frameTitle) ||
+			!MuiAreaRenderPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
+				address, MuiAreaRenderPolicyStateField.FrameDynamic,
+				out value.FrameDynamic))
 			return false;
 		value.Magic = magic;
+		value.FrameTitle = APTR.FromPointer(frameTitle);
 		return true;
 	}
 
@@ -158,6 +171,26 @@ internal static class MuiAreaRenderPolicyStateRecordCodec
 				value.FrameVisible) &&
 			MuiAreaRenderPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
 				address, MuiAreaRenderPolicyStateField.FramePhantomHoriz,
-				value.FramePhantomHoriz);
+				value.FramePhantomHoriz) &&
+			MuiAreaRenderPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				address, MuiAreaRenderPolicyStateField.FrameTitle,
+				value.FrameTitle.Raw) &&
+			MuiAreaRenderPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				address, MuiAreaRenderPolicyStateField.FrameDynamic,
+				value.FrameDynamic);
 	}
+}
+
+// FillArea, FrameVisible, FramePhantomHoriz, and FrameDynamic are BOOL-like
+// MorphOS ULONGs. The remaining fields are selectors or caller-owned pointers
+// and are intentionally preserved without narrowing their bit patterns.
+internal static class MuiAreaRenderPolicyStateValidation
+{
+	internal static bool IsValidState(MuiAreaRenderPolicyStateRecord value) =>
+		value.Magic == MuiAreaRenderPolicyStateRecord.Cookie &&
+		value.FillArea <= 1 && value.FrameVisible <= 1 &&
+		value.FramePhantomHoriz <= 1 && value.FrameDynamic <= 1;
+
+	internal static bool IsValidRecord(MuiAreaRenderPolicyStateRecord value) =>
+		IsValidState(value);
 }

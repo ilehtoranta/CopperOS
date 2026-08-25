@@ -189,26 +189,39 @@ internal static class MuiAreaHandledEventsStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
+		uint signature;
+		uint events;
+		uint window;
+		uint handler;
+		uint generation;
+		ushort handlerFlags;
+		byte priority;
+		byte reserved;
 		if (!TryReadUInt32(ref platform, address,
-			MuiAreaHandledEventsStateField.Signature, out record.Signature) ||
+			MuiAreaHandledEventsStateField.Signature, out signature) ||
 			!TryReadUInt32(ref platform, address,
-				MuiAreaHandledEventsStateField.Events, out record.Events) ||
+				MuiAreaHandledEventsStateField.Events, out events) ||
 			!TryReadUInt32(ref platform, address,
-				MuiAreaHandledEventsStateField.Window, out var window) ||
+				MuiAreaHandledEventsStateField.Window, out window) ||
 			!TryReadUInt32(ref platform, address,
-				MuiAreaHandledEventsStateField.Handler, out var handler) ||
+				MuiAreaHandledEventsStateField.Handler, out handler) ||
 			!TryReadUInt32(ref platform, address,
-				MuiAreaHandledEventsStateField.Generation, out record.Generation) ||
+				MuiAreaHandledEventsStateField.Generation, out generation) ||
 			!TryReadUInt16(ref platform, address,
-				MuiAreaHandledEventsStateField.HandlerFlags, out record.HandlerFlags) ||
+				MuiAreaHandledEventsStateField.HandlerFlags, out handlerFlags) ||
 			!TryReadUInt8(ref platform, address,
-				MuiAreaHandledEventsStateField.Priority, out var priority) ||
+				MuiAreaHandledEventsStateField.Priority, out priority) ||
 			!TryReadUInt8(ref platform, address,
-				MuiAreaHandledEventsStateField.Reserved, out record.Reserved))
+				MuiAreaHandledEventsStateField.Reserved, out reserved))
 			return false;
+		record.Signature = signature;
+		record.Events = events;
 		record.Window = APTR.FromPointer(window);
 		record.Handler = APTR.FromPointer(handler);
+		record.Generation = generation;
+		record.HandlerFlags = handlerFlags;
 		record.Priority = unchecked((sbyte)priority);
+		record.Reserved = reserved;
 		record.HandlerFlags = (ushort)(record.HandlerFlags &
 			MuiAreaHandledEventsStateRecord.PolicyFlags);
 		return record.Signature == MuiAreaHandledEventsStateRecord.Magic;
@@ -322,7 +335,19 @@ internal static class MuiAreaEventHandlerCore
 		MuiAreaEventHandlerPolicyField field, sbyte priority)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!TryReadState(ref platform, state, obj, out var current)) return false;
+		var hadState = TryReadState(ref platform, state, obj, out var current);
+		if (!hadState)
+		{
+			// MorphOS allows the event-handler policy properties to be assigned
+			// independently of handledEvents. Retain that policy in the same
+			// named guest record, but do not create a zero-mask handler yet.
+			if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+				return false;
+			current = default;
+			current.Signature = MuiAreaHandledEventsStateRecord.Magic;
+			current.Generation = MuiHeadlessMemory.NextSequence(ref platform, state);
+			current.HandlerFlags = MuiEventHandlerNodeInput.MUI_EHF_GUIMODE;
+		}
 		var next = current;
 		switch (field)
 		{
@@ -351,7 +376,7 @@ internal static class MuiAreaEventHandlerCore
 		next.Window = APTR.Null;
 		next.Handler = APTR.Null;
 		if (!StoreState(ref platform, state, obj, next)) return false;
-		Unregister(ref platform, state, current);
+		if (hadState) Unregister(ref platform, state, current);
 		return Reconcile(ref platform, state, obj);
 	}
 
@@ -378,7 +403,7 @@ internal static class MuiAreaEventHandlerCore
 			Unregister(ref platform, state, record);
 			record = detached;
 		}
-		if (owner.IsNotNull && record.Handler.IsNull)
+		if (owner.IsNotNull && record.Events != 0 && record.Handler.IsNull)
 		{
 			var handler = MuiHeadlessMemory.Allocate(ref platform,
 				MuiEventHandlerNodeRecord.Size);

@@ -16,11 +16,20 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public uint CurrentTask;
 	public uint AllocationCount;
 	public uint FreeCount;
+	public uint PoolCreateCount;
+	public uint PoolDeleteCount;
+	public uint PooledAllocationCount;
+	public uint PooledFreeCount;
+	public APTR LastPool;
+	public uint LastPoolRequirements;
+	public uint LastPoolPuddleSize;
+	public uint LastPoolThreshold;
 	public uint DispatchCount;
 	public APTR LastDispatchObject;
 	public uint LastDispatchMethod;
 	public uint LastDispatchArgument;
 	public uint DispatchResult;
+	public bool RouteHandleEventToCore;
 	public APTR ObservedHandler;
 	public bool CallingFlagObserved;
 	public APTR MutationSource;
@@ -31,8 +40,20 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public uint FillCount;
 	public uint LineCount;
 	public uint TextCount;
+	public uint CustomFontOpenCount;
+	public uint CustomFontCloseCount;
+	public APTR LastCustomFontObject;
+	public APTR LastCustomFontBase;
+	public MuiCustomFontSpec LastCustomFontSpec;
+	public APTR LastCustomFontHandle;
+	public APTR LastClosedCustomFont;
+	public MuiCustomFontMetrics LastCustomFontMetrics;
+	public MuiCustomFontMetrics ActiveCustomFontMetrics;
+	public APTR ActiveCustomFontHandle;
+	public bool CustomFontMetricsActive;
 	public uint ImageCount;
 	public APTR LastText;
+	public APTR LastTextFont;
 	public APTR FirstText;
 	public APTR SecondText;
 	public APTR ThirdText;
@@ -53,6 +74,15 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public int LastLineY2;
 	public uint LayerDepth;
 	public uint RedrawCount;
+	public uint StringEditBeepCount;
+	public APTR LastStringEditBeepObject;
+	public APTR LastStringEditBeepInputEvent;
+	public uint StringEditReuseCount;
+	public APTR LastStringEditReuseObject;
+	public APTR LastStringEditReuseWindow;
+	public APTR LastStringEditReuseInputEvent;
+	public int LastStringEditReuseMuiKey;
+	public ushort LastStringEditReuseCode;
 	public uint PendingSignals;
 	public uint SignaledMask;
 	public uint WaitMuiSignalsCount;
@@ -83,6 +113,18 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public bool Iconified;
 	public uint Ticks;
 	public uint PendingWindowEvent;
+	public uint PendingWindowTimerDelayElapsed;
+	public uint PendingWindowDoubleClickAvailable;
+	public APTR PendingWindowDoubleClickObject;
+	public int PendingWindowDoubleClickValue;
+	public bool PointerSampleAvailable;
+	public uint PointerSampleCount;
+	public APTR PendingWindowMouseObject;
+	public bool PreprocessedWindowEventAvailable;
+	public uint PreprocessedWindowEventCount;
+	public APTR PreprocessedInputMessage;
+	public int PreprocessedMuiKey;
+	public uint PreprocessedEventHandlerNode;
 	public uint AboutMUIRequestCount;
 	public APTR LastAboutMUIApplication;
 	public APTR LastAboutMUIReference;
@@ -160,9 +202,33 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public APTR LastHookA2;     // A2 delivered to the callback
 	public APTR LastHookA1;     // A1 delivered to the callback
 	public APTR LastHookData;   // h_Data reached through A0 (hook+16)
+	public bool LastConstructMessageValid;
+	public APTR LastConstructMessage;
+	public APTR LastConstructName;
+	public APTR LastConstructUser;
+	public APTR LastConstructListNode;
+	public APTR LastConstructPrevNode;
+	public uint LastConstructFlags;
+	public uint DisplayHookCount;
+	public APTR LastDisplayArray;
+	public APTR LastDisplayNode;
+	public APTR LastDisplayFirstText;
+	public APTR LastDisplaySecondText;
+	public APTR DisplayHookReplacement;
+	public APTR LastDisplaySecondTextAfterHook;
 	public uint StringEditHookResult;
 	public uint StringEditHookActions;
+	public bool StringEditReuseAcceptsEvent;
+	public bool StringEditReuseSwitchesActions;
+	public uint StringEditReuseNextActions;
 	public APTR StringEditHookBuffer;
+	public bool StringEditHookSetNumChars;
+	public short StringEditHookNumChars;
+	public bool StringEditHookSetBufferPos;
+	public short StringEditHookBufferPos;
+	public bool StringEditHookWriteInPlace;
+	public short LastStringEditBufferPos;
+	public short LastStringEditNumChars;
 	public uint LayoutHookMinMaxCount;
 	public uint LayoutHookLayoutCount;
 	public APTR LastLayoutHookChildren;
@@ -280,6 +346,27 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public APTR LastBeginUpdateLayer;
 	public APTR LastEndUpdateLayer;
 	public bool LastEndUpdateCompleted;
+	// ---- MUIA_DoubleBuffer rendering capability -----------------------------
+	public bool DoubleBufferCapabilityAvailable;
+	public bool DoubleBufferBeginResult;
+	public bool DoubleBufferEndResult;
+	public APTR DoubleBufferTargetRenderInfo;
+	public APTR DoubleBufferTargetRastPort;
+	public bool DoubleBufferOverrideTargetGeometry;
+	public int DoubleBufferTargetLeft;
+	public int DoubleBufferTargetTop;
+	public int DoubleBufferTargetWidth;
+	public int DoubleBufferTargetHeight;
+	public uint DoubleBufferBeginCount;
+	public uint DoubleBufferEndCount;
+	public bool LastDoubleBufferEndCompleted;
+	public MuiDoubleBufferRenderRequest LastDoubleBufferRequest;
+	// ---- MUIArea DrawBackground/Backfill capability ------------------------
+	public bool BackfillCapabilityAvailable;
+	public bool BackfillHandled;
+	public bool BackfillMutatesIdentity;
+	public uint BackfillCount;
+	public MuiBackfillRenderRequest LastBackfillRequest;
 
 	// ---- MG09 Process/Slave scheduler capability (deterministic host model) --
 	// Next opaque task token handed out by ProcessLaunch (non-zero == success).
@@ -354,11 +441,20 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		CurrentTask = 1;
 		AllocationCount = 0;
 		FreeCount = 0;
+		PoolCreateCount = 0;
+		PoolDeleteCount = 0;
+		PooledAllocationCount = 0;
+		PooledFreeCount = 0;
+		LastPool = APTR.Null;
+		LastPoolRequirements = 0;
+		LastPoolPuddleSize = 0;
+		LastPoolThreshold = 0;
 		DispatchCount = 0;
 		LastDispatchObject = APTR.Null;
 		LastDispatchMethod = 0;
 		LastDispatchArgument = 0;
 		DispatchResult = 1;
+		RouteHandleEventToCore = false;
 		MutationSource = APTR.Null;
 		MutationDestination = APTR.Null;
 		MutationAttribute = 0;
@@ -383,6 +479,15 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		LastLineY2 = 0;
 		LayerDepth = 0;
 		RedrawCount = 0;
+		StringEditBeepCount = 0;
+		LastStringEditBeepObject = APTR.Null;
+		LastStringEditBeepInputEvent = APTR.Null;
+		StringEditReuseCount = 0;
+		LastStringEditReuseObject = APTR.Null;
+		LastStringEditReuseWindow = APTR.Null;
+		LastStringEditReuseInputEvent = APTR.Null;
+		LastStringEditReuseMuiKey = 0;
+		LastStringEditReuseCode = 0;
 		PendingSignals = 0;
 		SignaledMask = 0;
 		WaitMuiSignalsCount = 0;
@@ -399,6 +504,18 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		Iconified = false;
 		Ticks = 0;
 		PendingWindowEvent = 0;
+		PendingWindowTimerDelayElapsed = 0;
+		PendingWindowDoubleClickAvailable = 0;
+		PendingWindowDoubleClickObject = APTR.Null;
+		PendingWindowDoubleClickValue = 0;
+		PointerSampleAvailable = false;
+		PointerSampleCount = 0;
+		PendingWindowMouseObject = APTR.Null;
+		PreprocessedWindowEventAvailable = false;
+		PreprocessedWindowEventCount = 0;
+		PreprocessedInputMessage = APTR.Null;
+		PreprocessedMuiKey = -1;
+		PreprocessedEventHandlerNode = 0;
 		AboutMUIRequestCount = 0;
 		LastAboutMUIApplication = APTR.Null;
 		LastAboutMUIReference = APTR.Null;
@@ -468,9 +585,26 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		LastHookA2 = APTR.Null;
 		LastHookA1 = APTR.Null;
 		LastHookData = APTR.Null;
+		LastConstructMessageValid = false;
+		LastConstructMessage = APTR.Null;
+		LastConstructName = APTR.Null;
+		LastConstructUser = APTR.Null;
+		LastConstructListNode = APTR.Null;
+		LastConstructPrevNode = APTR.Null;
+		LastConstructFlags = 0;
 		StringEditHookResult = 1;
 		StringEditHookActions = MuiStringEditWorkCodec.ActionUse;
+		StringEditReuseAcceptsEvent = false;
+		StringEditReuseSwitchesActions = false;
+		StringEditReuseNextActions = MuiStringEditWorkCodec.ActionUse;
 		StringEditHookBuffer = APTR.Null;
+		StringEditHookSetNumChars = false;
+		StringEditHookNumChars = 0;
+		StringEditHookSetBufferPos = false;
+		StringEditHookBufferPos = 0;
+		StringEditHookWriteInPlace = false;
+		LastStringEditBufferPos = 0;
+		LastStringEditNumChars = 0;
 		DirectoryCount = 0;
 		DirectoryMissing = false;
 		DirectoryFailIndex = -1;
@@ -553,6 +687,25 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		LastBeginUpdateLayer = APTR.Null;
 		LastEndUpdateLayer = APTR.Null;
 		LastEndUpdateCompleted = false;
+		DoubleBufferCapabilityAvailable = false;
+		DoubleBufferBeginResult = true;
+		DoubleBufferEndResult = true;
+		DoubleBufferTargetRenderInfo = APTR.Null;
+		DoubleBufferTargetRastPort = APTR.Null;
+		DoubleBufferOverrideTargetGeometry = false;
+		DoubleBufferTargetLeft = 0;
+		DoubleBufferTargetTop = 0;
+		DoubleBufferTargetWidth = 0;
+		DoubleBufferTargetHeight = 0;
+		DoubleBufferBeginCount = 0;
+		DoubleBufferEndCount = 0;
+		LastDoubleBufferEndCompleted = false;
+		LastDoubleBufferRequest = default;
+		BackfillCapabilityAvailable = false;
+		BackfillHandled = false;
+		BackfillMutatesIdentity = false;
+		BackfillCount = 0;
+		LastBackfillRequest = default;
 		NextProcessToken = 0x00C0DE01;
 		ProcessLaunchFailure = false;
 		ProcessKillResult = true;
@@ -615,6 +768,40 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		FreeCount++;
 	}
 
+	public APTR CreatePool(uint requirements, uint puddleSize, uint threshold)
+	{
+		var pool = Allocate(16, requirements);
+		if (pool.IsNull) return APTR.Null;
+		PoolCreateCount++;
+		LastPool = pool;
+		LastPoolRequirements = requirements;
+		LastPoolPuddleSize = puddleSize;
+		LastPoolThreshold = threshold;
+		return pool;
+	}
+
+	public void DeletePool(APTR pool)
+	{
+		if (pool.IsNull) return;
+		PoolDeleteCount++;
+		Free(pool, 16);
+	}
+
+	public APTR AllocPooled(APTR pool, uint byteSize)
+	{
+		if (pool.IsNull || !IsMapped(pool, 16)) return APTR.Null;
+		var result = Allocate(byteSize, 0);
+		if (result.IsNotNull) PooledAllocationCount++;
+		return result;
+	}
+
+	public void FreePooled(APTR pool, APTR address, uint byteSize)
+	{
+		if (pool.IsNull || address.IsNull) return;
+		PooledFreeCount++;
+		Free(address, byteSize);
+	}
+
 	public APTR MakeClass(APTR classId, APTR superClass, ushort instanceSize,
 		APTR dispatcher)
 	{
@@ -653,6 +840,10 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		LastDispatchObject = obj;
 		LastDispatchMethod = ReadUInt32(message, 0);
 		LastDispatchArgument = IsMapped(message, 8) ? ReadUInt32(message, 4) : 0;
+		if (RouteHandleEventToCore && State.IsNotNull &&
+			LastDispatchMethod == MuiCommonControlPacketCore.HandleEvent)
+			return MuiCommonControlDispatcher.Dispatch(ref this, State, obj,
+				message);
 		if (MutationMode == 1 && obj.Raw == MutationDestination.Raw)
 		{
 			MuiNotifyCore.Remove(ref this, State, MutationSource,
@@ -740,6 +931,7 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	internal const uint HookEntryMultiTest = 0x00CA0004u;
 	internal const uint HookEntryGroupLayout = 0x00CA0005u;
 	internal const uint HookEntryStringEdit = 0x00CA0006u;
+	internal const uint HookEntryDisplay = 0x00CA0007u;
 	private const uint GroupLayoutMinMax = 1;
 	private const uint GroupLayout = 2;
 	internal const uint HookDataCookie = 0x00C0FFEEu;
@@ -755,9 +947,49 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		var mapped = IsMapped(hook, 20);
 		var entry = mapped ? ReadUInt32(hook, 8) : 0u;
 		LastHookData = mapped ? APTR.FromPointer(ReadUInt32(hook, 16)) : APTR.Null;
-		switch (entry)
+			switch (entry)
 		{
+			case HookEntryDisplay:
+				DisplayHookCount++;
+				LastDisplayArray = objectAddress;
+				LastDisplayNode = messageAddress;
+				if (MuiListtreeCore.MuiListtreeDisplayColumnCodec.TryRead(ref this, objectAddress,
+					out var firstColumn))
+					LastDisplayFirstText = firstColumn.Text;
+				var displayCursor = default(
+					MuiListtreeCore.MuiListtreeDisplayColumnCursor);
+				displayCursor.Base = objectAddress;
+				displayCursor.Index = 1;
+				if (MuiListtreeCore.MuiListtreeDisplayColumnCursorCodec.TryGetEntry(
+					ref this, displayCursor, out var secondAddress) &&
+					MuiListtreeCore.MuiListtreeDisplayColumnCodec.TryRead(ref this,
+					secondAddress, out var secondColumn))
+					LastDisplaySecondText = secondColumn.Text;
+				if (DisplayHookReplacement.IsNotNull &&
+					MuiListtreeCore.MuiListtreeDisplayColumnCursorCodec.TryGetEntry(
+						ref this, displayCursor, out var replacementAddress))
+				{
+					var replacement = default(
+						MuiListtreeCore.MuiListtreeDisplayColumnRecord);
+					replacement.Text = DisplayHookReplacement;
+					if (MuiListtreeCore.MuiListtreeDisplayColumnCodec.Write(ref this,
+						replacementAddress, replacement))
+						LastDisplaySecondTextAfterHook = replacement.Text;
+				}
+				return 0;
 			case HookEntryConstruct:
+				LastConstructMessage = messageAddress;
+				LastConstructMessageValid = false;
+				if (MuiListtreeMessageCodec.TryReadInsert(ref this,
+					messageAddress, out var insertMessage))
+				{
+					LastConstructMessageValid = true;
+					LastConstructName = APTR.FromPointer(insertMessage.Name);
+					LastConstructUser = APTR.FromPointer(insertMessage.User);
+					LastConstructListNode = APTR.FromPointer(insertMessage.ListNode);
+					LastConstructPrevNode = APTR.FromPointer(insertMessage.PrevNode);
+					LastConstructFlags = insertMessage.Flags;
+				}
 				// A0 delivered the hook, so h_Data is reachable. Publish the three
 				// delivered registers into the h_Data scratch and return it as the
 				// newly constructed entry.
@@ -817,9 +1049,17 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 			case HookEntryStringEdit:
 				if (!MuiStringEditWorkCodec.TryRead(ref this, objectAddress,
 					out var stringEdit)) return 0;
+				LastStringEditBufferPos = stringEdit.BufferPos;
+				LastStringEditNumChars = stringEdit.NumChars;
 				stringEdit.Actions = StringEditHookActions;
 				if (StringEditHookBuffer.IsNotNull)
 					stringEdit.WorkBuffer = StringEditHookBuffer;
+				if (StringEditHookSetNumChars)
+					stringEdit.NumChars = StringEditHookNumChars;
+				if (StringEditHookSetBufferPos)
+					stringEdit.BufferPos = StringEditHookBufferPos;
+				if (StringEditHookWriteInPlace && stringEdit.WorkBuffer.IsNotNull)
+					WriteCString(stringEdit.WorkBuffer, "rejected");
 				MuiStringEditWorkCodec.Write(ref this, objectAddress, stringEdit);
 				return StringEditHookResult;
 			default:
@@ -852,12 +1092,296 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		LastEndUpdateLayer = layer;
 		LastEndUpdateCompleted = completed;
 	}
+	public bool BeginMuiDoubleBuffer(ref MuiDoubleBufferRenderRequest request)
+	{
+		if (!DoubleBufferCapabilityAvailable || !DoubleBufferBeginResult)
+			return false;
+		DoubleBufferBeginCount++;
+		request.TargetRenderInfo = DoubleBufferTargetRenderInfo;
+		request.TargetRastPort = DoubleBufferTargetRastPort.IsNull ?
+			request.SourceRastPort : DoubleBufferTargetRastPort;
+		if (DoubleBufferOverrideTargetGeometry)
+		{
+			request.TargetLeft = DoubleBufferTargetLeft;
+			request.TargetTop = DoubleBufferTargetTop;
+			request.TargetWidth = DoubleBufferTargetWidth;
+			request.TargetHeight = DoubleBufferTargetHeight;
+		}
+		LastDoubleBufferRequest = request;
+		return true;
+	}
+	public bool EndMuiDoubleBuffer(ref MuiDoubleBufferRenderRequest request,
+		bool completed)
+	{
+		DoubleBufferEndCount++;
+		LastDoubleBufferRequest = request;
+		LastDoubleBufferEndCompleted = completed;
+		return DoubleBufferEndResult;
+	}
+	public bool ApplyMuiBackfill(ref MuiBackfillRenderRequest request)
+	{
+		if (!BackfillCapabilityAvailable) return false;
+		BackfillCount++;
+		LastBackfillRequest = request;
+		if (BackfillMutatesIdentity) request.Left++;
+		return BackfillHandled;
+	}
 
 	public int TranslateTextInput(APTR intuiMessage)
 	{
 		if (intuiMessage.IsNull || !IsMapped(intuiMessage, 28) ||
 			ReadUInt32(intuiMessage, 20) != 0x00000400u) return -1;
 		return ReadUInt16(intuiMessage, 24);
+	}
+
+	public bool DisplayMuiBeep(ref MuiStringEditBeepRequest request)
+	{
+		StringEditBeepCount++;
+		LastStringEditBeepObject = request.Object;
+		LastStringEditBeepInputEvent = request.InputEvent;
+		request.Accepted = 1;
+		return true;
+	}
+
+	public bool ReuseMuiInput(ref MuiStringEditReuseRequest request)
+	{
+		StringEditReuseCount++;
+		LastStringEditReuseObject = request.Object;
+		LastStringEditReuseWindow = request.Window;
+		LastStringEditReuseInputEvent = request.InputEvent;
+		LastStringEditReuseMuiKey = request.MuiKey;
+		LastStringEditReuseCode = request.Code;
+		if (StringEditReuseSwitchesActions)
+		{
+			StringEditHookActions = StringEditReuseNextActions;
+			StringEditReuseSwitchesActions = false;
+		}
+		request.Accepted = StringEditReuseAcceptsEvent ? 1u : 0u;
+		return StringEditReuseAcceptsEvent;
+	}
+
+	public bool KeyadjustTextInputSampleAvailable;
+	public int KeyadjustTextInputSampleCode;
+	public bool KeyadjustTextInputSampleMutatesIdentity;
+
+	public bool ReadMuiKeyadjustTextInput(ref MuiKeyadjustTextInputSample input)
+	{
+		if (!KeyadjustTextInputSampleAvailable) return false;
+		if (KeyadjustTextInputSampleMutatesIdentity)
+		{
+			input.IntuiMessage = APTR.FromPointer(0x3FFFu);
+			input.MuiKey = -99;
+		}
+		input.TextCode = KeyadjustTextInputSampleCode;
+		input.Available = KeyadjustTextInputSampleCode >= 0 ? 1u : 0u;
+		return true;
+	}
+
+	public bool KeyadjustInputSampleAvailable;
+	public uint KeyadjustInputIsMouse;
+	public uint KeyadjustInputClickCount;
+	public uint KeyadjustInputMultiKey;
+	public bool KeyadjustInputSampleMutatesIdentity;
+
+	public bool ReadMuiKeyadjustInput(ref MuiKeyadjustInputSample input)
+	{
+		if (!KeyadjustInputSampleAvailable) return false;
+		if (KeyadjustInputSampleMutatesIdentity)
+		{
+			input.IntuiMessage = APTR.FromPointer(0x3FFFu);
+			input.MuiKey = -99;
+		}
+		input.IsMouse = KeyadjustInputIsMouse;
+		input.ClickCount = KeyadjustInputClickCount;
+		input.MultiKey = KeyadjustInputMultiKey;
+		return true;
+	}
+
+	public bool ShortHelpCreateSampleAvailable;
+	public APTR ShortHelpCreateResult;
+	public APTR LastShortHelpCreateObject;
+	public APTR LastShortHelpCreateCurrent;
+	public int LastShortHelpCreateMouseX;
+	public int LastShortHelpCreateMouseY;
+	public bool ShortHelpCheckSampleAvailable;
+	public bool ShortHelpCheckSampleMutatesIdentity;
+	public APTR ShortHelpCheckResult;
+	public APTR LastShortHelpCheckObject;
+	public APTR LastShortHelpCheckCurrent;
+	public int LastShortHelpCheckMouseX;
+	public int LastShortHelpCheckMouseY;
+	public bool ShortHelpDeleteSampleAvailable;
+	public APTR LastShortHelpDeleted;
+
+	public bool CreateMuiShortHelp(ref MuiShortHelpCreateSample sample)
+	{
+		if (!ShortHelpCreateSampleAvailable) return false;
+		LastShortHelpCreateObject = sample.Object;
+		LastShortHelpCreateCurrent = sample.CurrentHelp;
+		LastShortHelpCreateMouseX = sample.MouseX;
+		LastShortHelpCreateMouseY = sample.MouseY;
+		sample.Result = ShortHelpCreateResult;
+		return true;
+	}
+
+	public bool CheckMuiShortHelp(ref MuiShortHelpCheckSample sample)
+	{
+		if (!ShortHelpCheckSampleAvailable) return false;
+		if (ShortHelpCheckSampleMutatesIdentity)
+		{
+			sample.Object = APTR.FromPointer(0x3FFFu);
+			sample.MouseX = -99;
+		}
+		LastShortHelpCheckObject = sample.Object;
+		LastShortHelpCheckCurrent = sample.CurrentHelp;
+		LastShortHelpCheckMouseX = sample.MouseX;
+		LastShortHelpCheckMouseY = sample.MouseY;
+		sample.Result = ShortHelpCheckResult;
+		return true;
+	}
+
+	public bool DeleteMuiShortHelp(ref MuiShortHelpDeleteSample sample)
+	{
+		if (!ShortHelpDeleteSampleAvailable) return false;
+		LastShortHelpDeleted = sample.Help;
+		return true;
+	}
+
+	public bool BubbleCreateSampleAvailable;
+	public APTR BubbleCreateResult;
+	public APTR LastBubbleCreateObject;
+	public int LastBubbleCreateX;
+	public int LastBubbleCreateY;
+	public APTR LastBubbleCreateText;
+	public uint LastBubbleCreateFlags;
+	public bool BubbleDeleteSampleAvailable;
+	public APTR LastBubbleDeleted;
+
+	public bool CreateMuiBubble(ref MuiBubbleCreateSample sample)
+	{
+		if (!BubbleCreateSampleAvailable) return false;
+		LastBubbleCreateObject = sample.Object;
+		LastBubbleCreateX = sample.X;
+		LastBubbleCreateY = sample.Y;
+		LastBubbleCreateText = sample.Text;
+		LastBubbleCreateFlags = sample.Flags;
+		sample.Result = BubbleCreateResult;
+		return true;
+	}
+
+	public bool DeleteMuiBubble(ref MuiBubbleDeleteSample sample)
+	{
+		if (!BubbleDeleteSampleAvailable) return false;
+		LastBubbleDeleted = sample.Bubble;
+		return true;
+	}
+
+	public bool ContextMenuAddSampleAvailable;
+	public uint ContextMenuAddResult;
+	public APTR LastContextMenuAddObject;
+	public APTR LastContextMenuAddMenuStrip;
+	public int LastContextMenuAddMouseX;
+	public int LastContextMenuAddMouseY;
+	public APTR LastContextMenuAddMouseXPointer;
+	public APTR LastContextMenuAddMouseYPointer;
+	public bool ContextMenuChoiceSampleAvailable;
+	public APTR LastContextMenuChoiceObject;
+	public APTR LastContextMenuChoiceItem;
+
+	public bool AddMuiContextMenu(ref MuiContextMenuAddSample sample)
+	{
+		if (!ContextMenuAddSampleAvailable) return false;
+		LastContextMenuAddObject = sample.Object;
+		LastContextMenuAddMenuStrip = sample.MenuStrip;
+		LastContextMenuAddMouseX = sample.MouseX;
+		LastContextMenuAddMouseY = sample.MouseY;
+		LastContextMenuAddMouseXPointer = sample.MouseXPointer;
+		LastContextMenuAddMouseYPointer = sample.MouseYPointer;
+		sample.Result = ContextMenuAddResult;
+		return true;
+	}
+
+	public bool HandleMuiContextMenuChoice(ref MuiContextMenuChoiceSample sample)
+	{
+		if (!ContextMenuChoiceSampleAvailable) return false;
+		LastContextMenuChoiceObject = sample.Object;
+		LastContextMenuChoiceItem = sample.Item;
+		return true;
+	}
+
+	public bool DragImageCreateSampleAvailable;
+	public APTR DragImageCreateResult;
+	public APTR LastDragImageCreateObject;
+	public int LastDragImageCreateTouchX;
+	public int LastDragImageCreateTouchY;
+	public uint LastDragImageCreateFlags;
+	public bool DragImageDeleteSampleAvailable;
+	public APTR LastDragImageDeleted;
+
+	public bool CreateMuiDragImage(ref MuiDragImageCreateSample sample)
+	{
+		if (!DragImageCreateSampleAvailable) return false;
+		LastDragImageCreateObject = sample.Object;
+		LastDragImageCreateTouchX = sample.TouchX;
+		LastDragImageCreateTouchY = sample.TouchY;
+		LastDragImageCreateFlags = sample.Flags;
+		sample.Result = DragImageCreateResult;
+		return true;
+	}
+
+	public bool DeleteMuiDragImage(ref MuiDragImageDeleteSample sample)
+	{
+		if (!DragImageDeleteSampleAvailable) return false;
+		LastDragImageDeleted = sample.DragImage;
+		return true;
+	}
+
+	public bool PointerCaptureSampleAvailable;
+	public uint PointerCaptureCount;
+	public uint PointerReleaseCount;
+	public APTR LastPointerCaptureObject;
+	public MuiPointerCaptureKind LastPointerCaptureKind;
+	public int LastPointerCaptureStartX;
+	public int LastPointerCaptureStartY;
+	public APTR LastPointerReleaseObject;
+	public MuiPointerCaptureKind LastPointerReleaseKind;
+	public int LastPointerReleaseStartX;
+	public int LastPointerReleaseStartY;
+
+	public bool CaptureMuiPointer(ref MuiPointerCaptureSample sample)
+	{
+		if (!PointerCaptureSampleAvailable) return false;
+		PointerCaptureCount++;
+		LastPointerCaptureObject = sample.Object;
+		LastPointerCaptureKind = sample.Kind;
+		LastPointerCaptureStartX = sample.StartX;
+		LastPointerCaptureStartY = sample.StartY;
+		return true;
+	}
+
+	public bool ReleaseMuiPointer(ref MuiPointerCaptureSample sample)
+	{
+		if (!PointerCaptureSampleAvailable) return false;
+		PointerReleaseCount++;
+		LastPointerReleaseObject = sample.Object;
+		LastPointerReleaseKind = sample.Kind;
+		LastPointerReleaseStartX = sample.StartX;
+		LastPointerReleaseStartY = sample.StartY;
+		return true;
+	}
+
+	public bool DragRouteSampleAvailable;
+	public MuiDragRouteSample LastDragRouteSample;
+	public uint DragRouteCount;
+	public uint DragRouteResult = 1;
+
+	public bool RouteMuiDrag(ref MuiDragRouteSample sample)
+	{
+		if (!DragRouteSampleAvailable) return false;
+		LastDragRouteSample = sample;
+		DragRouteCount++;
+		sample.Result = DragRouteResult;
+		return true;
 	}
 
 	public APTR PushClip(APTR layer, int left, int top, int width, int height)
@@ -877,9 +1401,118 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		LastPoppedClip = previousClip;
 	}
 	public int TextWidth(APTR rastPort, APTR font, APTR text, int length) =>
-		length < 0 ? 0 : length * 8;
-	public int TextHeight(APTR rastPort, APTR font) => 8;
+		length < 0 ? 0 :
+			(TryGetMuiCustomFontMetrics(font, out var metrics) ?
+				(length > int.MaxValue / metrics.GlyphWidth ? int.MaxValue :
+					length * metrics.GlyphWidth) : length * 8);
+	public int TextHeight(APTR rastPort, APTR font) =>
+		TryGetMuiCustomFontMetrics(font, out var metrics) ? metrics.Height : 8;
+	public APTR OpenMuiCustomFont(ref MuiCustomFontOpenRequest request)
+	{
+		CustomFontOpenCount++;
+		LastCustomFontObject = request.Object;
+		LastCustomFontBase = request.BaseFont;
+		LastCustomFontSpec = request.Spec;
+		LastCustomFontMetrics = MuiCustomFontMetricsCore.FromSpec(request.Spec);
+		LastCustomFontHandle = APTR.FromPointer(0x1F000u +
+			CustomFontOpenCount * 0x10u);
+		ActiveCustomFontHandle = LastCustomFontHandle;
+		ActiveCustomFontMetrics = LastCustomFontMetrics;
+		CustomFontMetricsActive = true;
+		request.Result = LastCustomFontHandle;
+		return LastCustomFontHandle;
+	}
+	public bool CloseMuiCustomFont(APTR font)
+	{
+		CustomFontCloseCount++;
+		LastClosedCustomFont = font;
+		if (font.Raw == ActiveCustomFontHandle.Raw)
+			CustomFontMetricsActive = false;
+		return font.IsNotNull;
+	}
+	public bool TryGetMuiCustomFontMetrics(APTR font,
+		out MuiCustomFontMetrics metrics)
+	{
+		metrics = ActiveCustomFontMetrics;
+		return CustomFontMetricsActive && font.IsNotNull &&
+			font.Raw == ActiveCustomFontHandle.Raw;
+	}
 	public void SetPen(APTR rastPort, uint pen) => LastPen = pen;
+	public uint MuiTextColorValue = 0x00FFFFFFu;
+	public bool MuiTextColorAvailable = true;
+	public uint MuiTextColorRequestCount;
+	public APTR LastMuiTextColorObject;
+	public APTR LastMuiTextColorRenderInfo;
+	public uint MuiTextColorApplyCount;
+	public APTR LastMuiTextColorRastPort;
+	public uint LastAppliedMuiTextColor;
+	public uint MuiCustomFontRenderCount;
+	public MuiCustomFontRenderRequest LastMuiCustomFontRender;
+	public uint MuiTextStyleApplyCount;
+	public MuiTextStyleRenderRequest LastMuiTextStyleRequest;
+	public uint MuiTextInlineColorApplyCount;
+	public MuiTextInlineColorRenderRequest LastMuiTextInlineColorRequest;
+	public uint MuiTextInlineImageApplyCount;
+	public MuiTextInlineImageRenderRequest LastMuiTextInlineImageRequest;
+	public uint MuiTextMethodApplyCount;
+	public MuiTextMethodRenderRequest LastMuiTextMethodRequest;
+	public uint MuiTextDimensionApplyCount;
+	public MuiTextDimensionRequest LastMuiTextDimensionRequest;
+	public bool ResolveMuiTextColor(ref MuiTextColorResolutionRequest request)
+	{
+		MuiTextColorRequestCount++;
+		LastMuiTextColorObject = request.Object;
+		LastMuiTextColorRenderInfo = request.RenderInfo;
+		request.Color = request.CustomFontAvailable != 0 &&
+			(request.CustomFontSpec.ValueFlags & MuiCustomFontSpecFlags.HasTextColor) != 0
+			? request.CustomFontSpec.TextColor & 0x00FFFFFFu
+			: MuiTextColorValue & 0x00FFFFFFu;
+		request.Available = MuiTextColorAvailable ? 1u : 0u;
+		return request.Object.IsNotNull && request.RenderInfo.IsNotNull;
+	}
+	public bool ApplyMuiTextColor(ref MuiTextColorRenderRequest request)
+	{
+		MuiTextColorApplyCount++;
+		LastMuiTextColorRastPort = request.RastPort;
+		LastAppliedMuiTextColor = request.Color & 0x00FFFFFFu;
+		return request.RastPort.IsNotNull;
+	}
+	public bool ApplyMuiCustomFont(ref MuiCustomFontRenderRequest request)
+	{
+		MuiCustomFontRenderCount++;
+		LastMuiCustomFontRender = request;
+		return request.RastPort.IsNotNull && request.Font.IsNotNull;
+	}
+	public bool ApplyMuiTextStyle(ref MuiTextStyleRenderRequest request)
+	{
+		MuiTextStyleApplyCount++;
+		LastMuiTextStyleRequest = request;
+		return request.RastPort.IsNotNull && request.Present != 0;
+	}
+	public bool ApplyMuiTextInlineColor(ref MuiTextInlineColorRenderRequest request)
+	{
+		MuiTextInlineColorApplyCount++;
+		LastMuiTextInlineColorRequest = request;
+		return request.RastPort.IsNotNull && request.Present != 0;
+	}
+	public bool ApplyMuiTextInlineImage(ref MuiTextInlineImageRenderRequest request)
+	{
+		MuiTextInlineImageApplyCount++;
+		LastMuiTextInlineImageRequest = request;
+		return request.RastPort.IsNotNull && request.Present != 0;
+	}
+	public bool ApplyMuiTextMethod(ref MuiTextMethodRenderRequest request)
+	{
+		MuiTextMethodApplyCount++;
+		LastMuiTextMethodRequest = request;
+		return request.RastPort.IsNotNull && request.Present != 0;
+	}
+	public bool ApplyMuiTextDimensions(ref MuiTextDimensionRequest request)
+	{
+		MuiTextDimensionApplyCount++;
+		LastMuiTextDimensionRequest = request;
+		return false;
+	}
 	public void FillRectangle(APTR rastPort, int left, int top, int right,
 		int bottom)
 	{
@@ -917,6 +1550,7 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		}
 		TextCount++;
 		LastText = text;
+		LastTextFont = font;
 		LastTextLength = length;
 		LastTextLeft = left;
 		LastTextBaseline = baseline;
@@ -1052,13 +1686,48 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		WindowEventMask = eventMask;
 		return nativeWindow.IsNotNull;
 	}
-	public uint ReadWindowEvent(APTR nativeWindow, APTR eventStorage)
+	public bool ReadWindowEvent(ref MuiWindowEventSample sample)
 	{
 		var result = PendingWindowEvent;
 		PendingWindowEvent = 0;
-		if (result != 0 && eventStorage.IsNotNull)
-			WriteUInt32(eventStorage, 0, result);
-		return result;
+		if (result == 0 || sample.NativeWindow.IsNull ||
+			sample.InputEvent.IsNull) return false;
+		var input = default(InputEvent);
+		input.Class = InputEventClass.Event;
+		input.Code = unchecked((ushort)result);
+		input.TimeStamp.Seconds = 1;
+		input.TimeStamp.Microseconds = result;
+		if (!MuiWindowInputEventCodec.Write(ref this, sample.InputEvent, input))
+			return false;
+		sample.EventClass = result;
+		sample.TimerDelayElapsed = PendingWindowTimerDelayElapsed;
+		PendingWindowTimerDelayElapsed = 0;
+		sample.DoubleClick.Object = PendingWindowDoubleClickObject;
+		sample.DoubleClick.Value = PendingWindowDoubleClickValue;
+		sample.DoubleClick.Available = PendingWindowDoubleClickAvailable;
+		PendingWindowDoubleClickAvailable = 0;
+		PendingWindowDoubleClickObject = APTR.Null;
+		PendingWindowDoubleClickValue = 0;
+		return true;
+	}
+	public bool ReadMuiWindowEvent(ref MuiWindowEventInput input)
+	{
+		if (!PreprocessedWindowEventAvailable || input.Message.IsNull ||
+			input.EventClass == 0) return false;
+		if (!MuiCommonControlPacketCore.WriteHandleEvent(ref this,
+			input.Message, PreprocessedInputMessage.Raw, PreprocessedMuiKey,
+			PreprocessedEventHandlerNode)) return false;
+		PreprocessedWindowEventCount++;
+		return true;
+	}
+	public bool ReadMuiWindowPointer(APTR nativeWindow,
+		ref MuiWindowPointerInput input)
+	{
+		if (!PointerSampleAvailable || nativeWindow.IsNull ||
+			input.Window.IsNull || input.InputEvent.IsNull) return false;
+		PointerSampleCount++;
+		input.MouseObject = PendingWindowMouseObject;
+		return true;
 	}
 	public bool ActivateMuiWindow(APTR nativeWindow)
 	{

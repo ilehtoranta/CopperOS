@@ -99,6 +99,7 @@ public static class MuiExternalWrapperDispatcher
 	private const uint Show = 0x8042cc84u;
 	private const uint Hide = 0x8042f20fu;
 	private const uint Draw = 0x80426f3fu;
+	private const uint BoopsiQuery = MuiBoopsiQueryCore.Method;
 
 	public static uint Dispatch<TPlatform>(ref TPlatform platform, APTR instance,
 		APTR message) where TPlatform : struct, IMuiServicePlatform
@@ -207,6 +208,13 @@ public static class MuiExternalWrapperDispatcher
 					return true;
 				result = MuiExternalWrapperCore.AskMinMax(ref platform, instance,
 					APTR.FromPointer(minMaxPacket.Storage)) ? 1u : 0u;
+				return true;
+
+			case BoopsiQuery:
+				// MUIP_BoopsiQuery is a complete named record. The wrapper forwards
+				// it only when its packet and wrapped BOOPSI object are valid.
+				result = MuiExternalWrapperCore.BoopsiQuery(ref platform, instance,
+					message);
 				return true;
 
 			case Layout:

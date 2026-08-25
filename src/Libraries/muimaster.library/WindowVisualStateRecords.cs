@@ -108,24 +108,34 @@ internal static class MuiWindowVisualStateRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
+		uint noMenus;
+		uint hasAlpha;
+		uint opacity;
+		uint fancyDrawing;
+		uint menuAction;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiWindowVisualStateRecord.Size) ||
 			!MuiWindowVisualStateFieldCursorCodec.TryReadUInt32(ref platform,
 				address, MuiWindowVisualStateField.Magic, out var magic) ||
 			magic != MuiWindowVisualStateRecord.Cookie ||
 			!MuiWindowVisualStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowVisualStateField.NoMenus, out value.NoMenus) ||
+				address, MuiWindowVisualStateField.NoMenus, out noMenus) ||
 			!MuiWindowVisualStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowVisualStateField.HasAlpha, out value.HasAlpha) ||
+				address, MuiWindowVisualStateField.HasAlpha, out hasAlpha) ||
 			!MuiWindowVisualStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowVisualStateField.Opacity, out value.Opacity) ||
+				address, MuiWindowVisualStateField.Opacity, out opacity) ||
 			!MuiWindowVisualStateFieldCursorCodec.TryReadUInt32(ref platform,
 				address, MuiWindowVisualStateField.FancyDrawing,
-				out value.FancyDrawing) ||
+				out fancyDrawing) ||
 			!MuiWindowVisualStateFieldCursorCodec.TryReadUInt32(ref platform,
 				address, MuiWindowVisualStateField.MenuAction,
-				out value.MenuAction)) return false;
+				out menuAction)) return false;
 		value.Magic = magic;
+		value.NoMenus = noMenus;
+		value.HasAlpha = hasAlpha;
+		value.Opacity = opacity;
+		value.FancyDrawing = fancyDrawing;
+		value.MenuAction = menuAction;
 		return true;
 	}
 

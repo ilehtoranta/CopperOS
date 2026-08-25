@@ -9,12 +9,32 @@ using Amiga;
 namespace CopperOS.MuiMaster;
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
+public struct MuiDragImageCreateSample
+{
+	// The provider owns the temporary MorphOS MUI_DragImage allocation. The
+	// core only carries the named request and returned opaque handle.
+	public APTR Object;
+	public int TouchX;
+	public int TouchY;
+	public uint Flags;
+	public APTR Result;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+public struct MuiDragImageDeleteSample
+{
+	public APTR Object;
+	public APTR DragImage;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiAreaDragState
 {
 	internal const uint Size = 32;
 	internal const uint ActiveFlag = 1;
 	internal const uint DroppedFlag = 2;
 	internal const uint ReportedFlag = 4;
+	internal const uint CapturedFlag = 8;
 
 	internal uint Magic;
 	internal uint Source;
@@ -168,10 +188,10 @@ internal static class MuiAreaDragStateCodec
 	}
 }
 
-// First MorphOS Area drag slice. This owns the fixed method-family defaults
-// and a guest-resident source state record, but deliberately does not pretend
-// to provide Intuition pointer capture, drag images, or application-level drop
-// dispatch. Those capabilities remain separate progressive seams.
+// First MorphOS Area drag slice. This owns the fixed method-family defaults,
+// guest-resident source state record, and typed provider-owned drag-image and
+// external-routing capabilities. Intuition pointer capture remains a separate
+// progressive seam so local controls can retain deterministic drag behavior.
 public static class MuiAreaDragCore
 {
 	internal const uint Draggable = 0x80420B6Eu;
@@ -186,6 +206,39 @@ public static class MuiAreaDragCore
 	internal const uint StateKey = 0x7F090003u;
 	internal const uint PolicyStateKey = 0x7F07003Au;
 
+	// Build the provider-owned request as one named value. Keeping source and
+	// coordinates together avoids a platform adapter having to reconstruct the
+	// capture ABI from positional arguments or guest offsets.
+	public static bool BuildPointerCaptureSample(APTR source, int x, int y,
+		out MuiPointerCaptureSample sample)
+	{
+		sample = default;
+		if (source.IsNull) return false;
+		sample.Object = source;
+		sample.Kind = MuiPointerCaptureKind.AreaDrag;
+		sample.StartX = x;
+		sample.StartY = y;
+		return true;
+	}
+
+	// Build the complete named route sample for MorphOS MUIM_DoDrag.  This is
+	// also the small freestanding boundary used by native qualification; the
+	// dispatcher never asks a provider to recover touch coordinates from an
+	// untyped packet address.
+	public static bool BuildDoDragRouteSample(APTR source, int touchX,
+		int touchY, uint flags, out MuiDragRouteSample sample)
+	{
+		sample = default;
+		if (source.IsNull) return false;
+		sample.Phase = MuiDragRoutePhase.Begin;
+		sample.Source = source;
+		sample.X = touchX;
+		sample.Y = touchY;
+		sample.Flags = flags;
+		sample.Result = 1;
+		return true;
+	}
+
 	public static bool IsDragMethod(uint method) =>
 		MuiAreaDragMessageCodec.IsMethod(method);
 
@@ -196,6 +249,10 @@ public static class MuiAreaDragCore
 			out var methodHeader)) return 0;
 		switch (methodHeader.MethodId)
 		{
+			case MuiAreaDragMessageCodec.DoDrag:
+				if (!MuiAreaDragMessageCodec.TryReadDoDrag(ref platform, message,
+					out var doDrag)) return 0;
+				return DoDrag(ref platform, state, obj, doDrag);
 			case MuiAreaDragMessageCodec.DragBegin:
 				if (!MuiAreaDragMessageCodec.TryReadBegin(ref platform, message,
 					out var begin)) return 0;
@@ -220,14 +277,57 @@ public static class MuiAreaDragCore
 				if (!MuiAreaDragMessageCodec.TryReadReport(ref platform, message,
 					out var report)) return 0;
 				return Report(ref platform, state, report);
+			case MuiAreaDragMessageCodec.CreateDragImage:
+				if (!MuiAreaDragMessageCodec.TryReadCreateDragImage(ref platform,
+					message, out var createDragImage)) return 0;
+				return CreateDragImage(ref platform, state, obj, createDragImage).Raw;
+			case MuiAreaDragMessageCodec.DeleteDragImage:
+				if (!MuiAreaDragMessageCodec.TryReadDeleteDragImage(ref platform,
+					message, out var deleteDragImage)) return 0;
+				return DeleteDragImage(ref platform, state, obj, deleteDragImage);
 		}
 		return 0;
 	}
 
 	internal static uint Begin<TPlatform>(ref TPlatform platform, APTR state,
 		APTR source) where TPlatform : struct, IMuiHeadlessPlatform
+		=> Begin(ref platform, state, source, 0, 0, 0);
+
+	// MUIM_DoDrag is the handle-oriented entry point in MorphOS MUI.  Its
+	// receiver is the drag source, while the packet carries the initial touch
+	// coordinates and flags.  Keep those values in the named route sample so a
+	// native provider can implement synchronous or asynchronous policy without
+	// reconstructing an ABI from positional arguments.
+	internal static uint DoDrag<TPlatform>(ref TPlatform platform, APTR state,
+		APTR source, MuiAreaDoDragMessage packet)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (source.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			source).IsNull)
+			return 0;
+		return Begin(ref platform, state, source, packet.TouchX, packet.TouchY,
+			packet.Flags, true);
+	}
+
+	private static uint Begin<TPlatform>(ref TPlatform platform, APTR state,
+		APTR source, int touchX, int touchY, uint flags, bool hasTouchInput = false)
+		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (source.IsNull || !IsEnabled(ref platform, state, source, Draggable))
+			return 0;
+		var route = default(MuiDragRouteSample);
+		if (hasTouchInput)
+		{
+			if (!BuildDoDragRouteSample(source, touchX, touchY, flags,
+				out route)) return 0;
+		}
+		else
+		{
+			route.Phase = MuiDragRoutePhase.Begin;
+			route.Source = source;
+			route.Result = 1;
+		}
+		if (TryRoute(ref platform, ref route) && route.Result == 0)
 			return 0;
 		var storage = EnsureState(ref platform, state, source);
 		if (storage.IsNull) return 0;
@@ -239,14 +339,56 @@ public static class MuiAreaDragCore
 		return 1;
 	}
 
+	internal static APTR CreateDragImage<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiAreaCreateDragImageMessage packet)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return APTR.Null;
+		var sample = default(MuiDragImageCreateSample);
+		sample.Object = obj;
+		sample.TouchX = packet.TouchX;
+		sample.TouchY = packet.TouchY;
+		sample.Flags = packet.Flags;
+		if (!platform.CreateMuiDragImage(ref sample)) return APTR.Null;
+		if (sample.Object != obj || sample.TouchX != packet.TouchX ||
+			sample.TouchY != packet.TouchY || sample.Flags != packet.Flags)
+			return APTR.Null;
+		return sample.Result;
+	}
+
+	internal static uint DeleteDragImage<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiAreaDeleteDragImageMessage packet)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return 0;
+		var sample = default(MuiDragImageDeleteSample);
+		sample.Object = obj;
+		sample.DragImage = APTR.FromPointer(packet.DragImage);
+		if (!platform.DeleteMuiDragImage(ref sample)) return 0;
+		if (sample.Object != obj || sample.DragImage !=
+			APTR.FromPointer(packet.DragImage)) return 0;
+		return 1;
+	}
+
 	internal static uint Query<TPlatform>(ref TPlatform platform, APTR state,
 		APTR target, MuiAreaDragQueryMessage packet)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var source = APTR.FromPointer(packet.Object);
-		return source.IsNotNull && target.IsNotNull &&
-			IsEnabled(ref platform, state, source, Draggable) &&
-			IsEnabled(ref platform, state, target, Dropable) ? QueryAccept : QueryRefuse;
+		if (source.IsNull || target.IsNull ||
+			!IsEnabled(ref platform, state, source, Draggable) ||
+			!IsEnabled(ref platform, state, target, Dropable))
+			return QueryRefuse;
+		var route = default(MuiDragRouteSample);
+		route.Phase = MuiDragRoutePhase.Query;
+		route.Source = source;
+		route.Target = target;
+		route.Result = QueryAccept;
+		if (TryRoute(ref platform, ref route))
+			return route.Result == 0 ? QueryRefuse : QueryAccept;
+		return QueryAccept;
 	}
 
 	internal static uint Drop<TPlatform>(ref TPlatform platform, APTR state,
@@ -261,6 +403,16 @@ public static class MuiAreaDragCore
 		var storage = StateStorage(ref platform, state, source,
 			out var value);
 		if (storage.IsNull || (value.Flags & MuiAreaDragState.ActiveFlag) == 0)
+			return 0;
+		var route = default(MuiDragRouteSample);
+		route.Phase = MuiDragRoutePhase.Drop;
+		route.Source = source;
+		route.Target = target;
+		route.X = packet.X;
+		route.Y = packet.Y;
+		route.Qualifier = packet.Qualifier;
+		route.Result = 1;
+		if (TryRoute(ref platform, ref route) && route.Result == 0)
 			return 0;
 		value.Target = target.Raw;
 		value.LastX = packet.X;
@@ -280,6 +432,18 @@ public static class MuiAreaDragCore
 			out var value);
 		if (storage.IsNull || (value.Flags & MuiAreaDragState.ActiveFlag) == 0)
 			return 0;
+		var route = default(MuiDragRouteSample);
+		route.Phase = MuiDragRoutePhase.Event;
+		route.Window = APTR.FromPointer(packet.Window);
+		route.Source = source;
+		route.DragImage = APTR.FromPointer(packet.DragImage);
+		route.IntuiMessage = APTR.FromPointer(packet.IntuiMessage);
+		route.MuiKey = packet.MuiKey;
+		route.MousePointerType = packet.MousePointerType;
+		route.Flags = packet.Flags;
+		route.Result = 1;
+		if (TryRoute(ref platform, ref route) && route.Result == 0)
+			return 0;
 		value.EventFlags = packet.Flags;
 		MuiAreaDragStateCodec.Write(ref platform, storage, value);
 		return 1;
@@ -294,13 +458,31 @@ public static class MuiAreaDragCore
 			out var value);
 		if (storage.IsNull || (value.Flags & MuiAreaDragState.ActiveFlag) == 0)
 			return ReportAbort;
+		var route = default(MuiDragRouteSample);
+		route.Phase = MuiDragRoutePhase.Report;
+		route.Source = source;
+		route.X = packet.X;
+		route.Y = packet.Y;
+		route.Update = packet.Update;
+		route.Qualifier = packet.Qualifier;
+		route.Result = ReportContinue;
+		var routeResult = ReportContinue;
+		if (TryRoute(ref platform, ref route))
+		{
+			if (route.Result > ReportRefresh) routeResult = ReportAbort;
+			else routeResult = route.Result;
+		}
+		if (routeResult != ReportAbort &&
+			(value.Flags & MuiAreaDragState.CapturedFlag) == 0 &&
+			CapturePointer(ref platform, source, packet.X, packet.Y))
+			value.Flags |= MuiAreaDragState.CapturedFlag;
 		value.LastX = packet.X;
 		value.LastY = packet.Y;
 		value.Qualifier = packet.Qualifier;
 		value.EventFlags = unchecked((uint)packet.Update);
 		value.Flags |= MuiAreaDragState.ReportedFlag;
 		MuiAreaDragStateCodec.Write(ref platform, storage, value);
-		return ReportContinue;
+		return routeResult;
 	}
 
 	internal static uint Finish<TPlatform>(ref TPlatform platform, APTR state,
@@ -312,8 +494,78 @@ public static class MuiAreaDragCore
 			out var value);
 		if (storage.IsNull || (value.Flags & MuiAreaDragState.ActiveFlag) == 0)
 			return 0;
+		var route = default(MuiDragRouteSample);
+		route.Phase = MuiDragRoutePhase.Finish;
+		route.Source = source;
+		route.DropFollows = packet.DropFollows;
+		route.Result = 1;
+		var routed = TryRoute(ref platform, ref route);
+		if ((value.Flags & MuiAreaDragState.CapturedFlag) != 0)
+			ReleasePointer(ref platform, source, value.LastX, value.LastY);
 		ReleaseState(ref platform, state, source, storage);
-		return 1;
+		return routed && route.Result == 0 ? 0u : 1u;
+	}
+
+	// Object disposal is a second terminal path for an active drag.  A guest
+	// source can disappear without receiving MUIM_DragFinish, so release the
+	// typed state block before the generic attribute list is reclaimed.
+	internal static bool Cleanup<TPlatform>(ref TPlatform platform, APTR state,
+		APTR source) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (source.IsNull || !MuiHeadlessObjectCore.GetRawAttribute(ref platform,
+			state, source, StateKey, out var raw)) return true;
+		var storage = APTR.FromPointer(raw);
+		if (storage.IsNull)
+			return MuiHeadlessObjectCore.SetExistingAttribute(ref platform, state,
+				source, StateKey, 0);
+		if (MuiAreaDragStateCodec.TryRead(ref platform, storage, out var value) &&
+			(value.Flags & MuiAreaDragState.CapturedFlag) != 0)
+			ReleasePointer(ref platform, source, value.LastX, value.LastY);
+		ReleaseState(ref platform, state, source, storage);
+		return true;
+	}
+
+	private static bool CapturePointer<TPlatform>(ref TPlatform platform,
+		APTR source, int x, int y)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!BuildPointerCaptureSample(source, x, y, out var sample))
+			return false;
+		return platform.CaptureMuiPointer(ref sample);
+	}
+
+	private static void ReleasePointer<TPlatform>(ref TPlatform platform,
+		APTR source, int x, int y)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (BuildPointerCaptureSample(source, x, y, out var sample))
+			_ = platform.ReleaseMuiPointer(ref sample);
+	}
+
+	// The provider receives a complete value-type sample.  Only Result is an
+	// output; rejecting identity changes keeps an accidental native ABI mismatch
+	// from redirecting a drag to a different guest object or message.
+	private static bool TryRoute<TPlatform>(ref TPlatform platform,
+		ref MuiDragRouteSample sample)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var expected = sample;
+		if (!platform.RouteMuiDrag(ref sample)) return false;
+		if (sample.Phase != expected.Phase || sample.Window != expected.Window ||
+			sample.Source != expected.Source || sample.Target != expected.Target ||
+			sample.DragImage != expected.DragImage ||
+			sample.IntuiMessage != expected.IntuiMessage ||
+			sample.X != expected.X || sample.Y != expected.Y ||
+			sample.Update != expected.Update ||
+			sample.DropFollows != expected.DropFollows ||
+			sample.MuiKey != expected.MuiKey ||
+			sample.MousePointerType != expected.MousePointerType ||
+			sample.Qualifier != expected.Qualifier ||
+			sample.Flags != expected.Flags)
+		{
+			sample.Result = 0;
+		}
+		return true;
 	}
 
 	internal static bool TryReadPolicyState<TPlatform>(ref TPlatform platform,

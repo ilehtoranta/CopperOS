@@ -304,9 +304,10 @@ internal static class MuiCollectionSurfaceMessageCodec
 	private static bool IsPacket<TPlatform>(ref TPlatform platform, APTR message,
 		uint size, uint method) where TPlatform : struct, IMuiGuestMemory
 	{
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message, size) ||
-			!MuiCollectionBasicMessageCodec.TryReadMethodId(ref platform, message,
-				out var header)) return false;
-		return header.MethodId == method;
+			!MuiCollectionBasicMessageCodec.TryReadMethodIdValue(ref platform, message,
+				out methodId)) return false;
+		return methodId == method;
 	}
 }

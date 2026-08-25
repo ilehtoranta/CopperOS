@@ -98,6 +98,108 @@ public sealed class MuiAreaDoubleBufferTests
 		Assert.Equal(1u, platform.ReadUInt32(storage, 0));
 	}
 
+	[Fact]
+	public void CommonControlDrawUsesProviderTargetAndRestoresRenderInfo()
+	{
+		var platform = CreatePlatform(out var rectangleClass);
+		var rectangle = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			rectangleClass, APTR.Null);
+		var renderInfo = APTR.FromPointer(0x1300);
+		var sourceRastPort = APTR.FromPointer(0x1400);
+		var targetRenderInfo = APTR.FromPointer(0x1500);
+		var targetRastPort = APTR.FromPointer(0x1600);
+		platform.WriteUInt32(renderInfo, 20, sourceRastPort.Raw);
+		platform.WriteUInt32(targetRenderInfo, 20, targetRastPort.Raw);
+		platform.DoubleBufferCapabilityAvailable = true;
+		platform.DoubleBufferTargetRenderInfo = targetRenderInfo;
+		platform.DoubleBufferTargetRastPort = targetRastPort;
+		platform.DoubleBufferOverrideTargetGeometry = true;
+		platform.DoubleBufferTargetLeft = 7;
+		platform.DoubleBufferTargetTop = 8;
+		platform.DoubleBufferTargetWidth = 11;
+		platform.DoubleBufferTargetHeight = 6;
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, rectangle,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, rectangle, 4, 5,
+			24, 12));
+		Assert.True(MuiAreaDoubleBufferPacketCore.Set(ref platform, State,
+			rectangle, 1));
+
+		Assert.True(MuiCommonControlCore.DrawControl(ref platform, State,
+			rectangle, 0x12));
+		Assert.Equal(1u, platform.DoubleBufferBeginCount);
+		Assert.Equal(1u, platform.DoubleBufferEndCount);
+		Assert.True(platform.LastDoubleBufferEndCompleted);
+		Assert.Equal(sourceRastPort, platform.LastDoubleBufferRequest.SourceRastPort);
+		Assert.Equal(7, platform.LastDoubleBufferRequest.TargetLeft);
+		Assert.Equal(8, platform.LastDoubleBufferRequest.TargetTop);
+		Assert.Equal(11, platform.LastDoubleBufferRequest.TargetWidth);
+		Assert.Equal(6, platform.LastDoubleBufferRequest.TargetHeight);
+		Assert.Equal(targetRastPort, platform.LastBeginUpdateLayer);
+		Assert.Equal(1u, platform.FillCount);
+		Assert.Equal(7, platform.LastLeft);
+		Assert.Equal(8, platform.LastTop);
+		Assert.Equal(17, platform.LastRight);
+		Assert.Equal(13, platform.LastBottom);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			rectangle, 0x7FFF0001u, out var restored));
+		Assert.Equal(renderInfo.Raw, restored);
+	}
+
+	[Fact]
+	public void AreaDrawEndsFailedDoubleBufferWhenUpdateCannotBegin()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var area = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var renderInfo = APTR.FromPointer(0x1300);
+		var sourceRastPort = APTR.FromPointer(0x1400);
+		var targetRenderInfo = APTR.FromPointer(0x1500);
+		var targetRastPort = APTR.FromPointer(0x1600);
+		platform.WriteUInt32(renderInfo, 20, sourceRastPort.Raw);
+		platform.WriteUInt32(targetRenderInfo, 20, targetRastPort.Raw);
+		platform.DoubleBufferCapabilityAvailable = true;
+		platform.DoubleBufferTargetRenderInfo = targetRenderInfo;
+		platform.DoubleBufferTargetRastPort = targetRastPort;
+		platform.BeginUpdateFails = true;
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, area, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, area, 1, 2, 16,
+			8));
+		Assert.True(MuiAreaDoubleBufferPacketCore.Set(ref platform, State, area, 1));
+
+		Assert.False(MuiAreaLayoutCore.Draw(ref platform, State, area, 0x44));
+		Assert.Equal(1u, platform.DoubleBufferBeginCount);
+		Assert.Equal(1u, platform.DoubleBufferEndCount);
+		Assert.False(platform.LastDoubleBufferEndCompleted);
+		Assert.Equal(0u, platform.LayerDepth);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, area,
+			0x7FFF0001u, out var restored));
+		Assert.Equal(renderInfo.Raw, restored);
+	}
+
+	[Fact]
+	public void EnabledDoubleBufferFallsBackWhenProviderDeclines()
+	{
+		var platform = CreatePlatform(out var rectangleClass);
+		var rectangle = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			rectangleClass, APTR.Null);
+		var renderInfo = APTR.FromPointer(0x1300);
+		var sourceRastPort = APTR.FromPointer(0x1400);
+		platform.WriteUInt32(renderInfo, 20, sourceRastPort.Raw);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, rectangle,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, rectangle, 0, 0,
+			12, 8));
+		Assert.True(MuiAreaDoubleBufferPacketCore.Set(ref platform, State,
+			rectangle, 1));
+
+		Assert.True(MuiCommonControlCore.DrawControl(ref platform, State,
+			rectangle, 0));
+		Assert.Equal(0u, platform.DoubleBufferBeginCount);
+		Assert.Equal(0u, platform.DoubleBufferEndCount);
+		Assert.Equal(sourceRastPort, platform.LastBeginUpdateLayer);
+	}
+
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR areaClass)
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

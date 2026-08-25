@@ -25,6 +25,8 @@ public sealed class MuiListCoreTests
 	private const uint ConstructHookAttr = 0x8042894fu;
 	private const uint DestructHookAttr = 0x804297ceu;
 	private const uint FirstAttr = 0x804238d4u;
+	private const uint InsertPositionAttr = 0x8042d0cdu;
+	private const uint InsertPositionStateKey = 0x7F08001Au;
 	private const uint VisibleAttr = 0x8042191fu;
 	private const uint SelectChangeAttr = 0x8042178fu;
 	private const uint InputAttr = 0x8042682du;
@@ -48,6 +50,20 @@ public sealed class MuiListCoreTests
 	private const uint AutoVisibleAttr = 0x8042a445u;
 	private const uint SortColumnAttr = 0x8042cafbu;
 	private const uint TitleClickAttr = 0x80422fd9u;
+	private const uint SortStateKey = 0x7F080014u;
+	private const uint ActiveStateKey = 0x7F08000Fu;
+	private const uint SelectionSignalKey = 0x7F080017u;
+	private const uint ClickStateKey = 0x7F080012u;
+	private const uint HookPolicyKey = 0x7F080013u;
+	private const uint RedrawStateKey = 0x7F080008u;
+	private const uint PresentationPolicyKey = 0x7F080015u;
+	private const uint FormatPolicyKey = 0x7F080018u;
+	private const uint FormatColumnsKey = 0x7F080002u;
+	private const uint FontStateKey = 0x7F080019u;
+	private const uint HScrollerStateKey = 0x7F08000Du;
+	private const uint ViewportStateKey = 0x7F08000Au;
+	private const uint PoolPolicyKey = 0x7F080010u;
+	private const uint InteractionPolicyKey = 0x7F080011u;
 	private const uint DisplayHookAttr = 0x8042b4d5u;
 	private const uint MultiTestHookAttr = 0x8042c2c6u;
 	private const uint MinLineHeightAttr = 0x8042d1c3u;
@@ -57,7 +73,16 @@ public sealed class MuiListCoreTests
 	private const uint TotalPixelAttr = 0x8042a8f5u;
 	private const uint VisiblePixelAttr = 0x804273e9u;
 	private const uint TitleAttr = 0x80423e66u;
+	private const uint TitleStateKey = 0x7F080016u;
 	private const uint TitleArrayAttr = 0x80427d95u;
+	private const uint TitleArrayStateKey = 0x7F080007u;
+	private const uint ColumnOrderAttr = 0x9d5100f6u;
+	private const uint ColumnOrderKey = 0x7F08000Cu;
+	private const uint ColumnVisibilityKey = 0x7F08000Bu;
+	private const uint ColumnMetricsKey = 0x7F080009u;
+	private const uint ListHeaderKey = 0x7F080001u;
+	private const uint HideColumnAttr = 0x80428052u;
+	private const uint ShowColumnAttr = 0x8042c840u;
 	private const uint HScrollerVisibilityAttr = 0x804280a6u;
 	private const uint SourceArrayAttr = 0x8042c0a0u;
 	private const uint EditableAttr = 0x8042f9b9u;
@@ -102,6 +127,556 @@ public sealed class MuiListCoreTests
 		Assert.Equal(0u, Get(ref platform, list, VisiblePixelAttr));
 		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
 			list));
+	}
+
+	[Fact]
+	public void ListCoreGettersUseNamedViewportStateThroughGetAndOmGet()
+	{
+		var platform = CreatePlatform(out var listClass, out _, 0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		for (var row = 0u; row < 3; row++)
+			Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+				APTR.FromPointer(0x5200 + row * 0x20), InsertBottom));
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 16));
+		Assert.Equal(3u, MuiListCore.EntryCount(ref platform, State, list));
+		Assert.True(MuiListCore.TryGetAttribute(ref platform, State, list,
+			EntriesAttr, out var projectedEntries));
+		Assert.Equal(3u, projectedEntries);
+
+		Assert.Equal(3u, Get(ref platform, list, EntriesAttr));
+		Assert.Equal(2u, Get(ref platform, list, VisibleAttr));
+		Assert.Equal(0u, Get(ref platform, list, FirstAttr));
+		Assert.Equal(24u, Get(ref platform, list, TotalPixelAttr));
+		Assert.Equal(16u, Get(ref platform, list, VisiblePixelAttr));
+		Assert.Equal(3u, MuiListCore.EntryCount(ref platform, State, list));
+
+		var message = APTR.FromPointer(0x3000);
+		var storage = APTR.FromPointer(0x3080);
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			message, MuiCommonPacketKind.Get, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.OmGet));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			message, MuiCommonPacketKind.Get, MuiCommonField.Storage,
+			storage.Raw));
+		foreach (var (attribute, expected) in new[]
+		{
+			(EntriesAttr, 3u), (VisibleAttr, 2u), (FirstAttr, 0u),
+			(TopPixelAttr, 0u), (TotalPixelAttr, 24u),
+			(VisiblePixelAttr, 16u),
+		})
+		{
+			Assert.True(MuiListCore.TryGetAttribute(ref platform, State, list,
+				attribute, out var directListValue));
+			Assert.True(expected == directListValue,
+				$"attribute=0x{attribute:X8} projected={directListValue}");
+			Assert.True(MuiCommonControlCore.TryGet(ref platform, State, list,
+				attribute, out var directValue, out var directHandled));
+			Assert.True(directHandled);
+			Assert.True(expected == directValue,
+				$"common attribute=0x{attribute:X8} projected={directValue}");
+			Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+				message, MuiCommonPacketKind.Get, MuiCommonField.Attribute,
+				attribute));
+			Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform,
+				State, list, message));
+			Assert.True(MuiGuestUlongStorageCodec.TryRead(ref platform, storage,
+				out var stored));
+			Assert.Equal(expected, stored.Value);
+		}
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+	}
+
+	[Fact]
+	public void ListPolicyGettersUseNamedFormatSortTitleAndViewportState()
+	{
+		var platform = CreatePlatform(out var listClass, out _, 0x40000);
+		var format = APTR.FromPointer(0x2800);
+		var title = APTR.FromPointer(0x2840);
+		platform.WriteCString(format, ",,");
+		platform.WriteCString(title, "Title");
+		var tags = APTR.FromPointer(0x2900);
+		platform.WriteUInt32(tags, 0, FormatAttr);
+		platform.WriteUInt32(tags, 4, format.Raw);
+		platform.WriteUInt32(tags, 8, MaxColumnsAttr);
+		platform.WriteUInt32(tags, 12, 4);
+		platform.WriteUInt32(tags, 16, SortColumnAttr);
+		platform.WriteUInt32(tags, 20, 1);
+		platform.WriteUInt32(tags, 24, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, list,
+			TitleAttr, title.Raw));
+		for (var row = 0u; row < 3; row++)
+			Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+				APTR.FromPointer(0x5200 + row * 0x20), InsertBottom));
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 16));
+		Assert.True(MuiListCore.SetDropMark(ref platform, State, list, 1));
+		Assert.True(MuiListCore.TryGetSortState(ref platform, State, list,
+			out var sortBeforeRaw));
+		Assert.Equal(1u, sortBeforeRaw.SortColumn);
+
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, list);
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform,
+			State, record, FormatAttr, 0xDEAD0001, false));
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform,
+			State, record, SortColumnAttr, 0, false));
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform,
+			State, record, TitleAttr, 0xDEAD0002, false));
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform,
+			State, record, DropMarkAttr, unchecked((uint)-1), false));
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform,
+			State, record, LineHeightAttr, 99, false));
+		Assert.True(MuiListCore.TryGetSortState(ref platform, State, list,
+			out var sortAfterRaw));
+		Assert.Equal(1u, sortAfterRaw.SortColumn);
+		Assert.True(MuiListCore.TryGetAttribute(ref platform, State, list,
+			SortColumnAttr, out var projectedSort));
+		Assert.Equal(1u, projectedSort);
+
+		Assert.Equal(format.Raw, Get(ref platform, list, FormatAttr));
+		Assert.Equal(1u, Get(ref platform, list, SortColumnAttr));
+		Assert.Equal(title.Raw, Get(ref platform, list, TitleAttr));
+		Assert.Equal(1u, Get(ref platform, list, DropMarkAttr));
+		Assert.Equal(8u, Get(ref platform, list, LineHeightAttr));
+
+		var message = APTR.FromPointer(0x3000);
+		var storage = APTR.FromPointer(0x3080);
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			message, MuiCommonPacketKind.Get, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.OmGet));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			message, MuiCommonPacketKind.Get, MuiCommonField.Storage,
+			storage.Raw));
+		foreach (var (attribute, expected) in new[]
+		{
+			(FormatAttr, format.Raw), (SortColumnAttr, 1u),
+			(TitleAttr, title.Raw), (DropMarkAttr, 1u), (LineHeightAttr, 8u),
+		})
+		{
+			Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+				message, MuiCommonPacketKind.Get, MuiCommonField.Attribute,
+				attribute));
+			Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform,
+				State, list, message));
+			Assert.True(MuiGuestUlongStorageCodec.TryRead(ref platform, storage,
+				out var stored));
+			Assert.Equal(expected, stored.Value);
+		}
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+	}
+
+	[Fact]
+	public void ListPresentationGettersUseNamedPolicyThroughGetAndOmGet()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var tags = APTR.FromPointer(0x3400);
+		platform.WriteUInt32(tags, 0, StripesAttr);
+		platform.WriteUInt32(tags, 4, 7);
+		platform.WriteUInt32(tags, 8, ShowDropMarksAttr);
+		platform.WriteUInt32(tags, 12, 0);
+		platform.WriteUInt32(tags, 16, DragSortableAttr);
+		platform.WriteUInt32(tags, 20, 5);
+		platform.WriteUInt32(tags, 24, DragTypeAttr);
+		platform.WriteUInt32(tags, 28, 9);
+		platform.WriteUInt32(tags, 32, AutoVisibleAttr);
+		platform.WriteUInt32(tags, 36, 6);
+		platform.WriteUInt32(tags, 40, AutoLineHeightAttr);
+		platform.WriteUInt32(tags, 44, 8);
+		platform.WriteUInt32(tags, 48, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.TryGetPresentationPolicy(ref platform, State, list,
+			out var policy));
+		Assert.Equal(1u, policy.Stripes);
+		Assert.Equal(0u, policy.ShowDropMarks);
+		Assert.Equal(1u, policy.DragSortable);
+		Assert.Equal(0u, policy.DragType);
+		Assert.Equal(1u, policy.AutoVisible);
+		Assert.Equal(1u, policy.AutoLineHeight);
+
+		// The named policy remains authoritative if a raw compatibility writer
+		// changes the public attribute slots underneath it.
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, list);
+		foreach (var attribute in new[]
+		{
+			StripesAttr, ShowDropMarksAttr, DragSortableAttr, DragTypeAttr,
+			AutoVisibleAttr, AutoLineHeightAttr,
+		})
+			Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform,
+				State, record, attribute, 0xDEAD0001, false));
+
+		Assert.Equal(policy.Stripes, Get(ref platform, list, StripesAttr));
+		Assert.Equal(policy.ShowDropMarks, Get(ref platform, list,
+			ShowDropMarksAttr));
+		Assert.Equal(policy.DragSortable, Get(ref platform, list,
+			DragSortableAttr));
+		Assert.Equal(policy.DragType, Get(ref platform, list, DragTypeAttr));
+		Assert.Equal(policy.AutoVisible, Get(ref platform, list, AutoVisibleAttr));
+		Assert.Equal(policy.AutoLineHeight, Get(ref platform, list,
+			AutoLineHeightAttr));
+
+		var message = APTR.FromPointer(0x3480);
+		var storage = APTR.FromPointer(0x34C0);
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiCommonPacketKind.Get, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.OmGet));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiCommonPacketKind.Get, MuiCommonField.Storage, storage.Raw));
+		foreach (var (attribute, expected) in new[]
+		{
+			(StripesAttr, policy.Stripes),
+			(ShowDropMarksAttr, policy.ShowDropMarks),
+			(DragSortableAttr, policy.DragSortable),
+			(DragTypeAttr, policy.DragType),
+			(AutoVisibleAttr, policy.AutoVisible),
+			(AutoLineHeightAttr, policy.AutoLineHeight),
+		})
+		{
+			Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+				message, MuiCommonPacketKind.Get, MuiCommonField.Attribute,
+				attribute));
+			Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+				list, message));
+			Assert.True(MuiGuestUlongStorageCodec.TryRead(ref platform, storage,
+				out var stored));
+			Assert.Equal(expected, stored.Value);
+		}
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State, list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State, listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListInsertPositionGetterUsesNamedStateThroughGetAndOmGet()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.TryGetInsertPositionState(ref platform, State, list,
+			out var position));
+		Assert.Equal(0u, position.Position);
+		Assert.Equal(0u, Get(ref platform, list, InsertPositionAttr));
+
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x5200), InsertBottom));
+		Assert.Equal(0u, Get(ref platform, list, InsertPositionAttr));
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x5240), InsertBottom));
+		Assert.True(MuiListCore.TryGetInsertPositionState(ref platform, State, list,
+			out position));
+		Assert.Equal(1u, position.Position);
+
+		// A raw compatibility write must not displace the canonical insertion
+		// result published by the named record.
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, list);
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			record, InsertPositionAttr, 0xDEAD0001, false));
+		Assert.Equal(1u, Get(ref platform, list, InsertPositionAttr));
+
+		var message = APTR.FromPointer(0x3580);
+		var storage = APTR.FromPointer(0x35C0);
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiCommonPacketKind.Get, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.OmGet));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiCommonPacketKind.Get, MuiCommonField.Storage, storage.Raw));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiCommonPacketKind.Get, MuiCommonField.Attribute, InsertPositionAttr));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			list, message));
+		Assert.True(MuiGuestUlongStorageCodec.TryRead(ref platform, storage,
+			out var stored));
+		Assert.Equal(1u, stored.Value);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State, list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State, listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListMalformedInsertPositionStateFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x5280), InsertBottom));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, InsertPositionStateKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiListCore.TryGetInsertPositionState(ref platform, State,
+			list, out var before));
+		Assert.Equal(MuiListCore.MuiListInsertPositionState.Cookie,
+			before.Magic);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, InsertPositionAttr, out var rawBefore));
+
+		// A published insertion result is typed state. Corrupting its cookie must
+		// not let the getter or a later insertion silently replace it from the raw
+		// compatibility scalar.
+		platform.WriteUInt32(APTR.FromPointer(stateRaw), 0, 0);
+		Assert.False(MuiListCore.TryGetInsertPositionState(ref platform, State,
+			list, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			InsertPositionAttr, out _));
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x52C0), InsertBottom));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, InsertPositionStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, InsertPositionAttr, out var rawAfter));
+		Assert.Equal(rawBefore, rawAfter);
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			InsertPositionAttr, out _));
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State, list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State, listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListInsertPositionRejectsOutOfRangeNamedValue()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x5300), InsertBottom));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, InsertPositionStateKey, out var stateRaw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, InsertPositionAttr, out var rawBefore));
+		Assert.True(MuiListCore.TryGetInsertPositionState(ref platform, State,
+			list, out var before));
+		Assert.Equal(0u, before.Position);
+
+		// The named result remains structurally readable, but UINT_MAX cannot be
+		// the zero-based position produced by the bounded insertion path.
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.InsertPosition,
+			MuiListCore.MuiListStateField.Position, uint.MaxValue));
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryReadUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.InsertPosition,
+			MuiListCore.MuiListStateField.Position, out var storedPosition));
+		Assert.Equal(uint.MaxValue, storedPosition);
+		Assert.False(MuiListCore.TryGetInsertPositionState(ref platform, State,
+			list, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			InsertPositionAttr, out _));
+
+		// A malformed present result is not absence. Insertion may still update
+		// the collection, but it must not replace the retained named record or
+		// publish a raw compatibility projection from that failed result.
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x5340), InsertBottom));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, InsertPositionStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, InsertPositionAttr, out var rawAfter));
+		Assert.Equal(rawBefore, rawAfter);
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			InsertPositionAttr, out _));
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListClickAndTitleClickGettersUseNamedStateThroughOmGet()
+	{
+		var platform = CreatePlatform(out var listClass, out _, 0x40000);
+		var tags = APTR.FromPointer(0x2C00);
+		platform.WriteUInt32(tags, 0, ClickColumnAttr);
+		platform.WriteUInt32(tags, 4, 3);
+		platform.WriteUInt32(tags, 8, AgainClickAttr);
+		platform.WriteUInt32(tags, 12, 7);
+		platform.WriteUInt32(tags, 16, DoubleClickAttr);
+		platform.WriteUInt32(tags, 20, 0);
+		platform.WriteUInt32(tags, 24, DefClickColumnAttr);
+		platform.WriteUInt32(tags, 28, 9);
+		platform.WriteUInt32(tags, 32, TitleClickAttr);
+		platform.WriteUInt32(tags, 36, 5);
+		platform.WriteUInt32(tags, 40, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.TryGetClickState(ref platform, State, list,
+			out var click));
+		Assert.True(MuiListCore.TryGetSortState(ref platform, State, list,
+			out var sort));
+		Assert.Equal(3u, click.ClickColumn);
+		Assert.Equal(1u, click.AgainClick);
+		Assert.Equal(0u, click.DoubleClick);
+		Assert.Equal(9u, click.DefClickColumn);
+		Assert.Equal(5u, sort.TitleClick);
+
+		// Raw compatibility writes must not replace the canonical named records
+		// used by public Get and OM_GET.
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, list);
+		foreach (var attribute in new[]
+		{
+			ClickColumnAttr, AgainClickAttr, DoubleClickAttr, DefClickColumnAttr,
+			TitleClickAttr,
+		})
+			Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform,
+				State, record, attribute, 0, false));
+
+		Assert.Equal(3u, Get(ref platform, list, ClickColumnAttr));
+		Assert.Equal(1u, Get(ref platform, list, AgainClickAttr));
+		Assert.Equal(0u, Get(ref platform, list, DoubleClickAttr));
+		Assert.Equal(9u, Get(ref platform, list, DefClickColumnAttr));
+		Assert.Equal(5u, Get(ref platform, list, TitleClickAttr));
+
+		var message = APTR.FromPointer(0x3000);
+		var storage = APTR.FromPointer(0x3080);
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			message, MuiCommonPacketKind.Get, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.OmGet));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			message, MuiCommonPacketKind.Get, MuiCommonField.Storage,
+			storage.Raw));
+		foreach (var (attribute, expected) in new[]
+		{
+			(ClickColumnAttr, 3u), (AgainClickAttr, 1u),
+			(DoubleClickAttr, 0u), (DefClickColumnAttr, 9u),
+			(TitleClickAttr, 5u),
+		})
+		{
+			Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+				message, MuiCommonPacketKind.Get, MuiCommonField.Attribute,
+				attribute));
+			Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform,
+				State, list, message));
+			Assert.True(MuiGuestUlongStorageCodec.TryRead(ref platform, storage,
+				out var stored));
+			Assert.Equal(expected, stored.Value);
+		}
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+	}
+
+	[Fact]
+	public void ListPoolTitleArrayAndColumnOrderGettersUseNamedRecordsThroughOmGet()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var firstTitle = APTR.FromPointer(0x2F00);
+		var secondTitle = APTR.FromPointer(0x2F20);
+		var titleSource = APTR.FromPointer(0x2F40);
+		var format = APTR.FromPointer(0x2F50);
+		var orderSource = APTR.FromPointer(0x2F60);
+		var pool = APTR.FromPointer(0x2F80);
+		var tags = APTR.FromPointer(0x3100);
+		platform.WriteCString(firstTitle, "Name");
+		platform.WriteCString(secondTitle, "Population");
+		platform.WriteCString(format, ",");
+		platform.WriteUInt32(titleSource, 0, firstTitle.Raw);
+		platform.WriteUInt32(titleSource, 4, secondTitle.Raw);
+		platform.WriteUInt32(titleSource, 8, 0);
+		platform.WriteUInt8(orderSource, 0, 1);
+		platform.WriteUInt8(orderSource, 1, 0);
+		platform.WriteUInt8(orderSource, 2, 0xFF);
+		platform.WriteUInt32(tags, 0, PoolAttr);
+		platform.WriteUInt32(tags, 4, pool.Raw);
+		platform.WriteUInt32(tags, 8, MaxColumnsAttr);
+		platform.WriteUInt32(tags, 12, 2);
+		platform.WriteUInt32(tags, 16, FormatAttr);
+		platform.WriteUInt32(tags, 20, format.Raw);
+		platform.WriteUInt32(tags, 24, TitleArrayAttr);
+		platform.WriteUInt32(tags, 28, titleSource.Raw);
+		platform.WriteUInt32(tags, 32, ColumnOrderAttr);
+		platform.WriteUInt32(tags, 36, orderSource.Raw);
+		platform.WriteUInt32(tags, 40, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.TryGetPoolPolicy(ref platform, State, list,
+			out var poolPolicy));
+		Assert.Equal(pool, poolPolicy.Pool);
+		var storedTitles = APTR.FromPointer(Get(ref platform, list, TitleArrayAttr));
+		var storedOrder = APTR.FromPointer(Get(ref platform, list, ColumnOrderAttr));
+		Assert.NotEqual(titleSource, storedTitles);
+		Assert.NotEqual(orderSource, storedOrder);
+		Assert.Equal(firstTitle.Raw, platform.ReadUInt32(storedTitles, 0));
+		Assert.Equal(secondTitle.Raw, platform.ReadUInt32(storedTitles, 4));
+		Assert.Equal(1, platform.ReadUInt8(storedOrder, 0));
+		Assert.Equal(0, platform.ReadUInt8(storedOrder, 1));
+
+		// Raw compatibility writes must not replace the canonical typed records.
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, list);
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			record, PoolAttr, 0xDEAD0001, false));
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			record, TitleArrayAttr, 0xDEAD0002, false));
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			record, ColumnOrderAttr, 0xDEAD0003, false));
+		Assert.Equal(pool.Raw, Get(ref platform, list, PoolAttr));
+		Assert.Equal(storedTitles.Raw, Get(ref platform, list, TitleArrayAttr));
+		Assert.Equal(storedOrder.Raw, Get(ref platform, list, ColumnOrderAttr));
+
+		var message = APTR.FromPointer(0x3200);
+		var storage = APTR.FromPointer(0x3240);
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiCommonPacketKind.Get, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.OmGet));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiCommonPacketKind.Get, MuiCommonField.Storage, storage.Raw));
+		foreach (var (attribute, expected) in new[]
+		{
+			(PoolAttr, pool.Raw), (TitleArrayAttr, storedTitles.Raw),
+			(ColumnOrderAttr, storedOrder.Raw),
+		})
+		{
+			Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiCommonPacketKind.Get, MuiCommonField.Attribute, attribute));
+			Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+				list, message));
+			Assert.True(MuiGuestUlongStorageCodec.TryRead(ref platform, storage,
+				out var stored));
+			Assert.Equal(expected, stored.Value);
+		}
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State, list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State, listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State, otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
 	}
 
 	[Fact]
@@ -187,6 +762,100 @@ public sealed class MuiListCoreTests
 	}
 
 	[Fact]
+	public void ListMalformedInteractionPolicyFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var tags = APTR.FromPointer(0x23E0);
+		platform.WriteUInt32(tags, 0, InputAttr);
+		platform.WriteUInt32(tags, 4, 1);
+		platform.WriteUInt32(tags, 8, MultiSelectAttr);
+		platform.WriteUInt32(tags, 12, 3);
+		platform.WriteUInt32(tags, 16, ScrollerPosAttr);
+		platform.WriteUInt32(tags, 20, 1);
+		platform.WriteUInt32(tags, 24, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, InteractionPolicyKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiListCore.TryGetInteractionPolicy(ref platform, State,
+			list, out var policyBefore));
+		Assert.Equal(3u, policyBefore.MultiSelect);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, MultiSelectAttr, out var multiSelectBefore));
+
+		// A published interaction policy is typed construction state. Corrupting
+		// its cookie must not let future input/composite consumers recreate it
+		// from the raw scalar aliases.
+		platform.WriteUInt32(APTR.FromPointer(stateRaw), 0, 0);
+		Assert.False(MuiListCore.TryGetInteractionPolicy(ref platform, State,
+			list, out _));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, InteractionPolicyKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, MultiSelectAttr, out var multiSelectAfter));
+		Assert.Equal(multiSelectBefore, multiSelectAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListInteractionPolicyInvalidValuesFailClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var tags = APTR.FromPointer(0x2420);
+		platform.WriteUInt32(tags, 0, InputAttr);
+		platform.WriteUInt32(tags, 4, 1);
+		platform.WriteUInt32(tags, 8, MultiSelectAttr);
+		platform.WriteUInt32(tags, 12, 2);
+		platform.WriteUInt32(tags, 16, ScrollerPosAttr);
+		platform.WriteUInt32(tags, 20, 1);
+		platform.WriteUInt32(tags, 24, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, InteractionPolicyKey, out var stateRaw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, MultiSelectAttr, out var multiSelectBefore));
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.InteractionPolicy,
+			MuiListCore.MuiListStateField.MultiSelect, 9));
+
+		// The named construction record is authoritative. Invalid enum values
+		// must not be normalized or repaired from the raw attribute projection.
+		Assert.False(MuiListCore.TryGetInteractionPolicy(ref platform, State,
+			list, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			MultiSelectAttr, out _));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, InteractionPolicyKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, MultiSelectAttr, out var multiSelectAfter));
+		Assert.Equal(multiSelectBefore, multiSelectAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
 	public void ListClickStateUsesNamedRecordAndKeepsClickAttributesCoherent()
 	{
 		var platform = CreatePlatform(out var listClass, out _, 0x40000);
@@ -256,6 +925,64 @@ public sealed class MuiListCoreTests
 	}
 
 	[Fact]
+	public void ListMalformedClickStateFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, list,
+			ClickColumnAttr, 3));
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, list,
+			AgainClickAttr, 1));
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, list,
+			DoubleClickAttr, 1));
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, list,
+			DefClickColumnAttr, 9));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ClickStateKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiListCore.TryGetClickState(ref platform, State, list,
+			out var clickBefore));
+		Assert.Equal(MuiListCore.MuiListClickState.Cookie, clickBefore.Magic);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ClickColumnAttr, out var columnBefore));
+
+		// A published click record is typed state. Corrupting its cookie must not
+		// let getters or click setters silently replace it from raw projections.
+		platform.WriteUInt32(APTR.FromPointer(stateRaw), 0, 0);
+		Assert.False(MuiListCore.TryGetClickState(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			ClickColumnAttr, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			AgainClickAttr, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			DoubleClickAttr, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			DefClickColumnAttr, out _));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			ClickColumnAttr, 4));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			AgainClickAttr, 0));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ClickStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ClickColumnAttr, out var columnAfter));
+		Assert.Equal(columnBefore, columnAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
 	public void ListHookPolicyUsesNamedRecordAndKeepsHookAttributesCoherent()
 	{
 		var platform = CreatePlatform(out var listClass, out _, 0x40000);
@@ -318,6 +1045,60 @@ public sealed class MuiListCoreTests
 	}
 
 	[Fact]
+	public void ListMalformedHookPolicyFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, list,
+			DisplayHookAttr, HookString));
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, list,
+			MultiTestHookAttr, 0x12345678u));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, HookPolicyKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiListCore.TryGetHookPolicy(ref platform, State, list,
+			out var policyBefore));
+		Assert.Equal(MuiListCore.MuiListHookPolicyState.Cookie,
+			policyBefore.Magic);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, DisplayHookAttr, out var displayBefore));
+
+		// A published hook policy is typed state. Corrupting its cookie must not
+		// let getters, hook dispatch, or hook setters silently replace it from raw
+		// attributes.
+		platform.WriteUInt32(APTR.FromPointer(stateRaw), 0, 0);
+		Assert.False(MuiListCore.TryGetHookPolicy(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			DisplayHookAttr, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			MultiTestHookAttr, out _));
+		Assert.Equal(0u, MuiListCore.HookPolicyValue(ref platform, State,
+			list, DisplayHookAttr));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			DisplayHookAttr, HookStringArray));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			MultiTestHookAttr, 0x23456789u));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, HookPolicyKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, DisplayHookAttr, out var displayAfter));
+		Assert.Equal(displayBefore, displayAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
 	public void ListSortStateUsesNamedRecordAndKeepsColumnProjectionsCoherent()
 	{
 		var platform = CreatePlatform(out var listClass, out _, 0x40000);
@@ -368,6 +1149,177 @@ public sealed class MuiListCoreTests
 			TitleClickAttr));
 		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
 			list));
+	}
+
+	[Fact]
+	public void ListMalformedSortStateFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, list,
+			TitleClickAttr, 5));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, SortStateKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiListCore.TryGetSortState(ref platform, State, list,
+			out var sortBefore));
+		Assert.Equal(MuiListCore.MuiListSortState.Cookie, sortBefore.Magic);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleClickAttr, out var titleClickBefore));
+
+		// A published sort record is typed state. Corrupting its cookie must not
+		// let getters or Sort/TitleClick setters silently replace it from raw
+		// projections.
+		platform.WriteUInt32(APTR.FromPointer(stateRaw), 0, 0);
+		Assert.False(MuiListCore.TryGetSortState(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			SortColumnAttr, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			TitleClickAttr, out _));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			SortColumnAttr, 1));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			TitleClickAttr, 7));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, SortStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleClickAttr, out var titleClickAfter));
+		Assert.Equal(titleClickBefore, titleClickAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListSortStateRejectsOutOfRangeNamedColumn()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, SortStateKey, out var stateRaw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, SortColumnAttr, out var sortBefore));
+		Assert.NotEqual(0u, stateRaw);
+
+		// Corrupt the format-derived index through its named record field. The
+		// record remains structurally valid, but UINT_MAX is outside the MUI
+		// bounded column domain.
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.SortState,
+			MuiListCore.MuiListStateField.SortColumn, uint.MaxValue));
+		Assert.False(MuiListCore.TryGetSortState(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			SortColumnAttr, out _));
+		Assert.False(MuiListCore.Sort(ref platform, State, list));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			SortColumnAttr, 0));
+
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, SortStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, SortColumnAttr, out var sortAfter));
+		Assert.Equal(sortBefore, sortAfter);
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryReadUInt32(
+			ref platform, APTR.FromPointer(stateAfter),
+			MuiListCore.MuiListStateRecordKind.SortState,
+			MuiListCore.MuiListStateField.SortColumn, out var storedSort));
+		Assert.Equal(uint.MaxValue, storedSort);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListMalformedSortStateStopsSortAndSortedInsertionConsumers()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		var first = APTR.FromPointer(0x2F40);
+		var second = APTR.FromPointer(0x2F80);
+		platform.WriteCString(first, "first");
+		platform.WriteCString(second, "second");
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list, first,
+			InsertBottom));
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list, second,
+			InsertBottom));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, SortStateKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.SortState,
+			MuiListCore.MuiListStateField.Magic, 0));
+
+		// A malformed present sort record is not a request for column zero. Sort,
+		// external-vector sorting, and sorted insertion must all fail before
+		// touching entries or constructing a replacement value.
+		Assert.False(MuiListCore.Sort(ref platform, State, list));
+		Assert.Equal(first, MuiListCore.GetEntry(ref platform, State, list, 0,
+			APTR.Null));
+		Assert.Equal(second, MuiListCore.GetEntry(ref platform, State, list, 1,
+			APTR.Null));
+
+		var entries = APTR.FromPointer(0x2FC0);
+		var cursor = default(MuiListCore.MuiListPointerVectorCursor);
+		cursor.Base = entries;
+		cursor.Index = 0;
+		Assert.True(MuiListCore.MuiListPointerVectorCursorCodec.TryGetEntry(
+			ref platform, cursor, out var firstSlot));
+		var firstValue = default(MuiListCore.MuiListPointerSlotRecord);
+		firstValue.Value = second;
+		Assert.True(MuiListCore.MuiListPointerSlotCodec.Write(ref platform,
+			firstSlot, firstValue));
+		cursor.Index = 1;
+		Assert.True(MuiListCore.MuiListPointerVectorCursorCodec.TryGetEntry(
+			ref platform, cursor, out var secondSlot));
+		var secondValue = default(MuiListCore.MuiListPointerSlotRecord);
+		secondValue.Value = first;
+		Assert.True(MuiListCore.MuiListPointerSlotCodec.Write(ref platform,
+			secondSlot, secondValue));
+		Assert.False(MuiListCore.SortEntries(ref platform, State, list,
+			entries));
+		Assert.True(MuiListCore.MuiListPointerSlotCodec.TryRead(ref platform,
+			firstSlot, out firstValue));
+		Assert.Equal(second, firstValue.Value);
+		Assert.True(MuiListCore.MuiListPointerSlotCodec.TryRead(ref platform,
+			secondSlot, out secondValue));
+		Assert.Equal(first, secondValue.Value);
+
+		Assert.False(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x2FC8), InsertSorted));
+		Assert.Equal(2u, MuiListCore.EntryCount(ref platform, State, list));
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
 	}
 
 	[Fact]
@@ -466,6 +1418,75 @@ public sealed class MuiListCoreTests
 	}
 
 	[Fact]
+	public void ListMalformedPresentationPolicyFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var tags = APTR.FromPointer(0x2700);
+		platform.WriteUInt32(tags, 0, StripesAttr);
+		platform.WriteUInt32(tags, 4, 1);
+		platform.WriteUInt32(tags, 8, ShowDropMarksAttr);
+		platform.WriteUInt32(tags, 12, 1);
+		platform.WriteUInt32(tags, 16, DragSortableAttr);
+		platform.WriteUInt32(tags, 20, 1);
+		platform.WriteUInt32(tags, 24, DragTypeAttr);
+		platform.WriteUInt32(tags, 28, 1);
+		platform.WriteUInt32(tags, 32, AutoVisibleAttr);
+		platform.WriteUInt32(tags, 36, 1);
+		platform.WriteUInt32(tags, 40, AutoLineHeightAttr);
+		platform.WriteUInt32(tags, 44, 1);
+		platform.WriteUInt32(tags, 48, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PresentationPolicyKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiListCore.TryGetPresentationPolicy(ref platform, State,
+			list, out var policyBefore));
+		Assert.Equal(1u, policyBefore.Stripes);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, StripesAttr, out var stripesBefore));
+
+		// A published presentation policy is typed state. Corrupting its cookie
+		// must not let getters, layout policy consumers, or runtime setters
+		// silently replace it from raw projections.
+		platform.WriteUInt32(APTR.FromPointer(stateRaw), 0, 0);
+		Assert.False(MuiListCore.TryGetPresentationPolicy(ref platform, State,
+			list, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			StripesAttr, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			ShowDropMarksAttr, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			DragSortableAttr, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			DragTypeAttr, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			AutoVisibleAttr, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			AutoLineHeightAttr, out _));
+		Assert.False(MuiListCore.SetRuntimeAttribute(ref platform, State, list,
+			StripesAttr, 0));
+		Assert.False(MuiListCore.SetRuntimeAttribute(ref platform, State, list,
+			DragTypeAttr, 0));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PresentationPolicyKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, StripesAttr, out var stripesAfter));
+		Assert.Equal(stripesBefore, stripesAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
 	public void ListHeaderCodecUsesNamedGuestFields()
 	{
 		var platform = CreatePlatform(out _, out _, 0x40000);
@@ -487,6 +1508,98 @@ public sealed class MuiListCoreTests
 		Assert.Equal(expected.Images, actual.Images);
 		Assert.False(MuiListHeaderCodec.TryRead(ref platform, APTR.Null,
 			out _));
+	}
+
+	[Fact]
+	public void ListMalformedHeaderFailsClosedAndCleanupUsesStorageFields()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x3000001), InsertBottom));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ListHeaderKey, out var headerRaw));
+		Assert.NotEqual(0u, headerRaw);
+		Assert.True(MuiListHeaderFieldCursorCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(headerRaw), MuiListHeaderField.Count, out var count));
+		Assert.Equal(1u, count);
+		Assert.True(MuiListHeaderFieldCursorCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(headerRaw), MuiListHeaderField.Magic, 0));
+		Assert.False(MuiListHeaderCodec.TryRead(ref platform,
+			APTR.FromPointer(headerRaw), out _));
+
+		// The malformed present header is not absence. Runtime consumers fail
+		// closed and do not allocate a replacement header or index.
+		Assert.Equal(0u, MuiListCore.EntryCount(ref platform, State, list));
+		Assert.Equal(APTR.Null, MuiListCore.GetEntry(ref platform, State, list,
+			0, APTR.Null));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			ActiveAttr, 0));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ListHeaderKey, out var headerAfter));
+		Assert.Equal(headerRaw, headerAfter);
+
+		// Cleanup reads the named storage fields independently of the cookie and
+		// retires the owned slot index before freeing the malformed header block.
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListPresentationPolicyInvalidValuesFailClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var tags = APTR.FromPointer(0x2780);
+		platform.WriteUInt32(tags, 0, StripesAttr);
+		platform.WriteUInt32(tags, 4, 1);
+		platform.WriteUInt32(tags, 8, DragTypeAttr);
+		platform.WriteUInt32(tags, 12, 1);
+		platform.WriteUInt32(tags, 16, MinLineHeightAttr);
+		platform.WriteUInt32(tags, 20, 16);
+		platform.WriteUInt32(tags, 24, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PresentationPolicyKey, out var stateRaw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, DragTypeAttr, out var dragTypeBefore));
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.PresentationPolicy,
+			MuiListCore.MuiListStateField.DragType, 9));
+
+		// The named record is authoritative. Unknown enum values must not be
+		// repaired from the raw compatibility projection.
+		Assert.False(MuiListCore.TryGetPresentationPolicy(ref platform, State,
+			list, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			DragTypeAttr, out _));
+		Assert.False(MuiListCore.SetRuntimeAttribute(ref platform, State, list,
+			DragTypeAttr, 0));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PresentationPolicyKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, DragTypeAttr, out var dragTypeAfter));
+		Assert.Equal(dragTypeBefore, dragTypeAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
 	}
 
 	[Fact]
@@ -536,6 +1649,7 @@ public sealed class MuiListCoreTests
 		Assert.Equal(4096u, policy.PuddleSize);
 		Assert.Equal(2048u, policy.ThresholdSize);
 		Assert.Equal(1u, policy.UsesExternalPool);
+		Assert.Equal(0u, platform.PoolCreateCount);
 		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
 			PoolAttr, APTR.FromPointer(0x2F40).Raw));
 		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
@@ -547,6 +1661,202 @@ public sealed class MuiListCoreTests
 
 		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
 			list));
+		Assert.Equal(0u, platform.PoolDeleteCount);
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListMalformedPoolPolicyFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var tags = APTR.FromPointer(0x2F80);
+		var pool = APTR.FromPointer(0x2F00);
+		platform.WriteUInt32(tags, 0, PoolAttr);
+		platform.WriteUInt32(tags, 4, pool.Raw);
+		platform.WriteUInt32(tags, 8, PoolPuddleSizeAttr);
+		platform.WriteUInt32(tags, 12, 4096);
+		platform.WriteUInt32(tags, 16, PoolThreshSizeAttr);
+		platform.WriteUInt32(tags, 20, 2048);
+		platform.WriteUInt32(tags, 24, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PoolPolicyKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiListCore.TryGetPoolPolicy(ref platform, State, list,
+			out var policyBefore));
+		Assert.Equal(pool, policyBefore.Pool);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PoolAttr, out var poolBefore));
+
+		// A published pool policy owns allocator provenance. Corrupting its
+		// cookie must not let getters or pool consumers replace it from the raw
+		// borrowed-pool projection.
+		platform.WriteUInt32(APTR.FromPointer(stateRaw), 0, 0);
+		Assert.False(MuiListCore.TryGetPoolPolicy(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			PoolAttr, out _));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PoolPolicyKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PoolAttr, out var poolAfter));
+		Assert.Equal(poolBefore, poolAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.Equal(0u, platform.PoolDeleteCount);
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListPoolPolicyNullHandleFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var tags = APTR.FromPointer(0x2FC0);
+		var pool = APTR.FromPointer(0x2F00);
+		platform.WriteUInt32(tags, 0, PoolAttr);
+		platform.WriteUInt32(tags, 4, pool.Raw);
+		platform.WriteUInt32(tags, 8, PoolPuddleSizeAttr);
+		platform.WriteUInt32(tags, 12, 4096);
+		platform.WriteUInt32(tags, 16, PoolThreshSizeAttr);
+		platform.WriteUInt32(tags, 20, 2048);
+		platform.WriteUInt32(tags, 24, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PoolPolicyKey, out var stateRaw));
+		Assert.True(MuiListCore.MuiListPoolPolicyFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListPoolPolicyField.Pool, 0));
+
+		// A published named policy with a NULL handle is malformed. Consumers must
+		// not fall back to the borrowed raw MUIA_List_Pool projection.
+		Assert.False(MuiListCore.TryGetPoolPolicy(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			PoolAttr, out _));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PoolPolicyKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PoolAttr, out var poolAfter));
+		Assert.Equal(pool.Raw, poolAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.Equal(0u, platform.PoolDeleteCount);
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListPoolPolicyMalformedExternalFlagFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var tags = APTR.FromPointer(0x3040);
+		var pool = APTR.FromPointer(0x2F00);
+		platform.WriteUInt32(tags, 0, PoolAttr);
+		platform.WriteUInt32(tags, 4, pool.Raw);
+		platform.WriteUInt32(tags, 8, PoolPuddleSizeAttr);
+		platform.WriteUInt32(tags, 12, 4096);
+		platform.WriteUInt32(tags, 16, PoolThreshSizeAttr);
+		platform.WriteUInt32(tags, 20, 2048);
+		platform.WriteUInt32(tags, 24, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PoolPolicyKey, out var stateRaw));
+		Assert.True(MuiListCore.MuiListPoolPolicyFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListPoolPolicyField.UsesExternalPool, 2));
+
+		// UsesExternalPool is a canonical BOOL in the named allocator record. A
+		// malformed present policy must not be normalized or replaced from raw
+		// MUIA_List_Pool state.
+		Assert.False(MuiListCore.TryGetPoolPolicy(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			PoolAttr, out _));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PoolPolicyKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiListCore.MuiListPoolPolicyFieldCursorCodec.TryReadUInt32(
+			ref platform, APTR.FromPointer(stateAfter),
+			MuiListCore.MuiListPoolPolicyField.UsesExternalPool,
+			out var externalAfter));
+		Assert.Equal(2u, externalAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, PoolAttr, out var poolAfter));
+		Assert.Equal(pool.Raw, poolAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.Equal(0u, platform.PoolDeleteCount);
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListCreatesOwnedExecPoolForHooksAndDeletesItAfterDestruction()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var constructHook = APTR.FromPointer(0x3000);
+		var constructData = APTR.FromPointer(0x3040);
+		var entry = APTR.FromPointer(0x3200);
+		var tags = APTR.FromPointer(0x3100);
+		platform.WriteUInt32(constructHook, 8,
+			MuiHeadlessTestPlatform.HookEntryConstruct);
+		platform.WriteUInt32(constructHook, 16, constructData.Raw);
+		platform.WriteUInt32(tags, 0, ConstructHookAttr);
+		platform.WriteUInt32(tags, 4, constructHook.Raw);
+		platform.WriteUInt32(tags, 8, DestructHookAttr);
+		platform.WriteUInt32(tags, 12, constructHook.Raw);
+		platform.WriteUInt32(tags, 16, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.Equal(1u, platform.PoolCreateCount);
+		Assert.Equal(0u, platform.LastPoolRequirements);
+		Assert.Equal(2008u, platform.LastPoolPuddleSize);
+		Assert.Equal(1024u, platform.LastPoolThreshold);
+		Assert.True(MuiListCore.TryGetPoolPolicy(ref platform, State, list,
+			out var policy));
+		Assert.NotEqual(APTR.Null, policy.Pool);
+		Assert.Equal(0u, policy.UsesExternalPool);
+
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list, entry,
+			InsertBottom));
+		Assert.Equal(policy.Pool, platform.LastHookA2);
+		Assert.Equal(constructData, MuiListCore.GetEntry(ref platform, State,
+			list, 0, APTR.Null));
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.Equal(1u, platform.PoolDeleteCount);
+		Assert.Equal(1u, platform.PoolCreateCount);
 		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
 			listClass));
 		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
@@ -625,6 +1935,161 @@ public sealed class MuiListCoreTests
 		Assert.Equal(1u, state.Visible);
 		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
 			HScrollerVisibilityAttr, 1)); // [I..] remains construction-only
+	}
+
+	[Fact]
+	public void ListMalformedHScrollerStateFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x50000);
+		var tags = APTR.FromPointer(0x2680);
+		platform.WriteUInt32(tags, 0, HScrollerVisibilityAttr);
+		platform.WriteUInt32(tags, 4, 1);
+		platform.WriteUInt32(tags, 8, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.TryGetHScrollerState(ref platform, State, list,
+			out var stateBefore));
+		Assert.Equal(1u, stateBefore.Policy);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, HScrollerStateKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, HScrollerVisibilityAttr, out var visibilityBefore));
+
+		// A published horizontal-scroller record is typed state. Corrupting its
+		// cookie must not let viewport/scroll consumers or state creation silently
+		// replace it from the raw construction-only policy.
+		platform.WriteUInt32(APTR.FromPointer(stateRaw), 0, 0);
+		Assert.False(MuiListCore.TryGetHScrollerState(ref platform, State, list,
+			out _));
+		Assert.Equal(100, MuiListCore.ContentLayoutWidth(ref platform, State,
+			list, 100));
+		Assert.Equal(0u, MuiListCore.HorizontalScrollX(ref platform, State,
+			list));
+		Assert.False(MuiListCore.SetHScrollerViewport(ref platform, State, list,
+			240, 100));
+		Assert.False(MuiListCore.SetHScrollerScroll(ref platform, State, list,
+			20));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, HScrollerStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, HScrollerVisibilityAttr, out var visibilityAfter));
+		Assert.Equal(visibilityBefore, visibilityAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListHScrollerInvalidNamedValuesFailClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x50000);
+		var tags = APTR.FromPointer(0x26C0);
+		platform.WriteUInt32(tags, 0, HScrollerVisibilityAttr);
+		platform.WriteUInt32(tags, 4, 1);
+		platform.WriteUInt32(tags, 8, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.SetHScrollerViewport(ref platform, State, list,
+			120, 100));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, HScrollerStateKey, out var stateRaw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, HScrollerVisibilityAttr, out var visibilityBefore));
+
+		Assert.True(MuiListHScrollerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListHScrollerStateField.Policy, 9));
+		Assert.False(MuiListCore.TryGetHScrollerState(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.SetHScrollerScroll(ref platform, State, list,
+			20));
+
+		Assert.True(MuiListHScrollerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListHScrollerStateField.Policy, 1));
+		Assert.True(MuiListHScrollerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListHScrollerStateField.MaxScrollX, 0));
+		Assert.False(MuiListCore.TryGetHScrollerState(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.SetHScrollerViewport(ref platform, State, list,
+			240, 100));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, HScrollerStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, HScrollerVisibilityAttr, out var visibilityAfter));
+		Assert.Equal(visibilityBefore, visibilityAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListClickStateInvalidFlagsFailClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var tags = APTR.FromPointer(0x24A0);
+		platform.WriteUInt32(tags, 0, ClickColumnAttr);
+		platform.WriteUInt32(tags, 4, 3);
+		platform.WriteUInt32(tags, 8, AgainClickAttr);
+		platform.WriteUInt32(tags, 12, 1);
+		platform.WriteUInt32(tags, 16, DoubleClickAttr);
+		platform.WriteUInt32(tags, 20, 0);
+		platform.WriteUInt32(tags, 24, DefClickColumnAttr);
+		platform.WriteUInt32(tags, 28, 9);
+		platform.WriteUInt32(tags, 32, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ClickStateKey, out var stateRaw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, DoubleClickAttr, out var doubleClickBefore));
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.ClickState,
+			MuiListCore.MuiListStateField.DoubleClick, 9));
+
+		// The named click record is authoritative. An invalid BOOL must not be
+		// normalized or repaired from the raw compatibility projection.
+		Assert.False(MuiListCore.TryGetClickState(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			DoubleClickAttr, out _));
+		Assert.False(MuiListCore.SetRuntimeAttribute(ref platform, State, list,
+			DoubleClickAttr, 0));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ClickStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, DoubleClickAttr, out var doubleClickAfter));
+		Assert.Equal(doubleClickBefore, doubleClickAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
 	}
 
 	[Fact]
@@ -1260,6 +2725,10 @@ public sealed class MuiListCoreTests
 		Assert.Equal(MuiCollectionAdvancedMessageCodec.InsertSingle,
 			packet.MethodId);
 		Assert.Equal(11u, packet.Entry);
+		Assert.True(MuiCollectionAdvancedMessageCodec.TryReadMethodId(
+			ref platform, address, out var methodHeader));
+		Assert.Equal(MuiCollectionAdvancedMessageCodec.InsertSingle,
+			methodHeader.MethodId);
 		platform.WriteUInt32(address, 0, 0xDEADBEEFu);
 		Assert.False(MuiCollectionAdvancedMessageCodec.TryReadInsertSingle(
 			ref platform, address, out _));
@@ -1648,6 +3117,7 @@ public sealed class MuiListCoreTests
 		platform.WriteCString(text, "owned-entry");
 		Assert.True(MuiListCore.InsertSingle(ref platform, State, list, text,
 			InsertBottom));
+		Assert.Equal(1u, platform.PooledAllocationCount);
 		// The stored entry is a private duplicate, not the caller buffer.
 		var stored = MuiListCore.GetEntry(ref platform, State, list, 0, APTR.Null);
 		Assert.NotEqual(text, stored);
@@ -1655,6 +3125,7 @@ public sealed class MuiListCoreTests
 		Assert.Equal((byte)'o', platform.ReadUInt8(stored, 0));
 		// Full teardown must balance every allocation with a free.
 		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State, list));
+		Assert.Equal(1u, platform.PooledFreeCount);
 		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
 			listClass));
 		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
@@ -1689,6 +3160,7 @@ public sealed class MuiListCoreTests
 
 		Assert.True(MuiListCore.InsertSingle(ref platform, State, list, source,
 			InsertBottom));
+		Assert.Equal(3u, platform.PooledAllocationCount);
 		var stored = MuiListCore.GetEntry(ref platform, State, list, 0,
 			APTR.Null);
 		Assert.NotEqual(source, stored);
@@ -1720,6 +3192,7 @@ public sealed class MuiListCoreTests
 			1) < 0);
 
 		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State, list));
+		Assert.Equal(3u, platform.PooledFreeCount);
 		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
 			listClass));
 		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
@@ -1749,6 +3222,40 @@ public sealed class MuiListCoreTests
 			display, 0));
 		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
 			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void StringArrayConstructRejectsUnmappedTerminatorBeforePoolAllocation()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var tags = APTR.FromPointer(0x2000);
+		platform.WriteUInt32(tags, 0, ConstructHookAttr);
+		platform.WriteUInt32(tags, 4, HookStringArray);
+		platform.WriteUInt32(tags, 8, DestructHookAttr);
+		platform.WriteUInt32(tags, 12, HookStringArray);
+		platform.WriteUInt32(tags, 16, 0);
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		var text = APTR.FromPointer(0x2800);
+		platform.WriteCString(text, "bounded");
+		var source = APTR.FromPointer(0x40FFC);
+		platform.WriteUInt32(source, 0, text.Raw);
+
+		// The source's first pointer is mapped, but its required NULL terminator
+		// is outside the guest arena. Validation must reject it before the pool
+		// table or any copied string is retained.
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list, source,
+			InsertBottom));
+		Assert.Equal(0u, MuiListCore.EntryCount(ref platform, State, list));
+		Assert.Equal(0u, platform.PooledAllocationCount);
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.Equal(0u, platform.PooledFreeCount);
 		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
 			listClass));
 		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
@@ -1833,6 +3340,114 @@ public sealed class MuiListCoreTests
 	}
 
 	[Fact]
+	public void ViewportPixelNotificationsFollowNamedMetricsForExternalScroller()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x43000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		var follow = APTR.FromPointer(0x2200);
+		platform.WriteUInt32(follow, 0, 0x90000010u);
+		platform.WriteUInt32(follow, 4, EveryTime);
+
+		// The MorphOS Listview documentation connects an external Prop to these
+		// List pixel attributes. A real metric transition must dispatch once.
+		Assert.True(MuiNotifyCore.Add(ref platform, State, list, TotalPixelAttr,
+			EveryTime, list, 2, follow));
+		var beforeInsert = platform.DispatchCount;
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x43010), InsertBottom));
+		Assert.Equal(beforeInsert + 1, platform.DispatchCount);
+		Assert.Equal(8u, Get(ref platform, list, TotalPixelAttr));
+		Assert.Equal(1u, MuiNotifyCore.Remove(ref platform, State, list,
+			TotalPixelAttr, list, true));
+
+		Assert.True(MuiNotifyCore.Add(ref platform, State, list, VisiblePixelAttr,
+			EveryTime, list, 2, follow));
+		var beforeLayout = platform.DispatchCount;
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 16));
+		Assert.Equal(beforeLayout + 1, platform.DispatchCount);
+		Assert.Equal(16u, Get(ref platform, list, VisiblePixelAttr));
+		Assert.Equal(1u, MuiNotifyCore.Remove(ref platform, State, list,
+			VisiblePixelAttr, list, true));
+
+		Assert.True(MuiNotifyCore.Add(ref platform, State, list, TotalPixelAttr,
+			EveryTime, list, 2, follow));
+		var beforeSecondInsert = platform.DispatchCount;
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x43020), InsertBottom));
+		Assert.Equal(beforeSecondInsert + 1, platform.DispatchCount);
+		Assert.Equal(16u, Get(ref platform, list, TotalPixelAttr));
+		Assert.Equal(1u, MuiNotifyCore.Remove(ref platform, State, list,
+			TotalPixelAttr, list, true));
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x43030), InsertBottom));
+
+		Assert.True(MuiNotifyCore.Add(ref platform, State, list, TopPixelAttr,
+			EveryTime, list, 2, follow));
+		var beforeFirst = platform.DispatchCount;
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, list, FirstAttr,
+			1, false));
+		Assert.Equal(beforeFirst + 1, platform.DispatchCount);
+		Assert.Equal(8u, Get(ref platform, list, TopPixelAttr));
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State, list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void LayoutViewportTransitionsNotifyFirstAndVisibleAfterRecordRefresh()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x44000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		for (var row = 0u; row < 3; row++)
+			Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+				APTR.FromPointer(0x44010 + row * 0x20), InsertBottom));
+
+		// Establish the hidden MorphOS cursor sentinel first. The following
+		// visible layout must notify First only after the named viewport record
+		// and its pixel projections have been refreshed.
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 0));
+		var follow = APTR.FromPointer(0x44200);
+		platform.WriteUInt32(follow, 0, 0x90000020u);
+		platform.WriteUInt32(follow, 4, EveryTime);
+		Assert.True(MuiNotifyCore.Add(ref platform, State, list, FirstAttr,
+			EveryTime, list, 2, follow));
+		Assert.True(MuiNotifyCore.Add(ref platform, State, list, VisibleAttr,
+			EveryTime, list, 2, follow));
+		var beforeVisibleLayout = platform.DispatchCount;
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 16));
+		Assert.Equal(beforeVisibleLayout + 2, platform.DispatchCount);
+		Assert.Equal(0u, Get(ref platform, list, FirstAttr));
+		Assert.Equal(2u, Get(ref platform, list, VisibleAttr));
+		Assert.Equal(0u, Get(ref platform, list, TopPixelAttr));
+		Assert.Equal(16u, Get(ref platform, list, VisiblePixelAttr));
+
+		var afterVisibleLayout = platform.DispatchCount;
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 16));
+		Assert.Equal(afterVisibleLayout, platform.DispatchCount);
+
+		Assert.Equal(1u, MuiNotifyCore.Remove(ref platform, State, list,
+			FirstAttr, list, true));
+		Assert.Equal(1u, MuiNotifyCore.Remove(ref platform, State, list,
+			VisibleAttr, list, true));
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
 	public void SelectionChangeNotifiesSelectedRemovalAndClear()
 	{
 		var platform = CreatePlatform(out var listClass, out _, 0x41000);
@@ -1890,6 +3505,51 @@ public sealed class MuiListCoreTests
 	}
 
 	[Fact]
+	public void ListMalformedSelectionSignalValueFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x42000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x4C40), InsertBottom));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, SelectionSignalKey, out var signalRaw));
+		Assert.NotEqual(0u, signalRaw);
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(signalRaw),
+			MuiListCore.MuiListStateRecordKind.SelectionSignal,
+			MuiListCore.MuiListStateField.SelectionValue, 2));
+
+		// SelectChange is a canonical BOOL edge signal. A malformed present value
+		// must not be normalized into an edge or rebuilt from the raw scalar.
+		Assert.False(MuiListCore.TryGetSelectionSignal(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			SelectChangeAttr, out _));
+		Assert.True(MuiListCore.Select(ref platform, State, list, 0, SelectOn,
+			APTR.Null));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, SelectionSignalKey, out var signalAfter));
+		Assert.Equal(signalRaw, signalAfter);
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryReadUInt32(
+			ref platform, APTR.FromPointer(signalAfter),
+			MuiListCore.MuiListStateRecordKind.SelectionSignal,
+			MuiListCore.MuiListStateField.SelectionValue, out var valueAfter));
+		Assert.Equal(2u, valueAfter);
+		Assert.Equal(0u, Get(ref platform, list, SelectChangeAttr));
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
 	public void DispatcherRoutesListMethodsAndRedraws()
 	{
 		var platform = CreatePlatform(out var listClass, out var otherClass,
@@ -1911,19 +3571,55 @@ public sealed class MuiListCoreTests
 		Assert.Equal(0x3300001u, MuiCollectionDispatcher.Dispatch(ref platform,
 			State, list, packet));
 		Assert.Equal(0x3300001u, platform.ReadUInt32(storage, 0));
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 16));
 		// MUIM_List_Redraw(MUIV_List_Redraw_All) schedules a redraw.
 		var beforeRedraw = platform.RedrawCount;
 		platform.WriteUInt32(packet, 0, 0x80427993u);
 		platform.WriteUInt32(packet, 4, unchecked((uint)(-2)));
+		platform.WriteUInt32(packet, 8, 0);
 		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State,
 			list, packet));
 		Assert.Equal(beforeRedraw + 1, platform.RedrawCount);
+		// MUIM_List_Redraw(MUIV_List_Redraw_Entry, entry) carries the entry
+		// pointer in the third ABI field and targets that visible row.
+		platform.WriteUInt32(packet, 4, unchecked((uint)(-3)));
+		platform.WriteUInt32(packet, 8, 0x3300001);
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State,
+			list, packet));
+		Assert.Equal(beforeRedraw + 2, platform.RedrawCount);
 		// A List method aimed at a non-List object falls through unchanged.
 		var other = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
 			otherClass, APTR.Null);
 		platform.WriteUInt32(packet, 0, 0x8042ad89u); // MUIM_List_Clear
 		Assert.Equal(0u, MuiCollectionDispatcher.Dispatch(ref platform, State,
 			other, packet));
+	}
+
+	[Fact]
+	public void CollectionDispatcherRoutesMorphosListRedrawEntryPacket()
+	{
+		var platform = CreatePlatform(out var listClass, out _, 0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		var entry = APTR.FromPointer(0x5600001);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list, entry,
+			InsertBottom));
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 16));
+
+		var packet = APTR.FromPointer(0x2A00);
+		Assert.True(MuiCollectionAdvancedMessageCodec.WriteRedraw(ref platform,
+			packet, unchecked((uint)-3), entry.Raw));
+		var before = platform.RedrawCount;
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State,
+			list, packet));
+		Assert.Equal(before + 1, platform.RedrawCount);
+
+		// An entry not present in the guest slot vector is a successful no-op.
+		Assert.True(MuiCollectionAdvancedMessageCodec.WriteRedraw(ref platform,
+			packet, unchecked((uint)-3), 0x5600002));
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State,
+			list, packet));
+		Assert.Equal(before + 1, platform.RedrawCount);
 	}
 
 	[Fact]
@@ -2373,6 +4069,109 @@ public sealed class MuiListCoreTests
 	}
 
 	[Fact]
+	public void ListMalformedActivePresenceFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x4B00), InsertBottom));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ActiveStateKey, out var activeRaw));
+		Assert.NotEqual(0u, activeRaw);
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(activeRaw),
+			MuiListCore.MuiListStateRecordKind.ActiveCursor,
+			MuiListCore.MuiListStateField.HasActive, 2));
+
+		// HasActive is a canonical BOOL in the named cursor record. A malformed
+		// present value must not be normalized into an active cursor or repaired
+		// from the public Active projection.
+		Assert.False(MuiListCore.TryGetActiveState(ref platform, State, list,
+			out _));
+		Assert.Equal(-1, MuiListCore.ActiveRow(ref platform, State, list));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			ActiveAttr, out _));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			ActiveAttr, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ActiveStateKey, out var activeAfter));
+		Assert.Equal(activeRaw, activeAfter);
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryReadUInt32(
+			ref platform, APTR.FromPointer(activeAfter),
+			MuiListCore.MuiListStateRecordKind.ActiveCursor,
+			MuiListCore.MuiListStateField.HasActive, out var hasActiveAfter));
+		Assert.Equal(2u, hasActiveAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListActiveStateRejectsOutOfRangeNamedRow()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		for (var row = 0u; row < 3; row++)
+			Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+				APTR.FromPointer(0x4C00 + row * 0x20), InsertBottom));
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, list,
+			ActiveAttr, 1));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ActiveStateKey, out var activeRaw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ActiveAttr, out var rawBefore));
+		Assert.True(MuiListCore.TryGetActiveState(ref platform, State, list,
+			out var before));
+		Assert.Equal(1u, before.Active);
+		Assert.Equal(1u, before.HasActive);
+
+		// The named record remains structurally readable, but an active row must
+		// belong to the current entry range. Keep the present record and raw
+		// projection unchanged when admission rejects this corruption.
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(activeRaw),
+			MuiListCore.MuiListStateRecordKind.ActiveCursor,
+			MuiListCore.MuiListStateField.Active, uint.MaxValue));
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryReadUInt32(
+			ref platform, APTR.FromPointer(activeRaw),
+			MuiListCore.MuiListStateRecordKind.ActiveCursor,
+			MuiListCore.MuiListStateField.Active, out var storedActive));
+		Assert.Equal(uint.MaxValue, storedActive);
+		Assert.False(MuiListCore.TryGetActiveState(ref platform, State, list,
+			out _));
+		Assert.Equal(-1, MuiListCore.ActiveRow(ref platform, State, list));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			ActiveAttr, out _));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			ActiveAttr, 0));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ActiveStateKey, out var activeAfter));
+		Assert.Equal(activeRaw, activeAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ActiveAttr, out var rawAfter));
+		Assert.Equal(rawBefore, rawAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
 	public void Morphos320EmptyListActivePublishesZeroWithoutCreatingCursor()
 	{
 		var platform = CreatePlatform(out var listClass, out _, 0x40000);
@@ -2417,6 +4216,31 @@ public sealed class MuiListCoreTests
 			packet));
 		Assert.Equal(APTR.FromPointer(0x5500001), MuiListCore.GetEntry(
 			ref platform, State, list, 0, APTR.Null));
+	}
+
+	[Fact]
+	public void CollectionDispatcherRoutesMorphosListInsertArrayAndNullTerminatedCount()
+	{
+		var platform = CreatePlatform(out var listClass, out _, 0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		var entries = APTR.FromPointer(0x2800);
+		platform.WriteUInt32(entries, 0, 0x5500101);
+		platform.WriteUInt32(entries, 4, 0x5500102);
+		platform.WriteUInt32(entries, 8, 0);
+		var packet = APTR.FromPointer(0x2840);
+		// MUIM_List_Insert(APTR *entries, LONG count, LONG pos).
+		platform.WriteUInt32(packet, 0, 0x80426c87u);
+		platform.WriteUInt32(packet, 4, entries.Raw);
+		platform.WriteUInt32(packet, 8, unchecked((uint)-1));
+		platform.WriteUInt32(packet, 12, unchecked((uint)InsertBottom));
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State,
+			list, packet));
+		Assert.Equal(2u, MuiListCore.EntryCount(ref platform, State, list));
+		Assert.Equal(APTR.FromPointer(0x5500101), MuiListCore.GetEntry(
+			ref platform, State, list, 0, APTR.Null));
+		Assert.Equal(APTR.FromPointer(0x5500102), MuiListCore.GetEntry(
+			ref platform, State, list, 1, APTR.Null));
 	}
 
 	[Fact]
@@ -2766,6 +4590,334 @@ public sealed class MuiListCoreTests
 	}
 
 	[Fact]
+	public void ListMalformedFormatPolicyFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var format = APTR.FromPointer(0x3680);
+		platform.WriteCString(format, ",,");
+		var tags = APTR.FromPointer(0x3780);
+		platform.WriteUInt32(tags, 0, FormatAttr);
+		platform.WriteUInt32(tags, 4, format.Raw);
+		platform.WriteUInt32(tags, 8, MaxColumnsAttr);
+		platform.WriteUInt32(tags, 12, 4);
+		platform.WriteUInt32(tags, 16, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatPolicyKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiListCore.TryGetFormatPolicyState(ref platform, State,
+			list, out var policyBefore));
+		Assert.Equal(MuiListCore.MuiListFormatPolicyState.Cookie,
+			policyBefore.Magic);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatAttr, out var formatBefore));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatColumnsKey, out var columnsBefore));
+
+		// A published FORMAT policy owns the descriptor range and normalized
+		// column limit. Corrupting its cookie must not let getters, descriptor
+		// cursors, or runtime setters rebuild it from raw aliases.
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.FormatPolicy,
+			MuiListCore.MuiListStateField.Magic, 0));
+		Assert.False(MuiListCore.TryGetFormatPolicyState(ref platform, State,
+			list, out _));
+		Assert.False(MuiListCore.TryGetFormatDescriptorState(ref platform, State,
+			list, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			FormatAttr, out _));
+		Assert.Equal(0u, MuiListCore.FormatColumnCount(ref platform, State,
+			list));
+		Assert.False(MuiListCore.GetFormatColumn(ref platform, State, list, 0,
+			APTR.FromPointer(0x3C80)));
+		Assert.Equal(256u, MuiListCore.GetFormatDisplaySourceColumn(ref platform,
+			State, list, 3));
+		var replacement = APTR.FromPointer(0x36C0);
+		platform.WriteCString(replacement, ",,,");
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			FormatAttr, replacement.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatPolicyKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatAttr, out var formatAfter));
+		Assert.Equal(formatBefore, formatAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatColumnsKey, out var columnsAfter));
+		Assert.Equal(columnsBefore, columnsAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListMalformedFormatDescriptorStateFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var format = APTR.FromPointer(0x3A80);
+		platform.WriteCString(format, ",,");
+		var tags = APTR.FromPointer(0x3B80);
+		platform.WriteUInt32(tags, 0, FormatAttr);
+		platform.WriteUInt32(tags, 4, format.Raw);
+		platform.WriteUInt32(tags, 8, MaxColumnsAttr);
+		platform.WriteUInt32(tags, 12, 4);
+		platform.WriteUInt32(tags, 16, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, MuiListCore.FormatDescriptorKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiListCore.TryGetFormatDescriptorState(ref platform, State,
+			list, out var stateBefore));
+		Assert.Equal(MuiListCore.MuiListFormatDescriptorState.Cookie,
+			stateBefore.Magic);
+		Assert.True(stateBefore.Values.IsNotNull);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatColumnsKey, out var columnsBefore));
+
+		// Keep the descriptor cookie and vector mapped, but publish a count that
+		// disagrees with the named FORMAT policy. This is a structurally readable
+		// cross-record mismatch and must fail the shared projection admission.
+		Assert.True(stateBefore.Columns < 4);
+		Assert.True(MuiListCore.MuiListFormatDescriptorStateFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(stateRaw),
+				MuiListCore.MuiListFormatDescriptorStateField.Columns,
+				stateBefore.Columns + 1));
+		Assert.False(MuiListCore.TryGetFormatPolicyState(ref platform, State,
+			list, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			FormatAttr, out _));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			FormatAttr, format.Raw));
+		Assert.False(MuiListCore.TryGetFormatDescriptorState(ref platform, State,
+			list, out _));
+		Assert.Equal(0u, MuiListCore.FormatColumnCount(ref platform, State,
+			list));
+		Assert.False(MuiListCore.GetFormatColumn(ref platform, State, list, 0,
+			APTR.FromPointer(0x3C80)));
+		Assert.False(MuiListCore.GetColumnGeometry(ref platform, State, list, 80,
+			APTR.FromPointer(0x3E80)));
+		Assert.Equal(256u, MuiListCore.GetFormatDisplaySourceColumn(ref platform,
+			State, list, 0));
+
+		// The descriptor owner is the authoritative relationship between the
+		// bounded count and its vector. Corrupting its cookie must not let a
+		// getter or runtime FORMAT update rebuild state from scalar aliases.
+		Assert.True(MuiListCore.MuiListFormatDescriptorStateFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(stateRaw),
+				MuiListCore.MuiListFormatDescriptorStateField.Magic, 0));
+		Assert.False(MuiListCore.TryGetFormatDescriptorState(ref platform, State,
+			list, out _));
+		Assert.Equal(0u, MuiListCore.FormatColumnCount(ref platform, State,
+			list));
+		Assert.False(MuiListCore.GetFormatColumn(ref platform, State, list, 0,
+			APTR.FromPointer(0x3C80)));
+		Assert.False(MuiListCore.GetColumnGeometry(ref platform, State, list, 80,
+			APTR.FromPointer(0x3E80)));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			SortColumnAttr, 0));
+		var replacement = APTR.FromPointer(0x3D80);
+		platform.WriteCString(replacement, ",,,");
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			FormatAttr, replacement.Raw));
+
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, MuiListCore.FormatDescriptorKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatColumnsKey, out var columnsAfter));
+		Assert.Equal(columnsBefore, columnsAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListFormatPolicyStalePointerFailsClosedBeforeRawFallback()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var format = APTR.FromPointer(0x36E0);
+		platform.WriteCString(format, ",,");
+		var tags = APTR.FromPointer(0x37E0);
+		platform.WriteUInt32(tags, 0, FormatAttr);
+		platform.WriteUInt32(tags, 4, format.Raw);
+		platform.WriteUInt32(tags, 8, MaxColumnsAttr);
+		platform.WriteUInt32(tags, 12, 4);
+		platform.WriteUInt32(tags, 16, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatPolicyKey, out var stateRaw));
+		Assert.True(MuiListCore.TryGetFormatPolicyState(ref platform, State,
+			list, out var before));
+		Assert.Equal(format, before.Format);
+
+		// Keep the policy cookie valid but replace its named Format pointer with
+		// an unmapped guest address. Admission must reject it before raw FORMAT
+		// fallback can rebuild descriptors or mutate the live policy.
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.FormatPolicy,
+			MuiListCore.MuiListStateField.FormatValue, 0xDEAD0000u));
+		Assert.False(MuiListCore.TryGetFormatPolicyState(ref platform, State,
+			list, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			FormatAttr, out _));
+		Assert.Equal(0u, MuiListCore.FormatColumnCount(ref platform, State, list));
+		var replacement = APTR.FromPointer(0x3720);
+		platform.WriteCString(replacement, ",,,");
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			FormatAttr, replacement.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatPolicyKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.Equal(format.Raw, Get(ref platform, list, FormatAttr));
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListMalformedFormatPolicyBoundsFailClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var format = APTR.FromPointer(0x3740);
+		platform.WriteCString(format, ",,");
+		var tags = APTR.FromPointer(0x3840);
+		platform.WriteUInt32(tags, 0, FormatAttr);
+		platform.WriteUInt32(tags, 4, format.Raw);
+		platform.WriteUInt32(tags, 8, MaxColumnsAttr);
+		platform.WriteUInt32(tags, 12, 4);
+		platform.WriteUInt32(tags, 16, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatPolicyKey, out var stateRaw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatColumnsKey, out var columnsBefore));
+
+		// MaxColumns and installed Columns are bounded fields in the named
+		// policy. A malformed present record must not be repaired from aliases.
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.FormatPolicy,
+			MuiListCore.MuiListStateField.MaxColumnsValue, 0));
+		Assert.False(MuiListCore.TryGetFormatPolicyState(ref platform, State,
+			list, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			MaxColumnsAttr, out _));
+		Assert.Equal(0u, MuiListCore.FormatColumnCount(ref platform, State,
+			list));
+
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.FormatPolicy,
+			MuiListCore.MuiListStateField.MaxColumnsValue, 4));
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.FormatPolicy,
+			MuiListCore.MuiListStateField.FormatColumnsValue, 5));
+		Assert.False(MuiListCore.TryGetFormatPolicyState(ref platform, State,
+			list, out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			FormatAttr, out _));
+		Assert.Equal(0u, MuiListCore.FormatColumnCount(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatPolicyKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FormatColumnsKey, out var columnsAfter));
+		Assert.Equal(columnsBefore, columnsAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListTitleStalePointerFailsClosedBeforeRawFallback()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var title = APTR.FromPointer(0x3760);
+		platform.WriteCString(title, "Title");
+		var tags = APTR.FromPointer(0x3860);
+		platform.WriteUInt32(tags, 0, TitleAttr);
+		platform.WriteUInt32(tags, 4, title.Raw);
+		platform.WriteUInt32(tags, 8, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleStateKey, out var stateRaw));
+		Assert.True(MuiListCore.TryGetTitleState(ref platform, State, list,
+			out var before));
+		Assert.Equal(title.Raw, before.Value);
+
+		// Keep the title record cookie valid but replace its named Value with an
+		// unmapped pointer. Admission must reject it before title-row geometry or
+		// the raw compatibility alias can publish the stale address.
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.TitleValue,
+			MuiListCore.MuiListStateField.TitleValue, 0xDEAD0000u));
+		Assert.False(MuiListCore.TryGetTitleState(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			TitleAttr, out _));
+		Assert.Equal(0u, MuiListCore.TitleValueCursor(ref platform, State, list));
+		Assert.Equal(0u, MuiListCore.TitleRowCount(ref platform, State, list));
+		var replacement = APTR.FromPointer(0x37A0);
+		platform.WriteCString(replacement, "Replacement");
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			TitleAttr, replacement.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleAttr, out var rawTitle));
+		Assert.Equal(title.Raw, rawTitle);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
 	public void FontUsesNamedCallerPointerState()
 	{
 		var platform = CreatePlatform(out var listClass, out _, 0x40000);
@@ -2795,6 +4947,106 @@ public sealed class MuiListCoreTests
 			list));
 		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
 			listClass));
+	}
+
+	[Fact]
+	public void ListMalformedFontStateFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var initial = APTR.FromPointer(0x3880);
+		var tags = APTR.FromPointer(0x3980);
+		platform.WriteUInt32(tags, 0, FontAttr);
+		platform.WriteUInt32(tags, 4, initial.Raw);
+		platform.WriteUInt32(tags, 8, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FontStateKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiListCore.TryGetFontState(ref platform, State, list,
+			out var fontBefore));
+		Assert.Equal(MuiListCore.MuiListFontState.Cookie, fontBefore.Magic);
+		Assert.Equal(initial, fontBefore.Font);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FontAttr, out var rawBefore));
+
+		// A published font record is typed caller-owned state. Corrupting its
+		// cookie must not let a font setter or measurement path recreate it from
+		// the raw Font projection.
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.FontPolicy,
+			MuiListCore.MuiListStateField.Magic, 0));
+		Assert.False(MuiListCore.TryGetFontState(ref platform, State, list,
+			out _));
+		var replacement = APTR.FromPointer(0x38C0);
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			FontAttr, replacement.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FontStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FontAttr, out var rawAfter));
+		Assert.Equal(rawBefore, rawAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListFontStateStalePointerFailsClosedBeforeRawFallback()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var font = APTR.FromPointer(0x39C0);
+		var tags = APTR.FromPointer(0x3AC0);
+		platform.WriteUInt32(tags, 0, FontAttr);
+		platform.WriteUInt32(tags, 4, font.Raw);
+		platform.WriteUInt32(tags, 8, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FontStateKey, out var stateRaw));
+		Assert.True(MuiListCore.TryGetFontState(ref platform, State, list,
+			out var before));
+		Assert.Equal(font, before.Font);
+
+		// Keep the font record cookie valid but replace its named Font pointer
+		// with an unmapped guest address. Admission must reject it before a raw
+		// compatibility write can become the active borrowed font.
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.FontPolicy,
+			MuiListCore.MuiListStateField.FontValue, 0xDEAD0000u));
+		Assert.False(MuiListCore.TryGetFontState(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			FontAttr, out _));
+		var replacement = APTR.FromPointer(0x3A00);
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			FontAttr, replacement.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FontStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FontAttr, out var rawFont));
+		Assert.Equal(font.Raw, rawFont);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
 	}
 
 	[Fact]
@@ -3320,6 +5572,225 @@ public sealed class MuiListCoreTests
 	}
 
 	[Fact]
+	public void ListMalformedColumnMetricsStateFailsClosedBeforeRefreshRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var format = APTR.FromPointer(0x4600);
+		platform.WriteCString(format, "MINWIDTH=-1,MAXWIDTH=-1");
+		var tags = APTR.FromPointer(0x4640);
+		platform.WriteUInt32(tags, 0, ConstructHookAttr);
+		platform.WriteUInt32(tags, 4, HookStringArray);
+		platform.WriteUInt32(tags, 8, DisplayHookAttr);
+		platform.WriteUInt32(tags, 12, HookStringArray);
+		platform.WriteUInt32(tags, 16, FormatAttr);
+		platform.WriteUInt32(tags, 20, format.Raw);
+		platform.WriteUInt32(tags, 24, MaxColumnsAttr);
+		platform.WriteUInt32(tags, 28, 2);
+		platform.WriteUInt32(tags, 32, 0);
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+
+		var first = APTR.FromPointer(0x4680);
+		var second = APTR.FromPointer(0x46C0);
+		platform.WriteCString(first, "short");
+		platform.WriteCString(second, "widest");
+		var row = APTR.FromPointer(0x4700);
+		platform.WriteUInt32(row, 0, first.Raw);
+		platform.WriteUInt32(row, 4, second.Raw);
+		platform.WriteUInt32(row, 8, 0);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list, row,
+			InsertBottom));
+
+		var renderInfo = APTR.FromPointer(0x4740);
+		platform.WriteUInt32(renderInfo, 20, 0x4780);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, list,
+			renderInfo));
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 8));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnMetricsKey, out var metricsRaw));
+		Assert.NotEqual(0u, metricsRaw);
+		Assert.True(MuiListCore.MuiListColumnMetricsStateCodec.TryRead(
+			ref platform, APTR.FromPointer(metricsRaw), out var before));
+		Assert.Equal(2u, before.Columns);
+		var valuesRaw = before.Values.Raw;
+		Assert.True(MuiListCore.TryGetColumnMetricsState(ref platform, State,
+			list, out var admittedBefore));
+		Assert.Equal(before.Width, admittedBefore.Width);
+
+		// The record remains structurally readable, but a width outside the
+		// signed layout domain must fail semantic admission without allowing
+		// Layout to replace the published record or its owned values vector.
+		Assert.True(MuiListCore.MuiListColumnMetricsFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(metricsRaw),
+				MuiListCore.MuiListColumnMetricsField.Width, uint.MaxValue));
+		Assert.True(MuiListCore.MuiListColumnMetricsStateCodec.TryRead(
+			ref platform, APTR.FromPointer(metricsRaw), out var structurallyValid));
+		Assert.Equal(uint.MaxValue, structurallyValid.Width);
+		Assert.False(MuiListCore.TryGetColumnMetricsState(ref platform, State,
+			list, out _));
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 8));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnMetricsKey, out var metricsAfterWidth));
+		Assert.Equal(metricsRaw, metricsAfterWidth);
+		Assert.True(MuiListCore.MuiListColumnMetricsFieldCursorCodec
+			.TryReadUInt32(ref platform, APTR.FromPointer(metricsAfterWidth),
+				MuiListCore.MuiListColumnMetricsField.Values, out var valuesAfterWidth));
+		Assert.Equal(valuesRaw, valuesAfterWidth);
+
+		// Corrupt only the named record cookie. Refresh and geometry must not
+		// treat this present state as absence and replace its owned value vector.
+		Assert.True(MuiListCore.MuiListColumnMetricsFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(metricsRaw),
+				MuiListCore.MuiListColumnMetricsField.Magic, 0));
+		Assert.False(MuiListCore.MuiListColumnMetricsStateCodec.TryRead(
+			ref platform, APTR.FromPointer(metricsRaw), out _));
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 8));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnMetricsKey, out var metricsAfter));
+		Assert.Equal(metricsRaw, metricsAfter);
+		Assert.True(MuiListCore.MuiListColumnMetricsFieldCursorCodec
+			.TryReadUInt32(ref platform, APTR.FromPointer(metricsAfter),
+				MuiListCore.MuiListColumnMetricsField.Values, out var valuesAfter));
+		Assert.Equal(valuesRaw, valuesAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListMalformedColumnMetricsStateSurvivesVisibilityInvalidation()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var format = APTR.FromPointer(0x4E00);
+		platform.WriteCString(format, "MINWIDTH=-1,MAXWIDTH=-1");
+		var tags = APTR.FromPointer(0x4E40);
+		platform.WriteUInt32(tags, 0, ConstructHookAttr);
+		platform.WriteUInt32(tags, 4, HookStringArray);
+		platform.WriteUInt32(tags, 8, DisplayHookAttr);
+		platform.WriteUInt32(tags, 12, HookStringArray);
+		platform.WriteUInt32(tags, 16, FormatAttr);
+		platform.WriteUInt32(tags, 20, format.Raw);
+		platform.WriteUInt32(tags, 24, MaxColumnsAttr);
+		platform.WriteUInt32(tags, 28, 2);
+		platform.WriteUInt32(tags, 32, 0);
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+
+		var first = APTR.FromPointer(0x4E80);
+		var second = APTR.FromPointer(0x4EC0);
+		platform.WriteCString(first, "short");
+		platform.WriteCString(second, "widest");
+		var row = APTR.FromPointer(0x4F00);
+		platform.WriteUInt32(row, 0, first.Raw);
+		platform.WriteUInt32(row, 4, second.Raw);
+		platform.WriteUInt32(row, 8, 0);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list, row,
+			InsertBottom));
+
+		var renderInfo = APTR.FromPointer(0x4F40);
+		platform.WriteUInt32(renderInfo, 20, 0x4F80);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, list,
+			renderInfo));
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 8));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnMetricsKey, out var metricsRaw));
+		Assert.NotEqual(0u, metricsRaw);
+		Assert.True(MuiListCore.MuiListColumnMetricsStateCodec.TryRead(
+			ref platform, APTR.FromPointer(metricsRaw), out var before));
+		var valuesRaw = before.Values.Raw;
+
+		// A malformed present record must not be reclaimed by a normal
+		// geometry-invalidating mutation. Use the named field cursor to corrupt
+		// only the cookie, then verify both owned pointers remain published.
+		Assert.True(MuiListCore.MuiListColumnMetricsFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(metricsRaw),
+				MuiListCore.MuiListColumnMetricsField.Magic, 0));
+		Assert.False(MuiListCore.TryGetColumnMetricsState(ref platform, State,
+			list, out _));
+		Assert.True(MuiListCore.SetColumnVisibility(ref platform, State, list,
+			1, true));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnMetricsKey, out var metricsAfter));
+		Assert.Equal(metricsRaw, metricsAfter);
+		Assert.True(MuiListCore.MuiListColumnMetricsFieldCursorCodec
+			.TryReadUInt32(ref platform, APTR.FromPointer(metricsAfter),
+				MuiListCore.MuiListColumnMetricsField.Values, out var valuesAfter));
+		Assert.Equal(valuesRaw, valuesAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListMalformedColumnLayoutStateSurvivesVisibilityInvalidation()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var format = APTR.FromPointer(0xA000);
+		platform.WriteCString(format, "WEIGHT=1,WEIGHT=1");
+		var tags = APTR.FromPointer(0xA040);
+		platform.WriteUInt32(tags, 0, FormatAttr);
+		platform.WriteUInt32(tags, 4, format.Raw);
+		platform.WriteUInt32(tags, 8, MaxColumnsAttr);
+		platform.WriteUInt32(tags, 12, 2);
+		platform.WriteUInt32(tags, 16, 0);
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+
+		var renderInfo = APTR.FromPointer(0xA080);
+		platform.WriteUInt32(renderInfo, 20, 0xA0C0);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, list,
+			renderInfo));
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 8));
+		Assert.True(MuiListCore.TryGetColumnLayoutState(ref platform, State, list,
+			out var before));
+		Assert.Equal(80u, before.Width);
+		Assert.Equal(2u, before.Columns);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, MuiListCore.ColumnLayoutKey, out var layoutRaw));
+		Assert.NotEqual(0u, layoutRaw);
+		var valuesRaw = before.Values.Raw;
+
+		// The named owner record is authoritative. Corrupting its cookie must
+		// not let a normal visibility mutation free the vector by re-deriving
+		// its size from FORMAT aliases.
+		Assert.True(MuiListCore.MuiListColumnLayoutFieldCursorCodec
+			.TryWriteUInt32(ref platform, APTR.FromPointer(layoutRaw),
+				MuiListCore.MuiListColumnLayoutField.Magic, 0));
+		Assert.False(MuiListCore.TryGetColumnLayoutState(ref platform, State, list,
+			out _));
+		Assert.True(MuiListCore.SetColumnVisibility(ref platform, State, list,
+			1, true));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, MuiListCore.ColumnLayoutKey, out var layoutAfter));
+		Assert.Equal(layoutRaw, layoutAfter);
+		Assert.True(MuiListCore.MuiListColumnLayoutFieldCursorCodec
+			.TryReadUInt32(ref platform, APTR.FromPointer(layoutAfter),
+				MuiListCore.MuiListColumnLayoutField.Values, out var valuesAfter));
+		Assert.Equal(valuesRaw, valuesAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
 	public void FormatWeightMinusOneUsesWidestDisplayedEntryAsFixedColumn()
 	{
 		var platform = CreatePlatform(out var listClass, out _, 0x40000);
@@ -3472,6 +5943,57 @@ public sealed class MuiListCoreTests
 		Assert.Equal(66u, platform.ReadUInt32(geometry, 16));
 		Assert.Equal(34u, platform.ReadUInt32(geometry, 20));
 		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State, list));
+	}
+
+	[Fact]
+	public void ListMalformedColumnVisibilityStateFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var format = APTR.FromPointer(0x3C00);
+		platform.WriteCString(format, ",,");
+		var tags = APTR.FromPointer(0x3C40);
+		platform.WriteUInt32(tags, 0, FormatAttr);
+		platform.WriteUInt32(tags, 4, format.Raw);
+		platform.WriteUInt32(tags, 8, MaxColumnsAttr);
+		platform.WriteUInt32(tags, 12, 2);
+		platform.WriteUInt32(tags, 16, 0);
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.SetAttribute(ref platform, State, list,
+			HideColumnAttr, 1));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnVisibilityKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, HideColumnAttr, out var hideBefore));
+
+		// The visibility mask is typed guest state. Corrupting its cookie must not
+		// let Hide/Show setters or layout consumers rebuild it from raw aliases.
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.ColumnVisibility,
+			MuiListCore.MuiListStateField.Magic, 0));
+		Assert.False(MuiListCore.SetColumnVisibility(ref platform, State, list,
+			1, false));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			ShowColumnAttr, 1));
+		Assert.False(MuiListCore.GetColumnGeometry(ref platform, State, list,
+			80, APTR.FromPointer(0x3D40)));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnVisibilityKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, HideColumnAttr, out var hideAfter));
+		Assert.Equal(hideBefore, hideAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
 	}
 
 	[Fact]
@@ -3637,6 +6159,46 @@ public sealed class MuiListCoreTests
 	}
 
 	[Fact]
+	public void ListMalformedTitleStateFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleStateKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiListCore.TryGetTitleState(ref platform, State, list,
+			out var titleBefore));
+		Assert.Equal(MuiListCore.MuiListTitleState.Cookie, titleBefore.Magic);
+
+		// A published title record is typed state. Corrupting its cookie must not
+		// let getters, drawing cursors, or a title setter silently replace it from
+		// the raw compatibility scalar.
+		platform.WriteUInt32(APTR.FromPointer(stateRaw), 0, 0);
+		Assert.False(MuiListCore.TryGetTitleState(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			TitleAttr, out _));
+		Assert.Equal(0u, MuiListCore.TitleValueCursor(ref platform, State,
+			list));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			TitleAttr, APTR.FromPointer(0x34C0).Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
 	public void BooleanTitleCallsDisplayHookWithNullEntryOnEmptyList()
 	{
 		var platform = CreatePlatform(out var listClass, out _, 0x40000);
@@ -3757,6 +6319,246 @@ public sealed class MuiListCoreTests
 		Assert.Equal(secondTitle.Raw, platform.LastText.Raw);
 		Assert.Equal(10, platform.LastTextLength);
 		Assert.Equal(8, platform.LastTextBaseline);
+	}
+
+	[Fact]
+	public void ListMalformedTitleArrayStateFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var firstTitle = APTR.FromPointer(0x3A00);
+		var secondTitle = APTR.FromPointer(0x3A20);
+		var source = APTR.FromPointer(0x3A40);
+		platform.WriteCString(firstTitle, "Name");
+		platform.WriteCString(secondTitle, "Population");
+		platform.WriteUInt32(source, 0, firstTitle.Raw);
+		platform.WriteUInt32(source, 4, secondTitle.Raw);
+		platform.WriteUInt32(source, 8, 0);
+		var tags = APTR.FromPointer(0x3A80);
+		platform.WriteUInt32(tags, 0, TitleArrayAttr);
+		platform.WriteUInt32(tags, 4, source.Raw);
+		platform.WriteUInt32(tags, 8, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleArrayStateKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleArrayAttr, out var rawBefore));
+		Assert.NotEqual(source.Raw, rawBefore);
+
+		// The private pointer table is typed ownership state. Corrupting its
+		// cookie must not let getters, title rendering, or setters fall back to
+		// the caller-owned source table.
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.TitleArray,
+			MuiListCore.MuiListStateField.Magic, 0));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			TitleArrayAttr, out _));
+		Assert.Equal(0u, MuiListCore.TitleRowCount(ref platform, State, list));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			TitleArrayAttr, source.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleArrayStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleArrayAttr, out var rawAfter));
+		Assert.Equal(rawBefore, rawAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListTitleArrayRejectsUnmappedNamedStringPointer()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var firstTitle = APTR.FromPointer(0x3AC0);
+		var secondTitle = APTR.FromPointer(0x3AE0);
+		var source = APTR.FromPointer(0x3B00);
+		platform.WriteCString(firstTitle, "Name");
+		platform.WriteCString(secondTitle, "Population");
+		platform.WriteUInt32(source, 0, firstTitle.Raw);
+		platform.WriteUInt32(source, 4, secondTitle.Raw);
+		platform.WriteUInt32(source, 8, 0);
+		var tags = APTR.FromPointer(0x3B20);
+		platform.WriteUInt32(tags, 0, TitleArrayAttr);
+		platform.WriteUInt32(tags, 4, source.Raw);
+		platform.WriteUInt32(tags, 8, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleArrayStateKey, out var stateRaw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleArrayAttr, out var rawBefore));
+		Assert.NotEqual(0u, stateRaw);
+
+		// Corrupt the borrowed string pointer through the named pointer-slot
+		// codec. The table remains mapped, but its present content is unusable.
+		var cursor = default(MuiListCore.MuiListPointerSlotCursor);
+		cursor.Base = APTR.FromPointer(rawBefore);
+		cursor.Index = 1;
+		Assert.True(MuiListCore.MuiListPointerSlotCursorCodec.TryGetEntry(
+			ref platform, cursor, out var slot));
+		var corrupted = default(MuiListCore.MuiListPointerSlotRecord);
+		corrupted.Value = APTR.FromPointer(0xFFFFFFF0u);
+		Assert.True(MuiListCore.MuiListPointerSlotCodec.Write(ref platform, slot,
+			corrupted));
+
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			TitleArrayAttr, out _));
+		Assert.Equal(0u, MuiListCore.TitleRowCount(ref platform, State, list));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			TitleArrayAttr, source.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleArrayStateKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, TitleArrayAttr, out var rawAfter));
+		Assert.Equal(rawBefore, rawAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListMalformedColumnOrderStateFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var format = APTR.FromPointer(0x3B00);
+		var source = APTR.FromPointer(0x3B20);
+		platform.WriteCString(format, ",,");
+		platform.WriteUInt8(source, 0, 1);
+		platform.WriteUInt8(source, 1, 0);
+		platform.WriteUInt8(source, 2, 0xFF);
+		var tags = APTR.FromPointer(0x3B40);
+		platform.WriteUInt32(tags, 0, MaxColumnsAttr);
+		platform.WriteUInt32(tags, 4, 2);
+		platform.WriteUInt32(tags, 8, FormatAttr);
+		platform.WriteUInt32(tags, 12, format.Raw);
+		platform.WriteUInt32(tags, 16, ColumnOrderAttr);
+		platform.WriteUInt32(tags, 20, source.Raw);
+		platform.WriteUInt32(tags, 24, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass, tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnOrderKey, out var stateRaw));
+		Assert.NotEqual(0u, stateRaw);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnOrderAttr, out var rawBefore));
+		Assert.NotEqual(source.Raw, rawBefore);
+
+		// The private permutation vector is typed ownership state. Corrupting its
+		// cookie must not let getters, display-order cursors, or setters rebuild it
+		// from the caller-owned raw BYTE*.
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(stateRaw),
+			MuiListCore.MuiListStateRecordKind.ColumnOrder,
+			MuiListCore.MuiListStateField.Magic, 0));
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			ColumnOrderAttr, out _));
+		Assert.Equal(99u, MuiListCore.GetColumnOrderDisplayColumn(ref platform,
+			APTR.FromPointer(stateRaw), 0, 99));
+		Assert.Equal(256u, MuiListCore.GetFormatDisplaySourceColumn(ref platform,
+			State, list, 0));
+		Assert.False(MuiListCore.GetFormatColumn(ref platform, State, list, 0,
+			APTR.FromPointer(0x3C80)));
+		Assert.False(MuiListCore.GetColumnGeometry(ref platform, State, list, 96,
+			APTR.FromPointer(0x3C80)));
+		Assert.False(MuiListCore.Sort(ref platform, State, list));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			ColumnOrderAttr, source.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnOrderKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnOrderAttr, out var rawAfter));
+		Assert.Equal(rawBefore, rawAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListColumnOrderRejectsDuplicateNamedBytes()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var format = APTR.FromPointer(0x3BC0);
+		var source = APTR.FromPointer(0x3BE0);
+		platform.WriteCString(format, ",,");
+		platform.WriteUInt8(source, 0, 0);
+		platform.WriteUInt8(source, 1, 1);
+		platform.WriteUInt8(source, 2, 0xFF);
+		var tags = APTR.FromPointer(0x3C00);
+		platform.WriteUInt32(tags, 0, MaxColumnsAttr);
+		platform.WriteUInt32(tags, 4, 2);
+		platform.WriteUInt32(tags, 8, FormatAttr);
+		platform.WriteUInt32(tags, 12, format.Raw);
+		platform.WriteUInt32(tags, 16, ColumnOrderAttr);
+		platform.WriteUInt32(tags, 20, source.Raw);
+		platform.WriteUInt32(tags, 24, 0);
+
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			tags);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnOrderKey, out var stateRaw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnOrderAttr, out var rawBefore));
+		Assert.NotEqual(0u, stateRaw);
+
+		// Corrupt the guest-owned vector through its named byte cursor. The
+		// record remains structurally valid, but [0, 0] is not a permutation.
+		var cursor = default(MuiListCore.MuiListColumnOrderByteCursor);
+		cursor.Base = APTR.FromPointer(rawBefore);
+		cursor.Index = 1;
+		Assert.True(MuiListCore.MuiListColumnOrderByteCursorCodec.TryGetEntry(
+			ref platform, cursor, out var duplicateAddress));
+		platform.WriteUInt8(duplicateAddress, 0, 0);
+
+		Assert.False(MuiListCore.TryGetAttribute(ref platform, State, list,
+			ColumnOrderAttr, out _));
+		Assert.Equal(99u, MuiListCore.GetColumnOrderDisplayColumn(ref platform,
+			APTR.FromPointer(stateRaw), 0, 99));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			ColumnOrderAttr, source.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnOrderKey, out var stateAfter));
+		Assert.Equal(stateRaw, stateAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ColumnOrderAttr, out var rawAfter));
+		Assert.Equal(rawBefore, rawAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
 	}
 
 	[Fact]
@@ -3991,6 +6793,118 @@ public sealed class MuiListCoreTests
 
 		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
 			list));
+	}
+
+	[Fact]
+	public void ListMalformedViewportStateFailsClosedBeforeLayoutAndCursorRepair()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x4300), InsertBottom));
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80, 16));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ViewportStateKey, out var viewportRaw));
+		Assert.NotEqual(0u, viewportRaw);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FirstAttr, out var firstBefore));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, VisibleAttr, out var visibleBefore));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ActiveAttr, out var activeBefore));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, DropMarkAttr, out var dropMarkBefore));
+
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(viewportRaw),
+			MuiListCore.MuiListStateRecordKind.Viewport,
+			MuiListCore.MuiListStateField.Magic, 0));
+		Assert.False(MuiListCore.TryGetViewportState(ref platform, State, list,
+			out _));
+
+		// Present malformed viewport state is not absence. No layout, cursor, or
+		// drag producer may rebuild it from the raw scalar projections.
+		Assert.False(MuiListCore.Layout(ref platform, State, list, 0, 0, 80,
+			16));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			FirstAttr, 1));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			ActiveAttr, 1));
+		Assert.False(MuiListCore.Jump(ref platform, State, list, 1));
+		Assert.False(MuiListCore.SetDropMark(ref platform, State, list, 1));
+
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ViewportStateKey, out var viewportAfter));
+		Assert.Equal(viewportRaw, viewportAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, FirstAttr, out var firstAfter));
+		Assert.Equal(firstBefore, firstAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, VisibleAttr, out var visibleAfter));
+		Assert.Equal(visibleBefore, visibleAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ActiveAttr, out var activeAfter));
+		Assert.Equal(activeBefore, activeAfter);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, DropMarkAttr, out var dropMarkAfter));
+		Assert.Equal(dropMarkBefore, dropMarkAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListViewportStateRejectsZeroNamedLineHeight()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x4380), InsertBottom));
+		Assert.True(MuiListCore.Layout(ref platform, State, list, 0, 0, 80,
+			16));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ViewportStateKey, out var viewportRaw));
+		Assert.NotEqual(0u, viewportRaw);
+
+		// Corrupt the named record through its field codec. The published record
+		// remains present, but a zero line height is not usable viewport state.
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(viewportRaw),
+			MuiListCore.MuiListStateRecordKind.Viewport,
+			MuiListCore.MuiListStateField.LineHeight, 0));
+		Assert.False(MuiListCore.TryGetViewportState(ref platform, State, list,
+			out _));
+		Assert.False(MuiListCore.Layout(ref platform, State, list, 0, 0, 80,
+			16));
+		Assert.False(MuiListCore.Jump(ref platform, State, list, 1));
+
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, ViewportStateKey, out var viewportAfter));
+		Assert.Equal(viewportRaw, viewportAfter);
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryReadUInt32(
+			ref platform, APTR.FromPointer(viewportAfter),
+			MuiListCore.MuiListStateRecordKind.Viewport,
+			MuiListCore.MuiListStateField.LineHeight, out var lineHeight));
+		Assert.Equal(0u, lineHeight);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
 	}
 
 	[Fact]
@@ -4322,6 +7236,109 @@ public sealed class MuiListCoreTests
 			QuietAttr, 0));
 		Assert.Equal(baseline + 1, MuiListCore.RedrawRequests(ref platform,
 			State, list));
+	}
+
+	[Fact]
+	public void ListMalformedRedrawStateFailsClosedBeforeQuietOrScheduleMutation()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, RedrawStateKey, out var redrawRaw));
+		Assert.NotEqual(0u, redrawRaw);
+		var redraw = APTR.FromPointer(redrawRaw);
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryReadUInt32(
+			ref platform, redraw, MuiListCore.MuiListStateRecordKind.Redraw,
+			MuiListCore.MuiListStateField.Requests, out var requestsBefore));
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, redraw, MuiListCore.MuiListStateRecordKind.Redraw,
+			MuiListCore.MuiListStateField.Magic, 0));
+
+		// A malformed present redraw record is not absence. Quiet must not change
+		// the presentation policy, and Redraw must not reach the platform seam.
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			QuietAttr, 1));
+		Assert.Equal(0u, Get(ref platform, list, QuietAttr));
+		var beforeSchedule = platform.RedrawCount;
+		Assert.False(MuiListCore.Redraw(ref platform, State, list, -2));
+		Assert.Equal(beforeSchedule, platform.RedrawCount);
+
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x3C00), InsertBottom));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, RedrawStateKey, out var redrawAfter));
+		Assert.Equal(redrawRaw, redrawAfter);
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryReadUInt32(
+			ref platform, APTR.FromPointer(redrawAfter),
+			MuiListCore.MuiListStateRecordKind.Redraw,
+			MuiListCore.MuiListStateField.Requests, out var requestsAfter));
+		Assert.Equal(requestsBefore, requestsAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ListMalformedRedrawDirtyFailsClosedBeforeQuietOrScheduleMutation()
+	{
+		var platform = CreatePlatform(out var listClass, out var otherClass,
+			0x40000);
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		Assert.NotEqual(APTR.Null, list);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, RedrawStateKey, out var redrawRaw));
+		Assert.NotEqual(0u, redrawRaw);
+		var redraw = APTR.FromPointer(redrawRaw);
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryReadUInt32(
+			ref platform, redraw, MuiListCore.MuiListStateRecordKind.Redraw,
+			MuiListCore.MuiListStateField.Requests, out var requestsBefore));
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, redraw, MuiListCore.MuiListStateRecordKind.Redraw,
+			MuiListCore.MuiListStateField.Dirty, 2));
+
+		// Dirty is a canonical BOOL in the named redraw record. A malformed
+		// present value is neither absence nor a truthy value; all consumers fail
+		// closed without changing policy, counters, or the platform redraw seam.
+		Assert.Equal(0u, MuiListCore.RedrawRequests(ref platform, State, list));
+		Assert.False(MuiListCore.SetAttribute(ref platform, State, list,
+			QuietAttr, 1));
+		Assert.Equal(0u, Get(ref platform, list, QuietAttr));
+		var beforeSchedule = platform.RedrawCount;
+		Assert.False(MuiListCore.Redraw(ref platform, State, list, -2));
+		Assert.Equal(beforeSchedule, platform.RedrawCount);
+
+		Assert.True(MuiListCore.InsertSingle(ref platform, State, list,
+			APTR.FromPointer(0x3C60), InsertBottom));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			list, RedrawStateKey, out var redrawAfter));
+		Assert.Equal(redrawRaw, redrawAfter);
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryReadUInt32(
+			ref platform, APTR.FromPointer(redrawAfter),
+			MuiListCore.MuiListStateRecordKind.Redraw,
+			MuiListCore.MuiListStateField.Dirty, out var dirtyAfter));
+		Assert.Equal(2u, dirtyAfter);
+		Assert.True(MuiListCore.MuiListStateFieldCursorCodec.TryReadUInt32(
+			ref platform, APTR.FromPointer(redrawAfter),
+			MuiListCore.MuiListStateRecordKind.Redraw,
+			MuiListCore.MuiListStateField.Requests, out var requestsAfter));
+		Assert.Equal(requestsBefore, requestsAfter);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			otherClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
 	}
 
 	[Fact]

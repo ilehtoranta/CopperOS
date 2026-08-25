@@ -298,6 +298,7 @@ internal struct MuiListviewHorizontalScrollerDragState
 	internal const uint Size = 20;
 	internal const uint Cookie = 0x48534452u; // 'HSDR'
 	internal const uint ActiveFlag = 1;
+	internal const uint CapturedFlag = 2;
 
 	internal uint Magic;
 	internal int GrabOffset;
@@ -426,6 +427,11 @@ internal static class MuiListviewHorizontalScrollerDragStateCodec
 			WriteUInt32(ref platform, fieldAddress, value);
 	}
 
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListviewHorizontalScrollerDragStateField field,
+		uint value) where TPlatform : struct, IMuiGuestMemory =>
+		TryWriteUInt32(ref platform, address, field, value);
+
 	private static bool ReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, out uint value) where TPlatform : struct, IMuiGuestMemory
 	{
@@ -453,6 +459,7 @@ internal struct MuiListviewScrollerDragState
 	internal const uint Size = 20;
 	internal const uint Cookie = 0x4C535344u; // 'LSSD'
 	internal const uint ActiveFlag = 1;
+	internal const uint CapturedFlag = 2;
 
 	internal uint Magic;
 	internal int GrabOffset;

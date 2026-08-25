@@ -123,3 +123,15 @@ internal static class MuiScalePresentationStateRecordCodec
 			value.Horizontal);
 	}
 }
+
+// Keep the wire field lossless for malformed-state diagnostics. Scale's
+// Horizontal value is a MorphOS BOOL and must be canonical before layout or
+// drawing consumers use the named presentation state.
+internal static class MuiScalePresentationStateValidation
+{
+	internal static bool IsValidRecord(MuiScalePresentationStateRecord value) =>
+		value.Horizontal <= 1;
+
+	internal static bool IsValidState(MuiScalePresentationState value) =>
+		value.Horizontal <= 1;
+}

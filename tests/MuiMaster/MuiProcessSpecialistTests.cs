@@ -512,6 +512,9 @@ public sealed class MuiProcessSpecialistTests
 			out var header));
 		Assert.Equal(2u, header.ArgumentCount);
 		Assert.Equal(0x8042AAAAu, header.MethodId);
+		Assert.True(MuiProcessDispatchPacketCodec.TryReadMethodIdValue(ref p,
+			Packet, out var methodId));
+		Assert.Equal(header.MethodId, methodId);
 		Assert.True(MuiProcessDispatchPacketCodec.TryReadArgument(ref p, Packet,
 			header, 0, out var first));
 		Assert.True(MuiProcessDispatchPacketCodec.TryReadArgument(ref p, Packet,
@@ -731,6 +734,9 @@ public sealed class MuiProcessSpecialistTests
 		Assert.True(MuiProcessSpecialistMessageCodec.TryReadMethodId(ref p, Message,
 			out var packet));
 		Assert.Equal(MuiProcessAttributes.Process_Launch, packet.MethodId);
+		Assert.True(MuiProcessSpecialistMessageCodec.TryReadMethodIdValue(ref p,
+			Message, out var methodId));
+		Assert.Equal(MuiProcessAttributes.Process_Launch, methodId);
 		Assert.False(MuiProcessSpecialistMessageCodec.TryReadMethodId(ref p,
 			APTR.Null, out _));
 	}

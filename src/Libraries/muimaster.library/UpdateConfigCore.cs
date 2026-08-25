@@ -618,10 +618,24 @@ public static class MuiUpdateConfigCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Native selector admission stays scalar so the compiler does not need to
+	// materialize a temporary one-field record. The public method header remains
+	// a named struct for host and dispatcher consumers.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiUpdateConfigMethodMessage.Size)) return false;
 		return MuiUpdateConfigPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiUpdateConfigPacketField.MethodId, out packet.MethodId);
+			message, MuiUpdateConfigPacketField.MethodId, out methodId);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR message,
@@ -629,15 +643,15 @@ public static class MuiUpdateConfigCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != Method || !platform.IsMapped(message,
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId) ||
+			methodId != Method || !platform.IsMapped(message,
 			MuiUpdateConfigMessage.Size)) return false;
 		if (!MuiUpdateConfigPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiUpdateConfigPacketField.CfgId, out packet.CfgId) ||
 			!MuiUpdateConfigPacketFieldCursorCodec.TryReadUInt32(ref platform,
 				message, MuiUpdateConfigPacketField.RedrawCount,
 				out var rawRedrawCount)) return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		packet.RedrawCount = unchecked((int)rawRedrawCount);
 		if (packet.RedrawCount < 0 || packet.RedrawCount > MaximumRedrawObjects)
 			return false;
@@ -693,8 +707,8 @@ public static class MuiUpdateConfigCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (message.IsNull || index < 0 || index >= MaximumRedrawObjects ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != Method ||
+			!TryReadMethodIdValue(ref platform, message, out var methodId) ||
+			methodId != Method ||
 			!platform.IsMapped(message, MuiUpdateConfigMessage.Size)) return false;
 		var objectCursor = default(MuiUpdateConfigObjectCursor);
 		objectCursor.Base = APTR.FromPointer(message.Raw +

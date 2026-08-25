@@ -126,11 +126,12 @@ internal static class MuiCollectionEditMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionCreateEditObjectMessage.Size) ||
-			!MuiCollectionBasicMessageCodec.TryReadMethodId(ref platform, message,
-				out var header) || header.MethodId != CreateEditObject) return false;
-		packet.MethodId = header.MethodId;
+			!MuiCollectionBasicMessageCodec.TryReadMethodIdValue(ref platform, message,
+				out methodId) || methodId != CreateEditObject) return false;
+		packet.MethodId = methodId;
 		if (!MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionEditPacketKind.CreateEditObject,
 			MuiCollectionEditField.Row, out var rawRow) ||
@@ -170,12 +171,13 @@ internal static class MuiCollectionEditMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionEditMessage.Size) ||
-			!MuiCollectionBasicMessageCodec.TryReadMethodId(ref platform, message,
-				out var header) || header.MethodId != Edit)
+			!MuiCollectionBasicMessageCodec.TryReadMethodIdValue(ref platform, message,
+				out methodId) || methodId != Edit)
 			return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		if (!MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionEditPacketKind.Edit,
 			MuiCollectionEditField.Row, out var rawRow) ||
@@ -209,11 +211,12 @@ internal static class MuiCollectionEditMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionEditDoneMessage.Size) ||
-			!MuiCollectionBasicMessageCodec.TryReadMethodId(ref platform, message,
-				out var header) || header.MethodId != EditDone) return false;
-		packet.MethodId = header.MethodId;
+			!MuiCollectionBasicMessageCodec.TryReadMethodIdValue(ref platform, message,
+				out methodId) || methodId != EditDone) return false;
+		packet.MethodId = methodId;
 		if (!MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionEditPacketKind.EditDone,
 			MuiCollectionEditField.Row, out var rawRow) ||
@@ -259,11 +262,12 @@ internal static class MuiCollectionEditMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionEndEditMessage.Size) ||
-			!MuiCollectionBasicMessageCodec.TryReadMethodId(ref platform, message,
-				out var header) || header.MethodId != EndEdit) return false;
-		packet.MethodId = header.MethodId;
+			!MuiCollectionBasicMessageCodec.TryReadMethodIdValue(ref platform, message,
+				out methodId) || methodId != EndEdit) return false;
+		packet.MethodId = methodId;
 		return MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionEditPacketKind.EndEdit,
 			MuiCollectionEditField.Mode, out packet.Mode);

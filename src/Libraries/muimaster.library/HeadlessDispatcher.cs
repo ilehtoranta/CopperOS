@@ -19,6 +19,8 @@ public static class MuiHeadlessDispatcher
 	private const uint FindObject = 0x8042038F;
 	private const uint Set = 0x8042549A;
 	private const uint NoNotifySet = 0x8042216F;
+	private const uint OmSet = MuiHeadlessOmSetMessageCodec.Method;
+	private const uint OmUpdate = MuiHeadlessOmUpdateMessageCodec.Method;
 	private const uint WriteLong = 0x80428D86;
 	private const uint WriteString = 0x80424BF4;
 	private const uint SetAsString = 0x80422590;
@@ -112,6 +114,34 @@ public static class MuiHeadlessDispatcher
 			method != MuiNotifyUserDataCore.SetUData &&
 			method != MuiNotifyUserDataCore.SetUDataOnce) return 0;
 		return DispatchUserDataCore(ref platform, state, obj, message, method);
+	}
+
+	// Focused native-qualification seam for the generic BOOPSI OM_SET path.
+	// The fixed packet and its guest TagItem list remain caller-owned; the
+	// object core performs the bounded struct-backed walk and MUIA_NoNotify
+	// operation-local notification suppression.
+	public static uint DispatchObjectSet<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, APTR message)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiHeadlessOmSetMessageCodec.TryRead(ref platform, message,
+			out var packet)) return 0;
+		return MuiHeadlessObjectCore.SetAttributes(ref platform, state, obj,
+			packet.Attributes) ? 1u : 0u;
+	}
+
+	// Focused native-qualification seam for the standard BOOPSI OM_UPDATE
+	// packet. The named Flags field is decoded even though the current MUI
+	// setter boundary has no interim-only behavior; preserving it here keeps the
+	// ABI complete and leaves future flag policy at the packet boundary.
+	public static uint DispatchObjectUpdate<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, APTR message)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiHeadlessOmUpdateMessageCodec.TryRead(ref platform, message,
+			out var packet)) return 0;
+		return MuiHeadlessObjectCore.SetAttributes(ref platform, state, obj,
+			packet.Attributes) ? 1u : 0u;
 	}
 
 	// Focused native-qualification seam for the public Notify packet family.
@@ -236,12 +266,12 @@ public static class MuiHeadlessDispatcher
 		}
 		if (method == MultiSet)
 		{
-			if (!MuiNotifyCore.TryReadMultiSet(ref platform, message, method,
-				out var packet)) return 0;
-			return MuiNotifyCore.MultiSet(ref platform, state, obj,
-				packet.Attribute, packet.Value,
-				APTR.FromPointer(packet.FirstObject),
-				MuiNotifyCore.MultiSetVector(ref platform, message)) ? 1u : 0u;
+			var dispatch = default(MuiMultiSetDispatchRequest);
+			dispatch.State = state;
+			dispatch.Executor = obj;
+			dispatch.Message = message;
+			return MuiNotifyCore.DispatchMultiSet(ref platform, dispatch) ?
+				1u : 0u;
 		}
 		if (method == WriteLong)
 		{
@@ -322,6 +352,10 @@ public static class MuiHeadlessDispatcher
 			case WriteString:
 			case SetAsString:
 				return DispatchNotifyCore(ref platform, state, obj, message, method);
+			case OmSet:
+				return DispatchObjectSet(ref platform, state, obj, message);
+			case OmUpdate:
+				return DispatchObjectUpdate(ref platform, state, obj, message);
 			case Export:
 			case Import:
 				return DispatchObjectPersistence(ref platform, state, obj, message);

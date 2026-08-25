@@ -132,12 +132,13 @@ internal static class MuiCollectionRecordMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionEntryPoolMessage.Size) ||
 			(method != Construct && method != Destruct) ||
-			!MuiCollectionBasicMessageCodec.TryReadMethodId(ref platform, message,
-				out var header) || header.MethodId != method) return false;
-		packet.MethodId = header.MethodId;
+			!MuiCollectionBasicMessageCodec.TryReadMethodIdValue(ref platform, message,
+				out methodId) || methodId != method) return false;
+		packet.MethodId = methodId;
 		return MuiCollectionRecordFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionRecordPacketKind.EntryPool,
 			MuiCollectionRecordField.Entry, out packet.Entry) &&
@@ -169,11 +170,12 @@ internal static class MuiCollectionRecordMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionDisplayMessage.Size) ||
-			!MuiCollectionBasicMessageCodec.TryReadMethodId(ref platform, message,
-				out var header) || header.MethodId != Display) return false;
-		packet.MethodId = header.MethodId;
+			!MuiCollectionBasicMessageCodec.TryReadMethodIdValue(ref platform, message,
+				out methodId) || methodId != Display) return false;
+		packet.MethodId = methodId;
 		return MuiCollectionRecordFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionRecordPacketKind.Display,
 			MuiCollectionRecordField.Entry, out packet.Entry) &&
@@ -210,11 +212,12 @@ internal static class MuiCollectionRecordMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionCompareMessage.Size) ||
-			!MuiCollectionBasicMessageCodec.TryReadMethodId(ref platform, message,
-				out var header) || header.MethodId != Compare) return false;
-		packet.MethodId = header.MethodId;
+			!MuiCollectionBasicMessageCodec.TryReadMethodIdValue(ref platform, message,
+				out methodId) || methodId != Compare) return false;
+		packet.MethodId = methodId;
 		return MuiCollectionRecordFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionRecordPacketKind.Compare,
 			MuiCollectionRecordField.Entry1, out packet.Entry1) &&
@@ -251,11 +254,12 @@ internal static class MuiCollectionRecordMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionTestPosMessage.Size) ||
-			!MuiCollectionBasicMessageCodec.TryReadMethodId(ref platform, message,
-				out var header) || header.MethodId != TestPos) return false;
-		packet.MethodId = header.MethodId;
+			!MuiCollectionBasicMessageCodec.TryReadMethodIdValue(ref platform, message,
+				out methodId) || methodId != TestPos) return false;
+		packet.MethodId = methodId;
 		return MuiCollectionRecordFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionRecordPacketKind.TestPos,
 			MuiCollectionRecordField.X, out packet.X) &&

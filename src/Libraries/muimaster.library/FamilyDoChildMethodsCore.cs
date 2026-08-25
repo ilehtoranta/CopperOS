@@ -81,11 +81,24 @@ internal static class MuiFamilyDoChildMethodsMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Native qualification keeps selector admission scalar while the
+	// dispatcher-facing overload above retains the named value-type record.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiFamilyDoChildMethodsMessage.Size)) return false;
 		return MuiFamilyDoChildMethodsPacketFieldCursorCodec.TryReadUInt32(
 			ref platform, message,
-			MuiFamilyDoChildMethodsPacketField.MethodId, out packet.MethodId);
+			MuiFamilyDoChildMethodsPacketField.MethodId, out methodId);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -99,8 +112,9 @@ internal static class MuiFamilyDoChildMethodsMessageCodec
 	internal static bool IsValid<TPlatform>(ref TPlatform platform, APTR message)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return TryReadMethodId(ref platform, message, out var packet) &&
-			packet.MethodId == Method;
+		uint methodId;
+		return TryReadMethodIdValue(ref platform, message, out methodId) &&
+			methodId == Method;
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR message)
@@ -123,8 +137,15 @@ public static class MuiFamilyDoChildMethodsCore
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiFamilyDoChildMethodsMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-		=> MuiFamilyDoChildMethodsMessageCodec.TryRead(ref platform, message,
-			out packet);
+	{
+		packet = default;
+		uint methodId;
+		if (!MuiFamilyDoChildMethodsMessageCodec.TryReadMethodIdValue(ref platform,
+			message, out methodId) || methodId != MuiFamilyDoChildMethodsMessageCodec.Method)
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
 
 	public static bool WriteRecord<TPlatform>(ref TPlatform platform,
 		APTR message) where TPlatform : struct, IMuiGuestMemory

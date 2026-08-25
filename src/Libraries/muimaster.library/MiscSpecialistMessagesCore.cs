@@ -16,6 +16,7 @@ internal enum MuiMiscSpecialistPacketKind : byte
 	Set,
 	Pointer,
 	Pair,
+	HandleInput,
 	RegisterGadget,
 }
 
@@ -28,6 +29,8 @@ internal enum MuiMiscSpecialistField : byte
 	Pointer,
 	First,
 	Second,
+	IntuiMessage,
+	MuiKey,
 	Gadget,
 	Id,
 	Parameters,
@@ -72,6 +75,11 @@ internal static class MuiMiscSpecialistFieldCursorCodec
 				if (field == MuiMiscSpecialistField.MethodId) { offset = 0; return true; }
 				if (field == MuiMiscSpecialistField.First) { offset = 4; return true; }
 				if (field == MuiMiscSpecialistField.Second) { offset = 8; return true; }
+				break;
+			case MuiMiscSpecialistPacketKind.HandleInput:
+				if (field == MuiMiscSpecialistField.MethodId) { offset = 0; return true; }
+				if (field == MuiMiscSpecialistField.IntuiMessage) { offset = 4; return true; }
+				if (field == MuiMiscSpecialistField.MuiKey) { offset = 8; return true; }
 				break;
 			case MuiMiscSpecialistPacketKind.RegisterGadget:
 				if (field == MuiMiscSpecialistField.MethodId) { offset = 0; return true; }
@@ -139,17 +147,31 @@ internal static class MuiMiscSpecialistMessageCodec
 	internal const uint OmGet = 0x00000104u;
 	internal const uint MethodSet = 0x8042549Au;
 	internal const uint MethodNoNotifySet = 0x8042216Fu;
+	internal const uint HandleInput = 0x80422A1Au;
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiMiscSpecialistMethodMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Native qualification keeps selector admission scalar while the
+	// dispatcher-facing overload above retains the named value-type record.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiMiscSpecialistMethodMessage.Size)) return false;
 		return MuiMiscSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiMiscSpecialistPacketKind.Method,
-			MuiMiscSpecialistField.MethodId, out packet.MethodId);
+			MuiMiscSpecialistField.MethodId, out methodId);
 	}
 
 	internal static bool TryReadLifecycle<TPlatform>(ref TPlatform platform,
@@ -157,10 +179,11 @@ internal static class MuiMiscSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (!IsLifecycleMethod(method) || message.IsNull ||
 			!platform.IsMapped(message, MuiMiscLifecycleMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != method) return false;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != method) return false;
 		return MuiMiscSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiMiscSpecialistPacketKind.Lifecycle,
 			MuiMiscSpecialistField.MethodId, out packet.MethodId);
@@ -183,8 +206,9 @@ internal static class MuiMiscSpecialistMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiMiscSpecialistGetMessage.Size,
 			OmGet)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiMiscSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiMiscSpecialistPacketKind.Get,
 			MuiMiscSpecialistField.Attribute, out packet.Attribute) &&
@@ -215,11 +239,12 @@ internal static class MuiMiscSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiMiscSpecialistMethodMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != method) return false;
-		packet.MethodId = header.MethodId;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != method) return false;
+		packet.MethodId = methodId;
 		return true;
 	}
 
@@ -240,8 +265,9 @@ internal static class MuiMiscSpecialistMessageCodec
 		packet = default;
 		if (!IsSetMethod(method) || !IsPacket(ref platform, message,
 			MuiMiscSpecialistSetMessage.Size, method)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiMiscSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiMiscSpecialistPacketKind.Set,
 			MuiMiscSpecialistField.Attribute, out packet.Attribute) &&
@@ -274,8 +300,9 @@ internal static class MuiMiscSpecialistMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message,
 			MuiMiscSpecialistPointerMessage.Size, method)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiMiscSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiMiscSpecialistPacketKind.Pointer,
 			MuiMiscSpecialistField.Pointer, out packet.Pointer);
@@ -302,8 +329,9 @@ internal static class MuiMiscSpecialistMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message,
 			MuiMiscSpecialistPairMessage.Size, method)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiMiscSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiMiscSpecialistPacketKind.Pair,
 			MuiMiscSpecialistField.First, out packet.First) &&
@@ -327,6 +355,43 @@ internal static class MuiMiscSpecialistMessageCodec
 				MuiMiscSpecialistPacketKind.Pair, MuiMiscSpecialistField.Second, second);
 	}
 
+	internal static bool TryReadHandleInput<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiMiscHandleInputMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!IsPacket(ref platform, message, MuiMiscHandleInputMessage.Size,
+			HandleInput)) return false;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId)) return false;
+		packet.MethodId = methodId;
+		if (!MuiMiscSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+			message, MuiMiscSpecialistPacketKind.HandleInput,
+			MuiMiscSpecialistField.IntuiMessage, out packet.IntuiMessage) ||
+			!MuiMiscSpecialistFieldCursorCodec.TryReadUInt32(ref platform, message,
+				MuiMiscSpecialistPacketKind.HandleInput,
+				MuiMiscSpecialistField.MuiKey, out var rawMuiKey)) return false;
+		packet.MuiKey = unchecked((int)rawMuiKey);
+		return true;
+	}
+
+	internal static bool WriteHandleInput<TPlatform>(ref TPlatform platform,
+		APTR message, uint intuiMessage, int muiKey)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (message.IsNull || !platform.IsMapped(message,
+			MuiMiscHandleInputMessage.Size)) return false;
+		return MuiMiscSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			message, MuiMiscSpecialistPacketKind.HandleInput,
+			MuiMiscSpecialistField.MethodId, HandleInput) &&
+			MuiMiscSpecialistFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiMiscSpecialistPacketKind.HandleInput,
+				MuiMiscSpecialistField.IntuiMessage, intuiMessage) &&
+			MuiMiscSpecialistFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiMiscSpecialistPacketKind.HandleInput,
+				MuiMiscSpecialistField.MuiKey, unchecked((uint)muiKey));
+	}
+
 	internal static bool TryReadRegisterGadget<TPlatform>(
 		ref TPlatform platform, APTR message,
 		out MuiMiscSpecialistRegisterGadgetMessage packet)
@@ -336,8 +401,9 @@ internal static class MuiMiscSpecialistMessageCodec
 		if (!IsPacket(ref platform, message,
 			MuiMiscSpecialistRegisterGadgetMessage.Size,
 			MuiMiscAttributes.Mccprefs_RegisterGadget)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiMiscSpecialistFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiMiscSpecialistPacketKind.RegisterGadget,
 			MuiMiscSpecialistField.Gadget, out packet.Gadget) &&
@@ -397,8 +463,9 @@ internal static class MuiMiscSpecialistMessageCodec
 	private static bool IsPacket<TPlatform>(ref TPlatform platform, APTR message,
 		uint size, uint method) where TPlatform : struct, IMuiGuestMemory
 	{
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message, size) ||
-			!TryReadMethodId(ref platform, message, out var header)) return false;
-		return header.MethodId == method;
+			!TryReadMethodIdValue(ref platform, message, out methodId)) return false;
+		return methodId == method;
 	}
 }

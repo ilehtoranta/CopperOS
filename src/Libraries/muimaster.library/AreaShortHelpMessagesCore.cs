@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -27,8 +28,26 @@ internal struct MuiAreaDeleteShortHelpMessage
 	internal APTR Help;
 }
 
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiAreaCheckShortHelpMessage
+{
+	internal const uint Size = 16;
+	internal uint MethodId;
+	internal APTR Help;
+	internal int MouseX;
+	internal int MouseY;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiAreaShortHelpMethodMessage
+{
+	internal const uint Size = 4;
+	internal uint MethodId;
+}
+
 internal enum MuiAreaShortHelpPacketKind : byte
 {
+	Check,
 	Create,
 	Delete,
 }
@@ -56,6 +75,12 @@ internal static class MuiAreaShortHelpMessageFieldCursorCodec
 	{
 		switch (packet)
 		{
+			case MuiAreaShortHelpPacketKind.Check:
+				if (field == MuiAreaShortHelpMessageField.MethodId) { offset = 0; return true; }
+				if (field == MuiAreaShortHelpMessageField.Help) { offset = 4; return true; }
+				if (field == MuiAreaShortHelpMessageField.MouseX) { offset = 8; return true; }
+				if (field == MuiAreaShortHelpMessageField.MouseY) { offset = 12; return true; }
+				break;
 			case MuiAreaShortHelpPacketKind.Create:
 				if (field == MuiAreaShortHelpMessageField.MethodId) { offset = 0; return true; }
 				if (field == MuiAreaShortHelpMessageField.MouseX) { offset = 4; return true; }
@@ -96,6 +121,20 @@ internal static class MuiAreaShortHelpMessageFieldCursorCodec
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaShortHelpPacketKind packet,
+		MuiAreaShortHelpMessageField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiAreaShortHelpMessageFieldCursor);
+		cursor.Message = message;
+		cursor.Packet = packet;
+		cursor.Field = field;
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
 }
 
 internal static class MuiAreaShortHelpMessageCodec
@@ -104,16 +143,93 @@ internal static class MuiAreaShortHelpMessageCodec
 	internal const uint CreateShortHelp = 0x80428E93u;
 	internal const uint DeleteShortHelp = 0x8042D35Au;
 
+	private static uint PacketSize(MuiAreaShortHelpPacketKind packet)
+	{
+		return packet switch
+		{
+			MuiAreaShortHelpPacketKind.Check => MuiAreaCheckShortHelpMessage.Size,
+			MuiAreaShortHelpPacketKind.Create => MuiAreaCreateShortHelpMessage.Size,
+			MuiAreaShortHelpPacketKind.Delete => MuiAreaDeleteShortHelpMessage.Size,
+			_ => 0u,
+		};
+	}
+
+	// Keep the selector scalar at the fixed guest ABI boundary. Consumers still
+	// receive the named method record or complete packet structs below.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaShortHelpPacketKind packet, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		var size = PacketSize(packet);
+		if (size == 0 || message.IsNull || !platform.IsMapped(message, size))
+			return false;
+		return MuiAreaShortHelpMessageFieldCursorCodec.TryReadUInt32(ref platform,
+			message, packet, MuiAreaShortHelpMessageField.MethodId, out methodId);
+	}
+
+	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaShortHelpPacketKind packet,
+		out MuiAreaShortHelpMethodMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadMethodIdValue(ref platform, message, packet,
+			out value.MethodId)) return false;
+		return true;
+	}
+
+	internal static bool TryReadCheck<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiAreaCheckShortHelpMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!TryReadMethodIdValue(ref platform, message,
+			MuiAreaShortHelpPacketKind.Check, out packet.MethodId) ||
+			packet.MethodId != CheckShortHelp ||
+			!MuiAreaShortHelpMessageFieldCursorCodec.TryReadUInt32(ref platform,
+				message, MuiAreaShortHelpPacketKind.Check,
+				MuiAreaShortHelpMessageField.Help, out var help) ||
+			!MuiAreaShortHelpMessageFieldCursorCodec.TryReadUInt32(ref platform,
+				message, MuiAreaShortHelpPacketKind.Check,
+				MuiAreaShortHelpMessageField.MouseX, out var mouseX) ||
+			!MuiAreaShortHelpMessageFieldCursorCodec.TryReadUInt32(ref platform,
+				message, MuiAreaShortHelpPacketKind.Check,
+				MuiAreaShortHelpMessageField.MouseY, out var mouseY)) return false;
+		packet.Help = APTR.FromPointer(help);
+		packet.MouseX = unchecked((int)mouseX);
+		packet.MouseY = unchecked((int)mouseY);
+		return true;
+	}
+
+	internal static bool WriteCheck<TPlatform>(ref TPlatform platform,
+		APTR message, APTR help, int mouseX, int mouseY)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (message.IsNull || !platform.IsMapped(message,
+			MuiAreaCheckShortHelpMessage.Size)) return false;
+		return MuiAreaShortHelpMessageFieldCursorCodec.TryWriteUInt32(ref platform,
+			message, MuiAreaShortHelpPacketKind.Check,
+			MuiAreaShortHelpMessageField.MethodId, CheckShortHelp) &&
+			MuiAreaShortHelpMessageFieldCursorCodec.TryWriteUInt32(ref platform,
+				message, MuiAreaShortHelpPacketKind.Check,
+				MuiAreaShortHelpMessageField.Help, help.Raw) &&
+			MuiAreaShortHelpMessageFieldCursorCodec.TryWriteUInt32(ref platform,
+				message, MuiAreaShortHelpPacketKind.Check,
+				MuiAreaShortHelpMessageField.MouseX, unchecked((uint)mouseX)) &&
+			MuiAreaShortHelpMessageFieldCursorCodec.TryWriteUInt32(ref platform,
+				message, MuiAreaShortHelpPacketKind.Check,
+				MuiAreaShortHelpMessageField.MouseY, unchecked((uint)mouseY));
+	}
+
 	internal static bool TryReadCreate<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiAreaCreateShortHelpMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiAreaCreateShortHelpMessage.Size) ||
-			!MuiAreaShortHelpMessageFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiAreaShortHelpPacketKind.Create,
-				MuiAreaShortHelpMessageField.MethodId, out packet.MethodId) ||
+		if (!TryReadMethodIdValue(ref platform, message,
+			MuiAreaShortHelpPacketKind.Create, out packet.MethodId) ||
 			packet.MethodId != CreateShortHelp ||
 			!MuiAreaShortHelpMessageFieldCursorCodec.TryReadUInt32(ref platform,
 				message, MuiAreaShortHelpPacketKind.Create,
@@ -131,11 +247,8 @@ internal static class MuiAreaShortHelpMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiAreaDeleteShortHelpMessage.Size) ||
-			!MuiAreaShortHelpMessageFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiAreaShortHelpPacketKind.Delete,
-				MuiAreaShortHelpMessageField.MethodId, out packet.MethodId) ||
+		if (!TryReadMethodIdValue(ref platform, message,
+			MuiAreaShortHelpPacketKind.Delete, out packet.MethodId) ||
 			packet.MethodId != DeleteShortHelp ||
 			!MuiAreaShortHelpMessageFieldCursorCodec.TryReadUInt32(ref platform,
 				message, MuiAreaShortHelpPacketKind.Delete,

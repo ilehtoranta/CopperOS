@@ -14,9 +14,10 @@ namespace CopperOS.MuiMaster;
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiStringscrollPointerState
 {
-	internal const uint Size = 24;
+	internal const uint Size = 32;
 	internal const uint Cookie = 0x53535054u; // 'SSPT'
 	internal const uint ActiveFlag = 1;
+	internal const uint CapturedFlag = 2;
 	internal const uint HorizontalAxis = 1;
 	internal const uint VerticalAxis = 2;
 
@@ -24,6 +25,8 @@ internal struct MuiStringscrollPointerState
 	internal uint Axis;
 	internal int GrabOffset;
 	internal int StartScroll;
+	internal int StartX;
+	internal int StartY;
 	internal int LastPointer;
 	internal uint Flags;
 }
@@ -34,6 +37,8 @@ internal enum MuiStringscrollPointerStateField : byte
 	Axis,
 	GrabOffset,
 	StartScroll,
+	StartX,
+	StartY,
 	LastPointer,
 	Flags,
 }
@@ -59,8 +64,10 @@ internal static class MuiStringscrollPointerStateFieldCursorCodec
 			case MuiStringscrollPointerStateField.Axis: offset = 4; break;
 			case MuiStringscrollPointerStateField.GrabOffset: offset = 8; break;
 			case MuiStringscrollPointerStateField.StartScroll: offset = 12; break;
-			case MuiStringscrollPointerStateField.LastPointer: offset = 16; break;
-			case MuiStringscrollPointerStateField.Flags: offset = 20; break;
+			case MuiStringscrollPointerStateField.StartX: offset = 16; break;
+			case MuiStringscrollPointerStateField.StartY: offset = 20; break;
+			case MuiStringscrollPointerStateField.LastPointer: offset = 24; break;
+			case MuiStringscrollPointerStateField.Flags: offset = 28; break;
 			default: return false;
 		}
 		if (cursor.Address.IsNull || cursor.Address.Raw >
@@ -130,6 +137,12 @@ internal static class MuiStringscrollPointerStateCodec
 				address, MuiStringscrollPointerStateField.StartScroll,
 				out var startScroll) ||
 			!MuiStringscrollPointerStateFieldCursorCodec.TryRead(ref platform,
+				address, MuiStringscrollPointerStateField.StartX,
+				out var startX) ||
+			!MuiStringscrollPointerStateFieldCursorCodec.TryRead(ref platform,
+				address, MuiStringscrollPointerStateField.StartY,
+				out var startY) ||
+			!MuiStringscrollPointerStateFieldCursorCodec.TryRead(ref platform,
 				address, MuiStringscrollPointerStateField.LastPointer,
 				out var lastPointer) ||
 			!MuiStringscrollPointerStateFieldCursorCodec.TryRead(ref platform,
@@ -137,6 +150,8 @@ internal static class MuiStringscrollPointerStateCodec
 			return false;
 		value.GrabOffset = unchecked((int)grabOffset);
 		value.StartScroll = unchecked((int)startScroll);
+		value.StartX = unchecked((int)startX);
+		value.StartY = unchecked((int)startY);
 		value.LastPointer = unchecked((int)lastPointer);
 		return value.Magic == MuiStringscrollPointerState.Cookie;
 	}
@@ -157,6 +172,12 @@ internal static class MuiStringscrollPointerStateCodec
 			MuiStringscrollPointerStateFieldCursorCodec.TryWrite(ref platform,
 				address, MuiStringscrollPointerStateField.StartScroll,
 				unchecked((uint)value.StartScroll)) &&
+			MuiStringscrollPointerStateFieldCursorCodec.TryWrite(ref platform,
+				address, MuiStringscrollPointerStateField.StartX,
+				unchecked((uint)value.StartX)) &&
+			MuiStringscrollPointerStateFieldCursorCodec.TryWrite(ref platform,
+				address, MuiStringscrollPointerStateField.StartY,
+				unchecked((uint)value.StartY)) &&
 			MuiStringscrollPointerStateFieldCursorCodec.TryWrite(ref platform,
 				address, MuiStringscrollPointerStateField.LastPointer,
 				unchecked((uint)value.LastPointer)) &&

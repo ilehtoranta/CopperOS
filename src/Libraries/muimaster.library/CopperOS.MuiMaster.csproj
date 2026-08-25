@@ -10,6 +10,9 @@
     <NoWarn>1591</NoWarn>
     <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperOSUseLocalCopperSharp)' == 'true'">
+    <DefineConstants>$(DefineConstants);COPPEROS_LOCAL_SDK</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\..\..\CopperSharp68k\Sdk.Amiga\GuestMemory\IAmigaGuestMemory.cs" Link="GuestMemory\IAmigaGuestMemory.cs" />
   </ItemGroup>

@@ -7,13 +7,76 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
-// MorphOS MUIArea double-buffer policy. This slice publishes and mutates the
-// documented BOOL state; allocating and blitting a native off-screen bitmap is
-// intentionally a later rendering capability and is not hidden behind a
-// managed object or exception path.
+// MorphOS MUIArea double-buffer policy. The named BOOL state is paired with a
+// typed native Begin/End render capability. Allocation and blitting stay on the
+// provider side; the core never creates a managed bitmap or exception path.
 internal static class MuiAreaDoubleBufferCore
 {
 	internal const uint StateKey = 0x7F070040u;
+	internal const uint RenderInfoAttribute = 0x7FFF0001u;
+
+	internal static bool Begin<TPlatform>(ref TPlatform platform, APTR state,
+		APTR obj, APTR renderInfo, APTR sourceRastPort, int left, int top,
+		int width, int height, uint flags,
+		out MuiAreaDoubleBufferLease lease)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		lease = default;
+		if (!TryReadState(ref platform, state, obj, out var policy)) return false;
+		if (policy.Enabled == 0) return true;
+		var request = default(MuiDoubleBufferRenderRequest);
+		request.Object = obj;
+		request.RenderInfo = renderInfo;
+		request.SourceRastPort = sourceRastPort;
+		request.Left = left;
+		request.Top = top;
+		request.Width = width;
+		request.Height = height;
+		request.TargetLeft = left;
+		request.TargetTop = top;
+		request.TargetWidth = width;
+		request.TargetHeight = height;
+		request.Flags = flags;
+		if (!platform.BeginMuiDoubleBuffer(ref request)) return true;
+		if (request.TargetRastPort.IsNull || request.TargetWidth <= 0 ||
+			request.TargetHeight <= 0 || request.TargetLeft >
+			int.MaxValue - request.TargetWidth || request.TargetTop >
+			int.MaxValue - request.TargetHeight)
+		{
+			platform.EndMuiDoubleBuffer(ref request, false);
+			return false;
+		}
+		var published = false;
+		if (request.TargetRenderInfo.IsNotNull)
+		{
+			if (!platform.IsMapped(request.TargetRenderInfo, 28) ||
+				!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+					RenderInfoAttribute, request.TargetRenderInfo.Raw, false))
+			{
+				platform.EndMuiDoubleBuffer(ref request, false);
+				return false;
+			}
+			published = true;
+		}
+		lease.Active = 1;
+		lease.RenderInfoPublished = published ? 1u : 0u;
+		lease.OriginalRenderInfo = renderInfo;
+		lease.Request = request;
+		return true;
+	}
+
+	internal static bool End<TPlatform>(ref TPlatform platform, APTR state,
+		APTR obj, ref MuiAreaDoubleBufferLease lease, bool completed)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		if (lease.Active == 0) return true;
+		var result = platform.EndMuiDoubleBuffer(ref lease.Request, completed);
+		if (lease.RenderInfoPublished != 0)
+			result = MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+				RenderInfoAttribute, lease.OriginalRenderInfo.Raw, false) && result;
+		lease.Active = 0;
+		return result;
+	}
 
 	internal static bool TryReadState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, out MuiAreaDoubleBufferStateInput value)
@@ -70,6 +133,14 @@ internal static class MuiAreaDoubleBufferCore
 		platform.Free(scratch, MuiAreaDoubleBufferStateRecord.Size);
 		return stored;
 	}
+}
+
+internal struct MuiAreaDoubleBufferLease
+{
+	internal MuiDoubleBufferRenderRequest Request;
+	internal APTR OriginalRenderInfo;
+	internal uint RenderInfoPublished;
+	internal uint Active;
 }
 
 // Public typed seam for the Area double-buffer policy. The input/output is a

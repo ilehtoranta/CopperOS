@@ -127,10 +127,24 @@ internal static class MuiBoopsiQueryMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Keep native selector admission scalar while the named method record remains
+	// the dispatcher-facing ABI type. Packed offsets stay inside this codec.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiBoopsiQueryMethodMessage.Size)) return false;
 		return MuiBoopsiQueryPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiBoopsiQueryPacketField.MethodId, out packet.MethodId);
+			message, MuiBoopsiQueryPacketField.MethodId, out methodId);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -138,10 +152,11 @@ internal static class MuiBoopsiQueryMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiBoopsiQueryMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != MuiBoopsiQueryMessage.Method)
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != MuiBoopsiQueryMessage.Method)
 			return false;
 		if (!MuiBoopsiQueryPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiBoopsiQueryPacketField.Screen, out var rawScreen) ||
@@ -166,7 +181,7 @@ internal static class MuiBoopsiQueryMessageCodec
 			!MuiBoopsiQueryPacketFieldCursorCodec.TryReadUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.RenderInfo,
 				out var rawRenderInfo)) return false;
-		record.MethodId = header.MethodId;
+		record.MethodId = methodId;
 		record.Screen = APTR.FromPointer(rawScreen);
 		record.MinWidth = unchecked((int)rawMinWidth);
 		record.MinHeight = unchecked((int)rawMinHeight);
@@ -258,5 +273,17 @@ public static class MuiBoopsiQueryCore
 		APTR message) where TPlatform : struct, IMuiGuestMemory
 	{
 		return TryRead(ref platform, message, out var packet) ? packet.Flags : 0;
+	}
+
+	// Forward a validated MorphOS query packet to the wrapped BOOPSI object.
+	// The packet remains caller-owned guest memory; the existing typed
+	// IMuiBoopsiCapability owns the class dispatcher call and returns its D0
+	// result. No managed callback or shadow packet is introduced.
+	public static uint DispatchToObject<TPlatform>(ref TPlatform platform,
+		APTR obj, APTR message)
+		where TPlatform : struct, IMuiGuestMemory, IMuiBoopsiCapability
+	{
+		if (obj.IsNull || !TryRead(ref platform, message, out _)) return 0;
+		return platform.DoMethod(obj, message);
 	}
 }

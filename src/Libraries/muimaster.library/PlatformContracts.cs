@@ -12,6 +12,13 @@ public interface IMuiExecCapability
 {
 	APTR Allocate(uint byteSize, uint flags);
 	void Free(APTR address, uint byteSize);
+	// MorphOS Listtree ConstructHook/DestructHook receives a standard Exec
+	// memory-pool handle in A2. The handle is opaque to MUI; the native provider
+	// owns its pool header and the pooled allocation policy.
+	APTR CreatePool(uint requirements, uint puddleSize, uint threshold);
+	void DeletePool(APTR pool);
+	APTR AllocPooled(APTR pool, uint byteSize);
+	void FreePooled(APTR pool, APTR address, uint byteSize);
 }
 
 public interface IMuiBoopsiCapability
@@ -52,6 +59,78 @@ public interface IMuiLayersCapability
 	void PopClip(APTR layer, APTR previousClip);
 }
 
+// Native MorphOS MUIA_DoubleBuffer rendering seam. The request is a value
+// record: the core supplies the visible render-info/rastport and source
+// geometry, while a native provider may return an off-screen render-info and
+// rastport plus the temporary target origin. No managed bitmap or host object
+// crosses this boundary. A provider that returns false leaves the deterministic
+// direct-render path in place.
+public struct MuiDoubleBufferRenderRequest
+{
+	public APTR Object;
+	public APTR RenderInfo;
+	public APTR SourceRastPort;
+	public APTR TargetRenderInfo;
+	public APTR TargetRastPort;
+	public int Left;
+	public int Top;
+	public int Width;
+	public int Height;
+	public int TargetLeft;
+	public int TargetTop;
+	public int TargetWidth;
+	public int TargetHeight;
+	public uint Flags;
+}
+
+public interface IMuiDoubleBufferCapability
+{
+	// Return true only when the target fields in the request identify a valid
+	// native off-screen surface. The core publishes TargetRenderInfo during the
+	// draw and restores the original render-info before returning.
+	bool BeginMuiDoubleBuffer(ref MuiDoubleBufferRenderRequest request);
+
+	// Finish the temporary surface. `completed` is false on any layer/update or
+	// malformed-target failure so the provider can discard an incomplete blit.
+	bool EndMuiDoubleBuffer(ref MuiDoubleBufferRenderRequest request,
+		bool completed);
+}
+
+// Named MorphOS MUIArea background/backfill request. The rectangle packet has
+// one wire shape for both MUIM_DrawBackground and MUIM_Backfill, but their
+// final word has different meaning; this value record keeps that distinction
+// explicit for providers without leaking packet offsets into rendering code.
+public struct MuiBackfillRenderRequest
+{
+	public const uint DrawBackground = 0;
+	public const uint Backfill = 1;
+
+	public APTR Object;
+	public APTR RenderInfo;
+	public APTR RastPort;
+	public int Left;
+	public int Top;
+	public int Right;
+	public int Bottom;
+	public int Width;
+	public int Height;
+	public int XOffset;
+	public int YOffset;
+	public int Brightness;
+	public uint Flags;
+	public uint Kind;
+	public uint CustomBackfill;
+	public uint Background;
+}
+
+public interface IMuiBackfillCapability
+{
+	// Return true when the provider has rendered the requested region. A false
+	// result leaves the deterministic pen/fill fallback in place. Providers
+	// must not mutate the named request identity or geometry fields.
+	bool ApplyMuiBackfill(ref MuiBackfillRenderRequest request);
+}
+
 public interface IMuiGraphicsCapability
 {
 	int TextWidth(APTR rastPort, APTR font, APTR text, int length);
@@ -64,6 +143,201 @@ public interface IMuiGraphicsCapability
 	void DrawImage(APTR rastPort, APTR image, int left, int top, int width,
 		int height);
 	bool ScheduleRedraw(APTR obj, uint flags);
+}
+
+// Native font-provider seam for MorphOS MUIA_CustomFont.  The request is a
+// fixed value record: the caller owns Object/BaseFont and the parsed spec;
+// the provider returns only an opaque APTR handle.  No managed font object or
+// host string crosses this boundary.
+public struct MuiCustomFontOpenRequest
+{
+	public APTR Object;
+	public APTR BaseFont;
+	public MuiCustomFontSpec Spec;
+	public APTR Result;
+}
+
+// Integer metrics published by an opened MorphOS custom-font provider.  The
+// MUI core only needs the logical glyph advance and line height for layout;
+// rasterization, kerning, and glyph storage remain provider-owned.  Keeping
+// this as a value record avoids a managed font object or an ABI offset table.
+public struct MuiCustomFontMetrics
+{
+	public int GlyphWidth;
+	public int Height;
+}
+
+public interface IMuiCustomFontCapability
+{
+	APTR OpenMuiCustomFont(ref MuiCustomFontOpenRequest request);
+	bool CloseMuiCustomFont(APTR font);
+	bool TryGetMuiCustomFontMetrics(APTR font, out MuiCustomFontMetrics metrics);
+}
+
+// MorphOS MUIA_TextColor is a resolved 00RRGGBB value, not a pen number.
+// Keep the native lookup behind a small value-type request so the core never
+// needs a managed colour object or an anonymous platform-specific offset.
+public struct MuiTextColorResolutionRequest
+{
+	public APTR Object;
+	public APTR RenderInfo;
+	public uint Color;
+	public uint Available;
+	// When the effective Area font is a CustomFont selection, the core passes
+	// its parsed value here so the provider can honor a `/crrggbb` override
+	// without retaining a managed string or font object.
+	public uint CustomFontAvailable;
+	public MuiCustomFontSpec CustomFontSpec;
+}
+
+// Render-time text color request.  The core passes the setup-scoped 00RRGGBB
+// value as a named record; the provider decides how that value maps to its
+// native raster port.  It is deliberately separate from SetPen, whose value
+// is an Amiga pen selector rather than an RGB color.
+public struct MuiTextColorRenderRequest
+{
+	public APTR RastPort;
+	public uint Color;
+}
+
+public interface IMuiTextColorCapability
+{
+	bool ResolveMuiTextColor(ref MuiTextColorResolutionRequest request);
+	bool ApplyMuiTextColor(ref MuiTextColorRenderRequest request);
+}
+
+// Render-time CustomFont request.  The parsed specification and effective
+// provider font handle cross as named value fields so style, outline, glow,
+// and underline policy remain provider-owned without managed font state or an
+// anonymous offset table in the MUI core.
+public struct MuiCustomFontRenderRequest
+{
+	public APTR Object;
+	public APTR RastPort;
+	public APTR Font;
+	public MuiCustomFontSpec Spec;
+}
+
+public interface IMuiCustomFontRenderCapability
+{
+	bool ApplyMuiCustomFont(ref MuiCustomFontRenderRequest request);
+}
+
+// Text.mui preparse soft-style request. Style bits intentionally reuse the
+// MorphOS CustomFont values (Shadow/Outline/Glow/Underline/Bold/Italic), while
+// the Present field distinguishes an explicit reset (`\33n`) from no style
+// directive. Leading preparse directives are projected as a value record;
+// per-glyph rasterization remains provider-owned.
+public struct MuiTextStyleRenderRequest
+{
+	public APTR Object;
+	public APTR RastPort;
+	public APTR Font;
+	public uint StyleFlags;
+	public uint Present;
+}
+
+public interface IMuiTextStyleCapability
+{
+	bool ApplyMuiTextStyle(ref MuiTextStyleRenderRequest request);
+}
+
+// Leading Text.mui preparse direct-colour request. MorphOS accepts both
+// six-digit RGB and eight-digit alpha+RGB forms; an alpha-only `AA------`
+// form updates only the alpha component. The request is a fixed value record
+// so providers can apply the colour to their native RastPort without managed
+// colour objects or an offset-backed ABI table.
+public static class MuiTextInlineColorFlags
+{
+	public const uint HasColor = 1u;
+	public const uint HasAlpha = 2u;
+}
+
+public struct MuiTextInlineColorRenderRequest
+{
+	public APTR Object;
+	public APTR RastPort;
+	public uint Color;
+	public uint Alpha;
+	public uint Flags;
+	public uint Present;
+}
+
+public interface IMuiTextInlineColorCapability
+{
+	bool ApplyMuiTextInlineColor(ref MuiTextInlineColorRenderRequest request);
+}
+
+// Leading Text.mui `ESC I[s]` request. The image specification is parsed into
+// the existing named MuiImageSpec value before it crosses this seam; the
+// provider owns image lookup/rasterization and may use the supplied rectangle
+// as the text object's available placement area.
+public struct MuiTextInlineImageRenderRequest
+{
+	public APTR Object;
+	public APTR RastPort;
+	public MuiImageSpec Spec;
+	public int Left;
+	public int Top;
+	public int Width;
+	public int Height;
+	public uint Present;
+}
+
+public interface IMuiTextInlineImageCapability
+{
+	bool ApplyMuiTextInlineImage(ref MuiTextInlineImageRenderRequest request);
+}
+
+// Full MUIM_Text argument record. The public packet provides the text and
+// optional preparse pointer, Unicode policy, and rendering flags; keeping them
+// named here lets a provider apply MorphOS formatting policy before the
+// graphics Text call without a managed string or an anonymous offset table.
+public struct MuiTextMethodRenderRequest
+{
+	public APTR Object;
+	public APTR RastPort;
+	public APTR Font;
+	public APTR Text;
+	public APTR PreParse;
+	public int Left;
+	public int Top;
+	public int Width;
+	public int Height;
+	public int Length;
+	public uint Flags;
+	public uint Unicode;
+	public uint Present;
+}
+
+public interface IMuiTextMethodCapability
+{
+	bool ApplyMuiTextMethod(ref MuiTextMethodRenderRequest request);
+}
+
+// Full MUIM_TextDim argument record. Width and Height are provider output
+// fields initialized to -1 by the core; a provider may fill both and return
+// true to supply native metrics. The graphics TextWidth/TextHeight fallback
+// remains authoritative when the provider declines or leaves either result
+// invalid. All inputs and outputs are fixed-width value fields.
+public struct MuiTextDimensionRequest
+{
+	public APTR Object;
+	public APTR RastPort;
+	public APTR Font;
+	public APTR Text;
+	public APTR PreParse;
+	public int Length;
+	public uint Flags;
+	public uint Unicode;
+	public int Width;
+	public int Height;
+	public uint Present;
+}
+
+public interface IMuiTextDimensionCapability
+{
+	bool ApplyMuiTextDimensions(ref MuiTextDimensionRequest request);
 }
 
 public interface IMuiDosCapability
@@ -377,7 +651,7 @@ public interface IMuiServicePlatform : IMuiHeadlessPlatform,
 	IMuiLibraryLoaderCapability, IMuiCustomClassCapability, IMuiAslCapability,
 	IMuiRequesterCapability, IMuiLayersCapability, IMuiRegionCapability,
 	IMuiPenCapability, IMuiProcessCapability, IMuiExternalBoopsiCapability,
-	IMuiDatatypeCapability
+	IMuiDatatypeCapability, IMuiInputCapability, IMuiKeyadjustInputCapability
 {
 }
 
@@ -403,7 +677,11 @@ public interface IMuiTaskCapability
 
 public interface IMuiHeadlessPlatform : IMuiGuestMemory, IMuiExecCapability,
 	IMuiBoopsiClassCapability, IMuiCallbackCapability, IMuiTaskCapability,
-	IMuiDirectoryCapability, IMuiObjectPersistenceCapability, IMuiDosCapability
+	IMuiDirectoryCapability, IMuiObjectPersistenceCapability, IMuiDosCapability,
+	IMuiShortHelpCapability, IMuiDragImageCapability,
+	IMuiBubbleCapability, IMuiContextMenuCapability, IMuiPointerCaptureCapability,
+	IMuiDragRoutingCapability,
+	IMuiCustomFontCapability
 {
 	// Resolve one item from the object's local MUI configuration.  MorphOS
 	// currently publishes only MUICFG_PublicScreen (0x24) through
@@ -412,18 +690,129 @@ public interface IMuiHeadlessPlatform : IMuiGuestMemory, IMuiExecCapability,
 	bool GetMuiConfigItem(APTR objectAddress, uint configId, out uint value);
 }
 
+public interface IMuiDragRoutingCapability
+{
+	// Return true when the native window/application layer handled the named
+	// MUIM_Drag* phase.  Input fields are immutable across the call; only
+	// Result may be changed.  A false result leaves the core's deterministic
+	// headless behavior in place.
+	bool RouteMuiDrag(ref MuiDragRouteSample sample);
+}
+
+public interface IMuiShortHelpCapability
+{
+	// A true result means the provider handled the named checkShortHelp
+	// request. Result may be Null to withdraw help for the current position.
+	// The previous help handle and coordinates are immutable across the call.
+	bool CheckMuiShortHelp(ref MuiShortHelpCheckSample sample);
+
+	// A true result means the provider handled the named dynamic-help request.
+	// Result may be Null to withdraw help for the current mouse position.
+	bool CreateMuiShortHelp(ref MuiShortHelpCreateSample sample);
+
+	// A true result means the provider accepted responsibility for the supplied
+	// temporary help handle. Static caller-owned text remains an accepted no-op
+	// when the provider returns false.
+	bool DeleteMuiShortHelp(ref MuiShortHelpDeleteSample sample);
+}
+
+public interface IMuiBubbleCapability
+{
+	// A true result means the provider created a visible custom bubble and put
+	// its opaque handle in Result. Text remains caller-owned guest memory.
+	bool CreateMuiBubble(ref MuiBubbleCreateSample sample);
+
+	// A true result means the provider accepted responsibility for deleting the
+	// opaque bubble handle supplied in Bubble.
+	bool DeleteMuiBubble(ref MuiBubbleDeleteSample sample);
+}
+
+// Native provider boundary for the MorphOS Area context-menu methods. Menu
+// strips and items are opaque guest objects; the core owns only the typed
+// request validation and the default ContextMenuTrigger publication.
+public interface IMuiContextMenuCapability
+{
+	// A true result means the provider added the requested items and placed its
+	// IPTR-compatible result in Result. The coordinate pointers are optional
+	// caller-owned LONG storage and remain immutable at this boundary.
+	bool AddMuiContextMenu(ref MuiContextMenuAddSample sample);
+
+	// A true result means a subclass/provider consumed ContextMenuChoice. A false
+	// result lets the Area default path publish MUIA_ContextMenuTrigger.
+	bool HandleMuiContextMenuChoice(ref MuiContextMenuChoiceSample sample);
+}
+
+public interface IMuiDragImageCapability
+{
+	// A true result means the provider created the named temporary
+	// MUI_DragImage and placed its opaque handle in Result.
+	bool CreateMuiDragImage(ref MuiDragImageCreateSample sample);
+
+	// A true result means the provider accepted responsibility for deleting the
+	// opaque handle supplied in DragImage.
+	bool DeleteMuiDragImage(ref MuiDragImageDeleteSample sample);
+}
+
+public interface IMuiPointerCaptureCapability
+{
+	// Capture the pointer for one named MUI gesture. Returning false means the
+	// provider has no native capture implementation; the local state machine may
+	// continue with its bounded guest-resident behavior.
+	bool CaptureMuiPointer(ref MuiPointerCaptureSample sample);
+
+	// Release a capture previously accepted for the same object and gesture kind.
+	bool ReleaseMuiPointer(ref MuiPointerCaptureSample sample);
+}
+
 public interface IMuiInputCapability
 {
+	// Fill the named text result for a caller-owned Intuition message. Returning
+	// false leaves the compatibility TranslateTextInput path available; a true
+	// result with Available == 0 means the provider recognized the message but
+	// did not produce a printable text code.
+	bool ReadMuiKeyadjustTextInput(ref MuiKeyadjustTextInputSample input);
+
+	// Compatibility primitive retained for existing layout/input providers while
+	// current Keyadjust code uses the named sample above.
 	int TranslateTextInput(APTR intuiMessage);
+
+	// Display the Intuition/MorphOS beep requested by a String.mui EditHook.
+	// The MUI object and caller-owned input message are supplied as a named
+	// request; the provider owns screen resolution and native UI effects.
+	bool DisplayMuiBeep(ref MuiStringEditBeepRequest request);
+
+	// Reuse a caller-owned Intuition input event after the String EditHook's
+	// SGA_END transition. The named request includes the owning MUI Window and
+	// preprocessed MUI key so a provider may consume it through its native event
+	// loop. Set Accepted non-zero and return true only when the provider has
+	// taken responsibility; otherwise the core's guest-resident window queue
+	// performs one bounded post-dispatch redispatch.
+	bool ReuseMuiInput(ref MuiStringEditReuseRequest request);
 }
 
+public interface IMuiKeyadjustInputCapability
+{
+	// Fill named event metadata for one Keyadjust MUIP_HandleInput sample.
+	// Returning false leaves the core's keyboard-only defaults in place.
+	bool ReadMuiKeyadjustInput(ref MuiKeyadjustInputSample input);
+}
+
+// Layout/input dispatch consumes producer-owned IntuiTick identities for
+// relverify timer transitions. Keeping the capability on this struct-backed
+// platform contract avoids a managed clock or a second runtime dispatch path.
 public interface IMuiLayoutPlatform : IMuiHeadlessPlatform,
-	IMuiGraphicsCapability, IMuiLayersCapability, IMuiInputCapability
+	IMuiTimerCapability,
+	IMuiGraphicsCapability, IMuiLayersCapability, IMuiDoubleBufferCapability,
+	IMuiBackfillCapability,
+	IMuiInputCapability,
+	IMuiTextColorCapability, IMuiCustomFontRenderCapability,
+	IMuiTextStyleCapability, IMuiTextInlineColorCapability,
+	IMuiTextInlineImageCapability, IMuiTextMethodCapability,
+	IMuiTextDimensionCapability
 {
 }
 
-public interface IMuiApplicationPlatform : IMuiLayoutPlatform,
-	IMuiTimerCapability
+public interface IMuiApplicationPlatform : IMuiLayoutPlatform
 {
 	// Show the MorphOS MUI about window for an Application object. `refWindow`
 	// is a MUI Window object (not an Intuition struct Window) and may be Null.
@@ -463,7 +852,24 @@ public interface IMuiApplicationPlatform : IMuiLayoutPlatform,
 	APTR OpenMuiWindow(APTR windowObject);
 	void CloseMuiWindow(APTR nativeWindow);
 	bool ConfigureWindowEvents(APTR nativeWindow, uint eventMask);
-	uint ReadWindowEvent(APTR nativeWindow, APTR eventStorage);
+	// Read one native event into the named sample. The provider fills the
+	// caller-owned InputEvent record, returns the resolved event class, and may
+	// report the initial relverify timer delay for IDCMP_INTUITICKS or a
+	// completed named double-click decision.
+	bool ReadWindowEvent(ref MuiWindowEventSample sample);
+	// Translate the event just returned by ReadWindowEvent into the caller's
+	// preprocessed MUIP_HandleEvent packet. The core supplies the MUI Window,
+	// native Window, standard InputEvent, packet storage, and event class in a
+	// named struct; the provider writes only that packet and returns true when
+	// it has a usable MUI event message.
+	bool ReadMuiWindowEvent(ref MuiWindowEventInput input);
+	// Read one native pointer sample into the named window publication record.
+	// The caller supplies the MUI Window object and its caller-owned InputEvent;
+	// the platform resolves the deepest live MouseObject (or NULL) without
+	// exposing coordinates, hit-test tables, or native widget offsets. Returning
+	// false means that this platform has no pointer sample for the event.
+	bool ReadMuiWindowPointer(APTR nativeWindow,
+		ref MuiWindowPointerInput input);
 	bool ActivateMuiWindow(APTR nativeWindow);
 	// Apply or remove the MorphOS busy pointer for an open MUI Window. The
 	// window core owns the nesting counter and calls this seam only on the

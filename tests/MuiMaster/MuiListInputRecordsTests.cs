@@ -95,6 +95,59 @@ public sealed class MuiListInputRecordsTests
 		Assert.Equal(0x10203040u, message.IAddress);
 		Assert.Equal((short)-11, message.MouseX);
 		Assert.Equal((short)22, message.MouseY);
+		Assert.Equal(1u, message.TimestampValid);
+
+		Assert.True(MuiIntuiMessageCodec.WritePointerWithTime(ref platform,
+			messageAddress, 0x12345678u, 0x3456, 0x789A, 0x10203040u, -11, 22,
+			77, 880000));
+		Assert.True(MuiIntuiMessageCodec.TryReadPointer(ref platform,
+			messageAddress, out message));
+		Assert.Equal(1u, message.TimestampValid);
+		Assert.Equal(77u, message.Seconds);
+		Assert.Equal(880000u, message.Micros);
+		var timestampCursor = new MuiListInputRecordFieldCursor
+		{
+			Address = messageAddress,
+			Record = MuiListInputRecordKind.IntuiMessage,
+			Field = MuiListInputRecordField.Seconds,
+		};
+		Assert.True(MuiListInputRecordFieldCursorCodec.TryGetAddress(ref platform,
+			timestampCursor, out var timestampAddress, out var timestampSize));
+		Assert.Equal(APTR.FromPointer(0x3224), timestampAddress);
+		Assert.Equal(4u, timestampSize);
+
+		var rawKeyCursor = new MuiListInputRecordFieldCursor
+		{
+			Address = messageAddress,
+			Record = MuiListInputRecordKind.RawKey,
+			Field = MuiListInputRecordField.Code,
+		};
+		Assert.True(MuiListInputRecordFieldCursorCodec.TryGetAddress(ref platform,
+			rawKeyCursor, out var rawKeyFieldAddress, out var rawKeyFieldSize));
+		Assert.Equal(APTR.FromPointer(0x3218), rawKeyFieldAddress);
+		Assert.Equal(2u, rawKeyFieldSize);
+
+		Assert.False(MuiIntuiMessageCodec.TryReadRawKey(ref platform,
+			messageAddress, out _));
+		Assert.True(MuiIntuiMessageCodec.WriteRawKey(ref platform, messageAddress,
+			MuiIntuiMessageCodec.RawKeyClass, (ushort)'K', (ushort)0xA55A));
+		Assert.True(MuiIntuiMessageCodec.TryReadRawKey(ref platform,
+			messageAddress, out var rawKey));
+		Assert.Equal(MuiIntuiMessageCodec.RawKeyClass, rawKey.Class);
+		Assert.Equal((ushort)'K', rawKey.Code);
+		Assert.Equal((ushort)0xA55A, rawKey.Qualifier);
+		var shortRawKey = APTR.FromPointer(0x3400);
+		Assert.True(MuiIntuiMessageCodec.WriteRawKey(ref platform, shortRawKey,
+			MuiIntuiMessageCodec.RawKeyClass, (ushort)'R'));
+		Assert.True(MuiIntuiMessageCodec.TryReadRawKey(ref platform,
+			shortRawKey, out rawKey));
+		Assert.Equal((ushort)'R', rawKey.Code);
+		Assert.Equal((ushort)0, rawKey.Qualifier);
+		Assert.False(MuiIntuiMessageCodec.WriteRawKey(ref platform,
+			APTR.FromPointer(0xFFFFFFF0u), MuiIntuiMessageCodec.RawKeyClass,
+			(ushort)'X'));
+		Assert.False(MuiIntuiMessageCodec.TryReadRawKey(ref platform,
+			APTR.FromPointer(0xFFFFFFF0u), out _));
 
 		var dragAddress = APTR.FromPointer(0x3300);
 		var drag = new MuiListviewDragState

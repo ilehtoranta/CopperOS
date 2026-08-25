@@ -30,6 +30,18 @@ internal struct MuiAreaLayoutPolicyStateRecord
 	internal uint VerticalWeight;
 }
 
+internal static class MuiAreaLayoutPolicyStateValidation
+{
+	// MUIA_ShowMe is a public BOOL.  The remaining fields are ULONG inputs and
+	// must remain lossless here; their range/relationship semantics are applied
+	// by the layout consumers rather than silently rewritten at the ABI seam.
+	internal static bool IsValidState(MuiAreaLayoutPolicyStateRecord value) =>
+		value.Magic == MuiAreaLayoutPolicyStateRecord.Cookie && value.ShowMe <= 1;
+
+	internal static bool IsValidRecord(MuiAreaLayoutPolicyStateRecord value) =>
+		IsValidState(value);
+}
+
 internal enum MuiAreaLayoutPolicyField : byte
 {
 	Magic,

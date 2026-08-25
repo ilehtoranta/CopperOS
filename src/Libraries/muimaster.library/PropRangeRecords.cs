@@ -8,8 +8,9 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
-// Shared Prop/Scrollbar range state.  The ULONG fields retain MorphOS
-// semantics while movement, clamping, and drawing consume one named value.
+// Shared Prop/Scrollbar range state. MorphOS exposes these as LONG values;
+// the fixed-width ULONG fields preserve their guest wire representation while
+// movement, clamping, and drawing consume one named value.
 public struct MuiPropRangeState
 {
 	public uint Entries;
@@ -134,5 +135,47 @@ internal static class MuiPropRangeStateRecordCodec
 			MuiPropRangeStateField.Visible, value.Visible) &&
 			MuiPropRangeStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
 			MuiPropRangeStateField.First, value.First);
+	}
+}
+
+// Preserve the LONG-valued range fields losslessly for malformed-state
+// diagnostics, but admit only non-negative values whose First position is
+// reachable from Entries and Visible. The public record keeps ULONG wire
+// storage so the guest ABI remains lossless.
+internal static class MuiPropRangeStateValidation
+{
+	private const uint LongMaximum = 0x7fffffffu;
+
+	internal static bool IsValidRecord(MuiPropRangeStateRecord value)
+	{
+		var state = default(MuiPropRangeState);
+		state.Entries = value.Entries;
+		state.Visible = value.Visible;
+		state.First = value.First;
+		return IsValidState(state);
+	}
+
+	internal static bool IsValidState(MuiPropRangeState value)
+	{
+		if (value.Entries > LongMaximum || value.Visible > LongMaximum ||
+			value.First > LongMaximum) return false;
+		var last = value.Entries > value.Visible ?
+			value.Entries - value.Visible : 0u;
+		return value.First <= last;
+	}
+
+	internal static uint ClampFirst(MuiPropRangeState value)
+	{
+		var last = value.Entries > value.Visible ?
+			value.Entries - value.Visible : 0u;
+		if (value.First > LongMaximum) return 0;
+		return value.First > last ? last : value.First;
+	}
+
+	internal static uint ClampRequestedFirst(MuiPropRangeState range, uint value)
+	{
+		if (value > LongMaximum) return 0;
+		range.First = value;
+		return ClampFirst(range);
 	}
 }

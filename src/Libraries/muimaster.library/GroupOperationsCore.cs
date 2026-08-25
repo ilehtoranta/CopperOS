@@ -176,9 +176,23 @@ internal static class MuiGroupOrderingMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
+		if (!TryReadMethodIdValue(ref platform, address, out var methodId))
+			return false;
+		value.MethodId = methodId;
+		return true;
+	}
+
+	// Native selector admission stays scalar so compiler paths do not need to
+	// materialize a temporary one-field record. Public packet consumers still
+	// receive the named method and payload structs.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		return MuiGroupOrderingPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			address, MuiGroupOrderingPacketKind.Header,
-			MuiGroupOrderingPacketField.MethodId, out value.MethodId);
+			MuiGroupOrderingPacketField.MethodId, out methodId);
 	}
 
 	internal static bool WriteMoveMember<TPlatform>(ref TPlatform platform,
@@ -227,10 +241,10 @@ internal static class MuiGroupOrderingMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryReadMethodId(ref platform, address, out var header) ||
-			header.MethodId != method || !platform.IsMapped(address,
+		if (!TryReadMethodIdValue(ref platform, address, out var methodId) ||
+			methodId != method || !platform.IsMapped(address,
 			MuiGroupMoveMemberMessage.Size)) return false;
-		value.MethodId = header.MethodId;
+		value.MethodId = methodId;
 		if (!MuiGroupOrderingPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			address, MuiGroupOrderingPacketKind.MoveMember,
 			MuiGroupOrderingPacketField.Object, out value.Object) ||
@@ -246,10 +260,10 @@ internal static class MuiGroupOrderingMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryReadMethodId(ref platform, address, out var header) ||
-			header.MethodId != method || !platform.IsMapped(address,
+		if (!TryReadMethodIdValue(ref platform, address, out var methodId) ||
+			methodId != method || !platform.IsMapped(address,
 			MuiGroupReorderMessage.Size)) return false;
-		value.MethodId = header.MethodId;
+		value.MethodId = methodId;
 		if (!MuiGroupOrderingPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			address, MuiGroupOrderingPacketKind.Reorder,
 			MuiGroupOrderingPacketField.After, out value.After) ||
@@ -264,10 +278,10 @@ internal static class MuiGroupOrderingMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryReadMethodId(ref platform, address, out var header) ||
-			header.MethodId != method || !platform.IsMapped(address,
+		if (!TryReadMethodIdValue(ref platform, address, out var methodId) ||
+			methodId != method || !platform.IsMapped(address,
 			MuiGroupSortMessage.Size)) return false;
-		value.MethodId = header.MethodId;
+		value.MethodId = methodId;
 		if (!MuiGroupOrderingPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			address, MuiGroupOrderingPacketKind.Sort,
 			MuiGroupOrderingPacketField.Objects, out value.Objects)) return false;

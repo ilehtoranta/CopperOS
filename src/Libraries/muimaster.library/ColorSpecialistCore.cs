@@ -944,6 +944,14 @@ public static class MuiColorSpecialistCore
 				return true;
 
 			// -- Palette (obsolete but supported) --
+			case MuiColorAttributes.PaletteEntries:
+				if (cls != MuiColorSpecialistClass.Palette) return false;
+				value = state.Entries.Raw;
+				return true;
+			case MuiColorAttributes.PaletteNames:
+				if (cls != MuiColorSpecialistClass.Palette) return false;
+				value = state.Names.Raw;
+				return true;
 			case MuiColorAttributes.PaletteGroupable:
 				if (cls != MuiColorSpecialistClass.Palette) return false;
 				value = (state.Flags &
@@ -1040,7 +1048,7 @@ public static class MuiColorSpecialistCore
 				return true;
 
 			// -- Coloradjust -- synchronized [ISG] components / RGB / ARGB / XRGB
-			//    / Alpha / ModeID; [I.G] ShowAlpha.
+			//    / Alpha / ModeID / ShowAlpha.
 			case MuiColorAttributes.ColoradjustRed:
 				if (cls != MuiColorSpecialistClass.Coloradjust) return false;
 				changed = WriteComponent(ref platform, rgb,
@@ -1097,42 +1105,48 @@ public static class MuiColorSpecialistCore
 					changed);
 				return true;
 			case MuiColorAttributes.ColoradjustShowAlpha:
-				// [I.G]: honoured only at creation time.
-				if (cls != MuiColorSpecialistClass.Coloradjust || !isInit)
-					return cls == MuiColorSpecialistClass.Coloradjust;
+				if (cls != MuiColorSpecialistClass.Coloradjust) return false;
 				changed = SetFlag(ref platform, instance,
 					MuiColorSpecialistLayout.FlagShowAlpha, value != 0);
+				Notify(ref platform, instance, attribute, value, isInit, notify,
+					changed);
 				return true;
 
-			// -- Palette (obsolete) -- [I..] Entries / Names; [I.G] Groupable.
+			// -- Palette (obsolete) -- [I.G] Entries; [ISG] Names / Groupable.
 			case MuiColorAttributes.PaletteEntries:
-				if (cls != MuiColorSpecialistClass.Palette) return false;
-				if (isInit)
+				if (cls != MuiColorSpecialistClass.Palette || !isInit) return false;
+				changed = state.Entries.Raw != value;
+				if (changed)
 				{
 					state.Entries = APTR.FromPointer(value);
 					MuiColorSpecialistStateCodec.Write(ref platform, instance, state);
-					changed = true;
 				}
+				Notify(ref platform, instance, attribute, value, isInit, notify,
+					changed);
 				return true;
 			case MuiColorAttributes.PaletteNames:
 				if (cls != MuiColorSpecialistClass.Palette) return false;
-				if (isInit)
+				changed = state.Names.Raw != value;
+				if (changed)
 				{
 					state.Names = APTR.FromPointer(value);
 					MuiColorSpecialistStateCodec.Write(ref platform, instance, state);
-					changed = true;
 				}
+				Notify(ref platform, instance, attribute, value, isInit, notify,
+					changed);
 				return true;
 			case MuiColorAttributes.PaletteGroupable:
 				if (cls != MuiColorSpecialistClass.Palette) return false;
-				if (isInit)
-					changed = SetFlag(ref platform, instance,
-						MuiColorSpecialistLayout.FlagGroupable, value != 0);
+				changed = SetFlag(ref platform, instance,
+					MuiColorSpecialistLayout.FlagGroupable, value != 0);
+				Notify(ref platform, instance, attribute, value, isInit, notify,
+					changed);
 				return true;
 
-			// -- Penadjust (private) -- PSIMode.
+			// -- Penadjust (private) -- [I..] PSIMode.
 			case MuiColorAttributes.PenadjustPsiMode:
-				if (cls != MuiColorSpecialistClass.Penadjust) return false;
+				if (cls != MuiColorSpecialistClass.Penadjust || !isInit)
+					return false;
 				changed = SetFlag(ref platform, instance,
 					MuiColorSpecialistLayout.FlagPSIMode, value != 0);
 				return true;

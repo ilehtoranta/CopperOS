@@ -120,6 +120,43 @@ public sealed class MuiAreaShortHelpTests
 	}
 
 	[Fact]
+	public void ShortHelpMethodHeaderUsesNamedField()
+	{
+		var platform = CreatePlatform(out _);
+		var packet = APTR.FromPointer(0x1B80);
+		platform.WriteUInt32(packet, 0, MuiAreaShortHelpMessageCodec.CreateShortHelp);
+		Assert.True(MuiAreaShortHelpMessageCodec.TryReadMethodIdValue(ref platform,
+			packet, MuiAreaShortHelpPacketKind.Create, out var methodId));
+		Assert.Equal(MuiAreaShortHelpMessageCodec.CreateShortHelp, methodId);
+
+		platform.WriteUInt32(packet, 0, MuiAreaShortHelpMessageCodec.DeleteShortHelp);
+		Assert.True(MuiAreaShortHelpMessageCodec.TryReadMethodId(ref platform,
+			packet, MuiAreaShortHelpPacketKind.Delete, out var named));
+		Assert.Equal(MuiAreaShortHelpMessageCodec.DeleteShortHelp, named.MethodId);
+		Assert.False(MuiAreaShortHelpMessageCodec.TryReadMethodIdValue(ref platform,
+			APTR.FromPointer(0x20FFFu), MuiAreaShortHelpPacketKind.Check, out _));
+	}
+
+	[Fact]
+	public void CheckShortHelpPacketUsesNamedHandleAndCoordinates()
+	{
+		var platform = CreatePlatform(out _);
+		var check = APTR.FromPointer(0x1F00);
+		platform.WriteUInt32(check, 0, MuiAreaShortHelpMessageCodec.CheckShortHelp);
+		platform.WriteUInt32(check, 4, 0x1F80);
+		platform.WriteUInt32(check, 8, unchecked((uint)-23));
+		platform.WriteUInt32(check, 12, 47);
+
+		Assert.True(MuiAreaShortHelpMessageCodec.TryReadCheck(ref platform, check,
+			out var packet));
+		Assert.Equal(APTR.FromPointer(0x1F80), packet.Help);
+		Assert.Equal(-23, packet.MouseX);
+		Assert.Equal(47, packet.MouseY);
+		Assert.False(MuiAreaShortHelpMessageCodec.TryReadCheck(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+	}
+
+	[Fact]
 	public void DispatcherCreateAndDeleteShortHelpRemainCallerOwned()
 	{
 		var platform = CreatePlatform(out var areaClass);
@@ -143,6 +180,107 @@ public sealed class MuiAreaShortHelpTests
 		Assert.True(MuiAreaShortHelpPacketCore.TryGet(ref platform, State, obj,
 			out var value));
 		Assert.Equal(help, value.Text);
+	}
+
+	[Fact]
+	public void DispatcherCreateAndDeleteShortHelpUseNamedPlatformCapability()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var staticHelp = APTR.FromPointer(0x1E40);
+		var dynamicHelp = APTR.FromPointer(0x1E60);
+		Assert.True(MuiAreaShortHelpPacketCore.Set(ref platform, State, obj,
+			staticHelp));
+		platform.ShortHelpCreateSampleAvailable = true;
+		platform.ShortHelpCreateResult = dynamicHelp;
+
+		var create = APTR.FromPointer(0x1300);
+		platform.WriteUInt32(create, 0,
+			MuiAreaShortHelpMessageCodec.CreateShortHelp);
+		platform.WriteUInt32(create, 4, unchecked((uint)-12));
+		platform.WriteUInt32(create, 8, 27);
+		Assert.Equal(dynamicHelp.Raw, MuiCommonControlDispatcher.Dispatch(ref
+			platform, State, obj, create));
+		Assert.Equal(obj, platform.LastShortHelpCreateObject);
+		Assert.Equal(staticHelp, platform.LastShortHelpCreateCurrent);
+		Assert.Equal(-12, platform.LastShortHelpCreateMouseX);
+		Assert.Equal(27, platform.LastShortHelpCreateMouseY);
+
+		platform.ShortHelpDeleteSampleAvailable = true;
+		var delete = APTR.FromPointer(0x1400);
+		platform.WriteUInt32(delete, 0,
+			MuiAreaShortHelpMessageCodec.DeleteShortHelp);
+		platform.WriteUInt32(delete, 4, dynamicHelp.Raw);
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			obj, delete));
+		Assert.Equal(dynamicHelp, platform.LastShortHelpDeleted);
+	}
+
+	[Fact]
+	public void DispatcherCheckShortHelpUsesNamedPlatformCapability()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var staticHelp = APTR.FromPointer(0x1EA0);
+		var previousHelp = APTR.FromPointer(0x1EC0);
+		var dynamicHelp = APTR.FromPointer(0x1EE0);
+		Assert.True(MuiAreaShortHelpPacketCore.Set(ref platform, State, obj,
+			staticHelp));
+		platform.ShortHelpCheckSampleAvailable = true;
+		platform.ShortHelpCheckResult = dynamicHelp;
+
+		var check = APTR.FromPointer(0x1300);
+		Assert.True(MuiAreaShortHelpMessageCodec.WriteCheck(ref platform, check,
+			previousHelp, -18, 29));
+		Assert.Equal(dynamicHelp.Raw, MuiCommonControlDispatcher.Dispatch(ref
+			platform, State, obj, check));
+		Assert.Equal(obj, platform.LastShortHelpCheckObject);
+		Assert.Equal(previousHelp, platform.LastShortHelpCheckCurrent);
+		Assert.Equal(-18, platform.LastShortHelpCheckMouseX);
+		Assert.Equal(29, platform.LastShortHelpCheckMouseY);
+	}
+
+	[Fact]
+	public void DispatcherCheckShortHelpRejectsProviderIdentityMutation()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiAreaShortHelpPacketCore.Set(ref platform, State, obj,
+			APTR.FromPointer(0x1F00)));
+		platform.ShortHelpCheckSampleAvailable = true;
+		platform.ShortHelpCheckSampleMutatesIdentity = true;
+
+		var check = APTR.FromPointer(0x1300);
+		Assert.True(MuiAreaShortHelpMessageCodec.WriteCheck(ref platform, check,
+			APTR.FromPointer(0x1F20), 4, 5));
+		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			obj, check));
+	}
+
+	[Fact]
+	public void DispatcherCheckShortHelpReturnsCallerOwnedPointer()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var help = APTR.FromPointer(0x1E80);
+		Assert.True(MuiAreaShortHelpPacketCore.Set(ref platform, State, obj, help));
+
+		var check = APTR.FromPointer(0x1300);
+		platform.WriteUInt32(check, 0, MuiAreaShortHelpMessageCodec.CheckShortHelp);
+		platform.WriteUInt32(check, 4, 0x1E80);
+		platform.WriteUInt32(check, 8, unchecked((uint)-7));
+		platform.WriteUInt32(check, 12, 19);
+		Assert.Equal(help.Raw, MuiCommonControlDispatcher.Dispatch(ref platform,
+			State, obj, check));
+
+		Assert.True(MuiAreaShortHelpPacketCore.Set(ref platform, State, obj,
+			APTR.Null));
+		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform,
+			State, obj, check));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR areaClass)

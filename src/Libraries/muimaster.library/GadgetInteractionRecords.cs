@@ -147,3 +147,18 @@ internal static class MuiGadgetInteractionStateRecordCodec
 			value.ShowSelState);
 	}
 }
+
+// The codec deliberately preserves guest bytes for corruption inspection.
+// Admission is separate: InputMode is the documented four-value enum and the
+// remaining fields are MorphOS BOOL projections. Consumers must not turn an
+// invalid named record into a usable interaction state by normalizing it.
+internal static class MuiGadgetInteractionStateValidation
+{
+	internal static bool IsValidRecord(MuiGadgetInteractionStateRecord value) =>
+		value.InputMode <= 3 && value.Selected <= 1 && value.Pressed <= 1 &&
+		value.ShowSelState <= 1;
+
+	internal static bool IsValidState(MuiGadgetInteractionState value) =>
+		value.InputMode <= 3 && value.Selected <= 1 && value.Pressed <= 1 &&
+		value.ShowSelState <= 1;
+}

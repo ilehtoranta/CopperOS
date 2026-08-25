@@ -39,6 +39,12 @@ public static class MuiLayoutServiceCore
 		// MUI_Layout is normally called by a custom group hook for one child.
 		// Preserve class-specific geometry where the corresponding bounded core
 		// already exists, then use the Area fallback for every other object.
+		if (MuiScrollgroupCore.IsObject(ref platform, state, obj))
+			return MuiScrollgroupCore.Layout(ref platform, state, obj, left, top,
+				width, height);
+		if (MuiVirtgroupCore.IsObject(ref platform, state, obj))
+			return MuiVirtgroupCore.Layout(ref platform, state, obj, left, top, width,
+				height);
 		var collection = MuiListCore.Classify(ref platform, state, obj);
 		switch (collection)
 		{

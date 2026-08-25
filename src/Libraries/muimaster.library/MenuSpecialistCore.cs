@@ -394,6 +394,21 @@ public static class MuiMenuSpecialistCore
 		APTR state, APTR obj, APTR sc, MuiMenuSpecialistClass cls)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		// Menustrip CaseSensitive is [I.G]. The generic object factory applies
+		// creation tags before this sidecar exists, so import the raw bootstrap
+		// value into the named policy record before public Get/OM_GET is enabled.
+		if (cls == MuiMenuSpecialistClass.Menustrip &&
+			MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+				MuiMenuAttributes.Menustrip_CaseSensitive, out var caseSensitive) &&
+			caseSensitive != 0)
+		{
+			if (!MuiMenuSpecialistStateCodec.TryRead(ref platform, sc,
+				out var menustripState)) return false;
+			menustripState.Flags |= MuiMenuSpecialistLayout.FlagCaseSensitive;
+			if (!MuiMenuSpecialistStateCodec.Write(ref platform, sc,
+				menustripState)) return false;
+		}
+
 		var copyAttribute = cls == MuiMenuSpecialistClass.Menu
 			? MuiMenuAttributes.Menu_CopyStrings
 			: cls == MuiMenuSpecialistClass.Menuitem
@@ -736,9 +751,9 @@ public static class MuiMenuSpecialistCore
 
 	// ---- Attribute get -------------------------------------------------------
 
-	// Read a menu attribute honoring the official I/S/G policy. Init-only
-	// attributes (CopyStrings, CaseSensitive) are not exposed here per their
-	// [I..] policy and are read through their dedicated accessors instead.
+	// Read a menu attribute honoring the official I/S/G policy. Menu and
+	// Menuitem CopyStrings remain init-only and are not exposed here; the
+	// Menustrip CaseSensitive latch is [I.G] and is projected from named state.
 	public static bool GetAttribute<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, uint attribute, out uint value)
 		where TPlatform : struct, IMuiHeadlessPlatform
@@ -760,6 +775,10 @@ public static class MuiMenuSpecialistCore
 			case MuiMenuAttributes.Menustrip_Enabled:
 				if (cls != MuiMenuSpecialistClass.Menustrip) return false;
 				return ReadStored(ref platform, state, obj, attribute, out value);
+			case MuiMenuAttributes.Menustrip_CaseSensitive:
+				if (cls != MuiMenuSpecialistClass.Menustrip) return false;
+				value = CaseSensitiveFlag(ref platform, state, obj) ? 1u : 0u;
+				return true;
 
 			case MuiMenuAttributes.Menu_Enabled:
 			case MuiMenuAttributes.Menu_Title:
@@ -781,11 +800,20 @@ public static class MuiMenuSpecialistCore
 				if (cls != MuiMenuSpecialistClass.Menuitem) return false;
 				value = Trigger(ref platform, state, obj);
 				return true;
+
+			case MuiMenuAttributes.Menuitem_Menuitem:
+				// MorphOS documents this submenu convenience as [ISG]. The
+				// Family child list is the named, guest-resident source of truth;
+				// expose its first child without a parallel raw pointer slot.
+				if (cls != MuiMenuSpecialistClass.Menuitem) return false;
+				value = MuiFamilyCore.GetChild(ref platform, state, obj, 0,
+					APTR.Null).Raw;
+				return true;
 		}
 		return false;
 	}
 
-	// Init-only accessors (honor [I..]: not exposed through OM_GET).
+	// Named policy accessors used by internal construction and behavior paths.
 	public static bool CopyStringsFlag<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
@@ -823,15 +851,16 @@ public static class MuiMenuSpecialistCore
 
 		switch (attribute)
 		{
-			// -- Menustrip -- [ISG] Enabled; [I..] CaseSensitive
+			// -- Menustrip -- [ISG] Enabled; [I.G] CaseSensitive
 			case MuiMenuAttributes.Menustrip_Enabled:
 				if (cls != MuiMenuSpecialistClass.Menustrip) return false;
 				changed = SetBool(ref platform, state, obj, sc, attribute, value,
 					isInit, notify);
 				return true;
 			case MuiMenuAttributes.Menustrip_CaseSensitive:
-				if (cls != MuiMenuSpecialistClass.Menustrip) return false;
-				if (isInit) changed = SetFlag(ref platform, sc,
+				if (cls != MuiMenuSpecialistClass.Menustrip || !isInit)
+					return false;
+				changed = SetFlag(ref platform, sc,
 					MuiMenuSpecialistLayout.FlagCaseSensitive, value != 0);
 				return true;
 
@@ -853,7 +882,7 @@ public static class MuiMenuSpecialistCore
 				return true;
 
 			// -- Menuitem -- [ISG] Title/Shortcut/Checkit/Checked/Toggle/
-			//    CommandString/Enabled/Exclude; [I..] CopyStrings/Menuitem
+			//    CommandString/Enabled/Exclude/Menuitem; [I..] CopyStrings
 			case MuiMenuAttributes.Menuitem_Title:
 				if (cls != MuiMenuSpecialistClass.Menuitem) return false;
 				return SetString(ref platform, state, obj, sc, attribute,
@@ -890,9 +919,28 @@ public static class MuiMenuSpecialistCore
 					MuiMenuSpecialistLayout.FlagCopyStrings, value != 0);
 				return true;
 			case MuiMenuAttributes.Menuitem_Menuitem:
-				// [I..] convenience: adopt an already-created sub-item.
-				if (cls != MuiMenuSpecialistClass.Menuitem || !isInit) return false;
+				// [ISG] convenience: adopt an already-created sub-item. The
+				// family topology remains authoritative for the getter.
+				if (cls != MuiMenuSpecialistClass.Menuitem) return false;
 				changed = AddChild(ref platform, state, obj, APTR.FromPointer(value));
+				if (changed && !isInit && notify)
+					Notify(ref platform, state, sc, attribute, value);
+				return true;
+			case MuiMenuAttributes.Menuitem_Trigger:
+				// MorphOS exposes Trigger as [.SG]: it is a runtime publication
+				// token, not an initialization tag. Keep the named sidecar field
+				// authoritative and notify only when the token changes.
+				if (cls != MuiMenuSpecialistClass.Menuitem || isInit)
+					return false;
+				changed = sidecar.Trigger != value;
+				if (changed)
+				{
+					sidecar.Trigger = value;
+					if (!MuiMenuSpecialistStateCodec.Write(ref platform, sc, sidecar))
+						return false;
+				}
+				if (changed && notify)
+					Notify(ref platform, state, sc, attribute, value);
 				return true;
 
 			// -- Family -- [I..] Child (adopt at construction)
@@ -1185,7 +1233,7 @@ public static class MuiMenuSpecialistCore
 //
 // I/S/G policy (from the MUI class autodocs):
 //   Menustrip.mui : Family.mui
-//     MUIA_Menustrip_CaseSensitive [I..] BOOL  (default FALSE)
+//     MUIA_Menustrip_CaseSensitive [I.G] LONG  (default FALSE)
 //     MUIA_Menustrip_Enabled       [ISG] BOOL  (default TRUE)
 //     MUIM_Menustrip_InitChange / _ExitChange / _WillOpen / _Popup
 //   Menu.mui : Family.mui
@@ -1202,8 +1250,8 @@ public static class MuiMenuSpecialistCore
 //     MUIA_Menuitem_Enabled        [ISG] BOOL  (default TRUE)
 //     MUIA_Menuitem_CommandString  [ISG] BOOL
 //     MUIA_Menuitem_CopyStrings    [I..] BOOL
-//     MUIA_Menuitem_Menuitem       [I..] Object *
-//     MUIA_Menuitem_Trigger        [..G] struct MenuItem *
+//     MUIA_Menuitem_Menuitem       [ISG] Object *
+//     MUIA_Menuitem_Trigger        [.SG] struct MenuItem *
 //   Family.mui (shared superclass)
 //     MUIA_Family_Child            [I..] Object *
 //     MUIA_Family_ChildCount       [..G] LONG

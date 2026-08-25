@@ -127,16 +127,29 @@ internal static class MuiListHeaderCodec
 		out MuiListHeaderState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		if (!TryReadStorage(ref platform, address, out value) ||
+			value.Magic != MuiListHeaderState.Cookie)
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	// Read all named fields without trusting the runtime cookie. The List core
+	// applies its bounded capacity/index validation separately so disposal can
+	// recover a structurally valid header after cookie damage.
+	internal static bool TryReadStorage<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiListHeaderState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiListHeaderState.Size) ||
 			!MuiListHeaderFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiListHeaderField.Magic, out var magic) ||
-			magic != MuiListHeaderState.Cookie)
-			return false;
-		value.Magic = MuiListHeaderState.Cookie;
-		if (!MuiListHeaderFieldCursorCodec.TryReadUInt32(ref platform, address,
-			MuiListHeaderField.Index, out var index) ||
+				MuiListHeaderField.Magic, out value.Magic) ||
+			!MuiListHeaderFieldCursorCodec.TryReadUInt32(ref platform, address,
+				MuiListHeaderField.Index, out var index) ||
 			!MuiListHeaderFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiListHeaderField.Capacity, out value.Capacity) ||
 			!MuiListHeaderFieldCursorCodec.TryReadUInt32(ref platform, address,
@@ -165,6 +178,129 @@ internal static class MuiListHeaderCodec
 				MuiListHeaderField.Count, value.Count) &&
 			MuiListHeaderFieldCursorCodec.TryWriteUInt32(ref platform, address,
 				MuiListHeaderField.Images, value.Images.Raw);
+	}
+}
+
+// A List adopted by Listview keeps the reverse relationship in a bounded
+// guest record.  The record is state, not a second public object-layout word;
+// selection propagation can therefore reject malformed ownership without
+// consulting an untrusted scalar pointer.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiListviewOwnerState
+{
+	internal const uint Size = 8;
+	internal const uint Cookie = 0x4C564F57u; // 'LVOW'
+
+	internal uint Magic;
+	internal APTR Owner;
+}
+
+internal enum MuiListviewOwnerStateField : byte
+{
+	Magic,
+	Owner,
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiListviewOwnerStateFieldCursor
+{
+	internal APTR Record;
+	internal MuiListviewOwnerStateField Field;
+}
+
+internal static class MuiListviewOwnerStateFieldCursorCodec
+{
+	private static bool TryResolve(MuiListviewOwnerStateField field,
+		out uint offset)
+	{
+		offset = field switch
+		{
+			MuiListviewOwnerStateField.Magic => 0,
+			MuiListviewOwnerStateField.Owner => 4,
+			_ => uint.MaxValue,
+		};
+		return offset != uint.MaxValue;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiListviewOwnerStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
+			cursor.Record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(cursor.Record, MuiListviewOwnerState.Size))
+			return false;
+		address = APTR.FromPointer(cursor.Record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiListviewOwnerStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		var cursor = default(MuiListviewOwnerStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiListviewOwnerStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiListviewOwnerStateFieldCursor);
+		cursor.Record = record;
+		cursor.Field = field;
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
+internal static class MuiListviewOwnerStateCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiListviewOwnerState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiListviewOwnerState.Size) ||
+			!MuiListviewOwnerStateFieldCursorCodec.TryReadUInt32(ref platform,
+				address, MuiListviewOwnerStateField.Magic, out var magic) ||
+			magic != MuiListviewOwnerState.Cookie ||
+			!MuiListviewOwnerStateFieldCursorCodec.TryReadUInt32(ref platform,
+				address, MuiListviewOwnerStateField.Owner, out var owner))
+			return false;
+		value.Magic = magic;
+		value.Owner = APTR.FromPointer(owner);
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiListviewOwnerState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiListviewOwnerState.Size) || value.Magic !=
+			MuiListviewOwnerState.Cookie) return false;
+		return MuiListviewOwnerStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiListviewOwnerStateField.Magic, value.Magic) &&
+			MuiListviewOwnerStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiListviewOwnerStateField.Owner, value.Owner.Raw);
+	}
+
+	internal static bool Clear<TPlatform>(ref TPlatform platform, APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiListviewOwnerState.Size)) return false;
+		platform.Clear(address, MuiListviewOwnerState.Size);
+		return true;
 	}
 }
 
@@ -909,6 +1045,174 @@ public static class MuiListCore
 		}
 	}
 
+	// Layout publishes a named owner record for the contiguous geometry vector.
+	// Keeping the vector pointer, width, and column count together prevents a
+	// stale scalar alias from being paired with an unrelated guest allocation.
+	[StructLayout(LayoutKind.Sequential, Pack = 2)]
+	internal struct MuiListColumnLayoutState
+	{
+		internal const uint Size = 16;
+		internal const uint Cookie = 0x434C4159u; // 'CLAY'
+		internal uint Magic;
+		internal uint Width;
+		internal uint Columns;
+		internal APTR Values;
+	}
+
+	internal enum MuiListColumnLayoutField : byte
+	{
+		Magic,
+		Width,
+		Columns,
+		Values,
+	}
+
+	[StructLayout(LayoutKind.Sequential, Pack = 2)]
+	internal struct MuiListColumnLayoutFieldCursor
+	{
+		internal APTR Address;
+		internal MuiListColumnLayoutField Field;
+	}
+
+	internal static class MuiListColumnLayoutFieldCursorCodec
+	{
+		private static bool TryResolve(MuiListColumnLayoutField field,
+			out uint offset)
+		{
+			switch (field)
+			{
+				case MuiListColumnLayoutField.Magic:
+					offset = 0;
+					return true;
+				case MuiListColumnLayoutField.Width:
+					offset = 4;
+					return true;
+				case MuiListColumnLayoutField.Columns:
+					offset = 8;
+					return true;
+				case MuiListColumnLayoutField.Values:
+					offset = 12;
+					return true;
+			}
+			offset = 0;
+			return false;
+		}
+
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListColumnLayoutFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			address = APTR.Null;
+			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
+				cursor.Address.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(cursor.Address, MuiListColumnLayoutState.Size))
+				return false;
+			address = APTR.FromPointer(cursor.Address.Raw + offset);
+			return platform.IsMapped(address, 4);
+		}
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnLayoutField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = 0;
+			var cursor = default(MuiListColumnLayoutFieldCursor);
+			cursor.Address = address;
+			cursor.Field = field;
+			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			value = platform.ReadUInt32(fieldAddress, 0);
+			return true;
+		}
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnLayoutField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			var cursor = default(MuiListColumnLayoutFieldCursor);
+			cursor.Address = address;
+			cursor.Field = field;
+			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			platform.WriteUInt32(fieldAddress, 0, value);
+			return true;
+		}
+	}
+
+	internal static class MuiListColumnLayoutStateCodec
+	{
+		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
+			MuiListColumnLayoutState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (block.IsNull || !platform.IsMapped(block,
+				MuiListColumnLayoutState.Size) || value.Magic !=
+				MuiListColumnLayoutState.Cookie || value.Width > int.MaxValue ||
+				value.Columns == 0 || value.Columns > MaximumGeometryColumns ||
+				value.Values.IsNull || !platform.IsMapped(value.Values,
+					value.Columns * MuiListColumnGeometry.Size)) return false;
+			return MuiListColumnLayoutFieldCursorCodec.TryWriteUInt32(ref platform,
+				block, MuiListColumnLayoutField.Magic, value.Magic) &&
+				MuiListColumnLayoutFieldCursorCodec.TryWriteUInt32(ref platform,
+					block, MuiListColumnLayoutField.Width, value.Width) &&
+				MuiListColumnLayoutFieldCursorCodec.TryWriteUInt32(ref platform,
+					block, MuiListColumnLayoutField.Columns, value.Columns) &&
+				MuiListColumnLayoutFieldCursorCodec.TryWriteUInt32(ref platform,
+					block, MuiListColumnLayoutField.Values, value.Values.Raw);
+		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
+			out MuiListColumnLayoutState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (block.IsNull || !platform.IsMapped(block,
+				MuiListColumnLayoutState.Size) ||
+				!MuiListColumnLayoutFieldCursorCodec.TryReadUInt32(ref platform,
+					block, MuiListColumnLayoutField.Magic, out var magic) ||
+				magic != MuiListColumnLayoutState.Cookie ||
+				!MuiListColumnLayoutFieldCursorCodec.TryReadUInt32(ref platform,
+					block, MuiListColumnLayoutField.Width, out var width) ||
+				width > int.MaxValue ||
+				!MuiListColumnLayoutFieldCursorCodec.TryReadUInt32(ref platform,
+					block, MuiListColumnLayoutField.Columns, out var columns) ||
+				columns == 0 || columns > MaximumGeometryColumns ||
+				!MuiListColumnLayoutFieldCursorCodec.TryReadUInt32(ref platform,
+					block, MuiListColumnLayoutField.Values, out var valuesRaw))
+				return false;
+			var values = APTR.FromPointer(valuesRaw);
+			if (values.IsNull || !platform.IsMapped(values,
+				columns * MuiListColumnGeometry.Size)) return false;
+			value.Magic = magic;
+			value.Width = width;
+			value.Columns = columns;
+			value.Values = values;
+			return true;
+		}
+
+		// Teardown may use bounded structural fields after runtime admission has
+		// rejected the record. The vector pointer is returned only for a bounded
+		// column count; callers still verify its mapping before clearing/freeing.
+		internal static bool TryReadStorage<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListColumnLayoutState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (block.IsNull || !platform.IsMapped(block,
+				MuiListColumnLayoutState.Size) ||
+				!MuiListColumnLayoutFieldCursorCodec.TryReadUInt32(ref platform,
+					block, MuiListColumnLayoutField.Magic, out value.Magic) ||
+				!MuiListColumnLayoutFieldCursorCodec.TryReadUInt32(ref platform,
+					block, MuiListColumnLayoutField.Width, out value.Width) ||
+				!MuiListColumnLayoutFieldCursorCodec.TryReadUInt32(ref platform,
+					block, MuiListColumnLayoutField.Columns, out value.Columns) ||
+				!MuiListColumnLayoutFieldCursorCodec.TryReadUInt32(ref platform,
+					block, MuiListColumnLayoutField.Values, out var valuesRaw) ||
+				value.Columns == 0 || value.Columns > MaximumGeometryColumns)
+				return false;
+			value.Values = APTR.FromPointer(valuesRaw);
+			return true;
+		}
+	}
+
 	// Layout publishes a bounded table of {offset,width} records. Keep the
 	// geometry index as a named cursor so both the public projection and the
 	// cached layout reader share one overflow-checked guest boundary.
@@ -957,6 +1261,7 @@ public static class MuiListCore
 
 	internal enum MuiListStateRecordKind : byte
 	{
+		InsertPosition,
 		TitleArray,
 		TitleValue,
 		SelectionSignal,
@@ -1032,6 +1337,7 @@ public static class MuiListCore
 		AutoVisible,
 		AutoLineHeight,
 		MinLineHeight,
+		Position,
 	}
 
 	[StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -1051,6 +1357,19 @@ public static class MuiListCore
 			size = 0;
 			switch (record)
 			{
+				case MuiListStateRecordKind.InsertPosition:
+					switch (field)
+					{
+						case MuiListStateField.Magic:
+							offset = 0;
+							size = 8;
+							return true;
+						case MuiListStateField.Position:
+							offset = 4;
+							size = 8;
+							return true;
+					}
+					break;
 				case MuiListStateRecordKind.TitleArray:
 					switch (field)
 					{
@@ -1575,6 +1894,169 @@ public static class MuiListCore
 		}
 	}
 
+	// A FORMAT descriptor table owns a contiguous vector of named descriptor
+	// records. Keep the vector pointer and bounded count together so consumers
+	// cannot accidentally pair a stale scalar alias with an unrelated table.
+	[StructLayout(LayoutKind.Sequential, Pack = 2)]
+	internal struct MuiListFormatDescriptorState
+	{
+		internal const uint Size = 12;
+		internal const uint Cookie = 0x46445452u; // 'FDTR'
+		internal uint Magic;
+		internal uint Columns;
+		internal APTR Values;
+	}
+
+	internal enum MuiListFormatDescriptorStateField : byte
+	{
+		Magic,
+		Columns,
+		Values,
+	}
+
+	[StructLayout(LayoutKind.Sequential, Pack = 2)]
+	internal struct MuiListFormatDescriptorStateFieldCursor
+	{
+		internal APTR Address;
+		internal MuiListFormatDescriptorStateField Field;
+	}
+
+	internal static class MuiListFormatDescriptorStateFieldCursorCodec
+	{
+		private static bool TryResolve(MuiListFormatDescriptorStateField field,
+			out uint offset)
+		{
+			switch (field)
+			{
+				case MuiListFormatDescriptorStateField.Magic:
+					offset = 0;
+					return true;
+				case MuiListFormatDescriptorStateField.Columns:
+					offset = 4;
+					return true;
+				case MuiListFormatDescriptorStateField.Values:
+					offset = 8;
+					return true;
+			}
+			offset = 0;
+			return false;
+		}
+
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListFormatDescriptorStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			address = APTR.Null;
+			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
+				cursor.Address.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(cursor.Address,
+					MuiListFormatDescriptorState.Size)) return false;
+			address = APTR.FromPointer(cursor.Address.Raw + offset);
+			return platform.IsMapped(address, 4);
+		}
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFormatDescriptorStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = 0;
+			var cursor = default(MuiListFormatDescriptorStateFieldCursor);
+			cursor.Address = address;
+			cursor.Field = field;
+			if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+				return false;
+			value = platform.ReadUInt32(fieldAddress, 0);
+			return true;
+		}
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFormatDescriptorStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			var cursor = default(MuiListFormatDescriptorStateFieldCursor);
+			cursor.Address = address;
+			cursor.Field = field;
+			if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+				return false;
+			platform.WriteUInt32(fieldAddress, 0, value);
+			return true;
+		}
+	}
+
+	internal static class MuiListFormatDescriptorStateCodec
+	{
+		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
+			MuiListFormatDescriptorState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (block.IsNull || !platform.IsMapped(block,
+				MuiListFormatDescriptorState.Size) || value.Magic !=
+				MuiListFormatDescriptorState.Cookie || value.Columns == 0 ||
+				value.Columns > MuiListFormatDescriptorCursor.MaximumEntries ||
+				value.Values.IsNull || !platform.IsMapped(value.Values,
+					value.Columns * MuiListFormatDescriptor.Size)) return false;
+			return MuiListFormatDescriptorStateFieldCursorCodec.TryWriteUInt32(
+				ref platform, block, MuiListFormatDescriptorStateField.Magic,
+				value.Magic) &&
+				MuiListFormatDescriptorStateFieldCursorCodec.TryWriteUInt32(
+					ref platform, block, MuiListFormatDescriptorStateField.Columns,
+					value.Columns) &&
+				MuiListFormatDescriptorStateFieldCursorCodec.TryWriteUInt32(
+					ref platform, block, MuiListFormatDescriptorStateField.Values,
+					value.Values.Raw);
+		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
+			out MuiListFormatDescriptorState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (block.IsNull || !platform.IsMapped(block,
+				MuiListFormatDescriptorState.Size) ||
+				!MuiListFormatDescriptorStateFieldCursorCodec.TryReadUInt32(
+					ref platform, block, MuiListFormatDescriptorStateField.Magic,
+					out var magic) || magic != MuiListFormatDescriptorState.Cookie ||
+				!MuiListFormatDescriptorStateFieldCursorCodec.TryReadUInt32(
+					ref platform, block, MuiListFormatDescriptorStateField.Columns,
+					out var columns) || columns == 0 ||
+				columns > MuiListFormatDescriptorCursor.MaximumEntries ||
+				!MuiListFormatDescriptorStateFieldCursorCodec.TryReadUInt32(
+					ref platform, block, MuiListFormatDescriptorStateField.Values,
+					out var valuesRaw)) return false;
+			var values = APTR.FromPointer(valuesRaw);
+			if (values.IsNull || !platform.IsMapped(values,
+				columns * MuiListFormatDescriptor.Size)) return false;
+			value.Magic = magic;
+			value.Columns = columns;
+			value.Values = values;
+			return true;
+		}
+
+		// Teardown may reclaim a bounded descriptor vector even when runtime
+		// admission rejected its cookie. The count remains bounded and the vector
+		// is still checked for mapping by the owning cleanup helper.
+		internal static bool TryReadStorage<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListFormatDescriptorState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (block.IsNull || !platform.IsMapped(block,
+				MuiListFormatDescriptorState.Size) ||
+				!MuiListFormatDescriptorStateFieldCursorCodec.TryReadUInt32(
+					ref platform, block, MuiListFormatDescriptorStateField.Magic,
+					out value.Magic) ||
+				!MuiListFormatDescriptorStateFieldCursorCodec.TryReadUInt32(
+					ref platform, block, MuiListFormatDescriptorStateField.Columns,
+					out value.Columns) || value.Columns == 0 ||
+				value.Columns > MuiListFormatDescriptorCursor.MaximumEntries ||
+				!MuiListFormatDescriptorStateFieldCursorCodec.TryReadUInt32(
+					ref platform, block, MuiListFormatDescriptorStateField.Values,
+					out var valuesRaw)) return false;
+			value.Values = APTR.FromPointer(valuesRaw);
+			return true;
+		}
+	}
+
 	// A FORMAT value is a ReadArgs item, not a managed string. The source span
 	// remains guest-addressed while DecodedLength records the value that would
 	// be produced by DOS ReadItem's quoted star escapes.
@@ -1707,22 +2189,39 @@ public static class MuiListCore
 			APTR block, out MuiListColumnMetricsState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
+			if (!TryReadStorage(ref platform, block, out value) ||
+				value.Magic != ColumnMetricsCookie)
+			{
+				value = default;
+				return false;
+			}
+			return true;
+		}
+
+		// Teardown must be able to retire the owned Values vector even when a
+		// caller or memory fault has damaged only the record cookie. This reader
+		// validates the bounded value-type fields and guest allocation separately
+		// from the magic used for runtime admission.
+		internal static bool TryReadStorage<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListColumnMetricsState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
 			value = default;
 			if (block.IsNull || !platform.IsMapped(block,
 				MuiListColumnMetricsState.Size) ||
 				!MuiListColumnMetricsFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListColumnMetricsField.Magic, out var magic) ||
-				magic != ColumnMetricsCookie) return false;
-			value.Magic = ColumnMetricsCookie;
-			if (!MuiListColumnMetricsFieldCursorCodec.TryReadUInt32(ref platform, block,
-				MuiListColumnMetricsField.Width, out value.Width) ||
+					MuiListColumnMetricsField.Magic, out value.Magic) ||
+				!MuiListColumnMetricsFieldCursorCodec.TryReadUInt32(ref platform, block,
+					MuiListColumnMetricsField.Width, out value.Width) ||
 				!MuiListColumnMetricsFieldCursorCodec.TryReadUInt32(ref platform, block,
 					MuiListColumnMetricsField.Columns, out value.Columns) ||
 				!MuiListColumnMetricsFieldCursorCodec.TryReadUInt32(ref platform, block,
 					MuiListColumnMetricsField.Values, out var values)) return false;
 			value.Values = APTR.FromPointer(values);
-			return value.Columns != 0 &&
-				value.Columns <= MaximumGeometryColumns && value.Values.IsNotNull;
+			if (value.Columns == 0 || value.Columns > MaximumGeometryColumns ||
+				value.Values.IsNull) return false;
+			var bytes = value.Columns * MuiListColumnMetricValue.Size;
+			return platform.IsMapped(value.Values, bytes);
 		}
 	}
 
@@ -2177,6 +2676,19 @@ public static class MuiListCore
 		public uint Active;
 	}
 
+	// MUIA_List_InsertPosition is a getter-only result published by the last
+	// successful insertion. Keep its signed LONG projection in a named record so
+	// public Get/OM_GET does not depend on an untyped scalar attribute slot.
+	[StructLayout(LayoutKind.Sequential, Pack = 2)]
+	internal struct MuiListInsertPositionState
+	{
+		internal const uint Size = 8;
+		internal const uint Cookie = 0x4C494E53u; // 'LINS'
+
+		internal uint Magic;
+		internal uint Position;
+	}
+
 	// The public pixel viewport attributes are derived from the same bounded
 	// row geometry as Layout and hit-testing. Keep the values in one named
 	// guest record so callers never depend on private attribute offsets.
@@ -2288,11 +2800,11 @@ public static class MuiListCore
 
 	// MUIA_List_Pool, MUIA_List_PoolPuddleSize, and
 	// MUIA_List_PoolThreshSize are one construction policy. Keep the policy in
-	// a named guest record so future internal-pool allocation can consume the
-	// same state without scattering three independent attribute reads through
-	// construct/destruct paths. The current freestanding profile accepts a
-	// caller-owned pool and otherwise leaves allocation to the platform seam;
-	// it does not invent an Exec pool in managed code.
+	// a named guest record so the native Exec pool handle and its ownership stay
+	// explicit. A caller-supplied pool is borrowed; when it is omitted the
+	// platform creates the list-owned standard Exec pool used by construct and
+	// destruct hooks. No host allocator or managed object is hidden in this
+	// record.
 	[StructLayout(LayoutKind.Sequential, Pack = 2)]
 	internal struct MuiListPoolPolicyState
 	{
@@ -2416,7 +2928,10 @@ public static class MuiListCore
 					address, MuiListPoolPolicyField.UsesExternalPool,
 					out var external)) return false;
 			value.Pool = APTR.FromPointer(pool);
-			value.UsesExternalPool = external == 0 ? 0u : 1u;
+			// Preserve the guest BOOL until policy admission validates it. The
+			// allocator-provenance record must not turn malformed state into a
+			// valid external-pool flag before consumers can fail closed.
+			value.UsesExternalPool = external;
 			return true;
 		}
 
@@ -2461,11 +2976,11 @@ public static class MuiListCore
 	}
 
 	// ---- Public attribute identifiers (autodoc MUI_List.doc) -----------------
-	private const uint Active = 0x8042391cu;          // [ISG] LONG
-	private const uint Editable = 0x8042f9b9u;       // [ISG] BOOL
-	private const uint Entries = 0x80421654u;         // [..G] LONG
-	private const uint First = 0x804238d4u;           // [.SG] LONG
-	private const uint Visible = 0x8042191fu;         // [..G] LONG
+	public const uint Active = 0x8042391cu;          // [ISG] LONG
+	public const uint Editable = 0x8042f9b9u;       // [ISG] BOOL
+	public const uint Entries = 0x80421654u;         // [..G] LONG
+	public const uint First = 0x804238d4u;           // [.SG] LONG
+	public const uint Visible = 0x8042191fu;         // [..G] LONG
 	// MorphOS publishes -1 when the List has no visible geometry (for example
 	// while its window is iconified). Keep the ABI sentinel named so composite
 	// scroller code never mistakes it for a huge row capacity.
@@ -2475,44 +2990,44 @@ public static class MuiListCore
 	private const uint DisplayHook = 0x8042b4d5u;     // [IS.] struct Hook *
 	private const uint CompareHook = 0x80425c14u;     // [IS.] struct Hook *
 	private const uint SourceArray = 0x8042c0a0u;     // [I..] APTR
-	private const uint Pool = 0x80423431u;            // [I.G] APTR
-	private const uint Quiet = 0x8042d8c7u;           // [.SG] BOOL
-	private const uint SelectChange = 0x8042178fu;    // [..G] BOOL
+	public const uint Pool = 0x80423431u;             // [I.G] APTR
+	public const uint Quiet = 0x8042d8c7u;           // [.SG] BOOL
+	public const uint SelectChange = 0x8042178fu;    // [..G] BOOL
 	private const uint Input = 0x8042682du;           // [I..] BOOL
 	private const uint MultiSelect = 0x80427e08u;     // [I..] LONG
 	private const uint ScrollerPos = 0x8042b1b4u;     // [I..] LONG
-	private const uint AgainClick = 0x804214c2u;      // [ISG] BOOL
-	private const uint ClickColumn = 0x8042d1b3u;     // [.SG] LONG
-	private const uint DefClickColumn = 0x8042b296u;  // [ISG] LONG
-	private const uint DoubleClick = 0x80424635u;     // [ISG] BOOL
+	public const uint AgainClick = 0x804214c2u;      // [ISG] BOOL
+	public const uint ClickColumn = 0x8042d1b3u;     // [.SG] LONG
+	public const uint DefClickColumn = 0x8042b296u;  // [ISG] LONG
+	public const uint DoubleClick = 0x80424635u;     // [ISG] BOOL
 	private const uint MultiTestHook = 0x8042c2c6u;   // [IS.] struct Hook *
-	private const uint SortColumn = 0x8042cafbu;      // [ISG] LONG
+	public const uint SortColumn = 0x8042cafbu;      // [ISG] LONG
 	private const uint PoolPuddleSize = 0x8042a4ebu;  // [I..] ULONG
 	private const uint PoolThreshSize = 0x8042c48cu;   // [I..] ULONG
-	private const uint InsertPosition = 0x8042d0cdu;  // [..G] LONG
-	private const uint Format = 0x80423c0au;           // [ISG] STRPTR
+	public const uint InsertPosition = 0x8042d0cdu;   // [..G] LONG
+	public const uint Format = 0x80423c0au;           // [ISG] STRPTR
 	private const uint MaxColumns = 0x8042a98bu;       // [I..] LONG
 	private const uint AdjustHeight = 0x8042850du;     // [I..] BOOL
 	private const uint AdjustWidth = 0x8042354au;      // [I..] BOOL
-	private const uint Stripes = 0x8042a308u;          // [ISG] BOOL
-	private const uint DropMark = 0x8042aba6u;         // [..G] LONG
-	private const uint ShowDropMarks = 0x8042c6f3u;    // [ISG] BOOL
-	private const uint DragSortable = 0x80426099u;     // [ISG] BOOL
-	private const uint DragType = 0x80425cd3u;         // [ISG] LONG
-	private const uint AutoVisible = 0x8042a445u;      // [ISG] BOOL
+	public const uint Stripes = 0x8042a308u;           // [ISG] BOOL
+	public const uint DropMark = 0x8042aba6u;         // [..G] LONG
+	public const uint ShowDropMarks = 0x8042c6f3u;     // [ISG] BOOL
+	public const uint DragSortable = 0x80426099u;      // [ISG] BOOL
+	public const uint DragType = 0x80425cd3u;          // [ISG] LONG
+	public const uint AutoVisible = 0x8042a445u;       // [ISG] BOOL
 	private const uint MinLineHeight = 0x8042d1c3u;    // [I..] LONG
-	private const uint AutoLineHeight = 0x8042bc08u;   // [ISG] BOOL
-	private const uint LineHeight = 0x80425880u;       // [..G] ULONG
-	private const uint Title = 0x80423e66u;            // [ISG] STRPTR/BOOL
-	private const uint TitleArray = 0x80427d95u;       // [ISG] STRPTR *
-	private const uint TitleClick = 0x80422fd9u;       // [.SG] LONG
+	public const uint AutoLineHeight = 0x8042bc08u;    // [ISG] BOOL
+	public const uint LineHeight = 0x80425880u;       // [..G] ULONG
+	public const uint Title = 0x80423e66u;            // [ISG] STRPTR/BOOL
+	public const uint TitleArray = 0x80427d95u;        // [ISG] STRPTR *
+	public const uint TitleClick = 0x80422fd9u;       // [.SG] LONG
 	private const uint HScrollerVisibility = 0x804280a6u; // [I..] LONG
 	private const uint HideColumn = 0x80428052u;       // [IS.] LONG
 	private const uint ShowColumn = 0x8042c840u;       // [IS.] LONG
-	private const uint ColumnOrder = 0x9d5100f6u;      // [.SG] BYTE*
-	private const uint TopPixel = 0x80429df3u;         // [.SG] LONG
-	private const uint TotalPixel = 0x8042a8f5u;        // [..G] ULONG
-	private const uint VisiblePixel = 0x804273e9u;      // [..G] ULONG
+	public const uint ColumnOrder = 0x9d5100f6u;       // [.SG] BYTE*
+	public const uint TopPixel = 0x80429df3u;         // [.SG] LONG
+	public const uint TotalPixel = 0x8042a8f5u;        // [..G] ULONG
+	public const uint VisiblePixel = 0x804273e9u;      // [..G] ULONG
 	private const uint LeftEdge = 0x8042bec6u;
 	private const uint TopEdge = 0x8042509bu;
 	private const uint Width = 0x8042b59cu;
@@ -2593,15 +3108,15 @@ public static class MuiListCore
 	// reserved key so it travels with the object and is retired on disposal.
 	private const uint ListHeaderKey = 0x7F080001u;
 	private const uint FormatColumnsKey = 0x7F080002u;
-	private const uint FormatDescriptorKey = 0x7F080003u;
-	private const uint ColumnLayoutKey = 0x7F080004u;
-	private const uint ColumnLayoutWidthKey = 0x7F080005u;
+	internal const uint FormatDescriptorKey = 0x7F080003u;
+	internal const uint ColumnLayoutKey = 0x7F080004u;
 	private const uint EditStateKey = 0x7F080006u;
 	private const uint TitleArrayStateKey = 0x7F080007u;
 	private const uint TitleStateKey = 0x7F080016u;
 	private const uint SelectionSignalKey = 0x7F080017u;
 	private const uint FormatPolicyKey = 0x7F080018u;
 	private const uint FontStateKey = 0x7F080019u;
+	private const uint InsertPositionStateKey = 0x7F08001Au;
 	private const uint RedrawStateKey = 0x7F080008u;
 	private const uint ActiveStateKey = 0x7F08000Fu;
 	private const uint ColumnMetricsKey = 0x7F080009u;
@@ -2748,6 +3263,235 @@ public static class MuiListCore
 		cls == MuiCollectionClass.List || cls == MuiCollectionClass.Floattext ||
 		cls == MuiCollectionClass.Dirlist || cls == MuiCollectionClass.Volumelist;
 
+	// Generic Get and OM_GET projections for the core List row and viewport
+	// values. The named Active, Presentation, SelectionSignal, and Viewport
+	// records are authoritative once the List lifecycle has published them;
+	// raw attributes remain only as bounded early-lifecycle fallbacks.
+	internal static bool IsPublicGetterAttribute(uint attribute) =>
+		attribute == Active || attribute == Editable || attribute == Entries ||
+		attribute == First || attribute == SelectChange || attribute == Quiet ||
+		attribute == InsertPosition ||
+		attribute == Stripes || attribute == ShowDropMarks ||
+		attribute == DragSortable || attribute == DragType ||
+		attribute == AutoVisible || attribute == AutoLineHeight ||
+		attribute == TopPixel || attribute == TotalPixel ||
+		attribute == Visible || attribute == VisiblePixel ||
+		attribute == Pool || attribute == TitleArray || attribute == ColumnOrder ||
+		attribute == Format || attribute == SortColumn || attribute == Title ||
+		attribute == DropMark || attribute == LineHeight ||
+			attribute == AgainClick || attribute == ClickColumn ||
+			attribute == DefClickColumn || attribute == DoubleClick ||
+			attribute == TitleClick || attribute == ConstructHook ||
+			attribute == DestructHook || attribute == DisplayHook ||
+			attribute == CompareHook || attribute == MultiTestHook;
+
+	internal static bool TryGetAttribute<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, uint attribute, out uint value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = 0;
+		var listClass = Classify(ref platform, state, obj);
+		if (!IsPublicGetterAttribute(attribute) ||
+			!IsListBacked(listClass)) return false;
+		if (attribute == Entries)
+		{
+			value = EntryCount(ref platform, state, obj);
+			return true;
+		}
+		if (attribute == InsertPosition)
+		{
+			if (!TryReadInsertPositionAdmission(ref platform, state, obj,
+				out var insertPosition, out var present)) return false;
+			if (!present && (!EnsureInsertPositionState(ref platform, state, obj) ||
+				!TryReadInsertPositionAdmission(ref platform, state, obj,
+					out insertPosition, out present) || !present)) return false;
+			value = insertPosition.Position;
+			return true;
+		}
+		if (attribute == Active)
+		{
+			if (!TryReadActiveStateAdmission(ref platform, state, obj,
+				out _, out var activePresent)) return false;
+			if (!activePresent && !EnsureActiveState(ref platform, state, obj))
+				return false;
+			var count = EntryCount(ref platform, state, obj);
+			var active = ActiveIndex(ref platform, state, obj);
+			value = count == 0 ? 0u : unchecked((uint)active);
+			return true;
+		}
+		if (attribute == Editable || attribute == Quiet || attribute == Stripes ||
+			attribute == ShowDropMarks || attribute == DragSortable ||
+			attribute == DragType || attribute == AutoVisible ||
+			attribute == AutoLineHeight)
+		{
+			if (!TryGetPresentationPolicy(ref platform, state, obj, out var policy) &&
+				(!EnsurePresentationPolicy(ref platform, state, obj) ||
+					!TryGetPresentationPolicy(ref platform, state, obj, out policy)))
+				return false;
+			value = attribute == Editable ? policy.Editable :
+				attribute == Quiet ? policy.Quiet :
+				attribute == Stripes ? policy.Stripes :
+				attribute == ShowDropMarks ? policy.ShowDropMarks :
+				attribute == DragSortable ? policy.DragSortable :
+				attribute == DragType ? policy.DragType :
+				attribute == AutoVisible ? policy.AutoVisible :
+				policy.AutoLineHeight;
+			return true;
+		}
+		if (attribute == SelectChange)
+		{
+			if (!TryReadSelectionSignalAdmission(ref platform, state, obj,
+				out var signal, out var present)) return false;
+			if (present)
+			{
+				value = signal.Value;
+				return true;
+			}
+			if (!EnsureSelectionSignalState(ref platform, state, obj) ||
+				!TryReadSelectionSignalAdmission(ref platform, state, obj,
+					out signal, out present) || !present) return false;
+			value = signal.Value;
+			return true;
+		}
+		if (attribute == Pool)
+		{
+			if (!TryReadPoolPolicyAdmission(ref platform, state, obj,
+				out var pool, out var present)) return false;
+			if (!present && (!EnsurePoolPolicy(ref platform, state, obj) ||
+				!TryReadPoolPolicyAdmission(ref platform, state, obj,
+					out pool, out present) || !present)) return false;
+			value = pool.Pool.Raw;
+			return true;
+		}
+		if (attribute == TitleArray)
+		{
+			if (!TryReadTitleArrayAdmission(ref platform, state, obj,
+				out var titleArray, out var present)) return false;
+			if (present)
+			{
+				value = titleArray.Pointers.Raw;
+				return true;
+			}
+		value = ReadRaw(ref platform, state, obj, TitleArray, 0);
+			return true;
+		}
+		if (attribute == ColumnOrder)
+		{
+			if (!TryReadColumnOrderAdmission(ref platform, state, obj,
+				out var columnOrder, out var present)) return false;
+			if (present)
+			{
+				value = columnOrder.Values.Raw;
+				return true;
+			}
+		value = ReadRaw(ref platform, state, obj, ColumnOrder, 0);
+			return true;
+		}
+		if (attribute == Format)
+		{
+			if (!TryReadFormatProjectionAdmission(ref platform, state, obj,
+				out var format, out var present, out _, out _) || !present)
+			{
+				if (!EnsureFormatPolicyState(ref platform, state, obj) ||
+					!TryReadFormatProjectionAdmission(ref platform, state, obj,
+						out format, out present, out _, out _) || !present)
+					return false;
+			}
+			value = format.Format.Raw;
+			return true;
+		}
+		if (attribute == SortColumn)
+		{
+			if (!TryReadSortStateAdmission(ref platform, state, obj,
+				out var sort, out var present)) return false;
+			if (!present && (!EnsureSortState(ref platform, state, obj) ||
+				!TryReadSortStateAdmission(ref platform, state, obj,
+					out sort, out present) || !present)) return false;
+			value = sort.SortColumn;
+			return true;
+		}
+		if (attribute == Title)
+		{
+			if (!TryReadTitleStateAdmission(ref platform, state, obj,
+				out var title, out var present)) return false;
+			if (!present && (!EnsureTitleState(ref platform, state, obj) ||
+				!TryReadTitleStateAdmission(ref platform, state, obj,
+					out title, out present) || !present)) return false;
+			value = title.Value;
+			return true;
+		}
+		if (attribute == AgainClick || attribute == ClickColumn ||
+			attribute == DefClickColumn || attribute == DoubleClick)
+		{
+			if (!TryReadClickStateAdmission(ref platform, state, obj,
+				out var click, out var present)) return false;
+			if (!present && (!EnsureClickState(ref platform, state, obj) ||
+				!TryReadClickStateAdmission(ref platform, state, obj,
+					out click, out present) || !present)) return false;
+			value = attribute == AgainClick ? click.AgainClick :
+				attribute == ClickColumn ? click.ClickColumn :
+				attribute == DefClickColumn ? click.DefClickColumn :
+				click.DoubleClick;
+			return true;
+		}
+		if (attribute == TitleClick)
+		{
+			if (!TryReadSortStateAdmission(ref platform, state, obj,
+				out var sort, out var present)) return false;
+			if (!present && (!EnsureSortState(ref platform, state, obj) ||
+				!TryReadSortStateAdmission(ref platform, state, obj,
+					out sort, out present) || !present)) return false;
+			value = sort.TitleClick;
+			return true;
+		}
+		if (attribute == ConstructHook || attribute == DestructHook ||
+			attribute == DisplayHook || attribute == CompareHook ||
+			attribute == MultiTestHook)
+		{
+			if (!TryReadHookPolicyAdmission(ref platform, state, obj,
+				out var hooks, out var present)) return false;
+			if (!present && (!EnsureHookPolicy(ref platform, state, obj) ||
+				!TryReadHookPolicyAdmission(ref platform, state, obj,
+					out hooks, out present) || !present)) return false;
+			value = attribute == ConstructHook ? hooks.ConstructHook :
+				attribute == DestructHook ? hooks.DestructHook :
+				attribute == DisplayHook ? hooks.DisplayHook :
+				attribute == CompareHook ? hooks.CompareHook :
+				hooks.MultiTestHook;
+			return true;
+		}
+		if ((attribute == First || attribute == Visible ||
+			attribute == TopPixel || attribute == TotalPixel ||
+			attribute == VisiblePixel || attribute == DropMark ||
+			attribute == LineHeight) &&
+			TryGetViewportState(ref platform, state, obj, out var viewport))
+		{
+			if (attribute == First &&
+				ReadRaw(ref platform, state, obj, First, viewport.First) ==
+					VisibleOff)
+			{
+				// Preserve MorphOS's explicit First=-1 sentinel. The viewport
+				// record stores normalized geometry and therefore may contain zero
+				// while the public cursor is intentionally off-screen.
+				value = VisibleOff;
+				return true;
+			}
+			value = attribute == First ? viewport.First :
+				attribute == Visible ? viewport.Visible :
+				attribute == TopPixel ? viewport.TopPixel :
+				attribute == TotalPixel ? viewport.TotalPixel :
+				attribute == VisiblePixel ? viewport.VisiblePixel :
+				attribute == DropMark ? viewport.DropMark : viewport.LineHeight;
+			return true;
+		}
+		value = ReadRaw(ref platform, state, obj, attribute,
+			attribute == Visible ? 0u :
+			attribute == First ? 0u :
+			attribute == TopPixel ? 0u :
+			attribute == TotalPixel ? 0u : 0u);
+		return true;
+	}
+
 	// Keep the public [..G] and [I..] contracts at the class-aware boundary.
 	// Internal publication uses SetInternal/MuiHeadlessObjectCore directly, so
 	// this gate protects application OM_SET/OM_UPDATE calls without replacing
@@ -2769,7 +3513,8 @@ public static class MuiListCore
 	// guest-resident List header and source entries exist.
 	private static bool IsClassAwareAttribute(uint attribute) =>
 		attribute == Active || attribute == Editable || attribute == First ||
-		attribute == Quiet || attribute == Format || attribute == MaxColumns ||
+		attribute == Quiet || attribute == Font || attribute == Format ||
+		attribute == MaxColumns ||
 		attribute == SortColumn || attribute == AutoLineHeight ||
 		attribute == Stripes || attribute == ShowDropMarks ||
 		attribute == DragSortable || attribute == DragType ||
@@ -2979,6 +3724,7 @@ public static class MuiListCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!TryReadColumnOrderState(ref platform, storage, out var value) ||
+			!IsValidColumnOrderValues(ref platform, value) ||
 			displayColumn >= value.Count) return fallback;
 		var cursor = default(MuiListColumnOrderByteCursor);
 		cursor.Base = value.Values;
@@ -3015,7 +3761,9 @@ public static class MuiListCore
 		var cls = ClassifyRecord(ref platform, classRecord);
 		if (!IsListBacked(cls))
 			return true;
-		if (Header(ref platform, state, obj).IsNotNull) return true;
+		if (!TryReadHeaderAdmission(ref platform, state, obj,
+			out _, out var headerPresent)) return false;
+		if (headerPresent) return true;
 
 		var header = MuiHeadlessMemory.Allocate(ref platform, HeaderSize);
 		if (header.IsNull) return false;
@@ -3119,7 +3867,8 @@ public static class MuiListCore
 			!EnsureTitleState(ref platform, state, obj) ||
 			!EnsureSelectionSignalState(ref platform, state, obj) ||
 			!EnsureFormatPolicyState(ref platform, state, obj) ||
-			!EnsureFontState(ref platform, state, obj)) return false;
+			!EnsureFontState(ref platform, state, obj) ||
+			!EnsureInsertPositionState(ref platform, state, obj)) return false;
 
 		// Materialize MUIA_List_SourceArray if present. Failure here rolls the
 		// whole construction back through CleanupRecords + DisposeObject.
@@ -3142,8 +3891,10 @@ public static class MuiListCore
 		if (record.IsNull) return;
 		var active = unchecked((int)Read(ref platform, state, obj, Active,
 			ActiveOff));
-		if (EntryCount(ref platform, state, obj) != 0 && active != -1)
-			SetActivePresence(ref platform, state, obj, true);
+		// ApplyActive resolves construction sentinels and clamps raw requests
+		// before the named cursor publishes HasActive. This keeps dynamic range
+		// admission strict without rejecting a valid out-of-range construction
+		// tag that MorphOS would normalize to the last row.
 		ApplyActive(ref platform, state, record, obj, active, false);
 		var first = unchecked((int)Read(ref platform, state, obj, First, 0));
 		ApplyFirst(ref platform, state, record, obj, first, false);
@@ -3180,30 +3931,70 @@ public static class MuiListCore
 		APTR state, APTR obj, uint policy)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			HScrollerStateKey, 0));
-		if (MuiListHScrollerStateCodec.TryRead(ref platform, block,
-			out var current))
+		if (!TryReadHScrollerStateAdmission(ref platform, state, obj,
+			out var current, out var present)) return false;
+		var normalized = NormalizeHScrollerPolicy(policy);
+		if (present)
 		{
-			current.Policy = NormalizeHScrollerPolicy(policy);
-			return MuiListHScrollerStateCodec.Write(ref platform, block, current);
+			var existingBlock = APTR.FromPointer(Read(ref platform, state, obj,
+				HScrollerStateKey, 0));
+			current.Policy = normalized;
+			return MuiListHScrollerStateCodec.Write(ref platform, existingBlock,
+				current);
 		}
 
-		block = MuiHeadlessMemory.Allocate(ref platform,
+		var block = MuiHeadlessMemory.Allocate(ref platform,
 			MuiListHScrollerState.Size);
 		if (block.IsNull) return false;
 		var value = default(MuiListHScrollerState);
 		value.Magic = MuiListHScrollerState.Cookie;
-		value.Policy = NormalizeHScrollerPolicy(policy);
+		value.Policy = normalized;
 		if (!MuiListHScrollerStateCodec.Write(ref platform, block, value))
 		{
 			platform.Clear(block, MuiListHScrollerState.Size);
 			platform.Free(block, MuiListHScrollerState.Size);
 			return false;
 		}
-		SetInternal(ref platform, state, obj, HScrollerStateKey, block.Raw);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			HScrollerStateKey, block.Raw, false))
+		{
+			platform.Clear(block, MuiListHScrollerState.Size);
+			platform.Free(block, MuiListHScrollerState.Size);
+			return false;
+		}
 		return true;
 	}
+
+	// A published horizontal-scroller record is authoritative guest state. A
+	// non-NULL record that fails the cookie/field contract is malformed, not
+	// absence; viewport and scroll consumers must fail closed instead of
+	// replacing it from the raw HScrollerVisibility projection.
+	private static bool TryReadHScrollerStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListHScrollerState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			HScrollerStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return MuiListHScrollerStateCodec.TryRead(ref platform, block,
+			out value) && IsValidHScrollerState(value);
+	}
+
+	// The horizontal-scroller record is derived state, but every field still has
+	// a named contract. Policy and visibility are canonical BOOL/enumeration
+	// values; scroll position cannot exceed the derived range, and the range is
+	// exactly the content/viewport difference. Rejecting incoherent state keeps
+	// Listview consumers from treating a stale geometry word as a live scroller.
+	private static bool IsValidHScrollerState(MuiListHScrollerState value) =>
+		value.Policy <= HScrollerNever && value.Visible <= 1 &&
+		value.MaxScrollX == (value.ContentWidth > value.ViewWidth
+			? value.ContentWidth - value.ViewWidth : 0u) &&
+		value.ScrollX <= value.MaxScrollX;
 
 	private static void NormalizeHScrollerVisibility<TPlatform>(
 		ref TPlatform platform, APTR state, APTR record, APTR obj)
@@ -3218,20 +4009,14 @@ public static class MuiListCore
 	private static bool EnsurePoolPolicy<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			PoolPolicyKey, 0));
+		// Pool ownership is part of the typed policy. A non-NULL record that
+		// fails its contract is malformed, not absence; never create a second
+		// pool or replace a borrowed handle from raw compatibility attributes.
+		if (!TryReadPoolPolicyAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
+		if (present) return true;
+		var block = APTR.Null;
 		var value = default(MuiListPoolPolicyState);
-		if (MuiListPoolPolicyStateCodec.TryRead(ref platform, block, out value))
-		{
-			value.Pool = APTR.FromPointer(Read(ref platform, state, obj, Pool, 0));
-			value.PuddleSize = Read(ref platform, state, obj, PoolPuddleSize,
-				DefaultPoolPuddleSize);
-			value.ThresholdSize = Read(ref platform, state, obj, PoolThreshSize,
-				DefaultPoolThreshSize);
-			value.UsesExternalPool = value.Pool.IsNotNull ? 1u : 0u;
-			return MuiListPoolPolicyStateCodec.Write(ref platform, block, value);
-		}
-
 		block = MuiHeadlessMemory.Allocate(ref platform,
 			MuiListPoolPolicyState.Size);
 		if (block.IsNull) return false;
@@ -3243,13 +4028,37 @@ public static class MuiListCore
 		value.ThresholdSize = Read(ref platform, state, obj, PoolThreshSize,
 			DefaultPoolThreshSize);
 		value.UsesExternalPool = value.Pool.IsNotNull ? 1u : 0u;
+		if (value.Pool.IsNull)
+		{
+			// MorphOS supplies a standard Kickstart-compatible pool in A2 even
+			// when MUIA_List_Pool was omitted. Keep the handle opaque and let the
+			// native Exec provider own its internal layout.
+			value.Pool = platform.CreatePool(0, value.PuddleSize,
+				value.ThresholdSize);
+			if (value.Pool.IsNull)
+			{
+				platform.Clear(block, MuiListPoolPolicyState.Size);
+				platform.Free(block, MuiListPoolPolicyState.Size);
+				return false;
+			}
+		}
 		if (!MuiListPoolPolicyStateCodec.Write(ref platform, block, value))
 		{
+			if (value.UsesExternalPool == 0)
+				platform.DeletePool(value.Pool);
 			platform.Clear(block, MuiListPoolPolicyState.Size);
 			platform.Free(block, MuiListPoolPolicyState.Size);
 			return false;
 		}
-		SetInternal(ref platform, state, obj, PoolPolicyKey, block.Raw);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			PoolPolicyKey, block.Raw, false))
+		{
+			if (value.UsesExternalPool == 0 && value.Pool.IsNotNull)
+				platform.DeletePool(value.Pool);
+			platform.Clear(block, MuiListPoolPolicyState.Size);
+			platform.Free(block, MuiListPoolPolicyState.Size);
+			return false;
+		}
 		return true;
 	}
 
@@ -3273,8 +4082,13 @@ public static class MuiListCore
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			InteractionPolicyKey, 0));
+		// The construction-only interaction record is authoritative after
+		// publication. A non-NULL block that fails its field contract is
+		// malformed, not absence; do not normalize it from raw aliases.
+		if (!TryReadInteractionPolicyAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
+		if (present) return true;
+		var block = APTR.Null;
 		var value = default(MuiListInteractionPolicyState);
 		value.Magic = MuiListInteractionPolicyState.Cookie;
 		var hasInput = MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
@@ -3290,42 +4104,31 @@ public static class MuiListCore
 		value.ScrollerPos = NormalizeScrollerPos(hasScrollerPos ? scrollerPos :
 			ScrollerPosDefault);
 
-		if (block.IsNotNull && MuiListStateFieldCursorCodec.TryReadUInt32(
+		block = MuiHeadlessMemory.Allocate(ref platform,
+			MuiListInteractionPolicyState.Size);
+		if (block.IsNull) return false;
+		if (!MuiListStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
+			MuiListStateRecordKind.InteractionPolicy, MuiListStateField.Magic,
+			value.Magic) || !MuiListStateFieldCursorCodec.TryWriteUInt32(
 			ref platform, block, MuiListStateRecordKind.InteractionPolicy,
-			MuiListStateField.Magic, out var magic) &&
-			magic == MuiListInteractionPolicyState.Cookie)
-		{
-			if (!MuiListStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-				MuiListStateRecordKind.InteractionPolicy, MuiListStateField.Input,
-				value.Input) || !MuiListStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, block, MuiListStateRecordKind.InteractionPolicy,
+			MuiListStateField.Input, value.Input) ||
+			!MuiListStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
+				MuiListStateRecordKind.InteractionPolicy,
 				MuiListStateField.MultiSelect, value.MultiSelect) ||
-				!MuiListStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListStateRecordKind.InteractionPolicy,
-					MuiListStateField.ScrollerPos, value.ScrollerPos)) return false;
-		}
-		else
+			!MuiListStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
+				MuiListStateRecordKind.InteractionPolicy,
+				MuiListStateField.ScrollerPos, value.ScrollerPos))
 		{
-			block = MuiHeadlessMemory.Allocate(ref platform,
-				MuiListInteractionPolicyState.Size);
-			if (block.IsNull) return false;
-			if (!MuiListStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-				MuiListStateRecordKind.InteractionPolicy, MuiListStateField.Magic,
-				value.Magic) || !MuiListStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, block, MuiListStateRecordKind.InteractionPolicy,
-				MuiListStateField.Input, value.Input) ||
-				!MuiListStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListStateRecordKind.InteractionPolicy,
-					MuiListStateField.MultiSelect, value.MultiSelect) ||
-				!MuiListStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListStateRecordKind.InteractionPolicy,
-					MuiListStateField.ScrollerPos, value.ScrollerPos))
-			{
-				platform.Clear(block, MuiListInteractionPolicyState.Size);
-				platform.Free(block, MuiListInteractionPolicyState.Size);
-				return false;
-			}
-			SetInternal(ref platform, state, obj, InteractionPolicyKey, block.Raw);
+			platform.Clear(block, MuiListInteractionPolicyState.Size);
+			platform.Free(block, MuiListInteractionPolicyState.Size);
+			return false;
+		}
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			InteractionPolicyKey, block.Raw, false))
+		{
+			platform.Clear(block, MuiListInteractionPolicyState.Size);
+			platform.Free(block, MuiListInteractionPolicyState.Size);
+			return false;
 		}
 
 		if (hasInput) SetInternal(ref platform, state, obj, Input, value.Input);
@@ -3341,13 +4144,50 @@ public static class MuiListCore
 		out MuiListInteractionPolicyState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadInteractionPolicyAdmission(ref platform, state, obj,
+			out value, out var present)) return false;
+		return present;
+	}
+
+	// A published List interaction policy is authoritative guest state. A
+	// non-NULL block that fails the cookie/field contract is malformed, not
+	// absence; direct List consumers must not fall back to raw construction tags.
+	private static bool TryReadInteractionPolicyAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListInteractionPolicyState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
 		value = default;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			InteractionPolicyKey, 0));
-		if (block.IsNull || !MuiListStateFieldCursorCodec.TryReadUInt32(
-			ref platform, block, MuiListStateRecordKind.InteractionPolicy,
-			MuiListStateField.Magic, out var magic) ||
-			magic != MuiListInteractionPolicyState.Cookie) return false;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			InteractionPolicyKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadInteractionPolicy(ref platform, block, out value) &&
+			IsValidInteractionPolicy(value);
+	}
+
+	// Interaction values are normalized at construction and are immutable after
+	// publication. Keep the BOOL and enum domains at the named record boundary
+	// so input and composite-scroller consumers never interpret an arbitrary
+	// scalar as a MorphOS selection or scrollbar policy.
+	private static bool IsValidInteractionPolicy(
+		MuiListInteractionPolicyState value) =>
+		value.Input <= 1 && value.MultiSelect <= MultiSelectAlways &&
+		value.ScrollerPos <= ScrollerPosNone;
+
+	private static bool TryReadInteractionPolicy<TPlatform>(ref TPlatform platform,
+		APTR block, out MuiListInteractionPolicyState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (block.IsNull || !platform.IsMapped(block,
+			MuiListInteractionPolicyState.Size) ||
+			!MuiListStateFieldCursorCodec.TryReadUInt32(ref platform, block,
+				MuiListStateRecordKind.InteractionPolicy, MuiListStateField.Magic,
+				out var magic) || magic != MuiListInteractionPolicyState.Cookie)
+			return false;
 		value.Magic = magic;
 		return MuiListStateFieldCursorCodec.TryReadUInt32(ref platform, block,
 			MuiListStateRecordKind.InteractionPolicy, MuiListStateField.Input,
@@ -3362,12 +4202,11 @@ public static class MuiListCore
 	private static bool EnsureClickState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadClickStateAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ClickStateKey, 0));
-		if (block.IsNotNull && MuiListStateFieldCursorCodec.TryReadUInt32(
-			ref platform, block, MuiListStateRecordKind.ClickState,
-			MuiListStateField.Magic, out var magic) &&
-			magic == MuiListClickState.Cookie) return true;
+		if (present) return true;
 
 		block = MuiHeadlessMemory.Allocate(ref platform, MuiListClickState.Size);
 		if (block.IsNull) return false;
@@ -3392,11 +4231,13 @@ public static class MuiListCore
 			platform.Free(block, MuiListClickState.Size);
 			return false;
 		}
-		SetInternal(ref platform, state, obj, ClickStateKey, block.Raw);
-		if (hasDoubleClick) SetInternal(ref platform, state, obj, DoubleClick,
-			value.DoubleClick);
-		if (hasAgainClick) SetInternal(ref platform, state, obj, AgainClick,
-			value.AgainClick);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			ClickStateKey, block.Raw, false))
+		{
+			platform.Clear(block, MuiListClickState.Size);
+			platform.Free(block, MuiListClickState.Size);
+			return false;
+		}
 		return true;
 	}
 
@@ -3405,11 +4246,14 @@ public static class MuiListCore
 		uint attribute, uint value, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!EnsureClickState(ref platform, state, obj)) return false;
+		if (!TryReadClickStateAdmission(ref platform, state, obj,
+			out var clickState, out var present)) return false;
+		if (!present && (!EnsureClickState(ref platform, state, obj) ||
+			!TryReadClickStateAdmission(ref platform, state, obj,
+				out clickState, out present) || !present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ClickStateKey, 0));
-		if (!TryReadClickState(ref platform, block, out var clickState))
-			return false;
+		var previous = clickState;
 		var normalized = value;
 		if (attribute == AgainClick || attribute == DoubleClick)
 			normalized = value == 0 ? 0u : 1u;
@@ -3419,10 +4263,11 @@ public static class MuiListCore
 		else if (attribute == DefClickColumn)
 			clickState.DefClickColumn = value;
 		else return false;
-		if (!WriteClickState(ref platform, block, clickState) ||
-			!SetRaw(ref platform, state, record, attribute, normalized, notify))
-			return false;
-		return true;
+		if (!WriteClickState(ref platform, block, clickState)) return false;
+		if (SetRaw(ref platform, state, record, attribute, normalized, notify))
+			return true;
+		WriteClickState(ref platform, block, previous);
+		return false;
 	}
 
 	// Listview input owns the user gesture, but MorphOS publishes the resulting
@@ -3435,39 +4280,48 @@ public static class MuiListCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
-		if (record.IsNull || !EnsureClickState(ref platform, state, obj))
-			return false;
+		if (record.IsNull) return false;
+		if (!TryReadClickStateAdmission(ref platform, state, obj,
+			out var value, out var present)) return false;
+		if (!present && (!EnsureClickState(ref platform, state, obj) ||
+			!TryReadClickStateAdmission(ref platform, state, obj,
+				out value, out present) || !present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ClickStateKey, 0));
-		if (!TryReadClickState(ref platform, block, out var value)) return false;
+		var previous = value;
 		value.ClickColumn = column;
 		value.Clicks = clicks;
 		value.DoubleClick = doubleClick ? 1u : 0u;
 		value.AgainClick = againClick ? 1u : 0u;
-		return WriteClickState(ref platform, block, value) &&
-			SetRaw(ref platform, state, record, ClickColumn, column, false) &&
-			SetRaw(ref platform, state, record, DoubleClick,
-				doubleClick ? 1u : 0u, notify && doubleClick) &&
-			SetRaw(ref platform, state, record, AgainClick,
-				againClick ? 1u : 0u, notify);
+		if (!WriteClickState(ref platform, block, value)) return false;
+		if (!SetRaw(ref platform, state, record, ClickColumn, column, false) ||
+			!SetRaw(ref platform, state, record, DoubleClick,
+				doubleClick ? 1u : 0u, notify && doubleClick) ||
+			!SetRaw(ref platform, state, record, AgainClick,
+				againClick ? 1u : 0u, notify))
+		{
+			WriteClickState(ref platform, block, previous);
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetClickState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, out MuiListClickState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		value = default;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			ClickStateKey, 0));
-		return block.IsNotNull && TryReadClickState(ref platform, block,
-			out value);
+		return TryReadClickStateAdmission(ref platform, state, obj,
+			out value, out var present) && present;
 	}
 
 	private static bool EnsureHookPolicy<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadHookPolicyAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			HookPolicyKey, 0));
+		if (present) return true;
 		var value = default(MuiListHookPolicyState);
 		value.Magic = MuiListHookPolicyState.Cookie;
 		var hasConstruct = MuiHeadlessObjectCore.GetRawAttribute(ref platform,
@@ -3486,47 +4340,24 @@ public static class MuiListCore
 		value.CompareHook = hasCompare ? compareHook : 0;
 		value.MultiTestHook = hasMultiTest ? multiTestHook : 0;
 
-		if (block.IsNotNull && MuiListStateFieldCursorCodec.TryReadUInt32(
-			ref platform, block, MuiListStateRecordKind.HookPolicy,
-			MuiListStateField.Magic, out var magic) &&
-			magic == MuiListHookPolicyState.Cookie)
+		block = MuiHeadlessMemory.Allocate(ref platform,
+			MuiListHookPolicyState.Size);
+		if (block.IsNull || !WriteHookPolicy(ref platform, block, value))
 		{
-			if (!WriteHookPolicy(ref platform, block, value)) return false;
-		}
-		else
-		{
-			if (block.IsNotNull && platform.IsMapped(block,
-				MuiListHookPolicyState.Size))
+			if (block.IsNotNull)
 			{
 				platform.Clear(block, MuiListHookPolicyState.Size);
 				platform.Free(block, MuiListHookPolicyState.Size);
 			}
-			block = MuiHeadlessMemory.Allocate(ref platform,
-				MuiListHookPolicyState.Size);
-			if (block.IsNull || !WriteHookPolicy(ref platform, block, value))
-			{
-				if (block.IsNotNull)
-				{
-					platform.Clear(block, MuiListHookPolicyState.Size);
-					platform.Free(block, MuiListHookPolicyState.Size);
-				}
-				return false;
-			}
-			SetInternal(ref platform, state, obj, HookPolicyKey, block.Raw);
+			return false;
 		}
-
-		// Keep explicit construction tags normalized through the same raw seam;
-		// omitted hook values remain omitted public attributes.
-		if (hasConstruct) SetInternal(ref platform, state, obj, ConstructHook,
-			value.ConstructHook);
-		if (hasDestruct) SetInternal(ref platform, state, obj, DestructHook,
-			value.DestructHook);
-		if (hasDisplay) SetInternal(ref platform, state, obj, DisplayHook,
-			value.DisplayHook);
-		if (hasCompare) SetInternal(ref platform, state, obj, CompareHook,
-			value.CompareHook);
-		if (hasMultiTest) SetInternal(ref platform, state, obj, MultiTestHook,
-			value.MultiTestHook);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			HookPolicyKey, block.Raw, false))
+		{
+			platform.Clear(block, MuiListHookPolicyState.Size);
+			platform.Free(block, MuiListHookPolicyState.Size);
+			return false;
+		}
 		return true;
 	}
 
@@ -3535,11 +4366,14 @@ public static class MuiListCore
 		uint attribute, uint value, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!EnsureHookPolicy(ref platform, state, obj)) return false;
+		if (!TryReadHookPolicyAdmission(ref platform, state, obj,
+			out var hookPolicy, out var present)) return false;
+		if (!present && (!EnsureHookPolicy(ref platform, state, obj) ||
+			!TryReadHookPolicyAdmission(ref platform, state, obj,
+				out hookPolicy, out present) || !present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			HookPolicyKey, 0));
-		if (!TryReadHookPolicy(ref platform, block, out var hookPolicy))
-			return false;
+		var previous = hookPolicy;
 		switch (attribute)
 		{
 			case ConstructHook: hookPolicy.ConstructHook = value; break;
@@ -3549,19 +4383,19 @@ public static class MuiListCore
 			case MultiTestHook: hookPolicy.MultiTestHook = value; break;
 			default: return false;
 		}
-		return WriteHookPolicy(ref platform, block, hookPolicy) &&
-			SetRaw(ref platform, state, record, attribute, value, notify);
+		if (!WriteHookPolicy(ref platform, block, hookPolicy)) return false;
+		if (SetRaw(ref platform, state, record, attribute, value, notify))
+			return true;
+		WriteHookPolicy(ref platform, block, previous);
+		return false;
 	}
 
 	internal static bool TryGetHookPolicy<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, out MuiListHookPolicyState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		value = default;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			HookPolicyKey, 0));
-		return block.IsNotNull && TryReadHookPolicy(ref platform, block,
-			out value);
+		return TryReadHookPolicyAdmission(ref platform, state, obj,
+			out value, out var present) && present;
 	}
 
 	// Internal consumers use this typed projection instead of rereading hook
@@ -3571,7 +4405,9 @@ public static class MuiListCore
 		APTR state, APTR obj, uint attribute)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryGetHookPolicy(ref platform, state, obj, out var value))
+		if (!TryReadHookPolicyAdmission(ref platform, state, obj,
+			out var value, out var present)) return 0;
+		if (present)
 		{
 			switch (attribute)
 			{
@@ -3582,7 +4418,7 @@ public static class MuiListCore
 				case MultiTestHook: return value.MultiTestHook;
 			}
 		}
-		return Read(ref platform, state, obj, attribute, 0);
+		return ReadRaw(ref platform, state, obj, attribute, 0);
 	}
 
 	private static bool WriteHookPolicy<TPlatform>(ref TPlatform platform,
@@ -3636,52 +4472,61 @@ public static class MuiListCore
 				MuiListStateField.MultiTestHook, out value.MultiTestHook);
 	}
 
+	// A published hook policy is authoritative guest state. A non-NULL record
+	// that fails the cookie/field contract is malformed, not absence; hook
+	// dispatch must not replace it or fall back to raw hook attributes.
+	private static bool TryReadHookPolicyAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListHookPolicyState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			HookPolicyKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadHookPolicy(ref platform, block, out value);
+	}
+
 	private static bool EnsureSortState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadSortStateAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			SortStateKey, 0));
+		if (present) return true;
 		var value = default(MuiListSortState);
 		value.Magic = MuiListSortState.Cookie;
 		var hasSortColumn = MuiHeadlessObjectCore.GetRawAttribute(ref platform,
 			state, obj, SortColumn, out var sortColumn);
 		var hasTitleClick = MuiHeadlessObjectCore.GetRawAttribute(ref platform,
 			state, obj, TitleClick, out var titleClick);
-		value.SortColumn = hasSortColumn ? sortColumn : 0u;
+		var requestedSortColumn = hasSortColumn ? sortColumn : 0u;
+		value.SortColumn = requestedSortColumn >= MaximumColumns
+			? MaximumColumns - 1 : requestedSortColumn;
 		value.TitleClick = hasTitleClick ? titleClick : unchecked((uint)-1);
 
-		if (block.IsNotNull && MuiListStateFieldCursorCodec.TryReadUInt32(
-			ref platform, block, MuiListStateRecordKind.SortState,
-			MuiListStateField.Magic, out var magic) &&
-			magic == MuiListSortState.Cookie)
+		block = MuiHeadlessMemory.Allocate(ref platform,
+			MuiListSortState.Size);
+		if (block.IsNull || !WriteSortState(ref platform, block, value))
 		{
-			if (!WriteSortState(ref platform, block, value)) return false;
-		}
-		else
-		{
-			if (block.IsNotNull && platform.IsMapped(block,
-				MuiListSortState.Size))
+			if (block.IsNotNull)
 			{
 				platform.Clear(block, MuiListSortState.Size);
 				platform.Free(block, MuiListSortState.Size);
 			}
-			block = MuiHeadlessMemory.Allocate(ref platform,
-				MuiListSortState.Size);
-			if (block.IsNull || !WriteSortState(ref platform, block, value))
-			{
-				if (block.IsNotNull)
-				{
-					platform.Clear(block, MuiListSortState.Size);
-					platform.Free(block, MuiListSortState.Size);
-				}
-				return false;
-			}
-			SetInternal(ref platform, state, obj, SortStateKey, block.Raw);
+			return false;
 		}
-		if (hasSortColumn) SetInternal(ref platform, state, obj, SortColumn,
-			value.SortColumn);
-		if (hasTitleClick) SetInternal(ref platform, state, obj, TitleClick,
-			value.TitleClick);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			SortStateKey, block.Raw, false))
+		{
+			platform.Clear(block, MuiListSortState.Size);
+			platform.Free(block, MuiListSortState.Size);
+			return false;
+		}
 		return true;
 	}
 
@@ -3690,40 +4535,53 @@ public static class MuiListCore
 		uint attribute, uint value, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!EnsureSortState(ref platform, state, obj)) return false;
+		if (!TryReadSortStateAdmission(ref platform, state, obj,
+			out var sortState, out var present)) return false;
+		if (!present && (!EnsureSortState(ref platform, state, obj) ||
+			!TryReadSortStateAdmission(ref platform, state, obj,
+				out sortState, out present) || !present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			SortStateKey, 0));
-		if (!TryReadSortState(ref platform, block, out var sortState))
-			return false;
+		var previous = sortState;
 		if (attribute == SortColumn)
-			sortState.SortColumn = NormalizeSortColumn(ref platform, state, obj,
-				value);
+		{
+			if (!TryNormalizeSortColumn(ref platform, state, obj, value,
+				out var normalized)) return false;
+			sortState.SortColumn = normalized;
+		}
 		else if (attribute == TitleClick)
 			sortState.TitleClick = value;
 		else return false;
-		return WriteSortState(ref platform, block, sortState) &&
-			SetRaw(ref platform, state, record, attribute,
-				attribute == SortColumn ? sortState.SortColumn : value, notify);
+		if (!WriteSortState(ref platform, block, sortState)) return false;
+		if (SetRaw(ref platform, state, record, attribute,
+			attribute == SortColumn ? sortState.SortColumn : value, notify))
+			return true;
+		WriteSortState(ref platform, block, previous);
+		return false;
 	}
 
-	private static uint NormalizeSortColumn<TPlatform>(ref TPlatform platform,
-		APTR state, APTR obj, uint value)
+	private static bool TryNormalizeSortColumn<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, uint value, out uint normalized)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var columns = FormatColumnCount(ref platform, state, obj);
-		if (columns == 0) columns = 1;
-		return value >= columns ? columns - 1 : value;
+		normalized = 0;
+		if (!TryGetGeometryColumnCount(ref platform, state, obj,
+			out var columns) || columns == 0) return false;
+		normalized = value >= columns ? columns - 1 : value;
+		return true;
 	}
 
 	private static bool SetSortColumnState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, uint value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!EnsureSortState(ref platform, state, obj)) return false;
+		if (!TryReadSortStateAdmission(ref platform, state, obj,
+			out var sortState, out var present)) return false;
+		if (!present && (!EnsureSortState(ref platform, state, obj) ||
+			!TryReadSortStateAdmission(ref platform, state, obj,
+				out sortState, out present) || !present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			SortStateKey, 0));
-		if (!TryReadSortState(ref platform, block, out var sortState))
-			return false;
 		sortState.SortColumn = value;
 		return WriteSortState(ref platform, block, sortState);
 	}
@@ -3732,20 +4590,28 @@ public static class MuiListCore
 		APTR state, APTR obj, out MuiListSortState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		value = default;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			SortStateKey, 0));
-		return block.IsNotNull && TryReadSortState(ref platform, block,
-			out value);
+		return TryReadSortStateAdmission(ref platform, state, obj,
+			out value, out var present) && present;
+	}
+
+	private static bool TryGetSortColumnValue<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, out uint value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = 0;
+		if (!TryReadSortStateAdmission(ref platform, state, obj,
+			out var sort, out var present)) return false;
+		value = present ? sort.SortColumn :
+			ReadRaw(ref platform, state, obj, SortColumn, 0);
+		return true;
 	}
 
 	private static uint SortColumnValue<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		return TryGetSortState(ref platform, state, obj, out var value)
-			? value.SortColumn
-			: Read(ref platform, state, obj, SortColumn, 0);
+		return TryGetSortColumnValue(ref platform, state, obj, out var value)
+			? value : 0;
 	}
 
 	private static bool WriteSortState<TPlatform>(ref TPlatform platform,
@@ -3779,6 +4645,33 @@ public static class MuiListCore
 			ref platform, block, MuiListStateRecordKind.SortState,
 			MuiListStateField.TitleClick, out value.TitleClick);
 	}
+
+	// A published sort record is authoritative guest state. A non-NULL record
+	// that fails the cookie/field contract is malformed, not absence; sort and
+	// title-click consumers must not replace it or fall back to raw projections.
+	private static bool TryReadSortStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListSortState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			SortStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadSortState(ref platform, block, out value) &&
+			IsValidSortState(value);
+	}
+
+	// SortColumn is a format-derived index. Construction and runtime format
+	// normalization may later clamp it to the installed descriptor count, but a
+	// published state must never carry a value outside the bounded MUI column
+	// domain. Keep this check independent of the current format record so the
+	// early construction window can still materialize and normalize the state.
+	private static bool IsValidSortState(MuiListSortState value) =>
+		value.SortColumn < MaximumColumns;
 
 	private static bool WriteClickState<TPlatform>(ref TPlatform platform,
 		APTR block, MuiListClickState value)
@@ -3826,26 +4719,85 @@ public static class MuiListCore
 				MuiListStateRecordKind.ClickState, MuiListStateField.Clicks,
 				out value.Clicks) && MuiListStateFieldCursorCodec.TryReadUInt32(
 				ref platform, block, MuiListStateRecordKind.ClickState,
-				MuiListStateField.DefClickColumn, out value.DefClickColumn);
+			MuiListStateField.DefClickColumn, out value.DefClickColumn);
 	}
+
+	// A published click record is authoritative guest state. A non-NULL record
+	// that fails the cookie/field contract is malformed, not absence; click
+	// getters and Listview forwarding must not replace it from raw projections.
+	private static bool TryReadClickStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListClickState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			ClickStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadClickState(ref platform, block, out value) &&
+			IsValidClickState(value);
+	}
+
+	// Click columns and the click counter are signed/opaque public results, but
+	// the two click flags are canonical BOOLs in the named record. Reject only
+	// impossible flag values here so Listview forwarding cannot publish an
+	// arbitrary scalar as a double- or repeat-click result.
+	private static bool IsValidClickState(MuiListClickState value) =>
+		value.DoubleClick <= 1 && value.AgainClick <= 1;
 
 	internal static bool TryGetPoolPolicy<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, out MuiListPoolPolicyState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		value = default;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			PoolPolicyKey, 0));
-		return MuiListPoolPolicyStateCodec.TryRead(ref platform, block, out value);
+		if (!TryReadPoolPolicyAdmission(ref platform, state, obj,
+			out value, out var present)) return false;
+		return present;
 	}
 
 	private static APTR PoolFor<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryGetPoolPolicy(ref platform, state, obj, out var policy))
-			return policy.Pool;
-		return APTR.FromPointer(Read(ref platform, state, obj, Pool, 0));
+		if (!TryReadPoolPolicyAdmission(ref platform, state, obj,
+			out var policy, out var present)) return APTR.Null;
+		if (!present)
+		{
+			if (!EnsurePoolPolicy(ref platform, state, obj) ||
+				!TryReadPoolPolicyAdmission(ref platform, state, obj,
+					out policy, out present) || !present) return APTR.Null;
+		}
+		return policy.Pool;
 	}
+
+	// A published pool policy is authoritative guest state. A non-NULL record
+	// that fails the cookie/field contract is malformed, not absence; callers
+	// must not fall back to a raw pool pointer that could change ownership.
+	private static bool TryReadPoolPolicyAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListPoolPolicyState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			PoolPolicyKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return MuiListPoolPolicyStateCodec.TryRead(ref platform, block,
+			out value) && IsValidPoolPolicy(value);
+	}
+
+	// A published policy must always carry a usable opaque Exec pool handle. The
+	// handle is deliberately not decoded as a host object or by guessed offsets;
+	// the platform pool capability owns its representation. The ownership bit and
+	// construction sizes remain named fields in the policy record, while a NULL
+	// handle is rejected so hooks and pooled allocation cannot receive absence as a
+	// live pool.
+	private static bool IsValidPoolPolicy(MuiListPoolPolicyState value) =>
+		value.Pool.IsNotNull && value.UsesExternalPool <= 1;
 
 	// The format pointer remains caller-owned, as in the public MUI attribute;
 	// only its bounded column count is derived into guest state. Empty and NULL
@@ -3854,8 +4806,13 @@ public static class MuiListCore
 		APTR state, APTR record, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var maximum = MaxColumnsCursor(ref platform, state, obj);
-		var format = FormatValueCursor(ref platform, state, obj);
+		if (!TryReadFormatPolicyAdmission(ref platform, state, obj,
+			out var policy, out var present)) return;
+		if (!present && (!EnsureFormatPolicyState(ref platform, state, obj) ||
+			!TryReadFormatPolicyAdmission(ref platform, state, obj,
+				out policy, out present) || !present)) return;
+		var maximum = policy.MaxColumns;
+		var format = policy.Format;
 		if (format.IsNotNull && !TryReadCStringLength(ref platform, format,
 			MaximumStringLength, out _))
 		{
@@ -3881,7 +4838,9 @@ public static class MuiListCore
 		APTR state, APTR record, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var source = APTR.FromPointer(Read(ref platform, state, obj,
+		if (!TryReadTitleArrayAdmission(ref platform, state, obj,
+			out _, out _)) return;
+		var source = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			TitleArray, 0));
 		if (!ApplyTitleArray(ref platform, state, record, obj, source, false))
 			SetRaw(ref platform, state, record, TitleArray, 0, false);
@@ -3891,9 +4850,21 @@ public static class MuiListCore
 		APTR record, APTR obj, uint value, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadTitleStateAdmission(ref platform, state, obj,
+			out var title, out var present)) return false;
+		if (!present && (!EnsureTitleState(ref platform, state, obj) ||
+			!TryReadTitleStateAdmission(ref platform, state, obj,
+				out title, out present) || !present)) return false;
+		var previousRaw = title.Value;
+		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			Title, out var raw)) previousRaw = raw;
 		if (!SetRaw(ref platform, state, record, Title, value, notify))
 			return false;
-		SetTitleState(ref platform, state, obj, value);
+		if (!SetTitleState(ref platform, state, obj, value))
+		{
+			SetRaw(ref platform, state, record, Title, previousRaw, false);
+			return false;
+		}
 		return true;
 	}
 
@@ -3901,6 +4872,11 @@ public static class MuiListCore
 		APTR state, APTR record, APTR obj, APTR source, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		// A published pointer-table record is authoritative ownership state. A
+		// malformed present block is not absence and cannot be replaced by a raw
+		// caller table during a runtime setter.
+		if (!TryReadTitleArrayAdmission(ref platform, state, obj,
+			out _, out _)) return false;
 		var fresh = APTR.Null;
 		if (source.IsNotNull)
 		{
@@ -3908,8 +4884,18 @@ public static class MuiListCore
 			if (fresh.IsNull) return false;
 		}
 		var raw = 0u;
-		if (fresh.IsNotNull && TryReadTitleArrayStateBlock(ref platform, fresh,
-			out var stateValue)) raw = stateValue.Pointers.Raw;
+		if (fresh.IsNotNull)
+		{
+			if (!TryReadTitleArrayStateBlock(ref platform, fresh,
+				out var stateValue) ||
+				!IsValidTitleArrayValues(ref platform, stateValue))
+			{
+				FreeTitleArrayState(ref platform, fresh);
+				return false;
+			}
+			raw = stateValue.Pointers.Raw;
+		}
+		var previousRaw = ReadRaw(ref platform, state, obj, TitleArray, 0);
 		if (!SetRaw(ref platform, state, record, TitleArray, raw, notify))
 		{
 			FreeTitleArrayState(ref platform, fresh);
@@ -3917,7 +4903,13 @@ public static class MuiListCore
 		}
 		var old = APTR.FromPointer(Read(ref platform, state, obj,
 			TitleArrayStateKey, 0));
-		SetInternal(ref platform, state, obj, TitleArrayStateKey, fresh.Raw);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			TitleArrayStateKey, fresh.Raw, false))
+		{
+			SetRaw(ref platform, state, record, TitleArray, previousRaw, false);
+			FreeTitleArrayState(ref platform, fresh);
+			return false;
+		}
 		FreeTitleArrayState(ref platform, old);
 		return true;
 	}
@@ -3926,11 +4918,13 @@ public static class MuiListCore
 		ref TPlatform platform, APTR state, APTR record, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var hide = Read(ref platform, state, obj, HideColumn, uint.MaxValue);
+		if (!TryReadColumnVisibilityAdmission(ref platform, state, obj,
+			out _, out _)) return;
+		var hide = ReadRaw(ref platform, state, obj, HideColumn, uint.MaxValue);
 		if (hide < MaximumGeometryColumns)
 			ApplyColumnVisibility(ref platform, state, record, obj, hide, true,
 				false);
-		var show = Read(ref platform, state, obj, ShowColumn, uint.MaxValue);
+		var show = ReadRaw(ref platform, state, obj, ShowColumn, uint.MaxValue);
 		if (show < MaximumGeometryColumns)
 			ApplyColumnVisibility(ref platform, state, record, obj, show, false,
 				false);
@@ -3941,11 +4935,12 @@ public static class MuiListCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (column >= MaximumGeometryColumns) return false;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
+		if (!TryReadColumnVisibilityAdmission(ref platform, state, obj,
+			out var value, out var present)) return false;
+		var block = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			ColumnVisibilityKey, 0));
-		var fresh = false;
-		if (!TryReadColumnVisibilityState(ref platform, block,
-			out var value))
+		var fresh = !present;
+		if (fresh)
 		{
 			block = MuiHeadlessMemory.Allocate(ref platform,
 				MuiListColumnVisibilityState.Size);
@@ -3977,15 +4972,21 @@ public static class MuiListCore
 		value.Word7 = mask.Word7;
 		var changed = wasHidden != hide;
 		WriteColumnVisibilityState(ref platform, block, value);
-		if (fresh) SetInternal(ref platform, state, obj,
-			ColumnVisibilityKey, block.Raw);
+		if (fresh && !MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			ColumnVisibilityKey, block.Raw, false))
+		{
+			platform.Clear(block, MuiListColumnVisibilityState.Size);
+			platform.Free(block, MuiListColumnVisibilityState.Size);
+			return false;
+		}
 		if (!SetRaw(ref platform, state, record,
 			hide ? HideColumn : ShowColumn, column, notify))
 		{
 			WriteColumnVisibilityState(ref platform, block, previous);
 			if (fresh)
 			{
-				SetInternal(ref platform, state, obj, ColumnVisibilityKey, 0);
+				MuiHeadlessObjectCore.SetExistingAttribute(ref platform, state, obj,
+					ColumnVisibilityKey, 0);
 				platform.Clear(block, MuiListColumnVisibilityState.Size);
 				platform.Free(block, MuiListColumnVisibilityState.Size);
 			}
@@ -4002,7 +5003,9 @@ public static class MuiListCore
 		ref TPlatform platform, APTR state, APTR record, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var source = APTR.FromPointer(Read(ref platform, state, obj,
+		if (!TryReadColumnOrderAdmission(ref platform, state, obj,
+			out _, out _)) return;
+		var source = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			ColumnOrder, 0));
 		if (!ApplyColumnOrder(ref platform, state, record, obj, source, false))
 			SetRaw(ref platform, state, record, ColumnOrder, 0, false);
@@ -4012,6 +5015,11 @@ public static class MuiListCore
 		APTR state, APTR record, APTR obj, APTR source, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		// A published permutation record owns the copied byte vector. A malformed
+		// present block is not absence and cannot be replaced from the raw pointer
+		// during a runtime setter.
+		if (!TryReadColumnOrderAdmission(ref platform, state, obj,
+			out _, out _)) return false;
 		var old = APTR.FromPointer(Read(ref platform, state, obj,
 			ColumnOrderKey, 0));
 		var fresh = source.IsNotNull
@@ -4023,12 +5031,19 @@ public static class MuiListCore
 		var raw = 0u;
 		if (fresh.IsNotNull && TryReadColumnOrderState(ref platform, fresh,
 			out var freshValue)) raw = freshValue.Values.Raw;
+		var previousRaw = ReadRaw(ref platform, state, obj, ColumnOrder, 0);
 		if (!SetRaw(ref platform, state, record, ColumnOrder, raw, notify))
 		{
 			FreeColumnOrderState(ref platform, fresh);
 			return false;
 		}
-		SetInternal(ref platform, state, obj, ColumnOrderKey, fresh.Raw);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			ColumnOrderKey, fresh.Raw, false))
+		{
+			SetRaw(ref platform, state, record, ColumnOrder, previousRaw, false);
+			FreeColumnOrderState(ref platform, fresh);
+			return false;
+		}
 		FreeColumnOrderState(ref platform, old);
 		if (!changed) return true;
 		FreeColumnLayout(ref platform, state, obj);
@@ -4108,8 +5123,9 @@ public static class MuiListCore
 		APTR state, APTR obj, APTR source)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var columns = GeometryColumnCount(ref platform, state, obj);
-		if (columns == 0 || columns > MaximumGeometryColumns) return APTR.Null;
+		if (!TryGetGeometryColumnCount(ref platform, state, obj,
+			out var columns) || columns == 0 || columns > MaximumGeometryColumns)
+			return APTR.Null;
 		var valueBytes = ColumnOrderValueBytes(columns);
 		var values = MuiHeadlessMemory.Allocate(ref platform, valueBytes);
 		if (values.IsNull) return APTR.Null;
@@ -4142,6 +5158,11 @@ public static class MuiListCore
 		APTR record, APTR obj, APTR font, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadFontStateAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
+		if (!present && (!EnsureFontState(ref platform, state, obj) ||
+			!TryReadFontStateAdmission(ref platform, state, obj,
+				out _, out present) || !present)) return false;
 		if (!SetRaw(ref platform, state, record, Font, font.Raw, notify))
 			return false;
 		SetFontState(ref platform, state, obj, font);
@@ -4158,7 +5179,12 @@ public static class MuiListCore
 	{
 		if (format.IsNotNull && !TryReadCStringLength(ref platform, format,
 			MaximumStringLength, out _)) return false;
-		var maximum = MaxColumnsCursor(ref platform, state, obj);
+		if (!TryReadFormatPolicyAdmission(ref platform, state, obj,
+			out var policy, out var present)) return false;
+		if (!present && (!EnsureFormatPolicyState(ref platform, state, obj) ||
+			!TryReadFormatPolicyAdmission(ref platform, state, obj,
+				out policy, out present) || !present)) return false;
+		var maximum = policy.MaxColumns;
 		if (!InstallFormatDescriptors(ref platform, state, record, obj, format,
 			maximum, notify, false)) return false;
 		if (!SetRaw(ref platform, state, record, Format, format.Raw, notify))
@@ -4172,7 +5198,12 @@ public static class MuiListCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var maximum = NormalizeColumnLimit(value);
-		var format = FormatValueCursor(ref platform, state, obj);
+		if (!TryReadFormatPolicyAdmission(ref platform, state, obj,
+			out var policy, out var present)) return false;
+		if (!present && (!EnsureFormatPolicyState(ref platform, state, obj) ||
+			!TryReadFormatPolicyAdmission(ref platform, state, obj,
+				out policy, out present) || !present)) return false;
+		var format = policy.Format;
 		if (!InstallFormatDescriptors(ref platform, state, record, obj, format,
 			maximum, false, notify)) return false;
 		return ApplySortColumn(ref platform, state, record, obj,
@@ -4186,10 +5217,23 @@ public static class MuiListCore
 		APTR state, APTR record, APTR obj, uint value, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var normalized = NormalizeSortColumn(ref platform, state, obj, value);
-		if (!SetRaw(ref platform, state, record, SortColumn, normalized,
-			notify)) return false;
-		return SetSortColumnState(ref platform, state, obj, normalized);
+		if (!TryReadSortStateAdmission(ref platform, state, obj,
+			out var sortState, out var present)) return false;
+		if (!present && (!EnsureSortState(ref platform, state, obj) ||
+			!TryReadSortStateAdmission(ref platform, state, obj,
+				out sortState, out present) || !present)) return false;
+		if (!TryNormalizeSortColumn(ref platform, state, obj, value,
+			out var normalized)) return false;
+		var block = APTR.FromPointer(Read(ref platform, state, obj,
+			SortStateKey, 0));
+		var previous = sortState.SortColumn;
+		sortState.SortColumn = normalized;
+		if (!WriteSortState(ref platform, block, sortState)) return false;
+		if (SetRaw(ref platform, state, record, SortColumn, normalized, notify))
+			return true;
+		sortState.SortColumn = previous;
+		WriteSortState(ref platform, block, sortState);
+		return false;
 	}
 
 	// MorphOS Quiet suppresses intermediate refreshes and releases one
@@ -4199,18 +5243,19 @@ public static class MuiListCore
 		APTR state, APTR record, APTR obj, uint value, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadRedrawStateAdmission(ref platform, state, obj,
+			out var redraw, out var present) || !present) return false;
 		var wasQuiet = PresentationPolicyValue(ref platform, state, obj,
 			Quiet, 0) != 0;
 		var nowQuiet = value != 0;
 		if (!ApplyPresentationPolicyAttribute(ref platform, state, record, obj,
 			Quiet, nowQuiet ? 1u : 0u, notify)) return false;
 		if (!wasQuiet || nowQuiet) return true;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			RedrawStateKey, 0));
-		if (!TryReadRedrawState(ref platform, block, out var redraw) ||
-			redraw.Dirty == 0) return true;
+		if (redraw.Dirty == 0) return true;
 		redraw.Dirty = 0;
 		redraw.Requests = SaturatingAdd(redraw.Requests, 1);
+		var block = APTR.FromPointer(Read(ref platform, state, obj,
+			RedrawStateKey, 0));
 		WriteRedrawState(ref platform, block, redraw);
 		return true;
 	}
@@ -4230,8 +5275,13 @@ public static class MuiListCore
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			PresentationPolicyKey, 0));
+		// Once published, the guest-resident policy record is authoritative. A
+		// non-NULL record that fails its cookie/field contract is malformed, not
+		// an invitation to rebuild state from the raw compatibility projections.
+		if (!TryReadPresentationPolicyAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
+		if (present) return true;
+		var block = APTR.Null;
 		var value = default(MuiListPresentationPolicyState);
 		value.Magic = MuiListPresentationPolicyState.Cookie;
 		var hasEditable = MuiHeadlessObjectCore.GetRawAttribute(ref platform,
@@ -4275,33 +5325,24 @@ public static class MuiListCore
 		value.MinLineHeight = hasMinLineHeight
 			? NormalizePolicyMinLineHeight(minLineHeight) : RowHeight;
 
-		if (block.IsNotNull && TryReadPresentationPolicy(ref platform, block,
-			out var current) && current.Magic == value.Magic)
+		block = MuiHeadlessMemory.Allocate(ref platform,
+			MuiListPresentationPolicyState.Size);
+		if (block.IsNull || !WritePresentationPolicy(ref platform, block,
+			value))
 		{
-			if (!WritePresentationPolicy(ref platform, block, value)) return false;
-		}
-		else
-		{
-			if (block.IsNotNull && platform.IsMapped(block,
-				MuiListPresentationPolicyState.Size))
+			if (block.IsNotNull)
 			{
 				platform.Clear(block, MuiListPresentationPolicyState.Size);
 				platform.Free(block, MuiListPresentationPolicyState.Size);
 			}
-			block = MuiHeadlessMemory.Allocate(ref platform,
-				MuiListPresentationPolicyState.Size);
-			if (block.IsNull || !WritePresentationPolicy(ref platform, block,
-				value))
-			{
-				if (block.IsNotNull)
-				{
-					platform.Clear(block, MuiListPresentationPolicyState.Size);
-					platform.Free(block, MuiListPresentationPolicyState.Size);
-				}
-				return false;
-			}
-			SetInternal(ref platform, state, obj, PresentationPolicyKey,
-				block.Raw);
+			return false;
+		}
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			PresentationPolicyKey, block.Raw, false))
+		{
+			platform.Clear(block, MuiListPresentationPolicyState.Size);
+			platform.Free(block, MuiListPresentationPolicyState.Size);
+			return false;
 		}
 		if (hasEditable) SetInternal(ref platform, state, obj, Editable,
 			value.Editable);
@@ -4332,11 +5373,15 @@ public static class MuiListCore
 		uint attribute, uint value, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!EnsurePresentationPolicy(ref platform, state, obj)) return false;
+		if (!TryReadPresentationPolicyAdmission(ref platform, state, obj,
+			out var current, out var present)) return false;
+		if (!present && (!EnsurePresentationPolicy(ref platform, state, obj) ||
+			!TryReadPresentationPolicyAdmission(ref platform, state, obj,
+				out current, out present) || !present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			PresentationPolicyKey, 0));
-		if (!TryReadPresentationPolicy(ref platform, block, out var policy))
-			return false;
+		var policy = current;
+		var previous = policy;
 		var normalized = value;
 		switch (attribute)
 		{
@@ -4376,9 +5421,12 @@ public static class MuiListCore
 			default:
 				return false;
 		}
-		if (!WritePresentationPolicy(ref platform, block, policy) ||
-			!SetRaw(ref platform, state, record, attribute, normalized, notify))
+		if (!WritePresentationPolicy(ref platform, block, policy)) return false;
+		if (!SetRaw(ref platform, state, record, attribute, normalized, notify))
+		{
+			WritePresentationPolicy(ref platform, block, previous);
 			return false;
+		}
 		return attribute != AutoLineHeight ||
 			RefreshLineHeight(ref platform, state, obj);
 	}
@@ -4388,11 +5436,8 @@ public static class MuiListCore
 		out MuiListPresentationPolicyState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		value = default;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			PresentationPolicyKey, 0));
-		return block.IsNotNull && TryReadPresentationPolicy(ref platform, block,
-			out value);
+		return TryReadPresentationPolicyAdmission(ref platform, state, obj,
+			out value, out var present) && present;
 	}
 
 	private static uint PresentationPolicyValue<TPlatform>(
@@ -4400,7 +5445,9 @@ public static class MuiListCore
 		uint fallback)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryGetPresentationPolicy(ref platform, state, obj, out var policy))
+		if (!TryReadPresentationPolicyAdmission(ref platform, state, obj,
+			out var policy, out var present)) return 0;
+		if (present)
 		{
 			switch (attribute)
 			{
@@ -4419,6 +5466,42 @@ public static class MuiListCore
 		}
 		return Read(ref platform, state, obj, attribute, fallback);
 	}
+
+	// A published presentation-policy record is authoritative guest state. A
+	// non-NULL record that fails the cookie/field contract is malformed, not
+	// absence; all policy consumers therefore fail closed instead of repairing
+	// from the raw public projections.
+	private static bool TryReadPresentationPolicyAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListPresentationPolicyState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			PresentationPolicyKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadPresentationPolicy(ref platform, block, out value) &&
+			IsValidPresentationPolicy(value);
+	}
+
+	// Presentation values are normalized when the policy is published or
+	// mutated. Keep that contract at the named record boundary so a damaged
+	// guest field cannot make drawing, line-height, or drag policy consumers
+	// interpret an arbitrary scalar as a valid MUI policy.
+	private static bool IsValidPresentationPolicy(
+		MuiListPresentationPolicyState value) =>
+		value.Editable <= 1 && value.Quiet <= 1 &&
+		value.AdjustHeight <= 1 && value.AdjustWidth <= 1 &&
+		value.Stripes <= 1 && value.ShowDropMarks <= 1 &&
+		value.DragSortable <= 1 &&
+		(value.DragType == DragTypeNone ||
+			value.DragType == DragTypeImmediate) &&
+		value.AutoVisible <= 1 && value.AutoLineHeight <= 1 &&
+		value.MinLineHeight >= RowHeight &&
+		value.MinLineHeight <= MaximumLineHeight;
 
 	private static bool WritePresentationPolicy<TPlatform>(ref TPlatform platform,
 		APTR block, MuiListPresentationPolicyState value)
@@ -4572,13 +5655,36 @@ public static class MuiListCore
 		bool notifyFormat, bool notifyMaximum)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		// The named FORMAT policy is authoritative once published. A malformed
+		// record is not absence: refuse to install a replacement descriptor set from raw
+		// aliases, which would silently repair stale or corrupted guest state.
+		if (!TryReadFormatProjectionAdmission(ref platform, state, obj,
+			out _, out var present, out _, out _) || !present) return false;
 		if (!TryCountFormatColumns(ref platform, format, maximum,
 			out var count)) return false;
-		var block = BuildFormatDescriptors(ref platform, format, count);
-		if (block.IsNull) return false;
-		var old = APTR.FromPointer(Read(ref platform, state, obj,
+		var values = BuildFormatDescriptors(ref platform, format, count);
+		if (values.IsNull) return false;
+		var block = MuiHeadlessMemory.Allocate(ref platform,
+			MuiListFormatDescriptorState.Size);
+		if (block.IsNull)
+		{
+			FreeFormatDescriptors(ref platform, values, count);
+			return false;
+		}
+		var descriptorState = default(MuiListFormatDescriptorState);
+		descriptorState.Magic = MuiListFormatDescriptorState.Cookie;
+		descriptorState.Columns = count;
+		descriptorState.Values = values;
+		if (!MuiListFormatDescriptorStateCodec.Write(ref platform, block,
+			descriptorState))
+		{
+			platform.Clear(block, MuiListFormatDescriptorState.Size);
+			platform.Free(block, MuiListFormatDescriptorState.Size);
+			FreeFormatDescriptors(ref platform, values, count);
+			return false;
+		}
+		var old = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			FormatDescriptorKey, 0));
-		var oldCount = FormatColumnsCursor(ref platform, state, obj);
 		// Format/MaxColumns changes invalidate any geometry published by the
 		// previous Layout pass; retire it before replacing the descriptors.
 		FreeColumnLayout(ref platform, state, obj);
@@ -4589,11 +5695,11 @@ public static class MuiListCore
 				false) ||
 			!SetRaw(ref platform, state, record, FormatColumnsKey, count, false))
 		{
-			FreeFormatDescriptors(ref platform, block, count);
+			FreeFormatDescriptorState(ref platform, block, true);
 			return false;
 		}
 		SetFormatPolicyState(ref platform, state, obj, format, maximum, count);
-		FreeFormatDescriptors(ref platform, old, oldCount);
+		FreeFormatDescriptorState(ref platform, old);
 		return true;
 	}
 
@@ -5401,6 +6507,42 @@ public static class MuiListCore
 		platform.Free(block, size);
 	}
 
+	private static void FreeFormatDescriptorState<TPlatform>(
+		ref TPlatform platform, APTR block, bool allowMalformed = false,
+		uint boundedCount = 0)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (block.IsNull) return;
+		if (!allowMalformed &&
+			(!MuiListFormatDescriptorStateCodec.TryRead(ref platform, block,
+				out _) || !platform.IsMapped(block,
+				MuiListFormatDescriptorState.Size))) return;
+		if (!MuiListFormatDescriptorStateCodec.TryReadStorage(ref platform,
+			block, out var value))
+		{
+			if (platform.IsMapped(block, MuiListFormatDescriptorState.Size))
+			{
+				platform.Clear(block, MuiListFormatDescriptorState.Size);
+				platform.Free(block, MuiListFormatDescriptorState.Size);
+			}
+			return;
+		}
+		// During teardown a valid FORMAT policy is a second named owner of the
+		// vector cardinality. Prefer that bounded count when the descriptor record
+		// is structurally readable but disagrees with the policy; otherwise a
+		// malformed count could make cleanup walk into an adjacent guest block.
+		var count = boundedCount != 0 && boundedCount <= MaximumColumns
+			? boundedCount : value.Columns;
+		var bytes = count * MuiListFormatDescriptor.Size;
+		if (platform.IsMapped(value.Values, bytes))
+			FreeFormatDescriptors(ref platform, value.Values, count);
+		if (platform.IsMapped(block, MuiListFormatDescriptorState.Size))
+		{
+			platform.Clear(block, MuiListFormatDescriptorState.Size);
+			platform.Free(block, MuiListFormatDescriptorState.Size);
+		}
+	}
+
 	private static APTR BuildTitleArrayState<TPlatform>(ref TPlatform platform,
 		APTR source)
 		where TPlatform : struct, IMuiHeadlessPlatform
@@ -5535,12 +6677,47 @@ public static class MuiListCore
 		return true;
 	}
 
+	// A published title record is authoritative guest state. A non-NULL record
+	// that fails the cookie/field contract is malformed, not absence; title
+	// getters and drawing cursors must not replace it or fall back to the raw
+	// compatibility scalar.
+	private static bool TryReadTitleStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListTitleState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			TitleStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadTitleState(ref platform, block, out value) &&
+			IsValidTitleValue(ref platform, value);
+	}
+
+	// MUIA_List_Title accepts caller-owned text, NULL, or TRUE for the custom
+	// title-hook form. Admit the named value only when a non-sentinel pointer is
+	// a bounded mapped guest C string; title-row drawing must not dereference a
+	// stale compatibility pointer.
+	private static bool IsValidTitleValue<TPlatform>(ref TPlatform platform,
+		MuiListTitleState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (value.Value == 0 || value.Value == 1) return true;
+		return TryReadCStringLength(ref platform,
+			APTR.FromPointer(value.Value), MaximumStringLength, out _);
+	}
+
 	private static bool EnsureTitleState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadTitleStateAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			TitleStateKey, 0));
-		if (TryReadTitleState(ref platform, block, out _)) return true;
+		if (present) return true;
 		block = MuiHeadlessMemory.Allocate(ref platform, MuiListTitleState.Size);
 		if (block.IsNull) return false;
 		var value = default(MuiListTitleState);
@@ -5552,19 +6729,32 @@ public static class MuiListCore
 			platform.Free(block, MuiListTitleState.Size);
 			return false;
 		}
-		SetInternal(ref platform, state, obj, TitleStateKey, block.Raw);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			TitleStateKey, block.Raw, false))
+		{
+			platform.Clear(block, MuiListTitleState.Size);
+			platform.Free(block, MuiListTitleState.Size);
+			return false;
+		}
 		return true;
 	}
 
-	private static void SetTitleState<TPlatform>(ref TPlatform platform,
+	private static bool SetTitleState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, uint value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadTitleStateAdmission(ref platform, state, obj,
+			out var title, out var present)) return false;
+		if (!present)
+		{
+			if (!EnsureTitleState(ref platform, state, obj) ||
+				!TryReadTitleStateAdmission(ref platform, state, obj,
+					out title, out present) || !present) return false;
+		}
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			TitleStateKey, 0));
-		if (!TryReadTitleState(ref platform, block, out var title)) return;
 		title.Value = value;
-		WriteTitleState(ref platform, block, title);
+		return WriteTitleState(ref platform, block, title);
 	}
 
 	private static void FreeTitleState<TPlatform>(ref TPlatform platform,
@@ -5606,43 +6796,72 @@ public static class MuiListCore
 				MuiListStateRecordKind.SelectionSignal,
 				MuiListStateField.SelectionValue, out value.Value)) return false;
 		value.Magic = magic;
-		value.Value = value.Value == 0 ? 0u : 1u;
 		return true;
+	}
+
+	private static bool IsValidSelectionSignalState(
+		MuiListSelectionSignalState value) => value.Value <= 1;
+
+	// A published selection signal is authoritative guest state.  A non-NULL
+	// record that fails the cookie/field contract is malformed, not absence;
+	// selection transitions must not repair it from the raw signal alias.
+	private static bool TryReadSelectionSignalAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListSelectionSignalState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			SelectionSignalKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadSelectionSignalState(ref platform, block, out value) &&
+			IsValidSelectionSignalState(value);
 	}
 
 	private static bool EnsureSelectionSignalState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadSelectionSignalAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			SelectionSignalKey, 0));
-		if (TryReadSelectionSignalState(ref platform, block, out _)) return true;
+		if (present) return true;
 		block = MuiHeadlessMemory.Allocate(ref platform,
 			MuiListSelectionSignalState.Size);
 		if (block.IsNull) return false;
 		var value = default(MuiListSelectionSignalState);
 		value.Magic = SelectionSignalCookie;
-		value.Value = Read(ref platform, state, obj, SelectChange, 0);
+		value.Value = ReadRaw(ref platform, state, obj, SelectChange, 0);
 		if (!WriteSelectionSignalState(ref platform, block, value))
 		{
 			platform.Clear(block, MuiListSelectionSignalState.Size);
 			platform.Free(block, MuiListSelectionSignalState.Size);
 			return false;
 		}
-		SetInternal(ref platform, state, obj, SelectionSignalKey, block.Raw);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			SelectionSignalKey, block.Raw, false))
+		{
+			platform.Clear(block, MuiListSelectionSignalState.Size);
+			platform.Free(block, MuiListSelectionSignalState.Size);
+			return false;
+		}
 		return true;
 	}
 
-	private static void SetSelectionSignalState<TPlatform>(ref TPlatform platform,
+	private static bool SetSelectionSignalState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, uint value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadSelectionSignalAdmission(ref platform, state, obj,
+			out var signal, out var present) || !present) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			SelectionSignalKey, 0));
-		if (!TryReadSelectionSignalState(ref platform, block, out var signal))
-			return;
 		signal.Value = value;
-		WriteSelectionSignalState(ref platform, block, signal);
+		return WriteSelectionSignalState(ref platform, block, signal);
 	}
 
 	private static void FreeSelectionSignalState<TPlatform>(ref TPlatform platform,
@@ -5700,28 +6919,66 @@ public static class MuiListCore
 		return true;
 	}
 
+	// A published FORMAT policy is authoritative guest state. A missing key is
+	// the only state that may be bootstrapped from the raw FORMAT/MaxColumns
+	// aliases; a non-NULL malformed block is rejected so descriptor/layout code
+	// cannot repair it by silently rebuilding a second policy record.
+	private static bool TryReadFormatPolicyAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListFormatPolicyState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			FormatPolicyKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadFormatPolicyState(ref platform, block, out value) &&
+			IsValidFormatPolicy(ref platform, value);
+	}
+
+	// FORMAT remains caller-owned text, but a published pointer must still name
+	// a bounded, mapped guest C string before descriptor, layout, or display code
+	// can consume the named policy. NULL is the documented empty-format form.
+	private static bool IsValidFormatPolicy<TPlatform>(ref TPlatform platform,
+		MuiListFormatPolicyState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		value.MaxColumns != 0 && value.MaxColumns <= MaximumColumns &&
+		value.Columns != 0 && value.Columns <= value.MaxColumns &&
+		(value.Format.IsNull || TryReadCStringLength(ref platform, value.Format,
+			MaximumStringLength, out _));
+
 	private static bool EnsureFormatPolicyState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			FormatPolicyKey, 0));
-		if (TryReadFormatPolicyState(ref platform, block, out _)) return true;
+		if (!TryReadFormatPolicyAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
+		if (present) return true;
+		var block = APTR.Null;
 		block = MuiHeadlessMemory.Allocate(ref platform,
 			MuiListFormatPolicyState.Size);
 		if (block.IsNull) return false;
 		var value = default(MuiListFormatPolicyState);
 		value.Magic = FormatPolicyCookie;
-		value.Format = APTR.FromPointer(Read(ref platform, state, obj, Format, 0));
-		value.MaxColumns = NormalizeColumnLimit(Read(ref platform, state, obj,
+		value.Format = APTR.FromPointer(ReadRaw(ref platform, state, obj, Format, 0));
+		value.MaxColumns = NormalizeColumnLimit(ReadRaw(ref platform, state, obj,
 			MaxColumns, DefaultMaxColumns));
-		value.Columns = Read(ref platform, state, obj, FormatColumnsKey, 1);
+		value.Columns = ReadRaw(ref platform, state, obj, FormatColumnsKey, 1);
 		if (!WriteFormatPolicyState(ref platform, block, value))
 		{
 			platform.Clear(block, MuiListFormatPolicyState.Size);
 			platform.Free(block, MuiListFormatPolicyState.Size);
 			return false;
 		}
-		SetInternal(ref platform, state, obj, FormatPolicyKey, block.Raw);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			FormatPolicyKey, block.Raw, false))
+		{
+			platform.Clear(block, MuiListFormatPolicyState.Size);
+			platform.Free(block, MuiListFormatPolicyState.Size);
+			return false;
+		}
 		return true;
 	}
 
@@ -5778,24 +7035,58 @@ public static class MuiListCore
 		return true;
 	}
 
+	// A published Font record is authoritative caller-owned pointer state. A
+	// missing key may be bootstrapped from the raw Font alias; a non-NULL block
+	// that fails its cookie/field contract is malformed and must fail closed.
+	private static bool TryReadFontStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListFontState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			FontStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadFontState(ref platform, block, out value) &&
+			IsValidFontState(ref platform, value);
+	}
+
+	// MUIA_Font is a borrowed TextFont pointer. NULL means inherited font; an
+	// explicit value must at least cover the named guest TextFont structure so
+	// measurement and drawing never carry an unmapped pointer into graphics.
+	private static bool IsValidFontState<TPlatform>(ref TPlatform platform,
+		MuiListFontState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		value.Font.IsNull || platform.IsMapped(value.Font, TextFont.Size);
+
 	private static bool EnsureFontState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			FontStateKey, 0));
-		if (TryReadFontState(ref platform, block, out _)) return true;
+		if (!TryReadFontStateAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
+		if (present) return true;
+		var block = APTR.Null;
 		block = MuiHeadlessMemory.Allocate(ref platform, MuiListFontState.Size);
 		if (block.IsNull) return false;
 		var value = default(MuiListFontState);
 		value.Magic = FontStateCookie;
-		value.Font = APTR.FromPointer(Read(ref platform, state, obj, Font, 0));
+		value.Font = APTR.FromPointer(ReadRaw(ref platform, state, obj, Font, 0));
 		if (!WriteFontState(ref platform, block, value))
 		{
 			platform.Clear(block, MuiListFontState.Size);
 			platform.Free(block, MuiListFontState.Size);
 			return false;
 		}
-		SetInternal(ref platform, state, obj, FontStateKey, block.Raw);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			FontStateKey, block.Raw, false))
+		{
+			platform.Clear(block, MuiListFontState.Size);
+			platform.Free(block, MuiListFontState.Size);
+			return false;
+		}
 		return true;
 	}
 
@@ -5803,9 +7094,10 @@ public static class MuiListCore
 		APTR state, APTR obj, APTR font)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadFontStateAdmission(ref platform, state, obj,
+			out var value, out var present) || !present) return;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			FontStateKey, 0));
-		if (!TryReadFontState(ref platform, block, out var value)) return;
 		value.Font = font;
 		WriteFontState(ref platform, block, value);
 	}
@@ -5823,15 +7115,27 @@ public static class MuiListCore
 		ref TPlatform platform, APTR block, out MuiListTitleArrayState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		if (!TryReadTitleArrayStorage(ref platform, block, out value)) return false;
+		if (!MuiListStateFieldCursorCodec.TryReadUInt32(ref platform, block,
+			MuiListStateRecordKind.TitleArray, MuiListStateField.Magic,
+			out var magic) || magic != TitleArrayStateCookie) return false;
+		value.Magic = magic;
+		return true;
+	}
+
+	// Cleanup and admission share the bounded pointer-table validation, but only
+	// the admission reader requires the cookie. This lets teardown retire a
+	// record whose magic was corrupted while still rejecting arbitrary pointer
+	// and count values before freeing guest memory.
+	private static bool TryReadTitleArrayStorage<TPlatform>(
+		ref TPlatform platform, APTR block, out MuiListTitleArrayState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		value = default;
 		if (block.IsNull || !platform.IsMapped(block, MuiListTitleArrayState.Size) ||
 			!MuiListStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-				MuiListStateRecordKind.TitleArray, MuiListStateField.Magic,
-				out var magic) || magic != TitleArrayStateCookie) return false;
-		value.Magic = TitleArrayStateCookie;
-		if (!MuiListStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-			MuiListStateRecordKind.TitleArray, MuiListStateField.Pointers,
-			out var pointers) ||
+				MuiListStateRecordKind.TitleArray, MuiListStateField.Pointers,
+				out var pointers) ||
 			!MuiListStateFieldCursorCodec.TryReadUInt32(ref platform, block,
 				MuiListStateRecordKind.TitleArray, MuiListStateField.Count,
 				out value.Count)) return false;
@@ -5841,12 +7145,55 @@ public static class MuiListCore
 			(value.Count + 1) * MuiListPointerSlotRecord.Size);
 	}
 
+	private static bool TryReadTitleArrayAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListTitleArrayState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			TitleArrayStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadTitleArrayStateBlock(ref platform, block, out value) &&
+			IsValidTitleArrayValues(ref platform, value);
+	}
+
+	// The private TitleArray table owns copied pointers, not the strings they
+	// reference. Admission therefore validates every named slot as a bounded
+	// guest C string and requires the explicit terminator slot to remain NULL.
+	// The storage reader stays structural so teardown can still free the table
+	// after a caller corrupts one of its borrowed pointers.
+	private static bool IsValidTitleArrayValues<TPlatform>(
+		ref TPlatform platform, MuiListTitleArrayState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiListPointerSlotCursor);
+		cursor.Base = value.Pointers;
+		for (var column = 0u; column < value.Count; column++)
+		{
+			cursor.Index = column;
+			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+				out var slot) || !MuiListPointerSlotCodec.TryRead(ref platform, slot,
+				out var entry) || entry.Value.IsNull ||
+				!TryReadCStringLength(ref platform, entry.Value,
+					MaximumStringLength, out _)) return false;
+		}
+		cursor.Index = value.Count;
+		if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+			out var terminator) || !MuiListPointerSlotCodec.TryRead(ref platform,
+			terminator, out var terminatorValue)) return false;
+		return terminatorValue.Value.IsNull;
+	}
+
 	private static void FreeTitleArrayState<TPlatform>(ref TPlatform platform,
 		APTR block) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (block.IsNull || !platform.IsMapped(block, MuiListTitleArrayState.Size))
 			return;
-		if (TryReadTitleArrayStateBlock(ref platform, block, out var value))
+		if (TryReadTitleArrayStorage(ref platform, block, out var value))
 		{
 			var bytes = (value.Count + 1) * MuiListPointerSlotRecord.Size;
 			var pointers = value.Pointers;
@@ -5886,8 +7233,34 @@ public static class MuiListCore
 			!MuiListStateFieldCursorCodec.TryReadUInt32(ref platform, block,
 				MuiListStateRecordKind.Redraw, MuiListStateField.Requests,
 				out value.Requests)) return false;
-		value.Dirty = dirty == 0 ? 0u : 1u;
+		// Preserve the guest value until admission validates the BOOL contract.
+		// Normalizing here would turn malformed state into an apparently valid
+		// record before quiet/redraw consumers had a chance to fail closed.
+		value.Dirty = dirty;
 		return true;
+	}
+
+	private static bool IsValidRedrawState(MuiListRedrawState value) =>
+		value.Dirty <= 1;
+
+	// A published redraw record is authoritative coalescing state. A non-NULL
+	// record that fails its cookie/field contract is malformed, not absence;
+	// quiet transitions and redraw scheduling must fail before changing policy
+	// or issuing a platform redraw side effect.
+	private static bool TryReadRedrawStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListRedrawState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			RedrawStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadRedrawState(ref platform, block, out value) &&
+			IsValidRedrawState(value);
 	}
 
 	private static void WriteColumnVisibilityState<TPlatform>(
@@ -5962,6 +7335,49 @@ public static class MuiListCore
 		return true;
 	}
 
+	// A published metrics record is authoritative derived guest state. A missing
+	// key may be materialized by Layout; a non-NULL malformed record is rejected
+	// so refresh and geometry cannot silently replace it from an untrusted block.
+	private static bool TryReadColumnMetricsAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListColumnMetricsState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			ColumnMetricsKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return MuiListColumnMetricsStateCodec.TryRead(ref platform, block,
+			out value) && IsValidColumnMetricsState(value);
+	}
+
+	// Width is published from the signed host layout rectangle.  Keep the
+	// storage reader permissive for teardown, but do not let a post-publication
+	// UINT_MAX (or any value above INT_MAX) become an admitted derived metric.
+	private static bool IsValidColumnMetricsState(
+		MuiListColumnMetricsState value) => value.Width <= int.MaxValue;
+
+	// A published visibility mask is authoritative guest state. A missing key
+	// may be materialized by a Hide/Show setter; a non-NULL malformed record is
+	// rejected so layout and mutation cannot silently replace its mask.
+	private static bool TryReadColumnVisibilityAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListColumnVisibilityState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			ColumnVisibilityKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadColumnVisibilityState(ref platform, block, out value);
+	}
+
 	private static void FreeColumnVisibilityState<TPlatform>(
 		ref TPlatform platform, APTR block)
 		where TPlatform : struct, IMuiHeadlessPlatform
@@ -5995,16 +7411,30 @@ public static class MuiListCore
 		out MuiListColumnOrderState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		if (!TryReadColumnOrderStorage(ref platform, block, out value))
+			return false;
+		if (!MuiListStateFieldCursorCodec.TryReadUInt32(ref platform, block,
+			MuiListStateRecordKind.ColumnOrder, MuiListStateField.Magic,
+			out var magic) || magic != ColumnOrderCookie) return false;
+		value.Magic = magic;
+		return true;
+	}
+
+	// Teardown and admission share bounded vector validation, while only the
+	// admission reader requires the cookie. A corrupted magic word therefore
+	// cannot leak the owned byte vector, yet arbitrary count/pointer values are
+	// still rejected before cleanup frees guest memory.
+	private static bool TryReadColumnOrderStorage<TPlatform>(
+		ref TPlatform platform, APTR block,
+		out MuiListColumnOrderState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		value = default;
 		if (block.IsNull || !platform.IsMapped(block,
 			MuiListColumnOrderState.Size) ||
 			!MuiListStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-				MuiListStateRecordKind.ColumnOrder, MuiListStateField.Magic,
-				out var magic) || magic != ColumnOrderCookie) return false;
-		value.Magic = ColumnOrderCookie;
-		if (!MuiListStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-			MuiListStateRecordKind.ColumnOrder, MuiListStateField.Count,
-			out value.Count) ||
+				MuiListStateRecordKind.ColumnOrder, MuiListStateField.Count,
+				out value.Count) ||
 			!MuiListStateFieldCursorCodec.TryReadUInt32(ref platform, block,
 				MuiListStateRecordKind.ColumnOrder, MuiListStateField.Values,
 				out var values) ||
@@ -6018,13 +7448,53 @@ public static class MuiListCore
 			platform.IsMapped(value.Values, valueBytes);
 	}
 
+	private static bool TryReadColumnOrderAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListColumnOrderState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			ColumnOrderKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadColumnOrderState(ref platform, block, out value) &&
+			IsValidColumnOrderValues(ref platform, value);
+	}
+
+	// The persisted BYTE* vector is a permutation, not merely a bounded byte
+	// array. Keep this semantic check separate from the storage reader so
+	// teardown can still recover and free the owned vector when its contents are
+	// damaged. Admission rejects duplicate or out-of-range display columns while
+	// retaining the named record and raw projection for diagnosis and cleanup.
+	private static bool IsValidColumnOrderValues<TPlatform>(
+		ref TPlatform platform, MuiListColumnOrderState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var seen = default(MuiListHiddenColumns);
+		var cursor = default(MuiListColumnOrderByteCursor);
+		cursor.Base = value.Values;
+		for (var index = 0u; index < value.Count; index++)
+		{
+			cursor.Index = index;
+			if (!MuiListColumnOrderByteCursorCodec.TryGetEntry(ref platform,
+				cursor, out var address)) return false;
+			var column = platform.ReadUInt8(address, 0);
+			if (column >= value.Count || IsHidden(seen, column)) return false;
+			Hide(ref seen, column);
+		}
+		return true;
+	}
+
 	private static void FreeColumnOrderState<TPlatform>(
 		ref TPlatform platform, APTR block)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (block.IsNull || !platform.IsMapped(block,
 			MuiListColumnOrderState.Size)) return;
-		if (TryReadColumnOrderState(ref platform, block, out var value))
+		if (TryReadColumnOrderStorage(ref platform, block, out var value))
 		{
 			var values = value.Values;
 			ClearColumnOrderBytes(ref platform, values, value.Reserved);
@@ -6092,8 +7562,36 @@ public static class MuiListCore
 				MuiListStateRecordKind.ActiveCursor, MuiListStateField.Active,
 				out value.Active)) return false;
 		value.Magic = magic;
-		value.HasActive = value.HasActive == 0 ? 0u : 1u;
 		return true;
+	}
+
+	private static bool IsValidActiveState<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiListActiveState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (value.HasActive > 1) return false;
+		if (value.HasActive == 0) return true;
+		var count = EntryCount(ref platform, state, obj);
+		return count != 0 && value.Active < count;
+	}
+
+	// A published active cursor is authoritative guest state. A non-NULL
+	// record that fails the cookie/field contract is malformed, not absence;
+	// active-row consumers must not repair it from the raw Active scalar.
+	private static bool TryReadActiveStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListActiveState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			ActiveStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadActiveState(ref platform, block, out value) &&
+			IsValidActiveState(ref platform, state, obj, value);
 	}
 
 	private static bool WriteActiveState<TPlatform>(ref TPlatform platform,
@@ -6116,9 +7614,11 @@ public static class MuiListCore
 	private static bool EnsureActiveState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadActiveStateAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ActiveStateKey, 0));
-		if (TryReadActiveState(ref platform, block, out _)) return true;
+		if (present) return true;
 		block = MuiHeadlessMemory.Allocate(ref platform, MuiListActiveState.Size);
 		if (block.IsNull) return false;
 		var value = default(MuiListActiveState);
@@ -6130,28 +7630,24 @@ public static class MuiListCore
 			platform.Free(block, MuiListActiveState.Size);
 			return false;
 		}
-		SetInternal(ref platform, state, obj, ActiveStateKey, block.Raw);
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			ActiveStateKey, block.Raw, false))
+		{
+			platform.Clear(block, MuiListActiveState.Size);
+			platform.Free(block, MuiListActiveState.Size);
+			return false;
+		}
 		return true;
-	}
-
-	private static void SetActivePresence<TPlatform>(ref TPlatform platform,
-		APTR state, APTR obj, bool hasActive)
-		where TPlatform : struct, IMuiHeadlessPlatform
-	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			ActiveStateKey, 0));
-		if (!TryReadActiveState(ref platform, block, out var value)) return;
-		value.HasActive = hasActive ? 1u : 0u;
-		WriteActiveState(ref platform, block, value);
 	}
 
 	private static void SetActiveCursor<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, uint active, bool hasActive)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadActiveStateAdmission(ref platform, state, obj,
+			out var value, out var present) || !present) return;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ActiveStateKey, 0));
-		if (!TryReadActiveState(ref platform, block, out var value)) return;
 		value.Active = active;
 		value.HasActive = hasActive ? 1u : 0u;
 		WriteActiveState(ref platform, block, value);
@@ -6164,6 +7660,127 @@ public static class MuiListCore
 			return;
 		platform.Clear(block, MuiListActiveState.Size);
 		platform.Free(block, MuiListActiveState.Size);
+	}
+
+	private static bool WriteInsertPositionState<TPlatform>(
+		ref TPlatform platform, APTR block, MuiListInsertPositionState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (block.IsNull || !platform.IsMapped(block,
+			MuiListInsertPositionState.Size) || value.Magic !=
+			MuiListInsertPositionState.Cookie) return false;
+		return MuiListStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
+			MuiListStateRecordKind.InsertPosition, MuiListStateField.Magic,
+			value.Magic) && MuiListStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiListStateRecordKind.InsertPosition,
+			MuiListStateField.Position, value.Position);
+	}
+
+	private static bool TryReadInsertPositionState<TPlatform>(
+		ref TPlatform platform, APTR block,
+		out MuiListInsertPositionState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (block.IsNull || !platform.IsMapped(block,
+			MuiListInsertPositionState.Size) ||
+			!MuiListStateFieldCursorCodec.TryReadUInt32(ref platform, block,
+				MuiListStateRecordKind.InsertPosition, MuiListStateField.Magic,
+				out var magic) || magic != MuiListInsertPositionState.Cookie ||
+			!MuiListStateFieldCursorCodec.TryReadUInt32(ref platform, block,
+				MuiListStateRecordKind.InsertPosition, MuiListStateField.Position,
+				out value.Position)) return false;
+		value.Magic = magic;
+		return true;
+	}
+
+	// A published insertion result is authoritative guest state. A non-NULL
+	// record that fails the cookie/field contract is malformed, not absence;
+	// the getter must not replace it or fall back to the raw compatibility scalar.
+	private static bool TryReadInsertPositionAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListInsertPositionState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			InsertPositionStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadInsertPositionState(ref platform, block, out value) &&
+			IsValidInsertPositionState(value);
+	}
+
+	// InsertPosition is the zero-based result of a successful insertion. The
+	// list growth path is bounded by MaximumEntries, so preserve the neutral
+	// initial value and any stale last-result value after Clear while rejecting
+	// an impossible unsigned projection at the named record boundary.
+	private static bool IsValidInsertPositionState(
+		MuiListInsertPositionState value) => value.Position < MaximumEntries;
+
+	private static bool EnsureInsertPositionState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadInsertPositionAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
+		var block = APTR.FromPointer(Read(ref platform, state, obj,
+			InsertPositionStateKey, 0));
+		if (present) return true;
+		block = MuiHeadlessMemory.Allocate(ref platform,
+			MuiListInsertPositionState.Size);
+		if (block.IsNull) return false;
+		var value = default(MuiListInsertPositionState);
+		value.Magic = MuiListInsertPositionState.Cookie;
+		value.Position = ReadRaw(ref platform, state, obj, InsertPosition, 0);
+		if (!WriteInsertPositionState(ref platform, block, value))
+		{
+			platform.Clear(block, MuiListInsertPositionState.Size);
+			platform.Free(block, MuiListInsertPositionState.Size);
+			return false;
+		}
+		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			InsertPositionStateKey, block.Raw, false))
+		{
+			platform.Clear(block, MuiListInsertPositionState.Size);
+			platform.Free(block, MuiListInsertPositionState.Size);
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetInsertPositionState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListInsertPositionState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		return TryReadInsertPositionAdmission(ref platform, state, obj,
+			out value, out var present) && present;
+	}
+
+	private static void SetInsertPosition<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, uint position)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadInsertPositionAdmission(ref platform, state, obj,
+			out var current, out var present) || !present) return;
+		var block = APTR.FromPointer(Read(ref platform, state, obj,
+			InsertPositionStateKey, 0));
+		current.Position = position;
+		if (!WriteInsertPositionState(ref platform, block, current)) return;
+		SetInternal(ref platform, state, obj, InsertPosition, position);
+	}
+
+	private static void FreeInsertPositionState<TPlatform>(
+		ref TPlatform platform, APTR block)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (block.IsNull || !platform.IsMapped(block,
+			MuiListInsertPositionState.Size)) return;
+		platform.Clear(block, MuiListInsertPositionState.Size);
+		platform.Free(block, MuiListInsertPositionState.Size);
 	}
 
 	private static void WriteViewportState<TPlatform>(ref TPlatform platform,
@@ -6256,6 +7873,29 @@ public static class MuiListCore
 		return true;
 	}
 
+	private static bool IsValidViewportState(MuiListViewportState value) =>
+		value.LineHeight != 0;
+
+	// A published viewport record is authoritative derived state. A non-NULL
+	// record that fails the cookie/field contract is malformed, not absence;
+	// layout and cursor consumers must not replace it or fall back to raw row
+	// attributes while it is present.
+	private static bool TryReadViewportStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListViewportState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			ViewportStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadViewportState(ref platform, block, out value) &&
+			IsValidViewportState(value);
+	}
+
 	private static void FreeViewportState<TPlatform>(ref TPlatform platform,
 		APTR block) where TPlatform : struct, IMuiHeadlessPlatform
 	{
@@ -6274,57 +7914,120 @@ public static class MuiListCore
 		out MuiListFormatPolicyState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			FormatPolicyKey, 0));
-		return TryReadFormatPolicyState(ref platform, block, out value);
+		return TryReadFormatProjectionAdmission(ref platform, state, obj,
+			out value, out var present, out _, out _) && present;
+	}
+
+	internal static bool TryGetFormatDescriptorState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListFormatDescriptorState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		return TryReadFormatProjectionAdmission(ref platform, state, obj,
+			out _, out var policyPresent, out value, out var present) &&
+			policyPresent && present;
 	}
 
 	internal static bool TryGetFontState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, out MuiListFontState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			FontStateKey, 0));
-		return TryReadFontState(ref platform, block, out value);
+		return TryReadFontStateAdmission(ref platform, state, obj,
+			out value, out var present) && present;
+	}
+
+	internal static bool TryGetColumnMetricsState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListColumnMetricsState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		return TryReadColumnMetricsAdmission(ref platform, state, obj,
+			out value, out var present) && present;
 	}
 
 	private static APTR FontCursor<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		return TryGetFontState(ref platform, state, obj, out var value)
-			? value.Font
-			: APTR.FromPointer(Read(ref platform, state, obj, Font, 0));
+		if (!TryReadFontStateAdmission(ref platform, state, obj,
+			out var value, out var present)) return APTR.Null;
+		return present ? value.Font :
+			APTR.FromPointer(ReadRaw(ref platform, state, obj, Font, 0));
 	}
 
 	private static APTR FormatValueCursor<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			FormatPolicyKey, 0));
-		return TryReadFormatPolicyState(ref platform, block, out var value)
-			? value.Format
-			: APTR.FromPointer(Read(ref platform, state, obj, Format, 0));
+		if (!TryReadFormatProjectionAdmission(ref platform, state, obj,
+			out var value, out var present, out _, out _)) return APTR.Null;
+		return present ? value.Format :
+			APTR.FromPointer(ReadRaw(ref platform, state, obj, Format, 0));
 	}
 
 	private static uint MaxColumnsCursor<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			FormatPolicyKey, 0));
-		return TryReadFormatPolicyState(ref platform, block, out var value)
-			? value.MaxColumns
-			: NormalizeColumnLimit(Read(ref platform, state, obj, MaxColumns,
+		if (!TryReadFormatProjectionAdmission(ref platform, state, obj,
+			out var value, out var present, out _, out _)) return 0;
+		return present ? value.MaxColumns :
+			NormalizeColumnLimit(ReadRaw(ref platform, state, obj, MaxColumns,
 				DefaultMaxColumns));
 	}
 
 	private static uint FormatColumnsCursor<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			FormatPolicyKey, 0));
-		return TryReadFormatPolicyState(ref platform, block, out var value)
-			? value.Columns
-			: Read(ref platform, state, obj, FormatColumnsKey, 1);
+		// A malformed published policy is still authoritative failure state;
+		// do not expose a valid descriptor count through a damaged policy row.
+		if (!TryReadFormatProjectionAdmission(ref platform, state, obj,
+			out var policy, out var policyPresent,
+			out var descriptorState, out var descriptorPresent)) return 0;
+		// Once the descriptor owner is published, its bounded count is the
+		// authoritative FORMAT projection. The policy count is only a
+		// construction-time fallback before descriptor publication exists.
+		if (descriptorPresent) return policyPresent ? descriptorState.Columns : 0;
+		return policyPresent ? policy.Columns :
+			ReadRaw(ref platform, state, obj, FormatColumnsKey, 1);
+	}
+
+	private static bool TryReadFormatDescriptorAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListFormatDescriptorState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		var block = APTR.FromPointer(ReadRaw(ref platform, state, obj,
+			FormatDescriptorKey, 0));
+		present = block.IsNotNull;
+		if (!present) return true;
+		return MuiListFormatDescriptorStateCodec.TryRead(ref platform, block,
+			out value);
+	}
+
+	// FORMAT policy and descriptor owner are published as separate named
+	// records, but their bounded column contract is one projection. A descriptor
+	// owner with a count outside MaxColumns or different from the policy count
+	// is structurally readable yet semantically stale; all consumers fail closed
+	// before using its vector.
+	private static bool TryReadFormatProjectionAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListFormatPolicyState policy, out bool policyPresent,
+		out MuiListFormatDescriptorState descriptor, out bool descriptorPresent)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		policy = default;
+		descriptor = default;
+		if (!TryReadFormatPolicyAdmission(ref platform, state, obj,
+			out policy, out policyPresent))
+		{
+			descriptorPresent = false;
+			return false;
+		}
+		if (!TryReadFormatDescriptorAdmission(ref platform, state, obj,
+			out descriptor, out descriptorPresent)) return false;
+		if (descriptorPresent && (!policyPresent ||
+			descriptor.Columns != policy.Columns ||
+			descriptor.Columns > policy.MaxColumns)) return false;
+		return true;
 	}
 
 	public static bool GetFormatColumn<TPlatform>(ref TPlatform platform,
@@ -6333,14 +8036,18 @@ public static class MuiListCore
 	{
 		if (storage.IsNull || !platform.IsMapped(storage, FormatDescriptorSize))
 			return false;
-		var count = FormatColumnCount(ref platform, state, obj);
+		// The descriptor owner and FORMAT policy form one published projection:
+		// the policy supplies the bounded range and caller-owned format identity.
+		// Do not expose a still-mapped descriptor vector after the policy record
+		// has become malformed.
+		if (!TryReadFormatProjectionAdmission(ref platform, state, obj,
+			out _, out var policyPresent, out var descriptorState,
+			out var present) || !policyPresent || !present) return false;
+		var count = descriptorState.Columns;
 		if (column >= count) return false;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			FormatDescriptorKey, 0));
-		if (block.IsNull) return false;
-		var descriptorColumn = OrderedDescriptorColumn(ref platform, state, obj,
-			column);
-		if (descriptorColumn >= count) descriptorColumn = column;
+		var block = descriptorState.Values;
+		if (!TryGetOrderedDescriptorColumn(ref platform, state, obj, column,
+			out var descriptorColumn) || descriptorColumn >= count) return false;
 		var cursor = default(MuiListFormatDescriptorCursor);
 		cursor.Base = block;
 		cursor.Index = descriptorColumn;
@@ -6370,10 +8077,12 @@ public static class MuiListCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (width < 0 || storage.IsNull) return false;
-		var columns = GeometryColumnCount(ref platform, state, obj);
+		if (!TryGetGeometryColumnCount(ref platform, state, obj,
+			out var columns) || columns == 0) return false;
 		if (!platform.IsMapped(storage, columns * ColumnGeometryRecordSize))
 			return false;
-		var hidden = HiddenColumns(ref platform, state, obj, width, columns);
+		if (!TryGetHiddenColumns(ref platform, state, obj, width, columns,
+			out var hidden)) return false;
 		var totalWidth = unchecked((uint)width);
 		var totalDelta = VisibleDeltaTotal(ref platform, state, obj, columns,
 			hidden);
@@ -6431,51 +8140,146 @@ public static class MuiListCore
 		return true;
 	}
 
+	internal static bool TryGetColumnLayoutState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListColumnLayoutState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadColumnLayoutAdmission(ref platform, state, obj,
+			out value, out var present))
+			return false;
+		return present;
+	}
+
 	private static bool InstallColumnLayout<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, int width)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var columns = GeometryColumnCount(ref platform, state, obj);
+		// A published layout record is authoritative. Do not replace a malformed
+		// record from the derived geometry calculation during a runtime pass.
+		if (!TryReadColumnLayoutAdmission(ref platform, state, obj,
+			out _, out _)) return false;
+		if (!TryGetGeometryColumnCount(ref platform, state, obj,
+			out var columns) || columns == 0) return false;
 		var bytes = columns * ColumnGeometryRecordSize;
-		var block = MuiHeadlessMemory.Allocate(ref platform, bytes);
-		if (block.IsNull) return false;
-		if (!GetColumnGeometry(ref platform, state, obj, width, block))
+		var values = MuiHeadlessMemory.Allocate(ref platform, bytes);
+		if (values.IsNull) return false;
+		if (!GetColumnGeometry(ref platform, state, obj, width, values))
 		{
-			platform.Free(block, bytes);
+			platform.Clear(values, bytes);
+			platform.Free(values, bytes);
 			return false;
 		}
-		var old = APTR.FromPointer(Read(ref platform, state, obj,
+		var block = MuiHeadlessMemory.Allocate(ref platform,
+			MuiListColumnLayoutState.Size);
+		if (block.IsNull)
+		{
+			platform.Clear(values, bytes);
+			platform.Free(values, bytes);
+			return false;
+		}
+		var layout = default(MuiListColumnLayoutState);
+		layout.Magic = MuiListColumnLayoutState.Cookie;
+		layout.Width = unchecked((uint)width);
+		layout.Columns = columns;
+		layout.Values = values;
+		if (!MuiListColumnLayoutStateCodec.Write(ref platform, block, layout))
+		{
+			platform.Clear(block, MuiListColumnLayoutState.Size);
+			platform.Free(block, MuiListColumnLayoutState.Size);
+			platform.Clear(values, bytes);
+			platform.Free(values, bytes);
+			return false;
+		}
+		var old = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			ColumnLayoutKey, 0));
-		var oldColumns = GeometryColumnCount(ref platform, state, obj);
 		SetInternal(ref platform, state, obj, ColumnLayoutKey, block.Raw);
-		SetInternal(ref platform, state, obj, ColumnLayoutWidthKey,
-			unchecked((uint)width));
-		if (old.IsNotNull)
-			platform.Free(old, oldColumns * ColumnGeometryRecordSize);
+		if (old.IsNotNull) FreeColumnLayoutBlock(ref platform, old);
 		return true;
 	}
 
 	private static void FreeColumnLayout<TPlatform>(ref TPlatform platform,
-		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
+		APTR state, APTR obj, bool allowMalformed = false)
+		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
+		var block = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			ColumnLayoutKey, 0));
 		if (block.IsNull) return;
-		var columns = GeometryColumnCount(ref platform, state, obj);
-		platform.Clear(block, columns * ColumnGeometryRecordSize);
-		platform.Free(block, columns * ColumnGeometryRecordSize);
+		// Runtime invalidation may retire only an admitted named layout record.
+		// Teardown opts into the bounded storage reader so a malformed record is
+		// still reclaimed without deriving an untrusted byte count.
+		if (!allowMalformed &&
+			(!TryReadColumnLayoutAdmission(ref platform, state, obj,
+				out _, out var present) || !present)) return;
+		FreeColumnLayoutBlock(ref platform, block);
 		ClearInternal(ref platform, state, obj, ColumnLayoutKey);
-		ClearInternal(ref platform, state, obj, ColumnLayoutWidthKey);
+	}
+
+	private static void FreeColumnLayoutBlock<TPlatform>(ref TPlatform platform,
+		APTR block) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (block.IsNull) return;
+		if (!MuiListColumnLayoutStateCodec.TryReadStorage(ref platform, block,
+			out var value))
+		{
+			if (platform.IsMapped(block, MuiListColumnLayoutState.Size))
+			{
+				platform.Clear(block, MuiListColumnLayoutState.Size);
+				platform.Free(block, MuiListColumnLayoutState.Size);
+			}
+			return;
+		}
+		var bytes = value.Columns * MuiListColumnGeometry.Size;
+		if (platform.IsMapped(value.Values, bytes))
+		{
+			platform.Clear(value.Values, bytes);
+			platform.Free(value.Values, bytes);
+		}
+		if (platform.IsMapped(block, MuiListColumnLayoutState.Size))
+		{
+			platform.Clear(block, MuiListColumnLayoutState.Size);
+			platform.Free(block, MuiListColumnLayoutState.Size);
+		}
+	}
+
+	private static bool TryReadColumnLayoutAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListColumnLayoutState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		var block = APTR.FromPointer(ReadRaw(ref platform, state, obj,
+			ColumnLayoutKey, 0));
+		present = block.IsNotNull;
+		if (!present) return true;
+		return MuiListColumnLayoutStateCodec.TryRead(ref platform, block,
+			out value);
 	}
 
 	private static void FreeColumnMetrics<TPlatform>(ref TPlatform platform,
-		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
+		APTR state, APTR obj, bool allowMalformed = false)
+		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ColumnMetricsKey, 0));
-		if (!MuiListColumnMetricsStateCodec.TryRead(ref platform, block,
+		// A published non-NULL metrics record is authoritative guest state.
+		// Runtime invalidation may retire only an admitted named struct; an
+		// invalid cookie, width, count, or values vector is retained so mutation
+		// cannot turn malformed state into an ownership/free primitive. Object
+		// teardown opts into the bounded storage reader below to reclaim a record
+		// that can no longer pass runtime admission.
+		if (!allowMalformed &&
+			(!TryReadColumnMetricsAdmission(ref platform, state, obj,
+				out _, out var present) || !present)) return;
+		if (!MuiListColumnMetricsStateCodec.TryReadStorage(ref platform, block,
 			out var value))
 		{
+			if (block.IsNotNull && platform.IsMapped(block,
+				MuiListColumnMetricsState.Size))
+			{
+				platform.Clear(block, MuiListColumnMetricsState.Size);
+				platform.Free(block, MuiListColumnMetricsState.Size);
+			}
 			ClearInternal(ref platform, state, obj, ColumnMetricsKey);
 			return;
 		}
@@ -6505,6 +8309,21 @@ public static class MuiListCore
 		ClearInternal(ref platform, state, obj, HScrollerStateKey);
 	}
 
+	private static void FreePoolPolicyState<TPlatform>(ref TPlatform platform,
+		APTR block) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (block.IsNull || !platform.IsMapped(block,
+			MuiListPoolPolicyState.Size)) return;
+		// Deleting a pool is safe only after the complete typed record validates.
+		// For malformed state, retire the guest record but do not interpret an
+		// untrusted ownership bit or pool handle as a deletion request.
+		if (MuiListPoolPolicyStateCodec.TryRead(ref platform, block,
+			out var value) && value.UsesExternalPool == 0 && value.Pool.IsNotNull)
+			platform.DeletePool(value.Pool);
+		platform.Clear(block, MuiListPoolPolicyState.Size);
+		platform.Free(block, MuiListPoolPolicyState.Size);
+	}
+
 	private static void FreeImages<TPlatform>(ref TPlatform platform, APTR header)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
@@ -6524,9 +8343,33 @@ public static class MuiListCore
 	private static uint GeometryColumnCount<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var count = FormatColumnCount(ref platform, state, obj);
+		return TryGetGeometryColumnCount(ref platform, state, obj,
+			out var count) ? count : 0;
+	}
+
+	// Geometry consumers need to distinguish a valid one-column empty FORMAT
+	// from a malformed published owner. Keep policy fallback only before the
+	// descriptor owner exists; once either named record is malformed, report a
+	// failed admission instead of letting callers normalize zero to one.
+	private static bool TryGetGeometryColumnCount<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, out uint columns)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		columns = 0;
+		if (!TryReadFormatProjectionAdmission(ref platform, state, obj,
+			out var policy, out var policyPresent,
+			out var descriptor, out var descriptorPresent)) return false;
+		// Geometry and FORMAT descriptor projections share the display-column
+		// permutation. A malformed published order is authoritative failure
+		// state; do not let layout helpers continue with scalar/default widths.
+		if (!TryReadColumnOrderAdmission(ref platform, state, obj,
+			out _, out _)) return false;
+		var count = descriptorPresent ? descriptor.Columns :
+			policyPresent ? policy.Columns :
+			ReadRaw(ref platform, state, obj, FormatColumnsKey, 1);
 		if (count == 0) count = 1;
-		return count > MaximumGeometryColumns ? MaximumGeometryColumns : count;
+		columns = count > MaximumGeometryColumns ? MaximumGeometryColumns : count;
+		return columns != 0;
 	}
 
 	internal static int ContentLayoutWidth<TPlatform>(ref TPlatform platform,
@@ -6638,15 +8481,15 @@ public static class MuiListCore
 	// remain. The first column is never hidden; it is clipped instead. Re-run
 	// the bounded pass after each hide so a later column can become visible once
 	// an earlier impossible column has been removed.
-	private static MuiListHiddenColumns HiddenColumns<TPlatform>(
-		ref TPlatform platform, APTR state, APTR obj, int width, uint columns)
+	private static bool TryGetHiddenColumns<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, int width, uint columns,
+		out MuiListHiddenColumns hidden)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var hidden = default(MuiListHiddenColumns);
-		var visibilityBlock = APTR.FromPointer(Read(ref platform, state, obj,
-			ColumnVisibilityKey, 0));
-		if (TryReadColumnVisibilityState(ref platform, visibilityBlock,
-			out var visibility))
+		hidden = default;
+		if (!TryReadColumnVisibilityAdmission(ref platform, state, obj,
+			out var visibility, out var present)) return false;
+		if (present)
 		{
 			hidden.Low = visibility.Low;
 			hidden.High = visibility.High;
@@ -6657,7 +8500,7 @@ public static class MuiListCore
 			hidden.Word6 = visibility.Word6;
 			hidden.Word7 = visibility.Word7;
 		}
-		if (width <= 0 || columns <= 1) return hidden;
+		if (width <= 0 || columns <= 1) return true;
 		for (var pass = 0u; pass < columns; pass++)
 		{
 			var totalWidth = unchecked((uint)width);
@@ -6697,16 +8540,17 @@ public static class MuiListCore
 					remainingWeight = remainingWeight > weight
 						? remainingWeight - weight : 0;
 			}
-			if (!changed) return hidden;
+			if (!changed) return true;
 		}
-		return hidden;
+		return true;
 	}
 
 	private static uint ColumnOffset<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, int width, uint columns, uint target)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var hidden = HiddenColumns(ref platform, state, obj, width, columns);
+		if (!TryGetHiddenColumns(ref platform, state, obj, width, columns,
+			out var hidden)) return 0;
 		return ColumnOffset(ref platform, state, obj, width, columns, target,
 			hidden);
 	}
@@ -6734,7 +8578,8 @@ public static class MuiListCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (columns == 0 || target >= columns || width <= 0) return 0;
-		var hidden = HiddenColumns(ref platform, state, obj, width, columns);
+		if (!TryGetHiddenColumns(ref platform, state, obj, width, columns,
+			out var hidden)) return 0;
 		return ColumnWidth(ref platform, state, obj, width, columns, target,
 			hidden);
 	}
@@ -6840,58 +8685,127 @@ public static class MuiListCore
 	}
 
 	// Resolve a display column to the descriptor column selected by the
-	// guest-owned ColumnOrder permutation. An absent or malformed order is the
-	// identity mapping, preserving the ordinary FORMAT behavior.
-	private static uint OrderedDescriptorColumn<TPlatform>(
-		ref TPlatform platform, APTR state, APTR obj, uint displayColumn)
+	// guest-owned ColumnOrder permutation. Absence is the ordinary identity
+	// mapping; a malformed published state is a hard failure so descriptor and
+	// layout consumers cannot silently bypass the named permutation.
+	private static bool TryGetOrderedDescriptorColumn<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, uint displayColumn,
+		out uint descriptorColumn)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			ColumnOrderKey, 0));
-		if (!TryReadColumnOrderState(ref platform, block, out var order) ||
-			displayColumn >= order.Count) return displayColumn;
+		descriptorColumn = displayColumn;
+		if (!TryReadColumnOrderAdmission(ref platform, state, obj,
+			out var order, out var present)) return false;
+		if (!present || displayColumn >= order.Count) return true;
 		var cursor = default(MuiListColumnOrderByteCursor);
 		cursor.Base = order.Values;
 		cursor.Index = displayColumn;
 		if (!MuiListColumnOrderByteCursorCodec.TryGetEntry(ref platform, cursor,
-			out var address)) return displayColumn;
-		var value = platform.ReadUInt8(address, 0);
-		return value;
+			out var address)) return false;
+		descriptorColumn = platform.ReadUInt8(address, 0);
+		return true;
+	}
+
+	private static bool TryDescriptorValue<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, uint column, MuiListFormatField field,
+		out uint value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = 0;
+		var count = GeometryColumnCount(ref platform, state, obj);
+		if (column >= count) return false;
+		if (!TryReadFormatProjectionAdmission(ref platform, state, obj,
+			out _, out var policyPresent, out var descriptorState,
+			out var present) || !policyPresent || !present ||
+			count > descriptorState.Columns) return false;
+		var block = descriptorState.Values;
+		if (!TryGetOrderedDescriptorColumn(ref platform, state, obj, column,
+			out var descriptorColumn) || descriptorColumn >= count) return false;
+		var cursor = default(MuiListFormatDescriptorCursor);
+		cursor.Base = block;
+		cursor.Index = descriptorColumn;
+		if (!MuiListFormatDescriptorCursorCodec.TryGetEntry(ref platform, cursor,
+			out var descriptorAddress)) return false;
+		var descriptor = default(MuiListFormatDescriptor);
+		ReadFormatDescriptor(ref platform, descriptorAddress, out descriptor);
+		switch (field)
+		{
+			case MuiListFormatField.Delta:
+				value = descriptor.Delta;
+				return true;
+			case MuiListFormatField.Weight:
+				value = descriptor.Weight;
+				return true;
+			case MuiListFormatField.MinWidth:
+				value = descriptor.MinWidth;
+				return true;
+			case MuiListFormatField.MaxWidth:
+				value = descriptor.MaxWidth;
+				return true;
+			case MuiListFormatField.Column:
+				value = descriptor.Column;
+				return true;
+			case MuiListFormatField.Flags:
+				value = descriptor.Flags;
+				return true;
+			case MuiListFormatField.Preparse:
+				value = descriptor.Preparse.Raw;
+				return true;
+			case MuiListFormatField.PreparseLength:
+				value = descriptor.PreparseLength;
+				return true;
+			default:
+				return false;
+		}
 	}
 
 	private static uint DescriptorValue<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, uint column, MuiListFormatField field,
 		uint fallback)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		TryDescriptorValue(ref platform, state, obj, column, field,
+			out var value) ? value : fallback;
+
+	private static bool TryDisplaySourceColumn<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, uint displayColumn,
+		out uint sourceColumn)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var count = GeometryColumnCount(ref platform, state, obj);
-		if (column >= count) return fallback;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			FormatDescriptorKey, 0));
-		if (block.IsNull || !platform.IsMapped(block,
-			count * FormatDescriptorSize)) return fallback;
-		var descriptorColumn = OrderedDescriptorColumn(ref platform, state, obj,
-			column);
-		if (descriptorColumn >= count) descriptorColumn = column;
-		var cursor = default(MuiListFormatDescriptorCursor);
-		cursor.Base = block;
-		cursor.Index = descriptorColumn;
-		if (!MuiListFormatDescriptorCursorCodec.TryGetEntry(ref platform, cursor,
-			out var descriptorAddress)) return fallback;
-		var descriptor = default(MuiListFormatDescriptor);
-		ReadFormatDescriptor(ref platform, descriptorAddress, out descriptor);
-		return field switch
+		sourceColumn = MaximumDrawColumns;
+		// Display-source mapping is a FORMAT projection as well. Admit the
+		// policy before the bounded out-of-range identity branch; otherwise a
+		// damaged policy could remain observable through a harmless-looking
+		// column request outside the descriptor table.
+		if (!TryReadFormatProjectionAdmission(ref platform, state, obj,
+			out _, out var policyPresent, out var descriptor,
+			out var descriptorPresent) || !policyPresent) return false;
+		// Lists without FORMAT descriptors retain the ordinary single-column
+		// identity projection. The ColumnOrder record is still admitted first so
+		// a malformed published permutation cannot hide behind that fallback.
+		if (!TryReadColumnOrderAdmission(ref platform, state, obj,
+			out var order, out var orderPresent)) return false;
+		if (!descriptorPresent)
 		{
-			MuiListFormatField.Delta => descriptor.Delta,
-			MuiListFormatField.Weight => descriptor.Weight,
-			MuiListFormatField.MinWidth => descriptor.MinWidth,
-			MuiListFormatField.MaxWidth => descriptor.MaxWidth,
-			MuiListFormatField.Column => descriptor.Column,
-			MuiListFormatField.Flags => descriptor.Flags,
-			MuiListFormatField.Preparse => descriptor.Preparse.Raw,
-			MuiListFormatField.PreparseLength => descriptor.PreparseLength,
-			_ => fallback,
-		};
+			if (displayColumn >= MaximumDrawColumns) return false;
+			sourceColumn = displayColumn;
+			return true;
+		}
+		// FORMAT descriptors are bounded. Preserve the historical identity
+		// projection for a display column outside that bounded set unless a
+		// published permutation claims the column; the latter is inconsistent
+		// state and must fail closed.
+		if (displayColumn >= descriptor.Columns)
+		{
+			if (orderPresent && displayColumn < order.Count) return false;
+			sourceColumn = displayColumn < MaximumDrawColumns
+				? displayColumn : MaximumDrawColumns;
+			return sourceColumn < MaximumDrawColumns;
+		}
+		if (!TryDescriptorValue(ref platform, state, obj, displayColumn,
+			MuiListFormatField.Column, out var source) ||
+			source >= MaximumDrawColumns) return false;
+		sourceColumn = source;
+		return true;
 	}
 
 	// FORMAT's COL field changes which source StringArray column is displayed
@@ -6900,11 +8814,8 @@ public static class MuiListCore
 	private static uint DisplaySourceColumn<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, uint displayColumn)
 		where TPlatform : struct, IMuiHeadlessPlatform
-	{
-		var source = DescriptorValue(ref platform, state, obj, displayColumn,
-			MuiListFormatField.Column, displayColumn);
-		return source < MaximumDrawColumns ? source : MaximumDrawColumns;
-	}
+		=> TryDisplaySourceColumn(ref platform, state, obj, displayColumn,
+			out var source) ? source : MaximumDrawColumns;
 
 	// PREPARSE is a guest string owned by the FORMAT descriptor. The graphics
 	// seam currently needs only MUI's documented horizontal controls: ESC-c for
@@ -6951,6 +8862,12 @@ public static class MuiListCore
 		APTR record, APTR obj, int requested, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadViewportStateAdmission(ref platform, state, obj,
+			out _, out _)) return false;
+		if (!TryReadActiveStateAdmission(ref platform, state, obj,
+			out _, out var activePresent) ||
+			(!activePresent && !EnsureActiveState(ref platform, state, obj)))
+			return false;
 		var header = Header(ref platform, state, obj);
 		if (header.IsNull) return false;
 		var count = ReadHeaderCount(ref platform, header);
@@ -7002,6 +8919,8 @@ public static class MuiListCore
 		APTR record, APTR obj, int requested, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadViewportStateAdmission(ref platform, state, obj,
+			out _, out _)) return false;
 		var count = EntryCount(ref platform, state, obj);
 		var active = ActiveIndex(ref platform, state, obj);
 		var normalized = NormalizeFirst(ref platform, state, obj, requested,
@@ -7050,25 +8969,54 @@ public static class MuiListCore
 		// Clear the optional composite link before the child record is retired.
 		// CleanupTree visits children before their owning Listview, so this also
 		// prevents a late teardown callback from observing a stale parent.
+		var ownerBlock = APTR.FromPointer(Read(ref platform, state, obj,
+			ListviewOwnerKey, 0));
+		FreeListviewOwnerState(ref platform, ownerBlock);
 		ClearInternal(ref platform, state, obj, ListviewOwnerKey);
+		var rawHeader = APTR.FromPointer(Read(ref platform, state, obj,
+			ListHeaderKey, 0));
 		var header = Header(ref platform, state, obj);
-		if (header.IsNull) return;
+		if (header.IsNull)
+		{
+			// Runtime consumers reject a malformed cookie, but disposal may still
+			// use a structurally valid header to retire its owned index and slots.
+			if (rawHeader.IsNull || !TryReadHeaderStorage(ref platform, rawHeader,
+				out _))
+			{
+				if (rawHeader.IsNotNull && platform.IsMapped(rawHeader, HeaderSize))
+				{
+					platform.Clear(rawHeader, HeaderSize);
+					platform.Free(rawHeader, HeaderSize);
+				}
+				ClearInternal(ref platform, state, obj, ListHeaderKey);
+				return;
+			}
+			header = rawHeader;
+		}
 		CancelEditState(ref platform, state, obj);
 		var index = ReadHeaderIndex(ref platform, header);
 		var capacity = ReadHeaderCapacity(ref platform, header);
 		var count = ReadHeaderCount(ref platform, header);
 		var pool = PoolFor(ref platform, state, obj);
-		var formatBlock = APTR.FromPointer(Read(ref platform, state, obj,
+		var formatPolicy = APTR.FromPointer(Read(ref platform, state, obj,
+			FormatPolicyKey, 0));
+		var boundedFormatCount = 0u;
+		if (TryReadFormatPolicyState(ref platform, formatPolicy,
+			out var formatPolicyValue) &&
+			IsValidFormatPolicy(ref platform, formatPolicyValue))
+			boundedFormatCount = formatPolicyValue.Columns;
+		var formatBlock = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			FormatDescriptorKey, 0));
-		var formatCount = FormatColumnsCursor(ref platform, state, obj);
 		var titleArrayState = APTR.FromPointer(Read(ref platform, state, obj,
 			TitleArrayStateKey, 0));
 		for (var i = 0u; i < count && i < MaximumEntries; i++)
 			DestructSlot(ref platform, state, obj, index, i, pool);
 		FreeImages(ref platform, header);
-		FreeColumnLayout(ref platform, state, obj);
-		FreeColumnMetrics(ref platform, state, obj);
-		FreeFormatDescriptors(ref platform, formatBlock, formatCount);
+		FreeColumnLayout(ref platform, state, obj, true);
+		FreeColumnMetrics(ref platform, state, obj, true);
+		FreeFormatDescriptorState(ref platform, formatBlock, true,
+			boundedFormatCount);
+		ClearInternal(ref platform, state, obj, FormatDescriptorKey);
 		FreeTitleArrayState(ref platform, titleArrayState);
 		ClearInternal(ref platform, state, obj, TitleArrayStateKey);
 		ClearInternal(ref platform, state, obj, TitleArray);
@@ -7080,8 +9028,6 @@ public static class MuiListCore
 			SelectionSignalKey, 0));
 		FreeSelectionSignalState(ref platform, selectionSignal);
 		ClearInternal(ref platform, state, obj, SelectionSignalKey);
-		var formatPolicy = APTR.FromPointer(Read(ref platform, state, obj,
-			FormatPolicyKey, 0));
 		FreeFormatPolicyState(ref platform, formatPolicy);
 		ClearInternal(ref platform, state, obj, FormatPolicyKey);
 		var fontState = APTR.FromPointer(Read(ref platform, state, obj,
@@ -7109,14 +9055,16 @@ public static class MuiListCore
 			ActiveStateKey, 0));
 		FreeActiveState(ref platform, activeState);
 		ClearInternal(ref platform, state, obj, ActiveStateKey);
+		var insertPositionState = APTR.FromPointer(Read(ref platform, state, obj,
+			InsertPositionStateKey, 0));
+		FreeInsertPositionState(ref platform, insertPositionState);
+		ClearInternal(ref platform, state, obj, InsertPositionStateKey);
 		var poolPolicy = APTR.FromPointer(Read(ref platform, state, obj,
 			PoolPolicyKey, 0));
-		if (poolPolicy.IsNotNull && platform.IsMapped(poolPolicy,
-			MuiListPoolPolicyState.Size))
-		{
-			platform.Clear(poolPolicy, MuiListPoolPolicyState.Size);
-			platform.Free(poolPolicy, MuiListPoolPolicyState.Size);
-		}
+		// Entries must be destructed while the list-owned pool is alive. A
+		// supplied MUIA_List_Pool is borrowed and is never deleted here; a
+		// malformed record is retired without interpreting untrusted ownership.
+		FreePoolPolicyState(ref platform, poolPolicy);
 		ClearInternal(ref platform, state, obj, PoolPolicyKey);
 		var interactionPolicy = APTR.FromPointer(Read(ref platform, state, obj,
 			InteractionPolicyKey, 0));
@@ -7220,9 +9168,9 @@ public static class MuiListCore
 	public static bool ResolveHScrollerVisibility(uint policy,
 		uint contentWidth, uint viewWidth)
 	{
-		policy = NormalizeHScrollerPolicy(policy);
-		if (policy == HScrollerAlways) return true;
-		if (policy == HScrollerNever) return false;
+		var normalizedPolicy = NormalizeHScrollerPolicy(policy);
+		if (normalizedPolicy == HScrollerAlways) return true;
+		if (normalizedPolicy == HScrollerNever) return false;
 		return contentWidth > viewWidth;
 	}
 
@@ -7233,18 +9181,17 @@ public static class MuiListCore
 		APTR state, APTR obj, out MuiListHScrollerState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			HScrollerStateKey, 0));
-		if (MuiListHScrollerStateCodec.TryRead(ref platform, block, out value))
+		if (!TryReadHScrollerStateAdmission(ref platform, state, obj,
+			out value, out var present)) return false;
+		if (!present)
 		{
-			value.Policy = NormalizeHScrollerPolicy(value.Policy);
-			return true;
+			var policy = NormalizeHScrollerPolicy(ReadRaw(ref platform, state, obj,
+				HScrollerVisibility, HScrollerAuto));
+			if (!EnsureHScrollerState(ref platform, state, obj, policy) ||
+				!TryReadHScrollerStateAdmission(ref platform, state, obj,
+					out value, out present) || !present) return false;
 		}
-		value = default;
-		value.Magic = MuiListHScrollerState.Cookie;
-		value.Policy = NormalizeHScrollerPolicy(Read(ref platform, state, obj,
-			HScrollerVisibility, HScrollerAuto));
-		return EnsureHScrollerState(ref platform, state, obj, value.Policy);
+		return true;
 	}
 
 	internal static bool SetHScrollerViewport<TPlatform>(ref TPlatform platform,
@@ -7286,10 +9233,9 @@ public static class MuiListCore
 	public static uint RedrawRequests<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			RedrawStateKey, 0));
-		return TryReadRedrawState(ref platform, block, out var redraw)
-			? redraw.Requests : 0;
+		if (!TryReadRedrawStateAdmission(ref platform, state, obj,
+			out var redraw, out var present) || !present) return 0;
+		return redraw.Requests;
 	}
 
 	// Internal drag/drop seam for the future input dispatcher. MUIA_List_DropMark
@@ -7301,6 +9247,8 @@ public static class MuiListCore
 	{
 		var header = Header(ref platform, state, obj);
 		if (header.IsNull) return false;
+		if (!TryReadViewportStateAdmission(ref platform, state, obj,
+			out _, out _)) return false;
 		var count = ReadHeaderCount(ref platform, header);
 		var target = position;
 		if (target < DropMarkNone) target = DropMarkNone;
@@ -7916,31 +9864,31 @@ public static class MuiListCore
 	internal static uint TitleRowCount<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var titleState = APTR.FromPointer(Read(ref platform, state, obj,
-			TitleArrayStateKey, 0));
-		if (titleState.IsNotNull)
-			return TryReadTitleArrayStateBlock(ref platform, titleState,
-				out var value) && value.Count != 0 ? 1u : 0u;
+		if (!TryReadTitleArrayAdmission(ref platform, state, obj,
+			out var titleArray, out var titleArrayPresent)) return 0;
+		if (titleArrayPresent)
+			return titleArray.Count != 0 ? 1u : 0u;
 		return TitleValueCursor(ref platform, state, obj) == 0 ? 0u : 1u;
 	}
 
 	internal static uint TitleValueCursor<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			TitleStateKey, 0));
-		return TryReadTitleState(ref platform, block, out var value)
-			? value.Value
-			: Read(ref platform, state, obj, Title, 0);
+		if (!TryReadTitleStateAdmission(ref platform, state, obj,
+			out var value, out var present)) return 0;
+		// A true absence can occur during the low-level construction window;
+		// retain the bounded raw projection only for that bootstrap case. A
+		// malformed present record is rejected above and therefore contributes no
+		// title row or drawing pointer.
+		return present ? value.Value : ReadRaw(ref platform, state, obj, Title, 0);
 	}
 
 	internal static bool TryGetTitleState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, out MuiListTitleState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			TitleStateKey, 0));
-		return TryReadTitleState(ref platform, block, out value);
+		return TryReadTitleStateAdmission(ref platform, state, obj,
+			out value, out var present) && present;
 	}
 
 	private static short AdjustedHeight<TPlatform>(ref TPlatform platform,
@@ -8051,8 +9999,10 @@ public static class MuiListCore
 		var count = EntryCount(ref platform, state, obj);
 		var titleRows = TitleRowCount(ref platform, state, obj);
 		if (count == 0 && titleRows == 0) return true;
-		var columns = FormatColumnCount(ref platform, state, obj);
-		if (columns == 0) columns = 1;
+		if (!TryGetGeometryColumnCount(ref platform, state, obj,
+			out var columns) || columns == 0) return false;
+		if (!TryReadColumnVisibilityAdmission(ref platform, state, obj,
+			out _, out _)) return false;
 		if (columns > MaximumDrawColumns) columns = MaximumDrawColumns;
 		if (!TryAllocateDisplayArray(ref platform, out var displayStorage))
 			return false;
@@ -8174,10 +10124,8 @@ public static class MuiListCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (width < 0) return 0;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			ColumnMetricsKey, 0));
-		if (!MuiListColumnMetricsStateCodec.TryRead(ref platform, block,
-			out var value) ||
+		if (!TryReadColumnMetricsAdmission(ref platform, state, obj,
+			out var value, out var present) || !present ||
 			value.Width != unchecked((uint)width) || column >= value.Columns)
 			return 0;
 		var values = value.Values;
@@ -8199,6 +10147,8 @@ public static class MuiListCore
 		APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadViewportStateAdmission(ref platform, state, obj,
+			out _, out _)) return false;
 		var lineHeight = EffectiveLineHeight(ref platform, state, obj);
 		if (lineHeight == 0) lineHeight = 1;
 		var entries = EntryCount(ref platform, state, obj);
@@ -8258,6 +10208,9 @@ public static class MuiListCore
 
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ViewportStateKey, 0));
+		// The public scalar attributes below are updated through SetNotify so an
+		// external Prop can follow the documented List TopPixel/VisiblePixel/
+		// TotalPixel connection without reading private record words.
 		if (!TryReadViewportState(ref platform, block, out _))
 		{
 			block = MuiHeadlessMemory.Allocate(ref platform,
@@ -8275,9 +10228,14 @@ public static class MuiListCore
 			}
 		}
 		if (block.IsNotNull) WriteViewportState(ref platform, block, value);
-		SetInternal(ref platform, state, obj, TopPixel, value.TopPixel);
-		SetInternal(ref platform, state, obj, VisiblePixel, value.VisiblePixel);
-		SetInternal(ref platform, state, obj, TotalPixel, value.TotalPixel);
+		// These are public [..G]/[.SG] projections used by the MorphOS external
+		// scrollbar recipe. SetNotify is change-only, so repeated viewport
+		// refreshes remain quiet while real insertion, layout, or First changes
+		// dispatch the listener through the existing guest-resident notification
+		// records. No offset-based shadow state is introduced.
+		SetNotify(ref platform, state, obj, TopPixel, value.TopPixel);
+		SetNotify(ref platform, state, obj, VisiblePixel, value.VisiblePixel);
+		SetNotify(ref platform, state, obj, TotalPixel, value.TotalPixel);
 		return true;
 	}
 
@@ -8285,10 +10243,11 @@ public static class MuiListCore
 		APTR state, APTR obj, uint lineHeight)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadViewportStateAdmission(ref platform, state, obj,
+			out var value, out var present) || !present)
+			return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ViewportStateKey, 0));
-		if (!TryReadViewportState(ref platform, block, out var value))
-			return false;
 		value.LineHeight = lineHeight;
 		WriteViewportState(ref platform, block, value);
 		return true;
@@ -8298,10 +10257,11 @@ public static class MuiListCore
 		APTR state, APTR obj, uint dropMark)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadViewportStateAdmission(ref platform, state, obj,
+			out var value, out var present) || !present)
+			return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ViewportStateKey, 0));
-		if (!TryReadViewportState(ref platform, block, out var value))
-			return false;
 		value.DropMark = dropMark;
 		WriteViewportState(ref platform, block, value);
 		return true;
@@ -8321,51 +10281,58 @@ public static class MuiListCore
 		out MuiListViewportState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		value = default;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			ViewportStateKey, 0));
-		return block.IsNotNull && TryReadViewportState(ref platform, block,
-			out value);
+		return TryReadViewportStateAdmission(ref platform, state, obj,
+			out value, out var present) && present;
 	}
 
 	// Composite consumers use the named cursor when the viewport record exists;
 	// the raw attribute is only a construction/early-lifecycle fallback.
 	internal static uint FirstCursor<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj)
-		where TPlatform : struct, IMuiHeadlessPlatform =>
-		TryGetViewportState(ref platform, state, obj, out var value)
-			? value.First
-			: Read(ref platform, state, obj, First, 0);
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadViewportStateAdmission(ref platform, state, obj,
+			out var value, out var present)) return 0;
+		return present ? value.First : Read(ref platform, state, obj, First, 0);
+	}
 
 	// The visible row capacity follows the same publication boundary as First.
 	// Keep the raw attribute only as a fallback before the first viewport record
 	// exists or while Layout is constructing the next publication.
 	internal static uint VisibleCursor<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj)
-		where TPlatform : struct, IMuiHeadlessPlatform =>
-		TryGetViewportState(ref platform, state, obj, out var value)
-			? value.Visible
-			: Read(ref platform, state, obj, Visible, 0);
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadViewportStateAdmission(ref platform, state, obj,
+			out var value, out var present)) return 0;
+		return present ? value.Visible : Read(ref platform, state, obj, Visible, 0);
+	}
 
 	// DropMark is a derived drag insertion cue. Prefer the named viewport record
 	// after publication; raw state remains the early-lifecycle and transition
 	// fallback used before a viewport exists.
 	internal static uint DropMarkCursor<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj)
-		where TPlatform : struct, IMuiHeadlessPlatform =>
-		TryGetViewportState(ref platform, state, obj, out var value)
-			? value.DropMark
-			: Read(ref platform, state, obj, DropMark,
-				unchecked((uint)DropMarkNone));
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadViewportStateAdmission(ref platform, state, obj,
+			out var value, out var present))
+			return unchecked((uint)DropMarkNone);
+		return present ? value.DropMark : Read(ref platform, state, obj, DropMark,
+			unchecked((uint)DropMarkNone));
+	}
 
 	// Effective line height is a derived projection. Prefer the named viewport
 	// record once it exists; the raw attribute remains only as an early-lifecycle
 	// fallback before the first viewport publication.
 	private static uint LineHeightCursor<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, uint fallback)
-		where TPlatform : struct, IMuiHeadlessPlatform =>
-		TryGetViewportState(ref platform, state, obj, out var value) &&
-			value.LineHeight != 0 ? value.LineHeight : fallback;
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadViewportStateAdmission(ref platform, state, obj,
+			out var value, out var present)) return fallback;
+		return present && value.LineHeight != 0 ? value.LineHeight : fallback;
+	}
 
 	private static uint SaturatingMultiply(uint left, uint right) =>
 		left != 0 && right > uint.MaxValue / left
@@ -8380,7 +10347,15 @@ public static class MuiListCore
 		APTR state, APTR obj, int width)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
-		var columns = GeometryColumnCount(ref platform, state, obj);
+		// A non-NULL malformed record is not absence. Leave it untouched and
+		// let metric consumers fail closed until object teardown retires it
+		// through the bounded storage reader.
+		if (!TryReadColumnMetricsAdmission(ref platform, state, obj,
+			out _, out _)) return true;
+		if (!TryGetGeometryColumnCount(ref platform, state, obj,
+			out var columns) || columns == 0) return true;
+		if (!TryReadColumnVisibilityAdmission(ref platform, state, obj,
+			out _, out _)) return true;
 		if (!HasContentWidthDescriptors(ref platform, state, obj, columns))
 		{
 			FreeColumnMetrics(ref platform, state, obj);
@@ -8479,6 +10454,8 @@ public static class MuiListCore
 	{
 		if (!IsListBacked(Classify(ref platform, state, obj)))
 			return false;
+		if (!TryReadViewportStateAdmission(ref platform, state, obj,
+			out _, out _)) return false;
 		if (!MuiAreaLayoutCore.Layout(ref platform, state, obj, left, top, width,
 			height)) return false;
 		RefreshLineHeight(ref platform, state, obj);
@@ -8494,6 +10471,8 @@ public static class MuiListCore
 		// current entry count. MorphOS keeps the full capacity for short lists;
 		// drawing and hit-testing still stop at the named entry count.
 		var count = EntryCount(ref platform, state, obj);
+		var previousVisible = Read(ref platform, state, obj, Visible, 0);
+		var previousFirst = Read(ref platform, state, obj, First, 0);
 		var wasNotVisible = Read(ref platform, state, obj, Visible, 0) ==
 			VisibleOff;
 		SetInternal(ref platform, state, obj, Visible, rows);
@@ -8512,7 +10491,19 @@ public static class MuiListCore
 		SetInternal(ref platform, state, obj, First, unchecked((uint)normalized));
 		var contentLayoutWidth = ContentLayoutWidth(ref platform, state, obj, width);
 		RefreshColumnMetrics(ref platform, state, obj, contentLayoutWidth);
-		RefreshViewportState(ref platform, state, obj);
+		if (!RefreshViewportState(ref platform, state, obj)) return false;
+		// Layout may normalize First or change the row capacity without going
+		// through OM_SET.  Publish those public projections after the named
+		// viewport record and pixel metrics are current, so a callback can read a
+		// coherent tuple.  The explicit previous values avoid a second,
+		// offset-based shadow state and preserve change-only semantics.
+		var publishedVisible = Read(ref platform, state, obj, Visible, rows);
+		var publishedFirst = Read(ref platform, state, obj, First,
+			unchecked((uint)normalized));
+		NotifyViewportTransition(ref platform, state, obj, Visible,
+			previousVisible, publishedVisible);
+		NotifyViewportTransition(ref platform, state, obj, First,
+			previousFirst, publishedFirst);
 		return InstallColumnLayout(ref platform, state, obj, contentLayoutWidth);
 	}
 
@@ -8625,17 +10616,17 @@ public static class MuiListCore
 	{
 		column = -1;
 		xoffset = 0;
-		var columns = FormatColumnCount(ref platform, state, obj);
-		if (columns == 0) columns = 1;
+		if (!TryGetGeometryColumnCount(ref platform, state, obj,
+			out var columns) || columns == 0) return;
+		if (!TryReadColumnVisibilityAdmission(ref platform, state, obj,
+			out _, out _)) return;
 		if (columns > MaximumDrawColumns) columns = MaximumDrawColumns;
-		var layoutBlock = APTR.FromPointer(Read(ref platform, state, obj,
-			ColumnLayoutKey, 0));
-		var installedLayoutWidth = Read(ref platform, state, obj,
-			ColumnLayoutWidthKey, 0);
-		if (layoutBlock.IsNull || installedLayoutWidth !=
-			unchecked((uint)layoutWidth) ||
-			!platform.IsMapped(layoutBlock, columns * ColumnGeometryRecordSize))
-			layoutBlock = APTR.Null;
+		var layoutBlock = APTR.Null;
+		if (TryReadColumnLayoutAdmission(ref platform, state, obj,
+			out var layout, out var layoutPresent) && layoutPresent &&
+			layout.Width == unchecked((uint)layoutWidth) &&
+			layout.Columns == columns)
+			layoutBlock = layout.Values;
 		for (var current = 0u; current < columns; current++)
 		{
 			var geometry = default(MuiListColumnGeometry);
@@ -8677,8 +10668,8 @@ public static class MuiListCore
 		if (!IsListBacked(Classify(ref platform, state, obj))) return false;
 		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
 		if (record.IsNull) return false;
-		var columns = FormatColumnCount(ref platform, state, obj);
-		if (columns == 0) columns = 1;
+		if (!TryGetGeometryColumnCount(ref platform, state, obj,
+			out var columns) || columns == 0) return false;
 		if (column >= columns) return false;
 		if (!ApplySortStateAttribute(ref platform, state, record, obj,
 			TitleClick, unchecked((uint)column), true))
@@ -8819,17 +10810,17 @@ public static class MuiListCore
 		var contentLayoutWidth = ContentLayoutWidth(ref platform, state, obj,
 			width);
 		var scrollX = unchecked((int)HorizontalScrollX(ref platform, state, obj));
-		var columns = FormatColumnCount(ref platform, state, obj);
-		if (columns == 0) columns = 1;
+		if (!TryGetGeometryColumnCount(ref platform, state, obj,
+			out var columns) || columns == 0) return false;
+		if (!TryReadColumnVisibilityAdmission(ref platform, state, obj,
+			out _, out _)) return false;
 		if (columns > MaximumDrawColumns) columns = MaximumDrawColumns;
-		var layoutBlock = APTR.FromPointer(Read(ref platform, state, obj,
-			ColumnLayoutKey, 0));
-		var installedLayoutWidth = Read(ref platform, state, obj,
-			ColumnLayoutWidthKey, 0);
-		if (layoutBlock.IsNull || installedLayoutWidth !=
-			unchecked((uint)contentLayoutWidth) ||
-			!platform.IsMapped(layoutBlock, columns * ColumnGeometryRecordSize))
-			layoutBlock = APTR.Null;
+		var layoutBlock = APTR.Null;
+		if (TryReadColumnLayoutAdmission(ref platform, state, obj,
+			out var layout, out var layoutPresent) && layoutPresent &&
+			layout.Width == unchecked((uint)contentLayoutWidth) &&
+			layout.Columns == columns)
+			layoutBlock = layout.Values;
 		if (!TryAllocateDisplayArray(ref platform, out var displayStorage))
 			return false;
 		var displayArray = displayStorage.Array;
@@ -8852,11 +10843,12 @@ public static class MuiListCore
 		var rows = unchecked((uint)(height / (int)lineHeight));
 		var font = FontCursor(ref platform, state, obj);
 		var titleRows = 0u;
-		var titleStateBlock = APTR.FromPointer(Read(ref platform, state, obj,
-			TitleArrayStateKey, 0));
-		if (titleStateBlock.IsNotNull && rows != 0 &&
-			TryReadTitleArrayStateBlock(ref platform, titleStateBlock,
-				out var titleArrayState) && titleArrayState.Count != 0)
+		var titleArrayState = default(MuiListTitleArrayState);
+		var titleArrayPresent = false;
+		if (rows != 0 &&
+			TryReadTitleArrayAdmission(ref platform, state, obj,
+				out titleArrayState, out titleArrayPresent) &&
+			titleArrayPresent && titleArrayState.Count != 0)
 		{
 			ClearDisplayArray(ref platform, displayStorage);
 			if (CopyTitleArrayPointers(ref platform, titleArrayState, displayArray))
@@ -8867,7 +10859,7 @@ public static class MuiListCore
 				titleRows = 1;
 			}
 		}
-		else if (titleStateBlock.IsNull && TitleValueCursor(ref platform,
+		else if (!titleArrayPresent && TitleValueCursor(ref platform,
 			state, obj) != 0 && rows != 0)
 		{
 			// A neutral MUIA_List_Title row is published through the display hook.
@@ -9064,6 +11056,8 @@ public static class MuiListCore
 	{
 		var header = Header(ref platform, state, obj);
 		if (header.IsNull) return false;
+		if (pos == InsertSorted && !TryGetSortColumnValue(ref platform,
+			state, obj, out _)) return false;
 		CancelEditState(ref platform, state, obj);
 		var pool = PoolFor(ref platform, state, obj);
 		var stored = Construct(ref platform, state, obj, entry, pool,
@@ -9081,6 +11075,8 @@ public static class MuiListCore
 	{
 		var header = Header(ref platform, state, obj);
 		if (header.IsNull || entries.IsNull) return false;
+		if (pos == InsertSorted && !TryGetSortColumnValue(ref platform,
+			state, obj, out _)) return false;
 		CancelEditState(ref platform, state, obj);
 		var before = ReadHeaderCount(ref platform, header);
 		var terminated = count < 0;
@@ -9345,9 +11341,15 @@ public static class MuiListCore
 	{
 		var header = Header(ref platform, state, obj);
 		if (header.IsNull) return false;
+		if (!TryGetSortColumnValue(ref platform, state, obj,
+			out var column)) return false;
+		// CompareForSort consumes FORMAT flags and the display-column mapping.
+		// Admit the complete named geometry/order projection before allowing the
+		// allocation-free insertion sort to mutate guest slots.
+		if (!TryGetGeometryColumnCount(ref platform, state, obj,
+			out var columns) || column >= columns) return false;
 		CancelEditState(ref platform, state, obj);
 		var count = ReadHeaderCount(ref platform, header);
-		var column = SortColumnValue(ref platform, state, obj);
 		// Insertion sort keeps the pass allocation-free and stable.
 		for (var i = 1u; i < count; i++)
 		{
@@ -9376,8 +11378,11 @@ public static class MuiListCore
 		APTR obj, APTR entries) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (entries.IsNull) return false;
+		if (!TryGetSortColumnValue(ref platform, state, obj,
+			out var column)) return false;
+		if (!TryGetGeometryColumnCount(ref platform, state, obj,
+			out var columns) || column >= columns) return false;
 		CancelEditState(ref platform, state, obj);
-		var column = SortColumnValue(ref platform, state, obj);
 		uint count = 0;
 		var cursor = default(MuiListPointerVectorCursor);
 		cursor.Base = entries;
@@ -9491,6 +11496,8 @@ public static class MuiListCore
 	{
 		var header = Header(ref platform, state, obj);
 		if (header.IsNull) return false;
+		if (!TryReadViewportStateAdmission(ref platform, state, obj,
+			out _, out _)) return false;
 		var count = ReadHeaderCount(ref platform, header);
 		if (count == 0) return true;
 		var first = unchecked((int)FirstCursor(ref platform, state, obj));
@@ -9518,13 +11525,14 @@ public static class MuiListCore
 	private static void RequestMutationRedraw<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			RedrawStateKey, 0));
-		if (!TryReadRedrawState(ref platform, block, out var redraw)) return;
+		if (!TryReadRedrawStateAdmission(ref platform, state, obj,
+			out var redraw, out var present) || !present) return;
 		if (PresentationPolicyValue(ref platform, state, obj, Quiet, 0) != 0)
 			redraw.Dirty = 1;
 		else
 			redraw.Requests = SaturatingAdd(redraw.Requests, 1);
+		var block = APTR.FromPointer(Read(ref platform, state, obj,
+			RedrawStateKey, 0));
 		WriteRedrawState(ref platform, block, redraw);
 	}
 
@@ -9552,20 +11560,54 @@ public static class MuiListCore
 		return position >= first && position - first < visible;
 	}
 
+	// Resolve the entry pointer supplied with MUIV_List_Redraw_Entry without
+	// manufacturing a managed mirror of the list. The guest-resident slot
+	// vector remains the source of truth and the bounded count keeps malformed
+	// pointers from turning redraw qualification into an unbounded walk.
+	private static int FindEntryIndex<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, APTR entry)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (entry.IsNull) return -1;
+		var header = Header(ref platform, state, obj);
+		if (header.IsNull) return -1;
+		var count = ReadHeaderCount(ref platform, header);
+		for (var i = 0u; i < count; i++)
+			if (SlotEntryAt(ref platform, header, i) == entry)
+				return unchecked((int)i);
+		return -1;
+	}
+
 	// Schedule a redraw for the requested scope. Requires a graphics-capable
 	// platform; only issues a request when the list actually holds state.
 	public static bool Redraw<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, int pos) where TPlatform : struct, IMuiLayoutPlatform
+		=> Redraw(ref platform, state, obj, pos, APTR.Null);
+
+	public static bool Redraw<TPlatform>(ref TPlatform platform, APTR state,
+		APTR obj, int pos, APTR entry)
+		where TPlatform : struct, IMuiLayoutPlatform
 	{
 		var header = Header(ref platform, state, obj);
 		if (header.IsNull) return false;
-		if (!IsRedrawTargetVisible(ref platform, state, obj, pos)) return true;
+		if (!TryReadRedrawStateAdmission(ref platform, state, obj,
+			out _, out var redrawPresent) || !redrawPresent) return false;
+		var entryRequest = pos == RedrawEntry;
+		if (entryRequest)
+		{
+			pos = FindEntryIndex(ref platform, state, obj, entry);
+			if (pos < 0) return true;
+			if (!IsRedrawTargetVisible(ref platform, state, obj, pos))
+				return true;
+		}
+		else if (!IsRedrawTargetVisible(ref platform, state, obj, pos))
+			return true;
 		if (PresentationPolicyValue(ref platform, state, obj, Quiet, 0) != 0)
 		{
 			RequestMutationRedraw(ref platform, state, obj);
 			return true;
 		}
-		var flags = pos switch
+		var flags = entryRequest ? 2u : pos switch
 		{
 			RedrawAll => 0u,
 			RedrawActive => 1u,
@@ -9592,14 +11634,14 @@ public static class MuiListCore
 		if (hook == HookString)
 		{
 			if (entry.IsNull) return APTR.Null;
-			var dup = DuplicateString(ref platform, entry);
+			var dup = DuplicateString(ref platform, entry, pool);
 			ownership = dup.IsNotNull ? SlotOwnedString : 0;
 			return dup;
 		}
 		if (hook == HookStringArray)
 		{
 			if (entry.IsNull) return APTR.Null;
-			var dup = DuplicateStringArray(ref platform, entry);
+			var dup = DuplicateStringArray(ref platform, entry, pool);
 			ownership = dup.IsNotNull ? SlotOwnedStringArray : 0;
 			return dup;
 		}
@@ -9618,12 +11660,12 @@ public static class MuiListCore
 	{
 		if (ownership == SlotOwnedString)
 		{
-			FreeOwnedString(ref platform, entry);
+			FreeOwnedString(ref platform, entry, pool);
 			return;
 		}
 		if (ownership == SlotOwnedStringArray)
 		{
-			FreeOwnedStringArray(ref platform, entry);
+			FreeOwnedStringArray(ref platform, entry, pool);
 			return;
 		}
 		if (ownership == SlotOwnedRecord)
@@ -9776,15 +11818,16 @@ public static class MuiListCore
 		geometry = default;
 		var columns = GeometryColumnCount(ref platform, state, obj);
 		if (column >= columns) return false;
+		if (!TryReadColumnVisibilityAdmission(ref platform, state, obj,
+			out _, out _)) return false;
 		var width = Read(ref platform, state, obj, Width, 0);
 		if (width == 0) return false;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			ColumnLayoutKey, 0));
-		var layoutWidth = Read(ref platform, state, obj, ColumnLayoutWidthKey, 0);
-		if (block.IsNotNull && layoutWidth == width &&
-			platform.IsMapped(block, columns * MuiListColumnGeometry.Size))
+		if (!TryReadColumnLayoutAdmission(ref platform, state, obj,
+			out var layout, out var layoutPresent)) return false;
+		if (layoutPresent && layout.Width == width &&
+			layout.Columns == columns)
 		{
-			return TryReadColumnGeometryRecord(ref platform, block, column,
+			return TryReadColumnGeometryRecord(ref platform, layout.Values, column,
 				out geometry);
 		}
 		var widthSigned = unchecked((int)width);
@@ -9818,8 +11861,8 @@ public static class MuiListCore
 		resolvedColumn = column;
 		entry = APTR.Null;
 		var count = EntryCount(ref platform, state, obj);
-		var columns = FormatColumnCount(ref platform, state, obj);
-		if (columns == 0) columns = 1;
+		if (!TryGetGeometryColumnCount(ref platform, state, obj,
+			out var columns) || columns == 0) return false;
 		if (resolvedRow < 0 || (uint)resolvedRow >= count || column < 0 ||
 			(uint)column >= columns) return false;
 		var header = Header(ref platform, state, obj);
@@ -9883,8 +11926,7 @@ public static class MuiListCore
 		var active = ActiveIndex(ref platform, state, obj);
 		if (active >= index)
 			SetActive(ref platform, state, obj, unchecked((uint)(active + 1)));
-		SetInternal(ref platform, state, obj, InsertPosition,
-			unchecked((uint)index));
+		SetInsertPosition(ref platform, state, obj, unchecked((uint)index));
 		Publish(ref platform, state, obj, count + 1);
 		RequestMutationRedraw(ref platform, state, obj);
 		return true;
@@ -10086,12 +12128,14 @@ public static class MuiListCore
 	}
 
 	private static APTR DuplicateString<TPlatform>(ref TPlatform platform,
-		APTR source) where TPlatform : struct, IMuiHeadlessPlatform
+		APTR source, APTR pool) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (!TryReadCStringLength(ref platform, source, MaximumStringLength,
 			out var length)) return APTR.Null;
 		var size = length + 1;
-		var copy = MuiHeadlessMemory.Allocate(ref platform, size);
+		var copy = pool.IsNotNull
+			? platform.AllocPooled(pool, size)
+			: MuiHeadlessMemory.Allocate(ref platform, size);
 		if (copy.IsNotNull) platform.Copy(source, copy, size);
 		return copy;
 	}
@@ -10125,7 +12169,7 @@ public static class MuiListCore
 	// string are bounded before any allocation is retained, so malformed input
 	// fails without exposing a partial entry.
 	private static APTR DuplicateStringArray<TPlatform>(ref TPlatform platform,
-		APTR source) where TPlatform : struct, IMuiHeadlessPlatform
+		APTR source, APTR pool) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		uint count = 0;
 		var sourceCursor = default(MuiListPointerSlotCursor);
@@ -10154,7 +12198,9 @@ public static class MuiListCore
 		}
 
 		var tableSize = (count + 1) * MuiListPointerSlotRecord.Size;
-		var table = MuiHeadlessMemory.Allocate(ref platform, tableSize);
+		var table = pool.IsNotNull
+			? platform.AllocPooled(pool, tableSize)
+			: MuiHeadlessMemory.Allocate(ref platform, tableSize);
 		if (table.IsNull) return APTR.Null;
 		var destinationCursor = default(MuiListPointerSlotCursor);
 		destinationCursor.Base = table;
@@ -10167,14 +12213,14 @@ public static class MuiListCore
 				!MuiListPointerSlotCodec.TryRead(ref platform, sourceSlot,
 				out var sourceValue))
 			{
-				FreeOwnedStringArray(ref platform, table);
+				FreeOwnedStringArray(ref platform, table, pool);
 				return APTR.Null;
 			}
 			var text = sourceValue.Value;
-			var copy = DuplicateString(ref platform, text);
+			var copy = DuplicateString(ref platform, text, pool);
 			if (copy.IsNull)
 			{
-				FreeOwnedStringArray(ref platform, table);
+				FreeOwnedStringArray(ref platform, table, pool);
 				return APTR.Null;
 			}
 			var destinationValue = default(MuiListPointerSlotRecord);
@@ -10184,7 +12230,11 @@ public static class MuiListCore
 				!MuiListPointerSlotCodec.Write(ref platform, destinationSlot,
 					destinationValue))
 			{
-				FreeOwnedStringArray(ref platform, table);
+				// The copy is not reachable through the table when its destination
+				// slot cannot be published. Release it explicitly before rolling
+				// back the already-published entries.
+				FreeOwnedString(ref platform, copy, pool);
+				FreeOwnedStringArray(ref platform, table, pool);
 				return APTR.Null;
 			}
 		}
@@ -10245,14 +12295,17 @@ public static class MuiListCore
 	}
 
 	private static void FreeOwnedString<TPlatform>(ref TPlatform platform,
-		APTR entry) where TPlatform : struct, IMuiHeadlessPlatform
+		APTR entry, APTR pool) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (entry.IsNull) return;
 		if (!TryReadCStringLength(ref platform, entry, MaximumStringLength,
 			out var length)) return;
 		var size = length + 1;
 		platform.Clear(entry, size);
-		platform.Free(entry, size);
+		if (pool.IsNotNull)
+			platform.FreePooled(pool, entry, size);
+		else
+			platform.Free(entry, size);
 	}
 
 	private static void FreeOwnedRecord<TPlatform>(ref TPlatform platform,
@@ -10269,7 +12322,7 @@ public static class MuiListCore
 	}
 
 	private static void FreeOwnedStringArray<TPlatform>(ref TPlatform platform,
-		APTR table) where TPlatform : struct, IMuiHeadlessPlatform
+		APTR table, APTR pool) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (table.IsNull) return;
 		uint count = 0;
@@ -10283,12 +12336,15 @@ public static class MuiListCore
 				out var value)) break;
 			var text = value.Value;
 			if (text.IsNull) break;
-			FreeOwnedString(ref platform, text);
+			FreeOwnedString(ref platform, text, pool);
 			count++;
 		}
 		var tableSize = (count + 1) * MuiListPointerSlotRecord.Size;
 		platform.Clear(table, tableSize);
-		platform.Free(table, tableSize);
+		if (pool.IsNotNull)
+			platform.FreePooled(pool, table, tableSize);
+		else
+			platform.Free(table, tableSize);
 	}
 
 	private static int CompareStrings<TPlatform>(ref TPlatform platform, APTR left,
@@ -10312,23 +12368,68 @@ public static class MuiListCore
 
 	private static APTR ReadHeaderIndex<TPlatform>(ref TPlatform platform,
 		APTR header) where TPlatform : struct, IMuiGuestMemory =>
-		MuiListHeaderCodec.TryRead(ref platform, header, out var value)
+		TryReadHeaderStorage(ref platform, header, out var value)
 			? value.Index : APTR.Null;
 
 	private static uint ReadHeaderCapacity<TPlatform>(ref TPlatform platform,
 		APTR header) where TPlatform : struct, IMuiGuestMemory =>
-		MuiListHeaderCodec.TryRead(ref platform, header, out var value)
+		TryReadHeaderStorage(ref platform, header, out var value)
 			? value.Capacity : 0;
 
 	private static uint ReadHeaderCount<TPlatform>(ref TPlatform platform,
 		APTR header) where TPlatform : struct, IMuiGuestMemory =>
-		MuiListHeaderCodec.TryRead(ref platform, header, out var value)
+		TryReadHeaderStorage(ref platform, header, out var value)
 			? value.Count : 0;
 
 	private static APTR ReadHeaderImages<TPlatform>(ref TPlatform platform,
 		APTR header) where TPlatform : struct, IMuiGuestMemory =>
-		MuiListHeaderCodec.TryRead(ref platform, header, out var value)
+		TryReadHeaderStorage(ref platform, header, out var value)
 			? value.Images : APTR.Null;
+
+	private static bool TryReadHeaderStorage<TPlatform>(ref TPlatform platform,
+		APTR header, out MuiListHeaderState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiListHeaderCodec.TryReadStorage(ref platform, header,
+			out value) || value.Capacity == 0 ||
+			value.Capacity > MaximumEntries || value.Count > value.Capacity ||
+			value.Index.IsNull || value.Capacity > uint.MaxValue / SlotSize)
+		{
+			value = default;
+			return false;
+		}
+		var bytes = value.Capacity * SlotSize;
+		if (!platform.IsMapped(value.Index, bytes) ||
+			(value.Images.IsNotNull && !platform.IsMapped(value.Images,
+				ImageRecordSize)))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	private static bool TryReadHeaderAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListHeaderState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			ListHeaderKey, out var rawHeader)) return true;
+		var header = APTR.FromPointer(rawHeader);
+		present = header.IsNotNull;
+		if (!present) return true;
+		if (!TryReadHeaderStorage(ref platform, header, out value) ||
+			value.Magic != MuiListHeaderState.Cookie)
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
 
 	private static bool WriteHeaderIndex<TPlatform>(ref TPlatform platform,
 		APTR header, APTR index) where TPlatform : struct, IMuiGuestMemory
@@ -10369,12 +12470,11 @@ public static class MuiListCore
 	private static APTR Header<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj,
+		if (!TryReadHeaderAdmission(ref platform, state, obj,
+			out _, out var present) || !present) return APTR.Null;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
 			ListHeaderKey, out var value) || value == 0) return APTR.Null;
-		var header = APTR.FromPointer(value);
-		if (!MuiListHeaderCodec.TryRead(ref platform, header, out _))
-			return APTR.Null;
-		return header;
+		return APTR.FromPointer(value);
 	}
 
 	private static APTR SlotEntryAt<TPlatform>(ref TPlatform platform, APTR header,
@@ -10439,11 +12539,11 @@ public static class MuiListCore
 		// named cursor record also distinguishes an empty-list zero from a real
 		// row zero immediately after the first insertion.
 		if (EntryCount(ref platform, state, obj) == 0) return -1;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			ActiveStateKey, 0));
-		var raw = unchecked((int)Read(ref platform, state, obj, Active,
+		if (!TryReadActiveStateAdmission(ref platform, state, obj,
+			out var cursor, out var present)) return -1;
+		var raw = unchecked((int)ReadRaw(ref platform, state, obj, Active,
 			ActiveOff));
-		if (TryReadActiveState(ref platform, block, out var cursor))
+		if (present)
 		{
 			// A low-level construction/test writer may publish a nonzero raw
 			// projection before the class-aware setter has synchronized the named
@@ -10467,46 +12567,170 @@ public static class MuiListCore
 		APTR state, APTR obj, out MuiListActiveState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			ActiveStateKey, 0));
-		return TryReadActiveState(ref platform, block, out value);
+		if (!TryReadActiveStateAdmission(ref platform, state, obj,
+			out value, out var present)) return false;
+		return present;
 	}
 
 	private static void SetActive<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, uint value) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		// Clear/Remove transitions publish the empty-list projection after the
+		// header count reaches zero. The previous active row is then necessarily
+		// outside the dynamic admission range, so reset the named cursor through
+		// its structural codec before returning to normal admission.
+		if (EntryCount(ref platform, state, obj) == 0)
+		{
+			var emptyBlock = APTR.FromPointer(Read(ref platform, state, obj,
+				ActiveStateKey, 0));
+			if (!TryReadActiveState(ref platform, emptyBlock, out var emptyValue))
+				return;
+			emptyValue.Active = 0;
+			emptyValue.HasActive = 0;
+			if (!WriteActiveState(ref platform, emptyBlock, emptyValue)) return;
+			SetNotify(ref platform, state, obj, Active, 0);
+			return;
+		}
+		if (!TryReadActiveStateAdmission(ref platform, state, obj,
+			out _, out var present) ||
+			(!present && !EnsureActiveState(ref platform, state, obj))) return;
 		SetNotify(ref platform, state, obj, Active, value);
 		SetActiveCursor(ref platform, state, obj, value,
 			EntryCount(ref platform, state, obj) != 0 &&
 			unchecked((int)value) >= 0);
 	}
 
+	// A published reverse owner is authoritative guest state.  A non-NULL
+	// record that fails the cookie/field contract is malformed, not absence;
+	// selection propagation must not consult its raw scalar alias.
+	internal static bool TryGetListviewOwner<TPlatform>(ref TPlatform platform,
+		APTR state, APTR list, out MuiListviewOwnerState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, list,
+			ListviewOwnerKey, out var rawBlock)) return false;
+		var block = APTR.FromPointer(rawBlock);
+		return MuiListviewOwnerStateCodec.TryRead(ref platform, block,
+			out value) && IsValidListviewOwner(ref platform, state, list, value);
+	}
+
+	// The reverse owner record must name the live Listview that actually adopts
+	// this List. A valid cookie alone is insufficient: a stale or unrelated
+	// parent pointer could otherwise receive the child's selection signal.
+	private static bool IsValidListviewOwner<TPlatform>(ref TPlatform platform,
+		APTR state, APTR list, MuiListviewOwnerState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (list.IsNull || value.Owner.IsNull ||
+			MuiHeadlessObjectCore.FindObject(ref platform, state, list).IsNull ||
+			MuiHeadlessObjectCore.FindObject(ref platform, state,
+				value.Owner).IsNull ||
+			Classify(ref platform, state, list) != MuiCollectionClass.List ||
+			Classify(ref platform, state, value.Owner) !=
+				MuiCollectionClass.Listview)
+			return false;
+		return MuiListviewCore.ChildList(ref platform, state, value.Owner).Raw ==
+			list.Raw;
+	}
+
+	internal static bool SetListviewOwner<TPlatform>(ref TPlatform platform,
+		APTR state, APTR list, APTR owner)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (list.IsNull) return false;
+		if (owner.IsNotNull)
+		{
+			var candidate = default(MuiListviewOwnerState);
+			candidate.Magic = MuiListviewOwnerState.Cookie;
+			candidate.Owner = owner;
+			if (!IsValidListviewOwner(ref platform, state, list, candidate))
+				return false;
+		}
+		var hasRaw = MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
+			list, ListviewOwnerKey, out var rawBlock);
+		var block = APTR.FromPointer(rawBlock);
+		var present = hasRaw && block.IsNotNull;
+		if (present)
+		{
+			if (!MuiListviewOwnerStateCodec.TryRead(ref platform, block,
+				out var value)) return false;
+			if (owner.IsNull)
+			{
+				FreeListviewOwnerState(ref platform, block);
+				return MuiHeadlessObjectCore.SetExistingAttribute(ref platform, state,
+					list, ListviewOwnerKey, 0);
+			}
+			value.Owner = owner;
+			return MuiListviewOwnerStateCodec.Write(ref platform, block, value);
+		}
+		if (owner.IsNull) return true;
+		block = MuiHeadlessMemory.Allocate(ref platform,
+			MuiListviewOwnerState.Size);
+		if (block.IsNull) return false;
+		var fresh = default(MuiListviewOwnerState);
+		fresh.Magic = MuiListviewOwnerState.Cookie;
+		fresh.Owner = owner;
+		if (!MuiListviewOwnerStateCodec.Write(ref platform, block, fresh) ||
+			!MuiHeadlessObjectCore.SetAttribute(ref platform, state, list,
+				ListviewOwnerKey, block.Raw, false))
+		{
+			MuiListviewOwnerStateCodec.Clear(ref platform, block);
+			platform.Free(block, MuiListviewOwnerState.Size);
+			return false;
+		}
+		return true;
+	}
+
+	private static void FreeListviewOwnerState<TPlatform>(ref TPlatform platform,
+		APTR block) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (block.IsNull || !platform.IsMapped(block, MuiListviewOwnerState.Size))
+			return;
+		MuiListviewOwnerStateCodec.Clear(ref platform, block);
+		platform.Free(block, MuiListviewOwnerState.Size);
+	}
+
 	private static void ToggleSelectChange<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var value = SelectionSignalValue(ref platform, state, obj);
+		if (!TryReadSelectionSignalAdmission(ref platform, state, obj,
+			out var signal, out var present)) return;
+		if (!present)
+		{
+			if (!EnsureSelectionSignalState(ref platform, state, obj) ||
+				!TryReadSelectionSignalAdmission(ref platform, state, obj,
+					out signal, out present) || !present) return;
+		}
+		var value = signal.Value;
 		var next = value == 0 ? 1u : 0u;
+		var block = APTR.FromPointer(Read(ref platform, state, obj,
+			SelectionSignalKey, 0));
+		signal.Value = next;
+		if (!WriteSelectionSignalState(ref platform, block, signal)) return;
 		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
-			SelectChange, next, true)) return;
-		SetSelectionSignalState(ref platform, state, obj, next);
+			SelectChange, next, true))
+		{
+			signal.Value = value;
+			WriteSelectionSignalState(ref platform, block, signal);
+			return;
+		}
 		// Listview exposes the same selection-change signal as its owned List.
 		// Mirror once at the parent boundary; the parent has no owner link, so
 		// this cannot recurse back into the child.
-		var owner = APTR.FromPointer(Read(ref platform, state, obj,
-			ListviewOwnerKey, 0));
-		if (owner.IsNotNull && Classify(ref platform, state, owner) ==
+		if (TryGetListviewOwner(ref platform, state, obj, out var ownerState) &&
+			ownerState.Owner.IsNotNull && Classify(ref platform, state,
+				ownerState.Owner) ==
 			MuiCollectionClass.Listview)
-			MuiListviewCore.ToggleSelectionSignal(ref platform, state, owner);
+			MuiListviewCore.ToggleSelectionSignal(ref platform, state,
+				ownerState.Owner);
 	}
 
 	private static uint SelectionSignalValue<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			SelectionSignalKey, 0));
-		return TryReadSelectionSignalState(ref platform, block, out var signal)
-			? signal.Value
-			: Read(ref platform, state, obj, SelectChange, 0);
+		return TryReadSelectionSignalAdmission(ref platform, state, obj,
+			out var signal, out var present) && present ? signal.Value : 0;
 	}
 
 	internal static bool TryGetSelectionSignal<TPlatform>(
@@ -10514,9 +12738,9 @@ public static class MuiListCore
 		out MuiListSelectionSignalState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			SelectionSignalKey, 0));
-		return TryReadSelectionSignalState(ref platform, block, out value);
+		if (!TryReadSelectionSignalAdmission(ref platform, state, obj,
+			out value, out var present)) return false;
+		return present;
 	}
 
 	private static void Publish<TPlatform>(ref TPlatform platform, APTR state,
@@ -10534,8 +12758,27 @@ public static class MuiListCore
 
 	private static uint Read<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, uint attribute, uint fallback)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		// A public List projection can call into this helper while its named
+		// record is still being located. Read the scalar backing value directly
+		// for those attributes to keep construction/layout paths non-recursive;
+		// other attributes retain the established class-aware resolver behavior.
+		if (IsPublicGetterAttribute(attribute))
+			return MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+				attribute, out var raw) ? raw : fallback;
+		return MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj, attribute,
+			out var value) ? value : fallback;
+	}
+
+	// Internal projection code sometimes needs the raw backing value while the
+	// public Get dispatcher is resolving a named List record. Keeping this seam
+	// explicit prevents a getter from re-entering itself without changing the
+	// established class-aware Read behavior used by mutation and layout paths.
+	private static uint ReadRaw<TPlatform>(ref TPlatform platform, APTR state,
+		APTR obj, uint attribute, uint fallback)
 		where TPlatform : struct, IMuiHeadlessPlatform =>
-		MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj, attribute,
+		MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj, attribute,
 			out var value) ? value : fallback;
 
 	private static bool ReadRenderPort<TPlatform>(ref TPlatform platform,
@@ -10573,8 +12816,23 @@ public static class MuiListCore
 		APTR obj, uint attribute, uint value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj, attribute,
+		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj, attribute,
 			out var current) && current == value) return;
+		MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj, attribute,
+			value, true);
+	}
+
+	// Layout has already written its normalized public value before the viewport
+	// record is refreshed, so SetNotify cannot infer the prior value at this
+	// point. Keep the prior/current comparison explicit at the layout boundary
+	// and reuse the
+	// ordinary named notification core for the actual dispatch.
+	private static void NotifyViewportTransition<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, uint attribute,
+		uint previous, uint value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (previous == value) return;
 		MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj, attribute,
 			value, true);
 	}

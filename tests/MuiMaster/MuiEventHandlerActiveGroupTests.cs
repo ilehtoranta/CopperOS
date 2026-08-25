@@ -38,7 +38,8 @@ public sealed class MuiEventHandlerActiveGroupTests
 			ref platform, handler, new MuiEventHandlerNodeInput
 			{
 				Object = group,
-				Flags = MuiEventHandlerNodeInput.MUI_EHF_ISACTIVEGRP,
+				Flags = (ushort)(MuiEventHandlerNodeInput.MUI_EHF_GUIMODE |
+					MuiEventHandlerNodeInput.MUI_EHF_ISACTIVEGRP),
 				Events = 4,
 			}));
 		Assert.True(MuiApplicationWindowCore.AddEventHandler(ref platform, State,
@@ -47,8 +48,20 @@ public sealed class MuiEventHandlerActiveGroupTests
 			activeChild));
 		Assert.True(MuiEventHandlerNodeCodec.TryRead(ref platform, handler,
 			out var activeRecord));
+		Assert.Equal(4u, activeRecord.Events);
+		Assert.NotEqual(0, activeRecord.Flags & MuiEventHandlerNodeInput.MUI_EHF_GUIMODE);
+		Assert.Equal(group, activeRecord.Object);
 		Assert.NotEqual(0, activeRecord.Flags &
 			MuiEventHandlerNodeInput.MUI_EHF_ISACTIVE);
+		var eventMessage = APTR.FromPointer(0x1900);
+		Assert.True(MuiCommonControlPacketCore.WriteHandleEvent(ref platform,
+			eventMessage, APTR.FromPointer(0x90000077), -1, APTR.Null));
+		platform.DispatchResult = 0x77;
+		Assert.Equal(0x77u, MuiApplicationWindowCore.DispatchEventHandlerNode(
+			ref platform, State, handler, eventMessage, 4));
+		Assert.Equal(group, platform.LastDispatchObject);
+		Assert.Equal(MuiCommonControlPacketCore.HandleEvent,
+			platform.LastDispatchMethod);
 
 		Assert.True(MuiApplicationWindowCore.Activate(ref platform, State, window,
 			outside));

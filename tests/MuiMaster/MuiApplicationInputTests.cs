@@ -19,6 +19,11 @@ public sealed class MuiApplicationInputTests
 			packet, MuiApplicationDispatcher.ApplicationReturnIdMethod,
 			out var returnPacket));
 		Assert.Equal(77u, returnPacket.ReturnId);
+		Assert.True(MuiApplicationInputPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationInputPacketKind.ReturnId,
+			out var returnMethodId));
+		Assert.Equal(MuiApplicationDispatcher.ApplicationReturnIdMethod,
+			returnMethodId);
 		platform.WriteUInt32(packet, 0,
 			MuiApplicationDispatcher.ApplicationInputBufferedMethod);
 		Assert.True(MuiApplicationInputPacketCodec.TryReadInputBuffered(

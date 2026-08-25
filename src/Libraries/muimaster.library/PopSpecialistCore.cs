@@ -1197,6 +1197,10 @@ public static class MuiPopSpecialistCore
 				if (!IsAslDerived(cls)) return false;
 				value = (flags & MuiPopSpecialistLayout.FlagAslActive) != 0 ? 1u : 0u;
 				return true;
+			case MuiPopAttributes.Popasl_MUIFontStyles:
+				if (!IsAslDerived(cls)) return false;
+				value = state.FontStyles;
+				return true;
 			case MuiPopAttributes.Popasl_StartHook:
 				if (!IsAslDerived(cls)) return false;
 				value = state.StartHook.Raw;
@@ -1205,12 +1209,17 @@ public static class MuiPopSpecialistCore
 				if (!IsAslDerived(cls)) return false;
 				value = state.StopHook.Raw;
 				return true;
+			case MuiPopAttributes.Popasl_Type:
+				if (!IsAslDerived(cls)) return false;
+				value = state.AslType;
+				return true;
 
 			// -- Popcolor --
 			case MuiPopAttributes.Popcolor_ShowAlpha:
-				if (cls != MuiPopSpecialistClass.Popcolor) return false;
-				value = (flags & MuiPopSpecialistLayout.FlagShowAlpha) != 0 ? 1u : 0u;
-				return true;
+				// [I..]: Popcolor_ShowAlpha is an initializer-only projection.
+				// It intentionally has no getter even though the typed state keeps
+				// the flag for construction and rendering policy.
+				return false;
 		}
 		return false;
 	}
@@ -1320,7 +1329,7 @@ public static class MuiPopSpecialistCore
 					changed = SetArray(ref platform, instance, APTR.FromPointer(value));
 				return true;
 
-			// -- Popasl-derived -- [ISG] hooks; [I..] Type / MUIFontStyles
+			// -- Popasl-derived -- [ISG] hooks/MUIFontStyles; [I.G] Type
 			case MuiPopAttributes.Popasl_StartHook:
 				if (!IsAslDerived(cls)) return false;
 				changed = WritePointerField(ref platform, instance, ref state,
@@ -1346,12 +1355,14 @@ public static class MuiPopSpecialistCore
 				return true;
 			case MuiPopAttributes.Popasl_MUIFontStyles:
 				if (!IsAslDerived(cls)) return false;
-				if (isInit)
+				changed = state.FontStyles != value;
+				if (changed)
 				{
 					state.FontStyles = value;
 					MuiPopSpecialistStateCodec.Write(ref platform, instance, state);
-					changed = true;
 				}
+				Notify(ref platform, instance, attribute, value, isInit, notify,
+					changed);
 				return true;
 
 			// -- Popcolor -- [I..] ShowAlpha (shares Coloradjust_ShowAlpha id)

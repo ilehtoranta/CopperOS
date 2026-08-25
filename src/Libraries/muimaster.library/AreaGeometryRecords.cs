@@ -36,6 +36,47 @@ internal struct MuiAreaGeometryStateRecord
 	internal int Bottom;
 }
 
+internal static class MuiAreaGeometryStateValidation
+{
+	internal static bool TryExpectedEdge(int origin, int extent, out int edge)
+	{
+		edge = 0;
+		if (extent < 0) return false;
+		if (extent == 0)
+		{
+			// A zero-area layout is a valid disappearance/no-op state. It still
+			// has a representable preceding edge when an origin is available; the
+			// neutral pre-layout record is handled separately by IsValidState.
+			if (origin == int.MinValue) return false;
+			edge = origin - 1;
+			return true;
+		}
+		if (origin > int.MaxValue - extent) return false;
+		edge = origin + extent - 1;
+		return true;
+	}
+
+	internal static bool IsValidState(MuiAreaGeometryStateRecord value)
+	{
+		if (value.Magic != MuiAreaGeometryStateRecord.Cookie || value.Width < 0 ||
+			value.Height < 0) return false;
+		if (value.Width > 0)
+		{
+			if (!TryExpectedEdge(value.Left, value.Width, out var right) ||
+				right != value.Right) return false;
+		}
+		if (value.Height > 0)
+		{
+			if (!TryExpectedEdge(value.Top, value.Height, out var bottom) ||
+				bottom != value.Bottom) return false;
+		}
+		return true;
+	}
+
+	internal static bool IsValidRecord(MuiAreaGeometryStateRecord value) =>
+		IsValidState(value);
+}
+
 internal enum MuiAreaGeometryStateField : byte
 {
 	Magic,

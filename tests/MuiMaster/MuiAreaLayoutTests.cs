@@ -15,6 +15,10 @@ public sealed class MuiAreaLayoutTests
 	private const uint Frame = 0x8042AC64;
 	private const uint Background = 0x8042545B;
 	private const uint FillArea = 0x804294A3;
+	private const uint AreaGeometryStateKey = 0x7F070035;
+	private const uint AreaRenderPolicyStateKey = 0x7F070037;
+	private const uint AreaLayoutPolicyStateKey = 0x7F070073;
+	private const uint ShowMe = 0x80429BA8;
 	private const uint Horizontal = 0x8042536B;
 	private const uint HorizontalSpacing = 0x8042C651;
 	private const uint VerticalSpacing = 0x8042E1BF;
@@ -29,6 +33,7 @@ public sealed class MuiAreaLayoutTests
 	private const uint TopEdge = 0x8042509B;
 	private const uint Width = 0x8042B59C;
 	private const uint Height = 0x80423237;
+	private const uint Unicode = 0x8042E7D0;
 	private const uint HookEntryGroupLayout = 0x00CA0005u;
 
 	[Fact]
@@ -129,6 +134,160 @@ public sealed class MuiAreaLayoutTests
 		cursor.Field = (MuiAreaRenderPolicyStateField)255;
 		Assert.False(MuiAreaRenderPolicyStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void MalformedRenderPolicyFailsClosedBeforeGetterMutationAndDrawing()
+	{
+		var platform = CreatePlatform(out var cl);
+		var rectangleName = APTR.FromPointer(0x1120);
+		platform.WriteCString(rectangleName, "Rectangle.mui");
+		var rectangleClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			rectangleName, APTR.Null, 0, APTR.FromPointer(2), false);
+		var area = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			rectangleClass,
+			APTR.Null);
+		Assert.True(MuiAreaLayoutCore.TryReadRenderPolicyState(ref platform, State,
+			area, out _));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, area,
+			AreaRenderPolicyStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaRenderPolicyStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiAreaRenderPolicyStateField.FillArea, 2));
+		Assert.True(MuiAreaRenderPolicyStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiAreaRenderPolicyStateField.FillArea,
+			out var malformedFillArea));
+		Assert.Equal(2u, malformedFillArea);
+
+		Assert.False(MuiAreaLayoutCore.TryGetRenderPolicyState(ref platform, State,
+			area, out _));
+		Assert.False(MuiAreaLayoutCore.TryReadRenderPolicyState(ref platform, State,
+			area, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, area,
+			FillArea, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			area, FillArea, 1, false));
+		Assert.False(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			area, FillArea, out _));
+
+		var renderInfo = APTR.FromPointer(0x1300);
+		var rastPort = APTR.FromPointer(0x1400);
+		platform.WriteUInt32(renderInfo, 20, rastPort.Raw);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, area, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Show(ref platform, State, area));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, area, 2, 3,
+			20, 10));
+		Assert.False(MuiAreaLayoutCore.Draw(ref platform, State, area, 0));
+		Assert.Equal(0u, platform.FillCount);
+		Assert.Equal(0u, platform.LineCount);
+		Assert.False(MuiAreaLayoutCore.DrawBackground(ref platform, State, area,
+			0, 0, 8, 8));
+
+		Assert.True(MuiAreaRenderPolicyStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiAreaRenderPolicyStateField.FillArea,
+			out malformedFillArea));
+		Assert.Equal(2u, malformedFillArea);
+	}
+
+	[Fact]
+	public void MalformedLayoutPolicyFailsClosedBeforeGetterMutationAndConsumers()
+	{
+		var platform = CreatePlatform(out var cl);
+		var rectangleName = APTR.FromPointer(0x1120);
+		platform.WriteCString(rectangleName, "Rectangle.mui");
+		var rectangleClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			rectangleName, APTR.Null, 0, APTR.FromPointer(2), false);
+		var area = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			rectangleClass, APTR.Null);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, area,
+			ShowMe, 1, false));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, area,
+			FixWidth, 20, false));
+		Assert.True(MuiAreaLayoutCore.TryReadLayoutPolicyState(ref platform, State,
+			area, out _));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, area,
+			AreaLayoutPolicyStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaLayoutPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiAreaLayoutPolicyField.ShowMe, 2));
+		Assert.True(MuiAreaLayoutPolicyFieldCursorCodec.TryReadUInt32(ref platform,
+			block, MuiAreaLayoutPolicyField.ShowMe, out var malformedShowMe));
+		Assert.Equal(2u, malformedShowMe);
+
+		Assert.False(MuiAreaLayoutCore.TryGetLayoutPolicyState(ref platform, State,
+			area, out _));
+		Assert.False(MuiAreaLayoutCore.TryReadLayoutPolicyState(ref platform, State,
+			area, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, area,
+			FixWidth, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			area, FixWidth, 40, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, area,
+			FixWidth, out var rawFixWidth));
+		Assert.Equal(20u, rawFixWidth);
+
+		var minMax = MuiAreaLayoutCore.ComputeMinMax(ref platform, State, area);
+		Assert.Equal(0, minMax.MinWidth);
+		Assert.Equal(0, minMax.MinHeight);
+		var renderInfo = APTR.FromPointer(0x1300);
+		var rastPort = APTR.FromPointer(0x1400);
+		platform.WriteUInt32(renderInfo, 20, rastPort.Raw);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, area, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Show(ref platform, State, area));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, area, 2, 3,
+			20, 10));
+		Assert.False(MuiAreaLayoutCore.Draw(ref platform, State, area, 0));
+		Assert.False(MuiAreaLayoutCore.DrawBackground(ref platform, State, area,
+			0, 0, 8, 8));
+		Assert.Equal(0u, platform.FillCount);
+		Assert.Equal(0u, platform.LineCount);
+
+		Assert.True(MuiAreaLayoutPolicyFieldCursorCodec.TryReadUInt32(ref platform,
+			block, MuiAreaLayoutPolicyField.ShowMe, out malformedShowMe));
+		Assert.Equal(2u, malformedShowMe);
+	}
+
+	[Fact]
+	public void MalformedGeometryFailsClosedBeforeGetterMutationAndDrawing()
+	{
+		var platform = CreatePlatform(out var cl);
+		var area = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
+			APTR.Null);
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, area, 4, 6,
+			20, 10));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, area,
+			AreaGeometryStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaGeometryStateFieldCursorCodec.TryWriteInt32(ref platform,
+			block, MuiAreaGeometryStateField.Width, -1));
+		Assert.True(MuiAreaGeometryStateFieldCursorCodec.TryReadInt32(ref platform,
+			block, MuiAreaGeometryStateField.Width, out var malformedWidth));
+		Assert.Equal(-1, malformedWidth);
+
+		Assert.False(MuiAreaLayoutCore.TryGetGeometryStateRecord(ref platform, State,
+			area, out _));
+		Assert.False(MuiAreaLayoutCore.TryReadGeometryState(ref platform, State,
+			area, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, area, Width,
+			out _, out _));
+		Assert.False(MuiAreaLayoutCore.Layout(ref platform, State, area, 4, 6,
+			20, 10));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, area,
+			Width, out var rawWidth));
+		Assert.Equal(20u, rawWidth);
+
+		var renderInfo = APTR.FromPointer(0x1300);
+		var rastPort = APTR.FromPointer(0x1400);
+		platform.WriteUInt32(renderInfo, 20, rastPort.Raw);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, area, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Show(ref platform, State, area));
+		Assert.False(MuiAreaLayoutCore.Draw(ref platform, State, area, 0));
+		Assert.Equal(0u, platform.FillCount);
+		Assert.Equal(0u, platform.LineCount);
+
+		Assert.True(MuiAreaGeometryStateFieldCursorCodec.TryReadInt32(ref platform,
+			block, MuiAreaGeometryStateField.Width, out malformedWidth));
+		Assert.Equal(-1, malformedWidth);
 	}
 
 	[Fact]
@@ -470,13 +629,80 @@ public sealed class MuiAreaLayoutTests
 		Assert.Equal(1u, MuiLayoutDispatcher.Dispatch(ref platform, State, area,
 			packet));
 		Assert.Equal(1u, platform.RedrawCount);
+		var preParse = APTR.FromPointer(0x1600);
+		platform.WriteCString(preParse, "\u001bP[112233]");
+		Set(ref platform, area, Unicode, 1);
+		platform.WriteUInt32(packet, 0, MuiLayoutPacketCore.Text);
+		platform.WriteUInt32(packet, 4, 5);
+		platform.WriteUInt32(packet, 8, 6);
+		platform.WriteUInt32(packet, 12, 40);
+		platform.WriteUInt32(packet, 16, 12);
+		platform.WriteUInt32(packet, 20, text.Raw);
+		platform.WriteUInt32(packet, 24, 3);
+		platform.WriteUInt32(packet, 28, preParse.Raw);
+		platform.WriteUInt32(packet, 32, 0xA5u);
+		Assert.Equal(1u, MuiLayoutDispatcher.Dispatch(ref platform, State, area,
+			packet));
+		Assert.Equal(1u, platform.MuiTextMethodApplyCount);
+		var textRequest = platform.LastMuiTextMethodRequest;
+		Assert.Equal(area, textRequest.Object);
+		Assert.Equal(rastPort, textRequest.RastPort);
+		Assert.Equal(text, textRequest.Text);
+		Assert.Equal(preParse, textRequest.PreParse);
+		Assert.Equal(5, textRequest.Left);
+		Assert.Equal(6, textRequest.Top);
+		Assert.Equal(40, textRequest.Width);
+		Assert.Equal(12, textRequest.Height);
+		Assert.Equal(3, textRequest.Length);
+		Assert.Equal(0xA5u, textRequest.Flags);
+		Assert.Equal(1u, textRequest.Unicode);
+		Assert.Equal(1u, textRequest.Present);
+		Assert.Equal(1u, platform.MuiTextInlineColorApplyCount);
+		var colorRequest = platform.LastMuiTextInlineColorRequest;
+		Assert.Equal(area, colorRequest.Object);
+		Assert.Equal(rastPort, colorRequest.RastPort);
+		Assert.Equal(0x00112233u, colorRequest.Color);
+		Assert.Equal(0u, colorRequest.Alpha);
+		Assert.Equal(MuiTextInlineColorFlags.HasColor, colorRequest.Flags);
+		Assert.Equal(1u, colorRequest.Present);
 		platform.WriteUInt32(packet, 0, 0x80422AD7);
-		platform.WriteUInt32(packet, 4, text.Raw);
-		platform.WriteUInt32(packet, 8, 3);
-		platform.WriteUInt32(packet, 12, 0);
-		platform.WriteUInt32(packet, 16, 0);
+		var unicodeText = APTR.FromPointer(0x1700);
+		var utf8 = new byte[] { 0xC3, 0x85, 0xCE, 0xB2, 0xF0, 0x9F, 0x99, 0x82 };
+		for (var i = 0; i < utf8.Length; i++)
+			platform.WriteUInt8(unicodeText, i, utf8[i]);
+		platform.WriteUInt8(unicodeText, utf8.Length, 0);
+		platform.WriteUInt32(packet, 4, unicodeText.Raw);
+		platform.WriteUInt32(packet, 8, 8);
+		platform.WriteUInt32(packet, 12, preParse.Raw);
+		platform.WriteUInt32(packet, 16, 0x5Au);
 		Assert.Equal(0x00080018u, MuiLayoutDispatcher.Dispatch(ref platform, State,
 			area, packet));
+		Assert.Equal(1u, platform.MuiTextDimensionApplyCount);
+		var dimensionRequest = platform.LastMuiTextDimensionRequest;
+		Assert.Equal(area, dimensionRequest.Object);
+		Assert.Equal(rastPort, dimensionRequest.RastPort);
+		Assert.Equal(unicodeText, dimensionRequest.Text);
+		Assert.Equal(preParse, dimensionRequest.PreParse);
+		Assert.Equal(8, dimensionRequest.Length);
+		Assert.Equal(0x5Au, dimensionRequest.Flags);
+		Assert.Equal(1u, dimensionRequest.Unicode);
+		Assert.Equal(1u, dimensionRequest.Present);
+
+		var multilineText = APTR.FromPointer(0x1800);
+		var multilineUtf8 = new byte[]
+		{
+			0xC3, 0x85, 0x0A, 0xCE, 0xB2, 0xF0, 0x9F, 0x99, 0x82,
+		};
+		for (var i = 0; i < multilineUtf8.Length; i++)
+			platform.WriteUInt8(multilineText, i, multilineUtf8[i]);
+		platform.WriteUInt8(multilineText, multilineUtf8.Length, 0);
+		platform.WriteUInt32(packet, 4, multilineText.Raw);
+		platform.WriteUInt32(packet, 8, unchecked((uint)multilineUtf8.Length));
+		Assert.Equal(0x00100010u, MuiLayoutDispatcher.Dispatch(ref platform,
+			State, area, packet));
+		Assert.Equal(2u, platform.MuiTextDimensionApplyCount);
+		Assert.Equal(multilineText,
+			platform.LastMuiTextDimensionRequest.Text);
 	}
 
 	[Fact]
@@ -547,6 +773,26 @@ public sealed class MuiAreaLayoutTests
 			cursor, out _));
 		cursor.Message = APTR.FromPointer(0xFFFFFFF0u);
 		cursor.Packet = MuiLayoutPacketKind.Text;
+		cursor.Message = packet;
+		cursor.Field = MuiLayoutField.PreParse;
+		Assert.True(MuiLayoutFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out address));
+		Assert.Equal(packet.Raw + 28, address.Raw);
+		cursor.Field = MuiLayoutField.TextFlags;
+		Assert.True(MuiLayoutFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out address));
+		Assert.Equal(packet.Raw + 32, address.Raw);
+		cursor.Packet = MuiLayoutPacketKind.TextDimensions;
+		cursor.Message = packet;
+		cursor.Field = MuiLayoutField.PreParse;
+		Assert.True(MuiLayoutFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out address));
+		Assert.Equal(packet.Raw + 12, address.Raw);
+		cursor.Field = MuiLayoutField.TextFlags;
+		Assert.True(MuiLayoutFieldCursorCodec.TryGetAddress(ref platform,
+			cursor, out address));
+		Assert.Equal(packet.Raw + 16, address.Raw);
+		cursor.Message = APTR.FromPointer(0xFFFFFFF0u);
 		cursor.Field = MuiLayoutField.Reserved1;
 		Assert.False(MuiLayoutFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out _));

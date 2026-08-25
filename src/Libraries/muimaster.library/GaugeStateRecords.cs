@@ -145,3 +145,15 @@ internal static class MuiGaugeStateRecordCodec
 			MuiGaugeStateField.Horizontal, value.Horizontal);
 	}
 }
+
+// The wire codec remains lossless for malformed-state diagnostics. Gauge's
+// Horizontal field is a MorphOS BOOL; Maximum, Current, and Divide retain
+// their existing operation-specific clamping and divide-by-zero semantics.
+internal static class MuiGaugeStateValidation
+{
+	internal static bool IsValidRecord(MuiGaugeStateRecord value) =>
+		value.Horizontal <= 1;
+
+	internal static bool IsValidState(MuiGaugeState value) =>
+		value.Horizontal <= 1;
+}

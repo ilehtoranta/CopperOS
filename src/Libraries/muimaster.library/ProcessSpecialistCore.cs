@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -339,6 +340,21 @@ internal static class MuiProcessArgumentCursorCodec
 // the vector begins after the two ULONG header fields.
 internal static class MuiProcessDispatchPacketCodec
 {
+	// Keep the selector scalar at the fixed dispatch-header ABI boundary. The
+	// complete header and inline argument slots remain named records below.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiProcessDispatchPacketHeader.Size)) return false;
+		return MuiProcessRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			address, MuiProcessRecordKind.DispatchHeader,
+			MuiProcessRecordField.MethodId, out methodId);
+	}
+
 	internal static bool TryReadHeader<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiProcessDispatchPacketHeader packet)
 		where TPlatform : struct, IMuiGuestMemory
@@ -349,9 +365,8 @@ internal static class MuiProcessDispatchPacketCodec
 			!MuiProcessRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiProcessRecordKind.DispatchHeader,
 				MuiProcessRecordField.ArgumentCount, out packet.ArgumentCount) ||
-			!MuiProcessRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiProcessRecordKind.DispatchHeader,
-				MuiProcessRecordField.MethodId, out packet.MethodId)) return false;
+			!TryReadMethodIdValue(ref platform, address, out packet.MethodId))
+			return false;
 		if (packet.ArgumentCount > MuiProcessSpecialistLayout.MaximumDispatchArgs ||
 			packet.MethodId == 0) return false;
 		return platform.IsMapped(address, 8u + packet.ArgumentCount * 4u);

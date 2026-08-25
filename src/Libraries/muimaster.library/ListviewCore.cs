@@ -8,6 +8,23 @@ using System.Runtime.InteropServices;
 
 namespace CopperOS.MuiMaster;
 
+public enum MuiPointerCaptureKind : uint
+{
+	ListDrag = 1,
+	VerticalScroller = 2,
+	HorizontalScroller = 3,
+	AreaDrag = 4,
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+public struct MuiPointerCaptureSample
+{
+	public APTR Object;
+	public MuiPointerCaptureKind Kind;
+	public int StartX;
+	public int StartY;
+}
+
 // Listview.mui (autodoc MUI_Listview.doc). A listview is *not* a list: it is a
 // group-like composite that attaches a scrollbar and input handling to a list
 // child. The child list is supplied through MUIA_Listview_List or created
@@ -262,8 +279,11 @@ public static class MuiListviewCore
 					address, MuiListviewClickStateField.DefClickColumn,
 					out value.DefClickColumn))
 				return false;
-			value.DoubleClick = doubleClick == 0 ? 0u : 1u;
-			value.AgainClick = againClick == 0 ? 0u : 1u;
+			// Preserve the guest row exactly.  BOOL canonicalization belongs to
+			// semantic admission, not to the struct codec; otherwise a corrupted
+			// published record could be normalized before consumers can reject it.
+			value.DoubleClick = doubleClick;
+			value.AgainClick = againClick;
 			return true;
 		}
 
@@ -573,8 +593,7 @@ public static class MuiListviewCore
 				MuiListviewSelectionSignalField.Magic, value.Magic) &&
 				MuiListviewSelectionSignalFieldCursorCodec.TryWriteUInt32(
 					ref platform, address,
-					MuiListviewSelectionSignalField.Value,
-					value.Value == 0 ? 0u : 1u);
+					MuiListviewSelectionSignalField.Value, value.Value);
 		}
 	}
 
@@ -897,6 +916,153 @@ public static class MuiListviewCore
 		internal uint MaxFirst;
 	}
 
+	// Pixel-range projection used by an application-owned MorphOS Prop.  The
+	// Listview documentation connects that Prop to the child List's
+	// TopPixel/VisiblePixel/TotalPixel attributes; keep the three values named so
+	// the connection never depends on private attribute or object offsets.
+	internal struct MuiListviewExternalScrollerState
+	{
+		internal uint Entries;
+		internal uint Visible;
+		internal uint First;
+	}
+
+	// A Listview may own a live MorphOS notification recipe for an
+	// application-owned Prop/Scrollbar. Keep only the destination pointer in a
+	// named guest record so disposal can remove the recipe without a managed
+	// connection table or an object-layout offset convention.
+	[StructLayout(LayoutKind.Sequential, Pack = 2)]
+	internal struct MuiListviewExternalScrollerConnectionState
+	{
+		internal const uint Size = 8;
+		internal const uint Cookie = 0x4C564543u; // 'LVEC'
+
+		internal uint Magic;
+		internal APTR Prop;
+	}
+
+	internal enum MuiListviewExternalScrollerConnectionField : byte
+	{
+		Magic,
+		Prop,
+	}
+
+	[StructLayout(LayoutKind.Sequential, Pack = 2)]
+	internal struct MuiListviewExternalScrollerConnectionFieldCursor
+	{
+		internal APTR Record;
+		internal MuiListviewExternalScrollerConnectionField Field;
+	}
+
+	internal static class MuiListviewExternalScrollerConnectionFieldCursorCodec
+	{
+		private static bool TryResolve(
+			MuiListviewExternalScrollerConnectionField field,
+			out uint offset)
+		{
+			offset = field switch
+			{
+				MuiListviewExternalScrollerConnectionField.Magic => 0,
+				MuiListviewExternalScrollerConnectionField.Prop => 4,
+				_ => uint.MaxValue,
+			};
+			return offset != uint.MaxValue;
+		}
+
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListviewExternalScrollerConnectionFieldCursor cursor,
+			out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			address = APTR.Null;
+			if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
+				cursor.Record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(cursor.Record,
+					MuiListviewExternalScrollerConnectionState.Size)) return false;
+			address = APTR.FromPointer(cursor.Record.Raw + offset);
+			return platform.IsMapped(address, 4);
+		}
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR record,
+			MuiListviewExternalScrollerConnectionField field,
+			out uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = 0;
+			var cursor = default(
+				MuiListviewExternalScrollerConnectionFieldCursor);
+			cursor.Record = record;
+			cursor.Field = field;
+			if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+			value = platform.ReadUInt32(address, 0);
+			return true;
+		}
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR record,
+			MuiListviewExternalScrollerConnectionField field,
+			uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			var cursor = default(
+				MuiListviewExternalScrollerConnectionFieldCursor);
+			cursor.Record = record;
+			cursor.Field = field;
+			if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+			platform.WriteUInt32(address, 0, value);
+			return true;
+		}
+	}
+
+	internal static class MuiListviewExternalScrollerConnectionStateCodec
+	{
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListviewExternalScrollerConnectionState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (address.IsNull || !platform.IsMapped(address,
+				MuiListviewExternalScrollerConnectionState.Size)) return false;
+			if (!MuiListviewExternalScrollerConnectionFieldCursorCodec.TryReadUInt32(
+				ref platform, address,
+				MuiListviewExternalScrollerConnectionField.Magic,
+				out value.Magic) || value.Magic !=
+				MuiListviewExternalScrollerConnectionState.Cookie) return false;
+			if (!MuiListviewExternalScrollerConnectionFieldCursorCodec.TryReadUInt32(
+				ref platform, address,
+				MuiListviewExternalScrollerConnectionField.Prop,
+				out var prop)) return false;
+			value.Prop = APTR.FromPointer(prop);
+			return true;
+		}
+
+		internal static bool Write<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListviewExternalScrollerConnectionState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (address.IsNull || !platform.IsMapped(address,
+				MuiListviewExternalScrollerConnectionState.Size) ||
+				value.Magic != MuiListviewExternalScrollerConnectionState.Cookie)
+				return false;
+			return MuiListviewExternalScrollerConnectionFieldCursorCodec
+				.TryWriteUInt32(ref platform, address,
+					MuiListviewExternalScrollerConnectionField.Magic, value.Magic) &&
+				MuiListviewExternalScrollerConnectionFieldCursorCodec
+				.TryWriteUInt32(ref platform, address,
+					MuiListviewExternalScrollerConnectionField.Prop, value.Prop.Raw);
+		}
+
+		internal static void Clear<TPlatform>(ref TPlatform platform, APTR address)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (address.IsNotNull && platform.IsMapped(address,
+				MuiListviewExternalScrollerConnectionState.Size))
+				platform.Clear(address,
+					MuiListviewExternalScrollerConnectionState.Size);
+		}
+	}
+
 	internal enum MuiListviewScrollerField : byte
 	{
 		Magic,
@@ -1038,6 +1204,7 @@ public static class MuiListviewCore
 	private const uint RenderStateKey = 0x7F090009u;
 	private const uint ScrollerStateKey = 0x7F09000Au;
 	private const uint HorizontalScrollerStateKey = 0x7F09000Bu;
+	private const uint ExternalScrollerConnectionKey = 0x7F09000Cu;
 
 	// ---- MUIV_Listview_* selectors -------------------------------------------
 	private const uint MultiSelectNone = 0;
@@ -1066,6 +1233,9 @@ public static class MuiListviewCore
 	private const uint ListRowHeight = 8;
 	private const uint ScrollerWidth = 16;            // reserved scrollbar extent
 	private const uint HScrollerHeight = 16;          // reserved bottom extent
+	private const uint NotifyEveryTime = 1233727793u;
+	private const uint NotifyTriggerValue = 1233727793u;
+	private const uint ExternalNotifyFollowBytes = 12;
 
 	// ---- MUIM_List_* selectors reused for child forwarding -------------------
 	private const int SelectAll = -2;
@@ -1199,12 +1369,13 @@ public static class MuiListviewCore
 		APTR state, APTR obj, APTR child)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadChildStateAdmission(ref platform, state, obj,
+			out var value, out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ChildStateKey, 0));
-		if (MuiListviewChildStateCodec.TryRead(ref platform, block,
-			out var value))
+		if (present)
 		{
-			value.Child = child;
+			if (value.Child.Raw != child.Raw) return false;
 			return MuiListviewChildStateCodec.Write(ref platform, block, value);
 		}
 		var fresh = MuiHeadlessMemory.Allocate(ref platform,
@@ -1220,22 +1391,44 @@ public static class MuiListviewCore
 			platform.Free(fresh, MuiListviewChildState.Size);
 			return false;
 		}
-		if (block.IsNotNull && platform.IsMapped(block,
-			MuiListviewChildState.Size))
-		{
-			MuiListviewChildStateCodec.Clear(ref platform, block);
-			platform.Free(block, MuiListviewChildState.Size);
-		}
 		return true;
 	}
+
+	// A published child link is authoritative guest state. A non-NULL record
+	// that fails the cookie/field contract is malformed, not absence; child
+	// lookup must not replace it from the raw List alias.
+	private static bool TryReadChildStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewChildState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			ChildStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return MuiListviewChildStateCodec.TryRead(ref platform, block,
+			out value) && IsValidChildState(ref platform, state, value);
+	}
+
+	// The published child link must name a live List-backed object. Keeping this
+	// relationship typed prevents a stale or unrelated BOOPSI pointer from
+	// re-entering Listview selection, layout, or disposal through the legacy List
+	// alias.
+	private static bool IsValidChildState<TPlatform>(ref TPlatform platform,
+		APTR state, MuiListviewChildState value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		IsLiveChildList(ref platform, state, value.Child);
 
 	internal static bool TryGetChildState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, out MuiListviewChildState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			ChildStateKey, 0));
-		return MuiListviewChildStateCodec.TryRead(ref platform, block, out value);
+		if (!TryReadChildStateAdmission(ref platform, state, obj, out value,
+			out var present)) return false;
+		return present;
 	}
 
 	private static void FreeChildState<TPlatform>(ref TPlatform platform,
@@ -1259,29 +1452,71 @@ public static class MuiListviewCore
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform =>
 		EnsureInteractionPolicy(ref platform, state, obj);
 
+	// A policy block is optional only before the Listview has materialised its
+	// typed state. Once a non-NULL block is published, malformed bytes are an
+	// authoritative failure and must not be repaired from raw scalar aliases.
+	private static bool TryReadInteractionPolicyAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewInteractionPolicyState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			InteractionPolicyKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return MuiListviewInteractionPolicyStateCodec.TryRead(ref platform, block,
+			out value) && IsValidInteractionPolicy(value);
+	}
+
+	// The MorphOS policy fields are bounded enumerations/BOOLs, not arbitrary
+	// LONG payloads. Once the named record is published these bounds are part of
+	// admission: rejecting a malformed row keeps EnsureInteractionPolicy from
+	// normalizing it in place and accidentally hiding corruption behind the raw
+	// compatibility attributes.
+	private static bool IsValidInteractionPolicy(
+		MuiListviewInteractionPolicyState value) =>
+		value.Input <= 1 &&
+		value.MultiSelect <= MultiSelectAlways &&
+		value.ScrollerPos <= ScrollerPosNone &&
+		(value.DragType == DragTypeNone ||
+			value.DragType == DragTypeImmediate);
+
 	private static bool EnsureInteractionPolicy<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadInteractionPolicyAdmission(ref platform, state, obj,
+			out var value, out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			InteractionPolicyKey, 0));
-		var value = default(MuiListviewInteractionPolicyState);
-		value.Magic = MuiListviewInteractionPolicyState.Cookie;
-		value.Input = NormalizePolicy(Input,
-			Read(ref platform, state, obj, Input, 1));
-		value.MultiSelect = NormalizePolicy(MultiSelect,
-			Read(ref platform, state, obj, MultiSelect, MultiSelectDefault));
-		value.ScrollerPos = NormalizePolicy(ScrollerPos,
-			Read(ref platform, state, obj, ScrollerPos, ScrollerPosDefault));
-		value.DragType = NormalizePolicy(DragType,
-			Read(ref platform, state, obj, DragType, DragTypeNone));
-
-		if (!MuiListviewInteractionPolicyStateCodec.TryRead(ref platform, block,
-			out _))
+		if (present)
 		{
-			// Allocate and validate the replacement before retiring an invalid
-			// record, so a failure never leaves the object with a dangling policy
-			// pointer or a partially updated public state.
-			var stale = block;
+			// The named record is authoritative after publication. Normalize its
+			// fields in place, without importing possibly stale raw aliases.
+			value.Magic = MuiListviewInteractionPolicyState.Cookie;
+			value.Input = NormalizePolicy(Input, value.Input);
+			value.MultiSelect = NormalizePolicy(MultiSelect, value.MultiSelect);
+			value.ScrollerPos = NormalizePolicy(ScrollerPos, value.ScrollerPos);
+			value.DragType = NormalizePolicy(DragType, value.DragType);
+		}
+		else
+		{
+			value = default;
+			value.Magic = MuiListviewInteractionPolicyState.Cookie;
+			value.Input = NormalizePolicy(Input,
+				Read(ref platform, state, obj, Input, 1));
+			value.MultiSelect = NormalizePolicy(MultiSelect,
+				Read(ref platform, state, obj, MultiSelect, MultiSelectDefault));
+			value.ScrollerPos = NormalizePolicy(ScrollerPos,
+				Read(ref platform, state, obj, ScrollerPos, ScrollerPosDefault));
+			value.DragType = NormalizePolicy(DragType,
+				Read(ref platform, state, obj, DragType, DragTypeNone));
+		}
+
+		if (!present)
+		{
 			var fresh = MuiHeadlessMemory.Allocate(ref platform,
 				MuiListviewInteractionPolicyState.Size);
 			if (fresh.IsNull) return false;
@@ -1292,12 +1527,6 @@ public static class MuiListviewCore
 				platform.Clear(fresh, MuiListviewInteractionPolicyState.Size);
 				platform.Free(fresh, MuiListviewInteractionPolicyState.Size);
 				return false;
-			}
-			if (stale.IsNotNull && platform.IsMapped(stale,
-				MuiListviewInteractionPolicyState.Size))
-			{
-				platform.Clear(stale, MuiListviewInteractionPolicyState.Size);
-				platform.Free(stale, MuiListviewInteractionPolicyState.Size);
 			}
 			block = fresh;
 		}
@@ -1317,28 +1546,45 @@ public static class MuiListviewCore
 		out MuiListviewInteractionPolicyState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		value = default;
-		// This is an internal state-key lookup. Bypass the public getter router
-		// so the HeadlessObjectCore -> ListviewCore policy projection cannot
-		// recurse while resolving its own record address.
-		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-			InteractionPolicyKey, out var rawBlock)) return false;
-		var block = APTR.FromPointer(rawBlock);
-		return MuiListviewInteractionPolicyStateCodec.TryRead(ref platform, block,
-			out value);
+		if (!TryReadInteractionPolicyAdmission(ref platform, state, obj,
+			out value, out var present)) return false;
+		return present;
 	}
+
+	// SelectionChange is an optional edge-signal record until Listview setup
+	// publishes it. A non-NULL record is authoritative typed state; malformed
+	// present bytes must not be replaced from the raw signal alias.
+	private static bool TryReadSelectionSignalAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewSelectionSignalState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			SelectionSignalKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return MuiListviewSelectionSignalStateCodec.TryRead(ref platform, block,
+			out value) && IsValidSelectionSignal(value);
+	}
+
+	// SelectChange is a MorphOS BOOL edge signal. Keep the named row lossless
+	// until this semantic boundary so a malformed published value cannot be
+	// normalized into a phantom notification or toggle transition.
+	private static bool IsValidSelectionSignal(
+		MuiListviewSelectionSignalState value) => value.Value <= 1;
 
 	private static bool EnsureSelectionSignal<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadSelectionSignalAdmission(ref platform, state, obj,
+			out var value, out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			SelectionSignalKey, 0));
-		if (!MuiListviewSelectionSignalStateCodec.TryRead(ref platform, block,
-			out var value))
+		if (!present)
 		{
-			// Publish a fully initialized replacement before retiring a stale or
-			// malformed record; a failed allocation must preserve the old pointer.
-			var stale = block;
 			var fresh = MuiHeadlessMemory.Allocate(ref platform,
 				MuiListviewSelectionSignalState.Size);
 			if (fresh.IsNull) return false;
@@ -1352,12 +1598,6 @@ public static class MuiListviewCore
 				platform.Clear(fresh, MuiListviewSelectionSignalState.Size);
 				platform.Free(fresh, MuiListviewSelectionSignalState.Size);
 				return false;
-			}
-			if (stale.IsNotNull && platform.IsMapped(stale,
-				MuiListviewSelectionSignalState.Size))
-			{
-				platform.Clear(stale, MuiListviewSelectionSignalState.Size);
-				platform.Free(stale, MuiListviewSelectionSignalState.Size);
 			}
 			block = fresh;
 		}
@@ -1374,11 +1614,9 @@ public static class MuiListviewCore
 		out MuiListviewSelectionSignalState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		value = default;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			SelectionSignalKey, 0));
-		return MuiListviewSelectionSignalStateCodec.TryRead(ref platform, block,
-			out value);
+		if (!TryReadSelectionSignalAdmission(ref platform, state, obj,
+			out value, out var present)) return false;
+		return present;
 	}
 
 	internal static bool ToggleSelectionSignal<TPlatform>(ref TPlatform platform,
@@ -1400,14 +1638,27 @@ public static class MuiListviewCore
 		APTR obj, uint attribute, uint fallback)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryGetInteractionPolicy(ref platform, state, obj, out var value))
+		if (TryReadInteractionPolicyAdmission(ref platform, state, obj,
+			out var value, out var present))
 		{
-			if (attribute == Input) return value.Input;
-			if (attribute == MultiSelect) return value.MultiSelect;
-			if (attribute == ScrollerPos) return value.ScrollerPos;
-			if (attribute == DragType) return value.DragType;
+			if (present)
+			{
+				if (attribute == Input) return value.Input;
+				if (attribute == MultiSelect) return value.MultiSelect;
+				if (attribute == ScrollerPos) return value.ScrollerPos;
+				if (attribute == DragType) return value.DragType;
+			}
+			else
+			{
+				return Read(ref platform, state, obj, attribute, fallback);
+			}
 		}
-		return Read(ref platform, state, obj, attribute, fallback);
+		// Keep malformed present policy inert for all policy consumers. This is
+		// distinct from true absence, where the raw compatibility value above is
+		// still accepted during legacy bootstrap.
+		return attribute == Input ? 0u :
+			attribute == MultiSelect ? MultiSelectNone :
+			attribute == ScrollerPos ? ScrollerPosNone : DragTypeNone;
 	}
 
 	private static bool UpdateInteractionPolicy<TPlatform>(
@@ -1431,29 +1682,62 @@ public static class MuiListviewCore
 			policy);
 }
 
+	// Click state is optional before setup publishes it. A non-NULL block is
+	// authoritative typed state; malformed present bytes must not be repaired
+	// from the scalar click aliases after an input transition has begun.
+	private static bool TryReadClickStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewClickState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			ClickStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return TryReadClickState(ref platform, block, out value) &&
+			IsValidClickState(value);
+	}
+
+	// These two fields are MorphOS BOOLs in the published Listview record.  A
+	// non-zero value is accepted by the public setter path and written back as
+	// one, but an already-published guest row must contain a canonical BOOL so
+	// corruption cannot be hidden by a read-side normalization.
+	private static bool IsValidClickState(MuiListviewClickState value) =>
+		value.DoubleClick <= 1 && value.AgainClick <= 1;
+
 	private static bool EnsureClickState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadClickStateAdmission(ref platform, state, obj,
+			out var value, out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ClickStateKey, 0));
-		if (TryReadClickState(ref platform, block, out _)) return true;
-		block = MuiHeadlessMemory.Allocate(ref platform,
-			MuiListviewClickState.Size);
-		if (block.IsNull) return false;
-		var value = default(MuiListviewClickState);
-		value.Magic = MuiListviewClickState.Cookie;
-		value.ClickColumn = Read(ref platform, state, obj, ClickColumn, 0);
-		value.DoubleClick = Read(ref platform, state, obj, DoubleClick, 0) == 0
-			? 0u : 1u;
-		value.AgainClick = Read(ref platform, state, obj, AgainClick, 0) == 0
-			? 0u : 1u;
-		value.DefClickColumn = Read(ref platform, state, obj,
-			DefClickColumn, 0);
-		WriteClickState(ref platform, block, value);
-		if (SetInternal(ref platform, state, obj, ClickStateKey, block.Raw))
+		if (!present)
+		{
+			block = MuiHeadlessMemory.Allocate(ref platform,
+				MuiListviewClickState.Size);
+			if (block.IsNull) return false;
+			value = default;
+			value.Magic = MuiListviewClickState.Cookie;
+			value.ClickColumn = Read(ref platform, state, obj, ClickColumn, 0);
+			value.DoubleClick = Read(ref platform, state, obj, DoubleClick, 0) == 0
+				? 0u : 1u;
+			value.AgainClick = Read(ref platform, state, obj, AgainClick, 0) == 0
+				? 0u : 1u;
+			value.DefClickColumn = Read(ref platform, state, obj,
+				DefClickColumn, 0);
+			if (!WriteClickState(ref platform, block, value) ||
+				!SetInternal(ref platform, state, obj, ClickStateKey, block.Raw))
+			{
+				FreeClickState(ref platform, block);
+				return false;
+			}
 			return true;
-		FreeClickState(ref platform, block);
-		return false;
+		}
+		return WriteClickState(ref platform, block, value);
 	}
 
 	private static bool UpdateDefaultClickColumnState<TPlatform>(
@@ -1473,11 +1757,10 @@ public static class MuiListviewCore
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			ClickStateKey, 0));
-		return TryReadClickState(ref platform, block, out var clickState)
-			? clickState.DefClickColumn
-			: Read(ref platform, state, obj, DefClickColumn, 0);
+		if (TryReadClickStateAdmission(ref platform, state, obj,
+			out var clickState, out var present) && present)
+			return clickState.DefClickColumn;
+		return present ? 0u : Read(ref platform, state, obj, DefClickColumn, 0);
 	}
 
 	// Bind the child-to-composite notification projection through a named
@@ -1486,10 +1769,9 @@ public static class MuiListviewCore
 	internal static bool SetListviewOwner<TPlatform>(ref TPlatform platform,
 		APTR state, APTR list, APTR owner)
 		where TPlatform : struct, IMuiHeadlessPlatform =>
-		MuiHeadlessObjectCore.SetAttribute(ref platform, state, list,
-			MuiListCore.ListviewOwnerKey, owner.Raw, false);
+		MuiListCore.SetListviewOwner(ref platform, state, list, owner);
 
-	private static void WriteClickState<TPlatform>(ref TPlatform platform,
+	private static bool WriteClickState<TPlatform>(ref TPlatform platform,
 		APTR block, MuiListviewClickState value)
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiListviewClickStateCodec.Write(ref platform, block, value);
@@ -1503,9 +1785,9 @@ public static class MuiListviewCore
 		APTR state, APTR obj, out MuiListviewClickState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			ClickStateKey, 0));
-		return TryReadClickState(ref platform, block, out value);
+		if (!TryReadClickStateAdmission(ref platform, state, obj,
+			out value, out var present)) return false;
+		return present;
 	}
 
 	private static void FreeClickState<TPlatform>(ref TPlatform platform,
@@ -1519,33 +1801,82 @@ public static class MuiListviewCore
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadHorizontalScrollerDragStateAdmission(ref platform, state,
+			obj, out _, out var present)) return APTR.Null;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			HorizontalScrollerDragStateKey, 0));
-		if (MuiListviewHorizontalScrollerDragStateCodec.TryRead(ref platform,
-			block, out _)) return block;
-		if (block.IsNotNull && platform.IsMapped(block,
-			MuiListviewHorizontalScrollerDragState.Size))
-			platform.Free(block, MuiListviewHorizontalScrollerDragState.Size);
+		if (present) return block;
 		block = MuiHeadlessMemory.Allocate(ref platform,
 			MuiListviewHorizontalScrollerDragState.Size);
 		if (block.IsNull) return APTR.Null;
 		var value = default(MuiListviewHorizontalScrollerDragState);
 		value.Magic = MuiListviewHorizontalScrollerDragState.Cookie;
 		if (!MuiListviewHorizontalScrollerDragStateCodec.Write(ref platform, block,
-			value))
+			value) || !SetInternal(ref platform, state, obj,
+			HorizontalScrollerDragStateKey, block.Raw))
 		{
+			if (platform.IsMapped(block,
+				MuiListviewHorizontalScrollerDragState.Size))
+				platform.Clear(block,
+					MuiListviewHorizontalScrollerDragState.Size);
 			platform.Free(block, MuiListviewHorizontalScrollerDragState.Size);
 			return APTR.Null;
 		}
-		SetInternal(ref platform, state, obj, HorizontalScrollerDragStateKey,
-			block.Raw);
 		return block;
+	}
+
+	// A published horizontal drag record is authoritative guest state. A
+	// non-NULL record that fails the cookie/field contract is malformed, not
+	// absence; pointer admission must not free it and arm a replacement grab.
+	private static bool TryReadHorizontalScrollerDragStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewHorizontalScrollerDragState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			HorizontalScrollerDragStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return MuiListviewHorizontalScrollerDragStateCodec.TryRead(ref platform,
+			block, out value) && IsValidHorizontalScrollerDragState(
+			ref platform, state, obj, value);
+	}
+
+	// The horizontal thumb record is a bounded pointer-grab state machine. Its
+	// inactive storage is the all-zero value; an active record needs a
+	// non-negative grab offset and a scroll origin no greater than the current
+	// named horizontal projection. Keep LastPointer signed for guest coordinates
+	// above or below the window origin, and reject unknown transition bits.
+	private static bool IsValidHorizontalScrollerDragState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		MuiListviewHorizontalScrollerDragState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		const uint knownFlags =
+			MuiListviewHorizontalScrollerDragState.ActiveFlag |
+			MuiListviewHorizontalScrollerDragState.CapturedFlag;
+		if ((value.Flags & ~knownFlags) != 0) return false;
+		if ((value.Flags & MuiListviewHorizontalScrollerDragState.ActiveFlag) == 0)
+			return value.Flags == 0 && value.GrabOffset == 0 &&
+				value.StartScroll == 0 && value.LastPointer == 0;
+		if (value.GrabOffset < 0) return false;
+		if (!TryReadHorizontalScrollerStateAdmission(ref platform, state, obj,
+			out var projection, out var present) || !present) return false;
+		return value.StartScroll <= projection.MaxScrollX;
 	}
 
 	private static void ReleaseHorizontalScrollerDragState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj, APTR block)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (TryReadHorizontalScrollerDragStateAdmission(ref platform, state, obj,
+			out var value, out var present) && present && (value.Flags &
+			MuiListviewHorizontalScrollerDragState.CapturedFlag) != 0)
+			ReleasePointer(ref platform, obj,
+				MuiPointerCaptureKind.HorizontalScroller, value.LastPointer, 0);
 		if (block.IsNotNull && platform.IsMapped(block,
 			MuiListviewHorizontalScrollerDragState.Size))
 		{
@@ -1558,6 +1889,11 @@ public static class MuiListviewCore
 	internal static void CleanupRecords<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		// Remove any live external Prop/Scrollbar recipe before the child and
+		// generic notification records are retired. The destination pointer lives
+		// in a named guest connection record, so teardown does not scan object
+		// layout or depend on a managed side table.
+		DisconnectExternalScrollerProp(ref platform, state, obj, APTR.Null);
 		var childState = APTR.FromPointer(Read(ref platform, state, obj,
 			ChildStateKey, 0));
 		FreeChildState(ref platform, childState);
@@ -1672,12 +2008,160 @@ public static class MuiListviewCore
 	// ---- Child resolution -----------------------------------------------------
 
 	// The bound child list (MUIA_Listview_List). Null when the listview has been
-	// torn down or was never fully constructed.
+	// torn down or was never fully constructed.  The relationship is a guest
+	// record, not an ownership assumption: a caller may dispose a supplied List
+	// directly, so every consumer validates the named child against the live
+	// headless object table before returning it.  This keeps the raw compatibility
+	// pointer from becoming a use-after-free source.
+	private static bool IsLiveChildList<TPlatform>(ref TPlatform platform,
+		APTR state, APTR child) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (child.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			child).IsNull) return false;
+		return MuiListCore.IsListBacked(MuiListCore.Classify(ref platform, state,
+			child));
+	}
+
 	public static APTR ChildList<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform =>
-		TryGetChildState(ref platform, state, obj, out var value)
-			? value.Child
-			: APTR.FromPointer(Read(ref platform, state, obj, List, 0));
+		ResolveChildList(ref platform, state, obj);
+
+	private static APTR ResolveChildList<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		APTR child;
+		if (!TryReadChildStateAdmission(ref platform, state, obj,
+			out var value, out var present))
+			return APTR.Null;
+		if (present)
+			child = value.Child;
+		else if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			List, out var raw))
+			child = APTR.FromPointer(raw);
+		else
+			return APTR.Null;
+		return IsLiveChildList(ref platform, state, child) ? child : APTR.Null;
+	}
+
+	// A published connection record is authoritative guest state. A non-NULL
+	// record that fails the cookie/field contract is malformed, not absent; do
+	// not free it or silently replace it while a notification recipe may still
+	// refer to the recorded destination.
+	private static bool TryReadExternalScrollerConnectionAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewExternalScrollerConnectionState value,
+		out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			ExternalScrollerConnectionKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return MuiListviewExternalScrollerConnectionStateCodec.TryRead(
+			ref platform, block, out value) &&
+			IsValidExternalScrollerConnection(ref platform, state, value);
+	}
+
+	// A published connection owns one destination object identity. A null,
+	// unmapped, or non-Prop/Scrollbar destination cannot participate in the
+	// four notification edges and must not be used for teardown or reconnect.
+	private static bool IsValidExternalScrollerConnection<TPlatform>(
+		ref TPlatform platform, APTR state,
+		MuiListviewExternalScrollerConnectionState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (value.Prop.IsNull) return false;
+		return MuiCommonControlCore.IsPropClass(
+			MuiCommonControlCore.Classify(ref platform, state, value.Prop));
+	}
+
+	private static bool EnsureExternalScrollerConnection<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out APTR block) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!TryReadExternalScrollerConnectionAdmission(ref platform, state, obj,
+			out _, out var present))
+		{
+			block = APTR.Null;
+			return false;
+		}
+		block = APTR.FromPointer(Read(ref platform, state, obj,
+			ExternalScrollerConnectionKey, 0));
+		if (present) return block.IsNotNull;
+		var fresh = MuiHeadlessMemory.Allocate(ref platform,
+			MuiListviewExternalScrollerConnectionState.Size);
+		if (fresh.IsNull) return false;
+		var value = default(MuiListviewExternalScrollerConnectionState);
+		value.Magic = MuiListviewExternalScrollerConnectionState.Cookie;
+		if (!MuiListviewExternalScrollerConnectionStateCodec.Write(ref platform,
+			fresh, value) || !SetInternal(ref platform, state, obj,
+			ExternalScrollerConnectionKey, fresh.Raw))
+		{
+			MuiListviewExternalScrollerConnectionStateCodec.Clear(ref platform,
+				fresh);
+			platform.Free(fresh,
+				MuiListviewExternalScrollerConnectionState.Size);
+			return false;
+		}
+		block = fresh;
+		return true;
+	}
+
+	internal static bool TryGetExternalScrollerConnection<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewExternalScrollerConnectionState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		return TryReadExternalScrollerConnectionAdmission(ref platform, state,
+			obj, out value, out var present) && present;
+	}
+
+	private static void FreeExternalScrollerConnection<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var block = APTR.FromPointer(Read(ref platform, state, obj,
+			ExternalScrollerConnectionKey, 0));
+		MuiListviewExternalScrollerConnectionStateCodec.Clear(ref platform, block);
+		if (block.IsNotNull && platform.IsMapped(block,
+			MuiListviewExternalScrollerConnectionState.Size))
+			platform.Free(block,
+				MuiListviewExternalScrollerConnectionState.Size);
+		SetInternal(ref platform, state, obj, ExternalScrollerConnectionKey, 0);
+	}
+
+	// A destination Prop/Scrollbar can be disposed before its Listview owner.
+	// Walk the guest object chain and remove recipes that target that object
+	// while both records are still discoverable. The walk uses the named headless
+	// state/object codecs and retains no managed collection of connections.
+	internal static void DisconnectExternalScrollerConnectionsToObject<TPlatform>(
+		ref TPlatform platform, APTR state, APTR target)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (target.IsNull || !MuiHeadlessStateCodec.TryRead(ref platform, state,
+			out var stateValue)) return;
+		var current = stateValue.Objects;
+		uint visited = 0;
+		while (current.IsNotNull && visited++ <
+			MuiHeadlessLayout.MaximumTraversal)
+		{
+			if (!MuiHeadlessObjectCodec.TryRead(ref platform, current,
+				out var objectValue)) return;
+			var candidate = objectValue.Boopsi;
+			if (candidate.Raw != target.Raw &&
+				MuiListCore.Classify(ref platform, state, candidate) ==
+				MuiCollectionClass.Listview &&
+				TryGetExternalScrollerConnection(ref platform, state, candidate,
+					out var connection) && connection.Prop.Raw == target.Raw)
+				DisconnectExternalScrollerProp(ref platform, state, candidate,
+					APTR.Null);
+			current = objectValue.Next;
+		}
+	}
 
 	// Publish the bounded viewport state that a real Prop child would expose.
 	// The state is derived from the owned List child, so no second list model can
@@ -1711,7 +2195,11 @@ public static class MuiListviewCore
 				out var childGeometry)) return false;
 			var height = childGeometry.Height <= 0 ? 0u :
 				unchecked((uint)childGeometry.Height);
-			var rows = height / ListRowHeight;
+			var lineHeight = ListRowHeight;
+			if (MuiListCore.TryGetViewportState(ref platform, state, child,
+				out var childViewport) && childViewport.LineHeight != 0)
+				lineHeight = childViewport.LineHeight;
+			var rows = height / lineHeight;
 			if (rows == 0) rows = 1;
 			var titleRows = MuiListCore.TitleRowCount(ref platform, state, child);
 			visible = rows > titleRows ? rows - titleRows : 0;
@@ -1724,6 +2212,170 @@ public static class MuiListviewCore
 			first, maxFirst, out entries, out visible, out first, out maxFirst);
 	}
 
+	// Read the child List's pixel viewport as the range expected by an external
+	// Prop.  This is an explicit integration seam: MorphOS applications connect
+	// an independently created Prop with MUIM_Notify, so Listview does not own or
+	// silently replace that application object.
+	internal static bool TryGetExternalScrollerState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewExternalScrollerState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		if (MuiListCore.Classify(ref platform, state, obj) !=
+			MuiCollectionClass.Listview) return false;
+		var child = ChildList(ref platform, state, obj);
+		if (child.IsNull || !MuiListCore.TryGetViewportState(ref platform, state,
+			child, out var viewport)) return false;
+		value.Entries = viewport.TotalPixel;
+		value.Visible = viewport.VisiblePixel;
+		value.First = viewport.TopPixel;
+		return true;
+	}
+
+	// Apply the documented Listview external-scroller recipe to a real Prop or
+	// Scrollbar object.  SetControlAttribute keeps Prop range records, clamping,
+	// redraw scheduling, and optional notifications on the class-aware path.
+	// Entries, Visible, then First are written in that order so the final cursor
+	// is bounded against the complete pixel range.
+	internal static bool SyncExternalScrollerProp<TPlatform>(
+		ref TPlatform platform, APTR state, APTR listview, APTR prop,
+		bool notify = true)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		if (prop.IsNull || !MuiCommonControlCore.IsPropClass(
+			MuiCommonControlCore.Classify(ref platform, state, prop))) return false;
+		if (!TryGetExternalScrollerState(ref platform, state, listview,
+			out var range)) return false;
+		return MuiCommonControlCore.SetControlAttribute(ref platform, state, prop,
+			MuiCommonControlCore.PropEntries, range.Entries, notify) &&
+			MuiCommonControlCore.SetControlAttribute(ref platform, state, prop,
+				MuiCommonControlCore.PropVisible, range.Visible, notify) &&
+			MuiCommonControlCore.SetControlAttribute(ref platform, state, prop,
+				MuiCommonControlCore.PropFirst, range.First, notify);
+	}
+
+	// Install the MorphOS external-scrollbar recipe on an application-owned
+	// Prop/Scrollbar. The four notifications are copied into the notification
+	// core from a temporary guest follow vector; no managed or offset-based
+	// connection table is retained. Reconnecting first removes an earlier
+	// recipe, keeping repeated setup calls deterministic.
+	internal static bool ConnectExternalScrollerProp<TPlatform>(
+		ref TPlatform platform, APTR state, APTR listview, APTR prop)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		if (prop.IsNull || !MuiCommonControlCore.IsPropClass(
+			MuiCommonControlCore.Classify(ref platform, state, prop))) return false;
+		var child = ChildList(ref platform, state, listview);
+		if (child.IsNull) return false;
+		// Admission precedes disconnect so malformed published state cannot be
+		// mistaken for an empty recipe and partially mutate notifications.
+		if (!TryReadExternalScrollerConnectionAdmission(ref platform, state,
+			listview, out _, out _)) return false;
+		// Disconnect the recorded destination, if any, before installing another
+		// one. The destination is kept in a typed guest record so reconnecting an
+		// different Prop cannot strand the old source notifications.
+		DisconnectExternalScrollerProp(ref platform, state, listview, APTR.Null);
+		if (!SyncExternalScrollerProp(ref platform, state, listview, prop))
+			return false;
+		if (!AddExternalScrollerNotification(ref platform, state, child,
+			MuiListCore.TotalPixel, prop, MuiCommonControlCore.PropEntries) ||
+			!AddExternalScrollerNotification(ref platform, state, child,
+			MuiListCore.VisiblePixel, prop, MuiCommonControlCore.PropVisible) ||
+			!AddExternalScrollerNotification(ref platform, state, child,
+			MuiListCore.TopPixel, prop, MuiCommonControlCore.PropFirst) ||
+			!AddExternalScrollerNotification(ref platform, state, prop,
+			MuiCommonControlCore.PropFirst, child, MuiListCore.TopPixel))
+		{
+			DisconnectExternalScrollerProp(ref platform, state, listview, prop);
+			return false;
+		}
+		var connectionValue = default(
+			MuiListviewExternalScrollerConnectionState);
+		connectionValue.Magic =
+			MuiListviewExternalScrollerConnectionState.Cookie;
+		connectionValue.Prop = prop;
+		if (!EnsureExternalScrollerConnection(ref platform, state, listview,
+			out var connection) ||
+			!MuiListviewExternalScrollerConnectionStateCodec.Write(ref platform,
+				connection, connectionValue))
+		{
+			DisconnectExternalScrollerProp(ref platform, state, listview, prop);
+			return false;
+		}
+		return true;
+	}
+
+	// Remove the complete external-scrollbar recipe. Removal uses the same
+	// source/destination pairs as installation, so it also cleans up a partial
+	// connection after an allocation or notification failure.
+	internal static bool DisconnectExternalScrollerProp<TPlatform>(
+		ref TPlatform platform, APTR state, APTR listview, APTR prop)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var child = ChildList(ref platform, state, listview);
+		if (child.IsNull)
+		{
+			FreeExternalScrollerConnection(ref platform, state, listview);
+			return false;
+		}
+		var recorded = APTR.Null;
+		if (TryGetExternalScrollerConnection(ref platform, state, listview,
+			out var connection)) recorded = connection.Prop;
+		// Keep the guest pointer in one named APTR local. An implicit conditional
+		// expression makes the freestanding MC68000 lowering merge a scalar
+		// condition with a managed-pointer-shaped value; explicit state keeps this
+		// teardown path struct-first and compiler-stable.
+		var target = recorded;
+		if (target.IsNull) target = prop;
+		if (target.IsNotNull)
+		{
+			MuiNotifyCore.Remove(ref platform, state, child,
+				MuiListCore.TotalPixel, target, true);
+			MuiNotifyCore.Remove(ref platform, state, child,
+				MuiListCore.VisiblePixel, target, true);
+			MuiNotifyCore.Remove(ref platform, state, child,
+				MuiListCore.TopPixel, target, true);
+			MuiNotifyCore.Remove(ref platform, state, target,
+				MuiCommonControlCore.PropFirst, child, true);
+		}
+		// If a caller supplied a different explicit destination, remove that
+		// recipe too; this keeps the public disconnect operation idempotent even
+		// after a caller lost the recorded Prop pointer.
+		if (prop.IsNotNull && prop.Raw != target.Raw)
+		{
+			MuiNotifyCore.Remove(ref platform, state, child,
+				MuiListCore.TotalPixel, prop, true);
+			MuiNotifyCore.Remove(ref platform, state, child,
+				MuiListCore.VisiblePixel, prop, true);
+			MuiNotifyCore.Remove(ref platform, state, child,
+				MuiListCore.TopPixel, prop, true);
+			MuiNotifyCore.Remove(ref platform, state, prop,
+				MuiCommonControlCore.PropFirst, child, true);
+		}
+		if (recorded.IsNotNull || prop.IsNull)
+			FreeExternalScrollerConnection(ref platform, state, listview);
+		return target.IsNotNull || prop.IsNull;
+	}
+
+	private static bool AddExternalScrollerNotification<TPlatform>(
+		ref TPlatform platform, APTR state, APTR source, uint trigger,
+		APTR destination, uint targetAttribute)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var follow = MuiHeadlessMemory.Allocate(ref platform,
+			ExternalNotifyFollowBytes);
+		if (follow.IsNull) return false;
+		platform.WriteUInt32(follow, 0, MuiNotifyCore.SetMethod);
+		platform.WriteUInt32(follow, 4, targetAttribute);
+		platform.WriteUInt32(follow, 8, NotifyTriggerValue);
+		var added = MuiNotifyCore.Add(ref platform, state, source, trigger,
+			NotifyEveryTime, destination, 3, follow);
+		platform.Clear(follow, ExternalNotifyFollowBytes);
+		platform.Free(follow, ExternalNotifyFollowBytes);
+		return added;
+	}
+
 	// Scroll the child list by viewport row, with the same saturation rule as a
 	// Prop_First value. This is the narrow input seam used by the future full
 	// scrollbar gadget; it keeps all ownership in the existing List object.
@@ -1731,8 +2383,14 @@ public static class MuiListviewCore
 		APTR state, APTR obj, int requested)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!GetScrollerState(ref platform, state, obj, out _, out _, out _,
-			out var maxFirst)) return false;
+		if (!GetScrollerState(ref platform, state, obj, out _, out var visible,
+			out _, out var maxFirst) || visible == 0 ||
+			visible == MuiListCore.VisibleOff)
+			// A hidden or zero-height Listview has no usable Prop viewport. Keep the
+			// child's MorphOS -1 cursor sentinel intact instead of turning a
+			// programmatic scroller write into a latent row position that will be
+			// applied when the object becomes visible again.
+			return false;
 		var target = requested < 0 ? 0 : requested;
 		if ((uint)target > maxFirst) target = unchecked((int)maxFirst);
 		var child = ChildList(ref platform, state, obj);
@@ -1815,6 +2473,23 @@ public static class MuiListviewCore
 			child, attribute, value, notify);
 	}
 
+	// OM_SET cannot rewrite the adopted list relationship or the listview
+	// construction-only interaction policy. Keep the lower-level SetAttribute
+	// available for construction and internal forwarding, but make the public
+	// dispatcher use this explicit runtime boundary.
+	public static bool SetRuntimeAttribute<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, uint attribute, uint value, bool notify)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiListCore.Classify(ref platform, state, obj) !=
+			MuiCollectionClass.Listview)
+			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+				attribute, value, notify);
+		if (attribute == List || attribute == Input || attribute == MultiSelect ||
+			attribute == ScrollerPos) return false;
+		return SetAttribute(ref platform, state, obj, attribute, value, notify);
+	}
+
 	public static bool GetAttribute<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, uint attribute, out uint value)
 		where TPlatform : struct, IMuiHeadlessPlatform
@@ -1828,9 +2503,8 @@ public static class MuiListviewCore
 			attribute == DefClickColumn ||
 			attribute == DoubleClick)
 		{
-			var block = APTR.FromPointer(Read(ref platform, state, obj,
-				ClickStateKey, 0));
-			if (TryReadClickState(ref platform, block, out var clickState))
+			if (TryReadClickStateAdmission(ref platform, state, obj,
+				out var clickState, out var present) && present)
 			{
 				value = attribute == AgainClick ? clickState.AgainClick :
 					attribute == DoubleClick ? clickState.DoubleClick :
@@ -1838,51 +2512,130 @@ public static class MuiListviewCore
 					clickState.ClickColumn;
 				return true;
 			}
+			if (present) return false;
+			return MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+				attribute, out value);
 		}
 		if (attribute == SelectChange)
 		{
-			if (TryGetSelectionSignal(ref platform, state, obj, out var signal))
+			if (TryReadSelectionSignalAdmission(ref platform, state, obj,
+				out var signal, out var present) && present)
 			{
 				value = signal.Value;
+				return true;
+			}
+			if (present) return false;
+			return MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj,
+				attribute, out value);
+		}
+		// DragType is the only Listview interaction-policy attribute with a public
+		// getter ([ISG]). Input, MultiSelect, and ScrollerPos are [I..] in the
+		// MorphOS contract: their values remain in the named policy record for
+		// input/layout code, but Get/OM_GET must not claim them.
+		if (attribute == DragType)
+		{
+			if (TryReadInteractionPolicyAdmission(ref platform, state, obj,
+				out var policy, out var present) && present)
+			{
+				value = policy.DragType;
+				return true;
+			}
+			// True absence retains the raw compatibility scalar; malformed present
+			// state is rejected instead of leaking a stale alias.
+			if (present) return false;
+			return MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+				attribute, out value);
+		}
+		if (attribute == List)
+		{
+			if (!TryReadChildStateAdmission(ref platform, state, obj,
+				out var childState, out var present)) return false;
+			if (present)
+			{
+				value = childState.Child.Raw;
 				return true;
 			}
 			return MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj,
 				attribute, out value);
 		}
-		// The four interaction-policy attributes are published in a named
-		// guest-resident record. Keep that record authoritative for getters so a
-		// policy read never depends on the generic attribute-list storage or on a
-		// duplicated private offset path. The scalar projection remains in the
-		// generic list for legacy callers, but behavior and public reads share this
-		// fixed-width record.
-		if (attribute == Input || attribute == MultiSelect ||
-			attribute == ScrollerPos || attribute == DragType)
-		{
-			if (TryGetInteractionPolicy(ref platform, state, obj, out var policy))
-			{
-				value = attribute == Input ? policy.Input :
-					attribute == MultiSelect ? policy.MultiSelect :
-					attribute == ScrollerPos ? policy.ScrollerPos : policy.DragType;
-				return true;
-			}
-			// A malformed or legacy object may not yet have the typed policy
-			// block. Use the raw compatibility scalar as a terminal fallback;
-			// never re-enter the public getter router from this class-gated path.
-			return MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out value);
-		}
-		if (attribute == List && TryGetChildState(ref platform, state, obj,
-			out var childState))
-		{
-			value = childState.Child.Raw;
-			return true;
-		}
-		if (attribute == List || IsListviewAttribute(attribute))
+		if (IsListviewAttribute(attribute))
 			return MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj,
 				attribute, out value);
 		var child = ChildList(ref platform, state, obj);
 		return child.IsNotNull && MuiHeadlessObjectCore.GetAttribute(ref platform,
 			state, child, attribute, out value);
+	}
+
+	// OM_GET on a Listview projects the public List attribute family from the
+	// named owned child. Keep this seam separate from GetAttribute: the latter
+	// also handles Listview-private click and policy records, whose internal
+	// bootstrap reads must never recurse through the public getter router.
+	internal static bool TryGetForwardedPublicAttribute<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, uint attribute,
+		out uint value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = 0;
+		if (!MuiListCore.IsPublicGetterAttribute(attribute) ||
+			// Several List and Listview ABI IDs intentionally overlap (for
+			// example DragType and the click signals). They are Listview-owned
+			// policy/click projections and must not be mistaken for forwarded
+			// child attributes at the generic getter boundary.
+			IsListviewAttribute(attribute) ||
+			MuiListCore.Classify(ref platform, state, obj) !=
+			MuiCollectionClass.Listview)
+			return false;
+		var child = ChildList(ref platform, state, obj);
+		if (child.IsNull)
+		{
+			// The Listview still owns the public projection even when a supplied
+			// child was disposed directly.  Report the neutral value rather than
+			// falling through to the stale parent compatibility scalar.
+			value = 0;
+			return true;
+		}
+		return MuiHeadlessObjectCore.GetAttribute(ref platform, state, child,
+			attribute, out value);
+	}
+
+	// MUIA_Listview_List is a public relationship getter, but it is not part of
+	// the List attribute family above. Resolve it from the named child-state
+	// record before the generic parent attribute list so direct raw writes cannot
+	// replace the adopted-child identity.
+	internal static bool TryGetChildRelationAttribute<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, uint attribute,
+		out uint value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = 0;
+		if (attribute != List || MuiListCore.Classify(ref platform, state, obj) !=
+			MuiCollectionClass.Listview) return false;
+		// During CreateListview the named child record has not been installed
+		// yet. Preserve the construction tag through the raw bootstrap seam so a
+		// supplied List is adopted; once the record exists, the validated child
+		// projection below becomes authoritative.
+		if (!TryReadChildStateAdmission(ref platform, state, obj, out _,
+			out var present))
+		{
+			// A present but malformed named relationship is still a handled
+			// Listview projection.  Do not fall through to the raw List scalar,
+			// which would expose a disposed or otherwise incoherent child pointer.
+			if (present)
+			{
+				value = 0;
+				return true;
+			}
+			return false;
+		}
+		if (!present)
+			return MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+				List, out value);
+		var child = ChildList(ref platform, state, obj);
+		// This is a handled relationship getter even when the caller disposed a
+		// supplied child out of band.  Returning NULL prevents generic metadata
+		// from exposing the now-dangling raw pointer.
+		value = child.IsNull ? 0u : child.Raw;
+		return true;
 	}
 
 	private static bool IsListviewAttribute(uint attribute) =>
@@ -1898,9 +2651,28 @@ public static class MuiListviewCore
 	internal static bool IsPublicAttribute(uint attribute) =>
 		attribute == List || IsListviewAttribute(attribute);
 
+	// Listview talks through to the owned List for the List attribute family.
+	// Keep notification source selection on the same named-attribute boundary so
+	// an application may install a List notification on the Listview object and
+	// still observe the child List's authoritative state.
+	internal static bool IsForwardedNotificationAttribute(uint attribute) =>
+		MuiListCore.IsPublicGetterAttribute(attribute) &&
+		!IsListviewAttribute(attribute);
+
 	internal static bool IsInteractionPolicyAttribute(uint attribute) =>
 		attribute == Input || attribute == MultiSelect ||
 		attribute == ScrollerPos || attribute == DragType;
+
+	// Public getter projection for the interaction-policy record. Keep this
+	// separate from IsInteractionPolicyAttribute because three fields are
+	// construction-only and must not leak through HeadlessObjectCore's generic
+	// Get fallback.
+	internal static bool IsGettableInteractionPolicyAttribute(uint attribute) =>
+		attribute == DragType;
+
+	internal static bool IsInitializeOnlyAttribute(uint attribute) =>
+		attribute == Input || attribute == MultiSelect ||
+		attribute == ScrollerPos;
 
 	// ---- Input ----------------------------------------------------------------
 
@@ -1983,23 +2755,42 @@ public static class MuiListviewCore
 		APTR state, APTR obj)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			DragStateKey, 0));
-		if (MuiListviewDragStateCodec.TryRead(ref platform, block,
-			out var drag) && (drag.Flags & MuiListviewDragState.ActiveFlag) != 0)
+		if (TryReadDragStateAdmission(ref platform, state, obj, out var drag,
+			out var present) && present &&
+			(drag.Flags & MuiListviewDragState.ActiveFlag) != 0)
 			return true;
-		block = APTR.FromPointer(Read(ref platform, state, obj,
-			ScrollerDragStateKey, 0));
-		if (MuiListviewScrollerDragStateCodec.TryRead(ref platform, block,
-			out var scroller) &&
+		if (TryReadScrollerDragStateAdmission(ref platform, state, obj,
+			out var scroller, out present) && present &&
 			(scroller.Flags & MuiListviewScrollerDragState.ActiveFlag) != 0)
 			return true;
-		block = APTR.FromPointer(Read(ref platform, state, obj,
-			HorizontalScrollerDragStateKey, 0));
-		return MuiListviewHorizontalScrollerDragStateCodec.TryRead(ref platform,
-			block, out var horizontal) &&
+		return TryReadHorizontalScrollerDragStateAdmission(ref platform, state,
+			obj, out var horizontal, out present) && present &&
 			(horizontal.Flags &
 				MuiListviewHorizontalScrollerDragState.ActiveFlag) != 0;
+	}
+
+	private static bool CapturePointer<TPlatform>(ref TPlatform platform,
+		APTR obj, MuiPointerCaptureKind kind, int x, int y)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var sample = default(MuiPointerCaptureSample);
+		sample.Object = obj;
+		sample.Kind = kind;
+		sample.StartX = x;
+		sample.StartY = y;
+		return platform.CaptureMuiPointer(ref sample);
+	}
+
+	private static void ReleasePointer<TPlatform>(ref TPlatform platform,
+		APTR obj, MuiPointerCaptureKind kind, int x, int y)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var sample = default(MuiPointerCaptureSample);
+		sample.Object = obj;
+		sample.Kind = kind;
+		sample.StartX = x;
+		sample.StartY = y;
+		_ = platform.ReleaseMuiPointer(ref sample);
 	}
 
 	// Handle the stable MorphOS Listview keyboard navigation set. The packet
@@ -2038,6 +2829,7 @@ public static class MuiListviewCore
 		}
 		if (muiKey == KeyPress)
 		{
+			if (!EnsureClickState(ref platform, state, obj)) return false;
 			if (!SelectActive(ref platform, state, obj, child, false))
 				return false;
 			// MorphOS treats keyboard activation as a click on the active row.
@@ -2150,6 +2942,9 @@ public static class MuiListviewCore
 		value.LastX = pointer.MouseX;
 		value.LastY = pointer.MouseY;
 		value.Flags = MuiListviewDragState.ActiveFlag;
+		if (CapturePointer(ref platform, obj, MuiPointerCaptureKind.ListDrag,
+			pointer.MouseX, pointer.MouseY))
+			value.Flags |= MuiListviewDragState.CapturedFlag;
 		MuiListviewDragStateCodec.Write(ref platform, block, value);
 		return true;
 	}
@@ -2160,8 +2955,9 @@ public static class MuiListviewCore
 	{
 		var block = APTR.FromPointer(Read(ref platform, state, obj, DragStateKey,
 			0));
-		if (!MuiListviewDragStateCodec.TryRead(ref platform, block,
-			out var value) || (value.Flags & MuiListviewDragState.ActiveFlag) == 0)
+		if (!TryReadDragStateAdmission(ref platform, state, obj, out var value,
+			out var present) || !present ||
+			(value.Flags & MuiListviewDragState.ActiveFlag) == 0)
 			return false;
 		if (pointer.MouseX != value.StartX || pointer.MouseY != value.StartY)
 			value.Flags |= MuiListviewDragState.MovedFlag;
@@ -2199,8 +2995,9 @@ public static class MuiListviewCore
 	{
 		var block = APTR.FromPointer(Read(ref platform, state, obj, DragStateKey,
 			0));
-		if (!MuiListviewDragStateCodec.TryRead(ref platform, block,
-			out var value) || (value.Flags & MuiListviewDragState.ActiveFlag) == 0)
+		if (!TryReadDragStateAdmission(ref platform, state, obj, out var value,
+			out var present) || !present ||
+			(value.Flags & MuiListviewDragState.ActiveFlag) == 0)
 			return false;
 		var moved = (value.Flags & MuiListviewDragState.MovedFlag) != 0;
 		var changed = false;
@@ -2245,8 +3042,9 @@ public static class MuiListviewCore
 		var handled = false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj, DragStateKey,
 			0));
-		if (MuiListviewDragStateCodec.TryRead(ref platform, block,
-			out var value) && (value.Flags & MuiListviewDragState.ActiveFlag) != 0)
+		if (TryReadDragStateAdmission(ref platform, state, obj, out var value,
+			out var present) && present &&
+			(value.Flags & MuiListviewDragState.ActiveFlag) != 0)
 		{
 			// Clear the public child marker before releasing the private record.
 			// This keeps a cancelled drag from leaving a stale insertion cue behind
@@ -2258,8 +3056,8 @@ public static class MuiListviewCore
 		}
 		var scrollerBlock = APTR.FromPointer(Read(ref platform, state, obj,
 			ScrollerDragStateKey, 0));
-		if (MuiListviewScrollerDragStateCodec.TryRead(ref platform,
-			scrollerBlock, out var scrollerValue) &&
+		if (TryReadScrollerDragStateAdmission(ref platform, state, obj,
+			out var scrollerValue, out present) && present &&
 			(scrollerValue.Flags & MuiListviewScrollerDragState.ActiveFlag) != 0)
 		{
 			ReleaseScrollerDragState(ref platform, state, obj, scrollerBlock);
@@ -2267,8 +3065,8 @@ public static class MuiListviewCore
 		}
 		var horizontalBlock = APTR.FromPointer(Read(ref platform, state, obj,
 			HorizontalScrollerDragStateKey, 0));
-		if (MuiListviewHorizontalScrollerDragStateCodec.TryRead(ref platform,
-			horizontalBlock, out var horizontalValue) &&
+		if (TryReadHorizontalScrollerDragStateAdmission(ref platform, state,
+			obj, out var horizontalValue, out present) && present &&
 			(horizontalValue.Flags &
 				MuiListviewHorizontalScrollerDragState.ActiveFlag) != 0)
 		{
@@ -2279,33 +3077,120 @@ public static class MuiListviewCore
 		return handled;
 	}
 
+	// Window focus loss is a cancellation edge for every Listview or Stringscroll
+	// pointer gesture below that window. Walk the guest-resident Family topology
+	// with the bounded GetChild selector; do not build a managed object graph or
+	// infer child addresses from private offsets. A Listview or Stringscroll is a
+	// leaf from this traversal's perspective, so stop at the composite after
+	// cancelling its typed record rather than descending into implementation
+	// children.
+	internal static uint CancelPointerDragsInWindow<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		CancelPointerDragsInTree(ref platform, state, window, 0);
+
+	private static uint CancelPointerDragsInTree<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, uint depth)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (obj.IsNull || depth >= MuiHeadlessLayout.MaximumTraversal)
+			return 0;
+		var collectionClass = MuiListCore.Classify(ref platform, state, obj);
+		if (collectionClass == MuiCollectionClass.Listview)
+		{
+			var child = ChildList(ref platform, state, obj);
+			return CancelDrag(ref platform, state, obj, child) ? 1u : 0u;
+		}
+		if (collectionClass == MuiCollectionClass.Stringscroll)
+			return MuiStringscrollCore.CancelPointerDragForWindow(ref platform,
+				state, obj) ? 1u : 0u;
+		var cancelled = 0u;
+		for (var index = 0u; index < MuiHeadlessLayout.MaximumTraversal;
+			index++)
+		{
+			var child = MuiFamilyCore.GetChild(ref platform, state, obj,
+				unchecked((int)index), APTR.Null);
+			if (child.IsNull) break;
+			cancelled += CancelPointerDragsInTree(ref platform, state, child,
+				depth + 1);
+		}
+		return cancelled;
+	}
+
 	private static APTR EnsureDragState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadDragStateAdmission(ref platform, state, obj, out _,
+			out var present)) return APTR.Null;
 		var block = APTR.FromPointer(Read(ref platform, state, obj, DragStateKey,
 			0));
-		if (MuiListviewDragStateCodec.TryRead(ref platform, block, out _))
-			return block;
-		if (block.IsNotNull && platform.IsMapped(block, MuiListviewDragState.Size))
-			platform.Free(block, MuiListviewDragState.Size);
+		if (present) return block;
 		block = MuiHeadlessMemory.Allocate(ref platform, MuiListviewDragState.Size);
 		if (block.IsNull) return APTR.Null;
 		var value = default(MuiListviewDragState);
 		value.Magic = MuiListviewDragStateCodec.Cookie;
 		value.Source = -1;
 		value.Target = -1;
-		MuiListviewDragStateCodec.Write(ref platform, block, value);
-		if (SetInternal(ref platform, state, obj, DragStateKey, block.Raw))
+		if (MuiListviewDragStateCodec.TryWrite(ref platform, block, value) &&
+			SetInternal(ref platform, state, obj, DragStateKey, block.Raw))
 			return block;
 		MuiListviewDragStateCodec.Clear(ref platform, block);
 		platform.Free(block, MuiListviewDragState.Size);
 		return APTR.Null;
 	}
 
+	// A published list drag record is authoritative guest state. A non-NULL
+	// record that fails the cookie/field contract is malformed, not absence; a
+	// fresh pointer gesture must not free it and arm a replacement drag.
+	private static bool TryReadDragStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewDragState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			DragStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return MuiListviewDragStateCodec.TryRead(ref platform, block,
+			out value) && IsValidDragState(value);
+	}
+
+	// The list-drag projection is a small state machine, not an arbitrary
+	// coordinate snapshot.  Keep its named row sentinels and flag transitions
+	// coherent before a following pointer gesture can reuse the published record.
+	// Source is -1 only while the inactive storage block is parked; an active
+	// drag always has a source row, while Target may be -1 when no in-viewport
+	// drop target is present. A changed target must carry the Moved flag. Unknown
+	// bits are rejected so future consumers cannot mistake unrelated state for a
+	// capture or reorder transition.
+	private static bool IsValidDragState(MuiListviewDragState value)
+	{
+		const uint knownFlags = MuiListviewDragState.ActiveFlag |
+			MuiListviewDragState.MovedFlag |
+			MuiListviewDragState.CapturedFlag;
+		if ((value.Flags & ~knownFlags) != 0) return false;
+
+		var active = (value.Flags & MuiListviewDragState.ActiveFlag) != 0;
+		if (!active)
+			return value.Flags == 0 && value.Source == -1 && value.Target == -1;
+
+		if (value.Source < 0 || value.Target < -1) return false;
+		return value.Target == value.Source ||
+			(value.Flags & MuiListviewDragState.MovedFlag) != 0;
+	}
+
 	private static void ReleaseDragState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, APTR block)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (TryReadDragStateAdmission(ref platform, state, obj, out var value,
+			out var present) && present &&
+			(value.Flags & MuiListviewDragState.CapturedFlag) != 0)
+			ReleasePointer(ref platform, obj, MuiPointerCaptureKind.ListDrag,
+				value.LastX, value.LastY);
 		MuiListviewDragStateCodec.Clear(ref platform, block);
 		if (block.IsNotNull && platform.IsMapped(block, MuiListviewDragState.Size))
 			platform.Free(block, MuiListviewDragState.Size);
@@ -2322,8 +3207,8 @@ public static class MuiListviewCore
 			ScrollerPosNone || !GetScrollerState(ref platform, state, obj,
 			out var entries, out var visible, out var first, out var maxFirst) ||
 			entries <= visible) return false;
-		var hasLayout = TryReadLayoutState(ref platform, state, obj,
-			out var layout);
+		if (!TryReadLayoutStateAdmission(ref platform, state, obj,
+			out var layout, out var hasLayout)) return false;
 		var areaGeometry = default(MuiAreaGeometryState);
 		if (!hasLayout && !MuiAreaLayoutCore.TryReadGeometryState(ref platform,
 			state, obj, out areaGeometry)) return false;
@@ -2382,8 +3267,8 @@ public static class MuiListviewCore
 			ReleaseHorizontalScrollerState(ref platform, state, obj);
 			return false;
 		}
-		var hasLayout = TryReadLayoutState(ref platform, state, obj,
-			out var layout);
+		if (!TryReadLayoutStateAdmission(ref platform, state, obj,
+			out var layout, out var hasLayout)) return false;
 		var childGeometry = default(MuiAreaGeometryState);
 		if (!hasLayout && !MuiAreaLayoutCore.TryReadGeometryState(ref platform,
 			state, child, out childGeometry)) return false;
@@ -2436,8 +3321,16 @@ public static class MuiListviewCore
 		value.StartFirst = unchecked((int)geometry.First);
 		value.LastPointer = pointer.MouseY;
 		value.Flags = MuiListviewScrollerDragState.ActiveFlag;
+		if (CapturePointer(ref platform, obj,
+			MuiPointerCaptureKind.VerticalScroller, pointer.MouseX,
+			pointer.MouseY))
+			value.Flags |= MuiListviewScrollerDragState.CapturedFlag;
 		if (MuiListviewScrollerDragStateCodec.Write(ref platform, block, value))
 			return true;
+		if ((value.Flags & MuiListviewScrollerDragState.CapturedFlag) != 0)
+			ReleasePointer(ref platform, obj,
+				MuiPointerCaptureKind.VerticalScroller, pointer.MouseX,
+				pointer.MouseY);
 		ReleaseScrollerDragState(ref platform, state, obj, block);
 		return false;
 	}
@@ -2448,8 +3341,8 @@ public static class MuiListviewCore
 	{
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ScrollerDragStateKey, 0));
-		if (!MuiListviewScrollerDragStateCodec.TryRead(ref platform, block,
-			out var value) || (value.Flags &
+		if (!TryReadScrollerDragStateAdmission(ref platform, state, obj,
+			out var value, out var present) || !present || (value.Flags &
 			MuiListviewScrollerDragState.ActiveFlag) == 0) return false;
 		if (!TryBuildScrollerGeometry(ref platform, state, obj,
 			out var geometry)) return false;
@@ -2474,8 +3367,8 @@ public static class MuiListviewCore
 	{
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ScrollerDragStateKey, 0));
-		if (!MuiListviewScrollerDragStateCodec.TryRead(ref platform, block,
-			out var value) || (value.Flags &
+		if (!TryReadScrollerDragStateAdmission(ref platform, state, obj,
+			out var value, out var present) || !present || (value.Flags &
 			MuiListviewScrollerDragState.ActiveFlag) == 0) return false;
 		UpdateScrollerDrag(ref platform, state, obj, pointer);
 		ReleaseScrollerDragState(ref platform, state, obj, block);
@@ -2505,13 +3398,11 @@ public static class MuiListviewCore
 	private static APTR EnsureScrollerDragState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadScrollerDragStateAdmission(ref platform, state, obj,
+			out _, out var present)) return APTR.Null;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ScrollerDragStateKey, 0));
-		if (MuiListviewScrollerDragStateCodec.TryRead(ref platform, block,
-			out _)) return block;
-		if (block.IsNotNull && platform.IsMapped(block,
-			MuiListviewScrollerDragState.Size))
-			platform.Free(block, MuiListviewScrollerDragState.Size);
+		if (present) return block;
 		block = MuiHeadlessMemory.Allocate(ref platform,
 			MuiListviewScrollerDragState.Size);
 		if (block.IsNull) return APTR.Null;
@@ -2520,16 +3411,59 @@ public static class MuiListviewCore
 		if (!MuiListviewScrollerDragStateCodec.Write(ref platform, block, value) ||
 			!SetInternal(ref platform, state, obj, ScrollerDragStateKey, block.Raw))
 		{
+			if (platform.IsMapped(block, MuiListviewScrollerDragState.Size))
+				platform.Clear(block, MuiListviewScrollerDragState.Size);
 			platform.Free(block, MuiListviewScrollerDragState.Size);
 			return APTR.Null;
 		}
 		return block;
 	}
 
+	// A published vertical drag record is authoritative guest state. A
+	// non-NULL record that fails the cookie/field contract is malformed, not
+	// absence; pointer admission must not free it and arm a replacement grab.
+	private static bool TryReadScrollerDragStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewScrollerDragState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			ScrollerDragStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return MuiListviewScrollerDragStateCodec.TryRead(ref platform, block,
+			out value) && IsValidScrollerDragState(value);
+	}
+
+	// The vertical thumb record is a bounded pointer-grab state machine. Its
+	// inactive storage is the all-zero value; an active record needs a
+	// non-negative grab offset and first-row origin. Keep LastPointer signed so
+	// controls positioned above the window origin remain representable. Unknown
+	// flag bits are rejected before pointer movement can consume the record.
+	private static bool IsValidScrollerDragState(
+		MuiListviewScrollerDragState value)
+	{
+		const uint knownFlags = MuiListviewScrollerDragState.ActiveFlag |
+			MuiListviewScrollerDragState.CapturedFlag;
+		if ((value.Flags & ~knownFlags) != 0) return false;
+		if ((value.Flags & MuiListviewScrollerDragState.ActiveFlag) == 0)
+			return value.Flags == 0 && value.GrabOffset == 0 &&
+				value.StartFirst == 0 && value.LastPointer == 0;
+		return value.GrabOffset >= 0 && value.StartFirst >= 0;
+	}
+
 	private static void ReleaseScrollerDragState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj, APTR block)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (TryReadScrollerDragStateAdmission(ref platform, state, obj,
+			out var value, out var present) && present && (value.Flags &
+			MuiListviewScrollerDragState.CapturedFlag) != 0)
+			ReleasePointer(ref platform, obj,
+				MuiPointerCaptureKind.VerticalScroller, 0, value.LastPointer);
 		if (block.IsNotNull && platform.IsMapped(block,
 			MuiListviewScrollerDragState.Size))
 			platform.Free(block, MuiListviewScrollerDragState.Size);
@@ -2571,6 +3505,9 @@ public static class MuiListviewCore
 		if (child.IsNull) return false;
 		var count = MuiListCore.EntryCount(ref platform, state, child);
 		if (entry < 0 || (uint)entry >= count) return false;
+		// Admit click state before changing the child active/selection records;
+		// malformed typed state must not leave a partial input transition.
+		if (!EnsureClickState(ref platform, state, obj)) return false;
 
 		if (!MuiListCore.SetAttribute(ref platform, state, child, ListActive,
 			unchecked((uint)entry), true) ||
@@ -2629,10 +3566,18 @@ public static class MuiListviewCore
 		value.DoubleClick = doubleClick ? 1u : 0u;
 		value.AgainClick = againClick ? 1u : 0u;
 		WriteClickState(ref platform, block, value);
-		SetInternal(ref platform, state, obj, ClickColumn, column);
-		SetInternal(ref platform, state, obj, AgainClick,
-			againClick ? 1u : 0u);
-		var parentPublished = doubleClick
+		// The named click record is authoritative. Publish the event projections
+		// only after it is complete so notification readers see one coherent
+		// result, including repeated clicks with the same value.
+		var parentPublished = MuiHeadlessObjectCore.SetAttribute(ref platform,
+			state, obj, ClickColumn, column, true);
+		if (!parentPublished) return false;
+		parentPublished = againClick
+			? MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+				AgainClick, 1, true)
+			: SetInternal(ref platform, state, obj, AgainClick, 0);
+		if (!parentPublished) return false;
+		parentPublished = doubleClick
 			? MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 				DoubleClick, 1, true)
 			: SetInternal(ref platform, state, obj, DoubleClick, 0);
@@ -2706,8 +3651,16 @@ public static class MuiListviewCore
 		// still needs its own Area render-info binding so its geometry/draw path
 		// can run without a host callback or a second managed render object.
 		if (!BindChildRenderInfo(ref platform, state, obj, child)) return false;
+		// The child List has already refreshed its named viewport record. Use its
+		// effective line height here instead of assuming the default eight-pixel
+		// row, so Listview and List publish the same visible-row capacity when a
+		// MorphOS MinLineHeight or AutoLineHeight policy is active.
+		var lineHeight = ListRowHeight;
+		if (MuiListCore.TryGetViewportState(ref platform, state, child,
+			out var childViewport) && childViewport.LineHeight != 0)
+			lineHeight = childViewport.LineHeight;
 		var visibleRows = childHeight <= 0 ? MuiListCore.VisibleOff :
-			unchecked((uint)childHeight) / ListRowHeight;
+			unchecked((uint)childHeight) / lineHeight;
 		if (visibleRows == 0) visibleRows = 1;
 		var titleRows = MuiListCore.TitleRowCount(ref platform, state, child);
 		if (visibleRows != MuiListCore.VisibleOff)
@@ -2809,8 +3762,17 @@ public static class MuiListviewCore
 		value.StartScroll = geometry.ScrollX;
 		value.LastPointer = pointer.MouseX;
 		value.Flags = MuiListviewHorizontalScrollerDragState.ActiveFlag;
+		if (CapturePointer(ref platform, obj,
+			MuiPointerCaptureKind.HorizontalScroller, pointer.MouseX,
+			pointer.MouseY))
+			value.Flags |= MuiListviewHorizontalScrollerDragState.CapturedFlag;
 		if (MuiListviewHorizontalScrollerDragStateCodec.Write(ref platform, block,
 			value)) return true;
+		if ((value.Flags &
+			MuiListviewHorizontalScrollerDragState.CapturedFlag) != 0)
+			ReleasePointer(ref platform, obj,
+				MuiPointerCaptureKind.HorizontalScroller, pointer.MouseX,
+				pointer.MouseY);
 		ReleaseHorizontalScrollerDragState(ref platform, state, obj, block);
 		return false;
 	}
@@ -2822,8 +3784,8 @@ public static class MuiListviewCore
 	{
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			HorizontalScrollerDragStateKey, 0));
-		if (!MuiListviewHorizontalScrollerDragStateCodec.TryRead(ref platform,
-			block, out var value) || (value.Flags &
+		if (!TryReadHorizontalScrollerDragStateAdmission(ref platform, state,
+			obj, out var value, out var present) || !present || (value.Flags &
 			MuiListviewHorizontalScrollerDragState.ActiveFlag) == 0) return false;
 		if (!TryBuildHorizontalScrollerGeometry(ref platform, state, obj,
 			out var geometry)) return false;
@@ -2854,8 +3816,8 @@ public static class MuiListviewCore
 	{
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			HorizontalScrollerDragStateKey, 0));
-		if (!MuiListviewHorizontalScrollerDragStateCodec.TryRead(ref platform,
-			block, out var value) || (value.Flags &
+		if (!TryReadHorizontalScrollerDragStateAdmission(ref platform, state,
+			obj, out var value, out var present) || !present || (value.Flags &
 			MuiListviewHorizontalScrollerDragState.ActiveFlag) == 0) return false;
 		UpdateHorizontalScrollerDrag(ref platform, state, obj, pointer);
 		ReleaseHorizontalScrollerDragState(ref platform, state, obj, block);
@@ -2983,22 +3945,91 @@ public static class MuiListviewCore
 		APTR state, APTR obj, out MuiListviewRenderState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadRenderStateAdmission(ref platform, state, obj, out value,
+			out var present)) return false;
+		return present;
+	}
+
+	// A published render context is authoritative guest state. A non-NULL
+	// record that fails the cookie/field contract is malformed, not absence; a
+	// layout or draw pass must not replace it from the raw RenderInfo alias.
+	private static bool TryReadRenderStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewRenderState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
 		value = default;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			RenderStateKey, 0));
-		return MuiListviewRenderStateCodec.TryRead(ref platform, block,
-			out value);
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			RenderStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		if (!MuiListviewRenderStateCodec.TryRead(ref platform, block,
+			out value) || !IsCoherentRenderState(ref platform, value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	// RenderInfo is the authoritative graphics record for the decoded RastPort.
+	// A published null pair is the valid pre-setup state; once RenderInfo is
+	// present, the named RastPort projection must agree with it before draw or
+	// child binding can consume the context.
+	private static bool IsCoherentRenderState<TPlatform>(
+		ref TPlatform platform, MuiListviewRenderState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (value.RenderInfo.IsNull) return value.RastPort.IsNull;
+		return MuiDrawingRenderInfoCodec.TryRead(ref platform, value.RenderInfo,
+			out var renderInfo) && renderInfo.RastPort.Raw == value.RastPort.Raw;
 	}
 
 	private static bool TryReadScrollerState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, out MuiListviewScrollerState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadScrollerStateAdmission(ref platform, state, obj,
+			out value, out var present)) return false;
+		return present;
+	}
+
+	// A published viewport projection is authoritative guest state. A non-NULL
+	// record that fails the cookie/field contract is malformed, not absence; a
+	// recompute must not free it and silently publish a replacement record.
+	private static bool TryReadScrollerStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewScrollerState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
 		value = default;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			ScrollerStateKey, 0));
-		return MuiListviewScrollerStateCodec.TryRead(ref platform, block,
-			out value);
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			ScrollerStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		if (!MuiListviewScrollerStateCodec.TryRead(ref platform, block,
+			out value) || !IsValidScrollerState(value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	// The scroller projection is a bounded range, not an arbitrary snapshot.
+	// Keep the hidden-state sentinels distinct from a visible viewport and reject
+	// impossible cursor ranges before geometry or input can turn them into pixel
+	// coordinates. The named record remains the only source for steady-state
+	// consumers; raw attributes are used only while the record is absent.
+	private static bool IsValidScrollerState(MuiListviewScrollerState value)
+	{
+		if (value.Visible == MuiListCore.VisibleOff)
+			return value.First == MuiListCore.VisibleOff && value.MaxFirst == 0;
+		return value.First <= value.MaxFirst && value.MaxFirst <= value.Entries;
 	}
 
 	private static bool TryReadHorizontalScrollerState<TPlatform>(
@@ -3006,11 +4037,56 @@ public static class MuiListviewCore
 		out MuiListviewHorizontalScrollerState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadHorizontalScrollerStateAdmission(ref platform, state, obj,
+			out value, out var present)) return false;
+		return present;
+	}
+
+	// A published horizontal viewport projection is authoritative guest state.
+	// A non-NULL record that fails its cookie/field contract is malformed, not
+	// absence; a geometry pass must not free it and publish a replacement.
+	private static bool TryReadHorizontalScrollerStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewHorizontalScrollerState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
 		value = default;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			HorizontalScrollerStateKey, 0));
-		return MuiListviewHorizontalScrollerStateCodec.TryRead(ref platform,
-			block, out value);
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			HorizontalScrollerStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		if (!MuiListviewHorizontalScrollerStateCodec.TryRead(ref platform,
+			block, out value) || !IsValidHorizontalScrollerState(value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	// The horizontal projection is a bounded geometry/range record. Reject
+	// inverted or out-of-track rectangles and impossible child-scroll values
+	// before draw or pointer input turns them into coordinates. Content smaller
+	// than the viewport is legal (Always visibility), so its maximum remains
+	// zero rather than being treated as an error.
+	private static bool IsValidHorizontalScrollerState(
+		MuiListviewHorizontalScrollerState value)
+	{
+		if (value.TrackLeft > value.TrackRight ||
+			value.TrackTop > value.TrackBottom ||
+			value.ThumbLeft > value.ThumbRight ||
+			value.ThumbTop > value.ThumbBottom ||
+			value.ThumbLeft < value.TrackLeft ||
+			value.ThumbRight > value.TrackRight ||
+			value.ThumbTop < value.TrackTop ||
+			value.ThumbBottom > value.TrackBottom ||
+			value.ScrollX > value.MaxScrollX)
+			return false;
+		var expectedMax = value.ContentWidth > value.ViewWidth
+			? value.ContentWidth - value.ViewWidth : 0u;
+		return value.MaxScrollX == expectedMax;
 	}
 
 	private static void CopyHorizontalScrollerState(
@@ -3053,22 +4129,17 @@ public static class MuiListviewCore
 		value.ViewWidth = geometry.ViewWidth;
 		value.ScrollX = geometry.ScrollX;
 		value.MaxScrollX = geometry.MaxScrollX;
+		if (!TryReadHorizontalScrollerStateAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			HorizontalScrollerStateKey, 0));
-		if (MuiListviewHorizontalScrollerStateCodec.TryRead(ref platform, block,
-			out _))
+		if (present)
 		{
 			if (!MuiListviewHorizontalScrollerStateCodec.Write(ref platform, block,
 				value)) return false;
 		}
 		else
 		{
-			if (block.IsNotNull && platform.IsMapped(block,
-				MuiListviewHorizontalScrollerState.Size))
-			{
-				platform.Clear(block, MuiListviewHorizontalScrollerState.Size);
-				platform.Free(block, MuiListviewHorizontalScrollerState.Size);
-			}
 			block = MuiHeadlessMemory.Allocate(ref platform,
 				MuiListviewHorizontalScrollerState.Size);
 			if (block.IsNull) return false;
@@ -3094,6 +4165,12 @@ public static class MuiListviewCore
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		// A hidden child projection normally retires the composite geometry, but
+		// a malformed present record is still guest-owned state. Admit it before
+		// teardown so a visibility transition cannot silently free the record and
+		// make the next pass publish a replacement behind the caller's back.
+		if (!TryReadHorizontalScrollerStateAdmission(ref platform, state, obj,
+			out _, out var present) || !present) return;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			HorizontalScrollerStateKey, 0));
 		if (block.IsNotNull && platform.IsMapped(block,
@@ -3127,21 +4204,17 @@ public static class MuiListviewCore
 		value.Visible = visible;
 		value.First = first;
 		value.MaxFirst = maxFirst;
+		if (!TryReadScrollerStateAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			ScrollerStateKey, 0));
-		if (MuiListviewScrollerStateCodec.TryRead(ref platform, block, out _))
+		if (present)
 		{
 			if (!MuiListviewScrollerStateCodec.Write(ref platform, block, value))
 				return false;
 		}
 		else
 		{
-			if (block.IsNotNull && platform.IsMapped(block,
-				MuiListviewScrollerState.Size))
-			{
-				platform.Clear(block, MuiListviewScrollerState.Size);
-				platform.Free(block, MuiListviewScrollerState.Size);
-			}
 			block = MuiHeadlessMemory.Allocate(ref platform,
 				MuiListviewScrollerState.Size);
 			if (block.IsNull) return false;
@@ -3180,16 +4253,12 @@ public static class MuiListviewCore
 			RenderInfo, 0));
 		if (MuiDrawingRenderInfoCodec.TryRead(ref platform, value.RenderInfo,
 			out var info)) value.RastPort = info.RastPort;
+		if (!TryReadRenderStateAdmission(ref platform, state, obj, out _,
+			out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			RenderStateKey, 0));
-		if (MuiListviewRenderStateCodec.TryRead(ref platform, block, out _))
+		if (present)
 			return MuiListviewRenderStateCodec.Write(ref platform, block, value);
-		if (block.IsNotNull && platform.IsMapped(block,
-			MuiListviewRenderState.Size))
-		{
-			platform.Clear(block, MuiListviewRenderState.Size);
-			platform.Free(block, MuiListviewRenderState.Size);
-		}
 		block = MuiHeadlessMemory.Allocate(ref platform,
 			MuiListviewRenderState.Size);
 		if (block.IsNull) return false;
@@ -3209,23 +4278,30 @@ public static class MuiListviewCore
 		APTR state, APTR obj, out MuiListviewRenderState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!TryReadRenderState(ref platform, state, obj, out value) ||
-			value.RenderInfo.IsNull || value.RastPort.IsNull)
+		if (!TryReadRenderStateAdmission(ref platform, state, obj, out value,
+			out var present)) return false;
+		if (present)
 		{
-			value = default;
-			value.RenderInfo = APTR.FromPointer(Read(ref platform, state, obj,
-				RenderInfo, 0));
-			if (value.RenderInfo.IsNull) return false;
+			// Once the named render projection exists, even its valid pre-setup
+			// null pair is authoritative. Do not revive a raw Area alias here:
+			// draw consumers must either receive the admitted pair or no context.
+			if (value.RenderInfo.IsNull || value.RastPort.IsNull) return false;
 			if (!MuiDrawingRenderInfoCodec.TryRead(ref platform, value.RenderInfo,
-				out var fallbackInfo)) return false;
-			value.RastPort = fallbackInfo.RastPort;
-			return !value.RastPort.IsNull;
+				out var info) || info.RastPort.IsNull || info.RastPort.Raw !=
+				value.RastPort.Raw) return false;
+			return true;
 		}
-		if (value.RenderInfo.IsNull || value.RastPort.IsNull) return false;
+		// Before the first publication, the Area RenderInfo attribute is the
+		// only available source. Decode it once into the named record shape;
+		// steady-state consumers never use this fallback after publication.
+		value = default;
+		value.RenderInfo = APTR.FromPointer(Read(ref platform, state, obj,
+			RenderInfo, 0));
+		if (value.RenderInfo.IsNull) return false;
 		if (!MuiDrawingRenderInfoCodec.TryRead(ref platform, value.RenderInfo,
-			out var info) || info.RastPort.IsNull || info.RastPort.Raw !=
-			value.RastPort.Raw) return false;
-		return true;
+			out var fallbackInfo)) return false;
+		value.RastPort = fallbackInfo.RastPort;
+		return !value.RastPort.IsNull;
 	}
 
 	internal static bool TryGetRenderState<TPlatform>(ref TPlatform platform,
@@ -3237,12 +4313,37 @@ public static class MuiListviewCore
 		APTR state, APTR obj, out MuiListviewLayoutState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		value = default;
-		var block = APTR.FromPointer(Read(ref platform, state, obj,
-			LayoutStateKey, 0));
-		return MuiListviewLayoutStateCodec.TryRead(ref platform, block,
-			out value);
+		if (!TryReadLayoutStateAdmission(ref platform, state, obj, out value,
+			out var present)) return false;
+		return present;
 	}
+
+	// A published layout record is authoritative guest state. A non-NULL record
+	// that fails the cookie/field contract is malformed, not absence; geometry
+	// consumers must not bypass it through the raw Area record.
+	private static bool TryReadLayoutStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiListviewLayoutState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			LayoutStateKey, out var rawBlock)) return true;
+		var block = APTR.FromPointer(rawBlock);
+		present = block.IsNotNull;
+		if (!present) return true;
+		return MuiListviewLayoutStateCodec.TryRead(ref platform, block,
+			out value) && IsValidLayoutState(value);
+	}
+
+	// Layout receives signed coordinates, but dimensions are non-negative in
+	// the MUI layout contract. Keep the named row authoritative while rejecting
+	// impossible parent/child extents before geometry or pointer consumers turn
+	// them into coordinates.
+	private static bool IsValidLayoutState(MuiListviewLayoutState value) =>
+		value.Width >= 0 && value.Height >= 0 &&
+		value.ChildWidth >= 0 && value.ChildHeight >= 0;
 
 	private static bool PublishLayoutState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, APTR child)
@@ -3263,18 +4364,14 @@ public static class MuiListviewCore
 		value.ChildLeft = childGeometry.Left;
 		value.ChildTop = childGeometry.Top;
 		value.ChildWidth = childGeometry.Width;
-		value.ChildHeight = childGeometry.Height;
+	value.ChildHeight = childGeometry.Height;
 	}
+		if (!TryReadLayoutStateAdmission(ref platform, state, obj, out _,
+			out var present)) return false;
 		var block = APTR.FromPointer(Read(ref platform, state, obj,
 			LayoutStateKey, 0));
-		if (MuiListviewLayoutStateCodec.TryRead(ref platform, block, out _))
+		if (present)
 			return MuiListviewLayoutStateCodec.Write(ref platform, block, value);
-		if (block.IsNotNull && platform.IsMapped(block,
-			MuiListviewLayoutState.Size))
-		{
-			platform.Clear(block, MuiListviewLayoutState.Size);
-			platform.Free(block, MuiListviewLayoutState.Size);
-		}
 		block = MuiHeadlessMemory.Allocate(ref platform,
 			MuiListviewLayoutState.Size);
 		if (block.IsNull) return false;
@@ -3297,18 +4394,31 @@ public static class MuiListviewCore
 
 	private static uint Read<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, uint attribute, uint fallback)
-		where TPlatform : struct, IMuiHeadlessPlatform =>
-		MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj, attribute,
-		out var value) ? value : fallback;
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		// The public getter intentionally rejects Listview [I..] policy fields,
+		// but construction and input code still need their raw initialization
+		// values. Keep that internal bootstrap read explicit and struct-safe.
+		if (IsInitializeOnlyAttribute(attribute) &&
+			MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+				attribute, out var raw)) return raw;
+		return MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj,
+			attribute, out var value) ? value : fallback;
+	}
 
 	private static bool BindChildRenderInfo<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, APTR child)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
-		var hasTypedRender = TryReadRenderState(ref platform, state, obj,
-			out var renderState) && renderState.RenderInfo.IsNotNull;
-		var renderInfo = hasTypedRender ? renderState.RenderInfo :
-			APTR.FromPointer(Read(ref platform, state, obj, RenderInfo, 0));
+		if (!TryReadRenderStateAdmission(ref platform, state, obj,
+			out var renderState, out var present)) return false;
+		// Once the parent has published its named render projection, its
+		// complete record is authoritative for child binding too. In particular,
+		// a valid null pair means the parent is not renderable yet; do not revive
+		// a raw Area alias and hand stale context to the child.
+		var renderInfo = present
+			? renderState.RenderInfo
+			: APTR.FromPointer(Read(ref platform, state, obj, RenderInfo, 0));
 		if (renderInfo.IsNull) return true;
 		return MuiAreaLayoutCore.Setup(ref platform, state, child, renderInfo);
 	}
@@ -3323,6 +4433,9 @@ public static class MuiListviewCore
 		APTR obj, uint attribute, uint value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (IsInitializeOnlyAttribute(attribute) &&
+			MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+				attribute, out _)) return true;
 		if (!MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj, attribute,
 			out _))
 			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,

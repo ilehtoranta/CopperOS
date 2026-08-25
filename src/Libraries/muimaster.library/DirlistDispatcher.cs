@@ -110,8 +110,11 @@ public static class MuiDirlistDispatcher
 			case MuiDirlistMessageCodec.NoNotifySet:
 				if (!MuiDirlistMessageCodec.TryReadSet(ref platform, message, method,
 					out var setPacket)) return true;
-				result = MuiDirlistCore.SetAttribute(ref platform, state, obj,
-					setPacket.Attribute, setPacket.Value) ? 1u : 0u;
+				result = (cls == MuiCollectionClass.Volumelist
+					? MuiVolumelistCore.SetRuntimeAttribute(ref platform, state, obj,
+						setPacket.Attribute, setPacket.Value)
+					: MuiDirlistCore.SetRuntimeAttribute(ref platform, state, obj,
+						setPacket.Attribute, setPacket.Value)) ? 1u : 0u;
 				return true;
 			case MuiDirlistMessageCodec.ListGetEntry:
 				if (!MuiDirlistMessageCodec.TryReadGetEntry(ref platform, message,

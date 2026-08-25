@@ -129,3 +129,15 @@ internal static class MuiSliderPresentationStateRecordCodec
 			address, MuiSliderPresentationStateField.Quiet, value.Quiet);
 	}
 }
+
+// Keep the wire record lossless for malformed-state diagnostics. Both
+// presentation fields are MorphOS BOOL projections and must be canonical
+// before Slider layout, input, or drawing consumers use them.
+internal static class MuiSliderPresentationStateValidation
+{
+	internal static bool IsValidRecord(MuiSliderPresentationStateRecord value) =>
+		value.Horizontal <= 1 && value.Quiet <= 1;
+
+	internal static bool IsValidState(MuiSliderPresentationState value) =>
+		value.Horizontal <= 1 && value.Quiet <= 1;
+}

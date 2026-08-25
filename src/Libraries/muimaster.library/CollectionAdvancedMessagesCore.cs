@@ -16,6 +16,7 @@ internal enum MuiCollectionAdvancedPacketKind : byte
 	InsertSingle,
 	Insert,
 	Position,
+	Redraw,
 	Pointer,
 	Pair,
 	CreateImage,
@@ -25,6 +26,8 @@ internal enum MuiCollectionAdvancedField : byte
 {
 	MethodId,
 	Entry,
+	Entries,
+	Count,
 	Position,
 	Column,
 	Pointer,
@@ -60,13 +63,18 @@ internal static class MuiCollectionAdvancedFieldCursorCodec
 				break;
 			case MuiCollectionAdvancedPacketKind.Insert:
 				if (field == MuiCollectionAdvancedField.MethodId) { offset = 0; return true; }
-				if (field == MuiCollectionAdvancedField.Entry) { offset = 4; return true; }
-				if (field == MuiCollectionAdvancedField.Position) { offset = 8; return true; }
-				if (field == MuiCollectionAdvancedField.Column) { offset = 12; return true; }
+				if (field == MuiCollectionAdvancedField.Entries) { offset = 4; return true; }
+				if (field == MuiCollectionAdvancedField.Count) { offset = 8; return true; }
+				if (field == MuiCollectionAdvancedField.Position) { offset = 12; return true; }
 				break;
 			case MuiCollectionAdvancedPacketKind.Position:
 				if (field == MuiCollectionAdvancedField.MethodId) { offset = 0; return true; }
 				if (field == MuiCollectionAdvancedField.Position) { offset = 4; return true; }
+				break;
+			case MuiCollectionAdvancedPacketKind.Redraw:
+				if (field == MuiCollectionAdvancedField.MethodId) { offset = 0; return true; }
+				if (field == MuiCollectionAdvancedField.Position) { offset = 4; return true; }
+				if (field == MuiCollectionAdvancedField.Entry) { offset = 8; return true; }
 				break;
 			case MuiCollectionAdvancedPacketKind.Pointer:
 				if (field == MuiCollectionAdvancedField.MethodId) { offset = 0; return true; }
@@ -144,13 +152,27 @@ internal static class MuiCollectionAdvancedMessageCodec
 	internal const uint DeleteImage = 0x80420F58u;
 	internal const uint FloattextAppend = 0x8042A221u;
 
-	private static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint method)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(
 			ref platform, message, MuiCollectionAdvancedPacketKind.Method,
 			MuiCollectionAdvancedField.MethodId, out method);
+	}
+
+	// Keep the public packet seam as a named collection method record. Native
+	// packet readers use the scalar adapter above only for selector admission;
+	// operation payloads remain named value-type records.
+	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		uint method;
+		if (!TryReadMethodIdValue(ref platform, message, out method)) return false;
+		packet.MethodId = method;
+		return true;
 	}
 
 	private static bool TryWriteMethodId<TPlatform>(ref TPlatform platform,
@@ -170,7 +192,7 @@ internal static class MuiCollectionAdvancedMessageCodec
 		packet = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionInsertSingleMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var method) ||
+			!TryReadMethodIdValue(ref platform, message, out var method) ||
 			method != InsertSingle) return false;
 		packet.MethodId = method;
 		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
@@ -205,22 +227,22 @@ internal static class MuiCollectionAdvancedMessageCodec
 		packet = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionInsertMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var method) ||
+			!TryReadMethodIdValue(ref platform, message, out var method) ||
 			method != Insert) return false;
 		packet.MethodId = method;
 		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionAdvancedPacketKind.Insert,
-			MuiCollectionAdvancedField.Entry, out packet.Entry) &&
+			MuiCollectionAdvancedField.Entries, out packet.Entries) &&
 			MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
 				message, MuiCollectionAdvancedPacketKind.Insert,
-				MuiCollectionAdvancedField.Position, out packet.Position) &&
+				MuiCollectionAdvancedField.Count, out packet.Count) &&
 			MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
 				message, MuiCollectionAdvancedPacketKind.Insert,
-				MuiCollectionAdvancedField.Column, out packet.Column);
+				MuiCollectionAdvancedField.Position, out packet.Position);
 	}
 
 	internal static bool WriteInsert<TPlatform>(ref TPlatform platform,
-		APTR message, uint entry, uint position, uint column)
+		APTR message, uint entries, uint count, uint position)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (message.IsNull || !platform.IsMapped(message,
@@ -230,13 +252,13 @@ internal static class MuiCollectionAdvancedMessageCodec
 			MuiCollectionAdvancedField.MethodId, Insert) &&
 			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
 				message, MuiCollectionAdvancedPacketKind.Insert,
-				MuiCollectionAdvancedField.Entry, entry) &&
+				MuiCollectionAdvancedField.Entries, entries) &&
 			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
 				message, MuiCollectionAdvancedPacketKind.Insert,
-				MuiCollectionAdvancedField.Position, position) &&
+				MuiCollectionAdvancedField.Count, count) &&
 			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
 				message, MuiCollectionAdvancedPacketKind.Insert,
-				MuiCollectionAdvancedField.Column, column);
+				MuiCollectionAdvancedField.Position, position);
 	}
 
 	internal static bool TryReadPosition<TPlatform>(ref TPlatform platform,
@@ -246,7 +268,7 @@ internal static class MuiCollectionAdvancedMessageCodec
 		packet = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionPositionMessage.Size) || !IsPositionMethod(method) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
+			!TryReadMethodIdValue(ref platform, message, out var header) ||
 			header != method) return false;
 		packet.MethodId = header;
 		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
@@ -266,7 +288,42 @@ internal static class MuiCollectionAdvancedMessageCodec
 			MuiCollectionAdvancedField.MethodId, method) &&
 			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
 				message, MuiCollectionAdvancedPacketKind.Position,
-				MuiCollectionAdvancedField.Position, position);
+			MuiCollectionAdvancedField.Position, position);
+	}
+
+	internal static bool TryReadRedraw<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionRedrawMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (message.IsNull || !platform.IsMapped(message,
+			MuiCollectionRedrawMessage.Size) ||
+			!TryReadMethodIdValue(ref platform, message, out var method) ||
+			method != Redraw) return false;
+		packet.MethodId = method;
+		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
+			message, MuiCollectionAdvancedPacketKind.Redraw,
+			MuiCollectionAdvancedField.Position, out packet.Position) &&
+			MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
+				message, MuiCollectionAdvancedPacketKind.Redraw,
+				MuiCollectionAdvancedField.Entry, out packet.Entry);
+	}
+
+	internal static bool WriteRedraw<TPlatform>(ref TPlatform platform,
+		APTR message, uint position, uint entry)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (message.IsNull || !platform.IsMapped(message,
+			MuiCollectionRedrawMessage.Size)) return false;
+		return MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
+			message, MuiCollectionAdvancedPacketKind.Redraw,
+			MuiCollectionAdvancedField.MethodId, Redraw) &&
+			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
+				message, MuiCollectionAdvancedPacketKind.Redraw,
+				MuiCollectionAdvancedField.Position, position) &&
+			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
+				message, MuiCollectionAdvancedPacketKind.Redraw,
+				MuiCollectionAdvancedField.Entry, entry);
 	}
 
 	internal static bool TryReadPointer<TPlatform>(ref TPlatform platform,
@@ -276,7 +333,7 @@ internal static class MuiCollectionAdvancedMessageCodec
 		packet = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionPointerMessage.Size) || !IsPointerMethod(method) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
+			!TryReadMethodIdValue(ref platform, message, out var header) ||
 			header != method) return false;
 		packet.MethodId = header;
 		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
@@ -306,7 +363,7 @@ internal static class MuiCollectionAdvancedMessageCodec
 		packet = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionPairMessage.Size) || !IsPairMethod(method) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
+			!TryReadMethodIdValue(ref platform, message, out var header) ||
 			header != method) return false;
 		packet.MethodId = header;
 		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
@@ -341,7 +398,7 @@ internal static class MuiCollectionAdvancedMessageCodec
 		packet = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionCreateImageMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var method) ||
+			!TryReadMethodIdValue(ref platform, message, out var method) ||
 			method != CreateImage) return false;
 		packet.MethodId = method;
 		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,

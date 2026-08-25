@@ -82,9 +82,10 @@ public sealed class MuiMiscSpecialistTests
 		expected.PageCount = 3;
 		expected.ActivePage = 2;
 		expected.PageSequence = 9;
-		expected.Position = MuiMiscAttributes.Title_Position_Top;
+		expected.Position = unchecked((int)MuiMiscAttributes.Title_Position_Top);
 		expected.EventPriority = 4;
 		expected.OnLastClose = 1;
+		expected.Clickable = -5;
 		Assert.True(MuiMiscTitleStateCodec.Write(ref p, address, expected));
 		Assert.True(MuiMiscTitleStateCodec.TryRead(ref p, address,
 			out var actual));
@@ -95,6 +96,7 @@ public sealed class MuiMiscSpecialistTests
 		Assert.Equal(expected.Position, actual.Position);
 		Assert.Equal(expected.EventPriority, actual.EventPriority);
 		Assert.Equal(expected.OnLastClose, actual.OnLastClose);
+		Assert.Equal(expected.Clickable, actual.Clickable);
 		Assert.False(MuiMiscTitleStateCodec.TryRead(ref p,
 			APTR.FromPointer(0x50000), out _));
 	}
@@ -347,6 +349,10 @@ public sealed class MuiMiscSpecialistTests
 	{
 		var cursor = default(MuiMiscStateCursor);
 		cursor.Instance = APTR.FromPointer(0x2000);
+		cursor.Region = MuiMiscStateRegion.KeyadjustPolicy;
+		Assert.True(MuiMiscStateCursorCodec.TryGetAddress(cursor,
+			out var keyadjustPolicyAddress));
+		Assert.Equal(APTR.FromPointer(0x20B8), keyadjustPolicyAddress);
 		cursor.Region = MuiMiscStateRegion.Title;
 		Assert.True(MuiMiscStateCursorCodec.TryGetAddress(cursor,
 			out var address));
@@ -443,7 +449,7 @@ public sealed class MuiMiscSpecialistTests
 	}
 
 	[Fact]
-	public void KeyadjustAllowAndForcePoliciesAreIsg()
+	public void KeyadjustAllowPoliciesAreBoolAndForceKeyCodeIsUlong()
 	{
 		var p = NewPlatform();
 		CreateNamed(ref p, "Keyadjust.mui");
@@ -451,7 +457,41 @@ public sealed class MuiMiscSpecialistTests
 		AssertBoolIsg(ref p, MuiMiscAttributes.Keyadjust_AllowDoubleClick);
 		AssertBoolIsg(ref p, MuiMiscAttributes.Keyadjust_AllowTripleClick);
 		AssertBoolIsg(ref p, MuiMiscAttributes.Keyadjust_AllowMouseEvents);
-		AssertBoolIsg(ref p, MuiMiscAttributes.Keyadjust_ForceKeyCode);
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_ForceKeyCode, 0x12345678u,
+			false, true, out var changed));
+		Assert.True(changed);
+		Assert.True(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_ForceKeyCode, out var forceKeyCode));
+		Assert.Equal(0x12345678u, forceKeyCode);
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_ForceKeyCode, 0xFFFFFFFFu,
+			false, true, out changed));
+		Assert.True(changed);
+		Assert.True(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_ForceKeyCode, out forceKeyCode));
+		Assert.Equal(0xFFFFFFFFu, forceKeyCode);
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_ForceKeyCode, 0xFFFFFFFFu,
+			false, true, out changed));
+		Assert.False(changed);
+	}
+
+	[Fact]
+	public void KeyadjustForceKeyCodeRetainsNamedUlongState()
+	{
+		var p = NewPlatform();
+		CreateNamed(ref p, "Keyadjust.mui");
+		Assert.True(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_ForceKeyCode, out var initial));
+		Assert.Equal(0u, initial);
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_ForceKeyCode, 0x80000001u,
+			false, true, out var changed));
+		Assert.True(changed);
+		Assert.True(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_ForceKeyCode, out var stored));
+		Assert.Equal(0x80000001u, stored);
 	}
 
 	[Fact]
@@ -479,6 +519,24 @@ public sealed class MuiMiscSpecialistTests
 		MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
 			MuiMiscAttributes.Disabled, 1, false, false, out _);
 		Assert.False(MuiMiscSpecialistCore.RecordInput(ref p, Instance, Text, false, 1, false));
+	}
+
+	[Fact]
+	public void KeyadjustNamedInputRecordUsesFixedWidthPolicyFields()
+	{
+		var p = NewPlatform();
+		CreateNamed(ref p, "Keyadjust.mui");
+		p.WriteCString(Text, "shift a");
+		var input = default(MuiKeyadjustInputRecord);
+		input.KeyText = Text;
+		input.IsMouse = 0;
+		input.ClickCount = 1;
+		input.MultiKey = 0;
+		Assert.True(MuiMiscSpecialistCore.RecordInput(ref p, Instance, input));
+		Assert.True(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_Key, out var stored));
+		Assert.NotEqual(0u, stored);
+		Assert.Equal("shift a", ReadCString(ref p, APTR.FromPointer(stored)));
 	}
 
 	// ---- Argstring -----------------------------------------------------------
@@ -514,9 +572,13 @@ public sealed class MuiMiscSpecialistTests
 		Assert.False(MuiMiscSpecialistCore.AboutmuiOpen(ref p, Instance));
 		MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
 			MuiMiscAttributes.Aboutmui_Application, App.Raw, true, false, out _);
-		MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
-			MuiMiscAttributes.Aboutmui_Application, out var app);
-		Assert.Equal(App.Raw, app);
+		Assert.False(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Aboutmui_Application, out _));
+		Assert.False(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Aboutmui_Application, Win.Raw, false, true,
+			out _));
+		Assert.False(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Aboutmui_Application, out _));
 		Assert.True(MuiMiscSpecialistCore.AboutmuiOpen(ref p, Instance));
 		Assert.False(MuiMiscSpecialistCore.AboutmuiOpen(ref p, Instance)); // no double open
 		Assert.True(MuiMiscSpecialistCore.AboutmuiIsOpen(ref p, Instance));
@@ -526,6 +588,21 @@ public sealed class MuiMiscSpecialistTests
 		// Window-derived: no MUIA_Disabled state.
 		Assert.False(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
 			MuiMiscAttributes.Disabled, out _));
+	}
+
+	[Fact]
+	public void AboutmuiApplicationIsInitializeOnlyWithoutGetter()
+	{
+		var p = NewPlatform();
+		CreateNamed(ref p, "Aboutmui.mui");
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Aboutmui_Application, App.Raw, true, false,
+			out _));
+		Assert.False(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Aboutmui_Application, Win.Raw, false, true,
+			out _));
+		Assert.False(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Aboutmui_Application, out _));
 	}
 
 	// ---- Panel ---------------------------------------------------------------
@@ -591,6 +668,66 @@ public sealed class MuiMiscSpecialistTests
 			MuiMiscAttributes.Title_OnLastClose, 1, false, true, out _));
 		Assert.False(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
 			MuiMiscAttributes.Title_OnLastClose, 2, false, true, out _));
+		// Title EventHandlerPriority is a signed LONG-sized value; preserve a
+		// negative priority through the ULONG-shaped public ingress.
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Title_EventHandlerPriority, unchecked((uint)-7),
+			true, true, out _));
+		Assert.False(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Title_Position, unchecked((uint)-1),
+			false, true, out _));
+	}
+
+	[Fact]
+	public void TitleSignedPolicyStatePreservesNegativePriority()
+	{
+		var p = NewPlatform();
+		CreateNamed(ref p, "Title.mui");
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Title_EventHandlerPriority, unchecked((uint)-128),
+			true, true, out var changed));
+		Assert.True(changed);
+		Assert.False(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Title_EventHandlerPriority, out _));
+	}
+
+	[Fact]
+	public void TitleSignedAccessModesMatchMorphosContract()
+	{
+		var p = NewPlatform();
+		CreateNamed(ref p, "Title.mui");
+		Assert.False(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Title_EventHandlerPriority, unchecked((uint)-1),
+			false, true, out _));
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Title_EventHandlerPriority, unchecked((uint)-1),
+			true, true, out _));
+		Assert.False(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Title_EventHandlerPriority, out _));
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Title_OnLastClose, 1, false, true, out _));
+		Assert.False(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Title_OnLastClose, out _));
+	}
+
+	[Fact]
+	public void TitleClickableIsSignedInitializeOnlyWithoutGetter()
+	{
+		var p = NewPlatform();
+		CreateNamed(ref p, "Title.mui");
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Title_Clickable, unchecked((uint)-1), true,
+			true, out var changed));
+		Assert.True(changed);
+		Assert.False(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Title_Clickable, 0, false, true, out _));
+		Assert.False(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Title_Clickable, out _));
+		var address = APTR.FromPointer(Instance.Raw +
+			unchecked((uint)MuiMiscSpecialistLayout.TitleStateOffset));
+		Assert.True(MuiMiscTitleStateCodec.TryRead(ref p, address,
+			out var state));
+		Assert.Equal(-1, state.Clickable);
 	}
 
 	[Fact]
@@ -768,6 +905,41 @@ public sealed class MuiMiscSpecialistTests
 		Assert.Equal(1u, save);
 		Assert.False(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
 			MuiMiscAttributes.Filepanel_DoSaveMode, 0, false, true, out _));
+	}
+
+	[Fact]
+	public void FilepanelAcceptAndRejectPatternsAreInitializeOnly()
+	{
+		var p = NewPlatform();
+		CreateNamed(ref p, "Filepanel.mui");
+		p.WriteCString(Text, "#?.txt");
+		p.WriteCString(Text2, "#?.lha");
+
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Filepanel_AcceptPattern, Text.Raw, true, false,
+			out _));
+		Assert.True(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Filepanel_AcceptPattern, out var accept));
+		Assert.Equal("#?.txt", ReadCString(ref p, APTR.FromPointer(accept)));
+		Assert.False(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Filepanel_AcceptPattern, Text2.Raw, false, true,
+			out _));
+		Assert.True(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Filepanel_AcceptPattern, out accept));
+		Assert.Equal("#?.txt", ReadCString(ref p, APTR.FromPointer(accept)));
+
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Filepanel_RejectPattern, Text2.Raw, true, false,
+			out _));
+		Assert.True(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Filepanel_RejectPattern, out var reject));
+		Assert.Equal("#?.lha", ReadCString(ref p, APTR.FromPointer(reject)));
+		Assert.False(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Filepanel_RejectPattern, Text.Raw, false, true,
+			out _));
+		Assert.True(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Filepanel_RejectPattern, out reject));
+		Assert.Equal("#?.lha", ReadCString(ref p, APTR.FromPointer(reject)));
 	}
 
 	[Fact]
@@ -1207,6 +1379,9 @@ public sealed class MuiMiscSpecialistTests
 		Assert.True(MuiMiscSpecialistMessageCodec.TryReadMethodId(ref p, Packet,
 			out var header));
 		Assert.Equal(MuiMiscAttributes.Setup, header.MethodId);
+		Assert.True(MuiMiscSpecialistMessageCodec.TryReadMethodIdValue(ref p,
+			Packet, out var methodId));
+		Assert.Equal(MuiMiscAttributes.Setup, methodId);
 		Assert.True(MuiMiscSpecialistMessageCodec.TryReadLifecycle(ref p, Packet,
 			MuiMiscAttributes.Setup, out var lifecycle));
 		Assert.Equal(MuiMiscAttributes.Setup, lifecycle.MethodId);
@@ -1268,6 +1443,133 @@ public sealed class MuiMiscSpecialistTests
 			MuiMiscSpecialistField.MethodId, 0xDEADBEEFu));
 		Assert.False(MuiMiscSpecialistMessageCodec.TryReadGet(ref p, Packet,
 			out _));
+	}
+
+	[Fact]
+	public void MiscHandleInputUsesNamedMorphosPacketAndSignedMuiKey()
+	{
+		var p = NewPlatform();
+		Assert.True(MuiMiscSpecialistMessageCodec.WriteHandleInput(ref p, Packet,
+			0x12345678u, -2));
+		Assert.True(MuiMiscSpecialistDispatcher.TryReadHandleInputPacket(ref p,
+			Packet, out var packet));
+		Assert.Equal(MuiMiscSpecialistMessageCodec.HandleInput, packet.MethodId);
+		Assert.Equal(0x12345678u, packet.IntuiMessage);
+		Assert.Equal(-2, packet.MuiKey);
+
+		p.WriteUInt32(Packet, 0, 0xDEADBEEFu);
+		Assert.False(MuiMiscSpecialistMessageCodec.TryReadHandleInput(ref p,
+			Packet, out _));
+		Assert.False(MuiMiscSpecialistMessageCodec.TryReadHandleInput(ref p,
+			APTR.FromPointer(0x40FFFu), out _));
+	}
+
+	[Fact]
+	public void KeyadjustHandleInputDispatchStoresNamedKeyboardKey()
+	{
+		var p = NewPlatform();
+		Assert.Equal(MuiMiscSpecialistClass.Keyadjust,
+			CreateNamed(ref p, "Keyadjust.mui"));
+		Assert.True(MuiMiscSpecialistMessageCodec.WriteHandleInput(ref p, Packet,
+			0, (int)'A'));
+
+		Assert.Equal(1u, MuiMiscSpecialistDispatcher.Dispatch(ref p, Instance,
+			Packet));
+		Assert.True(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_Key, out var stored));
+		Assert.Equal("A", ReadCString(ref p, APTR.FromPointer(stored)));
+	}
+
+	[Fact]
+	public void KeyadjustHandleInputDispatchUsesPlatformTranslationForRawEvent()
+	{
+		var p = NewPlatform();
+		Assert.Equal(MuiMiscSpecialistClass.Keyadjust,
+			CreateNamed(ref p, "Keyadjust.mui"));
+		var intuiMessage = APTR.FromPointer(0x3000);
+		p.WriteUInt32(intuiMessage, 20, 0x00000400u);
+		p.WriteUInt16(intuiMessage, 24, (ushort)'b');
+		Assert.True(MuiMiscSpecialistMessageCodec.WriteHandleInput(ref p, Packet,
+			intuiMessage.Raw, -1));
+
+		Assert.Equal(1u, MuiMiscSpecialistDispatcher.Dispatch(ref p, Instance,
+			Packet));
+		Assert.True(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_Key, out var stored));
+		Assert.Equal("b", ReadCString(ref p, APTR.FromPointer(stored)));
+	}
+
+	[Fact]
+	public void KeyadjustHandleInputDispatchUsesNamedTextSample()
+	{
+		var p = NewPlatform();
+		Assert.Equal(MuiMiscSpecialistClass.Keyadjust,
+			CreateNamed(ref p, "Keyadjust.mui"));
+		var intuiMessage = APTR.FromPointer(0x3100);
+		p.KeyadjustTextInputSampleAvailable = true;
+		p.KeyadjustTextInputSampleCode = (int)'c';
+		Assert.True(MuiMiscSpecialistMessageCodec.WriteHandleInput(ref p, Packet,
+			intuiMessage.Raw, -1));
+
+		Assert.Equal(1u, MuiMiscSpecialistDispatcher.Dispatch(ref p, Instance,
+			Packet));
+		Assert.True(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_Key, out var stored));
+		Assert.Equal("c", ReadCString(ref p, APTR.FromPointer(stored)));
+	}
+
+	[Fact]
+	public void KeyadjustHandleInputRejectsMutatedSampleIdentity()
+	{
+		var metadata = NewPlatform();
+		Assert.Equal(MuiMiscSpecialistClass.Keyadjust,
+			CreateNamed(ref metadata, "Keyadjust.mui"));
+		metadata.KeyadjustInputSampleAvailable = true;
+		metadata.KeyadjustInputSampleMutatesIdentity = true;
+		Assert.True(MuiMiscSpecialistMessageCodec.WriteHandleInput(ref metadata,
+			Packet, 0, (int)'M'));
+		Assert.Equal(0u, MuiMiscSpecialistDispatcher.Dispatch(ref metadata,
+			Instance, Packet));
+
+		var text = NewPlatform();
+		Assert.Equal(MuiMiscSpecialistClass.Keyadjust,
+			CreateNamed(ref text, "Keyadjust.mui"));
+		text.KeyadjustTextInputSampleAvailable = true;
+		text.KeyadjustTextInputSampleCode = (int)'N';
+		text.KeyadjustTextInputSampleMutatesIdentity = true;
+		Assert.True(MuiMiscSpecialistMessageCodec.WriteHandleInput(ref text,
+			Packet, 0x3200u, -1));
+		Assert.Equal(0u, MuiMiscSpecialistDispatcher.Dispatch(ref text,
+			Instance, Packet));
+	}
+
+	[Fact]
+	public void KeyadjustHandleInputConsumesNamedPlatformPolicySample()
+	{
+		var p = NewPlatform();
+		Assert.Equal(MuiMiscSpecialistClass.Keyadjust,
+			CreateNamed(ref p, "Keyadjust.mui"));
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_AllowMouseEvents, 1, true, false,
+			out _));
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_AllowTripleClick, 1, true, false,
+			out _));
+		Assert.True(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_AllowMultipleKeys, 1, true, false,
+			out _));
+		p.KeyadjustInputSampleAvailable = true;
+		p.KeyadjustInputIsMouse = 1;
+		p.KeyadjustInputClickCount = 3;
+		p.KeyadjustInputMultiKey = 1;
+		Assert.True(MuiMiscSpecialistMessageCodec.WriteHandleInput(ref p, Packet,
+			0, (int)'M'));
+
+		Assert.Equal(1u, MuiMiscSpecialistDispatcher.Dispatch(ref p, Instance,
+			Packet));
+		Assert.True(MuiMiscSpecialistCore.GetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_Key, out var stored));
+		Assert.Equal("M", ReadCString(ref p, APTR.FromPointer(stored)));
 	}
 
 	[Fact]

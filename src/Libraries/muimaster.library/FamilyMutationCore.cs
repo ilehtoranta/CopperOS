@@ -191,11 +191,24 @@ internal static class MuiFamilyMutationMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Native qualification keeps selector admission scalar while the
+	// dispatcher-facing overload above retains the named value-type record.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiFamilyMethodMessage.Size)) return false;
 		return MuiFamilyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiFamilyPacketKind.Method, MuiFamilyPacketField.MethodId,
-			out packet.MethodId);
+			out methodId);
 	}
 
 	internal static bool TryReadChild<TPlatform>(ref TPlatform platform,
@@ -208,9 +221,9 @@ internal static class MuiFamilyMutationMessageCodec
 			(method != MuiFamilyMutationCore.AddHeadMethod &&
 				method != MuiFamilyMutationCore.AddTailMethod &&
 				method != MuiFamilyMutationCore.RemoveMethod) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != method) return false;
-		packet.MethodId = header.MethodId;
+			!TryReadMethodIdValue(ref platform, message, out var methodId) ||
+			methodId != method) return false;
+		packet.MethodId = methodId;
 		if (!MuiFamilyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiFamilyPacketKind.Child, MuiFamilyPacketField.Object,
 			out var rawObject)) return false;
@@ -242,8 +255,8 @@ internal static class MuiFamilyMutationMessageCodec
 		packet = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiFamilyInsertMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != MuiFamilyMutationCore.InsertMethod)
+			!TryReadMethodIdValue(ref platform, message, out var methodId) ||
+			methodId != MuiFamilyMutationCore.InsertMethod)
 			return false;
 		if (!MuiFamilyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiFamilyPacketKind.Insert, MuiFamilyPacketField.Object,
@@ -252,7 +265,7 @@ internal static class MuiFamilyMutationMessageCodec
 				message, MuiFamilyPacketKind.Insert,
 				MuiFamilyPacketField.Predecessor, out var rawPredecessor))
 			return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		packet.Object = APTR.FromPointer(rawObject);
 		packet.Predecessor = APTR.FromPointer(rawPredecessor);
 		return true;
@@ -282,13 +295,13 @@ internal static class MuiFamilyMutationMessageCodec
 		packet = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiFamilyTransferMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != MuiFamilyMutationCore.TransferMethod)
+			!TryReadMethodIdValue(ref platform, message, out var methodId) ||
+			methodId != MuiFamilyMutationCore.TransferMethod)
 			return false;
 		if (!MuiFamilyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiFamilyPacketKind.Transfer, MuiFamilyPacketField.Family,
 			out var rawFamily)) return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		packet.Family = APTR.FromPointer(rawFamily);
 		return true;
 	}
@@ -315,13 +328,13 @@ internal static class MuiFamilyMutationMessageCodec
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiFamilyReorderMessage.MinimumSize) ||
 			message.Raw > uint.MaxValue - MuiFamilyReorderMessage.ArrayOffset ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != MuiFamilyMutationCore.ReorderMethod)
+			!TryReadMethodIdValue(ref platform, message, out var methodId) ||
+			methodId != MuiFamilyMutationCore.ReorderMethod)
 			return false;
 		if (!MuiFamilyPacketFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiFamilyPacketKind.Reorder, MuiFamilyPacketField.After,
 			out var rawAfter)) return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		packet.After = APTR.FromPointer(rawAfter);
 		return true;
 	}
@@ -334,10 +347,10 @@ internal static class MuiFamilyMutationMessageCodec
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiFamilySortMessage.MinimumSize) ||
 			message.Raw > uint.MaxValue - MuiFamilySortMessage.ArrayOffset ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != MuiFamilyMutationCore.SortMethod)
+			!TryReadMethodIdValue(ref platform, message, out var methodId) ||
+			methodId != MuiFamilyMutationCore.SortMethod)
 			return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		return true;
 	}
 
@@ -698,9 +711,9 @@ public static class MuiFamilyMutationCore
 		APTR state, APTR family, APTR message)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiFamilyMutationMessageCodec.TryReadMethodId(ref platform, message,
-			out var methodHeader)) return 0;
-		var method = methodHeader.MethodId;
+		uint method;
+		if (!MuiFamilyMutationMessageCodec.TryReadMethodIdValue(ref platform,
+			message, out method)) return 0;
 		if (!TryRead(ref platform, message, method, out var packet)) return 0;
 		if (method == RemoveMethod)
 			return MuiFamilyCore.Remove(ref platform, state, family,
@@ -737,9 +750,9 @@ public static class MuiFamilyMutationCore
 		APTR list, APTR node, APTR message)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiFamilyMutationMessageCodec.TryReadMethodId(ref platform, message,
-			out var methodHeader)) return 0;
-		var method = methodHeader.MethodId;
+		uint method;
+		if (!MuiFamilyMutationMessageCodec.TryReadMethodIdValue(ref platform,
+			message, out method)) return 0;
 		if (!TryRead(ref platform, message, method, out var packet) ||
 			list.IsNull || node.IsNull || !platform.IsMapped(list,
 				MuiFamilyMutationListRecord.Size) || !platform.IsMapped(node,

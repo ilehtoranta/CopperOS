@@ -9,9 +9,12 @@ public sealed class MuiGroupPageTests
 	private const uint PageMode = 0x80421A5F;
 	private const uint ActivePage = 0x80424199;
 	private const uint LeftEdge = 0x8042BEC6;
+	private const uint TopEdge = 0x8042509B;
 	private const uint Width = 0x8042B59C;
+	private const uint Height = 0x80423237;
 	private const uint FixWidth = 0x8042A3F1;
 	private const uint FixHeight = 0x8042A92B;
+	private const uint ShowMe = 0x80429BA8;
 
 	[Fact]
 	public void ActivePageSelectorsNormalizeAndDrivePageLayout()
@@ -40,8 +43,8 @@ public sealed class MuiGroupPageTests
 		for (var index = 0; index < children.Length; index++)
 		{
 			var child = children[index];
-			Assert.Equal(index == 0 ? 80u : 0u, Get(ref platform, child, Width));
-			Assert.Equal(8u, Get(ref platform, child, LeftEdge));
+			Assert.Equal(index == 0 ? 10u : 0u, Get(ref platform, child, Width));
+			Assert.Equal(index == 0 ? 43u : 8u, Get(ref platform, child, LeftEdge));
 		}
 	}
 
@@ -87,6 +90,50 @@ public sealed class MuiGroupPageTests
 		Assert.True(MuiGuestUlongStorageCodec.TryRead(ref platform, storage,
 			out var stored));
 		Assert.Equal(3u, stored.Value);
+	}
+
+	[Fact]
+	public void HiddenActivePageKeepsSelectionButReceivesZeroAreaGeometry()
+	{
+		var platform = CreatePageGroup(out var group, out var children);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, group,
+			PageMode, 1, false));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, group,
+			ActivePage, 1, false));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State,
+			children[1], ShowMe, 0, false));
+
+		Assert.True(MuiGroupLayoutCore.Layout(ref platform, State, group, 8, 9,
+			80, 30));
+		Assert.Equal(1u, Get(ref platform, group, ActivePage));
+		Assert.Equal(0u, Get(ref platform, children[0], Width));
+		Assert.Equal(0u, Get(ref platform, children[1], Width));
+		Assert.Equal(0u, Get(ref platform, children[1], Height));
+	}
+
+	[Fact]
+	public void PageMinimumUsesLargestChildMinimumAndSmallestChildMaximum()
+	{
+		var platform = CreatePageGroup(out var group, out var children);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, group,
+			PageMode, 1, false));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State,
+			children[1], FixWidth, 20, false));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, group,
+			ActivePage, 0, false));
+
+		var minMax = APTR.FromPointer(0x1800);
+		Assert.True(MuiGroupLayoutCore.AskMinMax(ref platform, State, group,
+			minMax));
+		Assert.Equal((ushort)20, platform.ReadUInt16(minMax, 0));
+		Assert.Equal((ushort)10, platform.ReadUInt16(minMax, 4));
+
+		Assert.True(MuiGroupLayoutCore.Layout(ref platform, State, group, 8, 9,
+			80, 30));
+		Assert.Equal(10u, Get(ref platform, children[0], Width));
+		Assert.Equal(43u, Get(ref platform, children[0], LeftEdge));
+		Assert.Equal(10u, Get(ref platform, children[0], Height));
+		Assert.Equal(19u, Get(ref platform, children[0], TopEdge));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePageGroup(out APTR group,

@@ -1880,28 +1880,44 @@ internal static class MuiExternalBoopsiPacketCodec
 		APTR address, MuiExternalBoopsiOpGetMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (packet.MethodId != OmGet) return false;
+		return WriteOpGetValues(ref platform, address, packet.MethodId,
+			packet.Attribute, packet.Storage.Raw);
+	}
+
+	internal static bool WriteOpGetValues<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId, uint attribute, uint storage)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (methodId != OmGet) return false;
 		return WriteField(ref platform, address,
 			MuiExternalBoopsiPacketKind.OpGet,
-			MuiExternalBoopsiPacketField.MethodId, packet.MethodId) &&
+			MuiExternalBoopsiPacketField.MethodId, methodId) &&
 			WriteField(ref platform, address, MuiExternalBoopsiPacketKind.OpGet,
-				MuiExternalBoopsiPacketField.Attribute, packet.Attribute) &&
+				MuiExternalBoopsiPacketField.Attribute, attribute) &&
 			WriteField(ref platform, address, MuiExternalBoopsiPacketKind.OpGet,
-				MuiExternalBoopsiPacketField.Storage, packet.Storage.Raw);
+				MuiExternalBoopsiPacketField.Storage, storage);
 	}
 
 	internal static bool WriteRender<TPlatform>(ref TPlatform platform,
 		APTR address, MuiExternalBoopsiRenderMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (packet.MethodId != GmRender) return false;
+		return WriteRenderValues(ref platform, address, packet.MethodId,
+			packet.GadgetInfo.Raw, packet.RastPort.Raw);
+	}
+
+	internal static bool WriteRenderValues<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId, uint gadgetInfo, uint rastPort)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (methodId != GmRender) return false;
 		return WriteField(ref platform, address,
 			MuiExternalBoopsiPacketKind.Render,
-			MuiExternalBoopsiPacketField.MethodId, packet.MethodId) &&
+			MuiExternalBoopsiPacketField.MethodId, methodId) &&
 			WriteField(ref platform, address, MuiExternalBoopsiPacketKind.Render,
-				MuiExternalBoopsiPacketField.GadgetInfo, packet.GadgetInfo.Raw) &&
+				MuiExternalBoopsiPacketField.GadgetInfo, gadgetInfo) &&
 			WriteField(ref platform, address, MuiExternalBoopsiPacketKind.Render,
-				MuiExternalBoopsiPacketField.RastPort, packet.RastPort.Raw);
+				MuiExternalBoopsiPacketField.RastPort, rastPort);
 	}
 
 	internal static bool WriteTag<TPlatform>(ref TPlatform platform,
@@ -1918,21 +1934,32 @@ internal static class MuiExternalBoopsiPacketCodec
 		APTR address, MuiExternalBoopsiResultWord packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return WriteField(ref platform, address,
-			MuiExternalBoopsiPacketKind.Result,
-			MuiExternalBoopsiPacketField.Value, packet.Value);
+		return WriteResultValue(ref platform, address, packet.Value);
 	}
+
+	// Keep a scalar ABI seam for the freestanding compiler's one-word record
+	// argument path. The public/host-facing surface remains the named result
+	// record above; native roots can use this helper without passing a tiny
+	// struct by value across the guest call boundary.
+	internal static bool WriteResultValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteField(ref platform, address, MuiExternalBoopsiPacketKind.Result,
+			MuiExternalBoopsiPacketField.Value, value);
 
 	internal static bool TryReadResult<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiExternalBoopsiResultWord packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!ReadField(ref platform, address,
-			MuiExternalBoopsiPacketKind.Result,
-			MuiExternalBoopsiPacketField.Value, out packet.Value)) return false;
-		return true;
+		return TryReadResultValue(ref platform, address, out packet.Value);
 	}
+
+	internal static bool TryReadResultValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		ReadField(ref platform, address, MuiExternalBoopsiPacketKind.Result,
+			MuiExternalBoopsiPacketField.Value, out value);
 }
 
 public static class MuiExternalWrapperCore
@@ -2735,6 +2762,22 @@ public static class MuiExternalWrapperCore
 		platform.DoMethod(obj, work);
 		SetFlag(ref platform, instance, MuiExternalWrapperLayout.FlagRedraw, true);
 		return true;
+	}
+
+	// MUIM_BoopsiQuery is the MorphOS bridge used by MUIized BOOPSI gadgets to
+	// exchange their complete screen/geometry query record. Validate the named
+	// packet first, then pass the caller-owned record to the wrapped object
+	// through the existing BOOPSI method capability. Dtpic and uninitialized
+	// wrappers do not own a BOOPSI object and therefore return no result.
+	public static uint BoopsiQuery<TPlatform>(ref TPlatform platform,
+		APTR instance, APTR message)
+		where TPlatform : struct, IMuiServicePlatform
+	{
+		if (Classify(ref platform, instance) != MuiExternalWrapperClass.Boopsi ||
+			!MuiExternalBoopsiResourceCodec.TryRead(ref platform, instance,
+				out var resources)) return 0;
+		return MuiBoopsiQueryCore.DispatchToObject(ref platform,
+			resources.BoopsiObject, message);
 	}
 
 	// MUIM_Draw. A disabled object draws nothing. A Boopsi object is rendered by

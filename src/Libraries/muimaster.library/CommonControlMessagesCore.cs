@@ -138,62 +138,74 @@ internal static class MuiCommonFieldCursorCodec
 	private static bool TryResolve(MuiCommonPacketKind packet,
 		MuiCommonField field, out uint offset)
 	{
-		switch (packet)
+		// Keep the packed ABI selector straight-line for freestanding native
+		// lowering. The offset table remains confined to this codec; consumers
+		// receive the named common-control records below.
+		if (packet == MuiCommonPacketKind.Method)
 		{
-			case MuiCommonPacketKind.Method:
-			case MuiCommonPacketKind.Signed:
-			case MuiCommonPacketKind.Stringify:
-				if (field == MuiCommonField.MethodId) { offset = 0; return true; }
-				if (packet != MuiCommonPacketKind.Method &&
-					field == MuiCommonField.Value) { offset = 4; return true; }
-				break;
-			case MuiCommonPacketKind.ScaleToValue:
-				if (field == MuiCommonField.MethodId) { offset = 0; return true; }
-				if (field == MuiCommonField.Min) { offset = 4; return true; }
-				if (field == MuiCommonField.Max) { offset = 8; return true; }
-				if (field == MuiCommonField.Value) { offset = 12; return true; }
-				break;
-			case MuiCommonPacketKind.ValueToScale:
-				if (field == MuiCommonField.MethodId) { offset = 0; return true; }
-				if (field == MuiCommonField.Min) { offset = 4; return true; }
-				if (field == MuiCommonField.Max) { offset = 8; return true; }
-				break;
-			case MuiCommonPacketKind.HandleEvent:
-				if (field == MuiCommonField.MethodId) { offset = 0; return true; }
-				if (field == MuiCommonField.InputMessage) { offset = 4; return true; }
-				if (field == MuiCommonField.MuiKey) { offset = 8; return true; }
-				if (field == MuiCommonField.EventHandlerNode) { offset = 12; return true; }
-				break;
-			case MuiCommonPacketKind.Get:
-				if (field == MuiCommonField.MethodId) { offset = 0; return true; }
-				if (field == MuiCommonField.Attribute) { offset = 4; return true; }
-				if (field == MuiCommonField.Storage) { offset = 8; return true; }
-				break;
-			case MuiCommonPacketKind.Attribute:
-				if (field == MuiCommonField.MethodId) { offset = 0; return true; }
-				if (field == MuiCommonField.Attribute) { offset = 4; return true; }
-				if (field == MuiCommonField.Value) { offset = 8; return true; }
-				break;
-			case MuiCommonPacketKind.AskMinMax:
-				if (field == MuiCommonField.MethodId) { offset = 0; return true; }
-				if (field == MuiCommonField.Storage) { offset = 4; return true; }
-				break;
-			case MuiCommonPacketKind.Layout:
-				if (field == MuiCommonField.MethodId) { offset = 0; return true; }
-				if (field == MuiCommonField.Left) { offset = 4; return true; }
-				if (field == MuiCommonField.Top) { offset = 8; return true; }
-				if (field == MuiCommonField.Width) { offset = 12; return true; }
-				if (field == MuiCommonField.Height) { offset = 16; return true; }
-				if (field == MuiCommonField.Flags) { offset = 20; return true; }
-				break;
-			case MuiCommonPacketKind.Flags:
-				if (field == MuiCommonField.MethodId) { offset = 0; return true; }
-				if (field == MuiCommonField.Flags) { offset = 4; return true; }
-				break;
-			case MuiCommonPacketKind.RenderInfo:
-				if (field == MuiCommonField.MethodId) { offset = 0; return true; }
-				if (field == MuiCommonField.RenderInfo) { offset = 4; return true; }
-				break;
+			if (field == MuiCommonField.MethodId) { offset = 0; return true; }
+		}
+		else if (packet == MuiCommonPacketKind.Signed ||
+			packet == MuiCommonPacketKind.Stringify)
+		{
+			if (field == MuiCommonField.MethodId) { offset = 0; return true; }
+			if (field == MuiCommonField.Value) { offset = 4; return true; }
+		}
+		else if (packet == MuiCommonPacketKind.ScaleToValue)
+		{
+			if (field == MuiCommonField.MethodId) { offset = 0; return true; }
+			if (field == MuiCommonField.Min) { offset = 4; return true; }
+			if (field == MuiCommonField.Max) { offset = 8; return true; }
+			if (field == MuiCommonField.Value) { offset = 12; return true; }
+		}
+		else if (packet == MuiCommonPacketKind.ValueToScale)
+		{
+			if (field == MuiCommonField.MethodId) { offset = 0; return true; }
+			if (field == MuiCommonField.Min) { offset = 4; return true; }
+			if (field == MuiCommonField.Max) { offset = 8; return true; }
+		}
+		else if (packet == MuiCommonPacketKind.HandleEvent)
+		{
+			if (field == MuiCommonField.MethodId) { offset = 0; return true; }
+			if (field == MuiCommonField.InputMessage) { offset = 4; return true; }
+			if (field == MuiCommonField.MuiKey) { offset = 8; return true; }
+			if (field == MuiCommonField.EventHandlerNode) { offset = 12; return true; }
+		}
+		else if (packet == MuiCommonPacketKind.Get)
+		{
+			if (field == MuiCommonField.MethodId) { offset = 0; return true; }
+			if (field == MuiCommonField.Attribute) { offset = 4; return true; }
+			if (field == MuiCommonField.Storage) { offset = 8; return true; }
+		}
+		else if (packet == MuiCommonPacketKind.Attribute)
+		{
+			if (field == MuiCommonField.MethodId) { offset = 0; return true; }
+			if (field == MuiCommonField.Attribute) { offset = 4; return true; }
+			if (field == MuiCommonField.Value) { offset = 8; return true; }
+		}
+		else if (packet == MuiCommonPacketKind.AskMinMax)
+		{
+			if (field == MuiCommonField.MethodId) { offset = 0; return true; }
+			if (field == MuiCommonField.Storage) { offset = 4; return true; }
+		}
+		else if (packet == MuiCommonPacketKind.Layout)
+		{
+			if (field == MuiCommonField.MethodId) { offset = 0; return true; }
+			if (field == MuiCommonField.Left) { offset = 4; return true; }
+			if (field == MuiCommonField.Top) { offset = 8; return true; }
+			if (field == MuiCommonField.Width) { offset = 12; return true; }
+			if (field == MuiCommonField.Height) { offset = 16; return true; }
+			if (field == MuiCommonField.Flags) { offset = 20; return true; }
+		}
+		else if (packet == MuiCommonPacketKind.Flags)
+		{
+			if (field == MuiCommonField.MethodId) { offset = 0; return true; }
+			if (field == MuiCommonField.Flags) { offset = 4; return true; }
+		}
+		else if (packet == MuiCommonPacketKind.RenderInfo)
+		{
+			if (field == MuiCommonField.MethodId) { offset = 0; return true; }
+			if (field == MuiCommonField.RenderInfo) { offset = 4; return true; }
 		}
 		offset = 0;
 		return false;
@@ -266,12 +278,11 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCommonMethodMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != method)
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId))
 			return false;
-		packet.MethodId = header.MethodId;
+		if (methodId != method) return false;
+		packet.MethodId = methodId;
 		return true;
 	}
 
@@ -283,11 +294,25 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Native qualification keeps method-header admission scalar while the
+	// dispatcher-facing overload above retains the named value-type record.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCommonMethodMessage.Size)) return false;
 		return MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.Method, MuiCommonField.MethodId,
-			out packet.MethodId);
+			out methodId);
 	}
 
 	internal static bool WriteMethod<TPlatform>(ref TPlatform platform,
@@ -305,12 +330,13 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCommonSignedValueMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != method)
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != method)
 			return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		return MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.Signed, MuiCommonField.Value, out var rawValue)
 			? SetSignedValue(out packet.Value, rawValue) : false;
@@ -321,11 +347,12 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCommonScaleToValueMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != NumericScaleToValue) return false;
-		packet.MethodId = header.MethodId;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != NumericScaleToValue) return false;
+		packet.MethodId = methodId;
 		if (!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.ScaleToValue, MuiCommonField.Min, out var rawMin) ||
 			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
@@ -344,11 +371,12 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCommonValueToScaleMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != NumericValueToScale) return false;
-		packet.MethodId = header.MethodId;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != NumericValueToScale) return false;
+		packet.MethodId = methodId;
 		if (!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.ValueToScale, MuiCommonField.Min, out var rawMin) ||
 			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
@@ -364,11 +392,12 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCommonStringifyMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != NumericStringify) return false;
-		packet.MethodId = header.MethodId;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != NumericStringify) return false;
+		packet.MethodId = methodId;
 		return MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.Stringify, MuiCommonField.Value, out var rawValue)
 			? SetSignedValue(out packet.Value, rawValue) : false;
@@ -379,11 +408,12 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCommonHandleEventMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != HandleEvent) return false;
-		packet.MethodId = header.MethodId;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != HandleEvent) return false;
+		packet.MethodId = methodId;
 		if (!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.HandleEvent, MuiCommonField.InputMessage,
 			out packet.InputMessage) ||
@@ -421,12 +451,13 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCommonGetMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != OmGet)
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != OmGet)
 			return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		return MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.Get, MuiCommonField.Attribute,
 			out packet.Attribute) &&
@@ -440,12 +471,13 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCommonAttributeMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != method)
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != method)
 			return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		return MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.Attribute, MuiCommonField.Attribute,
 			out packet.Attribute) &&
@@ -480,11 +512,12 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCommonAskMinMaxMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != AskMinMax) return false;
-		packet.MethodId = header.MethodId;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != AskMinMax) return false;
+		packet.MethodId = methodId;
 		return MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.AskMinMax, MuiCommonField.Storage,
 			out packet.Storage);
@@ -495,10 +528,11 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message, MuiLayoutMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != Layout) return false;
-		packet.MethodId = header.MethodId;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != Layout) return false;
+		packet.MethodId = methodId;
 		return MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.Layout, MuiCommonField.Left, out packet.Left) &&
 			MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
@@ -519,12 +553,13 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiLayoutFlagsMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != Draw)
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != Draw)
 			return false;
-		packet.MethodId = header.MethodId;
+		packet.MethodId = methodId;
 		return MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.Flags, MuiCommonField.Flags, out packet.Flags);
 	}
@@ -534,11 +569,12 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiLayoutRenderInfoMessage.Size) ||
-			!TryReadMethodId(ref platform, message, out var header) ||
-			header.MethodId != Setup) return false;
-		packet.MethodId = header.MethodId;
+			!TryReadMethodIdValue(ref platform, message, out methodId) ||
+			methodId != Setup) return false;
+		packet.MethodId = methodId;
 		return MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.RenderInfo, MuiCommonField.RenderInfo,
 			out packet.RenderInfo);

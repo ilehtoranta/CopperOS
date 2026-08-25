@@ -119,11 +119,25 @@ internal static class MuiPopSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Native selector admission stays scalar so compiler paths do not need to
+	// materialize a temporary one-field record. Public packet consumers still
+	// receive the named struct above.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiPopSpecialistMethodMessage.Size)) return false;
 		return MuiPopSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiPopSpecialistPacketKind.Method,
-			MuiPopSpecialistField.MethodId, out packet.MethodId);
+			MuiPopSpecialistField.MethodId, out methodId);
 	}
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
@@ -143,8 +157,8 @@ internal static class MuiPopSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		return IsMethod(method) &&
-			TryReadMethodId(ref platform, message, out var header) &&
-			header.MethodId == method;
+			TryReadMethodIdValue(ref platform, message, out var methodId) &&
+			methodId == method;
 	}
 
 	internal static bool WriteMethod<TPlatform>(ref TPlatform platform,
@@ -165,8 +179,8 @@ internal static class MuiPopSpecialistMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiPopSpecialistGetMessage.Size,
 			OmGet)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiPopSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiPopSpecialistPacketKind.Get,
 			MuiPopSpecialistField.Attribute, out packet.Attribute) &&
@@ -199,8 +213,8 @@ internal static class MuiPopSpecialistMessageCodec
 		packet = default;
 		if (!IsSetMethod(method) || !IsPacket(ref platform, message,
 			MuiPopSpecialistSetMessage.Size, method)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiPopSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiPopSpecialistPacketKind.Set,
 			MuiPopSpecialistField.Attribute, out packet.Attribute) &&
@@ -233,8 +247,8 @@ internal static class MuiPopSpecialistMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiPopSpecialistMethodMessage.Size,
 			MuiPopAttributes.Popstring_Close)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		packet.MethodId = methodId;
 		// Preserve the MorphOS-compatible tolerant boundary: a method-only close
 		// frame means result FALSE, while the documented second word is consumed
 		// when present.
@@ -273,7 +287,7 @@ internal static class MuiPopSpecialistMessageCodec
 		uint size, uint method) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (message.IsNull || !platform.IsMapped(message, size) ||
-			!TryReadMethodId(ref platform, message, out var header)) return false;
-		return header.MethodId == method;
+			!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		return methodId == method;
 	}
 }

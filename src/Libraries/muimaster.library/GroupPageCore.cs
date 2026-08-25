@@ -19,6 +19,21 @@ internal struct MuiGroupPageState
 	public uint LastSelector;
 }
 
+// Page layout consumes one active child at a time.  Keep that decision in a
+// named host record so inactive and explicitly hidden pages are represented by
+// zero-area geometry without guest pointers, offsets, or managed collections.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiGroupPageLayoutSelection
+{
+	internal int ActiveIndex;
+	internal int Count;
+	internal int Left;
+	internal int Top;
+	internal int Width;
+	internal int Height;
+	internal uint ActiveShown;
+}
+
 internal enum MuiGroupPageStateField : byte
 {
 	Cookie,
@@ -217,6 +232,28 @@ public static class MuiGroupPageCore
 		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, group,
 			ActivePage, out var raw)) return 0;
 		return NormalizeActive(raw, count);
+	}
+
+	internal static MuiGroupPageLayoutSelection ResolveLayout<TPlatform>(
+		ref TPlatform platform, APTR state, APTR group, int count, int left,
+		int top, int width, int height)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var selection = default(MuiGroupPageLayoutSelection);
+		selection.ActiveIndex = (int)ReadActivePage(ref platform, state, group,
+			unchecked((uint)count));
+		selection.Count = count;
+		selection.Left = left;
+		selection.Top = top;
+		selection.Width = width;
+		selection.Height = height;
+		selection.ActiveShown = 1;
+		var child = MuiFamilyCore.GetChild(ref platform, state, group,
+			selection.ActiveIndex, APTR.Null);
+		if (!child.IsNull && MuiAreaLayoutCore.TryReadLayoutPolicyState(
+			ref platform, state, child, out var policy) && policy.ShowMe == 0)
+			selection.ActiveShown = 0;
+		return selection;
 	}
 
 	internal static void Cleanup<TPlatform>(ref TPlatform platform, APTR state,

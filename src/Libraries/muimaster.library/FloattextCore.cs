@@ -139,7 +139,6 @@ internal static class MuiFloattextPolicyStateCodec
 			return false;
 		value.Text = APTR.FromPointer(text);
 		value.SkipChars = APTR.FromPointer(skipChars);
-		value.Justify = value.Justify == 0 ? 0u : 1u;
 		return true;
 	}
 
@@ -160,10 +159,18 @@ internal static class MuiFloattextPolicyStateCodec
 				address, MuiFloattextPolicyField.TabSize, value.TabSize) &&
 			MuiFloattextPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
 				address, MuiFloattextPolicyField.Justify,
-				value.Justify == 0 ? 0u : 1u) &&
+				value.Justify) &&
 			MuiFloattextPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
 				address, MuiFloattextPolicyField.Width, value.Width);
 	}
+}
+
+internal static class MuiFloattextPolicyValidation
+{
+	// Justify is the only BOOL in this record. Keep the raw guest byte lossless
+	// in the codec, then reject any non-canonical value at the semantic boundary.
+	internal static bool IsValid(MuiFloattextPolicyState value) =>
+		value.Justify <= 1;
 }
 
 // Floattext.mui (autodoc MUI_Floattext.doc). Floattext is a subclass of list
@@ -268,12 +275,51 @@ public static class MuiFloattextCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (!TryReadPolicyAdmission(ref platform, state, obj, out value,
+			out var present) || !present) return false;
+		return ValidateOwnedPolicyPointers(ref platform, state, obj, value);
+	}
+
+	// A policy dataspace may be absent on legacy objects, but a present block is
+	// authoritative typed state.  Do not reinterpret a wrong-sized or malformed
+	// block as permission to fall back to raw attributes.
+	private static bool TryReadPolicyAdmission<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, out MuiFloattextPolicyState value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			PolicyKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, PolicyKey) !=
-			unchecked((int)MuiFloattextPolicyState.Size)) return false;
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			PolicyKey);
+		present = block.IsNotNull || length != 0;
+		if (!present) return true;
+		if (block.IsNull || length != unchecked((int)MuiFloattextPolicyState.Size))
+			return false;
 		return MuiFloattextPolicyStateCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiFloattextPolicyValidation.IsValid(value);
+	}
+
+	private static bool ValidateOwnedPolicyPointers<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		MuiFloattextPolicyState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var text = MuiStoreCore.DataspaceFind(ref platform, state, obj, TextKey);
+		var skip = MuiStoreCore.DataspaceFind(ref platform, state, obj, SkipKey);
+		if (!ValidateOwnedPointer(ref platform, value.Text, text,
+			MaximumTextLength) || !ValidateOwnedPointer(ref platform,
+			value.SkipChars, skip, MaximumSkipLength)) return false;
+		return true;
+	}
+
+	private static bool ValidateOwnedPointer<TPlatform>(ref TPlatform platform,
+		APTR projected, APTR owned, uint maximum)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (projected.IsNull) return owned.IsNull;
+		return owned.IsNotNull && projected.Raw == owned.Raw &&
+			CStringCodec.TryReadLength(ref platform, owned, maximum, out _);
 	}
 
 	// Area layout owns the effective render width.  Keep the policy record's
@@ -298,7 +344,12 @@ public static class MuiFloattextCore
 		APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!TryReadPolicyState(ref platform, state, obj, out var value))
+		// SetText/SetSkipChars deliberately update the owned dataspace before
+		// moving the corresponding pointer in this record.  Read the already
+		// admitted wire record without applying the pointer-coherence check again,
+		// then publish the complete replacement atomically through the codec.
+		if (!TryReadPolicyAdmission(ref platform, state, obj, out var value,
+			out var present) || !present)
 			return false;
 		value.Text = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			TextKey);
@@ -324,6 +375,16 @@ public static class MuiFloattextCore
 		platform.Clear(scratch, MuiFloattextPolicyState.Size);
 		var value = default(MuiFloattextPolicyState);
 		value.Magic = MuiFloattextPolicyState.Cookie;
+		// Seed the complete typed projection before admission validation.  A
+		// freshly-created record must agree with the already-owned Text/SkipChars
+		// blocks; writing an all-zero placeholder would be rejected as malformed
+		// pointer divergence by SyncPolicyState.
+		value.Text = MuiStoreCore.DataspaceFind(ref platform, state, obj, TextKey);
+		value.SkipChars = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			SkipKey);
+		value.TabSize = Read(ref platform, state, obj, TabSize, DefaultTabSize);
+		value.Justify = Read(ref platform, state, obj, Justify, 0) == 0 ? 0u : 1u;
+		value.Width = ReadEffectiveWidth(ref platform, state, obj);
 		var written = MuiFloattextPolicyStateCodec.Write(ref platform, scratch,
 			value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
@@ -354,8 +415,12 @@ public static class MuiFloattextCore
 		result = default;
 		if (MuiListCore.Classify(ref platform, state, obj) !=
 			MuiCollectionClass.Floattext) return false;
-		if (TryReadPolicyState(ref platform, state, obj, out var policy))
+		if (!TryReadPolicyAdmission(ref platform, state, obj, out var policy,
+			out var present)) return false;
+		if (present)
 		{
+			if (!ValidateOwnedPolicyPointers(ref platform, state, obj, policy))
+				return false;
 			result.Text = policy.Text;
 			result.SkipChars = policy.SkipChars;
 			result.TabSize = policy.TabSize;
@@ -402,6 +467,16 @@ public static class MuiFloattextCore
 				value = 0;
 				return false;
 			}
+			if (attribute == Width)
+			{
+				// Width is the shared Area geometry projection.  The policy
+				// record retains the last synchronized value for parsing, but a
+				// layout pass can publish a newer named geometry record without
+				// touching Floattext's policy dataspace.  Get/OM_GET must expose
+				// that current typed geometry rather than a stale scalar copy.
+				value = ReadEffectiveWidth(ref platform, state, obj);
+				return true;
+			}
 			value = attribute == Text ? policy.Text.Raw :
 				attribute == SkipChars ? policy.SkipChars.Raw :
 				attribute == TabSize ? policy.TabSize :
@@ -416,6 +491,14 @@ public static class MuiFloattextCore
 		APTR obj, uint attribute, uint value, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		// EnsurePolicyState may materialize a legacy-absent record, but it must
+		// never repair a malformed present record by replacing the typed state.
+		// Admit the existing record and its owned pointer projections before any
+		// setter can mutate raw attributes or retire a copied string.
+		if (!TryReadPolicyAdmission(ref platform, state, obj, out var existing,
+			out var present)) return false;
+		if (present && !ValidateOwnedPolicyPointers(ref platform, state, obj,
+			existing)) return false;
 		if (!EnsurePolicyState(ref platform, state, obj)) return false;
 		if (attribute == Text)
 			return SetText(ref platform, state, obj, APTR.FromPointer(value),

@@ -160,6 +160,34 @@ public sealed class MuiGroupChildrenTests
 	}
 
 	[Fact]
+	public void ForwardGetterNormalizesRawCompatibilityBooleans()
+	{
+		var platform = CreateClasses(out var groupClass, out _);
+		var group = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			groupClass, APTR.Null);
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State, group);
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			record, Forward, 7, false));
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			record, ForwardDepth, 9, false));
+		Assert.Equal(1u, Get(ref platform, group, Forward));
+		Assert.Equal(1u, Get(ref platform, group, ForwardDepth));
+	}
+
+	[Fact]
+	public void ForwardDepthTraversalStateUsesOneGlobalBudget()
+	{
+		var traversal = default(MuiGroupForwardTraversalState);
+		traversal.Remaining = 2;
+		Assert.True(MuiGroupForwardTraversalCore.TryVisit(ref traversal));
+		Assert.True(MuiGroupForwardTraversalCore.TryVisit(ref traversal));
+		Assert.False(MuiGroupForwardTraversalCore.TryVisit(ref traversal));
+		Assert.Equal(0u, traversal.Remaining);
+		Assert.Equal(2u, traversal.Visited);
+		Assert.Equal(1u, traversal.Exhausted);
+	}
+
+	[Fact]
 	public void GroupExecListCodecUsesNamedListFields()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

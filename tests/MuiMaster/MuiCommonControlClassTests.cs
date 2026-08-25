@@ -34,6 +34,7 @@ public sealed class MuiCommonControlClassTests
 	private const uint GaugeHoriz = 0x804232DD;
 	private const uint GaugeDivide = 0x8042D8DF;
 	private const uint GaugeInfoText = 0x8042BF15;
+	private const uint BalanceQuiet = 0x80427486;
 	private const uint LevelmeterLabel = 0x80420DD5;
 	private const uint SliderHoriz = 0x8042FAD1;
 	private const uint SliderQuiet = 0x80420B26;
@@ -50,6 +51,8 @@ public sealed class MuiCommonControlClassTests
 	private const uint ScrollbarTypeNone = 4;
 	private const uint FixWidth = 0x8042A3F1;
 	private const uint FixHeight = 0x8042A92B;
+	private const uint FixWidthTxt = 0x8042D044;
+	private const uint FixHeightTxt = 0x804276F2;
 	private const uint LeftEdge = 0x8042BEC6;
 	private const uint Width = 0x8042B59C;
 	private const uint TopEdge = 0x8042509B;
@@ -81,6 +84,8 @@ public sealed class MuiCommonControlClassTests
 	private const uint StringEditable = 0x8042C94B;
 	private const uint StringAdvanceOnCR = 0x804226DE;
 	private const uint StringMultiline = 0x8042D18B;
+	private const uint StringScrollLeft = 0x8042BD0D;
+	private const uint StringScrollTop = 0x8042F4E5;
 	private const uint StringAccept = 0x8042E3E1;
 	private const uint StringReject = 0x8042179C;
 	private const uint StringSecret = 0x80428769;
@@ -93,6 +98,26 @@ public sealed class MuiCommonControlClassTests
 	private const uint StringFormatRight = 2;
 	private const uint TextContents = 0x8042F8DC;
 	private const uint TextCopy = 0x80427727;
+	private const uint TextCopyKey = 0x7F070002;
+	private const uint GadgetInteractionStateKey = 0x7F070030;
+	private const uint NumericStateKey = 0x7F07002A;
+	private const uint PropRangeStateKey = 0x7F07002B;
+	private const uint GaugeStateKey = 0x7F07002C;
+	private const uint ScrollbarLayoutStateKey = 0x7F07002D;
+	private const uint SliderPresentationStateKey = 0x7F07002E;
+	private const uint ScalePresentationStateKey = 0x7F07002F;
+	private const uint LevelmeterPresentationStateKey = 0x7F070031;
+	private const uint TextPresentationStateKey = 0x7F070032;
+	private const uint TextCopyStateKey = 0x7F07003F;
+	private const uint TextUnicodeStateKey = 0x7F070071;
+	private const uint TextShortenedStateKey = 0x7F070072;
+	private const uint AreaPresentationStateKey = 0x7F070034;
+	private const uint PropPolicyStateKey = 0x7F07003C;
+	private const uint BalancePolicyStateKey = 0x7F07003E;
+	private const uint NumericFormatKey = 0x7F070007;
+	private const uint GaugeInfoTextKey = 0x7F070008;
+	private const uint LevelmeterLabelKey = 0x7F07000E;
+	private const uint TextPreParseKey = 0x7F07000C;
 	private const uint TextSetMin = 0x80424E10;
 	private const uint TextSetMax = 0x80424D0A;
 	private const uint TextSetVMax = 0x80420D8B;
@@ -160,12 +185,16 @@ public sealed class MuiCommonControlClassTests
 	private const int KeyDown = 3;
 	private const int KeyPageUp = 4;
 	private const int KeyPageDown = 5;
+	private const int KeyTop = 6;
+	private const int KeyBottom = 7;
 	private const int KeyPress = 0;
 	private const int KeyToggle = 1;
 	private const int KeyBackspace = 29;
 	private const int KeyDelete = 28;
 	private const int KeyLeft = 8;
 	private const int KeyRight = 9;
+	private const int KeyWordLeft = 10;
+	private const int KeyWordRight = 11;
 	private const int KeyHome = 12;
 	private const int KeyEnd = 13;
 	private const int ListInsertBottom = -3;
@@ -194,6 +223,7 @@ public sealed class MuiCommonControlClassTests
 		("Scrollbar.mui", MuiControlClass.Scrollbar),
 		("Scale.mui", MuiControlClass.Scale),
 		("Gadget.mui", MuiControlClass.Gadget),
+		("Balance.mui", MuiControlClass.Balance),
 	};
 
 	[Fact]
@@ -296,6 +326,44 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void ControlFontResolvesThroughGuestParentWhenInherited()
+	{
+		var platform = NewPlatform();
+		var groupClass = Register(ref platform, 0x1180, "Group.mui");
+		var textClass = Register(ref platform, 0x11C0, "Text.mui");
+		var group = MuiCommonControlCore.CreateControl(ref platform, State,
+			groupClass, APTR.Null);
+		var child = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, APTR.Null);
+		var inheritedFont = APTR.FromPointer(0x3A00);
+		Assert.NotEqual(APTR.Null, group);
+		Assert.NotEqual(APTR.Null, child);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, group,
+			Font, inheritedFont.Raw, false));
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, group, child));
+
+		Assert.True(MuiCommonControlCore.TryResolveControlFontState(ref platform,
+			State, child, out var resolution));
+		Assert.True(resolution.Present);
+		Assert.True(resolution.Inherited);
+		Assert.Equal(1u, resolution.Depth);
+		Assert.Equal(inheritedFont.Raw, resolution.Font.Raw);
+		Assert.True(MuiCommonControlCore.TryGet(ref platform, State, child, Font,
+			out var projected, out var handled));
+		Assert.True(handled);
+		Assert.Equal(inheritedFont.Raw, projected);
+		Assert.Equal(inheritedFont.Raw, Get(ref platform, child, Font));
+
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, child,
+			Font, MuiControlFontResolutionCore.MUIV_Font_Inherit, false));
+		Assert.True(MuiCommonControlCore.TryResolveControlFontState(ref platform,
+			State, child, out resolution));
+		Assert.True(resolution.Inherited);
+		Assert.Equal(inheritedFont.Raw, resolution.Font.Raw);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, group));
+	}
+
+	[Fact]
 	public void CommonControlMethodHeaderUsesNamedField()
 	{
 		var platform = NewPlatform();
@@ -305,6 +373,9 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiCommonControlPacketCore.TryReadMethodId(ref platform,
 			address, out var packet));
 		Assert.Equal(MuiCommonControlPacketCore.Draw, packet.MethodId);
+		Assert.True(MuiCommonControlPacketCore.TryReadMethodIdValue(ref platform,
+			address, out var methodId));
+		Assert.Equal(MuiCommonControlPacketCore.Draw, methodId);
 		Assert.False(MuiCommonControlPacketCore.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -427,6 +498,9 @@ public sealed class MuiCommonControlClassTests
 				case MuiControlClass.Gadget:
 					Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform,
 						State, entry.obj, GadgetGadget, 0x3100));
+					break;
+				case MuiControlClass.Balance:
+					Assert.Equal(0u, Get(ref platform, entry.obj, BalanceQuiet));
 					break;
 				case MuiControlClass.Prop:
 				case MuiControlClass.Scrollbar:
@@ -567,6 +641,128 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void TextCopyUsesNamedRecordAndSwitchesFutureContentsOwnership()
+	{
+		var platform = NewPlatform();
+		var textClass = Register(ref platform, 0x1100, "Text.mui");
+		var first = APTR.FromPointer(0x2480);
+		var second = APTR.FromPointer(0x24C0);
+		var third = APTR.FromPointer(0x2500);
+		var setMessage = APTR.FromPointer(0x2580);
+		var getMessage = APTR.FromPointer(0x25C0);
+		var getStorage = APTR.FromPointer(0x2600);
+		platform.WriteCString(first, "first");
+		platform.WriteCString(second, "second");
+		platform.WriteCString(third, "third");
+		var text = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x2540, new[] {
+				(TextCopy, 0u), (TextContents, first.Raw) }));
+		Assert.NotEqual(APTR.Null, text);
+		Assert.True(MuiCommonControlCore.TryGetTextCopyStateRecord(
+			ref platform, State, text, out var record));
+		Assert.Equal(MuiTextCopyStateRecord.Cookie, record.Magic);
+		Assert.Equal(0u, record.Copy);
+		Assert.True(MuiCommonControlCore.TryGet(ref platform, State, text,
+			TextCopy, out var copy, out var handled));
+		Assert.True(handled);
+		Assert.Equal(0u, copy);
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			getMessage, MuiCommonPacketKind.Get, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.OmGet));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			getMessage, MuiCommonPacketKind.Get, MuiCommonField.Attribute,
+			TextCopy));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			getMessage, MuiCommonPacketKind.Get, MuiCommonField.Storage,
+			getStorage.Raw));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			text, getMessage));
+		Assert.Equal(0u, platform.ReadUInt32(getStorage, 0));
+
+		// Enabling Copy materialises the current caller-owned contents.
+		Assert.True(MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			setMessage, MethodSet, TextCopy, 1));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			text, setMessage));
+		Assert.True(MuiCommonControlCore.TryGetTextCopyStateRecord(
+			ref platform, State, text, out record));
+		Assert.Equal(1u, record.Copy);
+		var copiedFirst = Get(ref platform, text, TextContents);
+		Assert.NotEqual(first.Raw, copiedFirst);
+		Assert.Equal("first", ReadCString(ref platform,
+			APTR.FromPointer(copiedFirst)));
+
+		// A later contents update remains owned while Copy is enabled.
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			text, TextContents, second.Raw));
+		var copiedSecond = Get(ref platform, text, TextContents);
+		Assert.NotEqual(second.Raw, copiedSecond);
+		Assert.Equal("second", ReadCString(ref platform,
+			APTR.FromPointer(copiedSecond)));
+
+		// MorphOS defines NULL Text_Contents as an empty object. The named
+		// contents state and the object-owned copy must both be cleared.
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			text, TextContents, 0));
+		Assert.Equal(0u, Get(ref platform, text, TextContents));
+		Assert.True(MuiCommonControlCore.TryReadTextContentsState(ref platform,
+			State, text, out var emptyContents));
+		Assert.True(emptyContents.Contents.IsNull);
+		Assert.Equal(0, MuiStoreCore.DataspaceLength(ref platform, State, text,
+			TextCopyKey));
+
+		// Disabling Copy changes the policy for subsequent updates and preserves
+		// the caller pointer exactly at the ABI boundary.
+		Assert.True(MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			setMessage, MethodSet, TextCopy, 0));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			text, setMessage));
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			text, TextContents, third.Raw));
+		Assert.True(MuiCommonControlCore.TryGetTextCopyStateRecord(
+			ref platform, State, text, out record));
+		Assert.Equal(0u, record.Copy);
+		Assert.Equal(third.Raw, Get(ref platform, text, TextContents));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, text));
+	}
+
+	[Fact]
+	public void TextCopyMalformedPolicyRecordFailsClosed()
+	{
+		var platform = NewPlatform();
+		var textClass = Register(ref platform, 0x1180, "Text.mui");
+		var text = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x11C0, [(TextCopy, 1u)]));
+		Assert.True(text.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, text,
+			TextCopyStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiTextCopyStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiTextCopyStateField.Copy, 2));
+		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+
+		Assert.False(MuiCommonControlCore.TryGetTextCopyStateRecord(
+			ref platform, State, text, out _));
+		Assert.False(MuiCommonControlCore.TryReadTextCopyState(
+			ref platform, State, text, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, text,
+			TextCopy, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			text, TextCopy, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			text, TextCopy, out var rawCopy));
+		Assert.Equal(1u, rawCopy);
+
+		var source = APTR.FromPointer(0x1200);
+		platform.WriteCString(source, "contents");
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			text, TextContents, source.Raw, false));
+		Assert.Equal(0u, Get(ref platform, text, TextContents));
+		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+	}
+
+	[Fact]
 	public void TextPreParseUsesNamedGuestRecordAndOwnedReplacement()
 	{
 		var platform = NewPlatform();
@@ -651,6 +847,31 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
 			numeric, NumericValue, 500));
 		Assert.Equal(100u, Get(ref platform, numeric, NumericValue));
+	}
+
+	[Fact]
+	public void AreaGeometryGettersRejectRuntimeSet()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1100, "String.mui");
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, APTR.Null);
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, stringObj,
+			-4, 3, 24, 12));
+
+		// These six fields are a named geometry projection, not mutable raw
+		// attributes. Runtime OM_SET must leave the projection untouched.
+		var geometryGetters = new[] {
+			LeftEdge, TopEdge, Width, ControlHeight, RightEdge, BottomEdge };
+		var geometryValues = new[] { unchecked((uint)-4), 3u, 24u, 12u,
+			19u, 14u };
+		for (var index = 0; index < geometryGetters.Length; index++)
+		{
+			Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform,
+				State, stringObj, geometryGetters[index], 42));
+			Assert.Equal(geometryValues[index], Get(ref platform, stringObj,
+				geometryGetters[index]));
+		}
 	}
 
 	[Fact]
@@ -781,6 +1002,38 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiCommonControlCore.TryGetNumericStateRecord(
 			ref platform, State, numeric, out var changed));
 		Assert.Equal(0u, changed.Reverse);
+	}
+
+	[Fact]
+	public void NumericMalformedReverseRecordFailsClosed()
+	{
+		var platform = NewPlatform();
+		var numericClass = Register(ref platform, 0x1180, "Numeric.mui");
+		var numeric = MuiCommonControlCore.CreateControl(ref platform, State,
+			numericClass, BuildTags(ref platform, 0x11C0,
+			[(NumericMin, 10u), (NumericMax, 90u), (NumericValue, 50u),
+				(NumericReverse, 1u)]));
+		Assert.True(numeric.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, numeric,
+			NumericStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiNumericStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiNumericStateField.Reverse, 2));
+		Assert.Equal(2u, platform.ReadUInt32(block, 20));
+
+		Assert.False(MuiCommonControlCore.TryGetNumericStateRecord(
+			ref platform, State, numeric, out _));
+		Assert.False(MuiCommonControlCore.TryReadNumericState(ref platform, State,
+			numeric, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, numeric,
+			NumericReverse, out _, out _));
+		Assert.False(MuiCommonControlCore.SetNumericValue(ref platform, State,
+			numeric, 60, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			numeric, NumericValue, out var rawValue));
+		Assert.Equal(50u, rawValue);
+		Assert.Equal(2u, platform.ReadUInt32(block, 20));
 	}
 
 	[Fact]
@@ -2114,6 +2367,52 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void TextMalformedShortenedRecordFailsClosedBeforeDrawingStatus()
+	{
+		var platform = NewPlatform();
+		var textClass = Register(ref platform, 0x1280, "Text.mui");
+		var source = APTR.FromPointer(0x12C0);
+		platform.WriteCString(source, "LongText");
+		var text = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x1300,
+				[(TextContents, source.Raw)]));
+		Assert.True(text.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, text,
+			TextShortenedStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiTextShortenedStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiTextShortenedStateField.Shortened, 2));
+		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+
+		Assert.False(MuiCommonControlCore.TryGetTextShortenedStateRecord(
+			ref platform, State, text, out _));
+		Assert.False(MuiCommonControlCore.TryReadTextShortenedState(
+			ref platform, State, text, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, text,
+			TextShortened, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			text, TextShortened, 1, false));
+
+		var renderInfo = APTR.FromPointer(0x1340);
+		platform.WriteUInt32(renderInfo, 20, 0x2000);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, text, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, text, 0, 0,
+			16, 10));
+		var packet = APTR.FromPointer(0x1380);
+		platform.WriteUInt32(packet, 0, Draw);
+		platform.WriteUInt32(packet, 4, 0);
+		platform.TextCount = 0;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			text, packet));
+		Assert.Equal(0u, platform.TextCount);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			text, TextShortened, out var rawShortened));
+		Assert.Equal(0u, rawShortened);
+		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+	}
+
+	[Fact]
 	public void BitmapFamilySetupExposesRemappedStateWithoutFreeing()
 	{
 		var platform = NewPlatform();
@@ -2168,6 +2467,82 @@ public sealed class MuiCommonControlClassTests
 			bitmap));
 		Assert.Equal(0xC0FFEE00u, platform.ReadUInt32(sourceBitmap, 0));
 		Assert.True(platform.FreeCount > freedBefore);
+	}
+
+	[Fact]
+	public void BalanceQuietUsesTypedPolicyAndRendersSeparator()
+	{
+		var platform = NewPlatform();
+		var balanceClass = Register(ref platform, 0x1200, "Balance.mui");
+		var tags = BuildTags(ref platform, 0x1240,
+			new[] { (BalanceQuiet, 7u) });
+		var balance = MuiCommonControlCore.CreateControl(ref platform, State,
+			balanceClass, tags);
+		Assert.True(balance.IsNotNull);
+		Assert.Equal(MuiControlClass.Balance,
+			MuiCommonControlCore.Classify(ref platform, State, balance));
+		Assert.Equal(1u, Get(ref platform, balance, BalanceQuiet));
+		Assert.True(MuiCommonControlCore.TryGetBalancePolicyStateRecord(
+			ref platform, State, balance, out var record));
+		Assert.Equal(MuiBalancePolicyStateRecord.Cookie, record.Magic);
+		Assert.Equal(1u, record.Quiet);
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			balance, BalanceQuiet, 0));
+
+		// A raw compatibility write is normalized back into the typed BOOL state.
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, balance,
+			BalanceQuiet, 9, false));
+		Assert.True(MuiCommonControlCore.TryGet(ref platform, State, balance,
+			BalanceQuiet, out var projected, out var handled));
+		Assert.True(handled);
+		Assert.Equal(1u, projected);
+
+		var renderInfo = APTR.FromPointer(0x1300);
+		platform.WriteUInt32(renderInfo, 20, 0x2000);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, balance,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, balance, 0, 0,
+			20, 8));
+		var packet = APTR.FromPointer(0x1340);
+		platform.WriteUInt32(packet, 0, Draw);
+		platform.WriteUInt32(packet, 4, 0);
+		var linesBefore = platform.LineCount;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			balance, packet));
+		Assert.Equal(linesBefore + 1, platform.LineCount);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			balance));
+	}
+
+	[Fact]
+	public void BalanceMalformedPolicyRecordFailsClosed()
+	{
+		var platform = NewPlatform();
+		var balanceClass = Register(ref platform, 0x1380, "Balance.mui");
+		var balance = MuiCommonControlCore.CreateControl(ref platform, State,
+			balanceClass, BuildTags(ref platform, 0x13C0,
+				[(BalanceQuiet, 1u)]));
+		Assert.True(balance.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, balance,
+			BalancePolicyStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiBalancePolicyStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiBalancePolicyStateField.Quiet, 2));
+		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+
+		Assert.False(MuiCommonControlCore.TryGetBalancePolicyStateRecord(
+			ref platform, State, balance, out _));
+		Assert.False(MuiCommonControlCore.TryReadBalancePolicyState(
+			ref platform, State, balance, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, balance,
+			BalanceQuiet, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			balance, BalanceQuiet, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			balance, BalanceQuiet, out var rawQuiet));
+		Assert.Equal(1u, rawQuiet);
+		Assert.Equal(2u, platform.ReadUInt32(block, 4));
 	}
 
 	[Fact]
@@ -2566,15 +2941,25 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(InputModeRelVerify, Get(ref platform, relative, InputMode));
 		platform.WriteUInt32(packet, 0, HandleEvent);
 		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPress));
+		platform.Ticks = 17;
 		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
 			relative, packet));
 		Assert.Equal(1u, Get(ref platform, relative, Selected));
 		Assert.Equal(1u, Get(ref platform, relative, Pressed));
+		Assert.True(MuiAreaTimerPacketCore.TryGet(ref platform, State, relative,
+			out var timerAfterPress));
+		Assert.Equal(1u, timerAfterPress.Armed);
+		Assert.Equal(1u, timerAfterPress.MouseOver);
+		Assert.Equal(17u, timerAfterPress.LastTick);
 		platform.WriteUInt32(packet, 8, unchecked((uint)KeyUp));
 		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
 			relative, packet));
 		Assert.Equal(1u, Get(ref platform, relative, Selected));
 		Assert.Equal(0u, Get(ref platform, relative, Pressed));
+		Assert.True(MuiAreaTimerPacketCore.TryGet(ref platform, State, relative,
+			out var timerAfterRelease));
+		Assert.Equal(0u, timerAfterRelease.Armed);
+		Assert.Equal(0u, timerAfterRelease.MouseOver);
 
 		var immediateTags = BuildTags(ref platform, 0x1C00, new[] {
 			(InputMode, InputModeImmediate) });
@@ -2702,6 +3087,440 @@ public sealed class MuiCommonControlClassTests
 			stringObj, packet));
 	}
 
+	[Fact]
+	public void StringTranslatedTabUsesSpaceUnlessMultilineEnablesTabs()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x3D00, "String.mui");
+		var source = APTR.FromPointer(0x3D40);
+		platform.WriteCString(source, "a");
+		var singleLine = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3D80, new[] {
+				(StringContents, source.Raw) }));
+		Assert.NotEqual(APTR.Null, singleLine);
+
+		var intuiMessage = APTR.FromPointer(0x3DC0);
+		var packet = APTR.FromPointer(0x3E00);
+		platform.WriteUInt32(intuiMessage, 20, 0x00000400);
+		platform.WriteUInt16(intuiMessage, 24, 9);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 4, intuiMessage.Raw);
+		platform.WriteUInt32(packet, 8, unchecked((uint)-1));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			singleLine, packet));
+		Assert.Equal("a ", ReadCString(ref platform, APTR.FromPointer(
+			Get(ref platform, singleLine, StringContents))));
+
+		var multiSource = APTR.FromPointer(0x3E40);
+		platform.WriteCString(multiSource, "a");
+		var multiline = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3E80, new[] {
+				(StringContents, multiSource.Raw), (StringMultiline, 1u) }));
+		Assert.NotEqual(APTR.Null, multiline);
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			multiline, packet));
+		Assert.Equal("a\t", ReadCString(ref platform, APTR.FromPointer(
+			Get(ref platform, multiline, StringContents))));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			singleLine));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			multiline));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+	}
+
+	[Fact]
+	public void StringWordNavigationUsesLogicalUtf8CursorBoundaries()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x3F00, "String.mui");
+		var source = APTR.FromPointer(0x3F40);
+		WriteUtf8CString(ref platform, source, "one Ångström end");
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3F80, new[] {
+				(StringContents, source.Raw), (Unicode, 1u) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+		Assert.Equal(16u, Get(ref platform, stringObj, StringBufferPos));
+
+		var packet = APTR.FromPointer(0x3FC0);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyWordLeft));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		// The logical cursor starts after the final word and crosses the preceding
+		// separator to the start of "end" (13 UTF-8 characters).
+		Assert.Equal(13u, Get(ref platform, stringObj, StringBufferPos));
+
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyWordLeft));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(4u, Get(ref platform, stringObj, StringBufferPos));
+
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyWordRight));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(13u, Get(ref platform, stringObj, StringBufferPos));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+	}
+
+	[Fact]
+	public void StringMultilineReturnInsertsLineBreakUnlessAdvanceOnCrIsEnabled()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1100, "String.mui");
+		var source = APTR.FromPointer(0x3A00);
+		platform.WriteCString(source, "ab");
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3B00, new[] {
+				(StringContents, source.Raw), (StringMaxLen, 8u),
+				(StringMultiline, 1u) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		var packet = APTR.FromPointer(0x3C00);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPress));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal("ab\n", ReadCString(ref platform, APTR.FromPointer(
+			Get(ref platform, stringObj, StringContents))));
+		Assert.Equal(3u, Get(ref platform, stringObj, StringBufferPos));
+		// A multiline Return edits contents; it does not publish Acknowledge.
+		Assert.Equal(0u, Get(ref platform, stringObj, StringAcknowledge));
+
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringAdvanceOnCR, 1));
+		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal("ab\n", ReadCString(ref platform, APTR.FromPointer(
+			Get(ref platform, stringObj, StringContents))));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+	}
+
+	[Fact]
+	public void StringMultilineCursorNavigationUsesLineBoundaries()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x3E00, "String.mui");
+		var source = APTR.FromPointer(0x3E40);
+		platform.WriteCString(source, "abc\ndefg\nhij");
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3E80, new[] {
+				(StringContents, source.Raw), (StringMultiline, 1u) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		var packet = APTR.FromPointer(0x3EC0);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		Set(ref platform, stringObj, StringBufferPos, 6);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyHome));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(4u, Get(ref platform, stringObj, StringBufferPos));
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyEnd));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(8u, Get(ref platform, stringObj, StringBufferPos));
+
+		// From line two, Up/Down preserve the logical column and clamp only when
+		// the adjacent line is shorter.
+		Set(ref platform, stringObj, StringBufferPos, 6);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyUp));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(2u, Get(ref platform, stringObj, StringBufferPos));
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyDown));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(6u, Get(ref platform, stringObj, StringBufferPos));
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyDown));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(11u, Get(ref platform, stringObj, StringBufferPos));
+
+		// At the first/last line, vertical movement is a no-op.
+		Set(ref platform, stringObj, StringBufferPos, 2);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyUp));
+		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Set(ref platform, stringObj, StringBufferPos, 11);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyDown));
+		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+	}
+
+	[Fact]
+	public void StringMultilineCursorNavigationUsesUtf8LogicalColumns()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x3F00, "String.mui");
+		var source = APTR.FromPointer(0x3F40);
+		var utf8 = Encoding.UTF8.GetBytes("Åβ\nx🙂");
+		for (var index = 0; index < utf8.Length; index++)
+			platform.WriteUInt8(source, index, utf8[index]);
+		platform.WriteUInt8(source, utf8.Length, 0);
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3F80, new[] {
+				(StringContents, source.Raw), (StringMultiline, 1u),
+				(Unicode, 1u) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		// Logical positions are Å=0, β=1, LF=2, x=3, 🙂=4.
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringBufferPos, 4));
+		var packet = APTR.FromPointer(0x3FC0);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyHome));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(3u, Get(ref platform, stringObj, StringBufferPos));
+		Set(ref platform, stringObj, StringBufferPos, 4);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyUp));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(1u, Get(ref platform, stringObj, StringBufferPos));
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyDown));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(4u, Get(ref platform, stringObj, StringBufferPos));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+	}
+
+	[Fact]
+	public void StringMultilinePageNavigationPreservesLogicalUtf8Columns()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x4000, "String.mui");
+		var source = APTR.FromPointer(0x4040);
+		var utf8 = Encoding.UTF8.GetBytes("aa\nb\nccc\nÅβ\nend");
+		for (var index = 0; index < utf8.Length; index++)
+			platform.WriteUInt8(source, index, utf8[index]);
+		platform.WriteUInt8(source, utf8.Length, 0);
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x4080, new[] {
+				(StringContents, source.Raw), (StringMultiline, 1u),
+				(Unicode, 1u) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		var renderInfo = APTR.FromPointer(0x40C0);
+		platform.WriteUInt32(renderInfo, 20, 0x4100);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, stringObj,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, stringObj, 0,
+			0, 32, 20));
+		Assert.True(MuiStringScrollAttributeCore.TryReadMetricsState(ref platform,
+			State, stringObj, out var metrics));
+		Assert.Equal(20u, metrics.VisibleHeight);
+
+		// Logical positions: line one ends at 4, line three starts at 9 and
+		// contains Å at 9 and β at 10. A two-line page keeps column one across
+		// the multibyte line rather than treating Å as two cursor columns.
+		Set(ref platform, stringObj, StringBufferPos, 4);
+		var packet = APTR.FromPointer(0x4140);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPageDown));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(10u, Get(ref platform, stringObj, StringBufferPos));
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPageUp));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(4u, Get(ref platform, stringObj, StringBufferPos));
+
+		// Paging beyond the document clamps to the last line and keeps the same
+		// logical column; paging back returns to the corresponding line.
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPageDown));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(10u, Get(ref platform, stringObj, StringBufferPos));
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPageDown));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(13u, Get(ref platform, stringObj, StringBufferPos));
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPageUp));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(6u, Get(ref platform, stringObj, StringBufferPos));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+	}
+
+	[Fact]
+	public void StringMultilineTopAndBottomUseDocumentBoundaries()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x4200, "String.mui");
+		var source = APTR.FromPointer(0x4240);
+		var utf8 = Encoding.UTF8.GetBytes("one\nÅβ\ntwo");
+		for (var index = 0; index < utf8.Length; index++)
+			platform.WriteUInt8(source, index, utf8[index]);
+		platform.WriteUInt8(source, utf8.Length, 0);
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x4280, new[] {
+				(StringContents, source.Raw), (StringMultiline, 1u),
+				(Unicode, 1u) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		// Logical positions are one per UTF-8 code point: the final position is
+		// ten, while the byte representation is twelve bytes long.
+		Set(ref platform, stringObj, StringBufferPos, 5);
+		var packet = APTR.FromPointer(0x42C0);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyTop));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(0u, Get(ref platform, stringObj, StringBufferPos));
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyBottom));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(10u, Get(ref platform, stringObj, StringBufferPos));
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyBottom));
+		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+
+		// The document boundaries also apply to ordinary single-line String
+		// instances, where they coincide with the absolute cursor endpoints.
+		var singleSource = APTR.FromPointer(0x4300);
+		platform.WriteCString(singleSource, "0123456789");
+		var single = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x4340, new[] {
+				(StringContents, singleSource.Raw), (Unicode, 1u) }));
+		Assert.NotEqual(APTR.Null, single);
+		Set(ref platform, single, StringBufferPos, 5);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyTop));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			single, packet));
+		Assert.Equal(0u, Get(ref platform, single, StringBufferPos));
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyBottom));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			single, packet));
+		Assert.Equal(10u, Get(ref platform, single, StringBufferPos));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, single));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+	}
+
+	[Fact]
+	public void StringMultilineCursorMovementKeepsNamedViewportVisible()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x4100, "String.mui");
+		var source = APTR.FromPointer(0x4140);
+		platform.WriteCString(source, "12345\nx\nz");
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x4180, new[] {
+				(StringContents, source.Raw), (StringMultiline, 1u) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		var renderInfo = APTR.FromPointer(0x41C0);
+		platform.WriteUInt32(renderInfo, 20, 0x4200);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, stringObj,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, stringObj, 0,
+			0, 16, 10));
+		Set(ref platform, stringObj, StringBufferPos, 0);
+
+		var packet = APTR.FromPointer(0x4240);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyRight));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyRight));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(2u, Get(ref platform, stringObj, StringBufferPos));
+		Assert.Equal(8u, Get(ref platform, stringObj, StringScrollLeft));
+
+		// Down moves to the one-character second line while retaining a valid
+		// horizontal viewport for the clamped column.
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyDown));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(7u, Get(ref platform, stringObj, StringBufferPos));
+		Assert.Equal(10u, Get(ref platform, stringObj, StringScrollTop));
+		Assert.Equal(8u, Get(ref platform, stringObj, StringScrollLeft));
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyHome));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(6u, Get(ref platform, stringObj, StringBufferPos));
+		Assert.Equal(0u, Get(ref platform, stringObj, StringScrollLeft));
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyDown));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(8u, Get(ref platform, stringObj, StringBufferPos));
+		Assert.Equal(20u, Get(ref platform, stringObj, StringScrollTop));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+	}
+
+	[Fact]
+	public void StringMultilineContentsReplacementKeepsNamedViewportVisible()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x4300, "String.mui");
+		var source = APTR.FromPointer(0x4340);
+		var replacement = APTR.FromPointer(0x4380);
+		platform.WriteCString(source, "a\nb\nc");
+		platform.WriteCString(replacement, "12345\nx\nz");
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x43C0, new[] {
+				(StringContents, source.Raw), (StringMultiline, 1u) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		var renderInfo = APTR.FromPointer(0x4400);
+		platform.WriteUInt32(renderInfo, 20, 0x4440);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, stringObj,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, stringObj, 0,
+			0, 16, 10));
+		Assert.True(MuiStringScrollAttributeCore.TryReadMetricsState(ref platform,
+			State, stringObj, out var initialMetrics));
+		Assert.Equal(30u, initialMetrics.Height);
+		Assert.Equal(10u, initialMetrics.VisibleHeight);
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringBufferPos, 4));
+		Assert.Equal(20u, Get(ref platform, stringObj, StringScrollTop));
+
+		// The same logical cursor position becomes line one, column four in the
+		// replacement. Contents replacement must reuse the named cursor and
+		// scroll records after clamping rather than leaving the old viewport.
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringContents, replacement.Raw));
+		Assert.Equal(4u, Get(ref platform, stringObj, StringBufferPos));
+		Assert.Equal(0u, Get(ref platform, stringObj, StringScrollTop));
+		Assert.Equal(24u, Get(ref platform, stringObj, StringScrollLeft));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+	}
+
 	// Gap 12/14: keyboard stepping and disabled gating across the whole Numeric
 	// family (shared behavior — asserted once per registered numeric class).
 	[Fact]
@@ -2748,6 +3567,18 @@ public sealed class MuiCommonControlClassTests
 				obj, packet));
 			Assert.Equal(49u, Get(ref platform, obj, NumericValue));
 			Set(ref platform, obj, NumericReverse, 0);
+			Set(ref platform, obj, NumericValue, 50);
+			Set(ref platform, obj, NumericDefault, 25);
+			platform.WriteUInt32(packet, 8, unchecked((uint)KeyToggle));
+			Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+				obj, packet));
+			Assert.Equal(25u, Get(ref platform, obj, NumericValue));
+			Set(ref platform, obj, NumericDefault, 500);
+			Set(ref platform, obj, NumericValue, 50);
+			Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+				obj, packet));
+			Assert.Equal(100u, Get(ref platform, obj, NumericValue));
+			Set(ref platform, obj, NumericDefault, 25);
 			Set(ref platform, obj, NumericValue, 50);
 
 			// A disabled control consumes nothing and leaves the value untouched.
@@ -2988,6 +3819,36 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void LevelmeterMalformedPresentationRecordFailsClosed()
+	{
+		var platform = NewPlatform();
+		var levelmeterClass = Register(ref platform, 0x1F00, "Levelmeter.mui");
+		var levelmeter = MuiCommonControlCore.CreateControl(ref platform, State,
+			levelmeterClass, BuildTags(ref platform, 0x1F40, [(GaugeHoriz, 1u)]));
+		Assert.True(levelmeter.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, levelmeter,
+			LevelmeterPresentationStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiLevelmeterPresentationStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiLevelmeterPresentationStateField.Horizontal, 2));
+		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+
+		Assert.False(MuiCommonControlCore.TryGetLevelmeterPresentationStateRecord(
+			ref platform, State, levelmeter, out _));
+		Assert.False(MuiCommonControlCore.TryReadLevelmeterPresentationState(
+			ref platform, State, levelmeter, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, levelmeter,
+			GaugeHoriz, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			levelmeter, GaugeHoriz, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			levelmeter, GaugeHoriz, out var rawHorizontal));
+		Assert.Equal(1u, rawHorizontal);
+		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+	}
+
+	[Fact]
 	public void LevelmeterLabelUsesNamedGuestRecordAndTracksReplacement()
 	{
 		var platform = NewPlatform();
@@ -3126,6 +3987,40 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void PropMalformedRangeRecordFailsClosed()
+	{
+		var platform = NewPlatform();
+		var propClass = Register(ref platform, 0x1180, "Prop.mui");
+		var prop = MuiCommonControlCore.CreateControl(ref platform, State,
+			propClass, BuildTags(ref platform, 0x11C0, new[] {
+				(PropEntries, 100u), (PropVisible, 10u), (PropFirst, 20u) }));
+		Assert.True(prop.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, prop,
+			PropRangeStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiPropRangeStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiPropRangeStateField.First, 99));
+		Assert.Equal(99u, platform.ReadUInt32(block, 12));
+
+		Assert.False(MuiCommonControlCore.TryGetPropRangeStateRecord(
+			ref platform, State, prop, out _));
+		Assert.False(MuiCommonControlCore.TryReadPropRangeState(ref platform, State,
+			prop, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, prop,
+			PropFirst, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			prop, PropFirst, 30, false));
+		Assert.False(MuiCommonControlCore.TrySetHeadlessPropAttribute(ref platform,
+			State, prop, PropVisible, 5, false, out var handled));
+		Assert.True(handled);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, prop,
+			PropFirst, out var rawFirst));
+		Assert.Equal(20u, rawFirst);
+		Assert.Equal(99u, platform.ReadUInt32(block, 12));
+	}
+
+	[Fact]
 	public void GaugeStateUsesNamedGuestRecordForDivideClampAndDrawing()
 	{
 		var platform = NewPlatform();
@@ -3210,6 +4105,37 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiCommonControlCore.TryGetGaugeStateRecord(
 			ref platform, State, gauge, out var rendered));
 		Assert.Equal(25u, rendered.Current);
+	}
+
+	[Fact]
+	public void GaugeMalformedHorizontalRecordFailsClosed()
+	{
+		var platform = NewPlatform();
+		var gaugeClass = Register(ref platform, 0x1E80, "Gauge.mui");
+		var gauge = MuiCommonControlCore.CreateControl(ref platform, State,
+			gaugeClass, BuildTags(ref platform, 0x1EC0,
+			[(GaugeMax, 100u), (GaugeCurrent, 25u), (GaugeHoriz, 1u)]));
+		Assert.True(gauge.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, gauge,
+			GaugeStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiGaugeStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiGaugeStateField.Horizontal, 2));
+		Assert.Equal(2u, platform.ReadUInt32(block, 16));
+
+		Assert.False(MuiCommonControlCore.TryGetGaugeStateRecord(
+			ref platform, State, gauge, out _));
+		Assert.False(MuiCommonControlCore.TryReadGaugeState(ref platform, State,
+			gauge, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, gauge,
+			GaugeHoriz, out _, out _));
+		Assert.False(MuiCommonControlCore.SetGauge(ref platform, State, gauge,
+			50));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			gauge, GaugeCurrent, out var rawCurrent));
+		Assert.Equal(25u, rawCurrent);
+		Assert.Equal(2u, platform.ReadUInt32(block, 16));
 	}
 
 	// Gap 13: Draw produces class-specific content for the numeric readout
@@ -3354,6 +4280,94 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
 			body, drawPacket));
 		Assert.Equal(bodyImageBefore + 1, platform.ImageCount);
+	}
+
+	[Fact]
+	public void StringMultilineDrawSplitsLinesAndAdvancesBaselines()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1200, "String.mui");
+		var source = APTR.FromPointer(0x3200);
+		platform.WriteCString(source, "ab\ncde");
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3240, new[] {
+				(StringContents, source.Raw), (StringMultiline, 1u),
+				(StringFormat, StringFormatCenter) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		var renderInfo = APTR.FromPointer(0x3280);
+		platform.WriteUInt32(renderInfo, 20, 0x3300);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, stringObj,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, stringObj, 0,
+			0, 80, 20));
+		var packet = APTR.FromPointer(0x3340);
+		platform.WriteUInt32(packet, 0, Draw);
+		platform.WriteUInt32(packet, 4, 0);
+		platform.TextCount = 0;
+
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(2u, platform.TextCount);
+		var owned = APTR.FromPointer(Get(ref platform, stringObj, StringContents));
+		Assert.Equal(owned.Raw, platform.FirstText.Raw);
+		Assert.Equal(32, platform.FirstTextLeft);
+		Assert.Equal(owned.Raw + 3, platform.SecondText.Raw);
+		Assert.Equal(28, platform.SecondTextLeft);
+		Assert.Equal(3, platform.LastTextLength);
+		Assert.Equal(20, platform.LastTextBaseline);
+		Assert.Equal("cde", ReadCString(ref platform, platform.SecondText));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+	}
+
+	[Fact]
+	public void StringMultilineDrawHonorsNamedScrollViewport()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x3600, "String.mui");
+		var source = APTR.FromPointer(0x3640);
+		platform.WriteCString(source, "0123456789\nalpha\nomega");
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3680, new[] {
+				(StringContents, source.Raw), (StringMultiline, 1u) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		var renderInfo = APTR.FromPointer(0x36C0);
+		platform.WriteUInt32(renderInfo, 20, 0x3700);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, stringObj,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, stringObj, 0,
+			0, 40, 10));
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringScrollTop, 10));
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringScrollLeft, 8));
+		var packet = APTR.FromPointer(0x3740);
+		platform.WriteUInt32(packet, 0, Draw);
+		platform.WriteUInt32(packet, 4, 0);
+		platform.TextCount = 0;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+
+		// ScrollTop=10 selects the second logical line. ScrollLeft=8 skips one
+		// character from "alpha" while the 40-pixel viewport shows the rest.
+		var owned = APTR.FromPointer(Get(ref platform, stringObj, StringContents));
+		Assert.Equal(1u, platform.TextCount);
+		Assert.Equal(owned.Raw + 12, platform.FirstText.Raw);
+		Assert.Equal(4, platform.LastTextLength);
+		Assert.Equal(0, platform.LastTextLeft);
+		Assert.Equal(10, platform.LastTextBaseline);
+		Assert.Equal("lpha", Encoding.UTF8.GetString(ReadBytes(ref platform,
+			platform.FirstText, platform.LastTextLength)));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
 	}
 
 	// Gap 15: the neutral class-specific AskMinMax geometry is asserted exactly
@@ -3662,6 +4676,52 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void AreaMalformedPresentationRecordFailsClosedBeforeMutationSizingAndDrawing()
+	{
+		var platform = NewPlatform();
+		var rectangleClass = Register(ref platform, 0x2280, "Rectangle.mui");
+		var rectangle = MuiCommonControlCore.CreateControl(ref platform, State,
+			rectangleClass, APTR.Null);
+		Assert.True(rectangle.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, rectangle,
+			AreaPresentationStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaPresentationStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiAreaPresentationStateField.Disabled, 2));
+		Assert.True(MuiAreaPresentationStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiAreaPresentationStateField.Disabled,
+			out var malformedDisabled));
+		Assert.Equal(2u, malformedDisabled);
+
+		Assert.False(MuiCommonControlCore.TryGetAreaPresentationStateRecord(
+			ref platform, State, rectangle, out _));
+		Assert.False(MuiCommonControlCore.TryReadAreaPresentationState(
+			ref platform, State, rectangle, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, rectangle,
+			Disabled, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			rectangle, ShowMe, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			rectangle, ShowMe, out var rawShowMe));
+		Assert.Equal(1u, rawShowMe);
+
+		Assert.True(MuiCommonControlCore.TryComputeMinMax(ref platform, State,
+			rectangle, out var minMax));
+		Assert.Equal((short)0, minMax.MinWidth);
+		Assert.Equal((short)0, minMax.MinHeight);
+		Assert.False(MuiCommonControlCore.DrawControl(ref platform, State,
+			rectangle, 0));
+		Assert.False(MuiAreaLayoutCore.DrawBackground(ref platform, State,
+			rectangle, 0, 0, 8, 8));
+
+		Assert.True(MuiAreaPresentationStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiAreaPresentationStateField.Disabled,
+			out malformedDisabled));
+		Assert.Equal(2u, malformedDisabled);
+	}
+
+	[Fact]
 	public void AreaGeometryUsesNamedRecordForGetAndOmGet()
 	{
 		var platform = NewPlatform();
@@ -3763,6 +4823,43 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
 			text, getMessage));
 		Assert.Equal(5u, platform.ReadUInt32(getStorage, 0));
+	}
+
+	[Fact]
+	public void AreaFixedTextSamplesAreOwnedAndFixCommonMinMax()
+	{
+		var platform = NewPlatform();
+		var textClass = Register(ref platform, 0x12E0, "Text.mui");
+		var widthSource = APTR.FromPointer(0x2400);
+		var heightSource = APTR.FromPointer(0x2440);
+		platform.WriteCString(widthSource, "1234");
+		platform.WriteCString(heightSource, "\n\n");
+		var text = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x2480, new[] {
+				(FixWidthTxt, widthSource.Raw), (FixHeightTxt, heightSource.Raw) }));
+
+		Assert.True(MuiAreaFixedTextCore.TryReadState(ref platform, State, text,
+			out var fixedText));
+		Assert.NotEqual(widthSource.Raw, fixedText.WidthText.Raw);
+		Assert.NotEqual(heightSource.Raw, fixedText.HeightText.Raw);
+		Assert.Equal("1234", ReadCString(ref platform, fixedText.WidthText));
+		Assert.Equal("\n\n", ReadCString(ref platform, fixedText.HeightText));
+		Assert.Equal(fixedText.WidthText.Raw, Get(ref platform, text, FixWidthTxt));
+		Assert.Equal(fixedText.HeightText.Raw, Get(ref platform, text, FixHeightTxt));
+
+		Assert.True(MuiCommonControlCore.TryComputeMinMax(ref platform, State, text,
+			out var minMax));
+		Assert.Equal((short)32, minMax.MinWidth);
+		Assert.Equal((short)32, minMax.DefWidth);
+		Assert.Equal((short)32, minMax.MaxWidth);
+		Assert.Equal((short)30, minMax.MinHeight);
+		Assert.Equal((short)30, minMax.DefHeight);
+		Assert.Equal((short)30, minMax.MaxHeight);
+
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			text, FixWidthTxt, widthSource.Raw));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			text, FixHeightTxt, heightSource.Raw));
 	}
 
 	[Fact]
@@ -3962,6 +5059,37 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void GadgetInteractionMalformedNamedRecordFailsClosed()
+	{
+		var platform = NewPlatform();
+		var gadgetClass = Register(ref platform, 0x2380, "Gadget.mui");
+		var gadget = MuiCommonControlCore.CreateControl(ref platform, State,
+			gadgetClass, BuildTags(ref platform, 0x23C0,
+			[(InputMode, InputModeToggle), (Selected, 1u)]));
+		Assert.True(gadget.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, gadget,
+			GadgetInteractionStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiGadgetInteractionStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiGadgetInteractionStateField.Selected, 2));
+		Assert.Equal(2u, platform.ReadUInt32(block, 8));
+
+		Assert.False(MuiCommonControlCore.TryGetGadgetInteractionStateRecord(
+			ref platform, State, gadget, out _));
+		Assert.False(MuiCommonControlCore.TryReadGadgetInteractionState(
+			ref platform, State, gadget, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, gadget,
+			Selected, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			gadget, Selected, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			gadget, Selected, out var rawSelected));
+		Assert.Equal(1u, rawSelected);
+		Assert.Equal(2u, platform.ReadUInt32(block, 8));
+	}
+
+	[Fact]
 	public void PropAndScrollbarStateUseNamedRecordsForGetAndOmGet()
 	{
 		var platform = NewPlatform();
@@ -4015,6 +5143,53 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
 			scrollbar, getMessage));
 		Assert.Equal(ScrollbarTypeSym, platform.ReadUInt32(getStorage, 0));
+	}
+
+	[Fact]
+	public void ScrollbarMalformedLayoutRecordFailsClosed()
+	{
+		var platform = NewPlatform();
+		var scrollbarClass = Register(ref platform, 0x2880, "Scrollbar.mui");
+		var scrollbar = MuiCommonControlCore.CreateControl(ref platform, State,
+			scrollbarClass, BuildTags(ref platform, 0x28C0, new[] {
+				(GroupHoriz, 1u), (ScrollbarType, ScrollbarTypeSym) }));
+		Assert.True(scrollbar.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, scrollbar,
+			ScrollbarLayoutStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiScrollbarLayoutStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiScrollbarLayoutStateField.Type, 5));
+		Assert.Equal(5u, platform.ReadUInt32(block, 8));
+
+		Assert.False(MuiCommonControlCore.TryGetScrollbarLayoutStateRecord(
+			ref platform, State, scrollbar, out _));
+		Assert.False(MuiCommonControlCore.TryReadScrollbarLayoutState(
+			ref platform, State, scrollbar, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, scrollbar,
+			ScrollbarType, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			scrollbar, ScrollbarType, ScrollbarTypeTop, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			scrollbar, ScrollbarType, out var rawType));
+		Assert.Equal(ScrollbarTypeSym, rawType);
+		Assert.Equal(5u, platform.ReadUInt32(block, 8));
+
+		Assert.True(MuiScrollbarLayoutStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiScrollbarLayoutStateField.Type,
+			ScrollbarTypeSym));
+		Assert.True(MuiScrollbarLayoutStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiScrollbarLayoutStateField.Horizontal, 2));
+		Assert.False(MuiCommonControlCore.TryReadScrollbarLayoutState(
+			ref platform, State, scrollbar, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, scrollbar,
+			GroupHoriz, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			scrollbar, GroupHoriz, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			scrollbar, GroupHoriz, out var rawHorizontal));
+		Assert.Equal(1u, rawHorizontal);
+		Assert.Equal(2u, platform.ReadUInt32(block, 4));
 	}
 
 	[Fact]
@@ -4090,6 +5265,38 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, prop));
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
 			scrollbar));
+	}
+
+	[Fact]
+	public void PropMalformedPolicyRecordFailsClosed()
+	{
+		var platform = NewPlatform();
+		var propClass = Register(ref platform, 0x2880, "Prop.mui");
+		var prop = MuiCommonControlCore.CreateControl(ref platform, State,
+			propClass, BuildTags(ref platform, 0x28C0, new[] {
+				(PropHoriz, 1u), (PropDeltaFactor, 2u), (PropSlider, 1u),
+				(PropUseWinBorder, 0u) }));
+		Assert.True(prop.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, prop,
+			PropPolicyStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiPropPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiPropPolicyStateField.Slider, 2));
+		Assert.Equal(2u, platform.ReadUInt32(block, 12));
+
+		Assert.False(MuiCommonControlCore.TryGetPropPolicyStateRecord(
+			ref platform, State, prop, out _));
+		Assert.False(MuiCommonControlCore.TryReadPropPolicyState(ref platform, State,
+			prop, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, prop,
+			PropSlider, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			prop, PropSlider, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, prop,
+			PropSlider, out var rawSlider));
+		Assert.Equal(1u, rawSlider);
+		Assert.Equal(2u, platform.ReadUInt32(block, 12));
 	}
 
 	// Gap 8: Bitmap source/geometry attributes the autodocs mark [ISG]
@@ -4373,6 +5580,37 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void SliderMalformedPresentationRecordFailsClosed()
+	{
+		var platform = NewPlatform();
+		var sliderClass = Register(ref platform, 0x1E80, "Slider.mui");
+		var slider = MuiCommonControlCore.CreateControl(ref platform, State,
+			sliderClass, BuildTags(ref platform, 0x1EC0,
+			[(SliderHoriz, 0u), (SliderQuiet, 1u)]));
+		Assert.True(slider.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, slider,
+			SliderPresentationStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiSliderPresentationStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiSliderPresentationStateField.Quiet, 2));
+		Assert.Equal(2u, platform.ReadUInt32(block, 8));
+
+		Assert.False(MuiCommonControlCore.TryGetSliderPresentationStateRecord(
+			ref platform, State, slider, out _));
+		Assert.False(MuiCommonControlCore.TryReadSliderPresentationState(
+			ref platform, State, slider, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, slider,
+			SliderQuiet, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			slider, SliderHoriz, 1, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			slider, SliderHoriz, out var rawHorizontal));
+		Assert.Equal(0u, rawHorizontal);
+		Assert.Equal(2u, platform.ReadUInt32(block, 8));
+	}
+
+	[Fact]
 	public void ScalePresentationUsesNamedGuestRecordForOrientationAndDrawing()
 	{
 		var platform = NewPlatform();
@@ -4402,6 +5640,36 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
 			scale, packet));
 		Assert.True(platform.LineCount > linesBefore);
+	}
+
+	[Fact]
+	public void ScaleMalformedPresentationRecordFailsClosed()
+	{
+		var platform = NewPlatform();
+		var scaleClass = Register(ref platform, 0x1EC0, "Scale.mui");
+		var scale = MuiCommonControlCore.CreateControl(ref platform, State,
+			scaleClass, BuildTags(ref platform, 0x1F00, [(ScaleHoriz, 1u)]));
+		Assert.True(scale.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, scale,
+			ScalePresentationStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiScalePresentationStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiScalePresentationStateField.Horizontal, 2));
+		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+
+		Assert.False(MuiCommonControlCore.TryGetScalePresentationStateRecord(
+			ref platform, State, scale, out _));
+		Assert.False(MuiCommonControlCore.TryReadScalePresentationState(
+			ref platform, State, scale, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, scale,
+			ScaleHoriz, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			scale, ScaleHoriz, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			scale, ScaleHoriz, out var rawHorizontal));
+		Assert.Equal(1u, rawHorizontal);
+		Assert.Equal(2u, platform.ReadUInt32(block, 4));
 	}
 
 	[Fact]
@@ -4824,6 +6092,204 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void StringIntegerSeedAllocationFailureAbortsConstruction()
+	{
+		// The construction seed is applied after the String policy records have
+		// been created. Search a bounded guest arena for the narrow boundary where
+		// an unseeded String still fits but the seed's owned contents buffer does
+		// not. This keeps the assertion independent of private allocation counts
+		// or object-layout offsets.
+		var foundFailureBoundary = false;
+		for (var size = 0x7000; size <= 0x18000; size += 0x100)
+		{
+			var platform = new MuiHeadlessTestPlatform(0x1000, size, 0x8000,
+				State);
+			if (!MuiHeadlessObjectCore.Initialize(ref platform, State)) continue;
+			var stringClass = Register(ref platform, 0x1100, "String.mui");
+			if (stringClass.IsNull) continue;
+			var plain = MuiCommonControlCore.CreateControl(ref platform, State,
+				stringClass, APTR.Null);
+			if (plain.IsNull) continue;
+
+			var seeded = MuiCommonControlCore.CreateControl(ref platform, State,
+				stringClass, BuildTags(ref platform, 0x1900, new[] {
+					(StringInteger, 42u) }));
+			if (seeded.IsNull)
+			{
+				foundFailureBoundary = true;
+				MuiHeadlessObjectCore.DisposeObject(ref platform, State, plain);
+				break;
+			}
+			MuiHeadlessObjectCore.DisposeObject(ref platform, State, seeded);
+			MuiHeadlessObjectCore.DisposeObject(ref platform, State, plain);
+		}
+
+		Assert.True(foundFailureBoundary,
+			"expected a bounded arena where the String seed cannot allocate its " +
+			"owned contents buffer");
+	}
+
+	[Fact]
+	public void StringContentsReplacementFailureRestoresNamedPointer()
+	{
+		// The public StringContents slot is a caller-owned input boundary, while
+		// the live String record owns its copied buffer.  Search for an arena where
+		// construction and the first copy fit but the replacement copy cannot be
+		// allocated.  The failed Set must leave both projections on the old value.
+		var foundFailureBoundary = false;
+		for (var size = 0x7000; size <= 0x18000; size += 0x100)
+		{
+			var platform = new MuiHeadlessTestPlatform(0x1000, size, 0x8000,
+				State);
+			if (!MuiHeadlessObjectCore.Initialize(ref platform, State)) continue;
+			var stringClass = Register(ref platform, 0x1100, "String.mui");
+			if (stringClass.IsNull) continue;
+			var oldSource = APTR.FromPointer(0x1900);
+			var newSource = APTR.FromPointer(0x1A00);
+			platform.WriteCString(oldSource, "old");
+			platform.WriteCString(newSource, new string('x', 4095));
+			var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+				stringClass, BuildTags(ref platform, 0x1C00, new[] {
+					(StringContents, oldSource.Raw), (StringMaxLen, 4096u) }));
+			if (stringObj.IsNull) continue;
+			var previous = Get(ref platform, stringObj, StringContents);
+			var changed = MuiCommonControlCore.SetControlAttribute(ref platform,
+				State, stringObj, StringContents, newSource.Raw);
+			if (!changed)
+			{
+				Assert.Equal(previous, Get(ref platform, stringObj, StringContents));
+				Assert.True(MuiCommonControlCore.TryReadStringContentsState(
+					ref platform, State, stringObj, out var contents));
+				Assert.Equal(previous, contents.Contents.Raw);
+				Assert.Equal("old", ReadCString(ref platform, contents.Contents));
+				Assert.False(MuiCommonControlCore.SetPersistenceContents(
+					ref platform, State, stringObj, StringContents, newSource));
+				Assert.Equal(previous, Get(ref platform, stringObj, StringContents));
+				foundFailureBoundary = true;
+				MuiHeadlessObjectCore.DisposeObject(ref platform, State, stringObj);
+				break;
+			}
+			MuiHeadlessObjectCore.DisposeObject(ref platform, State, stringObj);
+		}
+
+		Assert.True(foundFailureBoundary,
+			"expected a bounded arena where String contents replacement allocation fails");
+	}
+
+	[Fact]
+	public void CopiedTextReplacementFailureRestoresNamedPointer()
+	{
+		// Text_PreParse uses the same copied C-string path as the other
+		// caller-owned format attributes.  A failed replacement must not leave the
+		// raw attribute pointing at a source whose owned record was never created.
+		var foundFailureBoundary = false;
+		for (var size = 0x7000; size <= 0x18000; size += 0x100)
+		{
+			var platform = new MuiHeadlessTestPlatform(0x1000, size, 0x8000,
+				State);
+			if (!MuiHeadlessObjectCore.Initialize(ref platform, State)) continue;
+			var textClass = Register(ref platform, 0x1100, "Text.mui");
+			if (textClass.IsNull) continue;
+			var oldSource = APTR.FromPointer(0x1900);
+			var newSource = APTR.FromPointer(0x1A00);
+			platform.WriteCString(oldSource, "old-preparse");
+			platform.WriteCString(newSource, new string('p', 4095));
+			var text = MuiCommonControlCore.CreateControl(ref platform, State,
+				textClass, BuildTags(ref platform, 0x1C00, new[] {
+					(TextPreParse, oldSource.Raw) }));
+			if (text.IsNull) continue;
+			var previous = Get(ref platform, text, TextPreParse);
+			if (MuiCommonControlCore.SetControlAttribute(ref platform, State,
+				text, TextPreParse, newSource.Raw))
+			{
+				MuiHeadlessObjectCore.DisposeObject(ref platform, State, text);
+				continue;
+			}
+
+			Assert.Equal(previous, Get(ref platform, text, TextPreParse));
+			Assert.True(MuiCommonControlCore.TryReadTextPreParseState(
+				ref platform, State, text, out var preParse));
+			Assert.Equal(previous, preParse.PreParse.Raw);
+			Assert.Equal("old-preparse", ReadCString(ref platform,
+				preParse.PreParse));
+			foundFailureBoundary = true;
+			MuiHeadlessObjectCore.DisposeObject(ref platform, State, text);
+			break;
+		}
+
+		Assert.True(foundFailureBoundary,
+			"expected a bounded arena where copied Text_PreParse replacement fails");
+	}
+
+	[Fact]
+	public void StringInteger64ReplacementFailureRestoresNamedState()
+	{
+		// Integer64 updates share the owned String contents buffer with ordinary
+		// text edits.  When the object-owned QUAD cannot be admitted, the failed
+		// Set must leave both the old contents and the NULL named QUAD state intact.
+		var foundFailureBoundary = false;
+		for (var size = 0x7000; size <= 0x18000; size += 0x100)
+		{
+			var platform = new MuiHeadlessTestPlatform(0x1000, size, 0x8000,
+				State);
+			if (!MuiHeadlessObjectCore.Initialize(ref platform, State)) continue;
+			var stringClass = Register(ref platform, 0x1100, "String.mui");
+			if (stringClass.IsNull) continue;
+			var oldSource = APTR.FromPointer(0x1900);
+			platform.WriteCString(oldSource, new string('o', 4095));
+			var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+				stringClass, BuildTags(ref platform, 0x1A00, new[] {
+					(StringContents, oldSource.Raw), (StringMaxLen, 4096u) }));
+			if (stringObj.IsNull) continue;
+
+			var quad = APTR.FromPointer(0x1B00);
+			platform.WriteUInt32(quad, 0, 0);
+			platform.WriteUInt32(quad, 4, 17);
+			var previousContents = Get(ref platform, stringObj, StringContents);
+			var previousInteger64 = Get(ref platform, stringObj, StringInteger64);
+			var previousText = ReadCString(ref platform, APTR.FromPointer(
+				previousContents));
+			if (!MuiCommonControlCore.SetControlAttribute(ref platform, State,
+				stringObj, StringInteger64, quad.Raw))
+			{
+				Assert.Equal(previousContents, Get(ref platform, stringObj,
+					StringContents));
+				Assert.Equal(previousInteger64, Get(ref platform, stringObj,
+					StringInteger64));
+				Assert.Equal(previousText, ReadCString(ref platform,
+					APTR.FromPointer(previousContents)));
+				Assert.False(MuiCommonControlCore.TryReadStringInteger64State(
+					ref platform, State, stringObj, out _, out _));
+				foundFailureBoundary = true;
+				MuiHeadlessObjectCore.DisposeObject(ref platform, State, stringObj);
+				break;
+			}
+			MuiHeadlessObjectCore.DisposeObject(ref platform, State, stringObj);
+		}
+
+		Assert.True(foundFailureBoundary,
+			"expected a bounded arena where String Integer64 replacement fails");
+	}
+
+	[Fact]
+	public void StringInteger64DefaultsToHandledNullWhenOmitted()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1100, "String.mui");
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, APTR.Null);
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		Assert.True(MuiCommonControlCore.TryGet(ref platform, State, stringObj,
+			StringInteger64, out var value, out var handled));
+		Assert.True(handled);
+		Assert.Equal(0u, value);
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+	}
+
+	[Fact]
 	public void StringPlaceholderUsesNamedGuestRecordAndOwnedReplacement()
 	{
 		var platform = NewPlatform();
@@ -4879,6 +6345,18 @@ public sealed class MuiCommonControlClassTests
 		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
 			stringObj, StringPlaceholder, unmapped.Raw));
 		Assert.Equal("new hint", ReadCString(ref platform, record.Contents));
+
+		// Clearing the placeholder retires its private copy and leaves the
+		// named guest record explicitly empty.
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringPlaceholder, 0));
+		Assert.Equal(0u, Get(ref platform, stringObj, StringPlaceholder));
+		Assert.True(MuiCommonControlCore.TryGetStringPlaceholderStateRecord(
+			ref platform, State, stringObj, out record));
+		Assert.Equal(MuiStringPlaceholderStateRecord.Cookie, record.Magic);
+		Assert.True(record.Contents.IsNull);
+		Assert.Equal(0, MuiStoreCore.DataspaceLength(ref platform, State,
+			stringObj, 0x7F07000A));
 
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
 			stringObj));
@@ -4936,8 +6414,228 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(record.Contents.Raw, Get(ref platform, stringObj,
 			StringContents));
 
+		// Clearing the caller-visible pointer retires the object-owned copy and
+		// leaves the named contents record in the explicit empty state.
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringContents, 0));
+		Assert.Equal(0u, Get(ref platform, stringObj, StringContents));
+		Assert.True(MuiCommonControlCore.TryGetStringContentsStateRecord(
+			ref platform, State, stringObj, out record));
+		Assert.Equal(MuiStringContentsStateRecord.Cookie, record.Magic);
+		Assert.True(record.Contents.IsNull);
+		Assert.Equal(0, MuiStoreCore.DataspaceLength(ref platform, State,
+			stringObj, 0x7F070001));
+
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
 			stringObj));
+	}
+
+	[Fact]
+	public void StringAndTextContentsRejectUnmappedGuestPointers()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1100, "String.mui");
+		var stringSource = APTR.FromPointer(0x2F00);
+		platform.WriteCString(stringSource, "keep");
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x2F40, new[] {
+				(StringContents, stringSource.Raw) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+		var ownedStringContents = Get(ref platform, stringObj, StringContents);
+		Assert.NotEqual(stringSource.Raw, ownedStringContents);
+		var unmapped = APTR.FromPointer(0x7F0000);
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringContents, unmapped.Raw));
+		Assert.Equal("keep", ReadCString(ref platform, APTR.FromPointer(
+			Get(ref platform, stringObj, StringContents))));
+		Assert.Equal(ownedStringContents, Get(ref platform, stringObj,
+			StringContents));
+
+		var textClass = Register(ref platform, 0x1200, "Text.mui");
+		var textSource = APTR.FromPointer(0x2F80);
+		platform.WriteCString(textSource, "text");
+		var textObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x2FC0, new[] {
+				(TextContents, textSource.Raw) }));
+		Assert.NotEqual(APTR.Null, textObj);
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			textObj, TextContents, unmapped.Raw));
+		Assert.Equal("text", ReadCString(ref platform, APTR.FromPointer(
+			Get(ref platform, textObj, TextContents))));
+
+		Assert.Equal(APTR.Null, MuiCommonControlCore.CreateControl(ref platform,
+			State, stringClass, BuildTags(ref platform, 0x3000, new[] {
+				(StringContents, unmapped.Raw) })));
+		Assert.Equal(APTR.Null, MuiCommonControlCore.CreateControl(ref platform,
+			State, textClass, BuildTags(ref platform, 0x3040, new[] {
+				(TextContents, unmapped.Raw) })));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			textObj));
+	}
+
+	[Fact]
+	public void CopiedStringAttributesRejectUnmappedPointersBeforeMutation()
+	{
+		var platform = NewPlatform();
+		var unmapped = APTR.FromPointer(0x7F0000);
+		Assert.False(MuiCommonControlCore.IsValidGuestCStringPointer(ref platform,
+			unmapped, 65536));
+
+		var textClass = Register(ref platform, 0x3100, "Text.mui");
+		var preParse = APTR.FromPointer(0x3140);
+		var textContents = APTR.FromPointer(0x3180);
+		platform.WriteCString(preParse, "\\33b");
+		platform.WriteCString(textContents, "text");
+		var textObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x31C0, new[] {
+				(TextPreParse, preParse.Raw), (TextContents, textContents.Raw) }));
+		Assert.NotEqual(APTR.Null, textObj);
+		var ownedPreParse = Get(ref platform, textObj, TextPreParse);
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			textObj, TextPreParse, unmapped.Raw));
+		Assert.Equal(ownedPreParse, Get(ref platform, textObj, TextPreParse));
+		var invalidText = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x3200, new[] {
+				(TextPreParse, unmapped.Raw) }));
+		Assert.Equal(APTR.Null, invalidText);
+
+		var numericClass = Register(ref platform, 0x3240, "Numeric.mui");
+		var format = APTR.FromPointer(0x3280);
+		platform.WriteCString(format, "%ld");
+		var numericObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			numericClass, BuildTags(ref platform, 0x32C0, new[] {
+				(NumericFormat, format.Raw) }));
+		Assert.NotEqual(APTR.Null, numericObj);
+		var ownedFormat = Get(ref platform, numericObj, NumericFormat);
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			numericObj, NumericFormat, unmapped.Raw));
+		Assert.Equal(ownedFormat, Get(ref platform, numericObj, NumericFormat));
+
+		var gaugeClass = Register(ref platform, 0x3300, "Gauge.mui");
+		var info = APTR.FromPointer(0x3340);
+		platform.WriteCString(info, "%ld%%");
+		var gaugeObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			gaugeClass, BuildTags(ref platform, 0x3380, new[] {
+				(GaugeInfoText, info.Raw) }));
+		Assert.NotEqual(APTR.Null, gaugeObj);
+		var ownedInfo = Get(ref platform, gaugeObj, GaugeInfoText);
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			gaugeObj, GaugeInfoText, unmapped.Raw));
+		Assert.Equal(ownedInfo, Get(ref platform, gaugeObj, GaugeInfoText));
+
+		var levelmeterClass = Register(ref platform, 0x33C0, "Levelmeter.mui");
+		var label = APTR.FromPointer(0x3400);
+		platform.WriteCString(label, "load");
+		var levelmeterObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			levelmeterClass, BuildTags(ref platform, 0x3440, new[] {
+				(LevelmeterLabel, label.Raw) }));
+		Assert.NotEqual(APTR.Null, levelmeterObj);
+		var ownedLabel = Get(ref platform, levelmeterObj, LevelmeterLabel);
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			levelmeterObj, LevelmeterLabel, unmapped.Raw));
+		Assert.Equal(ownedLabel, Get(ref platform, levelmeterObj, LevelmeterLabel));
+
+		var stringClass = Register(ref platform, 0x3480, "String.mui");
+		var placeholder = APTR.FromPointer(0x34C0);
+		platform.WriteCString(placeholder, "hint");
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3500, new[] {
+				(StringPlaceholder, placeholder.Raw) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+		var ownedPlaceholder = Get(ref platform, stringObj, StringPlaceholder);
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringPlaceholder, unmapped.Raw));
+		Assert.Equal(ownedPlaceholder, Get(ref platform, stringObj,
+			StringPlaceholder));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			textObj));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			numericObj));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			gaugeObj));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			levelmeterObj));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+	}
+
+	[Fact]
+	public void CopiedStringAttributesNullRetiresOwnedState()
+	{
+		var platform = NewPlatform();
+		var textClass = Register(ref platform, 0x3540, "Text.mui");
+		var preParse = APTR.FromPointer(0x3580);
+		platform.WriteCString(preParse, "\\33c");
+		var text = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x35C0, new[] {
+				(TextPreParse, preParse.Raw) }));
+		Assert.NotEqual(APTR.Null, text);
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			text, TextPreParse, 0));
+		Assert.Equal(0u, Get(ref platform, text, TextPreParse));
+		Assert.True(MuiCommonControlCore.TryReadTextPreParseState(ref platform,
+			State, text, out var emptyPreParse));
+		Assert.True(emptyPreParse.PreParse.IsNull);
+		Assert.Equal(0, MuiStoreCore.DataspaceLength(ref platform, State, text,
+			TextPreParseKey));
+
+		var numericClass = Register(ref platform, 0x3600, "Numeric.mui");
+		var format = APTR.FromPointer(0x3640);
+		platform.WriteCString(format, "%ld");
+		var numeric = MuiCommonControlCore.CreateControl(ref platform, State,
+			numericClass, BuildTags(ref platform, 0x3680, new[] {
+				(NumericFormat, format.Raw) }));
+		Assert.NotEqual(APTR.Null, numeric);
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			numeric, NumericFormat, 0));
+		Assert.Equal(0u, Get(ref platform, numeric, NumericFormat));
+		Assert.True(MuiCommonControlCore.TryReadNumericFormatState(ref platform,
+			State, numeric, out var emptyFormat));
+		Assert.True(emptyFormat.Format.IsNull);
+		Assert.Equal(0, MuiStoreCore.DataspaceLength(ref platform, State, numeric,
+			NumericFormatKey));
+
+		var gaugeClass = Register(ref platform, 0x36C0, "Gauge.mui");
+		var info = APTR.FromPointer(0x3700);
+		platform.WriteCString(info, "%ld%%");
+		var gauge = MuiCommonControlCore.CreateControl(ref platform, State,
+			gaugeClass, BuildTags(ref platform, 0x3740, new[] {
+				(GaugeInfoText, info.Raw) }));
+		Assert.NotEqual(APTR.Null, gauge);
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			gauge, GaugeInfoText, 0));
+		Assert.Equal(0u, Get(ref platform, gauge, GaugeInfoText));
+		Assert.True(MuiCommonControlCore.TryReadGaugeInfoTextState(ref platform,
+			State, gauge, out var emptyInfo));
+		Assert.True(emptyInfo.InfoText.IsNull);
+		Assert.Equal(0, MuiStoreCore.DataspaceLength(ref platform, State, gauge,
+			GaugeInfoTextKey));
+
+		var levelmeterClass = Register(ref platform, 0x3780, "Levelmeter.mui");
+		var label = APTR.FromPointer(0x37C0);
+		platform.WriteCString(label, "load");
+		var levelmeter = MuiCommonControlCore.CreateControl(ref platform, State,
+			levelmeterClass, BuildTags(ref platform, 0x3800, new[] {
+				(LevelmeterLabel, label.Raw) }));
+		Assert.NotEqual(APTR.Null, levelmeter);
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			levelmeter, LevelmeterLabel, 0));
+		Assert.Equal(0u, Get(ref platform, levelmeter, LevelmeterLabel));
+		Assert.True(MuiCommonControlCore.TryReadLevelmeterLabelState(ref platform,
+			State, levelmeter, out var emptyLabel));
+		Assert.True(emptyLabel.Label.IsNull);
+		Assert.Equal(0, MuiStoreCore.DataspaceLength(ref platform, State,
+			levelmeter, LevelmeterLabelKey));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, text));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, numeric));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, gauge));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			levelmeter));
 	}
 
 	[Fact]
@@ -5091,6 +6789,37 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void StringFilterMutationRejectsMalformedPairWithoutChangingRawAttribute()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1100, "String.mui");
+		var accept = APTR.FromPointer(0x1D00);
+		var reject = APTR.FromPointer(0x1D40);
+		var replacement = APTR.FromPointer(0x1D80);
+		var malformed = APTR.FromPointer(0x7F0000);
+		platform.WriteCString(accept, "abc");
+		platform.WriteCString(reject, "x");
+		platform.WriteCString(replacement, "xyz");
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x1E00, new[] {
+				(StringAccept, accept.Raw), (StringReject, reject.Raw) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		// Simulate malformed paired state below the public setter boundary.  The
+		// typed setter must fail closed before changing the other filter pointer.
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State,
+			stringObj, StringReject, malformed.Raw, false));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringAccept, replacement.Raw, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			stringObj, StringAccept, out var rawAccept));
+		Assert.Equal(accept.Raw, rawAccept);
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+	}
+
+	[Fact]
 	public void StringInteractionStateCanonicalizesBooleansAndLeavesAdvanceOnCrToCycleRouting()
 	{
 		var platform = NewPlatform();
@@ -5191,6 +6920,8 @@ public sealed class MuiCommonControlClassTests
 		platform.StringEditHookResult = 1;
 		platform.StringEditHookActions = MuiStringEditWorkCodec.ActionUse;
 		platform.StringEditHookBuffer = replacement;
+		platform.StringEditHookSetNumChars = true;
+		platform.StringEditHookNumChars = 6;
 		var packet = APTR.FromPointer(0x1C00);
 		platform.WriteUInt32(packet, 0, HandleEvent);
 		platform.WriteUInt32(packet, 4, 0);
@@ -5293,6 +7024,382 @@ public sealed class MuiCommonControlClassTests
 
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
 			stringObj));
+	}
+
+	[Fact]
+	public void StringUnicodeEditHookReportsLogicalCharacterCount()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1150, "String.mui");
+		var source = APTR.FromPointer(0x2A00);
+		var utf8 = Encoding.UTF8.GetBytes("Åβ🙂");
+		for (var index = 0; index < utf8.Length; index++)
+			platform.WriteUInt8(source, index, utf8[index]);
+		platform.WriteUInt8(source, utf8.Length, 0);
+		var hook = APTR.FromPointer(0x2B00);
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryStringEdit);
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x2C00, new[] {
+				(StringContents, source.Raw), (Unicode, 1u),
+				(MuiCommonControlCore.StringEditHook, hook.Raw) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+		Assert.Equal(3u, Get(ref platform, stringObj, StringBufferPos));
+
+		var packet = APTR.FromPointer(0x2D00);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPress));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		// Å, β and 🙂 occupy eight UTF-8 bytes but three MorphOS logical
+		// characters.  The SGWork struct reports the latter to EditHook.
+		Assert.Equal((short)3, platform.LastStringEditBufferPos);
+		Assert.Equal((short)3, platform.LastStringEditNumChars);
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+	}
+
+	[Fact]
+	public void StringUnicodeEditHookHonorsChangedLogicalCharacterCount()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1160, "String.mui");
+		var source = APTR.FromPointer(0x2E00);
+		var replacement = APTR.FromPointer(0x2F00);
+		WriteUtf8CString(ref platform, source, "Åβ🙂");
+		WriteUtf8CString(ref platform, replacement, "Åβ🙂x");
+		var hook = APTR.FromPointer(0x3000);
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryStringEdit);
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3100, new[] {
+				(StringContents, source.Raw), (Unicode, 1u),
+				(MuiCommonControlCore.StringEditHook, hook.Raw) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		platform.StringEditHookResult = 1;
+		platform.StringEditHookActions = MuiStringEditWorkCodec.ActionUse;
+		platform.StringEditHookBuffer = replacement;
+		platform.StringEditHookSetNumChars = true;
+		platform.StringEditHookNumChars = 2;
+		var packet = APTR.FromPointer(0x3200);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPress));
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		var contents = APTR.FromPointer(Get(ref platform, stringObj,
+			StringContents));
+		Assert.Equal("Åβ", Encoding.UTF8.GetString(ReadBytes(ref platform,
+			contents)));
+		Assert.Equal(2u, Get(ref platform, stringObj, StringBufferPos));
+
+		// An in-place hook edit uses the already-owned WorkBuffer pointer. The
+		// explicit NumChars change must still force a bounded guest copy.
+		platform.StringEditHookBuffer = APTR.Null;
+		platform.StringEditHookNumChars = 1;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		contents = APTR.FromPointer(Get(ref platform, stringObj, StringContents));
+		Assert.Equal("Å", Encoding.UTF8.GetString(ReadBytes(ref platform,
+			contents)));
+		Assert.Equal(1u, Get(ref platform, stringObj, StringBufferPos));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+	}
+
+	[Fact]
+	public void StringEditHookClearingUseRejectsContentsAndCursorMutation()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1170, "String.mui");
+		var source = APTR.FromPointer(0x3300);
+		platform.WriteCString(source, "abc");
+		var hook = APTR.FromPointer(0x3380);
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryStringEdit);
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x33C0, new[] {
+				(StringContents, source.Raw), (StringBufferPos, 2u),
+				(MuiCommonControlCore.StringEditHook, hook.Raw) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		platform.StringEditHookResult = 1;
+		platform.StringEditHookActions = 0;
+		platform.StringEditHookBuffer = APTR.Null;
+		platform.StringEditHookSetBufferPos = true;
+		platform.StringEditHookBufferPos = 0;
+		platform.StringEditHookWriteInPlace = true;
+		var packet = APTR.FromPointer(0x3400);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPress));
+
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal("abc", ReadCString(ref platform, APTR.FromPointer(
+			Get(ref platform, stringObj, StringContents))));
+		Assert.Equal(2u, Get(ref platform, stringObj, StringBufferPos));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+	}
+
+	[Fact]
+	public void StringEditHookActionEndDeactivatesActiveGadget()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1180, "String.mui");
+		var source = APTR.FromPointer(0x3480);
+		platform.WriteCString(source, "abc");
+		var hook = APTR.FromPointer(0x3500);
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryStringEdit);
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3540, new[] {
+				(StringContents, source.Raw),
+				(MuiCommonControlCore.StringEditHook, hook.Raw) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+		Assert.True(MuiAreaActivationPacketCore.GoActive(ref platform, State,
+			stringObj, 0x52));
+		Assert.True(MuiAreaActivationCore.IsActive(ref platform, State,
+			stringObj));
+
+		platform.StringEditHookResult = 1;
+		platform.StringEditHookActions = MuiStringEditWorkCodec.ActionEnd;
+		var packet = APTR.FromPointer(0x3580);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPress));
+
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.False(MuiAreaActivationCore.IsActive(ref platform, State,
+			stringObj));
+		Assert.True(MuiAreaActivationPacketCore.TryGet(ref platform, State,
+			stringObj, out var activation));
+		Assert.Equal(0u, activation.Active);
+		Assert.Equal(0x52u, activation.Flags);
+		Assert.Equal("abc", ReadCString(ref platform, APTR.FromPointer(
+			Get(ref platform, stringObj, StringContents))));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+	}
+
+	[Fact]
+	public void StringEditHookNextAndPreviousActiveRouteNamedWindowCycleChain()
+	{
+		const uint windowActiveObject = 0x80427925u;
+		var platform = NewPlatform();
+		var windowClass = Register(ref platform, 0x1180, "Window.mui");
+		var stringClass = Register(ref platform, 0x11C0, "String.mui");
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			windowClass, APTR.Null);
+		Assert.NotEqual(APTR.Null, window);
+		var firstSource = APTR.FromPointer(0x3600);
+		var secondSource = APTR.FromPointer(0x3640);
+		platform.WriteCString(firstSource, "first");
+		platform.WriteCString(secondSource, "second");
+		var hook = APTR.FromPointer(0x3680);
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryStringEdit);
+		var first = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x36C0, new[] {
+				(StringContents, firstSource.Raw),
+				(MuiCommonControlCore.StringEditHook, hook.Raw) }));
+		var second = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3700, new[] {
+				(StringContents, secondSource.Raw) }));
+		Assert.NotEqual(APTR.Null, first);
+		Assert.NotEqual(APTR.Null, second);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, window, first));
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, window, second));
+		var cycleVector = APTR.FromPointer(0x3740);
+		platform.WriteUInt32(cycleVector, 0, first.Raw);
+		platform.WriteUInt32(cycleVector, 4, second.Raw);
+		platform.WriteUInt32(cycleVector, 8, 0);
+		Assert.True(MuiApplicationWindowCore.SetCycleChain(ref platform, State,
+			window, cycleVector));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, window,
+			windowActiveObject, first.Raw, false));
+		Assert.True(MuiAreaActivationPacketCore.GoActive(ref platform, State,
+			first, 0x61));
+
+		var packet = APTR.FromPointer(0x3780);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPress));
+		platform.StringEditHookResult = 1;
+		platform.StringEditHookActions = MuiStringEditWorkCodec.ActionEnd |
+			MuiStringEditWorkCodec.ActionNextActive;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			first, packet));
+		Assert.Equal(second.Raw, Get(ref platform, window, windowActiveObject));
+		Assert.False(MuiAreaActivationCore.IsActive(ref platform, State, first));
+
+		platform.StringEditHookActions = MuiStringEditWorkCodec.ActionEnd |
+			MuiStringEditWorkCodec.ActionPreviousActive;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			first, packet));
+		Assert.Equal(first.Raw, Get(ref platform, window, windowActiveObject));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			window));
+	}
+
+	[Fact]
+	public void StringEditHookBeepUsesNamedPlatformRequest()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x11E0, "String.mui");
+		var source = APTR.FromPointer(0x3800);
+		platform.WriteCString(source, "abc");
+		var hook = APTR.FromPointer(0x3840);
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryStringEdit);
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3880, new[] {
+				(StringContents, source.Raw),
+				(MuiCommonControlCore.StringEditHook, hook.Raw) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+
+		var intuiMessage = APTR.FromPointer(0x38C0);
+		var packet = APTR.FromPointer(0x3900);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 4, intuiMessage.Raw);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPress));
+		platform.StringEditHookResult = 1;
+		platform.StringEditHookActions = MuiStringEditWorkCodec.ActionBeep;
+
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(1u, platform.StringEditBeepCount);
+		Assert.Equal(stringObj, platform.LastStringEditBeepObject);
+		Assert.Equal(intuiMessage, platform.LastStringEditBeepInputEvent);
+		Assert.Equal("abc", ReadCString(ref platform, APTR.FromPointer(
+			Get(ref platform, stringObj, StringContents))));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+	}
+
+	[Fact]
+	public void StringEditHookReuseRequiresEndAndUsesNamedPlatformRequest()
+	{
+		var platform = NewPlatform();
+		var windowClass = Register(ref platform, 0x11B0, "Window.mui");
+		var stringClass = Register(ref platform, 0x11F0, "String.mui");
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			windowClass, APTR.Null);
+		Assert.NotEqual(APTR.Null, window);
+		var source = APTR.FromPointer(0x3940);
+		platform.WriteCString(source, "abc");
+		var hook = APTR.FromPointer(0x3980);
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryStringEdit);
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x39C0, new[] {
+				(StringContents, source.Raw),
+				(MuiCommonControlCore.StringEditHook, hook.Raw) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, window, stringObj));
+		Assert.True(MuiAreaActivationPacketCore.GoActive(ref platform, State,
+			stringObj, 0x73));
+
+		var intuiMessage = APTR.FromPointer(0x3A00);
+		var packet = APTR.FromPointer(0x3A40);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 4, intuiMessage.Raw);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyPress));
+		platform.StringEditHookResult = 1;
+		platform.StringEditHookActions = MuiStringEditWorkCodec.ActionEnd |
+			MuiStringEditWorkCodec.ActionReuse;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(1u, platform.StringEditReuseCount);
+		Assert.Equal(stringObj, platform.LastStringEditReuseObject);
+		Assert.Equal(window, platform.LastStringEditReuseWindow);
+		Assert.Equal(intuiMessage, platform.LastStringEditReuseInputEvent);
+		Assert.Equal(KeyPress, platform.LastStringEditReuseMuiKey);
+		Assert.False(MuiAreaActivationCore.IsActive(ref platform, State,
+			stringObj));
+
+		// SGA_REUSE without SGA_END is invalid and must not cross the platform
+		// handoff, while the hook result itself remains handled.
+		Assert.True(MuiAreaActivationPacketCore.GoActive(ref platform, State,
+			stringObj, 0x74));
+		platform.StringEditHookActions = MuiStringEditWorkCodec.ActionReuse;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+		Assert.Equal(1u, platform.StringEditReuseCount);
+		Assert.True(MuiAreaActivationCore.IsActive(ref platform, State,
+			stringObj));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			window));
+	}
+
+	[Fact]
+	public void StringEditHookReuseDeclinedByProviderRedispatchesAfterPoll()
+	{
+		var platform = NewPlatform();
+		var windowClass = Register(ref platform, 0x3B00, "Window.mui");
+		var stringClass = Register(ref platform, 0x3B40, "String.mui");
+		var application = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			windowClass, APTR.Null);
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			windowClass, APTR.Null);
+		Assert.NotEqual(APTR.Null, application);
+		Assert.NotEqual(APTR.Null, window);
+
+		var source = APTR.FromPointer(0x3B80);
+		platform.WriteCString(source, "abc");
+		var hook = APTR.FromPointer(0x3BC0);
+		platform.WriteUInt32(hook, 8, MuiHeadlessTestPlatform.HookEntryStringEdit);
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3C00, new[] {
+				(StringContents, source.Raw),
+				(MuiCommonControlCore.StringEditHook, hook.Raw) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, window, stringObj));
+		Assert.True(MuiApplicationWindowCore.InitializeApplication(ref platform,
+			State, application, 0x20));
+		Assert.True(MuiApplicationWindowCore.AddWindow(ref platform, State,
+			application, window));
+		Assert.True(MuiApplicationWindowCore.OpenWindow(ref platform, State,
+			window, 0x200));
+
+		var handler = APTR.FromPointer(0x3C40);
+		Assert.True(MuiApplicationWindowRecordPacketCore.WriteEventHandler(
+			ref platform, handler, new MuiEventHandlerNodeInput
+			{
+				Flags = (ushort)(MuiEventHandlerNodeInput.MUI_EHF_GUIMODE |
+					MuiEventHandlerNodeInput.MUI_EHF_ALWAYSKEYS),
+				Object = stringObj,
+				Events = 4,
+			}));
+		Assert.True(MuiApplicationWindowCore.AddEventHandler(ref platform, State,
+			window, handler));
+
+		var eventStorage = APTR.FromPointer(0x3C80);
+		var eventMessage = APTR.FromPointer(0x3CC0);
+		var inputEvent = APTR.FromPointer(0x3D00);
+		platform.PreprocessedWindowEventAvailable = true;
+		platform.PreprocessedInputMessage = inputEvent;
+		platform.PreprocessedMuiKey = 0;
+		platform.PendingWindowEvent = 4;
+		platform.RouteHandleEventToCore = true;
+		platform.StringEditHookResult = 1;
+		platform.StringEditHookActions = MuiStringEditWorkCodec.ActionEnd |
+			MuiStringEditWorkCodec.ActionReuse;
+		platform.StringEditReuseAcceptsEvent = false;
+		platform.StringEditReuseSwitchesActions = true;
+		platform.StringEditReuseNextActions = MuiStringEditWorkCodec.ActionUse;
+
+		var pollInput = default(MuiWindowEventPollInput);
+		pollInput.InputEvent = eventStorage;
+		pollInput.EventMessage = eventMessage;
+		Assert.Equal(2u, MuiApplicationWindowCore.PollWindowEvents(ref platform,
+			State, application, pollInput));
+		Assert.Equal(1u, platform.StringEditReuseCount);
+		Assert.Equal(2u, platform.HookInvokeCount);
+		Assert.False(MuiApplicationWindowCore.TakeWindowEventReuse(ref platform,
+			State, window, out _));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			application));
 	}
 
 	[Fact]
@@ -5427,6 +7534,71 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void StringAttachedListClearsWhenReferencedListviewIsDisposed()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1100, "String.mui");
+		var listClass = Register(ref platform, 0x1200, "List.mui");
+		var listviewClass = Register(ref platform, 0x1240, "Listview.mui");
+		var list = MuiListCore.CreateList(ref platform, State, listClass,
+			APTR.Null);
+		var listview = MuiListviewCore.CreateListview(ref platform, State,
+			listviewClass, BuildTags(ref platform, 0x3280, new[] {
+				(ListviewList, list.Raw) }));
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x3300, new[] {
+				(StringAttachedList, listview.Raw) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+		Assert.Equal(listview.Raw, Get(ref platform, stringObj,
+			StringAttachedList));
+		var destination = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, APTR.Null);
+		var follow = APTR.FromPointer(0x3400);
+		platform.WriteUInt32(follow, 0, 0x90000011);
+		// MUIV_TriggerValue asks the notification engine to substitute the
+		// resulting attribute value into the follow-up message.
+		platform.WriteUInt32(follow, 4, 1233727793u);
+		Assert.True(MuiNotifyCore.Add(ref platform, State, stringObj,
+			StringAttachedList, 1233727793u, destination, 2, follow));
+		var dispatchesBefore = platform.DispatchCount;
+
+		// The String owns no Listview. Disposing that caller-owned target must
+		// neutralize the named relationship before later getters or input routing
+		// can observe the dead object pointer.
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			listview));
+		Assert.Equal(dispatchesBefore + 1, platform.DispatchCount);
+		Assert.Equal(destination, platform.LastDispatchObject);
+		Assert.Equal(0x90000011u, platform.LastDispatchMethod);
+		Assert.Equal(0u, platform.LastDispatchArgument);
+		Assert.True(MuiCommonControlCore.TryReadStringAttachedListState(ref platform,
+			State, stringObj, out var attached));
+		Assert.True(attached.Listview.IsNull);
+		Assert.Equal(0u, Get(ref platform, stringObj, StringAttachedList));
+
+		var packet = APTR.FromPointer(0x3380);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 4, 0);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyDown));
+		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			stringObj, packet));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			destination));
+		Assert.Equal(APTR.Null, MuiHeadlessObjectCore.FindObject(ref platform,
+			State, list));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			listviewClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
 	public void StringInteger64UsesNamedQuadStorageAndBoundedDecimalConversion()
 	{
 		var platform = NewPlatform();
@@ -5507,6 +7679,45 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void StringInteger64NullClearsNamedQuadState()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1100, "String.mui");
+		var source = APTR.FromPointer(0x2E00);
+		platform.WriteUInt32(source, 0, 0);
+		platform.WriteUInt32(source, 4, 17);
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x2E80, new[] {
+				(StringInteger64, source.Raw) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+		Assert.True(MuiCommonControlCore.TryReadStringInteger64State(ref platform,
+			State, stringObj, out _, out var initial));
+		Assert.Equal(17u, initial.Low);
+
+		// A NULL [ISG] QUAD clears the object-owned copy. GET still reports the
+		// valid empty pointer state, while the fixed-width record is absent rather
+		// than exposing stale caller data.
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringInteger64, 0));
+		Assert.True(MuiCommonControlCore.TryGet(ref platform, State, stringObj,
+			StringInteger64, out var cleared, out var clearedHandled));
+		Assert.True(clearedHandled);
+		Assert.Equal(0u, cleared);
+		Assert.False(MuiCommonControlCore.TryReadStringInteger64State(ref platform,
+			State, stringObj, out _, out _));
+
+		// The named state can be materialised again without retaining the previous
+		// pointer or requiring an object-layout offset.
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringInteger64, source.Raw));
+		Assert.True(MuiCommonControlCore.TryReadStringInteger64State(ref platform,
+			State, stringObj, out _, out var restored));
+		Assert.Equal(17u, restored.Low);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+	}
+
+	[Fact]
 	public void StringIntegerUsesNamedGuestRecordAndTracksContents()
 	{
 		var platform = NewPlatform();
@@ -5561,6 +7772,48 @@ public sealed class MuiCommonControlClassTests
 
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
 			stringObj));
+	}
+
+	[Fact]
+	public void StringIntegerHonorsMaxLenIncludingTerminatingNul()
+	{
+		var platform = NewPlatform();
+		var stringClass = Register(ref platform, 0x1100, "String.mui");
+		// MorphOS defines MaxLen as the complete buffer size, including NUL.
+		// MaxLen=1 therefore permits only an empty string, even when an integer
+		// seed is supplied at construction time.
+		var stringObj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x2E00, new[] {
+				(StringMaxLen, 1u), (StringInteger, 42u) }));
+		Assert.NotEqual(APTR.Null, stringObj);
+		Assert.Equal("", ReadCString(ref platform, APTR.FromPointer(
+			Get(ref platform, stringObj, StringContents))));
+		Assert.Equal(0u, Get(ref platform, stringObj, StringInteger));
+		Assert.True(MuiCommonControlCore.TryGetStringIntegerStateRecord(
+			ref platform, State, stringObj, out var record));
+		Assert.Equal(0, record.Value);
+
+		// The same bound applies to the runtime Integer setter.
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			stringObj, StringInteger, unchecked((uint)-7)));
+		Assert.Equal("", ReadCString(ref platform, APTR.FromPointer(
+			Get(ref platform, stringObj, StringContents))));
+		Assert.Equal(0u, Get(ref platform, stringObj, StringInteger));
+
+		var integer64Source = APTR.FromPointer(0x2E80);
+		platform.WriteUInt32(integer64Source, 0, 0xFFFFFFFFu);
+		platform.WriteUInt32(integer64Source, 4, 0xFFFFFFF9u);
+		var integer64Obj = MuiCommonControlCore.CreateControl(ref platform, State,
+			stringClass, BuildTags(ref platform, 0x2F00, new[] {
+				(StringMaxLen, 1u), (StringInteger64, integer64Source.Raw) }));
+		Assert.NotEqual(APTR.Null, integer64Obj);
+		Assert.Equal("", ReadCString(ref platform, APTR.FromPointer(
+			Get(ref platform, integer64Obj, StringContents))));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			stringObj));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			integer64Obj));
 	}
 
 	[Fact]
@@ -6093,6 +8346,66 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void TextMalformedPresentationRecordFailsClosedBeforeMutationSizingAndDrawing()
+	{
+		var platform = NewPlatform();
+		var textClass = Register(ref platform, 0x21C0, "Text.mui");
+		var source = APTR.FromPointer(0x2200);
+		platform.WriteCString(source, "LongText");
+		var text = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x2240, new[] {
+				(TextContents, source.Raw), (TextShorten, TextShortenCutoff) }));
+		Assert.True(text.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, text,
+			TextPresentationStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiTextPresentationStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiTextPresentationStateField.Shorten, 3));
+		Assert.True(MuiTextPresentationStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiTextPresentationStateField.Shorten,
+			out var malformedShorten));
+		Assert.Equal(3u, malformedShorten);
+
+		Assert.False(MuiCommonControlCore.TryGetTextPresentationStateRecord(
+			ref platform, State, text, out _));
+		Assert.False(MuiCommonControlCore.TryReadTextPresentationState(
+			ref platform, State, text, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, text,
+			TextShorten, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			text, TextShorten, TextShortenHide, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			text, TextShorten, out var rawShorten));
+		Assert.Equal(TextShortenCutoff, rawShorten);
+
+		var storage = APTR.FromPointer(0x2280);
+		var packet = APTR.FromPointer(0x22C0);
+		platform.WriteUInt32(packet, 0, AskMinMax);
+		platform.WriteUInt32(packet, 4, storage.Raw);
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			text, packet));
+		Assert.Equal(0, platform.ReadUInt16(storage, 0));
+		Assert.Equal(0, platform.ReadUInt16(storage, 2));
+
+		var renderInfo = APTR.FromPointer(0x2300);
+		platform.WriteUInt32(renderInfo, 20, 0x2400);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, text, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, text, 0, 0,
+			16, 10));
+		platform.TextCount = 0;
+		platform.WriteUInt32(packet, 0, Draw);
+		platform.WriteUInt32(packet, 4, 0);
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			text, packet));
+		Assert.Equal(0u, platform.TextCount);
+		Assert.True(MuiTextPresentationStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiTextPresentationStateField.Shorten,
+			out malformedShorten));
+		Assert.Equal(3u, malformedShorten);
+	}
+
+	[Fact]
 	public void TextMeasurementCountsVisibleGlyphsAcrossPreParseEscapesAndNewlines()
 	{
 		var platform = NewPlatform();
@@ -6134,6 +8447,176 @@ public sealed class MuiCommonControlClassTests
 			text, packet));
 		Assert.Equal(64, platform.ReadUInt16(storage, 0));
 		Assert.Equal(20, platform.ReadUInt16(storage, 2));
+	}
+
+	[Fact]
+	public void TextUnicodeModeUsesNamedStateAndLogicalUtf8Columns()
+	{
+		var platform = NewPlatform();
+		var textClass = Register(ref platform, 0x1B00, "Text.mui");
+		var contents = APTR.FromPointer(0x1B40);
+		// UTF-8 for "AλB": three logical glyphs, four bytes.
+		platform.WriteUInt8(contents, 0, (byte)'A');
+		platform.WriteUInt8(contents, 1, 0xCE);
+		platform.WriteUInt8(contents, 2, 0xBB);
+		platform.WriteUInt8(contents, 3, (byte)'B');
+		platform.WriteUInt8(contents, 4, 0);
+		var text = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x1B80, new[] {
+				(TextContents, contents.Raw), (Unicode, 1u),
+				(TextSetMin, 1u), (TextSetMax, 1u), (TextSetVMax, 1u),
+				(TextShorten, TextShortenCutoff) }));
+
+		Assert.Equal(1u, Get(ref platform, text, Unicode));
+		Assert.True(MuiCommonControlCore.TryGetTextUnicodeStateRecord(
+			ref platform, State, text, out var state));
+		Assert.Equal(MuiTextUnicodeStateRecord.Cookie, state.Magic);
+		Assert.Equal(1u, state.Unicode);
+
+		var storage = APTR.FromPointer(0x1BC0);
+		var packet = APTR.FromPointer(0x1C00);
+		platform.WriteUInt32(packet, 0, AskMinMax);
+		platform.WriteUInt32(packet, 4, storage.Raw);
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			text, packet));
+		// Unicode sizing counts A, λ, B rather than the four UTF-8 bytes.
+		Assert.Equal(24, platform.ReadUInt16(storage, 0));
+		Assert.Equal(24, platform.ReadUInt16(storage, 4));
+
+		var renderInfo = APTR.FromPointer(0x1C40);
+		platform.WriteUInt32(renderInfo, 20, 0x2000);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, text, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, text, 0, 0,
+			16, 10));
+		platform.TextCount = 0;
+		platform.WriteUInt32(packet, 0, Draw);
+		platform.WriteUInt32(packet, 4, 0);
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			text, packet));
+		Assert.Equal(1u, Get(ref platform, text, TextShortened));
+		// Two logical columns fit; the UTF-8 lambda remains whole in the byte span.
+		Assert.Equal(3, platform.LastTextLength);
+		Assert.Equal((byte)'A', platform.ReadUInt8(platform.LastText, 0));
+		Assert.Equal((byte)0xCE, platform.ReadUInt8(platform.LastText, 1));
+		Assert.Equal((byte)0xBB, platform.ReadUInt8(platform.LastText, 2));
+	}
+
+	[Fact]
+	public void TextMalformedUnicodeRecordFailsClosedBeforeMetricsAndDrawing()
+	{
+		var platform = NewPlatform();
+		var textClass = Register(ref platform, 0x1D00, "Text.mui");
+		var contents = APTR.FromPointer(0x1D40);
+		platform.WriteCString(contents, "unicode");
+		var text = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x1D80, new[] {
+				(TextContents, contents.Raw), (Unicode, 1u) }));
+		Assert.True(text.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, text,
+			TextUnicodeStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiTextUnicodeStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiTextUnicodeStateField.Unicode, 2));
+		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+
+		Assert.False(MuiCommonControlCore.TryGetTextUnicodeStateRecord(
+			ref platform, State, text, out _));
+		Assert.False(MuiCommonControlCore.TryReadTextUnicodeState(
+			ref platform, State, text, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, text,
+			Unicode, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			text, Unicode, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			text, Unicode, out var rawUnicode));
+		Assert.Equal(1u, rawUnicode);
+
+		var renderInfo = APTR.FromPointer(0x1DC0);
+		platform.WriteUInt32(renderInfo, 20, 0x2000);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, text, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, text, 0, 0,
+			48, 14));
+		Assert.Equal(0u, MuiAreaLayoutCore.TextDimensions(ref platform, State,
+			text, contents, 7));
+		Assert.False(MuiAreaLayoutCore.DrawText(ref platform, State, text, 0, 0,
+			48, 14, contents, 7));
+		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+	}
+
+	[Fact]
+	public void TextPreParseInlineArgbReachesNamedColorProviderRequest()
+	{
+		var platform = NewPlatform();
+		var textClass = Register(ref platform, 0x1C00, "Text.mui");
+		var preParse = APTR.FromPointer(0x1C40);
+		// An image spec may precede a colour directive; the bounded colour scan
+		// must skip it and continue through the leading escape stream.
+		platform.WriteCString(preParse, "\u001bI[img]\u001bP[AABBCCDD]");
+		var contents = APTR.FromPointer(0x1C80);
+		platform.WriteCString(contents, "Color");
+		var text = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x1CC0, new[] {
+				(TextPreParse, preParse.Raw), (TextContents, contents.Raw),
+				(TextSetMin, 1u), (TextSetMax, 1u), (TextSetVMax, 1u) }));
+		var renderInfo = APTR.FromPointer(0x1D00);
+		platform.WriteUInt32(renderInfo, 20, 0x2000);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, text, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, text, 0, 0,
+			48, 10));
+		var packet = APTR.FromPointer(0x1D40);
+		platform.WriteUInt32(packet, 0, Draw);
+		platform.WriteUInt32(packet, 4, 0);
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			text, packet));
+		Assert.Equal(1u, platform.MuiTextInlineColorApplyCount);
+		var request = platform.LastMuiTextInlineColorRequest;
+		Assert.Equal(text, request.Object);
+		Assert.Equal(APTR.FromPointer(0x2000), request.RastPort);
+		Assert.Equal(0x00BBCCDDu, request.Color);
+		Assert.Equal(0xAAu, request.Alpha);
+		Assert.Equal(MuiTextInlineColorFlags.HasColor |
+			MuiTextInlineColorFlags.HasAlpha, request.Flags);
+		Assert.Equal(1u, request.Present);
+	}
+
+	[Fact]
+	public void TextPreParseInlineImageSpecReachesNamedProviderRequest()
+	{
+		var platform = NewPlatform();
+		var textClass = Register(ref platform, 0x1D80, "Text.mui");
+		var preParse = APTR.FromPointer(0x1DC0);
+		platform.WriteCString(preParse, "\u001bI[2:112233]");
+		var contents = APTR.FromPointer(0x1E00);
+		platform.WriteCString(contents, "Picture");
+		var text = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x1E40, new[] {
+				(TextPreParse, preParse.Raw), (TextContents, contents.Raw),
+				(TextSetMin, 1u), (TextSetMax, 1u), (TextSetVMax, 1u) }));
+		var renderInfo = APTR.FromPointer(0x1E80);
+		platform.WriteUInt32(renderInfo, 20, 0x2000);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, text, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, text, 4, 6,
+			64, 12));
+		var packet = APTR.FromPointer(0x1EC0);
+		platform.WriteUInt32(packet, 0, Draw);
+		platform.WriteUInt32(packet, 4, 0);
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			text, packet));
+		Assert.Equal(1u, platform.MuiTextInlineImageApplyCount);
+		var request = platform.LastMuiTextInlineImageRequest;
+		Assert.Equal(text, request.Object);
+		Assert.Equal(APTR.FromPointer(0x2000), request.RastPort);
+		Assert.Equal(4, request.Left);
+		Assert.Equal(6, request.Top);
+		Assert.Equal(64, request.Width);
+		Assert.Equal(12, request.Height);
+		Assert.Equal(MuiImageSpecKind.Color, request.Spec.Kind);
+		Assert.Equal(0x00112233u, request.Spec.Value);
+		Assert.Equal(0x11u, request.Spec.Red);
+		Assert.Equal(0x22u, request.Spec.Green);
+		Assert.Equal(0x33u, request.Spec.Blue);
+		Assert.Equal(1u, request.Present);
 	}
 
 	[Fact]
@@ -6221,6 +8704,38 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(6u, platform.LastPen);
 		// 16px fits in 80px, so the text is not shortened.
 		Assert.Equal(0u, Get(ref platform, text, TextShortened));
+	}
+
+	[Fact]
+	public void TextPreParseSoftStylesReachNamedProviderRequest()
+	{
+		var platform = NewPlatform();
+		var textClass = Register(ref platform, 0x1100, "Text.mui");
+		var contents = APTR.FromPointer(0x1830);
+		platform.WriteCString(contents, "Styled");
+		var preParse = APTR.FromPointer(0x1850);
+		platform.WriteCString(preParse, "\u001bs\u001bb\u001bi");
+		var text = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, BuildTags(ref platform, 0x1900, new[] {
+				(TextContents, contents.Raw), (TextPreParse, preParse.Raw) }));
+		var renderInfo = APTR.FromPointer(0x1480);
+		var rastPort = APTR.FromPointer(0x2000);
+		platform.WriteUInt32(renderInfo, 20, rastPort.Raw);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, text, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, text, 0, 0,
+			80, 12));
+		var packet = APTR.FromPointer(0x1440);
+		platform.WriteUInt32(packet, 0, Draw);
+		platform.WriteUInt32(packet, 4, 0);
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			text, packet));
+		Assert.Equal(1u, platform.MuiTextStyleApplyCount);
+		Assert.Equal(text.Raw, platform.LastMuiTextStyleRequest.Object.Raw);
+		Assert.Equal(rastPort.Raw, platform.LastMuiTextStyleRequest.RastPort.Raw);
+		Assert.Equal(1u, platform.LastMuiTextStyleRequest.Present);
+		Assert.Equal(MuiCustomFontSpecFlags.Shadow |
+			MuiCustomFontSpecFlags.Bold | MuiCustomFontSpecFlags.Italic,
+			platform.LastMuiTextStyleRequest.StyleFlags);
 	}
 
 	[Fact]
@@ -6612,6 +9127,15 @@ public sealed class MuiCommonControlClassTests
 			builder.Append((char)ch);
 		}
 		return builder.ToString();
+	}
+
+	private static void WriteUtf8CString(ref MuiHeadlessTestPlatform platform,
+		APTR address, string value)
+	{
+		var bytes = Encoding.UTF8.GetBytes(value);
+		for (var index = 0; index < bytes.Length; index++)
+			platform.WriteUInt8(address, index, bytes[index]);
+		platform.WriteUInt8(address, bytes.Length, 0);
 	}
 
 	private static byte[] ReadBytes(ref MuiHeadlessTestPlatform platform, APTR address,

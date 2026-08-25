@@ -13,6 +13,15 @@ public sealed class MuiStringscrollTests
 	private const uint Width = 0x8042b59cu;
 	private const uint Height = 0x80423237u;
 	private const uint RenderInfo = 0x7fff0001u;
+	private const uint Font = 0x8042be50u;
+	private const uint ContentWidthStateKey = 0x0f110003u;
+	private const uint ScrollXStateKey = 0x0f110004u;
+	private const uint ScrollYStateKey = 0x0f110005u;
+	private const uint PolicyStateKey = 0x0f110007u;
+	private const uint CompositionStateKey = 0x0f11000du;
+	private const uint LayoutStateKey = 0x0f110009u;
+	private const uint RenderStateKey = 0x0f11000au;
+	private const uint ViewportStateKey = 0x0f11000bu;
 	private const uint Layout = 0x8042845bu;
 	private const uint Draw = 0x80426f3fu;
 	private const uint AskMinMax = 0x80423874u;
@@ -373,6 +382,272 @@ public sealed class MuiStringscrollTests
 	}
 
 	[Fact]
+	public void StringscrollPreservesInitializerScrollbarObjectPointers()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var tags = APTR.FromPointer(0x3000);
+		var horizontalBar = APTR.FromPointer(0x5A00);
+		var verticalBar = APTR.FromPointer(0x5A40);
+		platform.WriteUInt32(tags, 0, MuiStringscrollCore.HorizBar);
+		platform.WriteUInt32(tags, 4, horizontalBar.Raw);
+		platform.WriteUInt32(tags, 8, MuiStringscrollCore.VertBar);
+		platform.WriteUInt32(tags, 12, verticalBar.Raw);
+		platform.WriteUInt32(tags, 16, 0);
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, tags);
+		Assert.NotEqual(APTR.Null, obj);
+
+		Assert.True(MuiStringscrollCore.TryReadScrollbarState(ref platform, State,
+			obj, out var scrollbars));
+		Assert.Equal(horizontalBar, scrollbars.HorizBar);
+		Assert.Equal(verticalBar, scrollbars.VertBar);
+		Assert.True(MuiStringscrollCore.TryReadPolicyState(ref platform, State,
+			obj, out var policy));
+		Assert.Equal(1u, policy.HorizBar);
+		Assert.Equal(1u, policy.VertBar);
+
+		// A later class-aware initializer write updates the typed pointer record,
+		// while policy consumers continue to see a canonical BOOL.
+		var replacement = APTR.FromPointer(0x5A80);
+		Assert.True(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.HorizBar, replacement.Raw));
+		Assert.True(MuiStringscrollCore.TryReadScrollbarState(ref platform, State,
+			obj, out scrollbars));
+		Assert.Equal(replacement, scrollbars.HorizBar);
+		Assert.True(MuiStringscrollCore.TryReadPolicyState(ref platform, State,
+			obj, out policy));
+		Assert.Equal(1u, policy.HorizBar);
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void StringscrollBuildsTypedAutomaticScrollbarChildren()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var scrollbarName = APTR.FromPointer(0x1200);
+		platform.WriteCString(scrollbarName, "scrollbar.mui");
+		var scrollbarClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			scrollbarName, APTR.Null, 0, APTR.FromPointer(1), false);
+		Assert.NotEqual(APTR.Null, scrollbarClass);
+		var source = APTR.FromPointer(0x5B00);
+		platform.WriteCString(source,
+			"0123456789012345678901234567890123456789\nsecond line");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.NotEqual(APTR.Null, obj);
+		Assert.True(MuiStringscrollCore.TryReadCompositionState(ref platform, State,
+			obj, out var composition));
+		Assert.NotEqual(APTR.Null, composition.Horizontal);
+		Assert.NotEqual(APTR.Null, composition.Vertical);
+		Assert.Equal(MuiStringscrollCompositionState.HorizontalOwned |
+			MuiStringscrollCompositionState.VerticalOwned, composition.OwnedMask);
+		Assert.Equal(MuiControlClass.Scrollbar, MuiCommonControlCore.Classify(
+			ref platform, State, composition.Horizontal));
+		Assert.Equal(MuiControlClass.Scrollbar, MuiCommonControlCore.Classify(
+			ref platform, State, composition.Vertical));
+
+		var renderInfo = APTR.FromPointer(0x5B80);
+		platform.WriteUInt32(renderInfo, 20, 0x5BC0);
+		Assert.True(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			RenderInfo, renderInfo.Raw, false));
+		Assert.True(MuiStringscrollCore.Layout(ref platform, State, obj, 0, 0,
+			40, 24));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			composition.Horizontal, MuiCommonControlCore.PropEntries,
+			out var horizontalEntries));
+		Assert.True(horizontalEntries > 0);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			composition.Vertical, MuiCommonControlCore.PropEntries,
+			out var verticalEntries));
+		Assert.True(verticalEntries > 0);
+		Assert.True(MuiStringscrollCore.Draw(ref platform, State, obj, 0));
+		var horizontalChild = composition.Horizontal;
+		var verticalChild = composition.Vertical;
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State, obj));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+		Assert.Equal(APTR.Null, MuiHeadlessObjectCore.FindObject(ref platform,
+			State, horizontalChild));
+		Assert.Equal(APTR.Null, MuiHeadlessObjectCore.FindObject(ref platform,
+			State, verticalChild));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			scrollbarClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ComposedScrollbarChildrenRouteArrowAndThumbInput()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var scrollbarName = APTR.FromPointer(0x1300);
+		platform.WriteCString(scrollbarName, "scrollbar.mui");
+		var scrollbarClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			scrollbarName, APTR.Null, 0, APTR.FromPointer(1), false);
+		Assert.NotEqual(APTR.Null, scrollbarClass);
+		var source = APTR.FromPointer(0x5C00);
+		platform.WriteCString(source,
+			"01234567890123456789012345678901234567890123456789\nsecond line\nthird line");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.NotEqual(APTR.Null, obj);
+		Assert.True(MuiStringscrollCore.Layout(ref platform, State, obj, 0, 0,
+			80, 32));
+		Assert.True(MuiStringscrollCore.TryReadCompositionState(ref platform, State,
+			obj, out var composition));
+		Assert.True(MuiAreaLayoutCore.TryReadGeometryState(ref platform, State,
+			composition.Horizontal, out var horizontalGeometry));
+		Assert.True(MuiCommonControlCore.TryReadScrollbarLayoutState(ref platform,
+			State, composition.Horizontal, out var horizontalLayout));
+		Assert.Equal(1u, horizontalLayout.Horizontal);
+		Assert.Equal(0u, horizontalLayout.Type);
+
+		var intui = APTR.FromPointer(0x5C80);
+		var packet = APTR.FromPointer(0x5D80);
+		var arrowX = horizontalGeometry.Left + horizontalGeometry.Width - 8;
+		var arrowY = horizontalGeometry.Top + horizontalGeometry.Height / 2;
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			IdcmpMouseButtons, SelectUp, 0, 0, unchecked((short)arrowX),
+			unchecked((short)arrowY)));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, KeyNone));
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State, obj,
+			packet));
+		Assert.True(MuiStringscrollCore.GetScrollState(ref platform, State, obj,
+			out var afterArrowX, out var afterArrowY, out _, out _));
+		Assert.True(afterArrowX > 0);
+		Assert.Equal(0, afterArrowY);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			composition.Horizontal, MuiCommonControlCore.PropFirst,
+			out var childAfterArrow));
+		Assert.Equal((uint)afterArrowX, childAfterArrow);
+
+		var propLength = horizontalGeometry.Width - 32;
+		var trackX = horizontalGeometry.Left + 16 + propLength / 2;
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			IdcmpMouseButtons, SelectUp, 0, 0, unchecked((short)trackX),
+			unchecked((short)arrowY)));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, KeyNone));
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State, obj,
+			packet));
+		Assert.True(MuiStringscrollCore.GetScrollState(ref platform, State, obj,
+			out var afterTrackX, out _, out _, out _));
+		Assert.True(afterTrackX > afterArrowX);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			composition.Horizontal, MuiCommonControlCore.PropFirst,
+			out var childAfterTrack));
+		Assert.Equal((uint)afterTrackX, childAfterTrack);
+
+		// The typed child range is the source of the thumb geometry. A drag is
+		// routed through the same child hit region and must update Stringscroll's
+		// bounded pixel scroll state, without reading an ABI offset.
+		Assert.True(MuiCommonControlCore.TryReadPropRangeState(ref platform, State,
+			composition.Horizontal, out var range));
+		Assert.True(propLength > 8);
+		var knob = (int)(range.Visible * (uint)propLength / range.Entries);
+		if (knob <= 0) knob = 1;
+		var offset = (int)(range.First * (uint)propLength / range.Entries);
+		var thumbX = horizontalGeometry.Left + 16 + offset + knob / 2;
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			IdcmpMouseButtons, SelectDown, 0, 0, unchecked((short)thumbX),
+			unchecked((short)arrowY)));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, KeyNone));
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State, obj,
+			packet));
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			IdcmpMouseMove, 0, 0, 0, unchecked((short)(thumbX + 20)),
+			unchecked((short)arrowY)));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, KeyNone));
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State, obj,
+			packet));
+		Assert.True(MuiStringscrollCore.GetScrollState(ref platform, State, obj,
+			out var afterDragX, out _, out var maxX, out _));
+		Assert.True(afterDragX > afterTrackX && afterDragX <= maxX);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			composition.Horizontal, MuiCommonControlCore.PropFirst,
+			out var childAfterDrag));
+		Assert.Equal((uint)afterDragX, childAfterDrag);
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			IdcmpMouseButtons, SelectUp, 0, 0, unchecked((short)(thumbX + 20)),
+			unchecked((short)arrowY)));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, KeyNone));
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State, obj,
+			packet));
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State, obj));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			scrollbarClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void ComposedScrollbarChildFirstChangesAreAdoptedAndResynchronized()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var scrollbarName = APTR.FromPointer(0x1400);
+		platform.WriteCString(scrollbarName, "scrollbar.mui");
+		var scrollbarClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			scrollbarName, APTR.Null, 0, APTR.FromPointer(1), false);
+		Assert.NotEqual(APTR.Null, scrollbarClass);
+		var source = APTR.FromPointer(0x5E00);
+		platform.WriteCString(source,
+			"01234567890123456789012345678901234567890123456789");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.NotEqual(APTR.Null, obj);
+		Assert.True(MuiStringscrollCore.Layout(ref platform, State, obj, 0, 0,
+			80, 32));
+		Assert.True(MuiStringscrollCore.TryReadCompositionState(ref platform, State,
+			obj, out var composition));
+
+		var handled = false;
+		Assert.True(MuiCommonControlCore.TrySetHeadlessPropAttribute(ref platform,
+			State, composition.Horizontal, MuiCommonControlCore.PropFirst, 24,
+			false, out handled));
+		Assert.True(handled);
+		Assert.True(MuiStringscrollCore.Recompute(ref platform, State, obj));
+		Assert.True(MuiStringscrollCore.GetScrollState(ref platform, State, obj,
+			out var adoptedX, out var adoptedY, out _, out _));
+		Assert.Equal(24, adoptedX);
+		Assert.Equal(0, adoptedY);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			composition.Horizontal, MuiCommonControlCore.PropFirst,
+			out var synchronizedX));
+		Assert.Equal(24u, synchronizedX);
+
+		var destination = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			stringClass, APTR.Null);
+		var follow = APTR.FromPointer(0x6200);
+		platform.WriteUInt32(follow, 0, 0x90000001);
+		Assert.True(MuiNotifyCore.Add(ref platform, State, composition.Horizontal,
+			MuiCommonControlCore.PropFirst, 8, destination, 1, follow));
+		var before = platform.DispatchCount;
+		Assert.True(MuiStringscrollCore.SetScroll(ref platform, State, obj, 8, 0));
+		Assert.Equal(before + 1, platform.DispatchCount);
+		Assert.True(MuiStringscrollCore.GetScrollState(ref platform, State, obj,
+			out var parentX, out _, out _, out _));
+		Assert.Equal(8, parentX);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			composition.Horizontal, MuiCommonControlCore.PropFirst,
+			out var parentPublishedX));
+		Assert.Equal(8u, parentPublishedX);
+
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State, obj));
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+			destination));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			scrollbarClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
 	public void StringscrollPolicyUsesNamedGuestRecord()
 	{
 		var platform = CreatePlatform(out var stringClass);
@@ -495,6 +770,405 @@ public sealed class MuiStringscrollTests
 		Assert.True(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
 			MuiStringscrollCore.String, 0));
 		Assert.Equal(0u, Get(ref platform, obj, MuiStringscrollCore.String));
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void SetStringRejectsMalformedNamedStateBeforeReplacingOwnedBuffer()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var source = APTR.FromPointer(0x5120);
+		var replacement = APTR.FromPointer(0x5160);
+		platform.WriteCString(source, "original");
+		platform.WriteCString(replacement, "replacement");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.NotEqual(APTR.Null, obj);
+		var original = Get(ref platform, obj, MuiStringscrollCore.String);
+
+		// This is the named CopperOS store identity for the typed Stringscroll
+		// state record, not an object-layout offset.  Shrinking it simulates a
+		// malformed guest record at the setter boundary.
+		const uint stateRecordKey = 0x0f110008u;
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			stateRecordKey, 4));
+		Assert.False(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.String, replacement.Raw, false));
+		Assert.Equal(original, Get(ref platform, obj, MuiStringscrollCore.String));
+		Assert.Equal("original", ReadCString(ref platform, APTR.FromPointer(original)));
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void SetStringRejectsMalformedLayoutBeforeReplacingOwnedBuffer()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var source = APTR.FromPointer(0x5180);
+		var replacement = APTR.FromPointer(0x51C0);
+		platform.WriteCString(source, "layout-original");
+		platform.WriteCString(replacement, "layout-replacement");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.NotEqual(APTR.Null, obj);
+		var original = Get(ref platform, obj, MuiStringscrollCore.String);
+
+		// The layout record is a named typed state block.  A malformed dependent
+		// record must be rejected before String ownership is replaced because the
+		// successful setter path ends by recomputing the scroll viewport.
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			LayoutStateKey, 4));
+		Assert.False(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.String, replacement.Raw, false));
+		Assert.Equal(original, Get(ref platform, obj, MuiStringscrollCore.String));
+		Assert.Equal("layout-original", ReadCString(ref platform,
+			APTR.FromPointer(original)));
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void SetGeometryRejectsMalformedNamedStateBeforeRawMutation()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, APTR.Null);
+		Assert.NotEqual(APTR.Null, obj);
+		Assert.True(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			Width, 80, false));
+		var original = Get(ref platform, obj, Width);
+
+		// This is the named CopperOS store identity for the typed layout record,
+		// not an object-layout offset.  Shrinking it simulates malformed guest
+		// state at the typed setter boundary.
+		const uint layoutStateKey = 0x0f110009u;
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			layoutStateKey, 4));
+		Assert.False(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			Width, 120, false));
+		Assert.Equal(original, Get(ref platform, obj, Width));
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void SetRenderContextRejectsMalformedNamedStateBeforeRawMutation()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, APTR.Null);
+		Assert.NotEqual(APTR.Null, obj);
+		Assert.True(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			Font, 0x6300, false));
+		var original = Get(ref platform, obj, Font);
+
+		// This is the named CopperOS store identity for the typed render record,
+		// not an object-layout offset.  Shrinking it simulates malformed guest
+		// state at the typed setter boundary.
+		const uint renderStateKey = 0x0f11000au;
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			renderStateKey, 4));
+		Assert.False(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			Font, 0x6400, false));
+		Assert.Equal(original, Get(ref platform, obj, Font));
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void SetPolicyRejectsMalformedNamedStateBeforeRawMutation()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, APTR.Null);
+		Assert.NotEqual(APTR.Null, obj);
+		Assert.True(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.NoInput, 1, false));
+		var original = Get(ref platform, obj, MuiStringscrollCore.NoInput);
+
+		// This is the named CopperOS store identity for the typed policy record,
+		// not an object-layout offset.  Shrinking it simulates malformed guest
+		// state at the typed setter boundary.
+		const uint policyStateKey = 0x0f110007u;
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			policyStateKey, 4));
+		Assert.False(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.NoInput, 0, false));
+		Assert.False(MuiStringscrollCore.GetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.NoInput, out _));
+		Assert.Equal(original, MuiHeadlessObjectCore.GetRawAttribute(ref platform,
+			State, obj, MuiStringscrollCore.NoInput, out var raw) ? raw : 0u);
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void SetPolicyRejectsMalformedLayoutBeforeRawMutation()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, APTR.Null);
+		Assert.NotEqual(APTR.Null, obj);
+		Assert.True(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.NoInput, 1, false));
+		var original = Get(ref platform, obj, MuiStringscrollCore.NoInput);
+
+		// Policy setters finish by recomputing the viewport.  A malformed named
+		// layout record must be admitted before policy raw/named projections are
+		// changed, otherwise a failed recompute would expose a partial transition.
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			LayoutStateKey, 4));
+		Assert.False(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.NoInput, 0, false));
+		Assert.Equal(original, Get(ref platform, obj, MuiStringscrollCore.NoInput));
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void SetScrollbarPolicyRejectsMalformedCompositionBeforeRawMutation()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, APTR.Null);
+		Assert.NotEqual(APTR.Null, obj);
+		Assert.True(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.HorizBar, 1, false));
+		var original = Get(ref platform, obj, MuiStringscrollCore.HorizBar);
+
+		// This is the named CopperOS store identity for the typed scrollbar
+		// composition record, not an object-layout offset.  Shrinking it
+		// simulates malformed guest state before reconciliation.
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			CompositionStateKey, 4));
+		Assert.False(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.HorizBar, 0, false));
+		Assert.Equal(original, Get(ref platform, obj, MuiStringscrollCore.HorizBar));
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void MalformedCompositionRecordFailsClosedAcrossConsumers()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var scrollbarName = APTR.FromPointer(0x5BE0);
+		platform.WriteCString(scrollbarName, "scrollbar.mui");
+		var scrollbarClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			scrollbarName, APTR.Null, 0, APTR.FromPointer(1), false);
+		Assert.NotEqual(APTR.Null, scrollbarClass);
+		var source = APTR.FromPointer(0x5C20);
+		platform.WriteCString(source,
+			"composition admission text that is wider than the viewport");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.NotEqual(APTR.Null, obj);
+		Assert.True(MuiStringscrollCore.Layout(ref platform, State, obj, 0, 0,
+			16, 16));
+		Assert.True(MuiStringscrollCore.TryReadCompositionState(ref platform, State,
+			obj, out var composition));
+		Assert.True(MuiStringscrollCore.SetScroll(ref platform, State, obj, 8, 0));
+		var originalScrollX = GetRaw(ref platform, obj, ScrollXStateKey);
+
+		// This is the named CopperOS store identity for the typed composition
+		// record, not an object-layout offset. Shrinking it simulates malformed
+		// guest state at every composition consumer boundary.
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			CompositionStateKey, 4));
+		Assert.False(MuiStringscrollCore.TryReadCompositionState(ref platform, State,
+			obj, out _));
+		Assert.False(MuiStringscrollCore.SetScroll(ref platform, State, obj, 0, 0));
+		Assert.Equal(originalScrollX, GetRaw(ref platform, obj, ScrollXStateKey));
+		Assert.False(MuiStringscrollCore.Draw(ref platform, State, obj, 0));
+
+		// The malformed record cannot advertise its owned children, so dispose
+		// those captured children explicitly before exercising parent cleanup.
+		if (composition.Horizontal.IsNotNull)
+			Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+				composition.Horizontal));
+		if (composition.Vertical.IsNotNull)
+			Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State,
+				composition.Vertical));
+		Assert.False(MuiStringscrollCore.Cleanup(ref platform, State, obj));
+		Assert.True(MuiCollectionLifecycle.DisposeObject(ref platform, State, obj));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			stringClass));
+		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State,
+			scrollbarClass));
+		Assert.Equal(platform.AllocationCount, platform.FreeCount);
+	}
+
+	[Fact]
+	public void MalformedStateRecordFailsClosedBeforeScrollMutation()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var source = APTR.FromPointer(0x51c0);
+		platform.WriteCString(source, "state admission text with overflow");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.NotEqual(APTR.Null, obj);
+		Assert.True(MuiStringscrollCore.Layout(ref platform, State, obj, 0, 0,
+			16, 16));
+		Assert.True(MuiStringscrollCore.SetScroll(ref platform, State, obj, 8, 0));
+		var contentWidth = GetRaw(ref platform, obj, ContentWidthStateKey);
+		var scrollX = GetRaw(ref platform, obj, ScrollXStateKey);
+		var scrollY = GetRaw(ref platform, obj, ScrollYStateKey);
+
+		// This is the named CopperOS store identity for the typed Stringscroll
+		// content/scroll record, not an object-layout offset.  Shrinking it
+		// simulates malformed guest state at a shared consumer boundary.
+		const uint stateRecordKey = 0x0f110008u;
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			stateRecordKey, 4));
+		Assert.False(MuiStringscrollCore.TryReadState(ref platform, State, obj,
+			out _));
+		Assert.False(MuiStringscrollCore.GetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.String, out _));
+		Assert.False(MuiStringscrollCore.SetScroll(ref platform, State, obj, 0, 0));
+		Assert.Equal(contentWidth, GetRaw(ref platform, obj, ContentWidthStateKey));
+		Assert.Equal(scrollX, GetRaw(ref platform, obj, ScrollXStateKey));
+		Assert.Equal(scrollY, GetRaw(ref platform, obj, ScrollYStateKey));
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void StringGetterRejectsDivergentOwnedPointerState()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var source = APTR.FromPointer(0x51D0);
+		platform.WriteCString(source, "typed getter text");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.NotEqual(APTR.Null, obj);
+		Assert.True(MuiStringscrollCore.GetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.String, out var original));
+		Assert.Equal("typed getter text", ReadCString(ref platform,
+			APTR.FromPointer(original)));
+
+		// Mutate only the canonical named record.  The getter must reject the
+		// pointer divergence instead of returning the private ownership key.
+		Assert.True(MuiStringscrollCore.TryGetStateRecord(ref platform, State, obj,
+			out var record));
+		record.String = APTR.FromPointer(0x7200);
+		var stateBlock = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			0x0f110008u);
+		Assert.True(MuiStringscrollStateRecordCodec.Write(ref platform, stateBlock,
+			record));
+		Assert.False(MuiStringscrollCore.GetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.String, out _));
+
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void MalformedPolicyRecordFailsClosedBeforeScrollMutation()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var source = APTR.FromPointer(0x51e0);
+		platform.WriteCString(source, "policy admission text with overflow");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.NotEqual(APTR.Null, obj);
+		Assert.True(MuiStringscrollCore.Layout(ref platform, State, obj, 0, 0,
+			16, 16));
+		Assert.True(MuiStringscrollCore.SetScroll(ref platform, State, obj, 8, 0));
+		var scrollX = GetRaw(ref platform, obj, ScrollXStateKey);
+		var scrollY = GetRaw(ref platform, obj, ScrollYStateKey);
+		Assert.True(MuiStringscrollCore.TryGetPolicyRecord(ref platform, State, obj,
+			out var policyBefore));
+
+		// This is the named CopperOS store identity for the typed policy record,
+		// not an object-layout offset.  Shrinking it simulates malformed guest
+		// state at a shared policy-consumer boundary.
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			PolicyStateKey, 4));
+		Assert.False(MuiStringscrollCore.TryReadPolicyState(ref platform, State,
+			obj, out _));
+		Assert.False(MuiStringscrollCore.SetScroll(ref platform, State, obj, 0, 0));
+		Assert.Equal(scrollX, GetRaw(ref platform, obj, ScrollXStateKey));
+		Assert.Equal(scrollY, GetRaw(ref platform, obj, ScrollYStateKey));
+
+		// Restore the named record, then corrupt only one canonical BOOL. The
+		// record remains structurally readable, but value 2 must fail semantic
+		// admission instead of being treated as truthy policy.
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			PolicyStateKey, unchecked((int)MuiStringscrollPolicyRecord.Size)));
+		var policyBlock = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			PolicyStateKey);
+		Assert.True(MuiStringscrollPolicyRecordCodec.Write(ref platform,
+			policyBlock, policyBefore));
+		Assert.True(MuiStringscrollPolicyFieldCursorCodec.TryWriteUInt32(
+			ref platform, policyBlock, MuiStringscrollPolicyField.NoInput, 2));
+		Assert.False(MuiStringscrollCore.TryReadPolicyState(ref platform, State,
+			obj, out _));
+		Assert.False(MuiStringscrollCore.GetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.NoInput, out _));
+		Assert.False(MuiStringscrollCore.SetAttribute(ref platform, State, obj,
+			MuiStringscrollCore.NoInput, 0, false));
+		Assert.False(MuiStringscrollCore.SetScroll(ref platform, State, obj, 0, 0));
+		Assert.Equal(scrollX, GetRaw(ref platform, obj, ScrollXStateKey));
+		Assert.Equal(scrollY, GetRaw(ref platform, obj, ScrollYStateKey));
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void MalformedLayoutRenderAndViewportRecordsFailClosed()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var source = APTR.FromPointer(0x5200);
+		platform.WriteCString(source, "layout render viewport admission");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.NotEqual(APTR.Null, obj);
+		Assert.True(MuiStringscrollCore.Layout(ref platform, State, obj, 0, 0,
+			32, 16));
+		Assert.True(MuiStringscrollCore.TryReadLayoutState(ref platform, State,
+			obj, out _));
+		Assert.True(MuiStringscrollCore.TryReadViewportState(ref platform, State,
+			obj, out _));
+
+		// These are named CopperOS store identities for typed records, not
+		// object-layout offsets.  Shrinking each record simulates malformed guest
+		// state at its shared inspection boundary.
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			LayoutStateKey, 4));
+		Assert.False(MuiStringscrollCore.TryReadLayoutState(ref platform, State,
+			obj, out _));
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			RenderStateKey, 4));
+		Assert.False(MuiStringscrollCore.TryReadRenderState(ref platform, State,
+			obj, out _));
+		Assert.True(MuiStoreCore.DataspaceResize(ref platform, State, obj,
+			ViewportStateKey, 4));
+		Assert.False(MuiStringscrollCore.TryReadViewportState(ref platform, State,
+			obj, out _));
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void StringscrollRuntimeSetRejectsGetterAndInitializerAttributes()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		var source = APTR.FromPointer(0x5150);
+		platform.WriteCString(source, "immutable runtime text");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.NotEqual(APTR.Null, obj);
+
+		Assert.False(MuiStringscrollCore.SetRuntimeAttribute(ref platform, State,
+			obj, MuiStringscrollCore.String, 0));
+		Assert.False(MuiStringscrollCore.SetRuntimeAttribute(ref platform, State,
+			obj, MuiStringscrollCore.HorizBar, 0));
+		Assert.False(MuiStringscrollCore.SetRuntimeAttribute(ref platform, State,
+			obj, MuiStringscrollCore.NoInput, 1));
+		Assert.False(MuiStringscrollCore.SetRuntimeAttribute(ref platform, State,
+			obj, MuiStringscrollCore.SetMin, 1));
+		Assert.False(MuiStringscrollCore.SetRuntimeAttribute(ref platform, State,
+			obj, MuiStringscrollCore.SetVMin, 1));
+		Assert.False(MuiStringscrollCore.SetRuntimeAttribute(ref platform, State,
+			obj, MuiStringscrollCore.UseWinBorder, 1));
+		Assert.False(MuiStringscrollCore.SetRuntimeAttribute(ref platform, State,
+			obj, MuiStringscrollCore.VertBar, 0));
+		Assert.False(MuiStringscrollCore.SetRuntimeAttribute(ref platform, State,
+			obj, MuiStringscrollCore.VertScrollerOnly, 1));
+
+		Assert.Equal("immutable runtime text", ReadCString(ref platform,
+			APTR.FromPointer(Get(ref platform, obj, MuiStringscrollCore.String))));
+		Assert.Equal(1u, Get(ref platform, obj, MuiStringscrollCore.HorizBar));
+		Assert.Equal(0u, Get(ref platform, obj, MuiStringscrollCore.NoInput));
 		Dispose(ref platform, obj, stringClass);
 	}
 
@@ -738,7 +1412,7 @@ public sealed class MuiStringscrollTests
 		platform.WriteUInt32(packet, 0, Set);
 		platform.WriteUInt32(packet, 4, MuiStringscrollCore.NoInput);
 		platform.WriteUInt32(packet, 8, 1);
-		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State, obj,
+		Assert.Equal(0u, MuiCollectionDispatcher.Dispatch(ref platform, State, obj,
 			packet));
 		platform.WriteUInt32(packet, 0, Draw);
 		platform.WriteUInt32(packet, 4, 0);
@@ -942,6 +1616,156 @@ public sealed class MuiStringscrollTests
 	}
 
 	[Fact]
+	public void ThumbDragUsesNamedPointerCaptureCapability()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		platform.PointerCaptureSampleAvailable = true;
+		var source = APTR.FromPointer(0x6580);
+		platform.WriteCString(source,
+			"0123456789012345678901234567890123456789\nline two\nline three");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.True(MuiStringscrollCore.Layout(ref platform, State, obj, 0, 0,
+			48, 32));
+
+		var intui = APTR.FromPointer(0x6680);
+		var packet = APTR.FromPointer(0x6780);
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			IdcmpMouseButtons, SelectDown, 0, 0, 3, 26));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, KeyNone));
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State, obj,
+			packet));
+		Assert.Equal(1u, platform.PointerCaptureCount);
+		Assert.Equal(obj, platform.LastPointerCaptureObject);
+		Assert.Equal(MuiPointerCaptureKind.HorizontalScroller,
+			platform.LastPointerCaptureKind);
+		Assert.Equal(3, platform.LastPointerCaptureStartX);
+		Assert.Equal(26, platform.LastPointerCaptureStartY);
+
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			IdcmpMouseButtons, SelectUp, 0, 0, 30, 26));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, KeyNone));
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State, obj,
+			packet));
+		Assert.Equal(1u, platform.PointerReleaseCount);
+		Assert.Equal(obj, platform.LastPointerReleaseObject);
+		Assert.Equal(MuiPointerCaptureKind.HorizontalScroller,
+			platform.LastPointerReleaseKind);
+		Assert.Equal(3, platform.LastPointerReleaseStartX);
+		Assert.Equal(26, platform.LastPointerReleaseStartY);
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
+	public void ThumbDragCaptureIsReleasedWhenObjectIsDisposed()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		platform.PointerCaptureSampleAvailable = true;
+		var source = APTR.FromPointer(0x6780);
+		platform.WriteCString(source,
+			"0123456789012345678901234567890123456789\nline two\nline three");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.True(MuiStringscrollCore.Layout(ref platform, State, obj, 0, 0,
+			48, 32));
+
+		var intui = APTR.FromPointer(0x6880);
+		var packet = APTR.FromPointer(0x6980);
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			IdcmpMouseButtons, SelectDown, 0, 0, 3, 26));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, KeyNone));
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State, obj,
+			packet));
+		Assert.Equal(1u, platform.PointerCaptureCount);
+
+		Dispose(ref platform, obj, stringClass);
+		Assert.Equal(1u, platform.PointerReleaseCount);
+		Assert.Equal(obj, platform.LastPointerReleaseObject);
+		Assert.Equal(MuiPointerCaptureKind.HorizontalScroller,
+			platform.LastPointerReleaseKind);
+		Assert.Equal(3, platform.LastPointerReleaseStartX);
+		Assert.Equal(26, platform.LastPointerReleaseStartY);
+	}
+
+	[Fact]
+	public void ThumbDragCaptureIsReleasedByDirectHeadlessDisposal()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		platform.PointerCaptureSampleAvailable = true;
+		var source = APTR.FromPointer(0x6980);
+		platform.WriteCString(source,
+			"0123456789012345678901234567890123456789\nline two\nline three");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.True(MuiStringscrollCore.Layout(ref platform, State, obj, 0, 0,
+			48, 32));
+
+		var intui = APTR.FromPointer(0x6A80);
+		var packet = APTR.FromPointer(0x6B80);
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			IdcmpMouseButtons, SelectDown, 0, 0, 3, 26));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, KeyNone));
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State, obj,
+			packet));
+		Assert.Equal(1u, platform.PointerCaptureCount);
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+		Assert.Equal(1u, platform.PointerReleaseCount);
+		Assert.Equal(obj, platform.LastPointerReleaseObject);
+		Assert.Equal(MuiPointerCaptureKind.HorizontalScroller,
+			platform.LastPointerReleaseKind);
+		Assert.Equal(3, platform.LastPointerReleaseStartX);
+		Assert.Equal(26, platform.LastPointerReleaseStartY);
+	}
+
+	[Fact]
+	public void ThumbDragIsCancelledWhenOwningWindowBecomesInactive()
+	{
+		var platform = CreatePlatform(out var stringClass);
+		platform.PointerCaptureSampleAvailable = true;
+		var source = APTR.FromPointer(0x6280);
+		platform.WriteCString(source,
+			"0123456789012345678901234567890123456789\nline two\nline three");
+		var obj = MuiStringscrollCore.CreateStringscroll(ref platform, State,
+			stringClass, Tags(ref platform, (MuiStringscrollCore.String, source.Raw)));
+		Assert.True(MuiStringscrollCore.Layout(ref platform, State, obj, 0, 0,
+			48, 32));
+
+		var intui = APTR.FromPointer(0x6380);
+		var packet = APTR.FromPointer(0x6480);
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			IdcmpMouseButtons, SelectDown, 0, 0, 3, 26));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, KeyNone));
+		Assert.Equal(1u, MuiCollectionDispatcher.Dispatch(ref platform, State, obj,
+			packet));
+
+		// The window event dispatcher reaches the same typed Stringscroll record
+		// even though this focused test uses the object as the minimal root.
+		Assert.Equal(0u, MuiApplicationWindowCore.DispatchWindowEvent(
+			ref platform, State, obj, APTR.Null, 0x00080000));
+		Assert.Equal(1u, platform.PointerReleaseCount);
+		Assert.Equal(obj, platform.LastPointerReleaseObject);
+		Assert.Equal(MuiPointerCaptureKind.HorizontalScroller,
+			platform.LastPointerReleaseKind);
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intui,
+			IdcmpMouseMove, 0, 0, 0, 30, 26));
+		Assert.True(MuiCollectionSurfaceMessageCodec.WriteHandleInput(ref platform,
+			packet, intui.Raw, KeyNone));
+		Assert.Equal(0u, MuiCollectionDispatcher.Dispatch(ref platform, State, obj,
+			packet));
+		Assert.True(MuiStringscrollCore.GetScrollState(ref platform, State, obj,
+			out var x, out var y, out _, out _));
+		Assert.Equal(0, x);
+		Assert.Equal(0, y);
+		Dispose(ref platform, obj, stringClass);
+	}
+
+	[Fact]
 	public void HandleInputReleaseCancelsThumbDragBeforeNoInputGate()
 	{
 		var platform = CreatePlatform(out var stringClass);
@@ -999,6 +1823,14 @@ public sealed class MuiStringscrollTests
 		uint attribute)
 	{
 		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, obj,
+			attribute, out var value));
+		return value;
+	}
+
+	private static uint GetRaw(ref MuiHeadlessTestPlatform platform, APTR obj,
+		uint attribute)
+	{
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, obj,
 			attribute, out var value));
 		return value;
 	}

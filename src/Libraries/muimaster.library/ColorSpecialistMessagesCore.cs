@@ -132,11 +132,25 @@ internal static class MuiColorSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	// Native selector admission stays scalar so compiler paths do not need to
+	// materialize a temporary one-field record. Public packet consumers still
+	// receive the named struct above.
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiColorSpecialistMethodMessage.Size)) return false;
 		return MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Method,
-			MuiColorSpecialistField.MethodId, out packet.MethodId);
+			MuiColorSpecialistField.MethodId, out methodId);
 	}
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
@@ -156,8 +170,8 @@ internal static class MuiColorSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		return IsMethod(method) &&
-			TryReadMethodId(ref platform, message, out var header) &&
-			header.MethodId == method;
+			TryReadMethodIdValue(ref platform, message, out var methodId) &&
+			methodId == method;
 	}
 
 	internal static bool WriteMethod<TPlatform>(ref TPlatform platform,
@@ -178,8 +192,8 @@ internal static class MuiColorSpecialistMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiColorSpecialistGetMessage.Size,
 			OmGet)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Get,
 			MuiColorSpecialistField.Attribute, out packet.Attribute) &&
@@ -212,8 +226,8 @@ internal static class MuiColorSpecialistMessageCodec
 		packet = default;
 		if (!IsSetMethod(method) || !IsPacket(ref platform, message,
 			MuiColorSpecialistSetMessage.Size, method)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Set,
 			MuiColorSpecialistField.Attribute, out packet.Attribute) &&
@@ -246,8 +260,8 @@ internal static class MuiColorSpecialistMessageCodec
 		packet = default;
 		if (!IsPointerMethod(method) || !IsPacket(ref platform, message,
 			MuiColorSpecialistPointerMessage.Size, method)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Pointer,
 			MuiColorSpecialistField.Pointer, out packet.Pointer);
@@ -274,8 +288,8 @@ internal static class MuiColorSpecialistMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiColorSpecialistRgbMessage.Size,
 			SetRGB)) return false;
-		if (!TryReadMethodId(ref platform, message, out var header)) return false;
-		packet.MethodId = header.MethodId;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		packet.MethodId = methodId;
 		return MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Rgb,
 			MuiColorSpecialistField.Red, out packet.Red) &&
@@ -319,7 +333,7 @@ internal static class MuiColorSpecialistMessageCodec
 		uint size, uint method) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (message.IsNull || !platform.IsMapped(message, size) ||
-			!TryReadMethodId(ref platform, message, out var header)) return false;
-		return header.MethodId == method;
+			!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
+		return methodId == method;
 	}
 }

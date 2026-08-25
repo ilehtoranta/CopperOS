@@ -48,6 +48,7 @@ public sealed class MuiExternalWrapperTests
 	private const uint MethodDraw = 0x80426f3fu;
 	private const uint MethodAskMinMax = 0x80423874u;
 	private const uint MethodLayout = 0x8042845bu;
+	private const uint MethodBoopsiQuery = MuiBoopsiQueryCore.Method;
 
 	private static MuiHeadlessTestPlatform NewPlatform() =>
 		new(Base, Size, FirstAllocation, State);
@@ -1114,6 +1115,41 @@ public sealed class MuiExternalWrapperTests
 		Assert.Equal(100, p.ReadUInt16(MinMax, 6));
 	}
 
+	[Fact]
+	public void BoopsiQueryForwardsTheNamedPacketToWrappedObject()
+	{
+		var p = NewPlatform();
+		SetupPrivateBoopsi(ref p);
+		var obj = ObjectPointer(ref p);
+		p.DispatchResult = 0xB007u;
+		Assert.True(MuiBoopsiQueryCore.WriteRecord(ref p, Packet, Screen,
+			0x12u, 3, 4, 320, 240, 64, 32, RenderInfo));
+
+		Assert.Equal(0xB007u,
+			MuiExternalWrapperDispatcher.Dispatch(ref p, Instance, Packet));
+		Assert.Equal(obj.Raw, p.LastDispatchObject.Raw);
+		Assert.Equal(MethodBoopsiQuery, p.LastDispatchMethod);
+		Assert.True(MuiBoopsiQueryCore.TryRead(ref p, Packet, out var query));
+		Assert.Equal(Screen.Raw, query.Screen.Raw);
+		Assert.Equal(3, query.MinWidth);
+		Assert.Equal(240, query.MaxHeight);
+		Assert.Equal(RenderInfo.Raw, query.RenderInfo.Raw);
+	}
+
+	[Fact]
+	public void BoopsiQueryRejectsMalformedPacketBeforeDispatch()
+	{
+		var p = NewPlatform();
+		SetupPrivateBoopsi(ref p);
+		var before = p.DispatchCount;
+		var truncated = APTR.FromPointer(Base + (uint)Size - 4);
+		p.WriteUInt32(truncated, 0, MethodBoopsiQuery);
+
+		Assert.Equal(0u,
+			MuiExternalWrapperDispatcher.Dispatch(ref p, Instance, truncated));
+		Assert.Equal(before, p.DispatchCount);
+	}
+
 	// ---- Boopsi draw ---------------------------------------------------------
 
 	[Fact]
@@ -1587,6 +1623,49 @@ public sealed class MuiExternalWrapperTests
 		Assert.True(MuiExternalWrapperLifecycle.Dispose(ref p, Instance));
 		// Owned name + work block are freed on dispose.
 		Assert.True(p.FreeCount > before);
+	}
+
+	[Fact]
+	public void PublicDisposalRoutesBoopsiWrapperThroughTypedLifecycle()
+	{
+		var p = NewPlatform();
+		CreateBoopsi(ref p);
+		p.WriteCString(ClassId, "gadget.class");
+		Set(ref p, MuiExternalWrapperAttributes.Boopsi_ClassID, ClassId.Raw);
+		WriteTagDone(ref p, CreationTags);
+		MuiExternalWrapperCore.SetCreationTags(ref p, Instance, CreationTags);
+		BuildRenderInfo(ref p);
+		Assert.True(MuiExternalWrapperCore.Setup(ref p, Instance, RenderInfo));
+
+		Assert.True(MuiObjectDisposalServiceCore.DisposeObject(ref p, State,
+			Instance));
+		Assert.Equal(1u, p.CloseExternalClassCount);
+		Assert.False(MuiExternalWrapperCore.Valid(ref p, Instance));
+		Assert.False(MuiObjectDisposalServiceCore.DisposeObject(ref p, State,
+			Instance));
+		Assert.Equal(1u, p.CloseExternalClassCount);
+	}
+
+	[Fact]
+	public void PublicDisposalRoutesDtpicWrapperThroughTypedLifecycle()
+	{
+		var p = NewPlatform();
+		p.PictureWidth = 8;
+		p.PictureHeight = 8;
+		CreateDtpic(ref p);
+		p.WriteCString(NameA, "logo.iff");
+		Set(ref p, MuiExternalWrapperAttributes.Dtpic_Name, NameA.Raw);
+		BuildRenderInfo(ref p);
+		Assert.True(MuiExternalWrapperCore.Setup(ref p, Instance, RenderInfo));
+		Assert.Equal(1u, p.AcquirePictureCount);
+
+		Assert.True(MuiObjectDisposalServiceCore.DisposeObject(ref p, State,
+			Instance));
+		Assert.Equal(1u, p.ReleasePictureCount);
+		Assert.False(MuiExternalWrapperCore.Valid(ref p, Instance));
+		Assert.False(MuiObjectDisposalServiceCore.DisposeObject(ref p, State,
+			Instance));
+		Assert.Equal(1u, p.ReleasePictureCount);
 	}
 
 	// ---- Disabled state notifies + redraw -----------------------------------

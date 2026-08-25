@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -368,6 +369,17 @@ internal static class MuiDataspaceIffMessageCodec
 	internal const uint ReadIffMethod = 0x80420DFB;
 	internal const uint WriteIffMethod = 0x80425E8E;
 
+	// Keep scalar IFF selector admission at the guest ABI boundary; ReadIFF and
+	// WriteIFF consumers continue to use named fixed-layout records.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiDataspaceIffMethodFieldCursorCodec.TryRead(ref platform,
+			message, MuiDataspaceIffMethodField.MethodId, out methodId);
+	}
+
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceIffMethodMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
@@ -375,8 +387,9 @@ internal static class MuiDataspaceIffMessageCodec
 		packet = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiDataspaceIffMethodMessage.Size)) return false;
-		return MuiDataspaceIffMethodFieldCursorCodec.TryRead(ref platform,
-			message, MuiDataspaceIffMethodField.MethodId, out packet.MethodId);
+		if (!TryReadMethodIdValue(ref platform, message, out packet.MethodId))
+			return false;
+		return true;
 	}
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
