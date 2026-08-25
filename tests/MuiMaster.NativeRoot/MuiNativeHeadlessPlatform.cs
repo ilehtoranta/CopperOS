@@ -1,9 +1,44 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Amiga;
 using Amiga.MUI;
 using CopperOS.MuiMaster;
 
 namespace CopperOS.MuiMaster.NativeRoot;
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+public struct MuiNativeDispatchCapture
+{
+	public const uint Address = 0x0004F020;
+	public const uint Size = 12;
+	public APTR Class;
+	public APTR Object;
+	public uint Method;
+}
+
+public static class MuiNativeDispatchCaptureCodec
+{
+	public static bool Write(ref MuiNativeHeadlessPlatform platform,
+		MuiNativeDispatchCapture value)
+	{
+		var address = APTR.FromPointer(MuiNativeDispatchCapture.Address);
+		APTR.WriteUInt32(address, 0, value.Class.Raw);
+		APTR.WriteUInt32(address, 4, value.Object.Raw);
+		APTR.WriteUInt32(address, 8, value.Method);
+		return true;
+	}
+
+	public static bool TryRead(ref MuiNativeHeadlessPlatform platform,
+		out MuiNativeDispatchCapture value)
+	{
+		value = default;
+		var address = APTR.FromPointer(MuiNativeDispatchCapture.Address);
+		value.Class = APTR.FromPointer(APTR.ReadUInt32(address, 0));
+		value.Object = APTR.FromPointer(APTR.ReadUInt32(address, 4));
+		value.Method = APTR.ReadUInt32(address, 8);
+		return true;
+	}
+}
 
 public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 	IMuiServicePlatform, IMuiIffCapability
@@ -43,6 +78,32 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 	private const uint WindowModeBackdrop = 0x0004F078;
 	private const uint WindowModeBorderless = 0x0004F07C;
 	private const uint WindowModePanelWindow = 0x0004F080;
+	private const uint WindowEventPending = 0x0004F084;
+	private const uint WindowPointerPending = 0x0004F088;
+	private const uint WindowMuiEventPending = 0x0004F090;
+	private const uint WindowMuiEventInputMessage = 0x0004F094;
+	private const uint WindowMuiEventKey = 0x0004F098;
+	private const uint WindowMuiEventHandlerNode = 0x0004F09C;
+	private const uint StringEditActions = 0x0004F0A0;
+	private const uint StringEditReuseCount = 0x0004F0A4;
+	private const uint CurrentStateAddress = 0x0004F0A8;
+	private const uint ReuseWindowAddress = 0x0004F0B4;
+	private const uint ReuseGateAddress = 0x0004F0B8;
+	private const uint WindowDoubleClickPending = 0x0004F100;
+	private const uint WindowDoubleClickObject = 0x0004F104;
+	private const uint WindowDoubleClickValue = 0x0004F108;
+	private const uint DoubleBufferTargetRastPort = 0x0004F0C0;
+	private const uint DoubleBufferTargetRenderInfo = 0x0004F0CC;
+	private const uint DoubleBufferBeginMarker = 0x0004F0C4;
+	private const uint DoubleBufferEndMarker = 0x0004F0C8;
+	private const uint BackfillKindMarker = 0x0004F0D0;
+	private const uint BackfillOffsetMarker = 0x0004F0D4;
+	private const uint BackfillBrightnessMarker = 0x0004F0D8;
+	private const uint BackfillFlagsMarker = 0x0004F0DC;
+	// Provider-owned opaque custom-font handles.  The payload carries only the
+	// integer metrics required by the headless graphics seam; no managed font
+	// object or guest-memory offset table is used.
+	private const uint CustomFontHandleTag = 0x7E000000u;
 
 	public void Reset()
 	{
@@ -73,6 +134,36 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 		APTR.WriteUInt32(APTR.FromPointer(WindowModeBackdrop), 0, 0);
 		APTR.WriteUInt32(APTR.FromPointer(WindowModeBorderless), 0, 0);
 		APTR.WriteUInt32(APTR.FromPointer(WindowModePanelWindow), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowEventPending), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowPointerPending), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowMuiEventPending), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowMuiEventInputMessage), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowMuiEventKey), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowMuiEventHandlerNode), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(StringEditActions), 0,
+			MuiStringEditWorkCodec.ActionUse);
+		APTR.WriteUInt32(APTR.FromPointer(StringEditReuseCount), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(CurrentStateAddress), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(ReuseWindowAddress), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(ReuseGateAddress), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowDoubleClickPending), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowDoubleClickObject), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowDoubleClickValue), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(DoubleBufferBeginMarker), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(DoubleBufferEndMarker), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(BackfillKindMarker), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(BackfillOffsetMarker), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(BackfillBrightnessMarker), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(BackfillFlagsMarker), 0, 0);
+	}
+
+	public void SetState(APTR state) => APTR.WriteUInt32(
+		APTR.FromPointer(CurrentStateAddress), 0, state.Raw);
+
+	public void QueueWindowReuse(APTR window)
+	{
+		APTR.WriteUInt32(APTR.FromPointer(ReuseWindowAddress), 0, window.Raw);
+		APTR.WriteUInt32(APTR.FromPointer(ReuseGateAddress), 0, 1);
 	}
 
 	public APTR Allocate(uint byteSize, uint flags)
@@ -89,6 +180,23 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 	}
 
 	public void Free(APTR address, uint byteSize)
+	{
+	}
+
+	// The freestanding fixture models an Exec pool as an opaque arena token.
+	// Pool headers are not interpreted by the MUI core; native Exec owns that
+	// layout in the eventual target profile.
+	public APTR CreatePool(uint requirements, uint puddleSize, uint threshold) =>
+		Allocate(16, requirements);
+
+	public void DeletePool(APTR pool)
+	{
+	}
+
+	public APTR AllocPooled(APTR pool, uint byteSize) =>
+		pool.IsNull ? APTR.Null : Allocate(byteSize, 0);
+
+	public void FreePooled(APTR pool, APTR address, uint byteSize)
 	{
 	}
 
@@ -122,7 +230,40 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 
 	public uint DoMethod(APTR obj, APTR message)
 	{
-		return APTR.ReadUInt32(message, 0) == 0x90000077 ? 0x77u : 1u;
+		// A notification destination is an opaque guest object.  Keep the
+		// freestanding fixture's callback seam bounded when malformed or stale
+		// guest state names an unmapped destination; the production dispatcher
+		// treats that callback as a no-op rather than dereferencing host memory.
+		if (!IsMapped(obj, 1) || !IsMapped(message, 4)) return 0;
+		var method = APTR.ReadUInt32(message, 0);
+		var state = APTR.FromPointer(APTR.ReadUInt32(
+			APTR.FromPointer(CurrentStateAddress), 0));
+		if (state.IsNotNull && method == MuiCommonControlPacketCore.HandleEvent)
+		{
+			if (!MuiCommonControlPacketCore.TryReadHandleEvent(ref this, message,
+				out var handleEvent)) return 0;
+			if (APTR.ReadUInt32(APTR.FromPointer(ReuseGateAddress), 0) != 0)
+			{
+				var window = APTR.FromPointer(APTR.ReadUInt32(
+					APTR.FromPointer(ReuseWindowAddress), 0));
+				if (window.IsNotNull)
+					MuiApplicationWindowCore.QueueWindowEventReuse(ref this, state,
+						window, APTR.FromPointer(handleEvent.InputMessage));
+				APTR.WriteUInt32(APTR.FromPointer(ReuseGateAddress), 0, 0);
+			}
+			return 1u;
+		}
+		MuiNativeDispatchCaptureCodec.Write(ref this,
+			new MuiNativeDispatchCapture
+			{
+				Class = APTR.Null,
+				Object = obj,
+				Method = method,
+			});
+		// Notification callbacks are observational in this fixture. Return the
+		// ordinary successful DoMethod result; the selector itself is retained in
+		// the named capture record above for the native assertion.
+		return 1u;
 	}
 	public uint CoerceMethod(APTR classPointer, APTR obj, APTR message)
 	{
@@ -130,9 +271,13 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 		// observable without a managed callback or runtime service.
 		var method = APTR.ReadUInt32(message, 0);
 		var inputMessage = APTR.ReadUInt32(message, 4);
-		APTR.WriteUInt32(APTR.FromPointer(0x0004F020), 0, classPointer.Raw);
-		APTR.WriteUInt32(APTR.FromPointer(0x0004F024), 0, obj.Raw);
-		APTR.WriteUInt32(APTR.FromPointer(0x0004F028), 0, method);
+		MuiNativeDispatchCaptureCodec.Write(ref this,
+			new MuiNativeDispatchCapture
+			{
+				Class = classPointer,
+				Object = obj,
+				Method = method,
+			});
 		// MUIM_HandleEvent carries the test method selector as InputMessage;
 		// ordinary method packets keep their selector in the first word.
 		return method == 0x90000077 ||
@@ -168,6 +313,15 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 	{
 		if (hook.IsNull || !IsMapped(hook, 20) || ReadUInt32(hook, 8) == 0)
 			return 0;
+		if (ReadUInt32(hook, 8) == 0x00CA0006u &&
+			MuiStringEditWorkCodec.TryRead(ref this, objectAddress,
+				out var stringEdit))
+		{
+			stringEdit.Actions = APTR.ReadUInt32(
+				APTR.FromPointer(StringEditActions), 0);
+			return MuiStringEditWorkCodec.Write(ref this, objectAddress,
+				stringEdit) ? 1u : 0u;
+		}
 		if (ReadUInt32(hook, 8) == 0x00CA0005u &&
 			MUI_LayoutMsgCodec.TryRead(ref this, messageAddress,
 				out var layoutMessage))
@@ -190,6 +344,33 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 				return 1;
 			}
 		}
+		if (ReadUInt32(hook, 8) == 0x00CA0003u)
+		{
+			var compare = 0;
+			if (MuiListtreeCore.MuiListtreeNodeFieldCursorCodec.TryReadUInt32(
+				ref this, objectAddress, MuiListtreeCore.MuiListtreeNodeField.Name,
+				out var leftName) &&
+				MuiListtreeCore.MuiListtreeNodeFieldCursorCodec.TryReadUInt32(
+				ref this, messageAddress, MuiListtreeCore.MuiListtreeNodeField.Name,
+				out var rightName) &&
+				leftName != 0 && rightName != 0 &&
+				IsMapped(APTR.FromPointer(leftName), 1) &&
+				IsMapped(APTR.FromPointer(rightName), 1))
+			{
+				var leftFirst = ReadUInt8(APTR.FromPointer(leftName), 0);
+				var rightFirst = ReadUInt8(APTR.FromPointer(rightName), 0);
+				compare = leftFirst < rightFirst ? -1
+					: leftFirst > rightFirst ? 1 : 0;
+			}
+			var compareData = APTR.FromPointer(ReadUInt32(hook, 16));
+			if (compareData.IsNotNull && IsMapped(compareData, 12))
+			{
+				WriteUInt32(compareData, 0, hook.Raw);
+				WriteUInt32(compareData, 4, objectAddress.Raw);
+				WriteUInt32(compareData, 8, messageAddress.Raw);
+			}
+			return unchecked((uint)compare);
+		}
 		var data = APTR.FromPointer(ReadUInt32(hook, 16));
 		if (data.IsNotNull && IsMapped(data, 12))
 		{
@@ -205,20 +386,152 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 	public void UnlockLayer(APTR layer) { }
 	public bool BeginUpdate(APTR layer) => layer.IsNotNull;
 	public void EndUpdate(APTR layer, bool completed) { }
+	public bool BeginMuiDoubleBuffer(ref MuiDoubleBufferRenderRequest request)
+	{
+		APTR.WriteUInt32(APTR.FromPointer(DoubleBufferBeginMarker), 0,
+			request.Object.Raw);
+		request.TargetRenderInfo = APTR.FromPointer(DoubleBufferTargetRenderInfo);
+		request.TargetRastPort = APTR.FromPointer(DoubleBufferTargetRastPort);
+		return request.Object.IsNotNull && request.SourceRastPort.IsNotNull;
+	}
+	public bool EndMuiDoubleBuffer(ref MuiDoubleBufferRenderRequest request,
+		bool completed)
+	{
+		APTR.WriteUInt32(APTR.FromPointer(DoubleBufferEndMarker), 0,
+			completed ? 1u : 0u);
+		return request.Object.IsNotNull;
+	}
+	public bool ApplyMuiBackfill(ref MuiBackfillRenderRequest request)
+	{
+		APTR.WriteUInt32(APTR.FromPointer(BackfillKindMarker), 0, request.Kind);
+		APTR.WriteUInt32(APTR.FromPointer(BackfillOffsetMarker), 0,
+			unchecked((uint)request.XOffset));
+		APTR.WriteUInt32(APTR.FromPointer(BackfillBrightnessMarker), 0,
+			unchecked((uint)request.Brightness));
+		APTR.WriteUInt32(APTR.FromPointer(BackfillFlagsMarker), 0, request.Flags);
+		return request.CustomBackfill != 0;
+	}
 	public APTR PushClip(APTR layer, int left, int top, int width, int height) =>
 		APTR.FromPointer(1);
 
 	public int TranslateTextInput(APTR intuiMessage)
 	{
-		if (intuiMessage.IsNull || !IsMapped(intuiMessage, 28) ||
-			ReadUInt32(intuiMessage, 20) != 0x00000400u) return -1;
-		return ReadUInt16(intuiMessage, 24);
+		return MuiIntuiMessageCodec.TryReadRawKey(ref this, intuiMessage,
+			out var message) ? message.Code : -1;
 	}
+	public bool DisplayMuiBeep(ref MuiStringEditBeepRequest request)
+	{
+		request.Accepted = 1;
+		return true;
+	}
+	public bool ReuseMuiInput(ref MuiStringEditReuseRequest request)
+	{
+		// This fixture has no native event queue. Returning a declined, typed
+		// request exercises the core's bounded guest-resident fallback path.
+		var count = APTR.ReadUInt32(APTR.FromPointer(StringEditReuseCount), 0);
+		APTR.WriteUInt32(APTR.FromPointer(StringEditReuseCount), 0, count + 1);
+		if (count == 0)
+			QueueStringEditActions(MuiStringEditWorkCodec.ActionUse);
+		request.Accepted = 0;
+		return false;
+	}
+	public bool ReadMuiKeyadjustTextInput(ref MuiKeyadjustTextInputSample input)
+	{
+		if (!MuiIntuiMessageCodec.TryReadRawKey(ref this, input.IntuiMessage,
+			out var message)) return false;
+		input.TextCode = message.Code;
+		input.Available = 1;
+		return true;
+	}
+	public bool ReadMuiKeyadjustInput(ref MuiKeyadjustInputSample input) => false;
+	public bool CreateMuiShortHelp(ref MuiShortHelpCreateSample sample) => false;
+	public bool CheckMuiShortHelp(ref MuiShortHelpCheckSample sample) => false;
+	public bool DeleteMuiShortHelp(ref MuiShortHelpDeleteSample sample) => false;
+	public bool CreateMuiBubble(ref MuiBubbleCreateSample sample)
+	{
+		if (sample.Object.IsNull || sample.Text.IsNull) return false;
+		sample.Result = APTR.FromPointer(0x7E000120u);
+		return true;
+	}
+	public bool DeleteMuiBubble(ref MuiBubbleDeleteSample sample) =>
+		sample.Object.IsNotNull && sample.Bubble.Raw == 0x7E000120u;
+	public bool AddMuiContextMenu(ref MuiContextMenuAddSample sample)
+	{
+		if (sample.Object.IsNull) return false;
+		sample.Result = 1u;
+		return true;
+	}
+	public bool HandleMuiContextMenuChoice(ref MuiContextMenuChoiceSample sample) =>
+		false;
+	public bool CreateMuiDragImage(ref MuiDragImageCreateSample sample) => false;
+	public bool DeleteMuiDragImage(ref MuiDragImageDeleteSample sample) => false;
+	public bool CaptureMuiPointer(ref MuiPointerCaptureSample sample) => false;
+	public bool ReleaseMuiPointer(ref MuiPointerCaptureSample sample) => false;
+	public bool RouteMuiDrag(ref MuiDragRouteSample sample) => false;
 	public void PopClip(APTR layer, APTR previousClip) { }
-	public int TextWidth(APTR rastPort, APTR font, APTR text, int length) =>
-		length < 0 ? 0 : length * 8;
-	public int TextHeight(APTR rastPort, APTR font) => 8;
+	public int TextWidth(APTR rastPort, APTR font, APTR text, int length)
+	{
+		if (length < 0) return 0;
+		if (!TryGetMuiCustomFontMetrics(font, out var metrics)) return length * 8;
+		return length > int.MaxValue / metrics.GlyphWidth ? int.MaxValue :
+			length * metrics.GlyphWidth;
+	}
+	public int TextHeight(APTR rastPort, APTR font)
+	{
+		return TryGetMuiCustomFontMetrics(font, out var metrics) ? metrics.Height : 8;
+	}
+	public APTR OpenMuiCustomFont(ref MuiCustomFontOpenRequest request)
+	{
+		var metrics = MuiCustomFontMetricsCore.FromSpec(request.Spec);
+		var payload = (unchecked((uint)metrics.Height) << 8) |
+			unchecked((uint)metrics.GlyphWidth);
+		request.Result = APTR.FromPointer(CustomFontHandleTag | payload);
+		return request.Result;
+	}
+	public bool CloseMuiCustomFont(APTR font) => font.IsNotNull;
+	public bool TryGetMuiCustomFontMetrics(APTR font,
+		out MuiCustomFontMetrics metrics)
+	{
+		metrics = default;
+		if (font.IsNull || (font.Raw & 0xFF000000u) != CustomFontHandleTag)
+			return false;
+		var payload = font.Raw & 0x00FFFFFFu;
+		var height = unchecked((int)(payload >> 8));
+		var glyphWidth = unchecked((int)(payload & 0xFFu));
+		if (height < 1 || glyphWidth < 1) return false;
+		metrics.Height = height;
+		metrics.GlyphWidth = glyphWidth;
+		return true;
+	}
 	public void SetPen(APTR rastPort, uint pen) { }
+	public bool ResolveMuiTextColor(ref MuiTextColorResolutionRequest request)
+	{
+		request.Color = request.CustomFontAvailable != 0 &&
+			(request.CustomFontSpec.ValueFlags & MuiCustomFontSpecFlags.HasTextColor) != 0
+			? request.CustomFontSpec.TextColor & 0x00FFFFFFu
+			: 0x00FFFFFFu;
+		request.Available = 1;
+		return request.Object.IsNotNull && request.RenderInfo.IsNotNull;
+	}
+	public bool ApplyMuiTextColor(ref MuiTextColorRenderRequest request) =>
+		request.RastPort.IsNotNull;
+	public bool ApplyMuiCustomFont(ref MuiCustomFontRenderRequest request) =>
+		request.RastPort.IsNotNull && request.Font.IsNotNull;
+	public bool ApplyMuiTextStyle(ref MuiTextStyleRenderRequest request) =>
+		request.RastPort.IsNotNull && request.Present != 0;
+	public bool ApplyMuiTextInlineColor(ref MuiTextInlineColorRenderRequest request) =>
+		request.RastPort.IsNotNull && request.Present != 0;
+	public bool ApplyMuiTextInlineImage(ref MuiTextInlineImageRenderRequest request) =>
+		request.RastPort.IsNotNull && request.Present != 0;
+	public bool ApplyMuiTextMethod(ref MuiTextMethodRenderRequest request) =>
+		request.RastPort.IsNotNull && request.Present != 0;
+	public bool ApplyMuiTextDimensions(ref MuiTextDimensionRequest request)
+	{
+		if (request.RastPort.IsNull || request.Present == 0) return false;
+		request.Width = request.Length < 0 ? 0 : request.Length * 8;
+		request.Height = 8;
+		return true;
+	}
 	public void FillRectangle(APTR rastPort, int left, int top, int right,
 		int bottom) { }
 	public void DrawLine(APTR rastPort, int x1, int y1, int x2, int y2) { }
@@ -273,7 +586,86 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 	public void CloseMuiWindow(APTR nativeWindow) { }
 	public bool ConfigureWindowEvents(APTR nativeWindow, uint eventMask) =>
 		nativeWindow.IsNotNull;
-	public uint ReadWindowEvent(APTR nativeWindow, APTR eventStorage) => 0;
+	public bool ReadWindowEvent(ref MuiWindowEventSample sample)
+	{
+		var eventClass = APTR.ReadUInt32(APTR.FromPointer(WindowEventPending), 0);
+		if (eventClass == 0 || sample.NativeWindow.IsNull ||
+			sample.InputEvent.IsNull) return false;
+		APTR.WriteUInt32(APTR.FromPointer(WindowEventPending), 0, 0);
+		var input = default(InputEvent);
+		input.Class = InputEventClass.Event;
+		input.Code = unchecked((ushort)eventClass);
+		input.TimeStamp.Seconds = 1;
+		input.TimeStamp.Microseconds = eventClass;
+		if (!MuiWindowInputEventCodec.Write(ref this, sample.InputEvent, input))
+			return false;
+		sample.EventClass = eventClass;
+		sample.TimerDelayElapsed = eventClass == 0x00400000 ? 1u : 0u;
+		sample.DoubleClick.Available = APTR.ReadUInt32(
+			APTR.FromPointer(WindowDoubleClickPending), 0);
+		sample.DoubleClick.Object = APTR.FromPointer(APTR.ReadUInt32(
+			APTR.FromPointer(WindowDoubleClickObject), 0));
+		sample.DoubleClick.Value = unchecked((int)APTR.ReadUInt32(
+			APTR.FromPointer(WindowDoubleClickValue), 0));
+		APTR.WriteUInt32(APTR.FromPointer(WindowDoubleClickPending), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowDoubleClickObject), 0, 0);
+		APTR.WriteUInt32(APTR.FromPointer(WindowDoubleClickValue), 0, 0);
+		return true;
+	}
+	public void QueueWindowEvent(uint eventClass) =>
+		APTR.WriteUInt32(APTR.FromPointer(WindowEventPending), 0, eventClass);
+	public void QueueWindowDoubleClick(APTR obj, int value)
+	{
+		APTR.WriteUInt32(APTR.FromPointer(WindowDoubleClickObject), 0,
+			obj.Raw);
+		APTR.WriteUInt32(APTR.FromPointer(WindowDoubleClickValue), 0,
+			unchecked((uint)value));
+		APTR.WriteUInt32(APTR.FromPointer(WindowDoubleClickPending), 0, 1);
+	}
+	public bool ReadMuiWindowPointer(APTR nativeWindow,
+		ref MuiWindowPointerInput input)
+	{
+		var mouseObject = APTR.ReadUInt32(
+			APTR.FromPointer(WindowPointerPending), 0);
+		if (mouseObject == 0 || nativeWindow.IsNull || input.Window.IsNull ||
+			input.InputEvent.IsNull) return false;
+		APTR.WriteUInt32(APTR.FromPointer(WindowPointerPending), 0, 0);
+		input.MouseObject = APTR.FromPointer(mouseObject);
+		return true;
+	}
+	public void QueueWindowPointer(APTR mouseObject) =>
+		APTR.WriteUInt32(APTR.FromPointer(WindowPointerPending), 0,
+			mouseObject.Raw);
+	public void QueueWindowMuiEvent(APTR inputMessage, int muiKey,
+		APTR eventHandlerNode)
+	{
+		APTR.WriteUInt32(APTR.FromPointer(WindowMuiEventInputMessage), 0,
+			inputMessage.Raw);
+		APTR.WriteUInt32(APTR.FromPointer(WindowMuiEventKey), 0,
+			unchecked((uint)muiKey));
+		APTR.WriteUInt32(APTR.FromPointer(WindowMuiEventHandlerNode), 0,
+			eventHandlerNode.Raw);
+		APTR.WriteUInt32(APTR.FromPointer(WindowMuiEventPending), 0, 1);
+	}
+	public void QueueStringEditActions(uint actions) =>
+		APTR.WriteUInt32(APTR.FromPointer(StringEditActions), 0, actions);
+	public bool ReadMuiWindowEvent(ref MuiWindowEventInput input)
+	{
+		if (APTR.ReadUInt32(APTR.FromPointer(WindowMuiEventPending), 0) == 0 ||
+			input.Window.IsNull || input.NativeWindow.IsNull ||
+			input.InputEvent.IsNull || input.Message.IsNull ||
+			input.EventClass == 0) return false;
+		var inputMessage = APTR.ReadUInt32(
+			APTR.FromPointer(WindowMuiEventInputMessage), 0);
+		var muiKey = unchecked((int)APTR.ReadUInt32(
+			APTR.FromPointer(WindowMuiEventKey), 0));
+		var eventHandlerNode = APTR.ReadUInt32(
+			APTR.FromPointer(WindowMuiEventHandlerNode), 0);
+		if (!MuiCommonControlPacketCore.WriteHandleEvent(ref this, input.Message,
+			inputMessage, muiKey, eventHandlerNode)) return false;
+		APTR.WriteUInt32(APTR.FromPointer(WindowMuiEventPending), 0, 0);
+		return true;
+	}
 	public bool ActivateMuiWindow(APTR nativeWindow) => nativeWindow.IsNotNull;
 	public bool SetMuiWindowBusy(APTR nativeWindow, bool busy) =>
 		nativeWindow.IsNotNull;

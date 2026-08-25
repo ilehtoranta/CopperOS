@@ -6,3 +6,7 @@
 # IDE user state
 *.user
 *.suo
+.kiro
+.vs
+*.map
+*.hunk
