@@ -719,13 +719,16 @@ public static class MuiAreaLayoutCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			AreaRenderPolicyStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			AreaRenderPolicyStateKey) !=
 			unchecked((int)MuiAreaRenderPolicyStateRecord.Size)) return false;
-		return MuiAreaRenderPolicyStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiAreaRenderPolicyStateValidation.IsValidRecord(value);
+		return MuiAreaRenderPolicyStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiAreaRenderPolicyStateAdmission.ValidateLive(
+			ref platform, state, obj, value);
 	}
 
 	// Synchronize the named render-policy record from raw legacy attributes
@@ -737,6 +740,8 @@ public static class MuiAreaLayoutCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			AreaRenderPolicyStateKey);
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
@@ -745,13 +750,15 @@ public static class MuiAreaLayoutCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiAreaRenderPolicyStateRecord.Size) ||
-				!MuiAreaRenderPolicyStateRecordCodec.TryRead(ref platform, block,
-					out var record) ||
-				!MuiAreaRenderPolicyStateValidation.IsValidRecord(record)) return false;
+				!MuiAreaRenderPolicyStateRecordCodec.TryReadStructural(ref platform,
+					block, out var record) ||
+				!MuiAreaRenderPolicyStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			value = default;
 			value.Magic = MuiAreaRenderPolicyStateRecord.Cookie;
 			FillRenderPolicy(ref platform, state, obj, ref value);
-			if (!MuiAreaRenderPolicyStateValidation.IsValidState(value)) return false;
+			if (!MuiAreaRenderPolicyStateAdmission.ValidateLive(ref platform, state,
+				obj, value)) return false;
 			if (record.FillArea != value.FillArea || record.Background != value.Background ||
 				record.Frame != value.Frame || record.Font != value.Font ||
 				record.FrameVisible != value.FrameVisible ||
@@ -768,7 +775,8 @@ public static class MuiAreaLayoutCore
 		value = default;
 		value.Magic = MuiAreaRenderPolicyStateRecord.Cookie;
 		FillRenderPolicy(ref platform, state, obj, ref value);
-		if (!MuiAreaRenderPolicyStateValidation.IsValidState(value)) return false;
+		if (!MuiAreaRenderPolicyStateAdmission.ValidateLive(ref platform, state,
+			obj, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiAreaRenderPolicyStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -829,13 +837,16 @@ public static class MuiAreaLayoutCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			AreaLayoutPolicyStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			AreaLayoutPolicyStateKey) !=
 			unchecked((int)MuiAreaLayoutPolicyStateRecord.Size)) return false;
-		return MuiAreaLayoutPolicyStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiAreaLayoutPolicyStateValidation.IsValidRecord(value);
+		return MuiAreaLayoutPolicyStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiAreaLayoutPolicyStateAdmission.ValidateLive(
+			ref platform, state, obj, value);
 	}
 
 	// Synchronize the named policy record from raw legacy attributes without
@@ -847,6 +858,8 @@ public static class MuiAreaLayoutCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			AreaLayoutPolicyStateKey);
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
@@ -855,13 +868,15 @@ public static class MuiAreaLayoutCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiAreaLayoutPolicyStateRecord.Size) ||
-				!MuiAreaLayoutPolicyStateRecordCodec.TryRead(ref platform, block,
-					out var record) ||
-				!MuiAreaLayoutPolicyStateValidation.IsValidRecord(record)) return false;
+				!MuiAreaLayoutPolicyStateRecordCodec.TryReadStructural(ref platform,
+					block, out var record) ||
+				!MuiAreaLayoutPolicyStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			value = default;
 			value.Magic = MuiAreaLayoutPolicyStateRecord.Cookie;
 			FillLayoutPolicy(ref platform, state, obj, ref value);
-			if (!MuiAreaLayoutPolicyStateValidation.IsValidState(value)) return false;
+			if (!MuiAreaLayoutPolicyStateAdmission.ValidateLive(ref platform, state,
+				obj, value)) return false;
 			if (record.ShowMe != value.ShowMe || record.FixWidth != value.FixWidth ||
 				record.FixHeight != value.FixHeight || record.MaxWidth != value.MaxWidth ||
 				record.MaxHeight != value.MaxHeight || record.InnerLeft != value.InnerLeft ||
@@ -879,7 +894,8 @@ public static class MuiAreaLayoutCore
 		value = default;
 		value.Magic = MuiAreaLayoutPolicyStateRecord.Cookie;
 		FillLayoutPolicy(ref platform, state, obj, ref value);
-		if (!MuiAreaLayoutPolicyStateValidation.IsValidState(value)) return false;
+		if (!MuiAreaLayoutPolicyStateAdmission.ValidateLive(ref platform, state,
+			obj, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiAreaLayoutPolicyStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -971,8 +987,9 @@ public static class MuiAreaLayoutCore
 		var present = block.IsNotNull || length != 0;
 		MuiAreaGeometryStateRecord record = default;
 		if (present && (length != unchecked((int)MuiAreaGeometryStateRecord.Size) ||
-			!MuiAreaGeometryStateRecordCodec.TryRead(ref platform, block,
-				out record) || !MuiAreaGeometryStateValidation.IsValidRecord(record)))
+			!MuiAreaGeometryStateRecordCodec.TryReadStructural(ref platform, block,
+				out record) || !MuiAreaGeometryStateAdmission.ValidateLive(ref platform,
+					state, obj, record)))
 			return false;
 		var left = 0u;
 		var top = 0u;
@@ -1099,13 +1116,16 @@ public static class MuiAreaLayoutCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			AreaGeometryStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			AreaGeometryStateKey) != unchecked((int)MuiAreaGeometryStateRecord.Size))
 			return false;
-		return MuiAreaGeometryStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiAreaGeometryStateValidation.IsValidRecord(value);
+		return MuiAreaGeometryStateRecordCodec.TryReadStructural(ref platform, block,
+			out value) && MuiAreaGeometryStateAdmission.ValidateLive(ref platform,
+			state, obj, value);
 	}
 
 	private static bool EnsureGeometryStateRecord<TPlatform>(
@@ -1155,7 +1175,8 @@ public static class MuiAreaLayoutCore
 		candidate.Height = value.Height;
 		candidate.Right = value.Right;
 		candidate.Bottom = value.Bottom;
-		if (!MuiAreaGeometryStateValidation.IsValidRecord(candidate)) return false;
+		if (!MuiAreaGeometryStateAdmission.ValidateLive(ref platform, state, obj,
+			candidate)) return false;
 		if (!EnsureGeometryStateRecord(ref platform, state, obj)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			AreaGeometryStateKey);
@@ -1568,12 +1589,16 @@ public static class MuiGroupLayoutCore
 	{
 		if (!TryReadLayoutPolicyState(ref platform, state, group,
 			out _)) return false;
-		if (MuiGroupLayoutHookCore.IsInstalled(ref platform, state, group))
+		if (!MuiGroupLayoutHookCore.TryReadEffectiveState(ref platform, state,
+			group, out var hookState)) return false;
+		if (hookState.Hook.IsNotNull)
 		{
 			if (!MuiGroupLayoutHookCore.InvokeMinMax(ref platform, state, group,
 				out var hooked)) return false;
 			return MuiAreaLayoutCore.WriteMinMax(ref platform, storage, hooked);
 		}
+		if (!MuiGroupGridCore.TryRead(ref platform, state, group,
+			out _)) return false;
 		return MuiAreaLayoutCore.WriteMinMax(ref platform, storage,
 			ComputeMinMax(ref platform, state, group));
 	}
@@ -1583,7 +1608,9 @@ public static class MuiGroupLayoutCore
 	{
 		if (!TryReadLayoutPolicyState(ref platform, state, group,
 			out var policy)) return default;
-		if (MuiGroupLayoutHookCore.IsInstalled(ref platform, state, group))
+		if (!MuiGroupLayoutHookCore.TryReadEffectiveState(ref platform, state,
+			group, out var hookState)) return default;
+		if (hookState.Hook.IsNotNull)
 		{
 			return MuiGroupLayoutHookCore.InvokeMinMax(ref platform, state, group,
 				out var hooked) ? hooked : default;
@@ -1592,7 +1619,8 @@ public static class MuiGroupLayoutCore
 		var horizontal = policy.Horizontal;
 		var pageMode = policy.PageMode;
 		var count = CountChildren(ref platform, state, group);
-		var grid = MuiGroupGridCore.Read(ref platform, state, group);
+		if (!MuiGroupGridCore.TryRead(ref platform, state, group,
+			out var grid)) return default;
 		if (MuiGroupGridCore.IsEnabled(grid, count))
 			return MuiGroupGridCore.ComputeMinMax(ref platform, state, group,
 				grid, count);
@@ -1768,7 +1796,9 @@ public static class MuiGroupLayoutCore
 	{
 		if (!TryReadLayoutPolicyState(ref platform, state, group,
 			out var policy)) return false;
-		if (MuiGroupLayoutHookCore.IsInstalled(ref platform, state, group))
+		if (!MuiGroupLayoutHookCore.TryReadEffectiveState(ref platform, state,
+			group, out var hookState)) return false;
+		if (hookState.Hook.IsNotNull)
 		{
 			if (!MuiAreaLayoutCore.Layout(ref platform, state, group, left, top,
 				width, height)) return false;
@@ -1782,9 +1812,10 @@ public static class MuiGroupLayoutCore
 		}
 		var horizontal = policy.Horizontal;
 		var count = CountChildren(ref platform, state, group);
+		if (!MuiGroupGridCore.TryRead(ref platform, state, group,
+			out var grid)) return false;
 		if (count == 0) return MuiAreaLayoutCore.Layout(ref platform, state, group,
 			left, top, width, height);
-		var grid = MuiGroupGridCore.Read(ref platform, state, group);
 		if (MuiGroupGridCore.IsEnabled(grid, count))
 			return MuiGroupGridCore.Layout(ref platform, state, group, left, top,
 				width, height, grid, count);
@@ -2055,8 +2086,8 @@ public static class MuiGroupLayoutCore
 		APTR group, int left, int top, int width, int height, int count)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
-		var selection = MuiGroupPageCore.ResolveLayout(ref platform, state, group,
-			count, left, top, width, height);
+		if (!MuiGroupPageCore.TryResolveLayout(ref platform, state, group, count,
+			left, top, width, height, out var selection)) return false;
 		for (var index = 0; index < count; index++)
 		{
 			var child = MuiFamilyCore.GetChild(ref platform, state, group, index,
@@ -2103,13 +2134,16 @@ public static class MuiGroupLayoutCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, group).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, group,
 			LayoutPolicyStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, group,
-			LayoutPolicyStateKey) !=
-			unchecked((int)MuiGroupLayoutPolicyStateRecord.Size)) return false;
-		return MuiGroupLayoutPolicyStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiGroupLayoutPolicyStateValidation.IsValidRecord(value);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, group,
+			LayoutPolicyStateKey);
+		return length == unchecked((int)MuiGroupLayoutPolicyStateRecord.Size) &&
+			MuiGroupLayoutPolicyStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiGroupLayoutPolicyStateAdmission.ValidateLive(ref platform,
+				state, group, value);
 	}
 
 	// Synchronize the named policy record from raw legacy attributes.  A
@@ -2120,6 +2154,8 @@ public static class MuiGroupLayoutCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, group).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, group,
 			LayoutPolicyStateKey);
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, group,
@@ -2128,13 +2164,15 @@ public static class MuiGroupLayoutCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiGroupLayoutPolicyStateRecord.Size) ||
-				!MuiGroupLayoutPolicyStateRecordCodec.TryRead(ref platform, block,
+				!MuiGroupLayoutPolicyStateRecordCodec.TryReadStructural(ref platform, block,
 					out var record) ||
-				!MuiGroupLayoutPolicyStateValidation.IsValidRecord(record)) return false;
+				!MuiGroupLayoutPolicyStateAdmission.ValidateLive(ref platform, state,
+					group, record)) return false;
 			value = record;
 			if (!TryFillLayoutPolicy(ref platform, state, group, ref value))
 				return false;
-			if (!MuiGroupLayoutPolicyStateValidation.IsValidState(value)) return false;
+			if (!MuiGroupLayoutPolicyStateAdmission.ValidateLive(ref platform, state,
+				group, value)) return false;
 			if (record.Horizontal != value.Horizontal ||
 				record.HorizontalSpacing != value.HorizontalSpacing ||
 				record.VerticalSpacing != value.VerticalSpacing ||
@@ -2149,7 +2187,8 @@ public static class MuiGroupLayoutCore
 		value = default;
 		value.Magic = MuiGroupLayoutPolicyStateRecord.Cookie;
 		if (!TryFillLayoutPolicy(ref platform, state, group, ref value)) return false;
-		if (!MuiGroupLayoutPolicyStateValidation.IsValidState(value)) return false;
+		if (!MuiGroupLayoutPolicyStateAdmission.ValidateLive(ref platform, state,
+			group, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiGroupLayoutPolicyStateRecord.Size);
 		if (scratch.IsNull) return false;

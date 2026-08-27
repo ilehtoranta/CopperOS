@@ -16,6 +16,8 @@ namespace CopperOS.MuiMaster;
 internal struct MuiAreaDragMethodMessage
 {
 	public const uint Size = 4;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -23,6 +25,9 @@ internal struct MuiAreaDragMethodMessage
 internal struct MuiAreaDragBeginMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ObjectOffset = 4;
 	public uint MethodId;
 	public uint Object;
 }
@@ -31,6 +36,11 @@ internal struct MuiAreaDragBeginMessage
 internal struct MuiAreaDoDragMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint TouchXOffset = 4;
+	public const uint TouchYOffset = 8;
+	public const uint FlagsOffset = 12;
 	public uint MethodId;
 	public int TouchX;
 	public int TouchY;
@@ -41,6 +51,11 @@ internal struct MuiAreaDoDragMessage
 internal struct MuiAreaCreateDragImageMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint TouchXOffset = 4;
+	public const uint TouchYOffset = 8;
+	public const uint FlagsOffset = 12;
 	public uint MethodId;
 	public int TouchX;
 	public int TouchY;
@@ -51,6 +66,9 @@ internal struct MuiAreaCreateDragImageMessage
 internal struct MuiAreaDeleteDragImageMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint DragImageOffset = 4;
 	public uint MethodId;
 	public uint DragImage;
 }
@@ -59,6 +77,12 @@ internal struct MuiAreaDeleteDragImageMessage
 internal struct MuiAreaDragDropMessage
 {
 	public const uint Size = 20;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ObjectOffset = 4;
+	public const uint XOffset = 8;
+	public const uint YOffset = 12;
+	public const uint QualifierOffset = 16;
 	public uint MethodId;
 	public uint Object;
 	public int X;
@@ -70,6 +94,15 @@ internal struct MuiAreaDragDropMessage
 internal struct MuiAreaDragEventMessage
 {
 	public const uint Size = 32;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint WindowOffset = 4;
+	public const uint ObjectOffset = 8;
+	public const uint DragImageOffset = 12;
+	public const uint IntuiMessageOffset = 16;
+	public const uint MuiKeyOffset = 20;
+	public const uint MousePointerTypeOffset = 24;
+	public const uint FlagsOffset = 28;
 	public uint MethodId;
 	public uint Window;
 	public uint Object;
@@ -84,6 +117,10 @@ internal struct MuiAreaDragEventMessage
 internal struct MuiAreaDragFinishMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ObjectOffset = 4;
+	public const uint DropFollowsOffset = 8;
 	public uint MethodId;
 	public uint Object;
 	public int DropFollows;
@@ -93,6 +130,9 @@ internal struct MuiAreaDragFinishMessage
 internal struct MuiAreaDragQueryMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ObjectOffset = 4;
 	public uint MethodId;
 	public uint Object;
 }
@@ -101,6 +141,13 @@ internal struct MuiAreaDragQueryMessage
 internal struct MuiAreaDragReportMessage
 {
 	public const uint Size = 24;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ObjectOffset = 4;
+	public const uint XOffset = 8;
+	public const uint YOffset = 12;
+	public const uint UpdateOffset = 16;
+	public const uint QualifierOffset = 20;
 	public uint MethodId;
 	public uint Object;
 	public int X;
@@ -150,69 +197,258 @@ internal struct MuiAreaDragFieldCursor
 	internal MuiAreaDragField Field;
 }
 
-internal static class MuiAreaDragFieldCursorCodec
+// Named packet adapters keep the MorphOS ABI layout in one place. Callers
+// select packet/field enums and receive bounded addresses; raw offsets never
+// cross this boundary.
+internal static class MuiAreaDragMessageMemoryCodec
 {
+	private static bool TryGetPacketSize(MuiAreaDragPacketKind packet,
+		out uint size)
+	{
+		switch (packet)
+		{
+			case MuiAreaDragPacketKind.Method:
+				size = MuiAreaDragMethodMessage.Size;
+				return true;
+			case MuiAreaDragPacketKind.Begin:
+				size = MuiAreaDragBeginMessage.Size;
+				return true;
+			case MuiAreaDragPacketKind.DoDrag:
+			case MuiAreaDragPacketKind.CreateImage:
+				size = MuiAreaDoDragMessage.Size;
+				return true;
+			case MuiAreaDragPacketKind.Drop:
+				size = MuiAreaDragDropMessage.Size;
+				return true;
+			case MuiAreaDragPacketKind.Event:
+				size = MuiAreaDragEventMessage.Size;
+				return true;
+			case MuiAreaDragPacketKind.Finish:
+				size = MuiAreaDragFinishMessage.Size;
+				return true;
+			case MuiAreaDragPacketKind.Query:
+				size = MuiAreaDragQueryMessage.Size;
+				return true;
+			case MuiAreaDragPacketKind.Report:
+				size = MuiAreaDragReportMessage.Size;
+				return true;
+			case MuiAreaDragPacketKind.DeleteImage:
+				size = MuiAreaDeleteDragImageMessage.Size;
+				return true;
+		}
+		size = 0;
+		return false;
+	}
+
 	private static bool TryResolve(MuiAreaDragPacketKind packet,
 		MuiAreaDragField field, out uint offset)
 	{
 		switch (packet)
 		{
 			case MuiAreaDragPacketKind.Method:
-				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
+				if (field == MuiAreaDragField.MethodId)
+				{
+					offset = MuiAreaDragMethodMessage.MethodIdOffset;
+					return true;
+				}
 				break;
 			case MuiAreaDragPacketKind.Begin:
-				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
-				if (field == MuiAreaDragField.Object) { offset = 4; return true; }
+				if (field == MuiAreaDragField.MethodId)
+				{
+					offset = MuiAreaDragBeginMessage.MethodIdOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Object)
+				{
+					offset = MuiAreaDragBeginMessage.ObjectOffset;
+					return true;
+				}
 				break;
 			case MuiAreaDragPacketKind.DoDrag:
-				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
-				if (field == MuiAreaDragField.TouchX) { offset = 4; return true; }
-				if (field == MuiAreaDragField.TouchY) { offset = 8; return true; }
-				if (field == MuiAreaDragField.Flags) { offset = 12; return true; }
+				if (field == MuiAreaDragField.MethodId)
+				{
+					offset = MuiAreaDoDragMessage.MethodIdOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.TouchX)
+				{
+					offset = MuiAreaDoDragMessage.TouchXOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.TouchY)
+				{
+					offset = MuiAreaDoDragMessage.TouchYOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Flags)
+				{
+					offset = MuiAreaDoDragMessage.FlagsOffset;
+					return true;
+				}
 				break;
 			case MuiAreaDragPacketKind.Drop:
-				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
-				if (field == MuiAreaDragField.Object) { offset = 4; return true; }
-				if (field == MuiAreaDragField.X) { offset = 8; return true; }
-				if (field == MuiAreaDragField.Y) { offset = 12; return true; }
-				if (field == MuiAreaDragField.Qualifier) { offset = 16; return true; }
+				if (field == MuiAreaDragField.MethodId)
+				{
+					offset = MuiAreaDragDropMessage.MethodIdOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Object)
+				{
+					offset = MuiAreaDragDropMessage.ObjectOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.X)
+				{
+					offset = MuiAreaDragDropMessage.XOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Y)
+				{
+					offset = MuiAreaDragDropMessage.YOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Qualifier)
+				{
+					offset = MuiAreaDragDropMessage.QualifierOffset;
+					return true;
+				}
 				break;
 			case MuiAreaDragPacketKind.Event:
-				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
-				if (field == MuiAreaDragField.Window) { offset = 4; return true; }
-				if (field == MuiAreaDragField.Object) { offset = 8; return true; }
-				if (field == MuiAreaDragField.DragImage) { offset = 12; return true; }
-				if (field == MuiAreaDragField.IntuiMessage) { offset = 16; return true; }
-				if (field == MuiAreaDragField.MuiKey) { offset = 20; return true; }
-				if (field == MuiAreaDragField.MousePointerType) { offset = 24; return true; }
-				if (field == MuiAreaDragField.Flags) { offset = 28; return true; }
+				if (field == MuiAreaDragField.MethodId)
+				{
+					offset = MuiAreaDragEventMessage.MethodIdOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Window)
+				{
+					offset = MuiAreaDragEventMessage.WindowOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Object)
+				{
+					offset = MuiAreaDragEventMessage.ObjectOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.DragImage)
+				{
+					offset = MuiAreaDragEventMessage.DragImageOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.IntuiMessage)
+				{
+					offset = MuiAreaDragEventMessage.IntuiMessageOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.MuiKey)
+				{
+					offset = MuiAreaDragEventMessage.MuiKeyOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.MousePointerType)
+				{
+					offset = MuiAreaDragEventMessage.MousePointerTypeOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Flags)
+				{
+					offset = MuiAreaDragEventMessage.FlagsOffset;
+					return true;
+				}
 				break;
 			case MuiAreaDragPacketKind.Finish:
-				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
-				if (field == MuiAreaDragField.Object) { offset = 4; return true; }
-				if (field == MuiAreaDragField.DropFollows) { offset = 8; return true; }
+				if (field == MuiAreaDragField.MethodId)
+				{
+					offset = MuiAreaDragFinishMessage.MethodIdOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Object)
+				{
+					offset = MuiAreaDragFinishMessage.ObjectOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.DropFollows)
+				{
+					offset = MuiAreaDragFinishMessage.DropFollowsOffset;
+					return true;
+				}
 				break;
 			case MuiAreaDragPacketKind.Query:
-				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
-				if (field == MuiAreaDragField.Object) { offset = 4; return true; }
+				if (field == MuiAreaDragField.MethodId)
+				{
+					offset = MuiAreaDragQueryMessage.MethodIdOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Object)
+				{
+					offset = MuiAreaDragQueryMessage.ObjectOffset;
+					return true;
+				}
 				break;
 			case MuiAreaDragPacketKind.Report:
-				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
-				if (field == MuiAreaDragField.Object) { offset = 4; return true; }
-				if (field == MuiAreaDragField.X) { offset = 8; return true; }
-				if (field == MuiAreaDragField.Y) { offset = 12; return true; }
-				if (field == MuiAreaDragField.Update) { offset = 16; return true; }
-				if (field == MuiAreaDragField.Qualifier) { offset = 20; return true; }
+				if (field == MuiAreaDragField.MethodId)
+				{
+					offset = MuiAreaDragReportMessage.MethodIdOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Object)
+				{
+					offset = MuiAreaDragReportMessage.ObjectOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.X)
+				{
+					offset = MuiAreaDragReportMessage.XOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Y)
+				{
+					offset = MuiAreaDragReportMessage.YOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Update)
+				{
+					offset = MuiAreaDragReportMessage.UpdateOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Qualifier)
+				{
+					offset = MuiAreaDragReportMessage.QualifierOffset;
+					return true;
+				}
 				break;
 			case MuiAreaDragPacketKind.CreateImage:
-				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
-				if (field == MuiAreaDragField.TouchX) { offset = 4; return true; }
-				if (field == MuiAreaDragField.TouchY) { offset = 8; return true; }
-				if (field == MuiAreaDragField.Flags) { offset = 12; return true; }
+				if (field == MuiAreaDragField.MethodId)
+				{
+					offset = MuiAreaCreateDragImageMessage.MethodIdOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.TouchX)
+				{
+					offset = MuiAreaCreateDragImageMessage.TouchXOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.TouchY)
+				{
+					offset = MuiAreaCreateDragImageMessage.TouchYOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.Flags)
+				{
+					offset = MuiAreaCreateDragImageMessage.FlagsOffset;
+					return true;
+				}
 				break;
 			case MuiAreaDragPacketKind.DeleteImage:
-				if (field == MuiAreaDragField.MethodId) { offset = 0; return true; }
-				if (field == MuiAreaDragField.DragImage) { offset = 4; return true; }
+				if (field == MuiAreaDragField.MethodId)
+				{
+					offset = MuiAreaDeleteDragImageMessage.MethodIdOffset;
+					return true;
+				}
+				if (field == MuiAreaDragField.DragImage)
+				{
+					offset = MuiAreaDeleteDragImageMessage.DragImageOffset;
+					return true;
+				}
 				break;
 		}
 		offset = 0;
@@ -225,10 +461,24 @@ internal static class MuiAreaDragFieldCursorCodec
 	{
 		address = APTR.Null;
 		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset)
+			!TryGetPacketSize(cursor.Packet, out var packetSize) ||
+			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(cursor.Message, packetSize))
 			return false;
 		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiAreaDragMethodMessage.FieldSize);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaDragPacketKind packet, MuiAreaDragField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiAreaDragFieldCursor);
+		cursor.Message = message;
+		cursor.Packet = packet;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -259,6 +509,29 @@ internal static class MuiAreaDragFieldCursorCodec
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+internal static class MuiAreaDragFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDragFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaDragMessageMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaDragPacketKind packet, MuiAreaDragField field,
+		out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaDragMessageMemoryCodec.TryReadUInt32(ref platform, message, packet,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaDragPacketKind packet, MuiAreaDragField field,
+		uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform, message, packet,
+			field, value);
 }
 
 internal static class MuiAreaDragMessageCodec

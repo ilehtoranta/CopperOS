@@ -313,7 +313,8 @@ public static class MuiAreaDragCore
 		APTR source, int touchX, int touchY, uint flags, bool hasTouchInput = false)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (source.IsNull || !IsEnabled(ref platform, state, source, Draggable))
+		if (source.IsNull || !TryIsEnabled(ref platform, state, source,
+			Draggable, out var sourceEnabled) || !sourceEnabled)
 			return 0;
 		var route = default(MuiDragRouteSample);
 		if (hasTouchInput)
@@ -378,8 +379,10 @@ public static class MuiAreaDragCore
 	{
 		var source = APTR.FromPointer(packet.Object);
 		if (source.IsNull || target.IsNull ||
-			!IsEnabled(ref platform, state, source, Draggable) ||
-			!IsEnabled(ref platform, state, target, Dropable))
+			!TryIsEnabled(ref platform, state, source, Draggable,
+				out var sourceEnabled) || !sourceEnabled ||
+			!TryIsEnabled(ref platform, state, target, Dropable,
+				out var targetEnabled) || !targetEnabled)
 			return QueryRefuse;
 		var route = default(MuiDragRouteSample);
 		route.Phase = MuiDragRoutePhase.Query;
@@ -573,26 +576,36 @@ public static class MuiAreaDragCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
-		var draggable = ReadPolicyAttribute(ref platform, state, obj, Draggable,
-			0);
-		var dropable = ReadPolicyAttribute(ref platform, state, obj, Dropable, 1);
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			PolicyStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			PolicyStateKey) == unchecked((int)MuiAreaDragPolicyStateRecord.Size) &&
-			MuiAreaDragPolicyStateRecordCodec.TryRead(ref platform, block,
-				out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			PolicyStateKey);
+		if (block.IsNotNull || length != 0)
 		{
-			if (value.Draggable != draggable || value.Dropable != dropable)
+			if (length != unchecked((int)MuiAreaDragPolicyStateRecord.Size) ||
+				!MuiAreaDragPolicyStateRecordCodec.TryReadStructural(ref platform,
+					block, out value) ||
+				!MuiAreaDragPolicyStateAdmission.ValidateLive(ref platform, state,
+					obj, value)) return false;
+			var currentDraggable = ReadPolicyAttribute(ref platform, state, obj,
+				Draggable, 0);
+			var currentDropable = ReadPolicyAttribute(ref platform, state, obj,
+				Dropable, 1);
+			if (value.Draggable != currentDraggable || value.Dropable !=
+				currentDropable)
 			{
-				value.Draggable = draggable;
-				value.Dropable = dropable;
+				value.Draggable = currentDraggable;
+				value.Dropable = currentDropable;
 				if (!MuiAreaDragPolicyStateRecordCodec.Write(ref platform, block,
 					value)) return false;
 			}
 			return true;
 		}
-
+		var draggable = ReadPolicyAttribute(ref platform, state, obj, Draggable,
+			0);
+		var dropable = ReadPolicyAttribute(ref platform, state, obj, Dropable, 1);
 		value = default;
 		value.Magic = MuiAreaDragPolicyStateRecord.Cookie;
 		value.Draggable = draggable;
@@ -625,22 +638,42 @@ public static class MuiAreaDragCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			PolicyStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			PolicyStateKey) != unchecked((int)MuiAreaDragPolicyStateRecord.Size))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			PolicyStateKey);
+		if ((block.IsNull && length == 0) || length !=
+			unchecked((int)MuiAreaDragPolicyStateRecord.Size) ||
+			!MuiAreaDragPolicyStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) || !MuiAreaDragPolicyStateAdmission.ValidateLive(ref platform,
+				state, obj, value))
 			return false;
-		return MuiAreaDragPolicyStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return true;
 	}
 
-	private static bool IsEnabled<TPlatform>(ref TPlatform platform, APTR state,
-		APTR obj, uint attribute) where TPlatform : struct, IMuiHeadlessPlatform
+	private static bool TryIsEnabled<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, uint attribute, out bool enabled)
+		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryGetExistingPolicyStateRecord(ref platform, state, obj,
-			out var policy))
-			return (attribute == Draggable ? policy.Draggable : policy.Dropable) != 0;
+		enabled = false;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			PolicyStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			PolicyStateKey);
+		if (block.IsNotNull || length != 0)
+		{
+			if (length != unchecked((int)MuiAreaDragPolicyStateRecord.Size) ||
+				!MuiAreaDragPolicyStateRecordCodec.TryReadStructural(ref platform,
+					block, out var policy) ||
+				!MuiAreaDragPolicyStateAdmission.ValidateLive(ref platform, state,
+					obj, policy)) return false;
+			enabled = (attribute == Draggable ? policy.Draggable : policy.Dropable) != 0;
+			return true;
+		}
 		var defaultValue = attribute == Dropable ? 1u : 0u;
-		return ReadPolicyAttribute(ref platform, state, obj, attribute,
+		enabled = ReadPolicyAttribute(ref platform, state, obj, attribute,
 			defaultValue) != 0;
+		return true;
 	}
 
 	private static uint ReadPolicyAttribute<TPlatform>(ref TPlatform platform,

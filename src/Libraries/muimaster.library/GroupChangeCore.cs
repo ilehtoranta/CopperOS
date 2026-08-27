@@ -243,17 +243,27 @@ internal struct MuiGroupChangeState
 	public uint ExitRequests;
 }
 
+internal static class MuiGroupChangeStateValidation
+{
+	internal static bool IsValidRecord(MuiGroupChangeState value) =>
+		value.Cookie == MuiGroupChangeState.Magic &&
+		value.Depth <= MuiHeadlessLayout.MaximumTraversal;
+
+	internal static bool IsValidState(MuiGroupChangeState value) =>
+		IsValidRecord(value);
+}
+
 internal static class MuiGroupChangeStateCodec
 {
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiGroupChangeState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGroupChangeState.Size)) return false;
+		if (address.IsNull || !MuiGroupChangeStateValidation.IsValidRecord(value) ||
+			!platform.IsMapped(address, MuiGroupChangeState.Size)) return false;
 		return MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(ref platform,
 			address, MuiGroupChangeRecordKind.State,
-			MuiGroupChangeRecordField.Cookie, MuiGroupChangeState.Magic) &&
+			MuiGroupChangeRecordField.Cookie, value.Cookie) &&
 			MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(ref platform,
 				address, MuiGroupChangeRecordKind.State,
 				MuiGroupChangeRecordField.Depth, value.Depth) &&
@@ -286,8 +296,8 @@ internal static class MuiGroupChangeStateCodec
 				address, MuiGroupChangeRecordKind.State,
 				MuiGroupChangeRecordField.ExitRequests,
 				out value.ExitRequests)) return false;
-		value.Cookie = MuiGroupChangeState.Magic;
-		return true;
+		value.Cookie = cookie;
+		return MuiGroupChangeStateValidation.IsValidState(value);
 	}
 }
 
@@ -372,9 +382,9 @@ public static class MuiGroupChangeCore
 		var block = EnsureState(ref platform, state, group);
 		if (block.IsNull || !TryReadState(ref platform, block, out var value))
 			return 0;
-		if (value.Depth == uint.MaxValue) return 0;
+		if (value.Depth >= MuiHeadlessLayout.MaximumTraversal) return 0;
 		value.Depth++;
-		WriteState(ref platform, block, value);
+		if (!WriteState(ref platform, block, value)) return 0;
 		MuiHeadlessMemory.Mutated(ref platform, state);
 		// MorphOS documents NULL as failure; a live group pointer is the stable
 		// non-null success token and avoids inventing a separate handle format.
@@ -464,7 +474,7 @@ public static class MuiGroupChangeCore
 		value.ExitFlags = flags;
 		value.ExitRequests = value.ExitRequests == uint.MaxValue
 			? uint.MaxValue : value.ExitRequests + 1;
-		WriteState(ref platform, block, value);
+		if (!WriteState(ref platform, block, value)) return false;
 		MuiHeadlessMemory.Mutated(ref platform, state);
 		return true;
 	}
@@ -472,21 +482,32 @@ public static class MuiGroupChangeCore
 	private static APTR EnsureState<TPlatform>(ref TPlatform platform, APTR state,
 		APTR group) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(Read(ref platform, state, group,
-			StateAttribute));
-		if (TryReadState(ref platform, block, out _)) return block;
+		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, group,
+			StateAttribute, out var existing) && existing != 0)
+		{
+			var existingBlock = APTR.FromPointer(existing);
+			if (TryReadState(ref platform, existingBlock, out _))
+				return existingBlock;
+			return APTR.Null;
+		}
+		var block = APTR.Null;
 		block = MuiHeadlessMemory.Allocate(ref platform, MuiGroupChangeState.Size);
 		if (block.IsNull) return APTR.Null;
 		var value = default(MuiGroupChangeState);
 		value.Cookie = MuiGroupChangeState.Magic;
-		WriteState(ref platform, block, value);
+		if (!WriteState(ref platform, block, value))
+		{
+			platform.Clear(block, MuiGroupChangeState.Size);
+			platform.Free(block, MuiGroupChangeState.Size);
+			return APTR.Null;
+		}
 		if (Set(ref platform, state, group, StateAttribute, block.Raw)) return block;
 		platform.Clear(block, MuiGroupChangeState.Size);
 		platform.Free(block, MuiGroupChangeState.Size);
 		return APTR.Null;
 	}
 
-	private static void WriteState<TPlatform>(ref TPlatform platform, APTR block,
+	private static bool WriteState<TPlatform>(ref TPlatform platform, APTR block,
 		MuiGroupChangeState value) where TPlatform : struct, IMuiGuestMemory
 		=> MuiGroupChangeStateCodec.Write(ref platform, block, value);
 

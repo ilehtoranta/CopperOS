@@ -24,6 +24,20 @@ internal struct MuiStringPresentationStateRecord
 	internal uint Unicode;
 }
 
+internal static class MuiStringPresentationStateAdmission
+{
+	internal static bool Validate(MuiStringPresentationStateRecord value) =>
+		value.Magic == MuiStringPresentationStateRecord.Cookie &&
+		value.MaxLen <= 0x7FFFFFFFu && value.Secret <= 1 &&
+		value.Format <= 2 && value.Unicode <= 1;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiStringPresentationStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) && !obj.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
+}
+
 internal enum MuiStringPresentationStateField : byte
 {
 	Magic,
@@ -95,56 +109,81 @@ internal static class MuiStringPresentationStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Named presentation fields remain the
+// semantic record; this bounded adapter owns fixed guest-layout translation.
+internal static class MuiStringPresentationStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiStringPresentationStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiStringPresentationStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiStringPresentationStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiStringPresentationStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringPresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringPresentationStateRecord.Size) ||
-			!MuiStringPresentationStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiStringPresentationStateField.Magic, out var magic) ||
-			magic != MuiStringPresentationStateRecord.Cookie)
-			return false;
-		value.Magic = magic;
-		return MuiStringPresentationStateFieldCursorCodec.TryReadUInt32(
-			ref platform, address,
-			MuiStringPresentationStateField.MaxLen, out value.MaxLen) &&
-			MuiStringPresentationStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiStringPresentationStateField.Secret, out value.Secret) &&
-			MuiStringPresentationStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiStringPresentationStateField.Format, out value.Format) &&
-			MuiStringPresentationStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiStringPresentationStateField.Unicode, out value.Unicode);
+		return MuiStringPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) &&
+			MuiStringPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 4, out value.MaxLen) &&
+			MuiStringPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 8, out value.Secret) &&
+			MuiStringPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 12, out value.Format) &&
+			MuiStringPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 16, out value.Unicode);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiStringPresentationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiStringPresentationStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringPresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringPresentationStateRecord.Size) || value.Magic !=
-			MuiStringPresentationStateRecord.Cookie) return false;
-		return MuiStringPresentationStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiStringPresentationStateField.Magic, value.Magic) &&
-			MuiStringPresentationStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiStringPresentationStateField.MaxLen, value.MaxLen) &&
-			MuiStringPresentationStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiStringPresentationStateField.Secret, value.Secret) &&
-			MuiStringPresentationStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiStringPresentationStateField.Format, value.Format) &&
-			MuiStringPresentationStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiStringPresentationStateField.Unicode, value.Unicode);
+		if (!MuiStringPresentationStateAdmission.Validate(value)) return false;
+		return MuiStringPresentationStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 0, value.Magic) &&
+			MuiStringPresentationStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, 4, value.MaxLen) &&
+			MuiStringPresentationStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, 8, value.Secret) &&
+			MuiStringPresentationStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, 12, value.Format) &&
+			MuiStringPresentationStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, 16, value.Unicode);
 	}
 }

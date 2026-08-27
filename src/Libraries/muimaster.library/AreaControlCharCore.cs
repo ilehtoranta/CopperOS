@@ -28,11 +28,18 @@ internal static class MuiAreaControlCharCore
 			MuiCommonControlCore.ControlChar, out var raw))
 			character = Normalize(raw);
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) ==
-			unchecked((int)MuiAreaControlCharStateRecord.Size) &&
-			MuiAreaControlCharStateRecordCodec.TryRead(ref platform, block,
-				out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateKey);
+		MuiAreaControlCharStateRecord record;
+		if (block.IsNotNull || length != 0)
 		{
+			// A present block is authoritative typed state. Reject malformed
+			// characters instead of normalizing them during a repair read.
+			if (length != unchecked((int)MuiAreaControlCharStateRecord.Size) ||
+				!MuiAreaControlCharStateRecordCodec.TryReadStructural(ref platform,
+					block, out record) ||
+				!MuiAreaControlCharStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			if (record.Character != character)
 			{
 				record.Character = character;
@@ -63,8 +70,9 @@ internal static class MuiAreaControlCharCore
 		record.Magic = MuiAreaControlCharStateRecord.Cookie;
 		record.Character = Normalize(character);
 		record.Generation = generation == 0 ? 1u : generation;
-		var written = MuiAreaControlCharStateRecordCodec.Write(ref platform, scratch,
-			record);
+		var written = MuiAreaControlCharStateAdmission.ValidateLive(ref platform,
+			state, obj, record) && MuiAreaControlCharStateRecordCodec.Write(
+			ref platform, scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 			StateKey, scratch, unchecked((int)MuiAreaControlCharStateRecord.Size));
 		platform.Clear(scratch, MuiAreaControlCharStateRecord.Size);

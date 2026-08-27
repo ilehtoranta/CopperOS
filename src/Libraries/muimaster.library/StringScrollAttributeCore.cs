@@ -191,6 +191,9 @@ public static class MuiStringScrollAttributeCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		present = false;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			MetricsStateKey);
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
@@ -199,14 +202,17 @@ public static class MuiStringScrollAttributeCore
 		if (!present) return true;
 		if (block.IsNull || length != unchecked((int)MuiStringScrollMetricsStateRecord.Size))
 			return false;
-		return MuiStringScrollMetricsStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiStringScrollMetricsStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiStringScrollMetricsStateAdmission.ValidateLive(
+				ref platform, state, obj, value);
 	}
 
 	private static bool PublishMetricsState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, MuiStringScrollMetricsState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			MetricsStateKey);
 		if (block.IsNull)

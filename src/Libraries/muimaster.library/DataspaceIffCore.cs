@@ -16,6 +16,9 @@ namespace CopperOS.MuiMaster;
 internal struct MuiDataspaceReadIffMessage
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint HandleOffset = 4;
 	internal uint MethodId;
 	internal APTR Handle;
 }
@@ -33,29 +36,36 @@ internal struct MuiDataspaceReadIffFieldCursor
 	internal MuiDataspaceReadIffField Field;
 }
 
-internal static class MuiDataspaceReadIffFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed ReadIFF packet.
+internal static class MuiDataspaceReadIffMessageMemoryCodec
 {
+	private static bool TryResolve(MuiDataspaceReadIffField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiDataspaceReadIffField.MethodId:
+				offset = MuiDataspaceReadIffMessage.MethodIdOffset;
+				return true;
+			case MuiDataspaceReadIffField.Handle:
+				offset = MuiDataspaceReadIffMessage.HandleOffset;
+				return true;
+		}
+		offset = 0;
+		return false;
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiDataspaceReadIffFieldCursor cursor, out APTR address)
+		APTR message, MuiDataspaceReadIffField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		uint offset;
-		switch (cursor.Field)
-		{
-			case MuiDataspaceReadIffField.MethodId:
-				offset = 0;
-				break;
-			case MuiDataspaceReadIffField.Handle:
-				offset = 4;
-				break;
-			default:
-				return false;
-		}
-		if (cursor.Message.IsNull || cursor.Message.Raw >
-			uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || message.IsNull ||
+			message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, MuiDataspaceReadIffMessage.Size))
+			return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiDataspaceReadIffMessage.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -63,10 +73,8 @@ internal static class MuiDataspaceReadIffFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiDataspaceReadIffFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -75,19 +83,44 @@ internal static class MuiDataspaceReadIffFieldCursorCodec
 		APTR message, MuiDataspaceReadIffField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiDataspaceReadIffFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that construct the typed cursor.
+internal static class MuiDataspaceReadIffFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiDataspaceReadIffFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDataspaceReadIffMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspaceReadIffField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDataspaceReadIffMessageMemoryCodec.TryRead(ref platform, message,
+			field, out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspaceReadIffField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDataspaceReadIffMessageMemoryCodec.TryWrite(ref platform, message,
+			field, value);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiDataspaceWriteIffMessage
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint HandleOffset = 4;
+	internal const uint TypeOffset = 8;
+	internal const uint IdOffset = 12;
 	internal uint MethodId;
 	internal APTR Handle;
 	internal uint Type;
@@ -109,35 +142,42 @@ internal struct MuiDataspaceWriteIffFieldCursor
 	internal MuiDataspaceWriteIffField Field;
 }
 
-internal static class MuiDataspaceWriteIffFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed WriteIFF packet.
+internal static class MuiDataspaceWriteIffMessageMemoryCodec
 {
+	private static bool TryResolve(MuiDataspaceWriteIffField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiDataspaceWriteIffField.MethodId:
+				offset = MuiDataspaceWriteIffMessage.MethodIdOffset;
+				return true;
+			case MuiDataspaceWriteIffField.Handle:
+				offset = MuiDataspaceWriteIffMessage.HandleOffset;
+				return true;
+			case MuiDataspaceWriteIffField.Type:
+				offset = MuiDataspaceWriteIffMessage.TypeOffset;
+				return true;
+			case MuiDataspaceWriteIffField.Id:
+				offset = MuiDataspaceWriteIffMessage.IdOffset;
+				return true;
+		}
+		offset = 0;
+		return false;
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiDataspaceWriteIffFieldCursor cursor, out APTR address)
+		APTR message, MuiDataspaceWriteIffField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		uint offset;
-		switch (cursor.Field)
-		{
-			case MuiDataspaceWriteIffField.MethodId:
-				offset = 0;
-				break;
-			case MuiDataspaceWriteIffField.Handle:
-				offset = 4;
-				break;
-			case MuiDataspaceWriteIffField.Type:
-				offset = 8;
-				break;
-			case MuiDataspaceWriteIffField.Id:
-				offset = 12;
-				break;
-			default:
-				return false;
-		}
-		if (cursor.Message.IsNull || cursor.Message.Raw >
-			uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || message.IsNull ||
+			message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, MuiDataspaceWriteIffMessage.Size))
+			return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiDataspaceWriteIffMessage.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -145,10 +185,8 @@ internal static class MuiDataspaceWriteIffFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiDataspaceWriteIffFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -157,13 +195,33 @@ internal static class MuiDataspaceWriteIffFieldCursorCodec
 		APTR message, MuiDataspaceWriteIffField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiDataspaceWriteIffFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that construct the typed cursor.
+internal static class MuiDataspaceWriteIffFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiDataspaceWriteIffFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDataspaceWriteIffMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspaceWriteIffField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDataspaceWriteIffMessageMemoryCodec.TryRead(ref platform, message,
+			field, out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspaceWriteIffField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDataspaceWriteIffMessageMemoryCodec.TryWrite(ref platform, message,
+			field, value);
 }
 
 // Named view of one guest-resident Dataspace store record.  StoreCore remains

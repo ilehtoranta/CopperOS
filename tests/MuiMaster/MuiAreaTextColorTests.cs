@@ -88,6 +88,68 @@ public sealed class MuiAreaTextColorTests
 		Assert.Equal(address.Raw + 12, fieldAddress.Raw);
 	}
 
+	[Fact]
+	public void TextColorAdmissionRequiresPackedColorCanonicalActiveAndGeneration()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var valid = new MuiAreaTextColorStateRecord
+		{
+			Magic = MuiAreaTextColorStateRecord.Cookie,
+			Color = 0x00C0FFEE,
+			Active = 1,
+			Generation = 1,
+		};
+		Assert.True(MuiAreaTextColorStateAdmission.Validate(valid));
+		Assert.True(MuiAreaTextColorStateAdmission.ValidateLive(ref platform,
+			State, obj, valid));
+		var malformed = valid;
+		malformed.Color = 0x01000000;
+		Assert.False(MuiAreaTextColorStateAdmission.Validate(malformed));
+		malformed = valid;
+		malformed.Active = 2;
+		Assert.False(MuiAreaTextColorStateAdmission.Validate(malformed));
+		malformed = valid;
+		malformed.Generation = 0;
+		Assert.False(MuiAreaTextColorStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaTextColorStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedTextColorFailsClosedBeforeProviderOrReplacement()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiAreaTextColorCore.TryReadState(ref platform, State, obj,
+			out _));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaTextColorCore.StateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaTextColorStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiAreaTextColorStateField.Active, 2));
+		Assert.True(MuiAreaTextColorStateRecordCodec.TryReadStructural(ref platform,
+			block, out var structural));
+		Assert.Equal(2u, structural.Active);
+		Assert.False(MuiAreaTextColorStateAdmission.Validate(structural));
+		Assert.False(MuiAreaTextColorStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		var allocationsBefore = platform.AllocationCount;
+		Assert.False(MuiAreaTextColorCore.TryReadState(ref platform, State, obj,
+			out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		platform.MuiTextColorValue = 0x00112233u;
+		var renderInfo = APTR.FromPointer(0x1300);
+		platform.WriteUInt32(renderInfo, 20, 0x1400);
+		Assert.False(MuiAreaTextColorCore.Setup(ref platform, State, obj,
+			renderInfo));
+		Assert.Equal(0u, platform.MuiTextColorRequestCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaTextColorCore.StateKey));
+	}
+
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR areaClass)
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

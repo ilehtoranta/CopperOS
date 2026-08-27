@@ -44,6 +44,9 @@ internal static class MuiApplicationMethodHeaderCodec
 internal struct MuiApplicationReturnIdMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ReturnIdOffset = 4;
 	public uint MethodId;
 	public uint ReturnId;
 }
@@ -52,6 +55,9 @@ internal struct MuiApplicationReturnIdMessage
 internal struct MuiApplicationInputMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint SignalStorageOffset = 4;
 	public uint MethodId;
 	public uint SignalStorage;
 }
@@ -60,6 +66,8 @@ internal struct MuiApplicationInputMessage
 internal struct MuiApplicationInputBufferedMessage
 {
 	public const uint Size = 4;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -67,6 +75,9 @@ internal struct MuiApplicationInputBufferedMessage
 internal struct MuiApplicationInputHandlerMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint HandlerOffset = 4;
 	public uint MethodId;
 	public uint Handler;
 }
@@ -75,6 +86,10 @@ internal struct MuiApplicationInputHandlerMessage
 internal struct MuiApplicationPushMethodMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint DestinationOffset = 4;
+	public const uint CountOffset = 8;
 	public const uint ParametersOffset = Size;
 	public const uint MaximumParameterCount = 7;
 	public uint MethodId;
@@ -132,6 +147,11 @@ internal static class MuiApplicationPushMethodParameterCursorCodec
 internal struct MuiApplicationUnpushMethodMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint TargetObjectOffset = 4;
+	public const uint MethodIdSelectorOffset = 8;
+	public const uint MethodOffset = 12;
 	public uint MethodId;
 	public uint TargetObject;
 	public uint MethodIdSelector;
@@ -167,69 +187,12 @@ internal struct MuiApplicationQueuePacketFieldCursor
 
 internal static class MuiApplicationQueuePacketFieldCursorCodec
 {
-	private static bool TryResolve(MuiApplicationQueuePacketKind packet,
-		MuiApplicationQueuePacketField field, out uint offset, out uint size)
-	{
-		size = 0;
-		switch (packet)
-		{
-			case MuiApplicationQueuePacketKind.PushMethod:
-				size = MuiApplicationPushMethodMessage.Size;
-				if (field == MuiApplicationQueuePacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationQueuePacketField.Destination)
-				{
-					offset = 4;
-					return true;
-				}
-				if (field == MuiApplicationQueuePacketField.Count)
-				{
-					offset = 8;
-					return true;
-				}
-				break;
-			case MuiApplicationQueuePacketKind.UnpushMethod:
-				size = MuiApplicationUnpushMethodMessage.Size;
-				if (field == MuiApplicationQueuePacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationQueuePacketField.TargetObject)
-				{
-					offset = 4;
-					return true;
-				}
-				if (field == MuiApplicationQueuePacketField.MethodIdSelector)
-				{
-					offset = 8;
-					return true;
-				}
-				if (field == MuiApplicationQueuePacketField.Method)
-				{
-					offset = 12;
-					return true;
-				}
-				break;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiApplicationQueuePacketFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset,
-			out var packetSize) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize)) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiApplicationQueuePacketRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor.Message, cursor.Packet, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -237,14 +200,8 @@ internal static class MuiApplicationQueuePacketFieldCursorCodec
 		MuiApplicationQueuePacketField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiApplicationQueuePacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiApplicationQueuePacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, message, packet, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -252,11 +209,95 @@ internal static class MuiApplicationQueuePacketFieldCursorCodec
 		MuiApplicationQueuePacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationQueuePacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		return MuiApplicationQueuePacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, message, packet, field, value);
+	}
+}
+
+// Struct-first guest-memory adapter for the two fixed queue-control packet
+// records. Packet kind selects the complete wire struct and field selects a
+// named member; the ABI offsets are defined only by those record declarations.
+internal static class MuiApplicationQueuePacketRecordMemoryCodec
+{
+	private static bool TryResolve(MuiApplicationQueuePacketKind packet,
+		MuiApplicationQueuePacketField field, out uint offset, out uint size,
+		out uint fieldSize)
+	{
+		fieldSize = 0;
+		if (packet == MuiApplicationQueuePacketKind.PushMethod)
+		{
+			size = MuiApplicationPushMethodMessage.Size;
+			fieldSize = MuiApplicationPushMethodMessage.FieldSize;
+			if (field == MuiApplicationQueuePacketField.MethodId)
+				offset = MuiApplicationPushMethodMessage.MethodIdOffset;
+			else if (field == MuiApplicationQueuePacketField.Destination)
+				offset = MuiApplicationPushMethodMessage.DestinationOffset;
+			else if (field == MuiApplicationQueuePacketField.Count)
+				offset = MuiApplicationPushMethodMessage.CountOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationQueuePacketKind.UnpushMethod)
+		{
+			size = MuiApplicationUnpushMethodMessage.Size;
+			fieldSize = MuiApplicationUnpushMethodMessage.FieldSize;
+			if (field == MuiApplicationQueuePacketField.MethodId)
+				offset = MuiApplicationUnpushMethodMessage.MethodIdOffset;
+			else if (field == MuiApplicationQueuePacketField.TargetObject)
+				offset = MuiApplicationUnpushMethodMessage.TargetObjectOffset;
+			else if (field == MuiApplicationQueuePacketField.MethodIdSelector)
+				offset = MuiApplicationUnpushMethodMessage.MethodIdSelectorOffset;
+			else if (field == MuiApplicationQueuePacketField.Method)
+				offset = MuiApplicationUnpushMethodMessage.MethodOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		offset = 0;
+		size = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationQueuePacketKind packet,
+		MuiApplicationQueuePacketField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(packet, field, out var offset, out var size,
+			out var fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, fieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationQueuePacketKind packet,
+		MuiApplicationQueuePacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationQueuePacketKind packet,
+		MuiApplicationQueuePacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -266,6 +307,12 @@ internal static class MuiApplicationQueuePacketFieldCursorCodec
 internal struct MuiApplicationShowHelpMessage
 {
 	public const uint Size = 20;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ReferenceWindowOffset = 4;
+	public const uint HelpFileOffset = 8;
+	public const uint NodeOffset = 12;
+	public const uint LineOffset = 16;
 	public uint MethodId;
 	public uint ReferenceWindow;
 	public uint HelpFile;
@@ -277,6 +324,9 @@ internal struct MuiApplicationShowHelpMessage
 internal struct MuiApplicationAboutMuiMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ReferenceWindowOffset = 4;
 	public uint MethodId;
 	public uint ReferenceWindow;
 }
@@ -285,6 +335,9 @@ internal struct MuiApplicationAboutMuiMessage
 internal struct MuiApplicationConfigIdMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ConfigIdOffset = 4;
 	public uint MethodId;
 	public uint ConfigId;
 }
@@ -293,6 +346,10 @@ internal struct MuiApplicationConfigIdMessage
 internal struct MuiApplicationSetConfigItemMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ItemOffset = 4;
+	public const uint DataOffset = 8;
 	public uint MethodId;
 	public uint Item;
 	public uint Data;
@@ -302,6 +359,10 @@ internal struct MuiApplicationSetConfigItemMessage
 internal struct MuiApplicationOpenConfigWindowMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint FlagsOffset = 4;
+	public const uint ClassIdOffset = 8;
 	public uint MethodId;
 	public uint Flags;
 	public uint ClassId;
@@ -311,6 +372,9 @@ internal struct MuiApplicationOpenConfigWindowMessage
 internal struct MuiApplicationBuildSettingsPanelMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint NumberOffset = 4;
 	public uint MethodId;
 	public uint Number;
 }
@@ -319,6 +383,9 @@ internal struct MuiApplicationBuildSettingsPanelMessage
 internal struct MuiApplicationSettingsIoMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint NameOffset = 4;
 	public uint MethodId;
 	public uint Name;
 }
@@ -327,6 +394,8 @@ internal struct MuiApplicationSettingsIoMessage
 internal struct MuiApplicationCheckRefreshMessage
 {
 	public const uint Size = 4;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -334,6 +403,8 @@ internal struct MuiApplicationCheckRefreshMessage
 internal struct MuiApplicationLoopMessage
 {
 	public const uint Size = 4;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -341,6 +412,9 @@ internal struct MuiApplicationLoopMessage
 internal struct MuiApplicationMenuQueryMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint MenuIdOffset = 4;
 	public uint MethodId;
 	public uint MenuId;
 }
@@ -349,6 +423,10 @@ internal struct MuiApplicationMenuQueryMessage
 internal struct MuiApplicationMenuSetMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint MenuIdOffset = 4;
+	public const uint StateOffset = 8;
 	public uint MethodId;
 	public uint MenuId;
 	public uint State;
@@ -358,6 +436,9 @@ internal struct MuiApplicationMenuSetMessage
 internal struct MuiWindowMenuQueryMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint MenuIdOffset = 4;
 	public uint MethodId;
 	public uint MenuId;
 }
@@ -366,6 +447,10 @@ internal struct MuiWindowMenuQueryMessage
 internal struct MuiWindowMenuSetMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint MenuIdOffset = 4;
+	public const uint StateOffset = 8;
 	public uint MethodId;
 	public uint MenuId;
 	public uint State;
@@ -375,6 +460,9 @@ internal struct MuiWindowMenuSetMessage
 internal struct MuiWindowEventHandlerMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint HandlerOffset = 4;
 	public uint MethodId;
 	public uint Handler;
 }
@@ -383,6 +471,9 @@ internal struct MuiWindowEventHandlerMessage
 internal struct MuiWindowSnapshotMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint FlagsOffset = 4;
 	public uint MethodId;
 	public uint Flags;
 }
@@ -391,6 +482,8 @@ internal struct MuiWindowSnapshotMessage
 internal struct MuiWindowMethodMessage
 {
 	public const uint Size = 4;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -398,6 +491,9 @@ internal struct MuiWindowMethodMessage
 internal struct MuiWindowCycleChainMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint FirstObjectOffset = 4;
 	public const uint VectorOffset = 4;
 	public uint MethodId;
 	public uint FirstObject;
@@ -462,75 +558,12 @@ internal struct MuiApplicationInputPacketFieldCursor
 
 internal static class MuiApplicationInputPacketFieldCursorCodec
 {
-	private static bool TryResolve(MuiApplicationInputPacketKind packet,
-		MuiApplicationInputPacketField field, out uint offset, out uint size)
-	{
-		size = 0;
-			switch (packet)
-		{
-			case MuiApplicationInputPacketKind.ReturnId:
-				size = MuiApplicationReturnIdMessage.Size;
-				if (field == MuiApplicationInputPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationInputPacketField.ReturnId)
-				{
-					offset = 4;
-					return true;
-				}
-				break;
-			case MuiApplicationInputPacketKind.Input:
-				size = MuiApplicationInputMessage.Size;
-				if (field == MuiApplicationInputPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationInputPacketField.SignalStorage)
-				{
-					offset = 4;
-					return true;
-				}
-				break;
-			case MuiApplicationInputPacketKind.InputBuffered:
-				size = MuiApplicationInputBufferedMessage.Size;
-				if (field == MuiApplicationInputPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				break;
-			case MuiApplicationInputPacketKind.InputHandler:
-				size = MuiApplicationInputHandlerMessage.Size;
-				if (field == MuiApplicationInputPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationInputPacketField.Handler)
-				{
-					offset = 4;
-					return true;
-				}
-				break;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiApplicationInputPacketFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset,
-			out var packetSize) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize)) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiApplicationInputPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor.Message, cursor.Packet, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -538,14 +571,8 @@ internal static class MuiApplicationInputPacketFieldCursorCodec
 		MuiApplicationInputPacketField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiApplicationInputPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiApplicationInputPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, message, packet, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -553,11 +580,117 @@ internal static class MuiApplicationInputPacketFieldCursorCodec
 		MuiApplicationInputPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationInputPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		return MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, message, packet, field, value);
+	}
+}
+
+// Struct-first guest-memory adapter for the fixed application-input packet
+// records. Packet kind selects a complete record and the field enum selects a
+// named member; unknown packet/field combinations never cross the guest ABI.
+internal static class MuiApplicationInputPacketRecordMemoryCodec
+{
+	private static bool TryResolve(MuiApplicationInputPacketKind packet,
+		MuiApplicationInputPacketField field, out uint offset, out uint size,
+		out uint fieldSize)
+	{
+		fieldSize = 0;
+		if (packet == MuiApplicationInputPacketKind.ReturnId)
+		{
+			size = MuiApplicationReturnIdMessage.Size;
+			fieldSize = MuiApplicationReturnIdMessage.FieldSize;
+			if (field == MuiApplicationInputPacketField.MethodId)
+				offset = MuiApplicationReturnIdMessage.MethodIdOffset;
+			else if (field == MuiApplicationInputPacketField.ReturnId)
+				offset = MuiApplicationReturnIdMessage.ReturnIdOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationInputPacketKind.Input)
+		{
+			size = MuiApplicationInputMessage.Size;
+			fieldSize = MuiApplicationInputMessage.FieldSize;
+			if (field == MuiApplicationInputPacketField.MethodId)
+				offset = MuiApplicationInputMessage.MethodIdOffset;
+			else if (field == MuiApplicationInputPacketField.SignalStorage)
+				offset = MuiApplicationInputMessage.SignalStorageOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationInputPacketKind.InputBuffered)
+		{
+			size = MuiApplicationInputBufferedMessage.Size;
+			fieldSize = MuiApplicationInputBufferedMessage.FieldSize;
+			if (field == MuiApplicationInputPacketField.MethodId)
+				offset = MuiApplicationInputBufferedMessage.MethodIdOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationInputPacketKind.InputHandler)
+		{
+			size = MuiApplicationInputHandlerMessage.Size;
+			fieldSize = MuiApplicationInputHandlerMessage.FieldSize;
+			if (field == MuiApplicationInputPacketField.MethodId)
+				offset = MuiApplicationInputHandlerMessage.MethodIdOffset;
+			else if (field == MuiApplicationInputPacketField.Handler)
+				offset = MuiApplicationInputHandlerMessage.HandlerOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		offset = 0;
+		size = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationInputPacketKind packet,
+		MuiApplicationInputPacketField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(packet, field, out var offset, out var size,
+			out var fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, fieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationInputPacketKind packet,
+		MuiApplicationInputPacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationInputPacketKind packet,
+		MuiApplicationInputPacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -619,13 +752,29 @@ internal static class MuiApplicationInputPacketCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryReadMethodIdValue(ref platform, address,
-			MuiApplicationInputPacketKind.InputBuffered, out var methodId) ||
-			methodId != method ||
-			method != MuiApplicationDispatcher.ApplicationInputBufferedMethod ||
-			!platform.IsMapped(address, MuiApplicationInputBufferedMessage.Size))
+		if (!TryReadInputBufferedValue(ref platform, address, method,
+			out var methodId))
 			return false;
 		value.MethodId = methodId;
+		return true;
+	}
+
+	// Keep selector admission scalar for the one-field InputBuffered record.
+	// The public packet view remains a named struct; this helper avoids making
+	// the freestanding compiler materialize an out temporary for that record.
+	internal static bool TryReadInputBufferedValue<TPlatform>(
+		ref TPlatform platform, APTR address, uint method, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!TryReadMethodIdValue(ref platform, address,
+			MuiApplicationInputPacketKind.InputBuffered, out methodId) ||
+			methodId != method ||
+			method != MuiApplicationDispatcher.ApplicationInputBufferedMethod)
+		{
+			methodId = 0;
+			return false;
+		}
 		return true;
 	}
 
@@ -761,70 +910,12 @@ internal struct MuiApplicationPresentationPacketFieldCursor
 
 internal static class MuiApplicationPresentationPacketFieldCursorCodec
 {
-	private static bool TryResolve(MuiApplicationPresentationPacketKind packet,
-		MuiApplicationPresentationPacketField field, out uint offset,
-		out uint size)
-	{
-		size = 0;
-		switch (packet)
-		{
-			case MuiApplicationPresentationPacketKind.ShowHelp:
-				size = MuiApplicationShowHelpMessage.Size;
-				if (field == MuiApplicationPresentationPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationPresentationPacketField.ReferenceWindow)
-				{
-					offset = 4;
-					return true;
-				}
-				if (field == MuiApplicationPresentationPacketField.HelpFile)
-				{
-					offset = 8;
-					return true;
-				}
-				if (field == MuiApplicationPresentationPacketField.Node)
-				{
-					offset = 12;
-					return true;
-				}
-				if (field == MuiApplicationPresentationPacketField.Line)
-				{
-					offset = 16;
-					return true;
-				}
-				break;
-			case MuiApplicationPresentationPacketKind.AboutMui:
-				size = MuiApplicationAboutMuiMessage.Size;
-				if (field == MuiApplicationPresentationPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationPresentationPacketField.ReferenceWindow)
-				{
-					offset = 4;
-					return true;
-				}
-				break;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiApplicationPresentationPacketFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset,
-			out var packetSize) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize)) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiApplicationPresentationPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor.Message, cursor.Packet, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -832,14 +923,8 @@ internal static class MuiApplicationPresentationPacketFieldCursorCodec
 		MuiApplicationPresentationPacketField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiApplicationPresentationPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiApplicationPresentationPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, message, packet, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -847,11 +932,95 @@ internal static class MuiApplicationPresentationPacketFieldCursorCodec
 		MuiApplicationPresentationPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationPresentationPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		return MuiApplicationPresentationPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, message, packet, field, value);
+	}
+}
+
+// Struct-first guest-memory adapter for the fixed presentation packet
+// records. Packet kind selects the complete ShowHelp/AboutMUI record and the
+// field enum selects a named ULONG member.
+internal static class MuiApplicationPresentationPacketRecordMemoryCodec
+{
+	private static bool TryResolve(MuiApplicationPresentationPacketKind packet,
+		MuiApplicationPresentationPacketField field, out uint offset, out uint size,
+		out uint fieldSize)
+	{
+		fieldSize = 0;
+		if (packet == MuiApplicationPresentationPacketKind.ShowHelp)
+		{
+			size = MuiApplicationShowHelpMessage.Size;
+			fieldSize = MuiApplicationShowHelpMessage.FieldSize;
+			if (field == MuiApplicationPresentationPacketField.MethodId)
+				offset = MuiApplicationShowHelpMessage.MethodIdOffset;
+			else if (field == MuiApplicationPresentationPacketField.ReferenceWindow)
+				offset = MuiApplicationShowHelpMessage.ReferenceWindowOffset;
+			else if (field == MuiApplicationPresentationPacketField.HelpFile)
+				offset = MuiApplicationShowHelpMessage.HelpFileOffset;
+			else if (field == MuiApplicationPresentationPacketField.Node)
+				offset = MuiApplicationShowHelpMessage.NodeOffset;
+			else if (field == MuiApplicationPresentationPacketField.Line)
+				offset = MuiApplicationShowHelpMessage.LineOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationPresentationPacketKind.AboutMui)
+		{
+			size = MuiApplicationAboutMuiMessage.Size;
+			fieldSize = MuiApplicationAboutMuiMessage.FieldSize;
+			if (field == MuiApplicationPresentationPacketField.MethodId)
+				offset = MuiApplicationAboutMuiMessage.MethodIdOffset;
+			else if (field == MuiApplicationPresentationPacketField.ReferenceWindow)
+				offset = MuiApplicationAboutMuiMessage.ReferenceWindowOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		offset = 0;
+		size = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationPresentationPacketKind packet,
+		MuiApplicationPresentationPacketField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(packet, field, out var offset, out var size,
+			out var fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, fieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationPresentationPacketKind packet,
+		MuiApplicationPresentationPacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationPresentationPacketKind packet,
+		MuiApplicationPresentationPacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -960,91 +1129,12 @@ internal struct MuiApplicationSettingsPacketFieldCursor
 
 internal static class MuiApplicationSettingsPacketFieldCursorCodec
 {
-	private static bool TryResolve(MuiApplicationSettingsPacketKind packet,
-		MuiApplicationSettingsPacketField field, out uint offset,
-		out uint size)
-	{
-		size = 0;
-		switch (packet)
-		{
-			case MuiApplicationSettingsPacketKind.SetConfigItem:
-				size = MuiApplicationSetConfigItemMessage.Size;
-				if (field == MuiApplicationSettingsPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationSettingsPacketField.Item)
-				{
-					offset = 4;
-					return true;
-				}
-				if (field == MuiApplicationSettingsPacketField.Data)
-				{
-					offset = 8;
-					return true;
-				}
-				break;
-			case MuiApplicationSettingsPacketKind.OpenConfigWindow:
-				size = MuiApplicationOpenConfigWindowMessage.Size;
-				if (field == MuiApplicationSettingsPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationSettingsPacketField.Flags)
-				{
-					offset = 4;
-					return true;
-				}
-				if (field == MuiApplicationSettingsPacketField.ClassId)
-				{
-					offset = 8;
-					return true;
-				}
-				break;
-			case MuiApplicationSettingsPacketKind.BuildSettingsPanel:
-				size = MuiApplicationBuildSettingsPanelMessage.Size;
-				if (field == MuiApplicationSettingsPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationSettingsPacketField.Number)
-				{
-					offset = 4;
-					return true;
-				}
-				break;
-			case MuiApplicationSettingsPacketKind.SettingsIo:
-				size = MuiApplicationSettingsIoMessage.Size;
-				if (field == MuiApplicationSettingsPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationSettingsPacketField.Name)
-				{
-					offset = 4;
-					return true;
-				}
-				break;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiApplicationSettingsPacketFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset,
-			out var packetSize) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize)) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiApplicationSettingsPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor.Message, cursor.Packet, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -1052,14 +1142,8 @@ internal static class MuiApplicationSettingsPacketFieldCursorCodec
 		MuiApplicationSettingsPacketField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiApplicationSettingsPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiApplicationSettingsPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, message, packet, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -1067,11 +1151,123 @@ internal static class MuiApplicationSettingsPacketFieldCursorCodec
 		MuiApplicationSettingsPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationSettingsPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		return MuiApplicationSettingsPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, message, packet, field, value);
+	}
+}
+
+// Struct-first guest-memory adapter for the fixed application-settings
+// records. Packet kind selects a complete record and the field enum selects a
+// named member; unknown combinations never cross the guest ABI.
+internal static class MuiApplicationSettingsPacketRecordMemoryCodec
+{
+	private static bool TryResolve(MuiApplicationSettingsPacketKind packet,
+		MuiApplicationSettingsPacketField field, out uint offset, out uint size,
+		out uint fieldSize)
+	{
+		fieldSize = 0;
+		if (packet == MuiApplicationSettingsPacketKind.SetConfigItem)
+		{
+			size = MuiApplicationSetConfigItemMessage.Size;
+			fieldSize = MuiApplicationSetConfigItemMessage.FieldSize;
+			if (field == MuiApplicationSettingsPacketField.MethodId)
+				offset = MuiApplicationSetConfigItemMessage.MethodIdOffset;
+			else if (field == MuiApplicationSettingsPacketField.Item)
+				offset = MuiApplicationSetConfigItemMessage.ItemOffset;
+			else if (field == MuiApplicationSettingsPacketField.Data)
+				offset = MuiApplicationSetConfigItemMessage.DataOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationSettingsPacketKind.OpenConfigWindow)
+		{
+			size = MuiApplicationOpenConfigWindowMessage.Size;
+			fieldSize = MuiApplicationOpenConfigWindowMessage.FieldSize;
+			if (field == MuiApplicationSettingsPacketField.MethodId)
+				offset = MuiApplicationOpenConfigWindowMessage.MethodIdOffset;
+			else if (field == MuiApplicationSettingsPacketField.Flags)
+				offset = MuiApplicationOpenConfigWindowMessage.FlagsOffset;
+			else if (field == MuiApplicationSettingsPacketField.ClassId)
+				offset = MuiApplicationOpenConfigWindowMessage.ClassIdOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationSettingsPacketKind.BuildSettingsPanel)
+		{
+			size = MuiApplicationBuildSettingsPanelMessage.Size;
+			fieldSize = MuiApplicationBuildSettingsPanelMessage.FieldSize;
+			if (field == MuiApplicationSettingsPacketField.MethodId)
+				offset = MuiApplicationBuildSettingsPanelMessage.MethodIdOffset;
+			else if (field == MuiApplicationSettingsPacketField.Number)
+				offset = MuiApplicationBuildSettingsPanelMessage.NumberOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationSettingsPacketKind.SettingsIo)
+		{
+			size = MuiApplicationSettingsIoMessage.Size;
+			fieldSize = MuiApplicationSettingsIoMessage.FieldSize;
+			if (field == MuiApplicationSettingsPacketField.MethodId)
+				offset = MuiApplicationSettingsIoMessage.MethodIdOffset;
+			else if (field == MuiApplicationSettingsPacketField.Name)
+				offset = MuiApplicationSettingsIoMessage.NameOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		offset = 0;
+		size = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationSettingsPacketKind packet,
+		MuiApplicationSettingsPacketField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(packet, field, out var offset, out var size,
+			out var fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, fieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationSettingsPacketKind packet,
+		MuiApplicationSettingsPacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationSettingsPacketKind packet,
+		MuiApplicationSettingsPacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -1196,56 +1392,82 @@ internal struct MuiWindowCycleChainPacketFieldCursor
 
 internal static class MuiWindowCycleChainPacketFieldCursorCodec
 {
-	private static bool TryResolve(MuiWindowCycleChainPacketField field,
-		out uint offset)
-	{
-		switch (field)
-		{
-			case MuiWindowCycleChainPacketField.MethodId:
-				offset = 0;
-				return true;
-			case MuiWindowCycleChainPacketField.FirstObject:
-				offset = 4;
-				return true;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiWindowCycleChainPacketFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, MuiWindowCycleChainMessage.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiWindowCycleChainPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor.Message, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiWindowCycleChainPacketField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiWindowCycleChainPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiWindowCycleChainPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, message, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiWindowCycleChainPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiWindowCycleChainPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		return MuiWindowCycleChainPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, message, field, value);
+	}
+}
+
+// Struct-first guest-memory adapter for the fixed SetCycleChain header. The
+// inline object-vector tail remains owned by MuiWindowCycleChainInlineVectorCodec.
+internal static class MuiWindowCycleChainPacketRecordMemoryCodec
+{
+	private static bool TryResolve(MuiWindowCycleChainPacketField field,
+		out uint offset, out uint size, out uint fieldSize)
+	{
+		size = MuiWindowCycleChainMessage.Size;
+		fieldSize = MuiWindowCycleChainMessage.FieldSize;
+		if (field == MuiWindowCycleChainPacketField.MethodId)
+			offset = MuiWindowCycleChainMessage.MethodIdOffset;
+		else if (field == MuiWindowCycleChainPacketField.FirstObject)
+			offset = MuiWindowCycleChainMessage.FirstObjectOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowCycleChainPacketField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset, out var size,
+			out var fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, fieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowCycleChainPacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field,
+			out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowCycleChainPacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -1353,79 +1575,12 @@ internal struct MuiApplicationMethodPacketFieldCursor
 
 internal static class MuiApplicationMethodPacketFieldCursorCodec
 {
-	private static bool TryResolve(MuiApplicationMethodPacketKind packet,
-		MuiApplicationMethodPacketField field, out uint offset,
-		out uint size)
-	{
-		size = 0;
-		switch (packet)
-		{
-			case MuiApplicationMethodPacketKind.ConfigId:
-				size = MuiApplicationConfigIdMessage.Size;
-				if (field == MuiApplicationMethodPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationMethodPacketField.ConfigId)
-				{
-					offset = 4;
-					return true;
-				}
-				break;
-			case MuiApplicationMethodPacketKind.CheckRefresh:
-				size = MuiApplicationCheckRefreshMessage.Size;
-				if (field == MuiApplicationMethodPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				break;
-			case MuiApplicationMethodPacketKind.Loop:
-				size = MuiApplicationLoopMessage.Size;
-				if (field == MuiApplicationMethodPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				break;
-			case MuiApplicationMethodPacketKind.WindowMethod:
-				size = MuiWindowMethodMessage.Size;
-				if (field == MuiApplicationMethodPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				break;
-			case MuiApplicationMethodPacketKind.Snapshot:
-				size = MuiWindowSnapshotMessage.Size;
-				if (field == MuiApplicationMethodPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationMethodPacketField.Flags)
-				{
-					offset = 4;
-					return true;
-				}
-				break;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiApplicationMethodPacketFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset,
-			out var packetSize) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize)) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiApplicationMethodPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor.Message, cursor.Packet, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -1433,14 +1588,8 @@ internal static class MuiApplicationMethodPacketFieldCursorCodec
 		MuiApplicationMethodPacketField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiApplicationMethodPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiApplicationMethodPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, message, packet, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -1448,11 +1597,128 @@ internal static class MuiApplicationMethodPacketFieldCursorCodec
 		MuiApplicationMethodPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationMethodPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		return MuiApplicationMethodPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, message, packet, field, value);
+	}
+}
+
+// Struct-first guest-memory adapter for the fixed application/window method
+// records. Packet kind selects a complete record and the field enum selects a
+// named member; unknown combinations never cross the guest ABI.
+internal static class MuiApplicationMethodPacketRecordMemoryCodec
+{
+	private static bool TryResolve(MuiApplicationMethodPacketKind packet,
+		MuiApplicationMethodPacketField field, out uint offset, out uint size,
+		out uint fieldSize)
+	{
+		fieldSize = 0;
+		if (packet == MuiApplicationMethodPacketKind.ConfigId)
+		{
+			size = MuiApplicationConfigIdMessage.Size;
+			fieldSize = MuiApplicationConfigIdMessage.FieldSize;
+			if (field == MuiApplicationMethodPacketField.MethodId)
+				offset = MuiApplicationConfigIdMessage.MethodIdOffset;
+			else if (field == MuiApplicationMethodPacketField.ConfigId)
+				offset = MuiApplicationConfigIdMessage.ConfigIdOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationMethodPacketKind.CheckRefresh)
+		{
+			size = MuiApplicationCheckRefreshMessage.Size;
+			fieldSize = MuiApplicationCheckRefreshMessage.FieldSize;
+			if (field == MuiApplicationMethodPacketField.MethodId)
+				offset = MuiApplicationCheckRefreshMessage.MethodIdOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationMethodPacketKind.Loop)
+		{
+			size = MuiApplicationLoopMessage.Size;
+			fieldSize = MuiApplicationLoopMessage.FieldSize;
+			if (field == MuiApplicationMethodPacketField.MethodId)
+				offset = MuiApplicationLoopMessage.MethodIdOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationMethodPacketKind.WindowMethod)
+		{
+			size = MuiWindowMethodMessage.Size;
+			fieldSize = MuiWindowMethodMessage.FieldSize;
+			if (field == MuiApplicationMethodPacketField.MethodId)
+				offset = MuiWindowMethodMessage.MethodIdOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationMethodPacketKind.Snapshot)
+		{
+			size = MuiWindowSnapshotMessage.Size;
+			fieldSize = MuiWindowSnapshotMessage.FieldSize;
+			if (field == MuiApplicationMethodPacketField.MethodId)
+				offset = MuiWindowSnapshotMessage.MethodIdOffset;
+			else if (field == MuiApplicationMethodPacketField.Flags)
+				offset = MuiWindowSnapshotMessage.FlagsOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		offset = 0;
+		size = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationMethodPacketKind packet,
+		MuiApplicationMethodPacketField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(packet, field, out var offset, out var size,
+			out var fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, fieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationMethodPacketKind packet,
+		MuiApplicationMethodPacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationMethodPacketKind packet,
+		MuiApplicationMethodPacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -1582,90 +1848,12 @@ internal struct MuiApplicationMenuPacketFieldCursor
 
 internal static class MuiApplicationMenuPacketFieldCursorCodec
 {
-	private static bool TryResolve(MuiApplicationMenuPacketKind packet,
-		MuiApplicationMenuPacketField field, out uint offset, out uint size)
-	{
-		size = 0;
-		switch (packet)
-		{
-			case MuiApplicationMenuPacketKind.ApplicationQuery:
-				size = MuiApplicationMenuQueryMessage.Size;
-				if (field == MuiApplicationMenuPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationMenuPacketField.MenuId)
-				{
-					offset = 4;
-					return true;
-				}
-				break;
-			case MuiApplicationMenuPacketKind.ApplicationSet:
-				size = MuiApplicationMenuSetMessage.Size;
-				if (field == MuiApplicationMenuPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationMenuPacketField.MenuId)
-				{
-					offset = 4;
-					return true;
-				}
-				if (field == MuiApplicationMenuPacketField.State)
-				{
-					offset = 8;
-					return true;
-				}
-				break;
-			case MuiApplicationMenuPacketKind.WindowQuery:
-				size = MuiWindowMenuQueryMessage.Size;
-				if (field == MuiApplicationMenuPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationMenuPacketField.MenuId)
-				{
-					offset = 4;
-					return true;
-				}
-				break;
-			case MuiApplicationMenuPacketKind.WindowSet:
-				size = MuiWindowMenuSetMessage.Size;
-				if (field == MuiApplicationMenuPacketField.MethodId)
-				{
-					offset = 0;
-					return true;
-				}
-				if (field == MuiApplicationMenuPacketField.MenuId)
-				{
-					offset = 4;
-					return true;
-				}
-				if (field == MuiApplicationMenuPacketField.State)
-				{
-					offset = 8;
-					return true;
-				}
-				break;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiApplicationMenuPacketFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset,
-			out var packetSize) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize)) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiApplicationMenuPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor.Message, cursor.Packet, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -1673,14 +1861,8 @@ internal static class MuiApplicationMenuPacketFieldCursorCodec
 		MuiApplicationMenuPacketField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiApplicationMenuPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiApplicationMenuPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, message, packet, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -1688,11 +1870,123 @@ internal static class MuiApplicationMenuPacketFieldCursorCodec
 		MuiApplicationMenuPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationMenuPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		return MuiApplicationMenuPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, message, packet, field, value);
+	}
+}
+
+// Struct-first guest-memory adapter for the fixed Application/Window menu
+// records. Packet kind selects a complete record and the field enum selects a
+// named member; unknown combinations never cross the guest ABI.
+internal static class MuiApplicationMenuPacketRecordMemoryCodec
+{
+	private static bool TryResolve(MuiApplicationMenuPacketKind packet,
+		MuiApplicationMenuPacketField field, out uint offset, out uint size,
+		out uint fieldSize)
+	{
+		fieldSize = 0;
+		if (packet == MuiApplicationMenuPacketKind.ApplicationQuery)
+		{
+			size = MuiApplicationMenuQueryMessage.Size;
+			fieldSize = MuiApplicationMenuQueryMessage.FieldSize;
+			if (field == MuiApplicationMenuPacketField.MethodId)
+				offset = MuiApplicationMenuQueryMessage.MethodIdOffset;
+			else if (field == MuiApplicationMenuPacketField.MenuId)
+				offset = MuiApplicationMenuQueryMessage.MenuIdOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationMenuPacketKind.ApplicationSet)
+		{
+			size = MuiApplicationMenuSetMessage.Size;
+			fieldSize = MuiApplicationMenuSetMessage.FieldSize;
+			if (field == MuiApplicationMenuPacketField.MethodId)
+				offset = MuiApplicationMenuSetMessage.MethodIdOffset;
+			else if (field == MuiApplicationMenuPacketField.MenuId)
+				offset = MuiApplicationMenuSetMessage.MenuIdOffset;
+			else if (field == MuiApplicationMenuPacketField.State)
+				offset = MuiApplicationMenuSetMessage.StateOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationMenuPacketKind.WindowQuery)
+		{
+			size = MuiWindowMenuQueryMessage.Size;
+			fieldSize = MuiWindowMenuQueryMessage.FieldSize;
+			if (field == MuiApplicationMenuPacketField.MethodId)
+				offset = MuiWindowMenuQueryMessage.MethodIdOffset;
+			else if (field == MuiApplicationMenuPacketField.MenuId)
+				offset = MuiWindowMenuQueryMessage.MenuIdOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		if (packet == MuiApplicationMenuPacketKind.WindowSet)
+		{
+			size = MuiWindowMenuSetMessage.Size;
+			fieldSize = MuiWindowMenuSetMessage.FieldSize;
+			if (field == MuiApplicationMenuPacketField.MethodId)
+				offset = MuiWindowMenuSetMessage.MethodIdOffset;
+			else if (field == MuiApplicationMenuPacketField.MenuId)
+				offset = MuiWindowMenuSetMessage.MenuIdOffset;
+			else if (field == MuiApplicationMenuPacketField.State)
+				offset = MuiWindowMenuSetMessage.StateOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
+		}
+		offset = 0;
+		size = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationMenuPacketKind packet,
+		MuiApplicationMenuPacketField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(packet, field, out var offset, out var size,
+			out var fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, fieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationMenuPacketKind packet,
+		MuiApplicationMenuPacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationMenuPacketKind packet,
+		MuiApplicationMenuPacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -1722,38 +2016,12 @@ internal struct MuiWindowEventHandlerPacketFieldCursor
 
 internal static class MuiWindowEventHandlerPacketFieldCursorCodec
 {
-	private static bool TryResolve(MuiWindowEventHandlerPacketKind packet,
-		MuiWindowEventHandlerPacketField field, out uint offset)
-	{
-		if (packet == MuiWindowEventHandlerPacketKind.Add ||
-			packet == MuiWindowEventHandlerPacketKind.Remove)
-		{
-			if (field == MuiWindowEventHandlerPacketField.MethodId)
-			{
-				offset = 0;
-				return true;
-			}
-			if (field == MuiWindowEventHandlerPacketField.Handler)
-			{
-				offset = 4;
-				return true;
-			}
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiWindowEventHandlerPacketFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, MuiWindowEventHandlerMessage.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiWindowEventHandlerPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor.Message, cursor.Packet, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -1761,14 +2029,8 @@ internal static class MuiWindowEventHandlerPacketFieldCursorCodec
 		MuiWindowEventHandlerPacketField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiWindowEventHandlerPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiWindowEventHandlerPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, message, packet, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -1776,11 +2038,73 @@ internal static class MuiWindowEventHandlerPacketFieldCursorCodec
 		MuiWindowEventHandlerPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiWindowEventHandlerPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		return MuiWindowEventHandlerPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, message, packet, field, value);
+	}
+}
+
+// Struct-first guest-memory adapter for the fixed Window event-handler
+// record. The Add/Remove kind is retained for selector admission while both
+// variants share the same named members.
+internal static class MuiWindowEventHandlerPacketRecordMemoryCodec
+{
+	private static bool TryResolve(MuiWindowEventHandlerPacketKind packet,
+		MuiWindowEventHandlerPacketField field, out uint offset, out uint size,
+		out uint fieldSize)
+	{
+		size = MuiWindowEventHandlerMessage.Size;
+		fieldSize = MuiWindowEventHandlerMessage.FieldSize;
+		if (packet != MuiWindowEventHandlerPacketKind.Add &&
+			packet != MuiWindowEventHandlerPacketKind.Remove)
+		{
+			offset = 0;
+			return false;
+		}
+		if (field == MuiWindowEventHandlerPacketField.MethodId)
+			offset = MuiWindowEventHandlerMessage.MethodIdOffset;
+		else if (field == MuiWindowEventHandlerPacketField.Handler)
+			offset = MuiWindowEventHandlerMessage.HandlerOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowEventHandlerPacketKind packet,
+		MuiWindowEventHandlerPacketField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(packet, field, out var offset, out var size,
+			out var fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, fieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowEventHandlerPacketKind packet,
+		MuiWindowEventHandlerPacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowEventHandlerPacketKind packet,
+		MuiWindowEventHandlerPacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}

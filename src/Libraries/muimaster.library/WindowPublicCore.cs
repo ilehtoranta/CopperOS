@@ -120,10 +120,10 @@ public static class MuiWindowPublicCore
 
 	private const uint NativeWindow = 0x7FFE0011;
 	private const uint MenuNoMenu = uint.MaxValue;
-	private const uint WindowPresentationStateKey = 0x7F0A0004u;
-	private const uint WindowVisualStateKey = 0x7F0A0005u;
-	private const uint WindowRelationshipStateKey = 0x7F0A0018u;
-	private const uint WindowControlStateKey = 0x7F0A0019u;
+	internal const uint WindowPresentationStateKey = 0x7F0A0004u;
+	internal const uint WindowVisualStateKey = 0x7F0A0005u;
+	internal const uint WindowRelationshipStateKey = 0x7F0A0018u;
+	internal const uint WindowControlStateKey = 0x7F0A0019u;
 
 	private static bool IsPresentationAttribute(uint attribute) =>
 		attribute == Title || attribute == Screen || attribute == ScreenTitle ||
@@ -182,20 +182,24 @@ public static class MuiWindowPublicCore
 			WindowPresentationStateKey) !=
 			unchecked((int)MuiWindowPresentationStateRecord.Size)) return false;
 		return MuiWindowPresentationStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiWindowPresentationStateAdmission.ValidateLive(
+			ref platform, state, window, value);
 	}
 
 	private static MuiWindowPresentationStateRecord ReadWindowPresentation<TPlatform>(
 		ref TPlatform platform, APTR state, APTR window)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (PublishWindowPresentation(ref platform, state, window, out var value))
+		if (TryReadWindowPresentation(ref platform, state, window, out var value))
 			return value;
-		value = default;
-		value.Magic = MuiWindowPresentationStateRecord.Cookie;
-		FillWindowPresentation(ref platform, state, window, ref value);
-		return value;
+		return default;
 	}
+
+	private static bool TryReadWindowPresentation<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window,
+		out MuiWindowPresentationStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		PublishWindowPresentation(ref platform, state, window, out value);
 
 	private static bool PublishWindowPresentation<TPlatform>(
 		ref TPlatform platform, APTR state, APTR window,
@@ -208,13 +212,19 @@ public static class MuiWindowPublicCore
 		if (TryGetWindowPresentationState(ref platform, state, window, out value))
 		{
 			FillWindowPresentation(ref platform, state, window, ref value);
+			if (!MuiWindowPresentationStateAdmission.ValidateLive(ref platform,
+				state, window, value)) return false;
 			return MuiWindowPresentationStateRecordCodec.Write(ref platform, block,
 				value);
 		}
+		if (MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowPresentationStateKey) != 0) return false;
 
 		value = default;
 		value.Magic = MuiWindowPresentationStateRecord.Cookie;
 		FillWindowPresentation(ref platform, state, window, ref value);
+		if (!MuiWindowPresentationStateAdmission.ValidateLive(ref platform,
+			state, window, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiWindowPresentationStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -265,20 +275,23 @@ public static class MuiWindowPublicCore
 			WindowVisualStateKey) !=
 			unchecked((int)MuiWindowVisualStateRecord.Size)) return false;
 		return MuiWindowVisualStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiWindowVisualStateAdmission.ValidateLive(ref platform,
+			state, window, value);
 	}
 
 	private static MuiWindowVisualStateRecord ReadWindowVisual<TPlatform>(
 		ref TPlatform platform, APTR state, APTR window)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (PublishWindowVisual(ref platform, state, window, out var value))
+		if (TryReadWindowVisual(ref platform, state, window, out var value))
 			return value;
-		value = default;
-		value.Magic = MuiWindowVisualStateRecord.Cookie;
-		FillWindowVisual(ref platform, state, window, ref value);
-		return value;
+		return default;
 	}
+
+	private static bool TryReadWindowVisual<TPlatform>(ref TPlatform platform,
+		APTR state, APTR window, out MuiWindowVisualStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		PublishWindowVisual(ref platform, state, window, out value);
 
 	private static bool PublishWindowVisual<TPlatform>(ref TPlatform platform,
 		APTR state, APTR window, out MuiWindowVisualStateRecord value)
@@ -290,13 +303,19 @@ public static class MuiWindowPublicCore
 		if (TryGetWindowVisualState(ref platform, state, window, out value))
 		{
 			FillWindowVisual(ref platform, state, window, ref value);
+			if (!MuiWindowVisualStateAdmission.ValidateLive(ref platform, state,
+				window, value)) return false;
 			return MuiWindowVisualStateRecordCodec.Write(ref platform, block,
 				value);
 		}
+		if (MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowVisualStateKey) != 0) return false;
 
 		value = default;
 		value.Magic = MuiWindowVisualStateRecord.Cookie;
 		FillWindowVisual(ref platform, state, window, ref value);
+		if (!MuiWindowVisualStateAdmission.ValidateLive(ref platform, state,
+			window, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiWindowVisualStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -316,15 +335,18 @@ public static class MuiWindowPublicCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, window,
-			NoMenus, out value.NoMenus)) value.NoMenus = 0;
+			NoMenus, out var noMenus)) noMenus = 0;
 		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, window,
-			HasAlpha, out value.HasAlpha)) value.HasAlpha = 0;
+			HasAlpha, out var hasAlpha)) hasAlpha = 0;
 		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, window,
 			Opacity, out value.Opacity)) value.Opacity = 0;
 		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, window,
-			FancyDrawing, out value.FancyDrawing)) value.FancyDrawing = 0;
+			FancyDrawing, out var fancyDrawing)) fancyDrawing = 0;
 		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, window,
 			MenuAction, out value.MenuAction)) value.MenuAction = 0;
+		value.NoMenus = noMenus == 0 ? 0u : 1u;
+		value.HasAlpha = hasAlpha == 0 ? 0u : 1u;
+		value.FancyDrawing = fancyDrawing == 0 ? 0u : 1u;
 	}
 
 	private static uint VisualValue(MuiWindowVisualStateRecord value,
@@ -345,19 +367,29 @@ public static class MuiWindowPublicCore
 			WindowRelationshipStateKey) != unchecked((int)
 			MuiWindowRelationshipStateRecord.Size)) return false;
 		return MuiWindowRelationshipStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiWindowRelationshipStateAdmission.ValidateLive(
+			ref platform, state, window, value);
 	}
 
 	private static MuiWindowRelationshipStateRecord ReadWindowRelationship<TPlatform>(
 		ref TPlatform platform, APTR state, APTR window)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (PublishWindowRelationship(ref platform, state, window, out var value))
+		if (TryReadWindowRelationship(ref platform, state, window, out var value))
 			return value;
+		return default;
+	}
+
+	private static bool TryReadWindowRelationship<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window,
+		out MuiWindowRelationshipStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
 		value = default;
-		value.Magic = MuiWindowRelationshipStateRecord.Cookie;
-		FillWindowRelationship(ref platform, state, window, ref value);
-		return value;
+		return MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowRelationshipStateKey) == 0
+			? PublishWindowRelationship(ref platform, state, window, out value)
+			: TryGetWindowRelationshipState(ref platform, state, window, out value);
 	}
 
 	private static bool PublishWindowRelationship<TPlatform>(
@@ -368,9 +400,22 @@ public static class MuiWindowPublicCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
 			WindowRelationshipStateKey);
-		if (TryGetWindowRelationshipState(ref platform, state, window, out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowRelationshipStateKey);
+		if (length != 0)
 		{
+			// Relationship setters deliberately mutate the family/raw fields before
+			// publishing the named snapshot.  Admit only a structurally valid,
+			// mapped record here; its live ownership is checked again after the
+			// fields have been refreshed from the authoritative object state.
+			if (length != unchecked((int)MuiWindowRelationshipStateRecord.Size) ||
+				!MuiWindowRelationshipStateRecordCodec.TryReadStructural(ref platform,
+					block, out value) ||
+				!MuiWindowRelationshipStateAdmission.Validate(ref platform, value))
+				return false;
 			FillWindowRelationship(ref platform, state, window, ref value);
+			if (!MuiWindowRelationshipStateAdmission.ValidateLive(ref platform,
+				state, window, value)) return false;
 			return MuiWindowRelationshipStateRecordCodec.Write(ref platform, block,
 				value);
 		}
@@ -378,6 +423,8 @@ public static class MuiWindowPublicCore
 		value = default;
 		value.Magic = MuiWindowRelationshipStateRecord.Cookie;
 		FillWindowRelationship(ref platform, state, window, ref value);
+		if (!MuiWindowRelationshipStateAdmission.ValidateLive(ref platform,
+			state, window, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiWindowRelationshipStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -412,6 +459,13 @@ public static class MuiWindowPublicCore
 		attribute == Menustrip || attribute == Menu ? value.Menustrip.Raw :
 		value.RefWindow.Raw;
 
+	private static bool HasValidRelationshipState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowRelationshipStateKey) == 0 ||
+		TryReadWindowRelationship(ref platform, state, window, out _);
+
 	private static bool IsControlAttribute(uint attribute) => attribute == Id ||
 		attribute == DisableKeys || attribute == VisibleOnMaximize ||
 		attribute == IsSubWindow || attribute == NeedsMouseObject;
@@ -428,20 +482,23 @@ public static class MuiWindowPublicCore
 			WindowControlStateKey) != unchecked((int)
 			MuiWindowControlStateRecord.Size)) return false;
 		return MuiWindowControlStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiWindowControlStateAdmission.ValidateLive(
+			ref platform, state, window, value);
 	}
 
 	private static MuiWindowControlStateRecord ReadWindowControl<TPlatform>(
 		ref TPlatform platform, APTR state, APTR window)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (PublishWindowControl(ref platform, state, window, out var value))
+		if (TryReadWindowControl(ref platform, state, window, out var value))
 			return value;
-		value = default;
-		value.Magic = MuiWindowControlStateRecord.Cookie;
-		FillWindowControl(ref platform, state, window, ref value);
-		return value;
+		return default;
 	}
+
+	private static bool TryReadWindowControl<TPlatform>(ref TPlatform platform,
+		APTR state, APTR window, out MuiWindowControlStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		PublishWindowControl(ref platform, state, window, out value);
 
 	private static bool PublishWindowControl<TPlatform>(ref TPlatform platform,
 		APTR state, APTR window, out MuiWindowControlStateRecord value)
@@ -453,13 +510,19 @@ public static class MuiWindowPublicCore
 		if (TryGetWindowControlState(ref platform, state, window, out value))
 		{
 			FillWindowControl(ref platform, state, window, ref value);
+			if (!MuiWindowControlStateAdmission.ValidateLive(ref platform, state,
+				window, value)) return false;
 			return MuiWindowControlStateRecordCodec.Write(ref platform, block,
 				value);
 		}
+		if (MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowControlStateKey) != 0) return false;
 
 		value = default;
 		value.Magic = MuiWindowControlStateRecord.Cookie;
 		FillWindowControl(ref platform, state, window, ref value);
+		if (!MuiWindowControlStateAdmission.ValidateLive(ref platform, state,
+			window, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiWindowControlStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -507,6 +570,10 @@ public static class MuiWindowPublicCore
 			out var ownerValue)) return false;
 		var owner = ownerValue.Boopsi;
 		if (owner.IsNull) return false;
+		if (MuiStoreCore.DataspaceLength(ref platform, state, owner,
+			WindowControlStateKey) != 0 &&
+			!TryGetWindowControlState(ref platform, state, owner, out _))
+			return false;
 		var previous = 0u;
 		MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, owner,
 			attribute, out previous);
@@ -592,6 +659,17 @@ public static class MuiWindowPublicCore
 			return SetRootObject(ref platform, state, record, value, notify);
 		if (attribute == RefWindow)
 			return SetRefWindow(ref platform, state, record, value, notify);
+		if (IsPresentationAttribute(attribute))
+		{
+			if (!MuiHeadlessObjectCodec.TryRead(ref platform, record,
+				out var presentationOwnerValue)) return false;
+			var presentationOwner = presentationOwnerValue.Boopsi;
+			if (presentationOwner.IsNull) return false;
+			if (MuiStoreCore.DataspaceLength(ref platform, state,
+				presentationOwner, WindowPresentationStateKey) != 0 &&
+				!TryGetWindowPresentationState(ref platform, state,
+					presentationOwner, out _)) return false;
+		}
 		if (attribute == Screen)
 		{
 			var screen = APTR.FromPointer(value);
@@ -619,23 +697,32 @@ public static class MuiWindowPublicCore
 			value != 0 ? 1u : value;
 		if (attribute == NeedsMouseObject)
 			storedValue = value != 0 ? 1u : 0u;
+		if (IsVisualAttribute(attribute))
+		{
+			if (!MuiHeadlessObjectCodec.TryRead(ref platform, record,
+				out var visualOwnerValue)) return false;
+			var visualOwner = visualOwnerValue.Boopsi;
+			if (visualOwner.IsNull) return false;
+			if (MuiStoreCore.DataspaceLength(ref platform, state, visualOwner,
+				WindowVisualStateKey) != 0 &&
+				!TryGetWindowVisualState(ref platform, state, visualOwner, out _))
+				return false;
+		}
 		if (IsControlAttribute(attribute))
 			return SetWindowControlValue(ref platform, state, record, attribute,
 				storedValue, notify);
 		var result = MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform,
 			state, record, attribute, storedValue, notify);
-		if (result && IsPresentationAttribute(attribute))
-		{
-			if (MuiHeadlessObjectCodec.TryRead(ref platform, record,
-				out var objectValue))
-				PublishWindowPresentation(ref platform, state, objectValue.Boopsi,
-					out _);
-		}
+		if (result && IsPresentationAttribute(attribute) &&
+			MuiHeadlessObjectCodec.TryRead(ref platform, record,
+				out var objectValue) &&
+			!PublishWindowPresentation(ref platform, state, objectValue.Boopsi,
+				out _)) return false;
 		if (result && IsVisualAttribute(attribute) &&
 			MuiHeadlessObjectCodec.TryRead(ref platform, record,
-				out var visualObjectValue))
-			PublishWindowVisual(ref platform, state, visualObjectValue.Boopsi,
-				out _);
+				out var visualObjectValue) &&
+			!PublishWindowVisual(ref platform, state, visualObjectValue.Boopsi,
+				out _)) return false;
 		return result;
 	}
 
@@ -676,7 +763,8 @@ public static class MuiWindowPublicCore
 		if (!handled) return false;
 		if (IsControlAttribute(attribute))
 		{
-			var control = ReadWindowControl(ref platform, state, obj);
+			if (!TryReadWindowControl(ref platform, state, obj, out var control))
+				return false;
 			value = ControlValue(control, attribute);
 			return true;
 		}
@@ -697,7 +785,8 @@ public static class MuiWindowPublicCore
 		}
 		if (attribute == RootObject)
 		{
-			var relationship = ReadWindowRelationship(ref platform, state, obj);
+			if (!TryReadWindowRelationship(ref platform, state, obj,
+				out var relationship)) return false;
 			value = RelationshipValue(relationship, attribute);
 			return true;
 		}
@@ -720,7 +809,8 @@ public static class MuiWindowPublicCore
 		}
 		if (attribute == Menu || attribute == Menustrip || attribute == RefWindow)
 		{
-			var relationship = ReadWindowRelationship(ref platform, state, obj);
+			if (!TryReadWindowRelationship(ref platform, state, obj,
+				out var relationship)) return false;
 			value = RelationshipValue(relationship, attribute);
 			return true;
 		}
@@ -734,18 +824,24 @@ public static class MuiWindowPublicCore
 			(!MuiApplicationWindowCore.TryGetWindowLifecycleState(ref platform,
 				state, obj, out var lifecycle) || lifecycle.NativeWindow.IsNull))
 		{
+			if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				WindowPresentationStateKey) != 0 &&
+				!TryGetWindowPresentationState(ref platform, state, obj, out _))
+				return false;
 			value = 0;
 			return true;
 		}
 		if (IsPresentationAttribute(attribute))
 		{
-			var presentation = ReadWindowPresentation(ref platform, state, obj);
+			if (!TryReadWindowPresentation(ref platform, state, obj,
+				out var presentation)) return false;
 			value = PresentationValue(presentation, attribute);
 			return true;
 		}
 		if (IsVisualAttribute(attribute))
 		{
-			var visual = ReadWindowVisual(ref platform, state, obj);
+			if (!TryReadWindowVisual(ref platform, state, obj, out var visual))
+				return false;
 			value = VisualValue(visual, attribute);
 			return true;
 		}
@@ -753,11 +849,7 @@ public static class MuiWindowPublicCore
 			attribute == MouseObject)
 		{
 			if (!MuiApplicationWindowCore.TryGetWindowEventState(ref platform,
-				state, obj, out var eventState))
-			{
-				value = 0;
-				return true;
-			}
+				state, obj, out var eventState)) return false;
 			value = attribute == CloseRequest ? eventState.CloseRequest :
 			attribute == InputEvent ? eventState.InputEvent.Raw :
 				eventState.MouseObject.Raw;
@@ -826,6 +918,7 @@ public static class MuiWindowPublicCore
 			out var ownerValue)) return false;
 		var owner = ownerValue.Boopsi;
 		if (owner.IsNull) return false;
+		if (!HasValidRelationshipState(ref platform, state, owner)) return false;
 		var current = APTR.Null;
 		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, owner,
 			RootObject, out var currentValue)) current = APTR.FromPointer(currentValue);
@@ -876,6 +969,7 @@ public static class MuiWindowPublicCore
 			out var ownerValue)) return false;
 		var owner = ownerValue.Boopsi;
 		if (owner.IsNull) return false;
+		if (!HasValidRelationshipState(ref platform, state, owner)) return false;
 		var current = APTR.Null;
 		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, owner,
 			Menustrip, out var currentValue)) current = APTR.FromPointer(currentValue);
@@ -929,6 +1023,7 @@ public static class MuiWindowPublicCore
 			out var ownerValue)) return false;
 		var owner = ownerValue.Boopsi;
 		if (owner.IsNull) return false;
+		if (!HasValidRelationshipState(ref platform, state, owner)) return false;
 		var current = APTR.Null;
 		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, owner,
 			RefWindow, out var currentValue)) current = APTR.FromPointer(currentValue);

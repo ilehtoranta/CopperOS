@@ -25,6 +25,22 @@ internal struct MuiWindowControlStateRecord
 	internal uint NeedsMouseObject;
 }
 
+// Structural decoding remains available for ABI fixtures; this predicate is
+// the live contract consumed by Window.mui control getters and setters.
+internal static class MuiWindowControlStateAdmission
+{
+	internal static bool Validate(MuiWindowControlStateRecord value) =>
+		value.Magic == MuiWindowControlStateRecord.Cookie &&
+		value.VisibleOnMaximize <= 1 && value.IsSubWindow <= 1 &&
+		value.NeedsMouseObject <= 1;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR window, MuiWindowControlStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) && !window.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, window).IsNull;
+}
+
 internal enum MuiWindowControlStateField : byte
 {
 	Magic,
@@ -101,58 +117,89 @@ internal static class MuiWindowControlStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. The named control record remains the
+// semantic API; this bounded boundary is the only place that translates its
+// fixed guest representation into byte addresses.
+internal static class MuiWindowControlStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiWindowControlStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiWindowControlStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiWindowControlStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiWindowControlStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiWindowControlStateRecord.Size) ||
-			!MuiWindowControlStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowControlStateField.Magic, out var magic) ||
-			magic != MuiWindowControlStateRecord.Cookie ||
-			!MuiWindowControlStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowControlStateField.Id, out value.Id) ||
-			!MuiWindowControlStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowControlStateField.DisableKeys,
-				out value.DisableKeys) ||
-			!MuiWindowControlStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowControlStateField.VisibleOnMaximize,
-				out value.VisibleOnMaximize) ||
-			!MuiWindowControlStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowControlStateField.IsSubWindow,
-				out value.IsSubWindow) ||
-			!MuiWindowControlStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowControlStateField.NeedsMouseObject,
-				out value.NeedsMouseObject)) return false;
+		if (!MuiWindowControlStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out var magic) ||
+			!MuiWindowControlStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 4, out value.Id) ||
+			!MuiWindowControlStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 8, out value.DisableKeys) ||
+			!MuiWindowControlStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 12, out value.VisibleOnMaximize) ||
+			!MuiWindowControlStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 16, out value.IsSubWindow) ||
+			!MuiWindowControlStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 20, out value.NeedsMouseObject)) return false;
 		value.Magic = magic;
 		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiWindowControlStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiWindowControlStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiWindowControlStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiWindowControlStateRecord.Size) || value.Magic !=
-			MuiWindowControlStateRecord.Cookie) return false;
-		return MuiWindowControlStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiWindowControlStateField.Magic, value.Magic) &&
-			MuiWindowControlStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowControlStateField.Id, value.Id) &&
-			MuiWindowControlStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowControlStateField.DisableKeys,
-				value.DisableKeys) &&
-			MuiWindowControlStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowControlStateField.VisibleOnMaximize,
-				value.VisibleOnMaximize) &&
-			MuiWindowControlStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowControlStateField.IsSubWindow,
-				value.IsSubWindow) &&
-			MuiWindowControlStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowControlStateField.NeedsMouseObject,
-				value.NeedsMouseObject);
+		if (!MuiWindowControlStateAdmission.Validate(value)) return false;
+		return MuiWindowControlStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiWindowControlStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 4, value.Id) &&
+			MuiWindowControlStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 8, value.DisableKeys) &&
+			MuiWindowControlStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 12, value.VisibleOnMaximize) &&
+			MuiWindowControlStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 16, value.IsSubWindow) &&
+			MuiWindowControlStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 20, value.NeedsMouseObject);
 	}
 }

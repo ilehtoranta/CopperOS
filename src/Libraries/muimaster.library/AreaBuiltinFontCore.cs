@@ -31,7 +31,19 @@ internal static class MuiAreaBuiltinFontCore
 		value = default;
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
 			return false;
-		if (!TryReadRecord(ref platform, state, obj, out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			StateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateKey);
+		MuiAreaBuiltinFontStateRecord record;
+		if (block.IsNotNull || length != 0)
+		{
+			// A present block is authoritative typed state.  Do not repair a
+			// malformed record from raw attributes; callers can still use the
+			// structural codec for diagnostics.
+			if (!TryReadRecord(ref platform, state, obj, out record)) return false;
+		}
+		else
 		{
 			if (!Initialize(ref platform, state, obj) ||
 				!TryReadRecord(ref platform, state, obj, out record)) return false;
@@ -46,9 +58,9 @@ internal static class MuiAreaBuiltinFontCore
 			if (present) record.Selector = selector;
 			record.Generation = record.Generation == uint.MaxValue ? 1u :
 				record.Generation + 1u;
-			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			var updateBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StateKey);
-			if (!MuiAreaBuiltinFontStateRecordCodec.Write(ref platform, block,
+			if (!MuiAreaBuiltinFontStateRecordCodec.Write(ref platform, updateBlock,
 				record)) return false;
 		}
 		value.Selector = record.Selector;
@@ -76,8 +88,9 @@ internal static class MuiAreaBuiltinFontCore
 			StateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) !=
 			unchecked((int)MuiAreaBuiltinFontStateRecord.Size)) return false;
-		return MuiAreaBuiltinFontStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiAreaBuiltinFontStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiAreaBuiltinFontStateAdmission.ValidateLive(
+			ref platform, state, obj, value);
 	}
 
 	internal static bool WriteState<TPlatform>(ref TPlatform platform,
@@ -95,8 +108,9 @@ internal static class MuiAreaBuiltinFontCore
 		record.Selector = selector;
 		record.Present = present == 0 ? 0u : 1u;
 		record.Generation = generation == 0 ? 1u : generation;
-		var written = MuiAreaBuiltinFontStateRecordCodec.Write(ref platform, scratch,
-			record);
+		var written = MuiAreaBuiltinFontStateAdmission.ValidateLive(ref platform,
+			state, obj, record) && MuiAreaBuiltinFontStateRecordCodec.Write(
+			ref platform, scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 			StateKey, scratch, unchecked((int)MuiAreaBuiltinFontStateRecord.Size));
 		platform.Clear(scratch, MuiAreaBuiltinFontStateRecord.Size);

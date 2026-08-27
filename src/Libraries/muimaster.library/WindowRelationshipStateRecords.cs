@@ -23,6 +23,49 @@ internal struct MuiWindowRelationshipStateRecord
 	internal APTR RefWindow;
 }
 
+// The structural record carries opaque guest pointers.  The codec-level
+// predicate admits only mapped pointer carriers; WindowPublicCore adds the
+// owner/family relationship checks that require the object state registry.
+internal static class MuiWindowRelationshipStateAdmission
+{
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		MuiWindowRelationshipStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		value.Magic == MuiWindowRelationshipStateRecord.Cookie &&
+		IsMapped(ref platform, value.RootObject) &&
+		IsMapped(ref platform, value.Menustrip) &&
+		IsMapped(ref platform, value.RefWindow);
+
+	private static bool IsMapped<TPlatform>(ref TPlatform platform, APTR value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		value.IsNull || platform.IsMapped(value, 1);
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR owner, MuiWindowRelationshipStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!Validate(ref platform, value) || owner.IsNull) return false;
+		if (!ValidateOwnedChild(ref platform, state, owner, value.RootObject,
+			false) || !ValidateOwnedChild(ref platform, state, owner,
+			value.Menustrip, true)) return false;
+		return value.RefWindow.IsNull || (value.RefWindow != owner &&
+			!MuiHeadlessObjectCore.FindObject(ref platform, state,
+				value.RefWindow).IsNull);
+	}
+
+	private static bool ValidateOwnedChild<TPlatform>(ref TPlatform platform,
+		APTR state, APTR owner, APTR child, bool menustrip)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (child.IsNull) return true;
+		if (child == owner || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			child).IsNull || MuiHeadlessObjectCore.ParentObject(ref platform,
+			state, child) != owner) return false;
+		return !menustrip || MuiMenuSpecialistCore.Classify(ref platform, state,
+			child) == MuiMenuSpecialistClass.Menustrip;
+	}
+}
+
 internal enum MuiWindowRelationshipStateField : byte
 {
 	Magic,
@@ -95,27 +138,58 @@ internal static class MuiWindowRelationshipStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Relationship capabilities remain named
+// APTR fields; only this bounded boundary translates their fixed guest slots.
+internal static class MuiWindowRelationshipStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiWindowRelationshipStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiWindowRelationshipStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiWindowRelationshipStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiWindowRelationshipStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiWindowRelationshipStateRecord.Size) ||
-			!MuiWindowRelationshipStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowRelationshipStateField.Magic, out var magic) ||
-			magic != MuiWindowRelationshipStateRecord.Cookie ||
-			!MuiWindowRelationshipStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowRelationshipStateField.RootObject,
-				out var rootObject) ||
-			!MuiWindowRelationshipStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowRelationshipStateField.Menustrip,
-				out var menustrip) ||
-			!MuiWindowRelationshipStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowRelationshipStateField.RefWindow,
-				out var refWindow)) return false;
+		if (!MuiWindowRelationshipStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out var magic) ||
+			!MuiWindowRelationshipStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 4, out var rootObject) ||
+			!MuiWindowRelationshipStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 8, out var menustrip) ||
+			!MuiWindowRelationshipStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 12, out var refWindow)) return false;
 		value.Magic = magic;
 		value.RootObject = APTR.FromPointer(rootObject);
 		value.Menustrip = APTR.FromPointer(menustrip);
@@ -123,24 +197,25 @@ internal static class MuiWindowRelationshipStateRecordCodec
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiWindowRelationshipStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiWindowRelationshipStateAdmission.Validate(ref platform, value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiWindowRelationshipStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiWindowRelationshipStateRecord.Size) || value.Magic !=
-			MuiWindowRelationshipStateRecord.Cookie) return false;
-		return MuiWindowRelationshipStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address, MuiWindowRelationshipStateField.Magic,
-			value.Magic) &&
-			MuiWindowRelationshipStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowRelationshipStateField.RootObject,
-				value.RootObject.Raw) &&
-			MuiWindowRelationshipStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowRelationshipStateField.Menustrip,
-				value.Menustrip.Raw) &&
-			MuiWindowRelationshipStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowRelationshipStateField.RefWindow,
-				value.RefWindow.Raw);
+		if (!MuiWindowRelationshipStateAdmission.Validate(ref platform, value))
+			return false;
+		return MuiWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 0, value.Magic) &&
+			MuiWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 4, value.RootObject.Raw) &&
+			MuiWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 8, value.Menustrip.Raw) &&
+			MuiWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 12, value.RefWindow.Raw);
 	}
 }

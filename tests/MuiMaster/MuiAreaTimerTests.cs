@@ -36,6 +36,159 @@ public sealed class MuiAreaTimerTests
 	}
 
 	[Fact]
+	public void AreaTimerStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1580);
+		var value = default(MuiAreaTimerStateRecord);
+		value.Magic = MuiAreaTimerStateRecord.Cookie;
+		value.Value = int.MinValue;
+		value.Generation = 7;
+
+		Assert.True(MuiAreaTimerStateRecordCodec.Write(ref platform, address,
+			value));
+		Assert.True(MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Value, decoded.Value);
+		Assert.Equal(value.Generation, decoded.Generation);
+		Assert.True(MuiAreaTimerStateRecordCodec.TryRead(ref platform, address,
+			out decoded));
+		Assert.False(MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _));
+	}
+
+	[Fact]
+	public void TimerAdmissionRequiresGenerationAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var valid = new MuiAreaTimerStateRecord
+		{
+			Magic = MuiAreaTimerStateRecord.Cookie,
+			Value = -9,
+			Generation = 1,
+		};
+		Assert.True(MuiAreaTimerStateAdmission.Validate(valid));
+		Assert.True(MuiAreaTimerStateAdmission.ValidateLive(ref platform, State,
+			obj, valid));
+		var malformed = valid;
+		malformed.Generation = 0;
+		Assert.False(MuiAreaTimerStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaTimerStateAdmission.ValidateLive(ref platform, State,
+			obj, malformed));
+		malformed = valid;
+		malformed.Magic = 0;
+		Assert.False(MuiAreaTimerStateAdmission.ValidateLive(ref platform, State,
+			APTR.FromPointer(0xDEAD), malformed));
+	}
+
+	[Fact]
+	public void MalformedTimerFailsClosedBeforeRawRepairOrPublication()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiAreaTimerPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		Assert.True(MuiAreaTimerPacketCore.Publish(ref platform, State, obj,
+			-9, false));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaTimerCore.StateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaTimerStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiAreaTimerStateField.Generation, 0));
+		Assert.True(MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform,
+			block, out var structural));
+		Assert.Equal(0u, structural.Generation);
+		Assert.False(MuiAreaTimerStateAdmission.Validate(structural));
+		Assert.False(MuiAreaTimerStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		var allocationsBefore = platform.AllocationCount;
+		Assert.False(MuiAreaTimerPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.False(MuiAreaTimerPacketCore.Publish(ref platform, State, obj,
+			12, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, obj,
+			MuiCommonControlCore.Timer, out var raw));
+		Assert.Equal(unchecked((uint)-9), raw);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaTimerCore.StateKey));
+	}
+
+	[Fact]
+	public void TimerEventAdmissionRequiresCanonicalFlagsAndGeneration()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var valid = new MuiAreaTimerEventStateRecord
+		{
+			Magic = MuiAreaTimerEventStateRecord.Cookie,
+			Armed = 1,
+			MouseOver = 1,
+			DelayElapsed = 0,
+			LastTick = 42,
+			Generation = 1,
+		};
+		Assert.True(MuiAreaTimerEventStateAdmission.Validate(valid));
+		var malformed = valid;
+		malformed.MouseOver = 2;
+		Assert.False(MuiAreaTimerEventStateAdmission.Validate(malformed));
+		malformed = valid;
+		malformed.Generation = 0;
+		Assert.False(MuiAreaTimerEventStateAdmission.Validate(malformed));
+	}
+
+	[Fact]
+	public void MalformedTimerEventFailsClosedWithoutReplacement()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiAreaTimerPacketCore.ProcessEvent(ref platform, State, obj,
+			new MuiAreaTimerEventInput
+			{
+				Kind = MuiAreaTimerEventKind.RelVerifyPress,
+				Tick = 10,
+				PointerOver = 1,
+				DelayElapsed = 1,
+			}, false));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaTimerCore.EventStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaTimerEventStateCodec.TryReadStructural(ref platform,
+			block, out var structural));
+		structural.Armed = 2;
+		Assert.False(MuiAreaTimerEventStateCodec.Write(ref platform, block,
+			structural));
+		// The bounded codec rejects non-canonical flags, so inject the malformed
+		// value through its named guest field for structural diagnostics.
+		Assert.True(MuiAreaTimerEventStateCodec.TryWriteUInt32(ref platform,
+			block, MuiAreaTimerEventStateField.Armed, 2));
+		Assert.True(MuiAreaTimerEventStateCodec.TryReadStructural(ref platform,
+			block, out structural));
+		Assert.Equal(2u, structural.Armed);
+		Assert.False(MuiAreaTimerEventStateAdmission.Validate(structural));
+		Assert.False(MuiAreaTimerEventStateCodec.TryRead(ref platform, block,
+			out _));
+		var allocationsBefore = platform.AllocationCount;
+		Assert.False(MuiAreaTimerPacketCore.ProcessEvent(ref platform, State, obj,
+			new MuiAreaTimerEventInput
+			{
+				Kind = MuiAreaTimerEventKind.IntuiTick,
+				Tick = 11,
+				PointerOver = 1,
+				DelayElapsed = 1,
+			}, false));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaTimerCore.EventStateKey));
+	}
+
+	[Fact]
 	public void TypedTimerStatePublishesAndReadsSignedValues()
 	{
 		var platform = CreatePlatform(out var areaClass);

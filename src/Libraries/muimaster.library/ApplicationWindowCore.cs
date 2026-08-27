@@ -213,6 +213,12 @@ public static class MuiWindowEventHandlerPacketCore
 internal struct MuiApplicationWindowNodeRecord
 {
 	internal const uint Size = 20;
+	internal const uint NextOffset = 0;
+	internal const uint ValueOffset = 4;
+	internal const uint SequenceOffset = 8;
+	internal const uint AuxiliaryOffset = 12;
+	internal const uint PacketOffset = 16;
+	internal const uint FieldSize = 4;
 	// The Packet member is the first word of the inline method packet. The
 	// allocated node reserves the full 20-byte record, but payload begins at
 	// this ABI-defined member offset.
@@ -244,42 +250,12 @@ internal struct MuiApplicationWindowNodeFieldCursor
 
 internal static class MuiApplicationWindowNodeFieldCursorCodec
 {
-	private static bool TryResolve(MuiApplicationWindowNodeField field,
-		out uint offset)
-	{
-		switch (field)
-		{
-			case MuiApplicationWindowNodeField.Next:
-				offset = 0;
-				return true;
-			case MuiApplicationWindowNodeField.Value:
-				offset = 4;
-				return true;
-			case MuiApplicationWindowNodeField.Sequence:
-				offset = 8;
-				return true;
-			case MuiApplicationWindowNodeField.Auxiliary:
-				offset = 12;
-				return true;
-			case MuiApplicationWindowNodeField.Packet:
-				offset = 16;
-				return true;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiApplicationWindowNodeFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, MuiApplicationWindowNodeRecord.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiApplicationWindowNodeRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Address, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -304,6 +280,68 @@ internal static class MuiApplicationWindowNodeFieldCursorCodec
 		cursor.Field = field;
 		if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
+		return true;
+	}
+}
+
+// Struct-first guest-memory adapter for the fixed application/window queue
+// node. Its Packet member is the first word of an optional inline payload;
+// the payload boundary remains owned by MuiApplicationWindowNodePayloadCursor.
+internal static class MuiApplicationWindowNodeRecordMemoryCodec
+{
+	private static bool TryResolve(MuiApplicationWindowNodeField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiApplicationWindowNodeField.Next:
+				offset = MuiApplicationWindowNodeRecord.NextOffset;
+				return true;
+			case MuiApplicationWindowNodeField.Value:
+				offset = MuiApplicationWindowNodeRecord.ValueOffset;
+				return true;
+			case MuiApplicationWindowNodeField.Sequence:
+				offset = MuiApplicationWindowNodeRecord.SequenceOffset;
+				return true;
+			case MuiApplicationWindowNodeField.Auxiliary:
+				offset = MuiApplicationWindowNodeRecord.AuxiliaryOffset;
+				return true;
+			case MuiApplicationWindowNodeField.Packet:
+				offset = MuiApplicationWindowNodeRecord.PacketOffset;
+				return true;
+		}
+		offset = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationWindowNodeField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiApplicationWindowNodeRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiApplicationWindowNodeRecord.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationWindowNodeField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationWindowNodeField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
@@ -488,6 +526,18 @@ internal static class MuiApplicationWindowSignalStorageCodec
 internal struct MuiEventHandlerNodeRecord
 {
 	public const uint Size = 24;
+	public const uint NodeSuccessorOffset = 0;
+	public const uint NodePredecessorOffset = 4;
+	public const uint ReservedOffset = 8;
+	public const uint PriorityOffset = 9;
+	public const uint FlagsOffset = 10;
+	public const uint ObjectOffset = 12;
+	public const uint ClassOffset = 16;
+	public const uint EventsOffset = 20;
+	public const uint PointerFieldSize = 4;
+	public const uint ByteFieldSize = 1;
+	public const uint WordFieldSize = 2;
+	public const uint LongFieldSize = 4;
 	public APTR NodeSuccessor;
 	public APTR NodePredecessor;
 	public byte Reserved;
@@ -522,61 +572,12 @@ internal struct MuiEventHandlerNodeFieldCursor
 
 internal static class MuiEventHandlerNodeFieldCursorCodec
 {
-	private static bool TryResolve(MuiEventHandlerNodeField field,
-		out uint offset, out uint size)
-	{
-		switch (field)
-		{
-			case MuiEventHandlerNodeField.NodeSuccessor:
-				offset = 0;
-				size = 4;
-				return true;
-			case MuiEventHandlerNodeField.NodePredecessor:
-				offset = 4;
-				size = 4;
-				return true;
-			case MuiEventHandlerNodeField.Reserved:
-				offset = 8;
-				size = 1;
-				return true;
-			case MuiEventHandlerNodeField.Priority:
-				offset = 9;
-				size = 1;
-				return true;
-			case MuiEventHandlerNodeField.Flags:
-				offset = 10;
-				size = 2;
-				return true;
-			case MuiEventHandlerNodeField.Object:
-				offset = 12;
-				size = 4;
-				return true;
-			case MuiEventHandlerNodeField.Class:
-				offset = 16;
-				size = 4;
-				return true;
-			case MuiEventHandlerNodeField.Events:
-				offset = 20;
-				size = 4;
-				return true;
-		}
-		offset = 0;
-		size = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiEventHandlerNodeFieldCursor cursor, out APTR address, out uint size)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		size = 0;
-		if (!TryResolve(cursor.Field, out var offset, out size) ||
-			cursor.Address.IsNull || cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, MuiEventHandlerNodeRecord.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, size);
+		return MuiEventHandlerNodeRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Address, cursor.Field, out address, out size);
 	}
 
 	internal static bool TryReadUInt8<TPlatform>(ref TPlatform platform,
@@ -588,7 +589,7 @@ internal static class MuiEventHandlerNodeFieldCursorCodec
 		cursor.Address = address;
 		cursor.Field = field;
 		if (!TryGetAddress(ref platform, cursor, out var fieldAddress, out var size) ||
-			size != 1) return false;
+			size != MuiEventHandlerNodeRecord.ByteFieldSize) return false;
 		value = platform.ReadUInt8(fieldAddress, 0);
 		return true;
 	}
@@ -602,7 +603,7 @@ internal static class MuiEventHandlerNodeFieldCursorCodec
 		cursor.Address = address;
 		cursor.Field = field;
 		if (!TryGetAddress(ref platform, cursor, out var fieldAddress, out var size) ||
-			size != 2) return false;
+			size != MuiEventHandlerNodeRecord.WordFieldSize) return false;
 		value = platform.ReadUInt16(fieldAddress, 0);
 		return true;
 	}
@@ -616,7 +617,7 @@ internal static class MuiEventHandlerNodeFieldCursorCodec
 		cursor.Address = address;
 		cursor.Field = field;
 		if (!TryGetAddress(ref platform, cursor, out var fieldAddress, out var size) ||
-			size != 4) return false;
+			size != MuiEventHandlerNodeRecord.LongFieldSize) return false;
 		value = platform.ReadUInt32(fieldAddress, 0);
 		return true;
 	}
@@ -629,7 +630,7 @@ internal static class MuiEventHandlerNodeFieldCursorCodec
 		cursor.Address = address;
 		cursor.Field = field;
 		if (!TryGetAddress(ref platform, cursor, out var fieldAddress, out var size) ||
-			size != 1) return false;
+			size != MuiEventHandlerNodeRecord.ByteFieldSize) return false;
 		platform.WriteUInt8(fieldAddress, 0, value);
 		return true;
 	}
@@ -642,7 +643,7 @@ internal static class MuiEventHandlerNodeFieldCursorCodec
 		cursor.Address = address;
 		cursor.Field = field;
 		if (!TryGetAddress(ref platform, cursor, out var fieldAddress, out var size) ||
-			size != 2) return false;
+			size != MuiEventHandlerNodeRecord.WordFieldSize) return false;
 		platform.WriteUInt16(fieldAddress, 0, value);
 		return true;
 	}
@@ -655,8 +656,134 @@ internal static class MuiEventHandlerNodeFieldCursorCodec
 		cursor.Address = address;
 		cursor.Field = field;
 		if (!TryGetAddress(ref platform, cursor, out var fieldAddress, out var size) ||
-			size != 4) return false;
+			size != MuiEventHandlerNodeRecord.LongFieldSize) return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
+		return true;
+	}
+}
+
+// Struct-first guest-memory adapter for the MorphOS MUI event-handler node.
+// The semantic record above is the source of truth; this bounded adapter is
+// the only layer that translates its packed guest representation.
+internal static class MuiEventHandlerNodeRecordMemoryCodec
+{
+	private static bool TryResolve(MuiEventHandlerNodeField field,
+		out uint offset, out uint size)
+	{
+		switch (field)
+		{
+			case MuiEventHandlerNodeField.NodeSuccessor:
+				offset = MuiEventHandlerNodeRecord.NodeSuccessorOffset;
+				size = MuiEventHandlerNodeRecord.PointerFieldSize;
+				return true;
+			case MuiEventHandlerNodeField.NodePredecessor:
+				offset = MuiEventHandlerNodeRecord.NodePredecessorOffset;
+				size = MuiEventHandlerNodeRecord.PointerFieldSize;
+				return true;
+			case MuiEventHandlerNodeField.Reserved:
+				offset = MuiEventHandlerNodeRecord.ReservedOffset;
+				size = MuiEventHandlerNodeRecord.ByteFieldSize;
+				return true;
+			case MuiEventHandlerNodeField.Priority:
+				offset = MuiEventHandlerNodeRecord.PriorityOffset;
+				size = MuiEventHandlerNodeRecord.ByteFieldSize;
+				return true;
+			case MuiEventHandlerNodeField.Flags:
+				offset = MuiEventHandlerNodeRecord.FlagsOffset;
+				size = MuiEventHandlerNodeRecord.WordFieldSize;
+				return true;
+			case MuiEventHandlerNodeField.Object:
+				offset = MuiEventHandlerNodeRecord.ObjectOffset;
+				size = MuiEventHandlerNodeRecord.PointerFieldSize;
+				return true;
+			case MuiEventHandlerNodeField.Class:
+				offset = MuiEventHandlerNodeRecord.ClassOffset;
+				size = MuiEventHandlerNodeRecord.PointerFieldSize;
+				return true;
+			case MuiEventHandlerNodeField.Events:
+				offset = MuiEventHandlerNodeRecord.EventsOffset;
+				size = MuiEventHandlerNodeRecord.LongFieldSize;
+				return true;
+		}
+		offset = 0;
+		size = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiEventHandlerNodeField field, out APTR address,
+		out uint size)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		size = 0;
+		if (!TryResolve(field, out var offset, out size) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiEventHandlerNodeRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, size);
+	}
+
+	internal static bool TryReadUInt8<TPlatform>(ref TPlatform platform,
+		APTR record, MuiEventHandlerNodeField field, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var size) || size != MuiEventHandlerNodeRecord.ByteFieldSize) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+
+	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiEventHandlerNodeField field, out ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var size) || size != MuiEventHandlerNodeRecord.WordFieldSize) return false;
+		value = platform.ReadUInt16(address, 0);
+		return true;
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiEventHandlerNodeField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var size) || size != MuiEventHandlerNodeRecord.LongFieldSize) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt8<TPlatform>(ref TPlatform platform,
+		APTR record, MuiEventHandlerNodeField field, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var size) || size != MuiEventHandlerNodeRecord.ByteFieldSize) return false;
+		platform.WriteUInt8(address, 0, value);
+		return true;
+	}
+
+	internal static bool TryWriteUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiEventHandlerNodeField field, ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var size) || size != MuiEventHandlerNodeRecord.WordFieldSize) return false;
+		platform.WriteUInt16(address, 0, value);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiEventHandlerNodeField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var size) || size != MuiEventHandlerNodeRecord.LongFieldSize) return false;
+		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
@@ -726,8 +853,15 @@ internal static class MuiEventHandlerNodeCodec
 internal struct MuiInputHandlerRecord
 {
 	internal const uint Size = 24;
-	internal uint NodeSuccessor;
-	internal uint NodePredecessor;
+	internal const uint NodeSuccessorOffset = 0;
+	internal const uint NodePredecessorOffset = 4;
+	internal const uint ObjectOffset = 8;
+	internal const uint EventsOffset = 12;
+	internal const uint ReservedOffset = 16;
+	internal const uint PacketOffset = 20;
+	internal const uint FieldSize = 4;
+	internal APTR NodeSuccessor;
+	internal APTR NodePredecessor;
 	internal APTR Object;
 	internal uint Events;
 	internal uint Reserved;
@@ -753,44 +887,12 @@ internal struct MuiInputHandlerFieldCursor
 
 internal static class MuiInputHandlerFieldCursorCodec
 {
-	private static bool TryResolve(MuiInputHandlerField field, out uint offset)
-	{
-		switch (field)
-		{
-			case MuiInputHandlerField.NodeSuccessor:
-				offset = 0;
-				return true;
-			case MuiInputHandlerField.NodePredecessor:
-				offset = 4;
-				return true;
-			case MuiInputHandlerField.Object:
-				offset = 8;
-				return true;
-			case MuiInputHandlerField.Events:
-				offset = 12;
-				return true;
-			case MuiInputHandlerField.Reserved:
-				offset = 16;
-				return true;
-			case MuiInputHandlerField.Packet:
-				offset = 20;
-				return true;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiInputHandlerFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, MuiInputHandlerRecord.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiInputHandlerRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Address, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -819,6 +921,70 @@ internal static class MuiInputHandlerFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter for the fixed MorphOS input-handler
+// record. Pointer members are represented as APTR in the semantic record;
+// this adapter owns the 32-bit guest slots and complete-record validation.
+internal static class MuiInputHandlerRecordMemoryCodec
+{
+	private static bool TryResolve(MuiInputHandlerField field, out uint offset)
+	{
+		switch (field)
+		{
+			case MuiInputHandlerField.NodeSuccessor:
+				offset = MuiInputHandlerRecord.NodeSuccessorOffset;
+				return true;
+			case MuiInputHandlerField.NodePredecessor:
+				offset = MuiInputHandlerRecord.NodePredecessorOffset;
+				return true;
+			case MuiInputHandlerField.Object:
+				offset = MuiInputHandlerRecord.ObjectOffset;
+				return true;
+			case MuiInputHandlerField.Events:
+				offset = MuiInputHandlerRecord.EventsOffset;
+				return true;
+			case MuiInputHandlerField.Reserved:
+				offset = MuiInputHandlerRecord.ReservedOffset;
+				return true;
+			case MuiInputHandlerField.Packet:
+				offset = MuiInputHandlerRecord.PacketOffset;
+				return true;
+		}
+		offset = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiInputHandlerField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiInputHandlerRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiInputHandlerRecord.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiInputHandlerField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiInputHandlerField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiInputHandlerCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -829,9 +995,9 @@ internal static class MuiInputHandlerCodec
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiInputHandlerRecord.Size)) return false;
 		if (!MuiInputHandlerFieldCursorCodec.TryReadUInt32(ref platform, address,
-			MuiInputHandlerField.NodeSuccessor, out record.NodeSuccessor) ||
+			MuiInputHandlerField.NodeSuccessor, out var successor) ||
 			!MuiInputHandlerFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiInputHandlerField.NodePredecessor, out record.NodePredecessor) ||
+				MuiInputHandlerField.NodePredecessor, out var predecessor) ||
 			!MuiInputHandlerFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiInputHandlerField.Object, out var @object) ||
 			!MuiInputHandlerFieldCursorCodec.TryReadUInt32(ref platform, address,
@@ -840,8 +1006,30 @@ internal static class MuiInputHandlerCodec
 				MuiInputHandlerField.Reserved, out record.Reserved) ||
 			!MuiInputHandlerFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiInputHandlerField.Packet, out record.Packet)) return false;
+		record.NodeSuccessor = APTR.FromPointer(successor);
+		record.NodePredecessor = APTR.FromPointer(predecessor);
 		record.Object = APTR.FromPointer(@object);
 		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiInputHandlerRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiInputHandlerRecord.Size)) return false;
+		return MuiInputHandlerFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiInputHandlerField.NodeSuccessor, record.NodeSuccessor.Raw) &&
+			MuiInputHandlerFieldCursorCodec.TryWriteUInt32(ref platform, address,
+				MuiInputHandlerField.NodePredecessor, record.NodePredecessor.Raw) &&
+			MuiInputHandlerFieldCursorCodec.TryWriteUInt32(ref platform, address,
+				MuiInputHandlerField.Object, record.Object.Raw) &&
+			MuiInputHandlerFieldCursorCodec.TryWriteUInt32(ref platform, address,
+				MuiInputHandlerField.Events, record.Events) &&
+			MuiInputHandlerFieldCursorCodec.TryWriteUInt32(ref platform, address,
+				MuiInputHandlerField.Reserved, record.Reserved) &&
+			MuiInputHandlerFieldCursorCodec.TryWriteUInt32(ref platform, address,
+				MuiInputHandlerField.Packet, record.Packet);
 	}
 }
 
@@ -1078,30 +1266,30 @@ public static class MuiApplicationWindowCore
 	private const uint ApplicationSettingsRequests = 0x7FFE0034;
 	private const uint ApplicationSettingsSaves = 0x7FFE0035;
 	private const uint ApplicationSettingsLoads = 0x7FFE0036;
-	private const uint ApplicationSetConfigItemState = 0x7FFE003C;
-	private const uint ApplicationLifecycleStateKey = 0x7F0A0001u;
-	private const uint WindowLifecycleStateKey = 0x7F0A0002u;
-	private const uint WindowOpenPolicyStateKey = 0x7F0A0003u;
-	private const uint WindowSleepStateKey = 0x7F0A0006u;
-	private const uint ApplicationSleepStateKey = 0x7F0A0007u;
-	private const uint ApplicationSchedulerStateKey = 0x7F0A0008u;
-	private const uint WindowInteractionStateKey = 0x7F0A0009u;
-	private const uint WindowEventStateKey = 0x7F0A000Au;
-	private const uint WindowEventReuseStateKey = 0x7F0A0037u;
-	private const uint ApplicationHelpStateKey = 0x7F0A000Bu;
-	private const uint ApplicationDefaultConfigStateKey = 0x7F0A000Cu;
-	private const uint ApplicationConfigWindowStateKey = 0x7F0A000Du;
-	private const uint ApplicationSettingsPanelStateKey = 0x7F0A000Eu;
-	private const uint ApplicationSettingsPersistenceStateKey = 0x7F0A000Fu;
-	private const uint ApplicationRefreshStateKey = 0x7F0A0010u;
-	private const uint ApplicationMenuStateKey = 0x7F0A0011u;
-	private const uint ApplicationObjectStateKey = 0x7F0A0012u;
-	private const uint ApplicationTextStateKey = 0x7F0A0013u;
-	private const uint ApplicationIdentityStateKey = 0x7F0A0014u;
-	private const uint ApplicationPolicyStateKey = 0x7F0A0015u;
-	private const uint ApplicationUsedClassesStateKey = 0x7F0A0016u;
-	private const uint ApplicationWindowRelationshipStateKey = 0x7F0A0017u;
-	private const uint WindowFocusStateKey = 0x7F0A001Cu;
+	internal const uint ApplicationSetConfigItemState = 0x7FFE003C;
+	internal const uint ApplicationLifecycleStateKey = 0x7F0A0001u;
+	internal const uint WindowLifecycleStateKey = 0x7F0A0002u;
+	internal const uint WindowOpenPolicyStateKey = 0x7F0A0003u;
+	internal const uint WindowSleepStateKey = 0x7F0A0006u;
+	internal const uint ApplicationSleepStateKey = 0x7F0A0007u;
+	internal const uint ApplicationSchedulerStateKey = 0x7F0A0008u;
+	internal const uint WindowInteractionStateKey = 0x7F0A0009u;
+	internal const uint WindowEventStateKey = 0x7F0A000Au;
+	internal const uint WindowEventReuseStateKey = 0x7F0A0037u;
+	internal const uint ApplicationHelpStateKey = 0x7F0A000Bu;
+	internal const uint ApplicationDefaultConfigStateKey = 0x7F0A000Cu;
+	internal const uint ApplicationConfigWindowStateKey = 0x7F0A000Du;
+	internal const uint ApplicationSettingsPanelStateKey = 0x7F0A000Eu;
+	internal const uint ApplicationSettingsPersistenceStateKey = 0x7F0A000Fu;
+	internal const uint ApplicationRefreshStateKey = 0x7F0A0010u;
+	internal const uint ApplicationMenuStateKey = 0x7F0A0011u;
+	internal const uint ApplicationObjectStateKey = 0x7F0A0012u;
+	internal const uint ApplicationTextStateKey = 0x7F0A0013u;
+	internal const uint ApplicationIdentityStateKey = 0x7F0A0014u;
+	internal const uint ApplicationPolicyStateKey = 0x7F0A0015u;
+	internal const uint ApplicationUsedClassesStateKey = 0x7F0A0016u;
+	internal const uint ApplicationWindowRelationshipStateKey = 0x7F0A0017u;
+	internal const uint WindowFocusStateKey = 0x7F0A001Cu;
 	private const uint HelpFirstOpenWindow = uint.MaxValue;
 	private const uint SignalBreakCtrlC = 1u << 12;
 	private const uint MaximumRunIterations = 65535;
@@ -1124,8 +1312,10 @@ public static class MuiApplicationWindowCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
 			ApplicationLifecycleStateKey) !=
 			unchecked((int)MuiApplicationLifecycleStateRecord.Size)) return false;
-		return MuiApplicationLifecycleStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiApplicationLifecycleStateRecordCodec.TryReadStructural(
+			ref platform, block, out value) &&
+			MuiApplicationLifecycleStateAdmission.ValidateLive(ref platform, state,
+				application, value);
 	}
 
 	private static MuiApplicationLifecycleStateRecord ReadApplicationLifecycle<TPlatform>(
@@ -1134,6 +1324,11 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishApplicationLifecycle(ref platform, state, application,
 			out var value)) return value;
+		// A non-empty sidecar is a present record. Never fall back to raw
+		// attributes after strict admission rejects it; callers then observe the
+		// zero record and their mutating path fails closed in WriteApplicationLifecycle.
+		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationLifecycleStateKey) != 0) return default;
 		value = default;
 		value.Magic = MuiApplicationLifecycleStateRecord.Cookie;
 		FillApplicationLifecycle(ref platform, state, application, ref value);
@@ -1148,9 +1343,14 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationLifecycleStateKey);
-		if (TryGetApplicationLifecycleState(ref platform, state, application,
-			out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationLifecycleStateKey);
+		if (length != 0 && length !=
+			unchecked((int)MuiApplicationLifecycleStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!TryGetApplicationLifecycleState(ref platform, state, application,
+				out value)) return false;
 			FillApplicationLifecycle(ref platform, state, application, ref value);
 			return MuiApplicationLifecycleStateRecordCodec.Write(ref platform, block,
 				value);
@@ -1201,6 +1401,8 @@ public static class MuiApplicationWindowCore
 		APTR state, APTR application, MuiApplicationLifecycleStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!MuiApplicationLifecycleStateAdmission.ValidateLive(ref platform, state,
+			application, value)) return false;
 		if (!PublishApplicationLifecycle(ref platform, state, application,
 			out _)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
@@ -1233,19 +1435,23 @@ public static class MuiApplicationWindowCore
 			WindowLifecycleStateKey) !=
 			unchecked((int)MuiWindowLifecycleStateRecord.Size)) return false;
 		return MuiWindowLifecycleStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiWindowLifecycleStateAdmission.ValidateLive(
+			ref platform, state, window, value);
 	}
+
+	private static bool TryReadWindowLifecycle<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window,
+		out MuiWindowLifecycleStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		PublishWindowLifecycle(ref platform, state, window, out value);
 
 	private static MuiWindowLifecycleStateRecord ReadWindowLifecycle<TPlatform>(
 		ref TPlatform platform, APTR state, APTR window)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (PublishWindowLifecycle(ref platform, state, window, out var value))
+		if (TryReadWindowLifecycle(ref platform, state, window, out var value))
 			return value;
-		value = default;
-		value.Magic = MuiWindowLifecycleStateRecord.Cookie;
-		FillWindowLifecycle(ref platform, state, window, ref value);
-		return value;
+		return default;
 	}
 
 	private static bool PublishWindowLifecycle<TPlatform>(ref TPlatform platform,
@@ -1258,13 +1464,19 @@ public static class MuiApplicationWindowCore
 		if (TryGetWindowLifecycleState(ref platform, state, window, out value))
 		{
 			FillWindowLifecycle(ref platform, state, window, ref value);
+			if (!MuiWindowLifecycleStateAdmission.ValidateLive(ref platform, state,
+				window, value)) return false;
 			return MuiWindowLifecycleStateRecordCodec.Write(ref platform, block,
 				value);
 		}
+		if (MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowLifecycleStateKey) != 0) return false;
 
 		value = default;
 		value.Magic = MuiWindowLifecycleStateRecord.Cookie;
 		FillWindowLifecycle(ref platform, state, window, ref value);
+		if (!MuiWindowLifecycleStateAdmission.ValidateLive(ref platform, state,
+			window, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiWindowLifecycleStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -1301,6 +1513,8 @@ public static class MuiApplicationWindowCore
 		APTR state, APTR window, MuiWindowLifecycleStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!MuiWindowLifecycleStateAdmission.ValidateLive(ref platform, state,
+			window, value)) return false;
 		if (!PublishWindowLifecycle(ref platform, state, window, out _)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
 			WindowLifecycleStateKey);
@@ -1326,20 +1540,21 @@ public static class MuiApplicationWindowCore
 			WindowOpenPolicyStateKey) !=
 			unchecked((int)MuiWindowOpenPolicyStateRecord.Size)) return false;
 		return MuiWindowOpenPolicyStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiWindowOpenPolicyStateAdmission.ValidateLive(
+			ref platform, state, window, value);
 	}
 
-	private static MuiWindowOpenPolicyStateRecord ReadWindowOpenPolicy<TPlatform>(
+	private static bool HasWindowOpenPolicyStateStorage<TPlatform>(
 		ref TPlatform platform, APTR state, APTR window)
-		where TPlatform : struct, IMuiHeadlessPlatform
-	{
-		if (PublishWindowOpenPolicy(ref platform, state, window, out var value))
-			return value;
-		value = default;
-		value.Magic = MuiWindowOpenPolicyStateRecord.Cookie;
-		FillWindowOpenPolicy(ref platform, state, window, ref value);
-		return value;
-	}
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowOpenPolicyStateKey) != 0;
+
+	private static bool TryReadWindowOpenPolicy<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window,
+		out MuiWindowOpenPolicyStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		PublishWindowOpenPolicy(ref platform, state, window, out value);
 
 	internal static bool PublishWindowOpenPolicy<TPlatform>(ref TPlatform platform,
 		APTR state, APTR window, out MuiWindowOpenPolicyStateRecord value)
@@ -1351,13 +1566,21 @@ public static class MuiApplicationWindowCore
 		if (TryGetWindowOpenPolicyState(ref platform, state, window, out value))
 		{
 			FillWindowOpenPolicy(ref platform, state, window, ref value);
+			if (!MuiWindowOpenPolicyStateAdmission.ValidateLive(ref platform,
+				state, window, value)) return false;
 			return MuiWindowOpenPolicyStateRecordCodec.Write(ref platform, block,
 				value);
 		}
+		// A present malformed sidecar is not an open-time bootstrap miss. Keep
+		// invalid policy away from native window configuration.
+		if (HasWindowOpenPolicyStateStorage(ref platform, state, window))
+			return false;
 
 		value = default;
 		value.Magic = MuiWindowOpenPolicyStateRecord.Cookie;
 		FillWindowOpenPolicy(ref platform, state, window, ref value);
+		if (!MuiWindowOpenPolicyStateAdmission.ValidateLive(ref platform, state,
+			window, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiWindowOpenPolicyStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -1377,6 +1600,12 @@ public static class MuiApplicationWindowCore
 		where TPlatform : struct, IMuiHeadlessPlatform =>
 		MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, window,
 			attribute, out var value) ? value : 0;
+
+	private static uint ReadWindowOpenPolicyBool<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window, uint attribute)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		ReadWindowOpenPolicyRaw(ref platform, state, window, attribute) == 0
+			? 0u : 1u;
 
 	private static void FillWindowOpenPolicy<TPlatform>(ref TPlatform platform,
 		APTR state, APTR window, ref MuiWindowOpenPolicyStateRecord value)
@@ -1406,33 +1635,33 @@ public static class MuiApplicationWindowCore
 		value.TopEdge = unchecked((int)ReadWindowOpenPolicyRaw(ref platform, state,
 			window,
 			MuiWindowPublicCore.TopEdge));
-		value.CloseGadget = ReadWindowOpenPolicyRaw(ref platform, state, window,
+		value.CloseGadget = ReadWindowOpenPolicyBool(ref platform, state, window,
 			MuiWindowPublicCore.CloseGadget);
-		value.DepthGadget = ReadWindowOpenPolicyRaw(ref platform, state, window,
+		value.DepthGadget = ReadWindowOpenPolicyBool(ref platform, state, window,
 			MuiWindowPublicCore.DepthGadget);
-		value.DragBar = ReadWindowOpenPolicyRaw(ref platform, state, window,
+		value.DragBar = ReadWindowOpenPolicyBool(ref platform, state, window,
 			MuiWindowPublicCore.DragBar);
-		value.SizeGadget = ReadWindowOpenPolicyRaw(ref platform, state, window,
+		value.SizeGadget = ReadWindowOpenPolicyBool(ref platform, state, window,
 			MuiWindowPublicCore.SizeGadget);
-		value.SizeRight = ReadWindowOpenPolicyRaw(ref platform, state, window,
+		value.SizeRight = ReadWindowOpenPolicyBool(ref platform, state, window,
 			MuiWindowPublicCore.SizeRight);
-		value.AppWindow = ReadWindowOpenPolicyRaw(ref platform, state, window,
+		value.AppWindow = ReadWindowOpenPolicyBool(ref platform, state, window,
 			MuiWindowPublicCore.AppWindow);
-		value.Backdrop = ReadWindowOpenPolicyRaw(ref platform, state, window,
+		value.Backdrop = ReadWindowOpenPolicyBool(ref platform, state, window,
 			MuiWindowPublicCore.Backdrop);
-		value.Borderless = ReadWindowOpenPolicyRaw(ref platform, state, window,
+		value.Borderless = ReadWindowOpenPolicyBool(ref platform, state, window,
 			MuiWindowPublicCore.Borderless);
-		value.PanelWindow = ReadWindowOpenPolicyRaw(ref platform, state, window,
+		value.PanelWindow = ReadWindowOpenPolicyBool(ref platform, state, window,
 			MuiWindowPublicCore.PanelWindow);
-		value.TabletMessages = ReadWindowOpenPolicyRaw(ref platform, state, window,
+		value.TabletMessages = ReadWindowOpenPolicyBool(ref platform, state, window,
 			MuiWindowPublicCore.TabletMessages);
-		value.UseBottomBorderScroller = ReadWindowOpenPolicyRaw(ref platform, state,
+		value.UseBottomBorderScroller = ReadWindowOpenPolicyBool(ref platform, state,
 			window,
 			MuiWindowPublicCore.UseBottomBorderScroller);
-		value.UseLeftBorderScroller = ReadWindowOpenPolicyRaw(ref platform, state,
+		value.UseLeftBorderScroller = ReadWindowOpenPolicyBool(ref platform, state,
 			window,
 			MuiWindowPublicCore.UseLeftBorderScroller);
-		value.UseRightBorderScroller = ReadWindowOpenPolicyRaw(ref platform, state,
+		value.UseRightBorderScroller = ReadWindowOpenPolicyBool(ref platform, state,
 			window,
 			MuiWindowPublicCore.UseRightBorderScroller);
 	}
@@ -1484,7 +1713,9 @@ public static class MuiApplicationWindowCore
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, owner, key);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, owner, key) !=
 			unchecked((int)MuiSleepStateRecord.Size)) return false;
-		return MuiSleepStateRecordCodec.TryRead(ref platform, block, out value);
+		return MuiSleepStateRecordCodec.TryReadStructural(ref platform, block,
+			out value) && MuiSleepStateAdmission.ValidateLive(ref platform, state,
+			owner, value);
 	}
 
 	private static MuiSleepStateRecord ReadSleepState<TPlatform>(
@@ -1494,6 +1725,14 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishSleepState(ref platform, state, owner, key, depthAttribute,
 			savedDisabledAttribute, requestAttribute, out var value)) return value;
+		// A present but malformed sleep record must never fall back to raw
+		// attributes. The invalid marker makes mutating callers fail before they
+		// can change the native busy/disabled boundary.
+		if (MuiStoreCore.DataspaceLength(ref platform, state, owner, key) != 0)
+		{
+			value = default;
+			return value;
+		}
 		value = default;
 		value.Magic = MuiSleepStateRecord.Cookie;
 		FillSleepState(ref platform, state, owner, depthAttribute,
@@ -1509,11 +1748,17 @@ public static class MuiApplicationWindowCore
 	{
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, owner, key);
-		if (TryGetSleepState(ref platform, state, owner, key, depthAttribute,
-			savedDisabledAttribute, requestAttribute, out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, owner, key);
+		if (length != 0 && length != unchecked((int)MuiSleepStateRecord.Size))
+			return false;
+		if (length != 0)
 		{
+			if (!TryGetSleepState(ref platform, state, owner, key, depthAttribute,
+				savedDisabledAttribute, requestAttribute, out value)) return false;
 			FillSleepState(ref platform, state, owner, depthAttribute,
 				savedDisabledAttribute, requestAttribute, ref value);
+			if (!MuiSleepStateAdmission.ValidateLive(ref platform, state, owner,
+				value)) return false;
 			return MuiSleepStateRecordCodec.Write(ref platform, block, value);
 		}
 
@@ -1521,6 +1766,8 @@ public static class MuiApplicationWindowCore
 		value.Magic = MuiSleepStateRecord.Cookie;
 		FillSleepState(ref platform, state, owner, depthAttribute,
 			savedDisabledAttribute, requestAttribute, ref value);
+		if (!MuiSleepStateAdmission.ValidateLive(ref platform, state, owner,
+			value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiSleepStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -1546,7 +1793,7 @@ public static class MuiApplicationWindowCore
 		if (savedDisabledAttribute == 0 ||
 			!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, owner,
 				savedDisabledAttribute, out var savedDisabled)) savedDisabled = 0;
-		value.SavedDisabled = savedDisabled;
+		value.SavedDisabled = savedDisabled != 0 ? 1u : 0u;
 		value.Request = request;
 	}
 
@@ -1561,8 +1808,10 @@ public static class MuiApplicationWindowCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
 			ApplicationSchedulerStateKey) !=
 			unchecked((int)MuiApplicationSchedulerStateRecord.Size)) return false;
-		return MuiApplicationSchedulerStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiApplicationSchedulerStateRecordCodec.TryReadStructural(
+			ref platform, block, out value) &&
+			MuiApplicationSchedulerStateAdmission.ValidateLive(ref platform, state,
+				application, value);
 	}
 
 	private static MuiApplicationSchedulerStateRecord
@@ -1572,6 +1821,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishApplicationSchedulerState(ref platform, state, application,
 			out var value)) return value;
+		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationSchedulerStateKey) != 0) return default;
 		value = default;
 		value.Magic = MuiApplicationSchedulerStateRecord.Cookie;
 		FillApplicationSchedulerState(ref platform, state, application, ref value);
@@ -1586,11 +1837,18 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationSchedulerStateKey);
-		if (TryGetApplicationSchedulerState(ref platform, state, application,
-			out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationSchedulerStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationSchedulerStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!TryGetApplicationSchedulerState(ref platform, state, application,
+				out value)) return false;
 			FillApplicationSchedulerState(ref platform, state, application,
 				ref value);
+			if (!MuiApplicationSchedulerStateAdmission.ValidateLive(ref platform,
+				state, application, value)) return false;
 			return MuiApplicationSchedulerStateRecordCodec.Write(ref platform,
 				block, value);
 		}
@@ -1598,6 +1856,8 @@ public static class MuiApplicationWindowCore
 		value = default;
 		value.Magic = MuiApplicationSchedulerStateRecord.Cookie;
 		FillApplicationSchedulerState(ref platform, state, application, ref value);
+		if (!MuiApplicationSchedulerStateAdmission.ValidateLive(ref platform,
+			state, application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationSchedulerStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -1610,6 +1870,32 @@ public static class MuiApplicationWindowCore
 		platform.Clear(scratch, MuiApplicationSchedulerStateRecord.Size);
 		platform.Free(scratch, MuiApplicationSchedulerStateRecord.Size);
 		return added;
+	}
+
+	// Queue producers and consumers first validate the published sidecar, then
+	// mutate the raw Application attributes and guest links. During that small
+	// commit window the old sidecar no longer describes the resulting topology, so a
+	// second strict read would reject the operation before it can publish. This
+	// helper validates and writes the post-mutation value from the structural
+	// sidecar record.
+	private static bool ReconcileApplicationSchedulerState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application,
+		out MuiApplicationSchedulerStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
+			ApplicationSchedulerStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationSchedulerStateKey);
+		if (length != unchecked((int)MuiApplicationSchedulerStateRecord.Size) ||
+			!MuiApplicationSchedulerStateRecordCodec.TryReadStructural(ref platform,
+				block, out value)) return false;
+		FillApplicationSchedulerState(ref platform, state, application, ref value);
+		if (!MuiApplicationSchedulerStateAdmission.ValidateLive(ref platform, state,
+			application, value)) return false;
+		return MuiApplicationSchedulerStateRecordCodec.Write(ref platform, block,
+			value);
 	}
 
 	private static void FillApplicationSchedulerState<TPlatform>(
@@ -1634,28 +1920,27 @@ public static class MuiApplicationWindowCore
 		ref TPlatform platform, APTR state, APTR window,
 		out MuiWindowInteractionStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
-	{
-		value = default;
-		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
-			WindowInteractionStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, window,
-			WindowInteractionStateKey) !=
-			unchecked((int)MuiWindowInteractionStateRecord.Size)) return false;
-		return MuiWindowInteractionStateRecordCodec.TryRead(ref platform, block,
-			out value);
-	}
+		=> PublishWindowInteractionState(ref platform, state, window, out value);
 
-	private static MuiWindowInteractionStateRecord
-		ReadWindowInteractionState<TPlatform>(ref TPlatform platform, APTR state,
-		APTR window)
+	private static bool TryReadWindowInteractionState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window,
+		out MuiWindowInteractionStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (PublishWindowInteractionState(ref platform, state, window,
-			out var value)) return value;
 		value = default;
-		value.Magic = MuiWindowInteractionStateRecord.Cookie;
-		FillWindowInteractionState(ref platform, state, window, ref value);
-		return value;
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowInteractionStateKey);
+		if (length == 0)
+			return PublishWindowInteractionState(ref platform, state, window,
+				out value);
+		if (length != unchecked((int)MuiWindowInteractionStateRecord.Size))
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
+			WindowInteractionStateKey);
+		return MuiWindowInteractionStateRecordCodec.TryReadStructural(
+			ref platform, block, out value) &&
+			MuiWindowInteractionStateAdmission.ValidateLive(ref platform, state,
+				window, value);
 	}
 
 	private static bool PublishWindowInteractionState<TPlatform>(
@@ -1666,9 +1951,18 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
 			WindowInteractionStateKey);
-		if (TryGetWindowInteractionState(ref platform, state, window, out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowInteractionStateKey);
+		if (length != 0)
 		{
+			if (length != unchecked((int)MuiWindowInteractionStateRecord.Size) ||
+				!MuiWindowInteractionStateRecordCodec.TryReadStructural(
+					ref platform, block, out value) ||
+				!MuiWindowInteractionStateAdmission.Validate(ref platform, value))
+				return false;
 			FillWindowInteractionState(ref platform, state, window, ref value);
+			if (!MuiWindowInteractionStateAdmission.ValidateLive(ref platform, state,
+				window, value)) return false;
 			return MuiWindowInteractionStateRecordCodec.Write(ref platform, block,
 				value);
 		}
@@ -1676,6 +1970,8 @@ public static class MuiApplicationWindowCore
 		value = default;
 		value.Magic = MuiWindowInteractionStateRecord.Cookie;
 		FillWindowInteractionState(ref platform, state, window, ref value);
+		if (!MuiWindowInteractionStateAdmission.ValidateLive(ref platform, state,
+			window, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiWindowInteractionStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -1719,19 +2015,29 @@ public static class MuiApplicationWindowCore
 			WindowFocusStateKey) != unchecked((int)MuiWindowFocusStateRecord.Size))
 			return false;
 		return MuiWindowFocusStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiWindowFocusStateAdmission.ValidateLive(ref platform,
+			state, window, value);
 	}
 
 	private static MuiWindowFocusStateRecord ReadWindowFocusState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR window)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (PublishWindowFocusState(ref platform, state, window, out var value))
+		if (TryReadWindowFocusState(ref platform, state, window, out var value))
 			return value;
+		return default;
+	}
+
+	private static bool TryReadWindowFocusState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window,
+		out MuiWindowFocusStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
 		value = default;
-		value.Magic = MuiWindowFocusStateRecord.Cookie;
-		FillWindowFocusState(ref platform, state, window, ref value);
-		return value;
+		return MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowFocusStateKey) == 0
+			? PublishWindowFocusState(ref platform, state, window, out value)
+			: TryGetWindowFocusState(ref platform, state, window, out value);
 	}
 
 	private static bool PublishWindowFocusState<TPlatform>(
@@ -1742,9 +2048,20 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
 			WindowFocusStateKey);
-		if (TryGetWindowFocusState(ref platform, state, window, out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowFocusStateKey);
+		if (length != 0)
 		{
+			// Focus setters update the raw attributes before publishing this named
+			// snapshot. Admit the old record structurally, then validate the live
+			// object pointers after refreshing from those authoritative fields.
+			if (length != unchecked((int)MuiWindowFocusStateRecord.Size) ||
+				!MuiWindowFocusStateRecordCodec.TryReadStructural(ref platform, block,
+					out value) || !MuiWindowFocusStateAdmission.Validate(ref platform,
+					value)) return false;
 			FillWindowFocusState(ref platform, state, window, ref value);
+			if (!MuiWindowFocusStateAdmission.ValidateLive(ref platform, state,
+				window, value)) return false;
 			return MuiWindowFocusStateRecordCodec.Write(ref platform, block,
 				value);
 		}
@@ -1752,6 +2069,8 @@ public static class MuiApplicationWindowCore
 		value = default;
 		value.Magic = MuiWindowFocusStateRecord.Cookie;
 		FillWindowFocusState(ref platform, state, window, ref value);
+		if (!MuiWindowFocusStateAdmission.ValidateLive(ref platform, state,
+			window, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiWindowFocusStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -1765,6 +2084,13 @@ public static class MuiApplicationWindowCore
 		platform.Free(scratch, MuiWindowFocusStateRecord.Size);
 		return added;
 	}
+
+	private static bool HasValidWindowFocusState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowFocusStateKey) == 0 ||
+		TryGetWindowFocusState(ref platform, state, window, out _);
 
 	private static void FillWindowFocusState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR window, ref MuiWindowFocusStateRecord value)
@@ -1957,27 +2283,21 @@ public static class MuiApplicationWindowCore
 		ref TPlatform platform, APTR state, APTR window)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (PublishWindowEventState(ref platform, state, window,
-			out var value)) return value;
-		value = default;
-		value.Magic = MuiWindowEventStateRecord.Cookie;
-		FillWindowEventState(ref platform, state, window, ref value);
-		return value;
+		if (TryReadWindowEventState(ref platform, state, window, out var value))
+			return value;
+		return default;
 	}
 
-	private static bool TryReadWindowEventStateRecord<TPlatform>(
+	private static bool TryReadWindowEventState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR window,
 		out MuiWindowEventStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
-		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
-			WindowEventStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, window,
-			WindowEventStateKey) !=
-			unchecked((int)MuiWindowEventStateRecord.Size)) return false;
-		return MuiWindowEventStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowEventStateKey) == 0
+			? PublishWindowEventState(ref platform, state, window, out value)
+			: TryGetWindowEventState(ref platform, state, window, out value);
 	}
 
 	private static bool PublishWindowEventState<TPlatform>(
@@ -1988,15 +2308,28 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
 			WindowEventStateKey);
-		if (TryReadWindowEventStateRecord(ref platform, state, window, out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowEventStateKey);
+		if (length != 0)
 		{
+			// Pointer publication mutates raw attributes before refreshing this
+			// named snapshot. Structural admission preserves that transition while
+			// live admission is checked after FillWindowEventState.
+			if (length != unchecked((int)MuiWindowEventStateRecord.Size) ||
+				!MuiWindowEventStateRecordCodec.TryReadStructural(ref platform, block,
+					out value) || !MuiWindowEventStateAdmission.Validate(ref platform,
+					value)) return false;
 			FillWindowEventState(ref platform, state, window, ref value);
+			if (!MuiWindowEventStateAdmission.ValidateLive(ref platform, state,
+				window, value)) return false;
 			return MuiWindowEventStateRecordCodec.Write(ref platform, block, value);
 		}
 
 		value = default;
 		value.Magic = MuiWindowEventStateRecord.Cookie;
 		FillWindowEventState(ref platform, state, window, ref value);
+		if (!MuiWindowEventStateAdmission.ValidateLive(ref platform, state,
+			window, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiWindowEventStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -2010,6 +2343,13 @@ public static class MuiApplicationWindowCore
 		platform.Free(scratch, MuiWindowEventStateRecord.Size);
 		return added;
 	}
+
+	private static bool HasValidWindowEventState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR window)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowEventStateKey) == 0 ||
+		TryGetWindowEventState(ref platform, state, window, out _);
 
 	private static void FillWindowEventState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR window, ref MuiWindowEventStateRecord value)
@@ -2032,13 +2372,15 @@ public static class MuiApplicationWindowCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
-		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
-			WindowEventReuseStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, window,
 			WindowEventReuseStateKey) !=
 			unchecked((int)MuiWindowEventReuseStateRecord.Size)) return false;
-		return MuiWindowEventReuseStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
+			WindowEventReuseStateKey);
+		return MuiWindowEventReuseStateRecordCodec.TryReadStructural(
+			ref platform, block, out value) &&
+			MuiWindowEventReuseStateAdmission.ValidateLive(ref platform, state,
+				window, value);
 	}
 
 	private static bool EnsureWindowEventReuseStateRecord<TPlatform>(
@@ -2047,6 +2389,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (TryReadWindowEventReuseStateRecord(ref platform, state, window,
 			out _)) return true;
+		if (MuiStoreCore.DataspaceLength(ref platform, state, window,
+			WindowEventReuseStateKey) != 0) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiWindowEventReuseStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -2089,6 +2433,8 @@ public static class MuiApplicationWindowCore
 			next.InputEvent = APTR.FromPointer(packet.InputMessage);
 			next.MuiKey = packet.MuiKey;
 		}
+		if (!MuiWindowEventReuseStateAdmission.ValidateLive(ref platform, state,
+			window, next)) return false;
 		return MuiWindowEventReuseStateRecordCodec.Write(ref platform,
 			MuiStoreCore.DataspaceFind(ref platform, state, window,
 				WindowEventReuseStateKey), next);
@@ -2109,6 +2455,8 @@ public static class MuiApplicationWindowCore
 			previous.EventClass = current.EventClass;
 			previous.MuiKey = current.MuiKey;
 		}
+		if (!MuiWindowEventReuseStateAdmission.ValidateLive(ref platform, state,
+			window, previous)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
 			WindowEventReuseStateKey);
 		return MuiWindowEventReuseStateRecordCodec.Write(ref platform, block,
@@ -2127,6 +2475,8 @@ public static class MuiApplicationWindowCore
 			value.EventMessage.IsNull || value.InputEvent != inputEvent) return false;
 		if (value.Pending != 0) return true;
 		value.Pending = 1;
+		if (!MuiWindowEventReuseStateAdmission.ValidateLive(ref platform, state,
+			window, value)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
 			WindowEventReuseStateKey);
 		return MuiWindowEventReuseStateRecordCodec.Write(ref platform, block,
@@ -2141,6 +2491,8 @@ public static class MuiApplicationWindowCore
 		if (!TryReadWindowEventReuseStateRecord(ref platform, state, window,
 			out value) || value.Pending == 0) return false;
 		value.Pending = 0;
+		if (!MuiWindowEventReuseStateAdmission.ValidateLive(ref platform, state,
+			window, value)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, window,
 			WindowEventReuseStateKey);
 		if (!MuiWindowEventReuseStateRecordCodec.Write(ref platform, block,
@@ -2176,6 +2528,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishApplicationHelpState(ref platform, state, application,
 			out var value)) return value;
+		if (HasApplicationHelpStateStorage(ref platform, state, application))
+			return default;
 		value = default;
 		value.Magic = MuiApplicationHelpStateRecord.Cookie;
 		FillApplicationHelpState(ref platform, state, application, ref value);
@@ -2191,11 +2545,25 @@ public static class MuiApplicationWindowCore
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationHelpStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
-			ApplicationHelpStateKey) !=
-			unchecked((int)MuiApplicationHelpStateRecord.Size)) return false;
-		return MuiApplicationHelpStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			ApplicationHelpStateKey) != unchecked((int)
+			MuiApplicationHelpStateRecord.Size)) return false;
+		return MuiApplicationHelpStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) &&
+			MuiApplicationHelpStateAdmission.ValidateLive(ref platform, state,
+				application, value);
 	}
+
+	private static bool HasApplicationHelpStateStorage<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationHelpStateKey) != 0;
+
+	private static bool ApplicationHelpStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		!HasApplicationHelpStateStorage(ref platform, state, application) ||
+		TryReadApplicationHelpStateRecord(ref platform, state, application, out _);
 
 	private static bool PublishApplicationHelpState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR application,
@@ -2205,10 +2573,19 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationHelpStateKey);
-		if (TryReadApplicationHelpStateRecord(ref platform, state, application,
-			out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationHelpStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationHelpStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!MuiApplicationHelpStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) ||
+				!MuiApplicationHelpStateAdmission.ValidateLive(ref platform, state,
+					application, value)) return false;
 			FillApplicationHelpState(ref platform, state, application, ref value);
+			if (!MuiApplicationHelpStateAdmission.ValidateLive(ref platform, state,
+				application, value)) return false;
 			return MuiApplicationHelpStateRecordCodec.Write(ref platform, block,
 				value);
 		}
@@ -2216,6 +2593,8 @@ public static class MuiApplicationWindowCore
 		value = default;
 		value.Magic = MuiApplicationHelpStateRecord.Cookie;
 		FillApplicationHelpState(ref platform, state, application, ref value);
+		if (!MuiApplicationHelpStateAdmission.ValidateLive(ref platform, state,
+			application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationHelpStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -2263,6 +2642,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishApplicationDefaultConfigState(ref platform, state, application,
 			out var value)) return value;
+		if (HasApplicationDefaultConfigStateStorage(ref platform, state,
+			application)) return default;
 		value = default;
 		value.Magic = MuiApplicationDefaultConfigStateRecord.Cookie;
 		FillApplicationDefaultConfigState(ref platform, state, application,
@@ -2279,11 +2660,26 @@ public static class MuiApplicationWindowCore
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationDefaultConfigStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
-			ApplicationDefaultConfigStateKey) !=
-			unchecked((int)MuiApplicationDefaultConfigStateRecord.Size)) return false;
-		return MuiApplicationDefaultConfigStateRecordCodec.TryRead(ref platform,
-			block, out value);
+			ApplicationDefaultConfigStateKey) != unchecked((int)
+			MuiApplicationDefaultConfigStateRecord.Size)) return false;
+		return MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
+			ref platform, block, out value) &&
+			MuiApplicationDefaultConfigStateAdmission.ValidateLive(ref platform,
+				state, application, value);
 	}
+
+	private static bool HasApplicationDefaultConfigStateStorage<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationDefaultConfigStateKey) != 0;
+
+	private static bool ApplicationDefaultConfigStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		!HasApplicationDefaultConfigStateStorage(ref platform, state, application) ||
+		TryReadApplicationDefaultConfigStateRecord(ref platform, state,
+			application, out _);
 
 	private static bool PublishApplicationDefaultConfigState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR application,
@@ -2293,11 +2689,20 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationDefaultConfigStateKey);
-		if (TryReadApplicationDefaultConfigStateRecord(ref platform, state,
-			application, out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationDefaultConfigStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationDefaultConfigStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
+				ref platform, block, out value) ||
+				!MuiApplicationDefaultConfigStateAdmission.ValidateLive(ref platform,
+					state, application, value)) return false;
 			FillApplicationDefaultConfigState(ref platform, state, application,
 				ref value);
+			if (!MuiApplicationDefaultConfigStateAdmission.ValidateLive(ref platform,
+				state, application, value)) return false;
 			return MuiApplicationDefaultConfigStateRecordCodec.Write(ref platform,
 				block, value);
 		}
@@ -2306,6 +2711,8 @@ public static class MuiApplicationWindowCore
 		value.Magic = MuiApplicationDefaultConfigStateRecord.Cookie;
 		FillApplicationDefaultConfigState(ref platform, state, application,
 			ref value);
+		if (!MuiApplicationDefaultConfigStateAdmission.ValidateLive(ref platform,
+			state, application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationDefaultConfigStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -2347,6 +2754,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishApplicationConfigWindowState(ref platform, state, application,
 			out var value)) return value;
+		if (HasApplicationConfigWindowStateStorage(ref platform, state,
+			application)) return default;
 		value = default;
 		value.Magic = MuiApplicationConfigWindowStateRecord.Cookie;
 		FillApplicationConfigWindowState(ref platform, state, application,
@@ -2363,11 +2772,26 @@ public static class MuiApplicationWindowCore
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationConfigWindowStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
-			ApplicationConfigWindowStateKey) !=
-			unchecked((int)MuiApplicationConfigWindowStateRecord.Size)) return false;
-		return MuiApplicationConfigWindowStateRecordCodec.TryRead(ref platform,
-			block, out value);
+			ApplicationConfigWindowStateKey) != unchecked((int)
+			MuiApplicationConfigWindowStateRecord.Size)) return false;
+		return MuiApplicationConfigWindowStateRecordCodec.TryReadStructural(
+			ref platform, block, out value) &&
+			MuiApplicationConfigWindowStateAdmission.ValidateLive(ref platform,
+				state, application, value);
 	}
+
+	private static bool HasApplicationConfigWindowStateStorage<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationConfigWindowStateKey) != 0;
+
+	private static bool ApplicationConfigWindowStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		!HasApplicationConfigWindowStateStorage(ref platform, state, application) ||
+		TryReadApplicationConfigWindowStateRecord(ref platform, state, application,
+			out _);
 
 	private static bool PublishApplicationConfigWindowState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR application,
@@ -2377,11 +2801,20 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationConfigWindowStateKey);
-		if (TryReadApplicationConfigWindowStateRecord(ref platform, state,
-			application, out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationConfigWindowStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationConfigWindowStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!MuiApplicationConfigWindowStateRecordCodec.TryReadStructural(
+				ref platform, block, out value) ||
+				!MuiApplicationConfigWindowStateAdmission.ValidateLive(ref platform,
+					state, application, value)) return false;
 			FillApplicationConfigWindowState(ref platform, state, application,
 				ref value);
+			if (!MuiApplicationConfigWindowStateAdmission.ValidateLive(ref platform,
+				state, application, value)) return false;
 			return MuiApplicationConfigWindowStateRecordCodec.Write(ref platform,
 				block, value);
 		}
@@ -2390,6 +2823,8 @@ public static class MuiApplicationWindowCore
 		value.Magic = MuiApplicationConfigWindowStateRecord.Cookie;
 		FillApplicationConfigWindowState(ref platform, state, application,
 			ref value);
+		if (!MuiApplicationConfigWindowStateAdmission.ValidateLive(ref platform,
+			state, application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationConfigWindowStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -2431,6 +2866,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishApplicationSettingsPanelState(ref platform, state, application,
 			out var value)) return value;
+		if (HasApplicationSettingsPanelStateStorage(ref platform, state,
+			application)) return default;
 		value = default;
 		value.Magic = MuiApplicationSettingsPanelStateRecord.Cookie;
 		FillApplicationSettingsPanelState(ref platform, state, application,
@@ -2447,11 +2884,26 @@ public static class MuiApplicationWindowCore
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationSettingsPanelStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
-			ApplicationSettingsPanelStateKey) !=
-			unchecked((int)MuiApplicationSettingsPanelStateRecord.Size)) return false;
-		return MuiApplicationSettingsPanelStateRecordCodec.TryRead(ref platform,
-			block, out value);
+			ApplicationSettingsPanelStateKey) != unchecked((int)
+			MuiApplicationSettingsPanelStateRecord.Size)) return false;
+		return MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
+			ref platform, block, out value) &&
+			MuiApplicationSettingsPanelStateAdmission.ValidateLive(ref platform,
+				state, application, value);
 	}
+
+	private static bool HasApplicationSettingsPanelStateStorage<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationSettingsPanelStateKey) != 0;
+
+	private static bool ApplicationSettingsPanelStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		!HasApplicationSettingsPanelStateStorage(ref platform, state, application) ||
+		TryReadApplicationSettingsPanelStateRecord(ref platform, state, application,
+			out _);
 
 	private static bool PublishApplicationSettingsPanelState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR application,
@@ -2461,11 +2913,20 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationSettingsPanelStateKey);
-		if (TryReadApplicationSettingsPanelStateRecord(ref platform, state,
-			application, out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationSettingsPanelStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationSettingsPanelStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
+				ref platform, block, out value) ||
+				!MuiApplicationSettingsPanelStateAdmission.ValidateLive(ref platform,
+					state, application, value)) return false;
 			FillApplicationSettingsPanelState(ref platform, state, application,
 				ref value);
+			if (!MuiApplicationSettingsPanelStateAdmission.ValidateLive(ref platform,
+				state, application, value)) return false;
 			return MuiApplicationSettingsPanelStateRecordCodec.Write(ref platform,
 				block, value);
 		}
@@ -2474,6 +2935,8 @@ public static class MuiApplicationWindowCore
 		value.Magic = MuiApplicationSettingsPanelStateRecord.Cookie;
 		FillApplicationSettingsPanelState(ref platform, state, application,
 			ref value);
+		if (!MuiApplicationSettingsPanelStateAdmission.ValidateLive(ref platform,
+			state, application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationSettingsPanelStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -2509,12 +2972,14 @@ public static class MuiApplicationWindowCore
 			application, out value);
 
 	private static MuiApplicationSettingsPersistenceStateRecord
-		ReadApplicationSettingsPersistenceState<TPlatform>(ref TPlatform platform,
+	ReadApplicationSettingsPersistenceState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR application)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (PublishApplicationSettingsPersistenceState(ref platform, state,
 			application, out var value)) return value;
+		if (HasApplicationSettingsPersistenceStateStorage(ref platform, state,
+			application)) return default;
 		value = default;
 		value.Magic = MuiApplicationSettingsPersistenceStateRecord.Cookie;
 		FillApplicationSettingsPersistenceState(ref platform, state, application,
@@ -2533,9 +2998,25 @@ public static class MuiApplicationWindowCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
 			ApplicationSettingsPersistenceStateKey) != unchecked((int)
 			MuiApplicationSettingsPersistenceStateRecord.Size)) return false;
-		return MuiApplicationSettingsPersistenceStateRecordCodec.TryRead(
-			ref platform, block, out value);
+		return MuiApplicationSettingsPersistenceStateRecordCodec.TryReadStructural(
+			ref platform, block, out value) &&
+			MuiApplicationSettingsPersistenceStateAdmission.ValidateLive(ref platform,
+				state, application, value);
 	}
+
+	private static bool HasApplicationSettingsPersistenceStateStorage<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationSettingsPersistenceStateKey) != 0;
+
+	private static bool ApplicationSettingsPersistenceStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		!HasApplicationSettingsPersistenceStateStorage(ref platform, state,
+			application) ||
+		TryReadApplicationSettingsPersistenceStateRecord(ref platform, state,
+			application, out _);
 
 	private static bool PublishApplicationSettingsPersistenceState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR application,
@@ -2545,11 +3026,20 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationSettingsPersistenceStateKey);
-		if (TryReadApplicationSettingsPersistenceStateRecord(ref platform, state,
-			application, out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationSettingsPersistenceStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationSettingsPersistenceStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!MuiApplicationSettingsPersistenceStateRecordCodec.TryReadStructural(
+				ref platform, block, out value) ||
+				!MuiApplicationSettingsPersistenceStateAdmission.ValidateLive(ref platform,
+					state, application, value)) return false;
 			FillApplicationSettingsPersistenceState(ref platform, state, application,
 				ref value);
+			if (!MuiApplicationSettingsPersistenceStateAdmission.ValidateLive(ref platform,
+				state, application, value)) return false;
 			return MuiApplicationSettingsPersistenceStateRecordCodec.Write(
 				ref platform, block, value);
 		}
@@ -2558,6 +3048,8 @@ public static class MuiApplicationWindowCore
 		value.Magic = MuiApplicationSettingsPersistenceStateRecord.Cookie;
 		FillApplicationSettingsPersistenceState(ref platform, state, application,
 			ref value);
+		if (!MuiApplicationSettingsPersistenceStateAdmission.ValidateLive(ref platform,
+			state, application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationSettingsPersistenceStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -2602,6 +3094,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishApplicationRefreshState(ref platform, state, application,
 			out var value)) return value;
+		if (HasApplicationRefreshStateStorage(ref platform, state, application))
+			return default;
 		value = default;
 		value.Magic = MuiApplicationRefreshStateRecord.Cookie;
 		FillApplicationRefreshState(ref platform, state, application, ref value);
@@ -2619,9 +3113,23 @@ public static class MuiApplicationWindowCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
 			ApplicationRefreshStateKey) != unchecked((int)
 			MuiApplicationRefreshStateRecord.Size)) return false;
-		return MuiApplicationRefreshStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiApplicationRefreshStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiApplicationRefreshStateAdmission.ValidateLive(
+			ref platform, state, application, value);
 	}
+
+	private static bool HasApplicationRefreshStateStorage<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationRefreshStateKey) != 0;
+
+	private static bool ApplicationRefreshStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		!HasApplicationRefreshStateStorage(ref platform, state, application) ||
+		TryReadApplicationRefreshStateRecord(ref platform, state, application,
+			out _);
 
 	private static bool PublishApplicationRefreshState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR application,
@@ -2631,10 +3139,19 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationRefreshStateKey);
-		if (TryReadApplicationRefreshStateRecord(ref platform, state, application,
-			out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationRefreshStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationRefreshStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!MuiApplicationRefreshStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) ||
+				!MuiApplicationRefreshStateAdmission.ValidateLive(ref platform, state,
+					application, value)) return false;
 			FillApplicationRefreshState(ref platform, state, application, ref value);
+			if (!MuiApplicationRefreshStateAdmission.ValidateLive(ref platform, state,
+				application, value)) return false;
 			return MuiApplicationRefreshStateRecordCodec.Write(ref platform, block,
 				value);
 		}
@@ -2642,6 +3159,8 @@ public static class MuiApplicationWindowCore
 		value = default;
 		value.Magic = MuiApplicationRefreshStateRecord.Cookie;
 		FillApplicationRefreshState(ref platform, state, application, ref value);
+		if (!MuiApplicationRefreshStateAdmission.ValidateLive(ref platform, state,
+			application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationRefreshStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -2679,6 +3198,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishApplicationMenuState(ref platform, state, application,
 			out var value)) return value;
+		if (HasApplicationMenuStateStorage(ref platform, state, application))
+			return default;
 		value = default;
 		value.Magic = MuiApplicationMenuStateRecord.Cookie;
 		FillApplicationMenuState(ref platform, state, application, ref value);
@@ -2696,9 +3217,23 @@ public static class MuiApplicationWindowCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
 			ApplicationMenuStateKey) != unchecked((int)
 			MuiApplicationMenuStateRecord.Size)) return false;
-		return MuiApplicationMenuStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiApplicationMenuStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiApplicationMenuStateAdmission.ValidateLive(
+			ref platform, state, application, value);
 	}
+
+	private static bool HasApplicationMenuStateStorage<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationMenuStateKey) != 0;
+
+	private static bool ApplicationMenuStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		!HasApplicationMenuStateStorage(ref platform, state, application) ||
+		TryReadApplicationMenuStateRecord(ref platform, state, application,
+			out _);
 
 	private static bool PublishApplicationMenuState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR application,
@@ -2708,10 +3243,19 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationMenuStateKey);
-		if (TryReadApplicationMenuStateRecord(ref platform, state, application,
-			out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationMenuStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationMenuStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!MuiApplicationMenuStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) ||
+				!MuiApplicationMenuStateAdmission.ValidateLive(ref platform, state,
+					application, value)) return false;
 			FillApplicationMenuState(ref platform, state, application, ref value);
+			if (!MuiApplicationMenuStateAdmission.ValidateLive(ref platform, state,
+				application, value)) return false;
 			return MuiApplicationMenuStateRecordCodec.Write(ref platform, block,
 				value);
 		}
@@ -2719,6 +3263,8 @@ public static class MuiApplicationWindowCore
 		value = default;
 		value.Magic = MuiApplicationMenuStateRecord.Cookie;
 		FillApplicationMenuState(ref platform, state, application, ref value);
+		if (!MuiApplicationMenuStateAdmission.ValidateLive(ref platform, state,
+			application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationMenuStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -2758,6 +3304,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishApplicationObjectState(ref platform, state, application,
 			out var value)) return value;
+		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationObjectStateKey) != 0) return default;
 		value = default;
 		value.Magic = MuiApplicationObjectStateRecord.Cookie;
 		FillApplicationObjectState(ref platform, state, application, ref value);
@@ -2775,8 +3323,10 @@ public static class MuiApplicationWindowCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
 			ApplicationObjectStateKey) != unchecked((int)
 			MuiApplicationObjectStateRecord.Size)) return false;
-		return MuiApplicationObjectStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiApplicationObjectStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) &&
+			MuiApplicationObjectStateAdmission.ValidateLive(ref platform, state,
+				application, value);
 	}
 
 	private static bool PublishApplicationObjectState<TPlatform>(
@@ -2787,10 +3337,17 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationObjectStateKey);
-		if (TryReadApplicationObjectStateRecord(ref platform, state, application,
-			out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationObjectStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationObjectStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!TryReadApplicationObjectStateRecord(ref platform, state, application,
+				out value)) return false;
 			FillApplicationObjectState(ref platform, state, application, ref value);
+			if (!MuiApplicationObjectStateAdmission.ValidateLive(ref platform, state,
+				application, value)) return false;
 			return MuiApplicationObjectStateRecordCodec.Write(ref platform, block,
 				value);
 		}
@@ -2798,6 +3355,8 @@ public static class MuiApplicationWindowCore
 		value = default;
 		value.Magic = MuiApplicationObjectStateRecord.Cookie;
 		FillApplicationObjectState(ref platform, state, application, ref value);
+		if (!MuiApplicationObjectStateAdmission.ValidateLive(ref platform, state,
+			application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationObjectStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -2840,6 +3399,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishApplicationTextState(ref platform, state, application,
 			out var value)) return value;
+		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationTextStateKey) != 0) return default;
 		value = default;
 		value.Magic = MuiApplicationTextStateRecord.Cookie;
 		FillApplicationTextState(ref platform, state, application, ref value);
@@ -2857,8 +3418,10 @@ public static class MuiApplicationWindowCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
 			ApplicationTextStateKey) != unchecked((int)
 			MuiApplicationTextStateRecord.Size)) return false;
-		return MuiApplicationTextStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiApplicationTextStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) &&
+			MuiApplicationTextStateAdmission.ValidateLive(ref platform, state,
+				application, value);
 	}
 
 	private static bool PublishApplicationTextState<TPlatform>(
@@ -2869,10 +3432,17 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationTextStateKey);
-		if (TryReadApplicationTextStateRecord(ref platform, state, application,
-			out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationTextStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationTextStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!TryReadApplicationTextStateRecord(ref platform, state, application,
+				out value)) return false;
 			FillApplicationTextState(ref platform, state, application, ref value);
+			if (!MuiApplicationTextStateAdmission.ValidateLive(ref platform, state,
+				application, value)) return false;
 			return MuiApplicationTextStateRecordCodec.Write(ref platform, block,
 				value);
 		}
@@ -2880,6 +3450,8 @@ public static class MuiApplicationWindowCore
 		value = default;
 		value.Magic = MuiApplicationTextStateRecord.Cookie;
 		FillApplicationTextState(ref platform, state, application, ref value);
+		if (!MuiApplicationTextStateAdmission.ValidateLive(ref platform, state,
+			application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationTextStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -2920,6 +3492,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishApplicationIdentityState(ref platform, state, application,
 			out var value)) return value;
+		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationIdentityStateKey) != 0) return default;
 		value = default;
 		value.Magic = MuiApplicationIdentityStateRecord.Cookie;
 		FillApplicationIdentityState(ref platform, state, application, ref value);
@@ -2937,8 +3511,10 @@ public static class MuiApplicationWindowCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
 			ApplicationIdentityStateKey) != unchecked((int)
 			MuiApplicationIdentityStateRecord.Size)) return false;
-		return MuiApplicationIdentityStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiApplicationIdentityStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) &&
+			MuiApplicationIdentityStateAdmission.ValidateLive(ref platform, state,
+				application, value);
 	}
 
 	private static bool PublishApplicationIdentityState<TPlatform>(
@@ -2949,11 +3525,18 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationIdentityStateKey);
-		if (TryReadApplicationIdentityStateRecord(ref platform, state, application,
-			out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationIdentityStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationIdentityStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!TryReadApplicationIdentityStateRecord(ref platform, state, application,
+				out value)) return false;
 			FillApplicationIdentityState(ref platform, state, application,
 				ref value);
+			if (!MuiApplicationIdentityStateAdmission.ValidateLive(ref platform,
+				state, application, value)) return false;
 			return MuiApplicationIdentityStateRecordCodec.Write(ref platform,
 				block, value);
 		}
@@ -2961,6 +3544,8 @@ public static class MuiApplicationWindowCore
 		value = default;
 		value.Magic = MuiApplicationIdentityStateRecord.Cookie;
 		FillApplicationIdentityState(ref platform, state, application, ref value);
+		if (!MuiApplicationIdentityStateAdmission.ValidateLive(ref platform, state,
+			application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationIdentityStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -3012,6 +3597,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishApplicationPolicyState(ref platform, state, application,
 			out var value)) return value;
+		if (HasApplicationPolicyStateStorage(ref platform, state, application))
+			return default;
 		value = default;
 		value.Magic = MuiApplicationPolicyStateRecord.Cookie;
 		FillApplicationPolicyState(ref platform, state, application, ref value);
@@ -3029,9 +3616,24 @@ public static class MuiApplicationWindowCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
 			ApplicationPolicyStateKey) != unchecked((int)
 			MuiApplicationPolicyStateRecord.Size)) return false;
-		return MuiApplicationPolicyStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiApplicationPolicyStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) &&
+			MuiApplicationPolicyStateAdmission.ValidateLive(ref platform, state,
+				application, value);
 	}
+
+	private static bool HasApplicationPolicyStateStorage<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationPolicyStateKey) != 0;
+
+	private static bool ApplicationPolicyStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		!HasApplicationPolicyStateStorage(ref platform, state, application) ||
+		TryReadApplicationPolicyStateRecord(ref platform, state, application,
+			out _);
 
 	private static bool PublishApplicationPolicyState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR application,
@@ -3041,10 +3643,17 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationPolicyStateKey);
-		if (TryReadApplicationPolicyStateRecord(ref platform, state, application,
-			out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationPolicyStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationPolicyStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!TryReadApplicationPolicyStateRecord(ref platform, state, application,
+				out value)) return false;
 			FillApplicationPolicyState(ref platform, state, application, ref value);
+			if (!MuiApplicationPolicyStateAdmission.ValidateLive(ref platform, state,
+				application, value)) return false;
 			return MuiApplicationPolicyStateRecordCodec.Write(ref platform, block,
 				value);
 		}
@@ -3052,6 +3661,8 @@ public static class MuiApplicationWindowCore
 		value = default;
 		value.Magic = MuiApplicationPolicyStateRecord.Cookie;
 		FillApplicationPolicyState(ref platform, state, application, ref value);
+		if (!MuiApplicationPolicyStateAdmission.ValidateLive(ref platform, state,
+			application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationPolicyStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -3095,6 +3706,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (PublishApplicationUsedClassesState(ref platform, state, application,
 			out var value)) return value;
+		if (HasApplicationUsedClassesStateStorage(ref platform, state,
+			application)) return default;
 		value = default;
 		value.Magic = MuiApplicationUsedClassesStateRecord.Cookie;
 		FillApplicationUsedClassesState(ref platform, state, application,
@@ -3113,9 +3726,24 @@ public static class MuiApplicationWindowCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
 			ApplicationUsedClassesStateKey) != unchecked((int)
 			MuiApplicationUsedClassesStateRecord.Size)) return false;
-		return MuiApplicationUsedClassesStateRecordCodec.TryRead(ref platform,
-			block, out value);
+		return MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(
+			ref platform, block, out value) &&
+			MuiApplicationUsedClassesStateAdmission.ValidateLive(ref platform, state,
+				application, value);
 	}
+
+	private static bool HasApplicationUsedClassesStateStorage<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationUsedClassesStateKey) != 0;
+
+	private static bool ApplicationUsedClassesStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		!HasApplicationUsedClassesStateStorage(ref platform, state, application) ||
+		TryReadApplicationUsedClassesStateRecord(ref platform, state, application,
+			out _);
 
 	private static bool PublishApplicationUsedClassesState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR application,
@@ -3125,11 +3753,20 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationUsedClassesStateKey);
-		if (TryReadApplicationUsedClassesStateRecord(ref platform, state,
-			application, out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationUsedClassesStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationUsedClassesStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(
+				ref platform, block, out value) ||
+				!MuiApplicationUsedClassesStateAdmission.ValidateLive(ref platform,
+					state, application, value)) return false;
 			FillApplicationUsedClassesState(ref platform, state, application,
 				ref value);
+			if (!MuiApplicationUsedClassesStateAdmission.ValidateLive(ref platform,
+				state, application, value)) return false;
 			return MuiApplicationUsedClassesStateRecordCodec.Write(ref platform,
 				block, value);
 		}
@@ -3138,6 +3775,8 @@ public static class MuiApplicationWindowCore
 		value.Magic = MuiApplicationUsedClassesStateRecord.Cookie;
 		FillApplicationUsedClassesState(ref platform, state, application,
 			ref value);
+		if (!MuiApplicationUsedClassesStateAdmission.ValidateLive(ref platform,
+			state, application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationUsedClassesStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -3193,8 +3832,21 @@ public static class MuiApplicationWindowCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
 			ApplicationWindowRelationshipStateKey) != unchecked((int)
 			MuiApplicationWindowRelationshipStateRecord.Size)) return false;
-		return MuiApplicationWindowRelationshipStateRecordCodec.TryRead(
-			ref platform, block, out value);
+		return MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+			ref platform, block, out value) &&
+			MuiApplicationWindowRelationshipStateAdmission.ValidateLive(ref platform,
+				state, application, value);
+	}
+
+	internal static bool ApplicationWindowRelationshipStateAvailable<
+		TPlatform>(ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationWindowRelationshipStateKey);
+		return length == 0 ||
+			TryReadApplicationWindowRelationshipStateRecord(ref platform, state,
+				application, out _);
 	}
 
 	private static bool PublishApplicationWindowRelationshipState<TPlatform>(
@@ -3205,11 +3857,20 @@ public static class MuiApplicationWindowCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			ApplicationWindowRelationshipStateKey);
-		if (TryReadApplicationWindowRelationshipStateRecord(ref platform, state,
-			application, out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			ApplicationWindowRelationshipStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationWindowRelationshipStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+				ref platform, block, out value) ||
+				!MuiApplicationWindowRelationshipStateAdmission.ValidateLive(ref platform,
+					state, application, value)) return false;
 			FillApplicationWindowRelationshipState(ref platform, state, application,
 				ref value);
+			if (!MuiApplicationWindowRelationshipStateAdmission.ValidateLive(ref platform,
+				state, application, value)) return false;
 			return MuiApplicationWindowRelationshipStateRecordCodec.Write(
 				ref platform, block, value);
 		}
@@ -3218,6 +3879,8 @@ public static class MuiApplicationWindowCore
 		value.Magic = MuiApplicationWindowRelationshipStateRecord.Cookie;
 		FillApplicationWindowRelationshipState(ref platform, state, application,
 			ref value);
+		if (!MuiApplicationWindowRelationshipStateAdmission.ValidateLive(ref platform,
+			state, application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationWindowRelationshipStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -3242,6 +3905,8 @@ public static class MuiApplicationWindowCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
 			ApplicationWindowRelationshipStateKey) != unchecked((int)
 			MuiApplicationWindowRelationshipStateRecord.Size)) return false;
+		if (!MuiApplicationWindowRelationshipStateAdmission.ValidateLive(ref platform,
+			state, application, value)) return false;
 		return MuiApplicationWindowRelationshipStateRecordCodec.Write(ref platform,
 			block, value);
 	}
@@ -3262,6 +3927,11 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull) return false;
+		if (!ApplicationPolicyStateAvailable(ref platform, state, application))
+			return false;
+		if (!PublishApplicationSchedulerState(ref platform, state, application,
+			out _) || !TryGetApplicationSchedulerState(ref platform, state,
+			application, out _)) return false;
 		var lifecycle = ReadApplicationLifecycle(ref platform, state, application);
 		if (lifecycle.Initialized != 0)
 			return true;
@@ -3359,6 +4029,12 @@ public static class MuiApplicationWindowCore
 		APTR application, APTR window)
 		where TPlatform : struct, IMuiApplicationPlatform
 	{
+		if (!PublishApplicationSleepState(ref platform, state, application) ||
+			!PublishWindowSleepState(ref platform, state, window) ||
+			!TryGetApplicationSleepState(ref platform, state, application,
+				out var applicationSleepState) ||
+			!TryGetWindowSleepState(ref platform, state, window,
+				out var windowSleepState)) return false;
 		if (!MuiFamilyCore.AddTail(ref platform, state, application, window))
 			return false;
 		if (Set(ref platform, state, window, WindowOwner, application.Raw))
@@ -3367,9 +4043,8 @@ public static class MuiApplicationWindowCore
 			// application enters the sleeping state. Apply the complete named
 			// depth in one transition so a large nesting count cannot turn into
 			// an unbounded loop of single-step updates.
-			var applicationSleep = ReadApplicationSleepState(ref platform, state,
-				application).Depth;
-			var windowSleep = ReadWindowSleepState(ref platform, state, window).Depth;
+			var applicationSleep = applicationSleepState.Depth;
+			var windowSleep = windowSleepState.Depth;
 			if (applicationSleep <= uint.MaxValue - windowSleep &&
 				SetWindowSleepDepth(ref platform, state, window,
 					windowSleep + applicationSleep)) return true;
@@ -3382,11 +4057,16 @@ public static class MuiApplicationWindowCore
 		APTR application, APTR window)
 		where TPlatform : struct, IMuiApplicationPlatform
 	{
-		var applicationSleep = ReadApplicationSleepState(ref platform, state,
-			application).Depth;
+		if (!PublishApplicationSleepState(ref platform, state, application) ||
+			!PublishWindowSleepState(ref platform, state, window) ||
+			!TryGetApplicationSleepState(ref platform, state, application,
+				out var applicationSleepState) ||
+			!TryGetWindowSleepState(ref platform, state, window,
+				out var windowSleepState)) return false;
+		var applicationSleep = applicationSleepState.Depth;
 		if (applicationSleep != 0)
 		{
-			var windowSleep = ReadWindowSleepState(ref platform, state, window).Depth;
+			var windowSleep = windowSleepState.Depth;
 			var retainedSleep = windowSleep < applicationSleep ? 0u :
 				windowSleep - applicationSleep;
 			if (!SetWindowSleepDepth(ref platform, state, window, retainedSleep))
@@ -3402,7 +4082,10 @@ public static class MuiApplicationWindowCore
 		APTR window, uint eventMask)
 		where TPlatform : struct, IMuiApplicationPlatform
 	{
-		var lifecycle = ReadWindowLifecycle(ref platform, state, window);
+		if (!PublishWindowSleepState(ref platform, state, window) ||
+			!TryGetWindowSleepState(ref platform, state, window, out _)) return false;
+		if (!TryReadWindowLifecycle(ref platform, state, window,
+			out var lifecycle)) return false;
 		if (lifecycle.NativeWindow.IsNotNull) return true;
 		var requestedEvents = lifecycle.EventMask | eventMask;
 		// MorphOS remembers an open request made while the application is
@@ -3420,7 +4103,12 @@ public static class MuiApplicationWindowCore
 		}
 		var nativeWindow = platform.OpenMuiWindow(window);
 		if (nativeWindow.IsNull) return false;
-		var openPolicy = ReadWindowOpenPolicy(ref platform, state, window);
+		if (!TryReadWindowOpenPolicy(ref platform, state, window,
+			out var openPolicy))
+		{
+			platform.CloseMuiWindow(nativeWindow);
+			return false;
+		}
 		if (!platform.ConfigureWindowEvents(nativeWindow, requestedEvents))
 		{
 			platform.CloseMuiWindow(nativeWindow);
@@ -3520,7 +4208,10 @@ public static class MuiApplicationWindowCore
 		APTR state, APTR window, bool preserveIconifiedOpen)
 		where TPlatform : struct, IMuiApplicationPlatform
 	{
-		var lifecycle = ReadWindowLifecycle(ref platform, state, window);
+		if (!PublishWindowSleepState(ref platform, state, window) ||
+			!TryGetWindowSleepState(ref platform, state, window, out _)) return false;
+		if (!TryReadWindowLifecycle(ref platform, state, window,
+			out var lifecycle)) return false;
 		var nativeWindow = lifecycle.NativeWindow;
 		if (nativeWindow.IsNotNull)
 		{
@@ -3559,6 +4250,9 @@ public static class MuiApplicationWindowCore
 		// used by MUIM_Application_UnpushMethod's third argument.
 		if (destination.IsNull || count <= 0 || count > 7 || parameters.IsNull)
 			return 0;
+		if (!PublishApplicationSchedulerState(ref platform, state, application,
+			out _) || !TryGetApplicationSchedulerState(ref platform, state,
+			application, out var scheduler)) return 0;
 		var payloadBytes = (uint)count * 4u;
 		if (!platform.IsMapped(parameters, payloadBytes)) return 0;
 		var size = MuiApplicationWindowNodeRecord.Size + payloadBytes;
@@ -3583,8 +4277,6 @@ public static class MuiApplicationWindowCore
 			return 0;
 		}
 		platform.Copy(parameters, payload, payloadBytes);
-		var scheduler = ReadApplicationSchedulerState(ref platform, state,
-			application);
 		var tail = scheduler.PushTail;
 		if (tail.IsNotNull)
 		{
@@ -3605,7 +4297,8 @@ public static class MuiApplicationWindowCore
 			return 0;
 		}
 		Set(ref platform, state, application, PushTail, node.Raw);
-		PublishApplicationSchedulerState(ref platform, state, application, out _);
+		if (!ReconcileApplicationSchedulerState(ref platform, state, application,
+			out _)) return 0;
 		return methodId;
 	}
 
@@ -3615,13 +4308,19 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull) return 0;
-		var scheduler = ReadApplicationSchedulerState(ref platform, state,
-			application);
+		if (!PublishApplicationSchedulerState(ref platform, state, application,
+			out _) || !TryGetApplicationSchedulerState(ref platform, state,
+			application, out var scheduler)) return 0;
 		var node = scheduler.PushHead;
 		if (node.IsNull || !MuiApplicationWindowNodeCodec.TryRead(ref platform,
 			node, out var record)) return 0;
 		Set(ref platform, state, application, PushHead, record.Next.Raw);
 		if (record.Next.IsNull) Set(ref platform, state, application, PushTail, 0);
+		// Publish the post-pop topology before reclaiming the node.  The strict
+		// sidecar admission must be able to traverse the old head until the
+		// replacement head has been committed.
+		if (!ReconcileApplicationSchedulerState(ref platform, state, application,
+			out _)) return 0;
 		var result = 0u;
 		var payloadBytes = record.Auxiliary * 4u;
 		if (record.Value.IsNotNull &&
@@ -3631,7 +4330,6 @@ public static class MuiApplicationWindowCore
 		var size = MuiApplicationWindowNodeRecord.Size + record.Auxiliary * 4u;
 		platform.Clear(node, size);
 		platform.Free(node, size);
-		PublishApplicationSchedulerState(ref platform, state, application, out _);
 		return result;
 	}
 
@@ -3639,8 +4337,11 @@ public static class MuiApplicationWindowCore
 		APTR application, APTR destination, uint methodId, uint method)
 		where TPlatform : struct, IMuiApplicationPlatform
 	{
-		var scheduler = ReadApplicationSchedulerState(ref platform, state,
-			application);
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
+			application).IsNull ||
+			!PublishApplicationSchedulerState(ref platform, state, application,
+				out _) || !TryGetApplicationSchedulerState(ref platform, state,
+				application, out var scheduler)) return 0;
 		var current = scheduler.PushHead;
 		var previous = APTR.Null;
 		uint removed = 0;
@@ -3673,6 +4374,10 @@ public static class MuiApplicationWindowCore
 				if (scheduler.PushTail == current)
 					Set(ref platform, state, application, PushTail, previous.Raw);
 				var size = MuiApplicationWindowNodeRecord.Size + count * 4u;
+				// Reconcile the post-unpush chain while the removed node remains
+				// mapped; only then is it safe to reclaim its guest storage.
+				if (!ReconcileApplicationSchedulerState(ref platform, state, application,
+					out _)) return removed;
 				platform.Clear(current, size);
 				platform.Free(current, size);
 				removed++;
@@ -3680,7 +4385,6 @@ public static class MuiApplicationWindowCore
 			else previous = current;
 			current = next;
 		}
-		PublishApplicationSchedulerState(ref platform, state, application, out _);
 		return removed;
 	}
 
@@ -3690,8 +4394,9 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull) return false;
-		var scheduler = ReadApplicationSchedulerState(ref platform, state,
-			application);
+		if (!PublishApplicationSchedulerState(ref platform, state, application,
+			out _) || !TryGetApplicationSchedulerState(ref platform, state,
+			application, out var scheduler)) return false;
 		var node = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationWindowNodeRecord.Size);
 		if (node.IsNull) return false;
@@ -3727,7 +4432,8 @@ public static class MuiApplicationWindowCore
 		var task = platform.CurrentTaskToken();
 		var mask = scheduler.SignalMask;
 		if (task != 0 && mask != 0) platform.SignalTask(task, mask);
-		PublishApplicationSchedulerState(ref platform, state, application, out _);
+		if (!ReconcileApplicationSchedulerState(ref platform, state, application,
+			out _)) return false;
 		return true;
 	}
 
@@ -3737,8 +4443,9 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull) return 0;
-		var scheduler = ReadApplicationSchedulerState(ref platform, state,
-			application);
+		if (!PublishApplicationSchedulerState(ref platform, state, application,
+			out _) || !TryGetApplicationSchedulerState(ref platform, state,
+			application, out var scheduler)) return 0;
 		var head = scheduler.ReturnHead;
 		if (head.IsNotNull && MuiApplicationWindowNodeCodec.TryRead(ref platform,
 			head, out var record))
@@ -3747,12 +4454,13 @@ public static class MuiApplicationWindowCore
 			var result = record.Value.Raw;
 			Set(ref platform, state, application, ReturnHead, next.Raw);
 			if (next.IsNull) Set(ref platform, state, application, ReturnTail, 0);
+			if (!ReconcileApplicationSchedulerState(ref platform, state, application,
+				out _)) return 0;
 			platform.Clear(head, MuiApplicationWindowNodeRecord.Size);
 			platform.Free(head, MuiApplicationWindowNodeRecord.Size);
 			var emptySignals = default(MuiApplicationWindowSignalStorage);
 			MuiApplicationWindowSignalStorageCodec.Write(ref platform,
 				signalStorage, emptySignals);
-			PublishApplicationSchedulerState(ref platform, state, application, out _);
 			return result;
 		}
 		var signals = platform.ReadSignals(scheduler.SignalMask);
@@ -3790,6 +4498,9 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, application).IsNull)
 			return 0;
+		if (!PublishApplicationSchedulerState(ref platform, state, application,
+			out _) || !TryGetApplicationSchedulerState(ref platform, state,
+			application, out _)) return 0;
 		for (var iteration = 0u; iteration < MaximumRunIterations; iteration++)
 		{
 			var result = RunIteration(ref platform, state, application,
@@ -3812,8 +4523,10 @@ public static class MuiApplicationWindowCore
 			application).IsNull) return 0;
 		if (ReadApplicationSleepState(ref platform, state, application).Depth != 0)
 			return 0;
-		var current = ReadApplicationSchedulerState(ref platform, state,
-			application).InputHandlers;
+		if (!PublishApplicationSchedulerState(ref platform, state, application,
+			out _) || !TryGetApplicationSchedulerState(ref platform, state,
+			application, out var scheduler)) return 0;
+		var current = scheduler.InputHandlers;
 		var ticks = platform.ReadTicks();
 		uint dispatched = 0;
 		uint visited = 0;
@@ -3990,6 +4703,9 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull) return false;
+		if (!PublishApplicationSchedulerState(ref platform, state, application,
+			out _) || !TryGetApplicationSchedulerState(ref platform, state,
+			application, out _)) return false;
 		return AddHandler(ref platform, state, application, InputHandlers, handler,
 			MuiInputHandlerRecord.Size);
 	}
@@ -4000,6 +4716,9 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull) return false;
+		if (!PublishApplicationSchedulerState(ref platform, state, application,
+			out _) || !TryGetApplicationSchedulerState(ref platform, state,
+			application, out _)) return false;
 		return RemoveHandler(ref platform, state, application, InputHandlers,
 			handler);
 	}
@@ -4072,12 +4791,14 @@ public static class MuiApplicationWindowCore
 		APTR state, APTR window, APTR eventMessage, uint eventClass)
 		where TPlatform : struct, IMuiApplicationPlatform
 	{
-		var began = BeginWindowEventReuseContext(ref platform, state, window,
-			eventMessage, eventClass, out var previous);
+		if (!PublishWindowSleepState(ref platform, state, window) ||
+			!TryGetWindowSleepState(ref platform, state, window, out _)) return 0;
+		if (!BeginWindowEventReuseContext(ref platform, state, window,
+			eventMessage, eventClass, out var previous)) return 0;
 		var result = DispatchWindowEventCore(ref platform, state, window,
 			eventMessage, eventClass);
-		if (began) EndWindowEventReuseContext(ref platform, state, window,
-			previous);
+		if (!EndWindowEventReuseContext(ref platform, state, window, previous))
+			return 0;
 		return result;
 	}
 
@@ -4507,6 +5228,7 @@ public static class MuiApplicationWindowCore
 		APTR window, APTR target)
 		where TPlatform : struct, IMuiApplicationPlatform
 	{
+		if (!HasValidWindowFocusState(ref platform, state, window)) return false;
 		var previous = ReadWindowFocusState(ref platform, state, window)
 			.ActiveObject;
 		var nativeWindow = ReadWindowLifecycle(ref platform, state, window)
@@ -4536,6 +5258,7 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, window).IsNull)
 			return false;
+		if (!HasValidWindowFocusState(ref platform, state, window)) return false;
 		if (target.IsNotNull && MuiHeadlessObjectCore.FindObject(ref platform,
 			state, target).IsNull) return false;
 		var previous = ReadWindowFocusState(ref platform, state, window)
@@ -4575,6 +5298,8 @@ public static class MuiApplicationWindowCore
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, window).IsNull)
 			return false;
 		var sleep = ReadWindowSleepState(ref platform, state, window);
+		if (!MuiSleepStateAdmission.ValidateLive(ref platform, state, window,
+			sleep)) return false;
 		var depth = sleep.Depth;
 		if (depth == next) return PublishWindowSleepState(ref platform, state,
 			window);
@@ -4667,6 +5392,7 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, window).IsNull)
 			return false;
+		if (!HasValidWindowFocusState(ref platform, state, window)) return false;
 		if (value == 0)
 		{
 			var previous = ReadWindowFocusState(ref platform, state, window)
@@ -4704,7 +5430,8 @@ public static class MuiApplicationWindowCore
 	{
 		var window = FindContainingWindow(ref platform, state, obj);
 		if (window.IsNull) return false;
-		var interaction = ReadWindowInteractionState(ref platform, state, window);
+		if (!TryGetWindowInteractionState(ref platform, state, window,
+			out var interaction)) return false;
 		var chainCount = interaction.CycleChainCount;
 		if (chainCount == 0) return false;
 		var limit = chainCount > MuiHeadlessLayout.MaximumTraversal ?
@@ -4788,7 +5515,8 @@ public static class MuiApplicationWindowCore
 			ActiveObject));
 		if (active.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
 			active).IsNull) return false;
-		var interaction = ReadWindowInteractionState(ref platform, state, window);
+		if (!TryGetWindowInteractionState(ref platform, state, window,
+			out var interaction)) return false;
 		var chainCount = interaction.CycleChainCount;
 		if (chainCount == 0) return false;
 		var limit = chainCount > MuiHeadlessLayout.MaximumTraversal ?
@@ -4939,7 +5667,8 @@ public static class MuiApplicationWindowCore
 	{
 		var active = APTR.FromPointer(Read(ref platform, state, window,
 			ActiveObject));
-		var interaction = ReadWindowInteractionState(ref platform, state, window);
+		if (!TryGetWindowInteractionState(ref platform, state, window,
+			out var interaction)) return false;
 		var chainCount = interaction.CycleChainCount;
 		if (chainCount == 0) return false;
 		var limit = chainCount > MuiHeadlessLayout.MaximumTraversal ?
@@ -4996,7 +5725,8 @@ public static class MuiApplicationWindowCore
 		where TPlatform : struct, IMuiApplicationPlatform
 	{
 		if (target.IsNull) return false;
-		var interaction = ReadWindowInteractionState(ref platform, state, window);
+		if (!TryGetWindowInteractionState(ref platform, state, window,
+			out var interaction)) return false;
 		var chainCount = interaction.CycleChainCount;
 		if (chainCount == 0) return false;
 		var limit = chainCount > MuiHeadlessLayout.MaximumTraversal ?
@@ -5049,12 +5779,13 @@ public static class MuiApplicationWindowCore
 	{
 		if (flags > 1 || MuiHeadlessObjectCore.FindObject(ref platform, state,
 			window).IsNull) return false;
+		if (!TryGetWindowInteractionState(ref platform, state, window,
+			out var interaction)) return false;
 		if (!MuiHeadlessObjectCore.GetAttribute(ref platform, state, window,
 			WindowId, out var id) || id == 0) return false;
 		if (!platform.SnapshotMuiWindow(window, flags)) return false;
 		if (!Set(ref platform, state, window, WindowSnapshotFlags, flags))
 			return false;
-		var interaction = ReadWindowInteractionState(ref platform, state, window);
 		var requests = interaction.SnapshotRequests;
 		if (!Set(ref platform, state, window, WindowSnapshotRequests,
 			requests == uint.MaxValue ? uint.MaxValue : requests + 1)) return false;
@@ -5073,7 +5804,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, window).IsNull)
 			return false;
-		var interaction = ReadWindowInteractionState(ref platform, state, window);
+		if (!TryGetWindowInteractionState(ref platform, state, window,
+			out var interaction)) return false;
 		var oldHead = interaction.CycleChainHead;
 		var oldCount = interaction.CycleChainCount;
 		var oldRequests = interaction.CycleChainRequests;
@@ -5256,8 +5988,10 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull) return false;
-		var depth = ReadApplicationSleepState(ref platform, state,
-			application).Depth;
+		var sleep = ReadApplicationSleepState(ref platform, state, application);
+		if (!MuiSleepStateAdmission.ValidateLive(ref platform, state, application,
+			sleep)) return false;
+		var depth = sleep.Depth;
 		if (value != 0)
 		{
 			if (depth == uint.MaxValue ||
@@ -5503,6 +6237,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull) return false;
+		if (!ApplicationPolicyStateAvailable(ref platform, state, application))
+			return false;
 		var requested = value == 0 ? 0u : 1u;
 		if (Read(ref platform, state, application, ApplicationInitialized) != 0)
 			return false;
@@ -5523,6 +6259,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull) return false;
+		if (!ApplicationPolicyStateAvailable(ref platform, state, application))
+			return false;
 		if (Read(ref platform, state, application, ApplicationInitialized) != 0)
 			return false;
 		if (!Set(ref platform, state, application, ApplicationUseCommodities,
@@ -5541,6 +6279,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull) return false;
+		if (!ApplicationPolicyStateAvailable(ref platform, state, application))
+			return false;
 		if (Read(ref platform, state, application, ApplicationInitialized) != 0)
 			return false;
 		if (!Set(ref platform, state, application, ApplicationUseScreenNotify,
@@ -5562,6 +6302,8 @@ public static class MuiApplicationWindowCore
 		var diskObject = APTR.FromPointer(value);
 		if (diskObject.IsNotNull && !platform.IsMapped(diskObject,
 			DiskObject.Size)) return false;
+		if (!PublishApplicationObjectState(ref platform, state, application,
+			out _)) return false;
 		if (!Set(ref platform, state, application, ApplicationDiskObject, value))
 			return false;
 		return PublishApplicationObjectState(ref platform, state, application,
@@ -5581,6 +6323,8 @@ public static class MuiApplicationWindowCore
 		var dropObject = APTR.FromPointer(value);
 		if (dropObject.IsNotNull && MuiHeadlessObjectCore.FindObject(ref platform,
 			state, dropObject).IsNull) return false;
+		if (!PublishApplicationObjectState(ref platform, state, application,
+			out _)) return false;
 		if (!Set(ref platform, state, application, ApplicationDropObject, value))
 			return false;
 		return PublishApplicationObjectState(ref platform, state, application,
@@ -5598,6 +6342,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull || value == 0 ||
+			!PublishApplicationObjectState(ref platform, state, application,
+				out _) ||
 			Read(ref platform, state, application, ApplicationInitialized) != 0)
 			return false;
 		var strip = APTR.FromPointer(value);
@@ -5626,6 +6372,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull) return false;
+		if (!ApplicationMenuStateAvailable(ref platform, state, application))
+			return false;
 		if (!Set(ref platform, state, application, ApplicationMenuAction, value))
 			return false;
 		return PublishApplicationMenuState(ref platform, state, application,
@@ -5654,6 +6402,7 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, window).IsNull)
 			return false;
+		if (!HasValidWindowEventState(ref platform, state, window)) return false;
 		if (value == window || (value.IsNotNull &&
 			MuiHeadlessObjectCore.FindObject(ref platform, state, value).IsNull))
 			return false;
@@ -5663,7 +6412,13 @@ public static class MuiApplicationWindowCore
 		if (!Set(ref platform, state, window, MuiWindowPublicCore.MouseObject,
 			value.Raw)) return false;
 		if (!PublishWindowEventState(ref platform, state, window, out _))
+		{
+			MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state,
+				MuiHeadlessObjectCore.FindObject(ref platform, state, window),
+				MuiWindowPublicCore.MouseObject, previous, false);
+			PublishWindowEventState(ref platform, state, window, out _);
 			return false;
+		}
 		return MuiAreaTimerPacketCore.ProcessPointerTransition(ref platform,
 			state, APTR.FromPointer(previous), value, platform.ReadTicks(), true);
 	}
@@ -5681,6 +6436,7 @@ public static class MuiApplicationWindowCore
 		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, window);
 		if (record.IsNull)
 			return false;
+		if (!HasValidWindowEventState(ref platform, state, window)) return false;
 		if (input.MouseObject == window || (input.MouseObject.IsNotNull &&
 			MuiHeadlessObjectCore.FindObject(ref platform, state,
 				input.MouseObject).IsNull)) return false;
@@ -5738,11 +6494,19 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, window).IsNull)
 			return false;
+		if (!HasValidWindowEventState(ref platform, state, window)) return false;
 		if (eventStorage.IsNotNull && !platform.IsMapped(eventStorage,
 			global::Amiga.InputEvent.Size)) return false;
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, window);
+		MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, window,
+			MuiWindowPublicCore.InputEvent, out var previous);
 		if (!Set(ref platform, state, window, MuiWindowPublicCore.InputEvent,
 			eventStorage.Raw)) return false;
-		return PublishWindowEventState(ref platform, state, window, out _);
+		if (PublishWindowEventState(ref platform, state, window, out _)) return true;
+		MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state, record,
+			MuiWindowPublicCore.InputEvent, previous, false);
+		PublishWindowEventState(ref platform, state, window, out _);
+		return false;
 	}
 
 	// MenuHelp is a getter-only [..G] event attribute. The menu/input transport
@@ -5754,6 +6518,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull) return false;
+		if (!ApplicationMenuStateAvailable(ref platform, state, application))
+			return false;
 		if (!Set(ref platform, state, application, ApplicationMenuHelp, value))
 			return false;
 		return PublishApplicationMenuState(ref platform, state, application,
@@ -5808,6 +6574,11 @@ public static class MuiApplicationWindowCore
 			attribute != ApplicationCopyright && attribute != ApplicationDescription &&
 			attribute != ApplicationTitle && attribute != ApplicationVersion)
 			return false;
+		// Admit the current sidecar before mutating the raw attribute.  A
+		// malformed present record must remain observable and must not be
+		// repaired as a side effect of a failed setter.
+		if (!PublishApplicationIdentityState(ref platform, state, application,
+			out _)) return false;
 		if (!Set(ref platform, state, application, attribute, value)) return false;
 		return PublishApplicationIdentityState(ref platform, state, application,
 			out _);
@@ -5826,6 +6597,8 @@ public static class MuiApplicationWindowCore
 		var helpFile = APTR.FromPointer(value);
 		if (helpFile.IsNotNull && !CStringCodec.TryReadLength(ref platform,
 			helpFile, 65536, out _)) return false;
+		if (!PublishApplicationTextState(ref platform, state, application,
+			out _)) return false;
 		if (!Set(ref platform, state, application, ApplicationHelpFile, value))
 			return false;
 		return PublishApplicationTextState(ref platform, state, application,
@@ -5844,6 +6617,8 @@ public static class MuiApplicationWindowCore
 		var title = APTR.FromPointer(value);
 		if (title.IsNotNull && !CStringCodec.TryReadLength(ref platform, title,
 			65536, out _)) return false;
+		if (!PublishApplicationTextState(ref platform, state, application,
+			out _)) return false;
 		if (!Set(ref platform, state, application, ApplicationIconifyTitle, value))
 			return false;
 		return PublishApplicationTextState(ref platform, state, application,
@@ -5861,6 +6636,8 @@ public static class MuiApplicationWindowCore
 			application).IsNull || value == 0 ||
 			Read(ref platform, state, application, ApplicationInitialized) != 0)
 			return false;
+		if (!ApplicationWindowRelationshipStateAvailable(ref platform, state,
+			application)) return false;
 		var window = APTR.FromPointer(value);
 		if (window == application || MuiHeadlessObjectCore.FindObject(ref platform,
 			state, window).IsNull) return false;
@@ -5888,6 +6665,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			application).IsNull) return false;
+		if (!ApplicationUsedClassesStateAvailable(ref platform, state,
+			application)) return false;
 		var vector = APTR.FromPointer(value);
 		if (!MuiApplicationUsedClassesVectorCodec.TryValidate(ref platform, vector))
 			return false;
@@ -5908,6 +6687,8 @@ public static class MuiApplicationWindowCore
 		where TPlatform : struct, IMuiApplicationPlatform
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, application).IsNull)
+			return false;
+		if (!ApplicationHelpStateAvailable(ref platform, state, application))
 			return false;
 		if (refWindow.IsNotNull && MuiHeadlessObjectCore.FindObject(ref platform,
 			state, refWindow).IsNull) return false;
@@ -5931,6 +6712,8 @@ public static class MuiApplicationWindowCore
 		where TPlatform : struct, IMuiApplicationPlatform
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, application).IsNull)
+			return false;
+		if (!ApplicationHelpStateAvailable(ref platform, state, application))
 			return false;
 		var textState = ReadApplicationTextState(ref platform, state, application);
 		var helpFile = name;
@@ -6048,6 +6831,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, application).IsNull)
 			return 0;
+		if (!ApplicationDefaultConfigStateAvailable(ref platform, state,
+			application)) return 0;
 		if (!platform.GetApplicationDefaultConfigItem(application, configId,
 			out var value)) return 0;
 		if (!Set(ref platform, state, application, ApplicationDefaultConfigId,
@@ -6075,6 +6860,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, application).IsNull)
 			return false;
+		if (!SetConfigItemStateAvailable(ref platform, state, application))
+			return false;
 		// The payload is opaque and is never dereferenced, but a non-null caller
 		// pointer must still name at least one mapped guest byte.
 		if (data.IsNotNull && !platform.IsMapped(data, 1)) return false;
@@ -6085,6 +6872,8 @@ public static class MuiApplicationWindowCore
 		value.Data = data;
 		value.Requests = value.Requests == uint.MaxValue
 			? uint.MaxValue : value.Requests + 1;
+		if (!MuiApplicationSetConfigItemStateAdmission.ValidateLive(ref platform,
+			state, application, value)) return false;
 		return WriteSetConfigItemState(ref platform, block, value);
 	}
 
@@ -6105,6 +6894,8 @@ public static class MuiApplicationWindowCore
 			? raw : 0);
 		if (!TryReadSetConfigItemState(ref platform, block, out var value))
 			return false;
+		if (!MuiApplicationSetConfigItemStateAdmission.ValidateLive(ref platform,
+			state, application, value)) return false;
 		item = value.Item;
 		data = value.Data.Raw;
 		requests = value.Requests;
@@ -6125,7 +6916,23 @@ public static class MuiApplicationWindowCore
 		value.Item = item;
 		value.Data = APTR.FromPointer(data);
 		value.Requests = requests;
+		if (!MuiApplicationSetConfigItemStateAdmission.Validate(ref platform,
+			value)) return false;
 		return WriteSetConfigItemState(ref platform, storage, value);
+	}
+
+	internal static bool SetConfigItemStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
+			application, ApplicationSetConfigItemState, out var raw) || raw == 0)
+			return true;
+		var block = APTR.FromPointer(raw);
+		if (!MuiApplicationSetConfigItemStateRecordCodec.TryReadStructural(
+			ref platform, block, out var value)) return false;
+		return MuiApplicationSetConfigItemStateAdmission.ValidateLive(ref platform,
+			state, application, value);
 	}
 
 	private static APTR EnsureSetConfigItemState<TPlatform>(ref TPlatform platform,
@@ -6155,7 +6962,8 @@ public static class MuiApplicationWindowCore
 	private static bool WriteSetConfigItemState<TPlatform>(ref TPlatform platform,
 		APTR block, MuiApplicationSetConfigItemStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> MuiApplicationSetConfigItemStateRecordCodec.Write(ref platform, block,
+		=> MuiApplicationSetConfigItemStateAdmission.Validate(ref platform, value) &&
+		MuiApplicationSetConfigItemStateRecordCodec.Write(ref platform, block,
 			value);
 
 	private static bool TryReadSetConfigItemState<TPlatform>(ref TPlatform platform,
@@ -6175,6 +6983,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, application).IsNull)
 			return false;
+		if (!ApplicationConfigWindowStateAvailable(ref platform, state,
+			application)) return false;
 		if (classId.IsNotNull && !CStringCodec.TryReadLength(ref platform, classId,
 			65536, out _)) return false;
 		if (!platform.OpenMuiConfigWindow(application, flags, classId)) return false;
@@ -6202,6 +7012,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, application).IsNull)
 			return APTR.Null;
+		if (!ApplicationSettingsPanelStateAvailable(ref platform, state,
+			application)) return APTR.Null;
 		var panel = platform.BuildMuiSettingsPanel(application, number);
 		if (panel.IsNotNull && MuiHeadlessObjectCore.FindObject(ref platform,
 			state, panel).IsNull) return APTR.Null;
@@ -6241,6 +7053,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, application).IsNull)
 			return false;
+		if (!ApplicationSettingsPersistenceStateAvailable(ref platform, state,
+			application)) return false;
 		if (name.Raw != uint.MaxValue && name.IsNotNull &&
 			!CStringCodec.TryReadLength(ref platform, name, 65536, out _)) return false;
 		var accepted = save ? platform.SaveMuiApplicationSettings(state,
@@ -6275,6 +7089,8 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, application).IsNull)
 			return false;
+		if (!ApplicationRefreshStateAvailable(ref platform, state, application))
+			return false;
 		uint refreshed = 0;
 		for (var index = 0; index < 65535; index++)
 		{
@@ -6307,11 +7123,14 @@ public static class MuiApplicationWindowCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, application).IsNull)
 			return 0;
+		if (!ApplicationMenuStateAvailable(ref platform, state, application))
+			return 0;
 		for (var index = 0; index < 65535; index++)
 		{
 			var window = MuiFamilyCore.GetChild(ref platform, state, application,
 				index, APTR.Null);
 			if (window.IsNull) break;
+			if (!HasValidWindowEventState(ref platform, state, window)) continue;
 			var nativeWindow = ReadWindowLifecycle(ref platform, state, window)
 				.NativeWindow;
 			if (nativeWindow.IsNull) continue;
@@ -6326,6 +7145,8 @@ public static class MuiApplicationWindowCore
 		bool checkedState) where TPlatform : struct, IMuiApplicationPlatform
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, application).IsNull)
+			return 0;
+		if (!ApplicationMenuStateAvailable(ref platform, state, application))
 			return 0;
 		uint updated = 0;
 		for (var index = 0; index < 65535; index++)
@@ -6520,12 +7341,13 @@ public static class MuiApplicationWindowCore
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var scheduler = ReadApplicationSchedulerState(ref platform, state, obj);
-		var interaction = ReadWindowInteractionState(ref platform, state, obj);
+		var hasInteraction = TryGetWindowInteractionState(ref platform, state, obj,
+			out var interaction);
 		FreeNodes(ref platform, scheduler.ReturnHead);
 		FreeNodes(ref platform, scheduler.InputHandlers);
 		FreeEventHandlerNodes(ref platform, APTR.FromPointer(Read(ref platform,
 			state, obj, EventHandlers)));
-		FreeNodes(ref platform, interaction.CycleChainHead);
+		if (hasInteraction) FreeNodes(ref platform, interaction.CycleChainHead);
 		FreePushNodes(ref platform, scheduler.PushHead);
 		var configState = APTR.FromPointer(Read(ref platform, state, obj,
 			ApplicationSetConfigItemState));
@@ -6644,11 +7466,15 @@ public static class MuiApplicationWindowCore
 				if (listAttribute == EventHandlers &&
 					!RelinkAfterEventHandlerRemoval(ref platform, previousHandler,
 						successorHandler, handler, removedHandler)) return false;
+				// Reconcile the named scheduler sidecar while the removed node is
+				// still mapped.  The raw list mutation above has already made the
+				// resulting head/chain observable, so strict publication can validate the
+				// replacement topology before the old node is reclaimed.
+				if (listAttribute == InputHandlers &&
+					!PublishApplicationSchedulerState(ref platform, state, owner,
+						out _)) return false;
 				platform.Clear(current, MuiApplicationWindowNodeRecord.Size);
 				platform.Free(current, MuiApplicationWindowNodeRecord.Size);
-				if (listAttribute == InputHandlers)
-					PublishApplicationSchedulerState(ref platform, state, owner,
-						out _);
 				return true;
 			}
 			previous = current;

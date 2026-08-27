@@ -22,6 +22,19 @@ internal struct MuiStringSpellCheckingStateRecord
 	internal uint Enabled;
 }
 
+internal static class MuiStringSpellCheckingStateAdmission
+{
+	internal static bool Validate(MuiStringSpellCheckingStateRecord value) =>
+		value.Magic == MuiStringSpellCheckingStateRecord.Cookie &&
+		value.Enabled <= 1;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiStringSpellCheckingStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) && !obj.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
+}
+
 internal enum MuiStringSpellCheckingStateField : byte
 {
 	Magic,
@@ -87,37 +100,71 @@ internal static class MuiStringSpellCheckingStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. The named BOOL policy remains the
+// semantic record; this bounded adapter owns the fixed guest translation.
+// The cursor codec remains available for compatibility and malformed-state
+// diagnostics.
+internal static class MuiStringSpellCheckingStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiStringSpellCheckingStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiStringSpellCheckingStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiStringSpellCheckingStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiStringSpellCheckingStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringSpellCheckingStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringSpellCheckingStateRecord.Size) ||
-			!MuiStringSpellCheckingStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiStringSpellCheckingStateField.Magic, out var magic) ||
-			magic != MuiStringSpellCheckingStateRecord.Cookie) return false;
-		value.Magic = magic;
-		return MuiStringSpellCheckingStateFieldCursorCodec.TryReadUInt32(
-			ref platform, address,
-			MuiStringSpellCheckingStateField.Enabled, out value.Enabled);
+		return MuiStringSpellCheckingStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, 0, out value.Magic) &&
+			MuiStringSpellCheckingStateRecordMemoryCodec.TryReadUInt32(
+				ref platform, address, 4, out value.Enabled);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiStringSpellCheckingStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiStringSpellCheckingStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringSpellCheckingStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringSpellCheckingStateRecord.Size) || value.Magic !=
-			MuiStringSpellCheckingStateRecord.Cookie) return false;
-		return MuiStringSpellCheckingStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiStringSpellCheckingStateField.Magic, value.Magic) &&
-			MuiStringSpellCheckingStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiStringSpellCheckingStateField.Enabled, value.Enabled);
+		if (!MuiStringSpellCheckingStateAdmission.Validate(value)) return false;
+		return MuiStringSpellCheckingStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 0, value.Magic) &&
+			MuiStringSpellCheckingStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, 4, value.Enabled);
 	}
 }

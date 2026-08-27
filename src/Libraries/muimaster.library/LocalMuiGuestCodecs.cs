@@ -91,10 +91,148 @@ public struct MUI_LayoutDimensions
 public struct MUI_LayoutMsg
 {
 	public const uint Size = 36;
+	internal const uint FieldSize32 = 4;
+	internal const uint FieldSize16 = 2;
+	internal const uint TypeOffset = 0;
+	internal const uint ChildrenOffset = 4;
+	internal const uint MinWidthOffset = 8;
+	internal const uint MinHeightOffset = 10;
+	internal const uint MaxWidthOffset = 12;
+	internal const uint MaxHeightOffset = 14;
+	internal const uint DefWidthOffset = 16;
+	internal const uint DefHeightOffset = 18;
+	internal const uint WidthOffset = 20;
+	internal const uint HeightOffset = 24;
+	internal const uint Private5Offset = 28;
+	internal const uint Private6Offset = 32;
 	public uint lm_Type;
 	public APTR lm_Children;
 	public MUI_MinMax lm_MinMax;
 	public MUI_LayoutDimensions lm_Layout;
+}
+
+internal enum MUI_LayoutMsgField : byte
+{
+	Type,
+	Children,
+	MinWidth,
+	MinHeight,
+	MaxWidth,
+	MaxHeight,
+	DefWidth,
+	DefHeight,
+	Width,
+	Height,
+	Private5,
+	Private6,
+}
+
+// Struct-first adapter for the MorphOS layout hook packet. The hook bridge
+// exchanges the named MUI_LayoutMsg value; this bounded layer alone translates
+// its nested mixed-width guest representation.
+internal static class MUI_LayoutMsgMemoryCodec
+{
+	private static bool TryResolve(MUI_LayoutMsgField field,
+		out uint offset, out uint fieldSize)
+	{
+		switch (field)
+		{
+			case MUI_LayoutMsgField.Type:
+				offset = MUI_LayoutMsg.TypeOffset;
+				fieldSize = MUI_LayoutMsg.FieldSize32; return true;
+			case MUI_LayoutMsgField.Children:
+				offset = MUI_LayoutMsg.ChildrenOffset;
+				fieldSize = MUI_LayoutMsg.FieldSize32; return true;
+			case MUI_LayoutMsgField.MinWidth:
+				offset = MUI_LayoutMsg.MinWidthOffset;
+				fieldSize = MUI_LayoutMsg.FieldSize16; return true;
+			case MUI_LayoutMsgField.MinHeight:
+				offset = MUI_LayoutMsg.MinHeightOffset;
+				fieldSize = MUI_LayoutMsg.FieldSize16; return true;
+			case MUI_LayoutMsgField.MaxWidth:
+				offset = MUI_LayoutMsg.MaxWidthOffset;
+				fieldSize = MUI_LayoutMsg.FieldSize16; return true;
+			case MUI_LayoutMsgField.MaxHeight:
+				offset = MUI_LayoutMsg.MaxHeightOffset;
+				fieldSize = MUI_LayoutMsg.FieldSize16; return true;
+			case MUI_LayoutMsgField.DefWidth:
+				offset = MUI_LayoutMsg.DefWidthOffset;
+				fieldSize = MUI_LayoutMsg.FieldSize16; return true;
+			case MUI_LayoutMsgField.DefHeight:
+				offset = MUI_LayoutMsg.DefHeightOffset;
+				fieldSize = MUI_LayoutMsg.FieldSize16; return true;
+			case MUI_LayoutMsgField.Width:
+				offset = MUI_LayoutMsg.WidthOffset;
+				fieldSize = MUI_LayoutMsg.FieldSize32; return true;
+			case MUI_LayoutMsgField.Height:
+				offset = MUI_LayoutMsg.HeightOffset;
+				fieldSize = MUI_LayoutMsg.FieldSize32; return true;
+			case MUI_LayoutMsgField.Private5:
+				offset = MUI_LayoutMsg.Private5Offset;
+				fieldSize = MUI_LayoutMsg.FieldSize32; return true;
+			case MUI_LayoutMsgField.Private6:
+				offset = MUI_LayoutMsg.Private6Offset;
+				fieldSize = MUI_LayoutMsg.FieldSize32; return true;
+		}
+		offset = 0;
+		fieldSize = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TMemory>(ref TMemory memory,
+		APTR record, MUI_LayoutMsgField field, out APTR address,
+		out uint fieldSize) where TMemory : struct, IAmigaGuestMemory
+	{
+		address = APTR.Null;
+		fieldSize = 0;
+		if (!TryResolve(field, out var offset, out fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!memory.IsMapped(record, MUI_LayoutMsg.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return memory.IsMapped(address, fieldSize);
+	}
+
+	internal static bool TryReadUInt32<TMemory>(ref TMemory memory,
+		APTR record, MUI_LayoutMsgField field, out uint value)
+		where TMemory : struct, IAmigaGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref memory, record, field, out var address,
+			out var fieldSize) || fieldSize != MUI_LayoutMsg.FieldSize32) return false;
+		value = memory.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryReadUInt16<TMemory>(ref TMemory memory,
+		APTR record, MUI_LayoutMsgField field, out ushort value)
+		where TMemory : struct, IAmigaGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref memory, record, field, out var address,
+			out var fieldSize) || fieldSize != MUI_LayoutMsg.FieldSize16) return false;
+		value = memory.ReadUInt16(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TMemory>(ref TMemory memory,
+		APTR record, MUI_LayoutMsgField field, uint value)
+		where TMemory : struct, IAmigaGuestMemory
+	{
+		if (!TryGetAddress(ref memory, record, field, out var address,
+			out var fieldSize) || fieldSize != MUI_LayoutMsg.FieldSize32) return false;
+		memory.WriteUInt32(address, 0, value);
+		return true;
+	}
+
+	internal static bool TryWriteUInt16<TMemory>(ref TMemory memory,
+		APTR record, MUI_LayoutMsgField field, ushort value)
+		where TMemory : struct, IAmigaGuestMemory
+	{
+		if (!TryGetAddress(ref memory, record, field, out var address,
+			out var fieldSize) || fieldSize != MUI_LayoutMsg.FieldSize16) return false;
+		memory.WriteUInt16(address, 0, value);
+		return true;
+	}
 }
 
 public static class MUI_LayoutMsgCodec
@@ -105,39 +243,69 @@ public static class MUI_LayoutMsgCodec
 		out MUI_LayoutMsg value) where TMemory : struct, IAmigaGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !memory.IsMapped(address, Size)) return false;
-		value.lm_Type = memory.ReadUInt32(address, 0);
-		value.lm_Children = APTR.FromPointer(memory.ReadUInt32(address, 4));
-		value.lm_MinMax.MinWidth = unchecked((short)memory.ReadUInt16(address, 8));
-		value.lm_MinMax.MinHeight = unchecked((short)memory.ReadUInt16(address, 10));
-		value.lm_MinMax.MaxWidth = unchecked((short)memory.ReadUInt16(address, 12));
-		value.lm_MinMax.MaxHeight = unchecked((short)memory.ReadUInt16(address, 14));
-		value.lm_MinMax.DefWidth = unchecked((short)memory.ReadUInt16(address, 16));
-		value.lm_MinMax.DefHeight = unchecked((short)memory.ReadUInt16(address, 18));
-		value.lm_Layout.Width = unchecked((int)memory.ReadUInt32(address, 20));
-		value.lm_Layout.Height = unchecked((int)memory.ReadUInt32(address, 24));
-		value.lm_Layout.priv5 = memory.ReadUInt32(address, 28);
-		value.lm_Layout.priv6 = memory.ReadUInt32(address, 32);
+		if (!MUI_LayoutMsgMemoryCodec.TryReadUInt32(ref memory, address,
+			MUI_LayoutMsgField.Type, out value.lm_Type) ||
+			!MUI_LayoutMsgMemoryCodec.TryReadUInt32(ref memory, address,
+				MUI_LayoutMsgField.Children, out var children) ||
+			!MUI_LayoutMsgMemoryCodec.TryReadUInt16(ref memory, address,
+				MUI_LayoutMsgField.MinWidth, out var minWidth) ||
+			!MUI_LayoutMsgMemoryCodec.TryReadUInt16(ref memory, address,
+				MUI_LayoutMsgField.MinHeight, out var minHeight) ||
+			!MUI_LayoutMsgMemoryCodec.TryReadUInt16(ref memory, address,
+				MUI_LayoutMsgField.MaxWidth, out var maxWidth) ||
+			!MUI_LayoutMsgMemoryCodec.TryReadUInt16(ref memory, address,
+				MUI_LayoutMsgField.MaxHeight, out var maxHeight) ||
+			!MUI_LayoutMsgMemoryCodec.TryReadUInt16(ref memory, address,
+				MUI_LayoutMsgField.DefWidth, out var defWidth) ||
+			!MUI_LayoutMsgMemoryCodec.TryReadUInt16(ref memory, address,
+				MUI_LayoutMsgField.DefHeight, out var defHeight) ||
+			!MUI_LayoutMsgMemoryCodec.TryReadUInt32(ref memory, address,
+				MUI_LayoutMsgField.Width, out var width) ||
+			!MUI_LayoutMsgMemoryCodec.TryReadUInt32(ref memory, address,
+				MUI_LayoutMsgField.Height, out var height) ||
+			!MUI_LayoutMsgMemoryCodec.TryReadUInt32(ref memory, address,
+				MUI_LayoutMsgField.Private5, out value.lm_Layout.priv5) ||
+			!MUI_LayoutMsgMemoryCodec.TryReadUInt32(ref memory, address,
+				MUI_LayoutMsgField.Private6, out value.lm_Layout.priv6)) return false;
+		value.lm_Children = APTR.FromPointer(children);
+		value.lm_MinMax.MinWidth = unchecked((short)minWidth);
+		value.lm_MinMax.MinHeight = unchecked((short)minHeight);
+		value.lm_MinMax.MaxWidth = unchecked((short)maxWidth);
+		value.lm_MinMax.MaxHeight = unchecked((short)maxHeight);
+		value.lm_MinMax.DefWidth = unchecked((short)defWidth);
+		value.lm_MinMax.DefHeight = unchecked((short)defHeight);
+		value.lm_Layout.Width = unchecked((int)width);
+		value.lm_Layout.Height = unchecked((int)height);
 		return true;
 	}
 
 	public static bool Write<TMemory>(ref TMemory memory, APTR address,
 		MUI_LayoutMsg value) where TMemory : struct, IAmigaGuestMemory
 	{
-		if (address.IsNull || !memory.IsMapped(address, Size)) return false;
-		memory.WriteUInt32(address, 0, value.lm_Type);
-		memory.WriteUInt32(address, 4, value.lm_Children.Raw);
-		memory.WriteUInt16(address, 8, unchecked((ushort)value.lm_MinMax.MinWidth));
-		memory.WriteUInt16(address, 10, unchecked((ushort)value.lm_MinMax.MinHeight));
-		memory.WriteUInt16(address, 12, unchecked((ushort)value.lm_MinMax.MaxWidth));
-		memory.WriteUInt16(address, 14, unchecked((ushort)value.lm_MinMax.MaxHeight));
-		memory.WriteUInt16(address, 16, unchecked((ushort)value.lm_MinMax.DefWidth));
-		memory.WriteUInt16(address, 18, unchecked((ushort)value.lm_MinMax.DefHeight));
-		memory.WriteUInt32(address, 20, unchecked((uint)value.lm_Layout.Width));
-		memory.WriteUInt32(address, 24, unchecked((uint)value.lm_Layout.Height));
-		memory.WriteUInt32(address, 28, value.lm_Layout.priv5);
-		memory.WriteUInt32(address, 32, value.lm_Layout.priv6);
-		return true;
+		return MUI_LayoutMsgMemoryCodec.TryWriteUInt32(ref memory, address,
+			MUI_LayoutMsgField.Type, value.lm_Type) &&
+			MUI_LayoutMsgMemoryCodec.TryWriteUInt32(ref memory, address,
+				MUI_LayoutMsgField.Children, value.lm_Children.Raw) &&
+			MUI_LayoutMsgMemoryCodec.TryWriteUInt16(ref memory, address,
+				MUI_LayoutMsgField.MinWidth, unchecked((ushort)value.lm_MinMax.MinWidth)) &&
+			MUI_LayoutMsgMemoryCodec.TryWriteUInt16(ref memory, address,
+				MUI_LayoutMsgField.MinHeight, unchecked((ushort)value.lm_MinMax.MinHeight)) &&
+			MUI_LayoutMsgMemoryCodec.TryWriteUInt16(ref memory, address,
+				MUI_LayoutMsgField.MaxWidth, unchecked((ushort)value.lm_MinMax.MaxWidth)) &&
+			MUI_LayoutMsgMemoryCodec.TryWriteUInt16(ref memory, address,
+				MUI_LayoutMsgField.MaxHeight, unchecked((ushort)value.lm_MinMax.MaxHeight)) &&
+			MUI_LayoutMsgMemoryCodec.TryWriteUInt16(ref memory, address,
+				MUI_LayoutMsgField.DefWidth, unchecked((ushort)value.lm_MinMax.DefWidth)) &&
+			MUI_LayoutMsgMemoryCodec.TryWriteUInt16(ref memory, address,
+				MUI_LayoutMsgField.DefHeight, unchecked((ushort)value.lm_MinMax.DefHeight)) &&
+			MUI_LayoutMsgMemoryCodec.TryWriteUInt32(ref memory, address,
+				MUI_LayoutMsgField.Width, unchecked((uint)value.lm_Layout.Width)) &&
+			MUI_LayoutMsgMemoryCodec.TryWriteUInt32(ref memory, address,
+				MUI_LayoutMsgField.Height, unchecked((uint)value.lm_Layout.Height)) &&
+			MUI_LayoutMsgMemoryCodec.TryWriteUInt32(ref memory, address,
+				MUI_LayoutMsgField.Private5, value.lm_Layout.priv5) &&
+			MUI_LayoutMsgMemoryCodec.TryWriteUInt32(ref memory, address,
+				MUI_LayoutMsgField.Private6, value.lm_Layout.priv6);
 	}
 }
 }

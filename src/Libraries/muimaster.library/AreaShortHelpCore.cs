@@ -57,11 +57,17 @@ internal static class MuiAreaShortHelpCore
 		var hasRaw = MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
 			MuiCommonControlCore.ShortHelp, out var raw);
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) ==
-			unchecked((int)MuiAreaShortHelpStateRecord.Size) &&
-			MuiAreaShortHelpStateRecordCodec.TryRead(ref platform, block,
-				out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateKey);
+		MuiAreaShortHelpStateRecord record;
+		if (block.IsNotNull || length != 0)
 		{
+			// A present block is authoritative typed state. Do not repair a
+			// malformed generation from the legacy raw attribute.
+			if (length != unchecked((int)MuiAreaShortHelpStateRecord.Size) ||
+				!MuiAreaShortHelpStateRecordCodec.TryReadStructural(ref platform, block,
+					out record) || !MuiAreaShortHelpStateAdmission.ValidateLive(ref platform,
+					state, obj, record)) return false;
 			if (hasRaw && record.Text.Raw != raw)
 			{
 				record.Text = APTR.FromPointer(raw);
@@ -93,8 +99,9 @@ internal static class MuiAreaShortHelpCore
 		record.Magic = MuiAreaShortHelpStateRecord.Cookie;
 		record.Text = text;
 		record.Generation = generation == 0 ? 1u : generation;
-		var written = MuiAreaShortHelpStateRecordCodec.Write(ref platform, scratch,
-			record);
+		var written = MuiAreaShortHelpStateAdmission.ValidateLive(ref platform, state,
+			obj, record) && MuiAreaShortHelpStateRecordCodec.Write(ref platform,
+			scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 			StateKey, scratch, unchecked((int)MuiAreaShortHelpStateRecord.Size));
 		platform.Clear(scratch, MuiAreaShortHelpStateRecord.Size);
@@ -159,7 +166,8 @@ public static class MuiAreaShortHelpPacketCore
 		APTR obj, APTR help)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!MuiAreaShortHelpCore.TryReadState(ref platform, state, obj, out _))
 			return false;
 		var sample = default(MuiShortHelpDeleteSample);
 		sample.Object = obj;

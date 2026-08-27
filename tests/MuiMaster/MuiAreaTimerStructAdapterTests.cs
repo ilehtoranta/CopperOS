@@ -1,0 +1,38 @@
+using Amiga;
+using CopperOS.MuiMaster;
+
+namespace CopperOS.MuiMaster.Tests;
+
+public sealed class MuiAreaTimerStructAdapterTests
+{
+	[Fact]
+	public void AreaTimerStructAdapterUsesNamedFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3D00);
+		var value = new MuiAreaTimerStateRecord
+		{
+			Magic = MuiAreaTimerStateRecord.Cookie,
+			Value = -123,
+			Generation = 7,
+		};
+
+		Assert.True(MuiAreaTimerStateRecordCodec.Write(ref platform, address,
+			value));
+		Assert.True(MuiAreaTimerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaTimerStateField.Value, out var valueAddress));
+		Assert.Equal(0x3D04u, valueAddress.Raw);
+		Assert.True(MuiAreaTimerStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaTimerStateField.Value, unchecked((uint)456)));
+		Assert.True(MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(456, decoded.Value);
+		Assert.False(MuiAreaTimerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaTimerStateField)255, out _));
+		Assert.False(MuiAreaTimerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiAreaTimerStateField.Magic, out _));
+		Assert.False(MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _));
+	}
+}

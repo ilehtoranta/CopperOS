@@ -15,6 +15,7 @@ public sealed class MuiGroupPageTests
 	private const uint FixWidth = 0x8042A3F1;
 	private const uint FixHeight = 0x8042A92B;
 	private const uint ShowMe = 0x80429BA8;
+	private const uint PageStateAttribute = 0x7FFE0041;
 
 	[Fact]
 	public void ActivePageSelectorsNormalizeAndDrivePageLayout()
@@ -112,6 +113,35 @@ public sealed class MuiGroupPageTests
 	}
 
 	[Fact]
+	public void MalformedNamedPageStateFailsClosedBeforeGetterAndLayout()
+	{
+		var platform = CreatePageGroup(out var group, out var children);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, group,
+			PageMode, 1, false));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, group,
+			ActivePage, 1, false));
+		Assert.True(MuiGroupLayoutCore.Layout(ref platform, State, group, 8, 9,
+			80, 30));
+		var beforeWidth = Get(ref platform, children[1], Width);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, group,
+			PageStateAttribute, out var blockRaw));
+		var block = APTR.FromPointer(blockRaw);
+		Assert.True(MuiGroupPageStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiGroupPageStateField.Active, uint.MaxValue));
+
+		Assert.False(MuiGroupPageCore.TryGetAttribute(ref platform, State, group,
+			ActivePage, out _));
+		Assert.False(MuiGroupPageCore.TryReadActivePage(ref platform, State, group,
+			4, out _));
+		Assert.False(MuiHeadlessObjectCore.SetAttribute(ref platform, State, group,
+			ActivePage, 0, false));
+		Assert.False(MuiGroupLayoutCore.Layout(ref platform, State, group, 8, 9,
+			80, 30));
+		Assert.Equal(beforeWidth, Get(ref platform, children[1], Width));
+		Assert.Equal(1u, GetRaw(ref platform, group, ActivePage));
+	}
+
+	[Fact]
 	public void PageMinimumUsesLargestChildMinimumAndSmallestChildMaximum()
 	{
 		var platform = CreatePageGroup(out var group, out var children);
@@ -173,6 +203,14 @@ public sealed class MuiGroupPageTests
 		uint attribute)
 	{
 		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, obj,
+			attribute, out var value));
+		return value;
+	}
+
+	private static uint GetRaw(ref MuiHeadlessTestPlatform platform, APTR obj,
+		uint attribute)
+	{
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, obj,
 			attribute, out var value));
 		return value;
 	}

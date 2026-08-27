@@ -41,11 +41,18 @@ internal static class MuiAreaContextMenuCore
 		var hasRaw = MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
 			MuiCommonControlCore.ContextMenu, out var raw);
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) ==
-			unchecked((int)MuiAreaContextMenuStateRecord.Size) &&
-			MuiAreaContextMenuStateRecordCodec.TryRead(ref platform, block,
-				out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateKey);
+		MuiAreaContextMenuStateRecord record;
+		if (block.IsNotNull || length != 0)
 		{
+			// A present block is authoritative typed state.  Reject malformed
+			// records instead of rebuilding menu ownership from raw aliases.
+			if (length != unchecked((int)MuiAreaContextMenuStateRecord.Size) ||
+				!MuiAreaContextMenuStateRecordCodec.TryReadStructural(ref platform,
+					block, out record) ||
+				!MuiAreaContextMenuStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			if (hasRaw && record.MenuStrip.Raw != raw)
 			{
 				record.MenuStrip = APTR.FromPointer(raw);
@@ -81,8 +88,9 @@ internal static class MuiAreaContextMenuCore
 		record.MenuStrip = menuStrip;
 		record.Trigger = trigger;
 		record.Generation = generation == 0 ? 1u : generation;
-		var written = MuiAreaContextMenuStateRecordCodec.Write(ref platform, scratch,
-			record);
+		var written = MuiAreaContextMenuStateAdmission.ValidateLive(ref platform,
+			state, obj, record) && MuiAreaContextMenuStateRecordCodec.Write(
+			ref platform, scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 			StateKey, scratch, unchecked((int)MuiAreaContextMenuStateRecord.Size));
 		platform.Clear(scratch, MuiAreaContextMenuStateRecord.Size);
@@ -96,8 +104,10 @@ internal static class MuiAreaContextMenuCore
 	{
 		if (!TryReadState(ref platform, state, obj, out var current)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
-		if (!MuiAreaContextMenuStateRecordCodec.TryRead(ref platform, block,
-			out var record)) return false;
+		if (!MuiAreaContextMenuStateRecordCodec.TryReadStructural(ref platform,
+			block, out var record) ||
+			!MuiAreaContextMenuStateAdmission.ValidateLive(ref platform, state,
+				obj, record)) return false;
 		record.Trigger = item;
 		record.Generation = record.Generation == uint.MaxValue ? 1u :
 			record.Generation + 1u;

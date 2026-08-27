@@ -114,16 +114,15 @@ internal static class MuiFloattextPolicyFieldCursorCodec
 
 internal static class MuiFloattextPolicyStateCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiFloattextPolicyState value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiFloattextPolicyState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiFloattextPolicyState.Size) ||
 			!MuiFloattextPolicyFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiFloattextPolicyField.Magic, out var magic) ||
-			magic != MuiFloattextPolicyState.Cookie)
+				MuiFloattextPolicyField.Magic, out var magic))
 			return false;
 		value.Magic = magic;
 		if (!MuiFloattextPolicyFieldCursorCodec.TryReadUInt32(ref platform,
@@ -141,6 +140,12 @@ internal static class MuiFloattextPolicyStateCodec
 		value.SkipChars = APTR.FromPointer(skipChars);
 		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiFloattextPolicyState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		value.Magic == MuiFloattextPolicyState.Cookie;
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiFloattextPolicyState value)

@@ -234,13 +234,20 @@ internal static class MuiGroupGridCore
 				record.VerticalCenter;
 			return true;
 		}
+		var stateBlock = MuiStoreCore.DataspaceFind(ref platform, state, group,
+			StateKey);
+		var stateLength = MuiStoreCore.DataspaceLength(ref platform, state, group,
+			StateKey);
+		// A present named record is authoritative for the public getter seam.
+		// Never recover malformed state by projecting raw compatibility slots.
+		if (stateBlock.IsNotNull || stateLength != 0) return false;
 		var source = attribute == Spacing ? Spacing : attribute;
 		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, group,
 			source, out _) &&
 			(attribute != HorizontalSpacing && attribute != VerticalSpacing ||
 				!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, group,
 					Spacing, out _))) return false;
-		var spec = Read(ref platform, state, group);
+		if (!TryRead(ref platform, state, group, out var spec)) return false;
 		value = attribute == Columns ? spec.Columns :
 			attribute == Rows ? spec.Rows :
 			attribute == HorizontalSpacing ? spec.HorizontalSpacing :
@@ -258,9 +265,18 @@ internal static class MuiGroupGridCore
 	internal static MuiGroupGridSpec Read<TPlatform>(ref TPlatform platform,
 		APTR state, APTR group) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (PublishState(ref platform, state, group, out var record))
-			return ToSpec(record);
-		return ReadRawSpec(ref platform, state, group);
+		return TryRead(ref platform, state, group, out var spec) ? spec :
+			default;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR state,
+		APTR group, out MuiGroupGridSpec spec)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		spec = default;
+		if (!TryReadState(ref platform, state, group, out var record)) return false;
+		spec = ToSpec(record);
+		return true;
 	}
 
 	internal static bool TryGetStateRecord<TPlatform>(ref TPlatform platform,
@@ -268,30 +284,72 @@ internal static class MuiGroupGridCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, group).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, group,
 			StateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, group, StateKey) !=
 			unchecked((int)MuiGroupGridStateRecord.Size)) return false;
-		return MuiGroupGridStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiGroupGridStateRecordCodec.TryReadStructural(ref platform, block,
+			out value) && MuiGroupGridStateAdmission.ValidateLive(ref platform, state,
+			group, value);
 	}
 
-	private static bool PublishState<TPlatform>(ref TPlatform platform, APTR state,
+	internal static bool StateAvailable<TPlatform>(ref TPlatform platform,
+		APTR state, APTR group) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, group).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, group,
+			StateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, group,
+			StateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiGroupGridStateRecord.Size) &&
+			TryGetStateRecord(ref platform, state, group, out _);
+	}
+
+	private static bool TryReadState<TPlatform>(ref TPlatform platform, APTR state,
 		APTR group, out MuiGroupGridStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, group).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, group,
 			StateKey);
-		if (TryGetStateRecord(ref platform, state, group, out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, group,
+			StateKey);
+		var present = block.IsNotNull || length != 0;
+		if (present)
 		{
-			FillState(ref platform, state, group, ref value);
-			return MuiGroupGridStateRecordCodec.Write(ref platform, block, value);
+			if (length != unchecked((int)MuiGroupGridStateRecord.Size) ||
+				!MuiGroupGridStateRecordCodec.TryReadStructural(ref platform, block,
+					out var record) ||
+				!MuiGroupGridStateAdmission.ValidateLive(ref platform, state, group,
+					record)) return false;
+			value = record;
+			if (!TryFillState(ref platform, state, group, ref value) ||
+				!MuiGroupGridStateAdmission.ValidateLive(ref platform, state, group,
+					value)) return false;
+			if (record.Columns != value.Columns || record.Rows != value.Rows ||
+				record.HorizontalSpacing != value.HorizontalSpacing ||
+				record.VerticalSpacing != value.VerticalSpacing ||
+				record.SameWidth != value.SameWidth ||
+				record.SameHeight != value.SameHeight ||
+					record.HorizontalCenter != value.HorizontalCenter ||
+					record.VerticalCenter != value.VerticalCenter)
+				return MuiGroupGridStateAdmission.ValidateLive(ref platform, state,
+					group, value) && MuiGroupGridStateRecordCodec.Write(ref platform,
+					block, value);
+			return true;
 		}
 
 		value = default;
 		value.Magic = MuiGroupGridStateRecord.Cookie;
-		FillState(ref platform, state, group, ref value);
+		if (!TryFillState(ref platform, state, group, ref value) ||
+			!MuiGroupGridStateAdmission.ValidateLive(ref platform, state, group,
+				value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiGroupGridStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -305,7 +363,7 @@ internal static class MuiGroupGridCore
 		return added;
 	}
 
-	private static void FillState<TPlatform>(ref TPlatform platform, APTR state,
+	private static bool TryFillState<TPlatform>(ref TPlatform platform, APTR state,
 		APTR group, ref MuiGroupGridStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
@@ -323,6 +381,7 @@ internal static class MuiGroupGridCore
 		ReadValue(ref platform, state, group, SameHeight, 0,
 			out value.SameHeight);
 		ReadValue(ref platform, state, group, SameSize, 0, out var sameSize);
+		if (sameSize > 1) return false;
 		if (sameSize != 0)
 		{
 			value.SameWidth = 1;
@@ -338,6 +397,7 @@ internal static class MuiGroupGridCore
 		value.VerticalSpacing = NormalizeSpacing(value.VerticalSpacing);
 		value.HorizontalCenter = ClampCenter(value.HorizontalCenter);
 		value.VerticalCenter = ClampCenter(value.VerticalCenter);
+		return true;
 	}
 
 	private static MuiGroupGridSpec ReadRawSpec<TPlatform>(ref TPlatform platform,

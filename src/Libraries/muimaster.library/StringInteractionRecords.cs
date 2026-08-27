@@ -23,6 +23,19 @@ internal struct MuiStringInteractionStateRecord
 	internal uint Multiline;
 }
 
+internal static class MuiStringInteractionStateAdmission
+{
+	internal static bool Validate(MuiStringInteractionStateRecord value) =>
+		value.Magic == MuiStringInteractionStateRecord.Cookie &&
+		value.Editable <= 1 && value.AdvanceOnCR <= 1 && value.Multiline <= 1;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiStringInteractionStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) && !obj.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
+}
+
 internal enum MuiStringInteractionStateField : byte
 {
 	Magic,
@@ -92,52 +105,77 @@ internal static class MuiStringInteractionStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. The named interaction BOOLs remain the
+// semantic record; this bounded adapter owns fixed guest-layout translation.
+internal static class MuiStringInteractionStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiStringInteractionStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiStringInteractionStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiStringInteractionStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiStringInteractionStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringInteractionStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringInteractionStateRecord.Size) ||
-			!MuiStringInteractionStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiStringInteractionStateField.Magic, out var magic) ||
-			magic != MuiStringInteractionStateRecord.Cookie)
-			return false;
-		value.Magic = magic;
-		return MuiStringInteractionStateFieldCursorCodec.TryReadUInt32(
-			ref platform, address,
-			MuiStringInteractionStateField.Editable, out value.Editable) &&
-			MuiStringInteractionStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiStringInteractionStateField.AdvanceOnCR,
-				out value.AdvanceOnCR) &&
-			MuiStringInteractionStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiStringInteractionStateField.Multiline, out value.Multiline);
+		return MuiStringInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) &&
+			MuiStringInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 4, out value.Editable) &&
+			MuiStringInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 8, out value.AdvanceOnCR) &&
+			MuiStringInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 12, out value.Multiline);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiStringInteractionStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiStringInteractionStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringInteractionStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringInteractionStateRecord.Size) || value.Magic !=
-			MuiStringInteractionStateRecord.Cookie) return false;
-		return MuiStringInteractionStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiStringInteractionStateField.Magic, value.Magic) &&
-			MuiStringInteractionStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiStringInteractionStateField.Editable, value.Editable) &&
-			MuiStringInteractionStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiStringInteractionStateField.AdvanceOnCR,
-				value.AdvanceOnCR) &&
-			MuiStringInteractionStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiStringInteractionStateField.Multiline, value.Multiline);
+		if (!MuiStringInteractionStateAdmission.Validate(value)) return false;
+		return MuiStringInteractionStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 0, value.Magic) &&
+			MuiStringInteractionStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, 4, value.Editable) &&
+			MuiStringInteractionStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, 8, value.AdvanceOnCR) &&
+			MuiStringInteractionStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, 12, value.Multiline);
 	}
 }

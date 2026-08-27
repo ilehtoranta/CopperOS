@@ -15,6 +15,8 @@ namespace CopperOS.MuiMaster;
 internal struct MuiDataspaceMethodMessage
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
 
@@ -22,6 +24,11 @@ internal struct MuiDataspaceMethodMessage
 internal struct MuiDataspaceAddMessage
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint DataOffset = 4;
+	internal const uint LengthOffset = 8;
+	internal const uint IdOffset = 12;
 	internal uint MethodId;
 	internal APTR Data;
 	internal int Length;
@@ -32,6 +39,9 @@ internal struct MuiDataspaceAddMessage
 internal struct MuiDataspaceFindMessage
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint IdOffset = 4;
 	internal uint MethodId;
 	internal uint Id;
 }
@@ -40,6 +50,10 @@ internal struct MuiDataspaceFindMessage
 internal struct MuiDataspaceGetMessage
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint IdOffset = 4;
+	internal const uint SizeStorageOffset = 8;
 	internal uint MethodId;
 	internal uint Id;
 	internal APTR SizeStorage;
@@ -49,6 +63,9 @@ internal struct MuiDataspaceGetMessage
 internal struct MuiDataspaceMergeMessage
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint DataspaceOffset = 4;
 	internal uint MethodId;
 	internal APTR Dataspace;
 }
@@ -57,6 +74,9 @@ internal struct MuiDataspaceMergeMessage
 internal struct MuiDataspaceRemoveMessage
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint IdOffset = 4;
 	internal uint MethodId;
 	internal uint Id;
 }
@@ -65,6 +85,8 @@ internal struct MuiDataspaceRemoveMessage
 internal struct MuiDataspaceClearMessage
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
 
@@ -97,52 +119,77 @@ internal struct MuiDataspaceFieldCursor
 	internal MuiDataspaceField Field;
 }
 
-internal static class MuiDataspaceFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed Dataspace packet family.
+// Header reads admit the 4-byte method record; payload fields require their
+// packet's complete named record before being accessed.
+internal static class MuiDataspaceMessageMemoryCodec
 {
 	private static bool TryResolve(MuiDataspacePacketKind packet,
-		MuiDataspaceField field, out uint offset)
+		MuiDataspaceField field, out uint offset, out uint recordSize)
 	{
+		recordSize = 0;
 		switch (packet)
 		{
 			case MuiDataspacePacketKind.Method:
 			case MuiDataspacePacketKind.Clear:
-				if (field == MuiDataspaceField.MethodId) { offset = 0; return true; }
+				if (field == MuiDataspaceField.MethodId)
+				{
+					offset = MuiDataspaceMethodMessage.MethodIdOffset;
+					recordSize = MuiDataspaceMethodMessage.Size;
+					return true;
+				}
 				break;
 			case MuiDataspacePacketKind.Add:
-				if (field == MuiDataspaceField.MethodId) { offset = 0; return true; }
-				if (field == MuiDataspaceField.Data) { offset = 4; return true; }
-				if (field == MuiDataspaceField.Length) { offset = 8; return true; }
-				if (field == MuiDataspaceField.Id) { offset = 12; return true; }
+				recordSize = MuiDataspaceAddMessage.Size;
+				if (field == MuiDataspaceField.MethodId) { offset = MuiDataspaceAddMessage.MethodIdOffset; return true; }
+				if (field == MuiDataspaceField.Data) { offset = MuiDataspaceAddMessage.DataOffset; return true; }
+				if (field == MuiDataspaceField.Length) { offset = MuiDataspaceAddMessage.LengthOffset; return true; }
+				if (field == MuiDataspaceField.Id) { offset = MuiDataspaceAddMessage.IdOffset; return true; }
 				break;
 			case MuiDataspacePacketKind.Find:
 			case MuiDataspacePacketKind.Remove:
-				if (field == MuiDataspaceField.MethodId) { offset = 0; return true; }
-				if (field == MuiDataspaceField.Id) { offset = 4; return true; }
+				recordSize = packet == MuiDataspacePacketKind.Find ?
+					MuiDataspaceFindMessage.Size : MuiDataspaceRemoveMessage.Size;
+				if (field == MuiDataspaceField.MethodId)
+				{
+					offset = MuiDataspaceFindMessage.MethodIdOffset;
+					return true;
+				}
+				if (field == MuiDataspaceField.Id)
+				{
+					offset = MuiDataspaceFindMessage.IdOffset;
+					return true;
+				}
 				break;
 			case MuiDataspacePacketKind.Get:
-				if (field == MuiDataspaceField.MethodId) { offset = 0; return true; }
-				if (field == MuiDataspaceField.Id) { offset = 4; return true; }
-				if (field == MuiDataspaceField.SizeStorage) { offset = 8; return true; }
+				recordSize = MuiDataspaceGetMessage.Size;
+				if (field == MuiDataspaceField.MethodId) { offset = MuiDataspaceGetMessage.MethodIdOffset; return true; }
+				if (field == MuiDataspaceField.Id) { offset = MuiDataspaceGetMessage.IdOffset; return true; }
+				if (field == MuiDataspaceField.SizeStorage) { offset = MuiDataspaceGetMessage.SizeStorageOffset; return true; }
 				break;
 			case MuiDataspacePacketKind.Merge:
-				if (field == MuiDataspaceField.MethodId) { offset = 0; return true; }
-				if (field == MuiDataspaceField.Dataspace) { offset = 4; return true; }
+				recordSize = MuiDataspaceMergeMessage.Size;
+				if (field == MuiDataspaceField.MethodId) { offset = MuiDataspaceMergeMessage.MethodIdOffset; return true; }
+				if (field == MuiDataspaceField.Dataspace) { offset = MuiDataspaceMergeMessage.DataspaceOffset; return true; }
 				break;
 		}
 		offset = 0;
+		recordSize = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiDataspaceFieldCursor cursor, out APTR address)
+		APTR message, MuiDataspacePacketKind packet, MuiDataspaceField field,
+		out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset)
+		if (!TryResolve(packet, field, out var offset, out var recordSize) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, recordSize))
 			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiDataspaceAddMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -151,11 +198,8 @@ internal static class MuiDataspaceFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiDataspaceFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -165,14 +209,36 @@ internal static class MuiDataspaceFieldCursorCodec
 		uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiDataspaceFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for existing typed cursor callers. The live
+// packet codecs route through the named-record adapter above.
+internal static class MuiDataspaceFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiDataspaceFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDataspaceMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Packet, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspacePacketKind packet, MuiDataspaceField field,
+		out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message, packet,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspacePacketKind packet, MuiDataspaceField field,
+		uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message, packet,
+			field, value);
 }
 
 // Central codec for the fixed Dataspace packet family. All consumers receive

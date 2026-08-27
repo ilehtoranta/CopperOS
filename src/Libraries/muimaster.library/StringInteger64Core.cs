@@ -93,6 +93,20 @@ public struct MuiStringInteger64State
 	public APTR Value;
 }
 
+internal static class MuiStringInteger64StateAdmission
+{
+	// The structural domain is the complete 32-bit APTR space; mapping is a
+	// live-memory property checked only when an owning object is available.
+	internal static bool Validate(APTR value) => value.IsNull || value.IsNotNull;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, APTR value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) && !obj.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull &&
+		(value.IsNull || platform.IsMapped(value, MuiStringInteger64Value.Size));
+}
+
 internal static class MuiStringInteger64Codec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,

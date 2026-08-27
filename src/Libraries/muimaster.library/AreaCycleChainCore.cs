@@ -25,11 +25,18 @@ internal static class MuiAreaCycleChainCore
 			MuiCommonControlCore.CycleChain, out var raw))
 			cycleChain = unchecked((int)raw);
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) ==
-			unchecked((int)MuiAreaCycleChainStateRecord.Size) &&
-			MuiAreaCycleChainStateRecordCodec.TryRead(ref platform, block,
-				out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateKey);
+		MuiAreaCycleChainStateRecord record;
+		if (block.IsNotNull || length != 0)
 		{
+			// A present block is authoritative typed state. Reject malformed
+			// generation state instead of treating it as an absent projection.
+			if (length != unchecked((int)MuiAreaCycleChainStateRecord.Size) ||
+				!MuiAreaCycleChainStateRecordCodec.TryReadStructural(ref platform,
+					block, out record) ||
+				!MuiAreaCycleChainStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			if (record.Value != cycleChain)
 			{
 				record.Value = cycleChain;
@@ -60,8 +67,9 @@ internal static class MuiAreaCycleChainCore
 		record.Magic = MuiAreaCycleChainStateRecord.Cookie;
 		record.Value = cycleChain;
 		record.Generation = generation == 0 ? 1u : generation;
-		var written = MuiAreaCycleChainStateRecordCodec.Write(ref platform, scratch,
-			record);
+		var written = MuiAreaCycleChainStateAdmission.ValidateLive(ref platform,
+			state, obj, record) && MuiAreaCycleChainStateRecordCodec.Write(
+			ref platform, scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 			StateKey, scratch, unchecked((int)MuiAreaCycleChainStateRecord.Size));
 		platform.Clear(scratch, MuiAreaCycleChainStateRecord.Size);

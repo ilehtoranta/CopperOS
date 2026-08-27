@@ -99,6 +99,101 @@ public sealed class MuiAreaCustomFontTests
 	}
 
 	[Fact]
+	public void CustomFontRecordUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1540);
+		var value = default(MuiAreaCustomFontStateRecord);
+		value.Magic = MuiAreaCustomFontStateRecord.Cookie;
+		value.Spec = APTR.FromPointer(0x1A00);
+		value.Present = 1;
+		value.Generation = 7;
+
+		Assert.True(MuiAreaCustomFontStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiAreaCustomFontStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Spec, decoded.Spec);
+		Assert.Equal(value.Present, decoded.Present);
+		Assert.Equal(value.Generation, decoded.Generation);
+		Assert.True(MuiAreaCustomFontStateRecordCodec.TryRead(ref platform,
+			address, out decoded));
+		Assert.False(MuiAreaCustomFontStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void CustomFontAdmissionRequiresCanonicalPresenceGenerationAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State,
+			areaClass, APTR.Null);
+		var valid = new MuiAreaCustomFontStateRecord
+		{
+			Magic = MuiAreaCustomFontStateRecord.Cookie,
+			Spec = APTR.Null,
+			Present = 1,
+			Generation = 1,
+		};
+		Assert.True(MuiAreaCustomFontStateAdmission.Validate(valid));
+		Assert.True(MuiAreaCustomFontStateAdmission.ValidateLive(ref platform,
+			State, obj, valid));
+		var malformed = valid;
+		malformed.Present = 2;
+		Assert.False(MuiAreaCustomFontStateAdmission.Validate(malformed));
+		malformed = valid;
+		malformed.Generation = 0;
+		Assert.False(MuiAreaCustomFontStateAdmission.Validate(malformed));
+		malformed = valid;
+		malformed.Present = 0;
+		malformed.Spec = APTR.FromPointer(0x1700);
+		Assert.False(MuiAreaCustomFontStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaCustomFontStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedCustomFontFailsClosedBeforeRawRepairOrOpening()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var spec = APTR.FromPointer(0x1700);
+		platform.WriteCString(spec, "/+10/o");
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiAreaCustomFontPacketCore.Set(ref platform, State, obj,
+			spec, false));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaCustomFontCore.StateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaCustomFontStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiAreaCustomFontStateField.Present, 2));
+		Assert.True(MuiAreaCustomFontStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(2u, structural.Present);
+		Assert.False(MuiAreaCustomFontStateAdmission.Validate(structural));
+		Assert.False(MuiAreaCustomFontStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		var allocationsBefore = platform.AllocationCount;
+		Assert.False(MuiAreaCustomFontPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		Assert.False(MuiAreaCustomFontPacketCore.TryGetEffective(ref platform,
+			State, obj, out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		var renderInfo = APTR.FromPointer(0x1800);
+		platform.WriteUInt32(renderInfo, 20, 0x1900);
+		Assert.False(MuiAreaCustomFontCore.Setup(ref platform, State, obj));
+		Assert.Equal(0u, platform.CustomFontOpenCount);
+		Assert.False(MuiAreaCustomFontPacketCore.Set(ref platform, State, obj,
+			APTR.Null, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			obj, MuiCommonControlCore.CustomFont, out var raw));
+		Assert.Equal(spec.Raw, raw);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaCustomFontCore.StateKey));
+	}
+
+	[Fact]
 	public void CustomFontSpecParsesNamedFamilySizeStylesAndColors()
 	{
 		var platform = CreatePlatform(out _);
@@ -200,6 +295,87 @@ public sealed class MuiAreaCustomFontTests
 		Assert.True(MuiAreaFontSelectionStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out var fieldAddress));
 		Assert.Equal(address.Raw + 8, fieldAddress.Raw);
+	}
+
+	[Fact]
+	public void FontSelectionRecordUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1E00);
+		var value = default(MuiAreaFontSelectionStateRecord);
+		value.Magic = MuiAreaFontSelectionStateRecord.Cookie;
+		value.Active = (uint)MuiAreaFontSelectionKind.CustomFont;
+		value.Source = APTR.FromPointer(0x1F00);
+		value.Generation = 7;
+
+		Assert.True(MuiAreaFontSelectionStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiAreaFontSelectionStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Active, decoded.Active);
+		Assert.Equal(value.Source, decoded.Source);
+		Assert.Equal(value.Generation, decoded.Generation);
+		Assert.True(MuiAreaFontSelectionStateRecordCodec.TryRead(ref platform,
+			address, out decoded));
+		Assert.False(MuiAreaFontSelectionStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void FontSelectionAdmissionRequiresClosedChoiceAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State,
+			areaClass, APTR.Null);
+		var valid = new MuiAreaFontSelectionStateRecord
+		{
+			Magic = MuiAreaFontSelectionStateRecord.Cookie,
+			Active = (uint)MuiAreaFontSelectionKind.CustomFont,
+			Source = APTR.FromPointer(0x1D00),
+			Generation = 1,
+		};
+		Assert.True(MuiAreaFontSelectionStateAdmission.Validate(valid));
+		Assert.True(MuiAreaFontSelectionStateAdmission.ValidateLive(ref platform,
+			State, obj, valid));
+		var malformed = valid;
+		malformed.Active = 3;
+		Assert.False(MuiAreaFontSelectionStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaFontSelectionStateAdmission.ValidateLive(ref platform,
+			State, obj, malformed));
+		malformed = valid;
+		malformed.Active = (uint)MuiAreaFontSelectionKind.None;
+		Assert.False(MuiAreaFontSelectionStateAdmission.Validate(malformed));
+		malformed = valid;
+		malformed.Generation = 0;
+		Assert.False(MuiAreaFontSelectionStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaFontSelectionStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedFontSelectionFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State,
+			areaClass, APTR.Null);
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaFontSelectionCore.StateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaFontSelectionStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiAreaFontSelectionStateField.Active, 3));
+		Assert.True(MuiAreaFontSelectionStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(3u, structural.Active);
+		Assert.False(MuiAreaFontSelectionStateAdmission.Validate(structural));
+		Assert.False(MuiAreaFontSelectionStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		var allocationsBefore = platform.AllocationCount;
+		Assert.False(MuiAreaFontSelectionCore.TryReadState(ref platform, State, obj,
+			out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaFontSelectionCore.StateKey));
 	}
 
 	[Fact]
@@ -444,6 +620,104 @@ public sealed class MuiAreaCustomFontTests
 		Assert.True(MuiAreaCustomFontRuntimeFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out var fieldAddress));
 		Assert.Equal(address.Raw + 16, fieldAddress.Raw);
+	}
+
+	[Fact]
+	public void CustomFontRuntimeRecordUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x2A40);
+		var value = new MuiAreaCustomFontRuntimeRecord
+		{
+			Magic = MuiAreaCustomFontRuntimeRecord.Cookie,
+			Font = APTR.FromPointer(0x2B00),
+			Spec = APTR.FromPointer(0x2C00),
+			Generation = 7,
+			Active = 1,
+		};
+
+		Assert.True(MuiAreaCustomFontRuntimeRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Font, decoded.Font);
+		Assert.Equal(value.Spec, decoded.Spec);
+		Assert.Equal(value.Generation, decoded.Generation);
+		Assert.Equal(value.Active, decoded.Active);
+		Assert.True(MuiAreaCustomFontRuntimeRecordCodec.TryRead(ref platform,
+			address, out decoded));
+		Assert.False(MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void CustomFontRuntimeAdmissionRequiresCanonicalActiveGenerationAndOwner()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State,
+			areaClass, APTR.Null);
+		var valid = new MuiAreaCustomFontRuntimeRecord
+		{
+			Magic = MuiAreaCustomFontRuntimeRecord.Cookie,
+			Font = APTR.FromPointer(0x1600),
+			Spec = APTR.FromPointer(0x1700),
+			Generation = 1,
+			Active = 1,
+		};
+		Assert.True(MuiAreaCustomFontRuntimeStateAdmission.Validate(valid));
+		Assert.True(MuiAreaCustomFontRuntimeStateAdmission.ValidateLive(
+			ref platform, State, obj, valid));
+		var malformed = valid;
+		malformed.Active = 2;
+		Assert.False(MuiAreaCustomFontRuntimeStateAdmission.Validate(malformed));
+		malformed = valid;
+		malformed.Generation = 0;
+		Assert.False(MuiAreaCustomFontRuntimeStateAdmission.Validate(malformed));
+		malformed = valid;
+		malformed.Active = 0;
+		Assert.False(MuiAreaCustomFontRuntimeStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaCustomFontRuntimeStateAdmission.ValidateLive(
+			ref platform, State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedCustomFontRuntimeFailsClosedBeforeProviderCloseOrOpen()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var spec = APTR.FromPointer(0x1A00);
+		platform.WriteCString(spec, "/+10/o");
+		var obj = MuiCommonControlCore.CreateControl(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiAreaCustomFontPacketCore.Set(ref platform, State, obj,
+			spec, false));
+		var renderInfo = APTR.FromPointer(0x1B00);
+		platform.WriteUInt32(renderInfo, 20, 0x1C00);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, obj, renderInfo));
+		Assert.True(MuiAreaCustomFontPacketCore.TryGetRuntime(ref platform, State,
+			obj, out var runtime));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaCustomFontCore.RuntimeStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaCustomFontRuntimeFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiAreaCustomFontRuntimeField.Active, 2));
+		Assert.True(MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(2u, structural.Active);
+		Assert.False(MuiAreaCustomFontRuntimeStateAdmission.Validate(structural));
+		Assert.False(MuiAreaCustomFontRuntimeRecordCodec.TryRead(ref platform,
+			block, out _));
+		var closesBefore = platform.CustomFontCloseCount;
+		var opensBefore = platform.CustomFontOpenCount;
+		Assert.False(MuiAreaCustomFontPacketCore.TryGetRuntime(ref platform, State,
+			obj, out _));
+		Assert.False(MuiAreaCustomFontPacketCore.CloseCustomFont(ref platform,
+			State, obj, runtime.Font));
+		Assert.False(MuiAreaCustomFontCore.Setup(ref platform, State, obj));
+		Assert.Equal(closesBefore, platform.CustomFontCloseCount);
+		Assert.Equal(opensBefore, platform.CustomFontOpenCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaCustomFontCore.RuntimeStateKey));
 	}
 
 	[Fact]

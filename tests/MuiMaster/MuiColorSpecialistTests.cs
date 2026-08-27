@@ -167,7 +167,7 @@ public sealed class MuiColorSpecialistTests
 		value.NotifyValue = 0x01020304;
 		value.NotifyCount = 5;
 		Assert.True(MuiColorSpecialistStateCodec.Write(ref p, address, value));
-		Assert.True(MuiColorSpecialistStateCodec.TryRead(ref p, address,
+		Assert.True(MuiColorSpecialistStateCodec.TryReadStructural(ref p, address,
 			out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.Class, decoded.Class);
@@ -187,6 +187,28 @@ public sealed class MuiColorSpecialistTests
 		Assert.Equal(value.NotifyCount, decoded.NotifyCount);
 		Assert.False(MuiColorSpecialistStateCodec.TryRead(ref p,
 			APTR.FromPointer(0x21000), out _));
+	}
+
+	[Fact]
+	public void MalformedColorSidecarFailsClosedBeforePenLifecycle()
+	{
+		var p = NewPlatform();
+		Assert.Equal(MuiColorSpecialistClass.Pendisplay,
+			Create(ref p, Instance, "Pendisplay.mui"));
+		Assert.True(MuiColorSpecialistStateCodec.TryReadStructural(ref p,
+			Instance, out var state));
+		state.Flags |= MuiColorSpecialistLayout.FlagPenHeld;
+		Assert.True(MuiColorSpecialistStateCodec.Write(ref p, Instance, state));
+
+		Assert.False(MuiColorSpecialistStateCodec.TryRead(ref p, Instance,
+			out _));
+		Assert.False(MuiColorSpecialistCore.Valid(ref p, Instance));
+		Assert.Equal(MuiColorSpecialistClass.None,
+			MuiColorSpecialistCore.Classify(ref p, Instance));
+		Assert.False(MuiColorSpecialistCore.Setup(ref p, Instance, DrawState,
+			Mri));
+		Assert.Equal(0u, p.ObtainPenCount);
+		Assert.False(MuiColorSpecialistCore.Cleanup(ref p, Instance));
 	}
 
 	[Fact]
@@ -756,6 +778,57 @@ public sealed class MuiColorSpecialistTests
 		Assert.Equal(MuiColorSpecialistMessageCodec.OmDispose, methodId);
 		Assert.False(MuiColorSpecialistMessageCodec.TryReadMethodId(ref p,
 			APTR.Null, out _));
+	}
+
+	[Fact]
+	public void ColorSpecialistMessageAdapterOwnsStructBounds()
+	{
+		var p = NewPlatform();
+		var method = APTR.FromPointer(0x2400);
+		Assert.True(MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			method, MuiColorSpecialistPacketKind.Method,
+			MuiColorSpecialistField.MethodId,
+			MuiColorSpecialistMessageCodec.OmDispose));
+		Assert.True(MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			method, MuiColorSpecialistPacketKind.Method,
+			MuiColorSpecialistField.MethodId, out var methodId));
+		Assert.Equal(MuiColorSpecialistMessageCodec.OmDispose, methodId);
+
+		var get = APTR.FromPointer(0x2420);
+		Assert.True(MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			get, MuiColorSpecialistPacketKind.Get,
+			MuiColorSpecialistField.Attribute, 0x120));
+		Assert.True(MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			get, MuiColorSpecialistPacketKind.Get,
+			MuiColorSpecialistField.Storage, 0x3500));
+		Assert.True(MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			get, MuiColorSpecialistPacketKind.Get,
+			MuiColorSpecialistField.Storage, out var storage));
+		Assert.Equal(0x3500u, storage);
+		Assert.True(MuiColorSpecialistMessageMemoryCodec.TryGetAddress(ref p, get,
+			MuiColorSpecialistPacketKind.Get, MuiColorSpecialistField.Storage,
+			out var storageAddress));
+		Assert.Equal(get.Raw + MuiColorSpecialistGetMessage.StorageOffset,
+			storageAddress.Raw);
+
+		var rgb = APTR.FromPointer(0x2440);
+		Assert.True(MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			rgb, MuiColorSpecialistPacketKind.Rgb,
+			MuiColorSpecialistField.Blue, 0x30));
+		Assert.True(MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			rgb, MuiColorSpecialistPacketKind.Rgb,
+			MuiColorSpecialistField.Blue, out var blue));
+		Assert.Equal(0x30u, blue);
+
+		Assert.False(MuiColorSpecialistMessageMemoryCodec.TryGetAddress(ref p,
+			APTR.FromPointer(0x20FF1), MuiColorSpecialistPacketKind.Rgb,
+			MuiColorSpecialistField.Blue, out _));
+		Assert.False(MuiColorSpecialistMessageMemoryCodec.TryGetAddress(ref p,
+			method, MuiColorSpecialistPacketKind.Method,
+			MuiColorSpecialistField.Attribute, out _));
+		Assert.False(MuiColorSpecialistMessageMemoryCodec.TryGetAddress(ref p,
+			APTR.Null, MuiColorSpecialistPacketKind.Set,
+			MuiColorSpecialistField.Value, out _));
 	}
 
 	[Fact]

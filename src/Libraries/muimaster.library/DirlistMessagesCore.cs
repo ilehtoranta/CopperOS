@@ -118,6 +118,178 @@ internal static class MuiDirlistFieldCursorCodec
 	}
 }
 
+// The packet records below are the public MorphOS operation boundary.  Keep
+// their guest layout in small, named codecs rather than making the dispatcher
+// select a field through the shared packet/field cursor above.  The numeric
+// positions are therefore confined to these ABI adapters; callers work with
+// the fixed-width structs declared in DirlistDispatcher.cs.
+internal static class MuiDirlistPacketMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, uint packetSize, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (message.IsNull || offset > packetSize ||
+			packetSize - offset < 4 || message.Raw > uint.MaxValue - offset)
+			return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(message, packetSize) &&
+			platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, uint packetSize, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, message, packetSize, offset,
+			out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, uint packetSize, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, message, packetSize, offset,
+			out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
+internal static class MuiDirlistMethodMessageCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDirlistMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
+			MuiDirlistMethodMessage.Size, 0, out packet.MethodId);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR message, uint method)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+			MuiDirlistMethodMessage.Size, 0, method);
+}
+
+internal static class MuiDirlistSetMessageCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDirlistSetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
+			MuiDirlistSetMessage.Size, 0, out packet.MethodId) &&
+			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
+				MuiDirlistSetMessage.Size, 4, out packet.Attribute) &&
+			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
+				MuiDirlistSetMessage.Size, 8, out packet.Value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDirlistSetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+			MuiDirlistSetMessage.Size, 0, packet.MethodId) &&
+			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+				MuiDirlistSetMessage.Size, 4, packet.Attribute) &&
+			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+				MuiDirlistSetMessage.Size, 8, packet.Value);
+	}
+}
+
+internal static class MuiDirlistRenameMessageCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDirlistRenameMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
+			MuiDirlistRenameMessage.Size, 0, out packet.MethodId) &&
+			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
+				MuiDirlistRenameMessage.Size, 4, out packet.Entry) &&
+			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
+				MuiDirlistRenameMessage.Size, 8, out packet.Name);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDirlistRenameMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+			MuiDirlistRenameMessage.Size, 0, packet.MethodId) &&
+			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+				MuiDirlistRenameMessage.Size, 4, packet.Entry) &&
+			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+				MuiDirlistRenameMessage.Size, 8, packet.Name);
+	}
+}
+
+internal static class MuiDirlistProtectionMessageCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDirlistProtectionMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
+			MuiDirlistProtectionMessage.Size, 0, out packet.MethodId) &&
+			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
+				MuiDirlistProtectionMessage.Size, 4, out packet.Entry) &&
+			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
+				MuiDirlistProtectionMessage.Size, 8, out packet.Protection);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDirlistProtectionMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+			MuiDirlistProtectionMessage.Size, 0, packet.MethodId) &&
+			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+				MuiDirlistProtectionMessage.Size, 4, packet.Entry) &&
+			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+				MuiDirlistProtectionMessage.Size, 8, packet.Protection);
+	}
+}
+
+internal static class MuiDirlistGetEntryMessageCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDirlistGetEntryMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
+			MuiDirlistGetEntryMessage.Size, 0, out packet.MethodId) &&
+			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
+				MuiDirlistGetEntryMessage.Size, 4, out packet.Position) &&
+			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
+				MuiDirlistGetEntryMessage.Size, 8, out packet.Storage);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDirlistGetEntryMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+			MuiDirlistGetEntryMessage.Size, 0, packet.MethodId) &&
+			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+				MuiDirlistGetEntryMessage.Size, 4, packet.Position) &&
+			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+				MuiDirlistGetEntryMessage.Size, 8, packet.Storage);
+	}
+}
+
 internal static class MuiDirlistMessageCodec
 {
 	internal const uint ReRead = 0x80422d71u;
@@ -160,9 +332,14 @@ internal static class MuiDirlistMessageCodec
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiDirlistFieldCursorCodec.TryReadUInt32(ref platform, message,
-			MuiDirlistPacketKind.Method, MuiDirlistField.MethodId,
-			out methodId);
+		if (!MuiDirlistMethodMessageCodec.TryRead(ref platform, message,
+			out var packet))
+		{
+			methodId = 0;
+			return false;
+		}
+		methodId = packet.MethodId;
+		return true;
 	}
 
 	// Keep method-only validation scalar for native roots and dispatcher switch
@@ -178,10 +355,8 @@ internal static class MuiDirlistMessageCodec
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsMethod(method) || message.IsNull || !platform.IsMapped(message,
-			MuiDirlistMethodMessage.Size)) return false;
-		return MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform, message,
-			MuiDirlistPacketKind.Method, MuiDirlistField.MethodId, method);
+		return IsMethod(method) && MuiDirlistMethodMessageCodec.TryWrite(
+			ref platform, message, method);
 	}
 
 	internal static bool TryReadSet<TPlatform>(ref TPlatform platform,
@@ -189,28 +364,20 @@ internal static class MuiDirlistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsSetMethod(method) || !IsPacket(ref platform, message,
-			MuiDirlistSetMessage.Size, method)) return false;
-		packet.MethodId = method;
-		return MuiDirlistFieldCursorCodec.TryReadUInt32(ref platform, message,
-			MuiDirlistPacketKind.Set, MuiDirlistField.Attribute,
-			out packet.Attribute) &&
-			MuiDirlistFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiDirlistPacketKind.Set, MuiDirlistField.Value, out packet.Value);
+		return IsSetMethod(method) && MuiDirlistSetMessageCodec.TryRead(
+			ref platform, message, out packet) && packet.MethodId == method;
 	}
 
 	internal static bool WriteSet<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, uint attribute, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsSetMethod(method) || message.IsNull || !platform.IsMapped(
-			message, MuiDirlistSetMessage.Size)) return false;
-		return MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform, message,
-			MuiDirlistPacketKind.Set, MuiDirlistField.MethodId, method) &&
-			MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistPacketKind.Set, MuiDirlistField.Attribute, attribute) &&
-			MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistPacketKind.Set, MuiDirlistField.Value, value);
+		if (!IsSetMethod(method)) return false;
+		var packet = default(MuiDirlistSetMessage);
+		packet.MethodId = method;
+		packet.Attribute = attribute;
+		packet.Value = value;
+		return MuiDirlistSetMessageCodec.TryWrite(ref platform, message, packet);
 	}
 
 	internal static bool TryReadRename<TPlatform>(ref TPlatform platform,
@@ -223,29 +390,21 @@ internal static class MuiDirlistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsRenameMethod(method) || !IsPacket(ref platform, message,
-			MuiDirlistRenameMessage.Size, method)) return false;
-		packet.MethodId = method;
-		return MuiDirlistFieldCursorCodec.TryReadUInt32(ref platform, message,
-			MuiDirlistPacketKind.Rename, MuiDirlistField.Entry,
-			out packet.Entry) &&
-			MuiDirlistFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiDirlistPacketKind.Rename, MuiDirlistField.Name,
-				out packet.Name);
+		return IsRenameMethod(method) && MuiDirlistRenameMessageCodec.TryRead(
+			ref platform, message, out packet) && packet.MethodId == method;
 	}
 
 	internal static bool WriteRename<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, uint entry, uint name)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsRenameMethod(method) || message.IsNull || !platform.IsMapped(
-			message, MuiDirlistRenameMessage.Size)) return false;
-		return MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform, message,
-			MuiDirlistPacketKind.Rename, MuiDirlistField.MethodId, method) &&
-			MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistPacketKind.Rename, MuiDirlistField.Entry, entry) &&
-			MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistPacketKind.Rename, MuiDirlistField.Name, name);
+		if (!IsRenameMethod(method)) return false;
+		var packet = default(MuiDirlistRenameMessage);
+		packet.MethodId = method;
+		packet.Entry = entry;
+		packet.Name = name;
+		return MuiDirlistRenameMessageCodec.TryWrite(ref platform, message,
+			packet);
 	}
 
 	internal static bool TryReadProtection<TPlatform>(ref TPlatform platform,
@@ -253,31 +412,20 @@ internal static class MuiDirlistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPacket(ref platform, message, MuiDirlistProtectionMessage.Size,
-			SetProtection)) return false;
-		packet.MethodId = SetProtection;
-		return MuiDirlistFieldCursorCodec.TryReadUInt32(ref platform, message,
-			MuiDirlistPacketKind.Protection, MuiDirlistField.Entry,
-			out packet.Entry) &&
-			MuiDirlistFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiDirlistPacketKind.Protection, MuiDirlistField.Protection,
-				out packet.Protection);
+		return MuiDirlistProtectionMessageCodec.TryRead(ref platform, message,
+			out packet) && packet.MethodId == SetProtection;
 	}
 
 	internal static bool WriteProtection<TPlatform>(ref TPlatform platform,
 		APTR message, uint entry, uint protection)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiDirlistProtectionMessage.Size)) return false;
-		return MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform, message,
-			MuiDirlistPacketKind.Protection, MuiDirlistField.MethodId,
-			SetProtection) &&
-			MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistPacketKind.Protection, MuiDirlistField.Entry, entry) &&
-			MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistPacketKind.Protection, MuiDirlistField.Protection,
-				protection);
+		var packet = default(MuiDirlistProtectionMessage);
+		packet.MethodId = SetProtection;
+		packet.Entry = entry;
+		packet.Protection = protection;
+		return MuiDirlistProtectionMessageCodec.TryWrite(ref platform, message,
+			packet);
 	}
 
 	internal static bool TryReadGetEntry<TPlatform>(ref TPlatform platform,
@@ -285,30 +433,20 @@ internal static class MuiDirlistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPacket(ref platform, message, MuiDirlistGetEntryMessage.Size,
-			ListGetEntry)) return false;
-		packet.MethodId = ListGetEntry;
-		return MuiDirlistFieldCursorCodec.TryReadUInt32(ref platform, message,
-			MuiDirlistPacketKind.GetEntry, MuiDirlistField.Position,
-			out packet.Position) &&
-			MuiDirlistFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiDirlistPacketKind.GetEntry, MuiDirlistField.Storage,
-				out packet.Storage);
+		return MuiDirlistGetEntryMessageCodec.TryRead(ref platform, message,
+			out packet) && packet.MethodId == ListGetEntry;
 	}
 
 	internal static bool WriteGetEntry<TPlatform>(ref TPlatform platform,
 		APTR message, uint position, uint storage)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiDirlistGetEntryMessage.Size)) return false;
-		return MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform, message,
-			MuiDirlistPacketKind.GetEntry, MuiDirlistField.MethodId,
-			ListGetEntry) &&
-			MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistPacketKind.GetEntry, MuiDirlistField.Position, position) &&
-			MuiDirlistFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistPacketKind.GetEntry, MuiDirlistField.Storage, storage);
+		var packet = default(MuiDirlistGetEntryMessage);
+		packet.MethodId = ListGetEntry;
+		packet.Position = position;
+		packet.Storage = storage;
+		return MuiDirlistGetEntryMessageCodec.TryWrite(ref platform, message,
+			packet);
 	}
 
 	private static bool IsMethod(uint method) => method == ReRead ||
@@ -320,9 +458,4 @@ internal static class MuiDirlistMessageCodec
 	private static bool IsRenameMethod(uint method) => method == Rename ||
 		method == SetComment;
 
-	private static bool IsPacket<TPlatform>(ref TPlatform platform,
-		APTR message, uint size, uint method)
-		where TPlatform : struct, IMuiGuestMemory =>
-		TryReadMethodId(ref platform, message, out var header) &&
-		header.MethodId == method && platform.IsMapped(message, size);
 }

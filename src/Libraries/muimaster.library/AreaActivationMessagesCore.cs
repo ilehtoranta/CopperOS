@@ -15,6 +15,9 @@ namespace CopperOS.MuiMaster;
 internal struct MuiAreaActivationMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint FlagsOffset = 4;
 	public uint MethodId;
 	public uint Flags;
 }
@@ -23,6 +26,8 @@ internal struct MuiAreaActivationMessage
 internal struct MuiAreaActivationMethodMessage
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
 
@@ -48,33 +53,12 @@ internal struct MuiAreaActivationFieldCursor
 
 internal static class MuiAreaActivationFieldCursorCodec
 {
-	private static bool TryResolve(MuiAreaActivationPacketKind packet,
-		MuiAreaActivationField field, out uint offset)
-	{
-		switch (packet)
-		{
-			case MuiAreaActivationPacketKind.Method:
-				if (field == MuiAreaActivationField.MethodId) { offset = 0; return true; }
-				break;
-			case MuiAreaActivationPacketKind.Activation:
-				if (field == MuiAreaActivationField.MethodId) { offset = 0; return true; }
-				if (field == MuiAreaActivationField.Flags) { offset = 4; return true; }
-				break;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaActivationFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiAreaActivationRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Packet, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -102,6 +86,83 @@ internal static class MuiAreaActivationFieldCursorCodec
 		cursor.Packet = packet;
 		cursor.Field = field;
 		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
+// Struct-first guest-memory adapter for the fixed MUIP_GoActive/
+// MUIP_GoInactive records and their method-only header. The packet kind owns
+// the complete record boundary; callers never need to supply a numeric size.
+internal static class MuiAreaActivationRecordMemoryCodec
+{
+	private static bool TryResolve(MuiAreaActivationPacketKind packet,
+		MuiAreaActivationField field, out uint offset, out uint size,
+		out uint fieldSize)
+	{
+		fieldSize = MuiAreaActivationMessage.FieldSize;
+		if (packet == MuiAreaActivationPacketKind.Method)
+		{
+			if (field == MuiAreaActivationField.MethodId)
+			{
+				offset = MuiAreaActivationMethodMessage.MethodIdOffset;
+				size = MuiAreaActivationMethodMessage.Size;
+				return true;
+			}
+		}
+		else if (packet == MuiAreaActivationPacketKind.Activation)
+		{
+			if (field == MuiAreaActivationField.MethodId)
+				offset = MuiAreaActivationMessage.MethodIdOffset;
+			else if (field == MuiAreaActivationField.Flags)
+				offset = MuiAreaActivationMessage.FlagsOffset;
+			else
+			{
+				offset = 0;
+				size = 0;
+				return false;
+			}
+			size = MuiAreaActivationMessage.Size;
+			return true;
+		}
+		offset = 0;
+		size = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaActivationPacketKind packet,
+		MuiAreaActivationField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(packet, field, out var offset, out var size,
+			out var fieldSize) || message.IsNull ||
+			message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, size)) return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, fieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaActivationPacketKind packet,
+		MuiAreaActivationField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaActivationPacketKind packet,
+		MuiAreaActivationField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}

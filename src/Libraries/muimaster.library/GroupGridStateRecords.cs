@@ -15,6 +15,16 @@ namespace CopperOS.MuiMaster;
 internal struct MuiGroupGridStateRecord
 {
 	internal const uint Size = 36;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint ColumnsOffset = 4;
+	internal const uint RowsOffset = 8;
+	internal const uint HorizontalSpacingOffset = 12;
+	internal const uint VerticalSpacingOffset = 16;
+	internal const uint SameWidthOffset = 20;
+	internal const uint SameHeightOffset = 24;
+	internal const uint HorizontalCenterOffset = 28;
+	internal const uint VerticalCenterOffset = 32;
 	internal const uint Cookie = 0x47475250u; // 'GGRP'
 
 	internal uint Magic;
@@ -26,6 +36,45 @@ internal struct MuiGroupGridStateRecord
 	internal uint SameHeight;
 	internal uint HorizontalCenter;
 	internal uint VerticalCenter;
+}
+
+internal static class MuiGroupGridStateValidation
+{
+	private const int DefaultSpacing = -100;
+	private const int MaximumPixelSpacing = 10000;
+	private const uint MaximumAxis = 256;
+
+	private static bool IsBool(uint value) => value <= 1;
+
+	private static bool IsSpacing(uint raw)
+	{
+		var value = unchecked((int)raw);
+		if (value >= 0) return value <= MaximumPixelSpacing;
+		return value >= DefaultSpacing;
+	}
+
+	internal static bool IsValidRecord(MuiGroupGridStateRecord value) =>
+		value.Magic == MuiGroupGridStateRecord.Cookie &&
+		value.Columns <= MaximumAxis && value.Rows <= MaximumAxis &&
+		IsSpacing(value.HorizontalSpacing) &&
+		IsSpacing(value.VerticalSpacing) && IsBool(value.SameWidth) &&
+		IsBool(value.SameHeight) && value.HorizontalCenter <= 2 &&
+		value.VerticalCenter <= 2;
+
+	internal static bool IsValidState(MuiGroupGridStateRecord value) =>
+		IsValidRecord(value);
+}
+
+internal static class MuiGroupGridStateAdmission
+{
+	internal static bool Validate(MuiGroupGridStateRecord value) =>
+		MuiGroupGridStateValidation.IsValidRecord(value);
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR group, MuiGroupGridStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, group).IsNull;
 }
 
 internal enum MuiGroupGridStateField : byte
@@ -50,128 +99,153 @@ internal struct MuiGroupGridStateFieldCursor
 
 internal static class MuiGroupGridStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiGroupGridStateField field,
-		out uint offset)
-	{
-		switch (field)
-		{
-			case MuiGroupGridStateField.Magic:
-			case MuiGroupGridStateField.Columns:
-			case MuiGroupGridStateField.Rows:
-			case MuiGroupGridStateField.HorizontalSpacing:
-			case MuiGroupGridStateField.VerticalSpacing:
-			case MuiGroupGridStateField.SameWidth:
-			case MuiGroupGridStateField.SameHeight:
-			case MuiGroupGridStateField.HorizontalCenter:
-			case MuiGroupGridStateField.VerticalCenter:
-				offset = (uint)field * 4;
-				return true;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiGroupGridStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, MuiGroupGridStateRecord.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiGroupGridStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Address, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiGroupGridStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiGroupGridStateFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
-			return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
-		return true;
+		return MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiGroupGridStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiGroupGridStateFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		return MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, field, value);
+	}
+}
+
+// Struct-first guest-memory adapter. Named grid policy fields remain the
+// semantic record; this bounded adapter owns fixed guest-layout translation.
+internal static class MuiGroupGridStateRecordMemoryCodec
+{
+	private static bool TryResolve(MuiGroupGridStateField field,
+		out uint offset)
+	{
+		if (field == MuiGroupGridStateField.Magic)
+			offset = MuiGroupGridStateRecord.MagicOffset;
+		else if (field == MuiGroupGridStateField.Columns)
+			offset = MuiGroupGridStateRecord.ColumnsOffset;
+		else if (field == MuiGroupGridStateField.Rows)
+			offset = MuiGroupGridStateRecord.RowsOffset;
+		else if (field == MuiGroupGridStateField.HorizontalSpacing)
+			offset = MuiGroupGridStateRecord.HorizontalSpacingOffset;
+		else if (field == MuiGroupGridStateField.VerticalSpacing)
+			offset = MuiGroupGridStateRecord.VerticalSpacingOffset;
+		else if (field == MuiGroupGridStateField.SameWidth)
+			offset = MuiGroupGridStateRecord.SameWidthOffset;
+		else if (field == MuiGroupGridStateField.SameHeight)
+			offset = MuiGroupGridStateRecord.SameHeightOffset;
+		else if (field == MuiGroupGridStateField.HorizontalCenter)
+			offset = MuiGroupGridStateRecord.HorizontalCenterOffset;
+		else if (field == MuiGroupGridStateField.VerticalCenter)
+			offset = MuiGroupGridStateRecord.VerticalCenterOffset;
+		else
+		{
+			offset = 0;
 			return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiGroupGridStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiGroupGridStateRecord.Size) &&
+			platform.IsMapped(address, MuiGroupGridStateRecord.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiGroupGridStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiGroupGridStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
 internal static class MuiGroupGridStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiGroupGridStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGroupGridStateRecord.Size) ||
-			!MuiGroupGridStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiGroupGridStateField.Magic, out var magic) ||
-			magic != MuiGroupGridStateRecord.Cookie ||
-			!MuiGroupGridStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiGroupGridStateField.Columns, out value.Columns) ||
-			!MuiGroupGridStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiGroupGridStateField.Rows, out value.Rows) ||
-			!MuiGroupGridStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiGroupGridStateField.HorizontalSpacing,
-				out value.HorizontalSpacing) ||
-			!MuiGroupGridStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiGroupGridStateField.VerticalSpacing,
-				out value.VerticalSpacing) ||
-			!MuiGroupGridStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiGroupGridStateField.SameWidth, out value.SameWidth) ||
-			!MuiGroupGridStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiGroupGridStateField.SameHeight, out value.SameHeight) ||
-			!MuiGroupGridStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiGroupGridStateField.HorizontalCenter,
-				out value.HorizontalCenter) ||
-			!MuiGroupGridStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiGroupGridStateField.VerticalCenter,
-				out value.VerticalCenter)) return false;
-		value.Magic = magic;
+		if (!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiGroupGridStateField.Magic, out value.Magic) ||
+			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiGroupGridStateField.Columns, out value.Columns) ||
+			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiGroupGridStateField.Rows, out value.Rows) ||
+			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiGroupGridStateField.HorizontalSpacing, out value.HorizontalSpacing) ||
+			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiGroupGridStateField.VerticalSpacing, out value.VerticalSpacing) ||
+			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiGroupGridStateField.SameWidth, out value.SameWidth) ||
+			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiGroupGridStateField.SameHeight, out value.SameHeight) ||
+			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiGroupGridStateField.HorizontalCenter, out value.HorizontalCenter) ||
+			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiGroupGridStateField.VerticalCenter, out value.VerticalCenter)) return false;
 		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiGroupGridStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiGroupGridStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiGroupGridStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGroupGridStateRecord.Size) ||
-			value.Magic != MuiGroupGridStateRecord.Cookie) return false;
-		return MuiGroupGridStateFieldCursorCodec.TryWriteUInt32(ref platform,
+		if (!MuiGroupGridStateAdmission.Validate(value)) return false;
+		return MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiGroupGridStateField.Magic, value.Magic) &&
-			MuiGroupGridStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiGroupGridStateField.Columns, value.Columns) &&
-			MuiGroupGridStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiGroupGridStateField.Rows, value.Rows) &&
-			MuiGroupGridStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiGroupGridStateField.HorizontalSpacing, value.HorizontalSpacing) &&
-			MuiGroupGridStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiGroupGridStateField.VerticalSpacing, value.VerticalSpacing) &&
-			MuiGroupGridStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiGroupGridStateField.SameWidth, value.SameWidth) &&
-			MuiGroupGridStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiGroupGridStateField.SameHeight, value.SameHeight) &&
-			MuiGroupGridStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiGroupGridStateField.HorizontalCenter, value.HorizontalCenter) &&
-			MuiGroupGridStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiGroupGridStateField.VerticalCenter, value.VerticalCenter);
+			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGroupGridStateField.Columns, value.Columns) &&
+			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGroupGridStateField.Rows, value.Rows) &&
+			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGroupGridStateField.HorizontalSpacing, value.HorizontalSpacing) &&
+			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGroupGridStateField.VerticalSpacing, value.VerticalSpacing) &&
+			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGroupGridStateField.SameWidth, value.SameWidth) &&
+			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGroupGridStateField.SameHeight, value.SameHeight) &&
+			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGroupGridStateField.HorizontalCenter, value.HorizontalCenter) &&
+			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGroupGridStateField.VerticalCenter, value.VerticalCenter);
 	}
 }

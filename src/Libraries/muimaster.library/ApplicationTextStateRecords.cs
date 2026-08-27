@@ -14,11 +14,39 @@ namespace CopperOS.MuiMaster;
 internal struct MuiApplicationTextStateRecord
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint HelpFileOffset = 4;
+	internal const uint IconifyTitleOffset = 8;
 	internal const uint Cookie = 0x41545354u; // 'ATST'
 
 	internal uint Magic;
 	internal APTR HelpFile;
 	internal APTR IconifyTitle;
+}
+
+// Admission for mutable caller-owned Application text pointers.  NULL is the
+// explicit empty value; a non-NULL pointer must resolve to a bounded C string.
+internal static class MuiApplicationTextStateAdmission
+{
+	internal const uint MaximumStringLength = 65536;
+
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		MuiApplicationTextStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		value.Magic == MuiApplicationTextStateRecord.Cookie &&
+		IsCString(ref platform, value.HelpFile) &&
+		IsCString(ref platform, value.IconifyTitle);
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform, APTR state,
+		APTR application, MuiApplicationTextStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(ref platform, value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, application).IsNull;
+
+	private static bool IsCString<TPlatform>(ref TPlatform platform, APTR value)
+		where TPlatform : struct, IMuiGuestMemory => value.IsNull ||
+		CStringCodec.TryReadLength(ref platform, value, MaximumStringLength, out _);
 }
 
 internal enum MuiApplicationTextStateField : byte
@@ -37,15 +65,49 @@ internal struct MuiApplicationTextStateFieldCursor
 
 internal static class MuiApplicationTextStateFieldCursorCodec
 {
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiApplicationTextStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiApplicationTextStateRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor.Record, cursor.Field, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationTextStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiApplicationTextStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationTextStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiApplicationTextStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, record, field, value);
+	}
+}
+
+// Fixed application text state is read and written as a named value. Keep
+// packed guest positions in this ABI adapter; production consumers do not
+// select fields through the compatibility cursor.
+internal static class MuiApplicationTextStateRecordMemoryCodec
+{
 	private static bool TryResolve(MuiApplicationTextStateField field,
 		out uint offset)
 	{
 		switch (field)
 		{
 			case MuiApplicationTextStateField.Magic:
+				offset = MuiApplicationTextStateRecord.MagicOffset;
+				return true;
 			case MuiApplicationTextStateField.HelpFile:
+				offset = MuiApplicationTextStateRecord.HelpFileOffset;
+				return true;
 			case MuiApplicationTextStateField.IconifyTitle:
-				offset = (uint)field * 4;
+				offset = MuiApplicationTextStateRecord.IconifyTitleOffset;
 				return true;
 		}
 		offset = 0;
@@ -53,16 +115,16 @@ internal static class MuiApplicationTextStateFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiApplicationTextStateFieldCursor cursor, out APTR address)
+		APTR record, MuiApplicationTextStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record,
-				MuiApplicationTextStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset)
+			return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiApplicationTextStateRecord.Size) &&
+			platform.IsMapped(address, MuiApplicationTextStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -70,10 +132,8 @@ internal static class MuiApplicationTextStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiApplicationTextStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -82,10 +142,8 @@ internal static class MuiApplicationTextStateFieldCursorCodec
 		APTR record, MuiApplicationTextStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationTextStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -93,19 +151,18 @@ internal static class MuiApplicationTextStateFieldCursorCodec
 
 internal static class MuiApplicationTextStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiApplicationTextStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationTextStateRecord.Size) ||
-			!MuiApplicationTextStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationTextStateField.Magic, out var magic) ||
-			magic != MuiApplicationTextStateRecord.Cookie ||
-			!MuiApplicationTextStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationTextStateField.HelpFile, out var helpFile) ||
-			!MuiApplicationTextStateFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiApplicationTextStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationTextStateField.Magic, out var magic) ||
+			!MuiApplicationTextStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiApplicationTextStateField.HelpFile,
+				out var helpFile) ||
+			!MuiApplicationTextStateRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiApplicationTextStateField.IconifyTitle,
 				out var iconifyTitle)) return false;
 		value.Magic = magic;
@@ -114,21 +171,27 @@ internal static class MuiApplicationTextStateRecordCodec
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiApplicationTextStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiApplicationTextStateAdmission.Validate(ref platform, value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiApplicationTextStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationTextStateRecord.Size) || value.Magic !=
-			MuiApplicationTextStateRecord.Cookie) return false;
-		return MuiApplicationTextStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationTextStateField.Magic,
-			value.Magic) &&
-			MuiApplicationTextStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationTextStateField.HelpFile,
-			value.HelpFile.Raw) &&
-			MuiApplicationTextStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationTextStateField.IconifyTitle,
-			value.IconifyTitle.Raw);
+			MuiApplicationTextStateRecord.Size) ||
+			!MuiApplicationTextStateAdmission.Validate(ref platform, value))
+			return false;
+		return MuiApplicationTextStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationTextStateField.Magic, value.Magic) &&
+			MuiApplicationTextStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, MuiApplicationTextStateField.HelpFile,
+				value.HelpFile.Raw) &&
+			MuiApplicationTextStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, MuiApplicationTextStateField.IconifyTitle,
+				value.IconifyTitle.Raw);
 	}
 }

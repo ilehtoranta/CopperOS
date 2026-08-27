@@ -26,6 +26,25 @@ internal struct MuiLevelmeterLabelStateRecord
 	internal APTR Label;
 }
 
+internal static class MuiLevelmeterLabelStateAdmission
+{
+	internal const int MaximumLength = 64;
+
+	internal static bool Validate(MuiLevelmeterLabelStateRecord value) =>
+		value.Magic == MuiLevelmeterLabelStateRecord.Cookie;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiLevelmeterLabelStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!Validate(value) || obj.IsNull ||
+			MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		return value.Label.IsNull || CStringCodec.TryReadLength(ref platform,
+			value.Label, MaximumLength, out _);
+	}
+}
+
 internal enum MuiLevelmeterLabelStateField : byte
 {
 	Magic,
@@ -91,36 +110,73 @@ internal static class MuiLevelmeterLabelStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Levelmeter consumers use the named
+// record; this bounded adapter is the only layer that translates its fixed
+// guest layout into addresses. The cursor codec remains for compatibility and
+// malformed-state diagnostics.
+internal static class MuiLevelmeterLabelStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiLevelmeterLabelStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiLevelmeterLabelStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiLevelmeterLabelStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiLevelmeterLabelStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiLevelmeterLabelStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiLevelmeterLabelStateRecord.Size) ||
-			!MuiLevelmeterLabelStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiLevelmeterLabelStateField.Magic, out var magic) ||
-			magic != MuiLevelmeterLabelStateRecord.Cookie) return false;
-		value.Magic = magic;
-		if (!MuiLevelmeterLabelStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiLevelmeterLabelStateField.Label, out var label))
-			return false;
+		if (!MuiLevelmeterLabelStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) ||
+			!MuiLevelmeterLabelStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out var label)) return false;
 		value.Label = APTR.FromPointer(label);
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiLevelmeterLabelStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiLevelmeterLabelStateAdmission.Validate(value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiLevelmeterLabelStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiLevelmeterLabelStateRecord.Size) || value.Magic !=
-			MuiLevelmeterLabelStateRecord.Cookie) return false;
-		return MuiLevelmeterLabelStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address, MuiLevelmeterLabelStateField.Magic, value.Magic) &&
-			MuiLevelmeterLabelStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiLevelmeterLabelStateField.Label, value.Label.Raw);
+		if (!MuiLevelmeterLabelStateAdmission.Validate(value)) return false;
+		return MuiLevelmeterLabelStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 0, value.Magic) &&
+			MuiLevelmeterLabelStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 4, value.Label.Raw);
 	}
 }

@@ -92,35 +92,72 @@ internal static class MuiTextShortenedStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Text consumers use the named shortened
+// status record; this bounded adapter is the only layer that translates its
+// fixed guest layout into addresses. The cursor codec remains available for
+// compatibility and malformed-state diagnostics.
+internal static class MuiTextShortenedStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiTextShortenedStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiTextShortenedStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiTextShortenedStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiTextShortenedStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiTextShortenedStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiTextShortenedStateRecord.Size) ||
-			!MuiTextShortenedStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiTextShortenedStateField.Magic, out var magic) ||
-			magic != MuiTextShortenedStateRecord.Cookie)
-			return false;
-		value.Magic = magic;
-		return MuiTextShortenedStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiTextShortenedStateField.Shortened, out value.Shortened);
+		return MuiTextShortenedStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) &&
+			MuiTextShortenedStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out value.Shortened);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiTextShortenedStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiTextShortenedStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiTextShortenedStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiTextShortenedStateRecord.Size) || value.Magic !=
-			MuiTextShortenedStateRecord.Cookie) return false;
-		return MuiTextShortenedStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiTextShortenedStateField.Magic, value.Magic) &&
-			MuiTextShortenedStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiTextShortenedStateField.Shortened, value.Shortened);
+		if (!MuiTextShortenedStateAdmission.Validate(value)) return false;
+		return MuiTextShortenedStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiTextShortenedStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 4, value.Shortened);
 	}
 }
 
@@ -134,4 +171,17 @@ internal static class MuiTextShortenedStateValidation
 
 	internal static bool IsValidState(MuiTextShortenedState value) =>
 		value.Shortened <= 1;
+}
+
+internal static class MuiTextShortenedStateAdmission
+{
+	internal static bool Validate(MuiTextShortenedStateRecord value) =>
+		value.Magic == MuiTextShortenedStateRecord.Cookie &&
+		MuiTextShortenedStateValidation.IsValidRecord(value);
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiTextShortenedStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) && !obj.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 }

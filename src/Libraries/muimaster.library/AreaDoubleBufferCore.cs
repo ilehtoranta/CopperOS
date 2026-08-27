@@ -90,11 +90,18 @@ internal static class MuiAreaDoubleBufferCore
 			MuiCommonControlCore.DoubleBuffer, out var raw))
 			enabled = raw == 0 ? 0u : 1u;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) ==
-			unchecked((int)MuiAreaDoubleBufferStateRecord.Size) &&
-			MuiAreaDoubleBufferStateRecordCodec.TryRead(ref platform, block,
-				out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateKey);
+		MuiAreaDoubleBufferStateRecord record;
+		if (block.IsNotNull || length != 0)
 		{
+			// A present block is authoritative typed state.  Do not repair a
+			// malformed BOOL or generation from the legacy raw attribute.
+			if (length != unchecked((int)MuiAreaDoubleBufferStateRecord.Size) ||
+				!MuiAreaDoubleBufferStateRecordCodec.TryReadStructural(ref platform,
+					block, out record) ||
+				!MuiAreaDoubleBufferStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			if (record.Enabled != enabled)
 			{
 				record.Enabled = enabled;
@@ -125,8 +132,9 @@ internal static class MuiAreaDoubleBufferCore
 		record.Magic = MuiAreaDoubleBufferStateRecord.Cookie;
 		record.Enabled = enabled == 0 ? 0u : 1u;
 		record.Generation = generation == 0 ? 1u : generation;
-		var written = MuiAreaDoubleBufferStateRecordCodec.Write(ref platform,
-			scratch, record);
+		var written = MuiAreaDoubleBufferStateAdmission.ValidateLive(ref platform,
+			state, obj, record) &&
+			MuiAreaDoubleBufferStateRecordCodec.Write(ref platform, scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 			StateKey, scratch, unchecked((int)MuiAreaDoubleBufferStateRecord.Size));
 		platform.Clear(scratch, MuiAreaDoubleBufferStateRecord.Size);

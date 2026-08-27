@@ -546,7 +546,7 @@ public static class MuiClassServiceCore
 		if (serviceState.IsNull ||
 			!platform.IsMapped(serviceState, MuiClassServiceStateRecord.Size) ||
 			headlessState.IsNull ||
-			!MuiHeadlessStateCodec.TryRead(ref platform, headlessState,
+			!MuiHeadlessStateCodec.TryReadStructural(ref platform, headlessState,
 				out _) ||
 			!MuiHeadlessMemory.Ensure(ref platform, headlessState))
 			return false;

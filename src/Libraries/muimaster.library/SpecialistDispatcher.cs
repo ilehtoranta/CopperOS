@@ -12,6 +12,8 @@ namespace CopperOS.MuiMaster;
 internal struct MuiColorSpecialistMethodMessage
 {
 	public const uint Size = 4;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -19,6 +21,10 @@ internal struct MuiColorSpecialistMethodMessage
 internal struct MuiColorSpecialistGetMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint AttributeOffset = 4;
+	public const uint StorageOffset = 8;
 	public uint MethodId;
 	public uint Attribute;
 	public uint Storage;
@@ -28,6 +34,10 @@ internal struct MuiColorSpecialistGetMessage
 internal struct MuiColorSpecialistSetMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint AttributeOffset = 4;
+	public const uint ValueOffset = 8;
 	public uint MethodId;
 	public uint Attribute;
 	public uint Value;
@@ -37,6 +47,9 @@ internal struct MuiColorSpecialistSetMessage
 internal struct MuiColorSpecialistPointerMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint PointerOffset = 4;
 	public uint MethodId;
 	public uint Pointer;
 }
@@ -45,6 +58,11 @@ internal struct MuiColorSpecialistPointerMessage
 internal struct MuiColorSpecialistRgbMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint RedOffset = 4;
+	public const uint GreenOffset = 8;
+	public const uint BlueOffset = 12;
 	public uint MethodId;
 	public uint Red;
 	public uint Green;

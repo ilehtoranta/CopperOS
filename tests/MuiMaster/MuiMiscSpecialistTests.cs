@@ -73,6 +73,43 @@ public sealed class MuiMiscSpecialistTests
 	}
 
 	[Fact]
+	public void MalformedMiscSidecarFailsClosedBeforeClassOrHookDispatch()
+	{
+		var p = NewPlatform();
+		Assert.Equal(MuiMiscSpecialistClass.Keyadjust,
+			CreateNamed(ref p, "Keyadjust.mui"));
+		Assert.True(MuiMiscSpecialistHeaderCodec.TryReadStructural(ref p, Instance,
+			out var header));
+		// Title-only policy cannot be smuggled into Keyadjust live state.
+		header.Flags = MuiMiscSpecialistLayout.FlagTiClosable;
+		Assert.True(MuiMiscSpecialistHeaderCodec.Write(ref p, Instance, header));
+		Assert.False(MuiMiscSpecialistCore.Valid(ref p, Instance));
+		Assert.False(MuiMiscSpecialistCore.SetAttribute(ref p, Instance,
+			MuiMiscAttributes.Keyadjust_AllowMouseEvents, 1, false, true,
+			out _));
+
+		var fileInstance = APTR.FromPointer(0x4000);
+		p.WriteCString(ClassId, "Filepanel.mui");
+		Assert.Equal(MuiMiscSpecialistClass.Filepanel,
+			MuiMiscSpecialistCore.CreateByName(ref p, fileInstance, ClassId));
+		var cursor = default(MuiMiscStateCursor);
+		cursor.Instance = fileInstance;
+		cursor.Region = MuiMiscStateRegion.FilepanelService;
+		Assert.True(MuiMiscStateCursorCodec.TryGetAddress(cursor,
+			out var filepanelAddress));
+		Assert.True(MuiMiscFilepanelServiceStateCodec.TryRead(ref p,
+			filepanelAddress, out var filepanel));
+		filepanel.HookMsg = APTR.Null;
+		Assert.True(MuiMiscFilepanelServiceStateCodec.Write(ref p,
+			filepanelAddress, filepanel));
+		Assert.False(MuiMiscSpecialistCore.Valid(ref p, fileInstance));
+		var hooksBefore = p.HookInvokeCount;
+		Assert.Equal(0u, MuiMiscSpecialistCore.FilepanelFilter(ref p,
+			fileInstance, Text));
+		Assert.Equal(hooksBefore, p.HookInvokeCount);
+	}
+
+	[Fact]
 	public void MiscTitleStateCodecUsesNamedFields()
 	{
 		var p = NewPlatform();
@@ -1427,6 +1464,71 @@ public sealed class MuiMiscSpecialistTests
 			0xDEADBEEFu, out _));
 		Assert.False(MuiMiscSpecialistMessageCodec.TryReadLifecycle(ref p, Packet,
 			0xDEADBEEFu, out _));
+	}
+
+	[Fact]
+	public void MiscSpecialistMessageAdapterOwnsStructBounds()
+	{
+		var p = NewPlatform();
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.Lifecycle,
+			MuiMiscSpecialistField.MethodId, MuiMiscAttributes.Setup));
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.Lifecycle,
+			MuiMiscSpecialistField.MethodId, out var lifecycle));
+		Assert.Equal(MuiMiscAttributes.Setup, lifecycle);
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.Get,
+			MuiMiscSpecialistField.Storage, Storage.Raw));
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.Get,
+			MuiMiscSpecialistField.Storage, out var storage));
+		Assert.Equal(Storage.Raw, storage);
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.Set,
+			MuiMiscSpecialistField.Value, 0x456));
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.Set,
+			MuiMiscSpecialistField.Value, out var value));
+		Assert.Equal(0x456u, value);
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.Pointer,
+			MuiMiscSpecialistField.Pointer, 0x3300));
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.Pointer,
+			MuiMiscSpecialistField.Pointer, out var pointer));
+		Assert.Equal(0x3300u, pointer);
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.Pair,
+			MuiMiscSpecialistField.Second, Win.Raw));
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.Pair,
+			MuiMiscSpecialistField.Second, out var second));
+		Assert.Equal(Win.Raw, second);
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.HandleInput,
+			MuiMiscSpecialistField.MuiKey, unchecked((uint)-2)));
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.HandleInput,
+			MuiMiscSpecialistField.MuiKey, out var key));
+		Assert.Equal(unchecked((uint)-2), key);
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.RegisterGadget,
+			MuiMiscSpecialistField.Label, 10));
+		Assert.True(MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.RegisterGadget,
+			MuiMiscSpecialistField.Label, out var label));
+		Assert.Equal(10u, label);
+		Assert.False(MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			APTR.FromPointer(0x40FE9),
+			MuiMiscSpecialistPacketKind.RegisterGadget,
+			MuiMiscSpecialistField.Label, out _));
+		Assert.False(MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiMiscSpecialistPacketKind.Method,
+			MuiMiscSpecialistField.Attribute, out _));
+		Assert.False(MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			APTR.Null, MuiMiscSpecialistPacketKind.Set,
+			MuiMiscSpecialistField.Value, out _));
 	}
 
 	[Fact]

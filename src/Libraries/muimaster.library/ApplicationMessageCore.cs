@@ -15,6 +15,16 @@ namespace CopperOS.MuiMaster;
 internal struct MuiAppMessageNodeState
 {
 	internal const uint Size = 20;
+	internal const uint FieldSize32 = 4;
+	internal const uint FieldSize16 = 2;
+	internal const uint FieldSize8 = 1;
+	internal const uint SuccessorOffset = 0;
+	internal const uint PredecessorOffset = 4;
+	internal const uint TypeOffset = 8;
+	internal const uint PriorityOffset = 9;
+	internal const uint NameOffset = 10;
+	internal const uint ReplyPortOffset = 14;
+	internal const uint LengthOffset = 18;
 
 	internal APTR Successor;
 	internal APTR Predecessor;
@@ -45,57 +55,111 @@ internal struct MuiAppMessageNodeFieldCursor
 
 internal static class MuiAppMessageNodeFieldCursorCodec
 {
-	private static bool TryResolve(MuiAppMessageNodeField field,
-		out uint offset, out uint size)
-	{
-		switch (field)
-		{
-			case MuiAppMessageNodeField.Successor:
-				offset = 0;
-				size = 4;
-				break;
-			case MuiAppMessageNodeField.Predecessor:
-				offset = 4;
-				size = 4;
-				break;
-			case MuiAppMessageNodeField.Type:
-				offset = 8;
-				size = 1;
-				break;
-			case MuiAppMessageNodeField.Priority:
-				offset = 9;
-				size = 1;
-				break;
-			case MuiAppMessageNodeField.Name:
-				offset = 10;
-				size = 4;
-				break;
-			case MuiAppMessageNodeField.ReplyPort:
-				offset = 14;
-				size = 4;
-				break;
-			case MuiAppMessageNodeField.Length:
-				offset = 18;
-				size = 2;
-				break;
-			default:
-				offset = 0;
-				size = 0;
-				return false;
-		}
-		return true;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAppMessageNodeFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return MuiAppMessageNodeMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address, out _);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAppMessageNodeField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAppMessageNodeMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAppMessageNodeField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAppMessageNodeMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+	}
+
+	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAppMessageNodeField field, out ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAppMessageNodeMemoryCodec.TryReadUInt16(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAppMessageNodeField field, ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAppMessageNodeMemoryCodec.TryWriteUInt16(ref platform,
+			record, field, value);
+	}
+
+	internal static bool TryReadUInt8<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAppMessageNodeField field, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAppMessageNodeMemoryCodec.TryReadUInt8(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt8<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAppMessageNodeField field, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAppMessageNodeMemoryCodec.TryWriteUInt8(ref platform,
+			record, field, value);
+	}
+}
+
+// Fixed Exec message-node fields are translated through this named adapter.
+// Mixed byte, word, and long widths stay local to the bounded MorphOS guest
+// record boundary; message consumers use the semantic node struct.
+internal static class MuiAppMessageNodeMemoryCodec
+{
+	private static bool TryResolve(MuiAppMessageNodeField field,
+		out uint offset, out uint fieldSize)
+	{
+		switch (field)
+		{
+			case MuiAppMessageNodeField.Successor:
+				offset = MuiAppMessageNodeState.SuccessorOffset;
+				fieldSize = MuiAppMessageNodeState.FieldSize32; return true;
+			case MuiAppMessageNodeField.Predecessor:
+				offset = MuiAppMessageNodeState.PredecessorOffset;
+				fieldSize = MuiAppMessageNodeState.FieldSize32; return true;
+			case MuiAppMessageNodeField.Type:
+				offset = MuiAppMessageNodeState.TypeOffset;
+				fieldSize = MuiAppMessageNodeState.FieldSize8; return true;
+			case MuiAppMessageNodeField.Priority:
+				offset = MuiAppMessageNodeState.PriorityOffset;
+				fieldSize = MuiAppMessageNodeState.FieldSize8; return true;
+			case MuiAppMessageNodeField.Name:
+				offset = MuiAppMessageNodeState.NameOffset;
+				fieldSize = MuiAppMessageNodeState.FieldSize32; return true;
+			case MuiAppMessageNodeField.ReplyPort:
+				offset = MuiAppMessageNodeState.ReplyPortOffset;
+				fieldSize = MuiAppMessageNodeState.FieldSize32; return true;
+			case MuiAppMessageNodeField.Length:
+				offset = MuiAppMessageNodeState.LengthOffset;
+				fieldSize = MuiAppMessageNodeState.FieldSize16; return true;
+		}
+		offset = 0;
+		fieldSize = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAppMessageNodeField field, out APTR address,
+		out uint fieldSize) where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset, out var size) ||
-			cursor.Record.IsNull || cursor.Record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, size);
+		fieldSize = 0;
+		if (!TryResolve(field, out var offset, out fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiAppMessageNodeState.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, fieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -103,11 +167,9 @@ internal static class MuiAppMessageNodeFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAppMessageNodeFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
-			!TryResolve(field, out _, out var size) || size != 4) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != MuiAppMessageNodeState.FieldSize32)
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -116,11 +178,9 @@ internal static class MuiAppMessageNodeFieldCursorCodec
 		APTR record, MuiAppMessageNodeField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAppMessageNodeFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
-			!TryResolve(field, out _, out var size) || size != 4) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != MuiAppMessageNodeState.FieldSize32)
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -130,11 +190,9 @@ internal static class MuiAppMessageNodeFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAppMessageNodeFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
-			!TryResolve(field, out _, out var size) || size != 2) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != MuiAppMessageNodeState.FieldSize16)
+			return false;
 		value = platform.ReadUInt16(address, 0);
 		return true;
 	}
@@ -143,11 +201,9 @@ internal static class MuiAppMessageNodeFieldCursorCodec
 		APTR record, MuiAppMessageNodeField field, ushort value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAppMessageNodeFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
-			!TryResolve(field, out _, out var size) || size != 2) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != MuiAppMessageNodeState.FieldSize16)
+			return false;
 		platform.WriteUInt16(address, 0, value);
 		return true;
 	}
@@ -157,11 +213,9 @@ internal static class MuiAppMessageNodeFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAppMessageNodeFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
-			!TryResolve(field, out _, out var size) || size != 1) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != MuiAppMessageNodeState.FieldSize8)
+			return false;
 		value = platform.ReadUInt8(address, 0);
 		return true;
 	}
@@ -170,11 +224,9 @@ internal static class MuiAppMessageNodeFieldCursorCodec
 		APTR record, MuiAppMessageNodeField field, byte value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAppMessageNodeFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
-			!TryResolve(field, out _, out var size) || size != 1) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != MuiAppMessageNodeState.FieldSize8)
+			return false;
 		platform.WriteUInt8(address, 0, value);
 		return true;
 	}
@@ -184,6 +236,27 @@ internal static class MuiAppMessageNodeFieldCursorCodec
 internal struct MuiAppMessageRecord
 {
 	internal const uint Size = 86;
+	internal const uint FieldSize32 = 4;
+	internal const uint FieldSize16 = 2;
+	internal const uint TypeOffset = 20;
+	internal const uint UserDataOffset = 22;
+	internal const uint IdOffset = 26;
+	internal const uint NumberOfArgumentsOffset = 30;
+	internal const uint ArgumentListOffset = 34;
+	internal const uint VersionOffset = 38;
+	internal const uint ClassOffset = 40;
+	internal const uint MouseXOffset = 42;
+	internal const uint MouseYOffset = 44;
+	internal const uint SecondsOffset = 46;
+	internal const uint MicrosOffset = 50;
+	internal const uint Reserved0Offset = 54;
+	internal const uint Reserved1Offset = 58;
+	internal const uint Reserved2Offset = 62;
+	internal const uint Reserved3Offset = 66;
+	internal const uint Reserved4Offset = 70;
+	internal const uint Reserved5Offset = 74;
+	internal const uint Reserved6Offset = 78;
+	internal const uint Reserved7Offset = 82;
 
 	internal MuiAppMessageNodeState Message;
 	internal ushort Type;
@@ -239,105 +312,131 @@ internal struct MuiAppMessageFieldCursor
 
 internal static class MuiAppMessageFieldCursorCodec
 {
-	private static bool TryResolve(MuiAppMessageField field,
-		out uint offset, out uint size)
-	{
-		switch (field)
-		{
-			case MuiAppMessageField.Type:
-				offset = 20;
-				size = 2;
-				break;
-			case MuiAppMessageField.UserData:
-				offset = 22;
-				size = 4;
-				break;
-			case MuiAppMessageField.Id:
-				offset = 26;
-				size = 4;
-				break;
-			case MuiAppMessageField.NumberOfArguments:
-				offset = 30;
-				size = 4;
-				break;
-			case MuiAppMessageField.ArgumentList:
-				offset = 34;
-				size = 4;
-				break;
-			case MuiAppMessageField.Version:
-				offset = 38;
-				size = 2;
-				break;
-			case MuiAppMessageField.Class:
-				offset = 40;
-				size = 2;
-				break;
-			case MuiAppMessageField.MouseX:
-				offset = 42;
-				size = 2;
-				break;
-			case MuiAppMessageField.MouseY:
-				offset = 44;
-				size = 2;
-				break;
-			case MuiAppMessageField.Seconds:
-				offset = 46;
-				size = 4;
-				break;
-			case MuiAppMessageField.Micros:
-				offset = 50;
-				size = 4;
-				break;
-			case MuiAppMessageField.Reserved0:
-				offset = 54;
-				size = 4;
-				break;
-			case MuiAppMessageField.Reserved1:
-				offset = 58;
-				size = 4;
-				break;
-			case MuiAppMessageField.Reserved2:
-				offset = 62;
-				size = 4;
-				break;
-			case MuiAppMessageField.Reserved3:
-				offset = 66;
-				size = 4;
-				break;
-			case MuiAppMessageField.Reserved4:
-				offset = 70;
-				size = 4;
-				break;
-			case MuiAppMessageField.Reserved5:
-				offset = 74;
-				size = 4;
-				break;
-			case MuiAppMessageField.Reserved6:
-				offset = 78;
-				size = 4;
-				break;
-			case MuiAppMessageField.Reserved7:
-				offset = 82;
-				size = 4;
-				break;
-			default:
-				offset = 0;
-				size = 0;
-				return false;
-		}
-		return true;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAppMessageFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return MuiAppMessageRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address, out _);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAppMessageField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAppMessageRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAppMessageField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAppMessageRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+	}
+
+	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAppMessageField field, out ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAppMessageRecordMemoryCodec.TryReadUInt16(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAppMessageField field, ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAppMessageRecordMemoryCodec.TryWriteUInt16(ref platform,
+			record, field, value);
+	}
+}
+
+// Fixed AppMessage fields are translated through this named adapter. The
+// record contains the Exec node prefix followed by mixed-width message data;
+// only this bounded guest-memory layer knows those MorphOS slots.
+internal static class MuiAppMessageRecordMemoryCodec
+{
+	private static bool TryResolve(MuiAppMessageField field,
+		out uint offset, out uint fieldSize)
+	{
+		switch (field)
+		{
+			case MuiAppMessageField.Type:
+				offset = MuiAppMessageRecord.TypeOffset;
+				fieldSize = MuiAppMessageRecord.FieldSize16; return true;
+			case MuiAppMessageField.UserData:
+				offset = MuiAppMessageRecord.UserDataOffset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+			case MuiAppMessageField.Id:
+				offset = MuiAppMessageRecord.IdOffset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+			case MuiAppMessageField.NumberOfArguments:
+				offset = MuiAppMessageRecord.NumberOfArgumentsOffset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+			case MuiAppMessageField.ArgumentList:
+				offset = MuiAppMessageRecord.ArgumentListOffset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+			case MuiAppMessageField.Version:
+				offset = MuiAppMessageRecord.VersionOffset;
+				fieldSize = MuiAppMessageRecord.FieldSize16; return true;
+			case MuiAppMessageField.Class:
+				offset = MuiAppMessageRecord.ClassOffset;
+				fieldSize = MuiAppMessageRecord.FieldSize16; return true;
+			case MuiAppMessageField.MouseX:
+				offset = MuiAppMessageRecord.MouseXOffset;
+				fieldSize = MuiAppMessageRecord.FieldSize16; return true;
+			case MuiAppMessageField.MouseY:
+				offset = MuiAppMessageRecord.MouseYOffset;
+				fieldSize = MuiAppMessageRecord.FieldSize16; return true;
+			case MuiAppMessageField.Seconds:
+				offset = MuiAppMessageRecord.SecondsOffset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+			case MuiAppMessageField.Micros:
+				offset = MuiAppMessageRecord.MicrosOffset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+			case MuiAppMessageField.Reserved0:
+				offset = MuiAppMessageRecord.Reserved0Offset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+			case MuiAppMessageField.Reserved1:
+				offset = MuiAppMessageRecord.Reserved1Offset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+			case MuiAppMessageField.Reserved2:
+				offset = MuiAppMessageRecord.Reserved2Offset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+			case MuiAppMessageField.Reserved3:
+				offset = MuiAppMessageRecord.Reserved3Offset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+			case MuiAppMessageField.Reserved4:
+				offset = MuiAppMessageRecord.Reserved4Offset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+			case MuiAppMessageField.Reserved5:
+				offset = MuiAppMessageRecord.Reserved5Offset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+			case MuiAppMessageField.Reserved6:
+				offset = MuiAppMessageRecord.Reserved6Offset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+			case MuiAppMessageField.Reserved7:
+				offset = MuiAppMessageRecord.Reserved7Offset;
+				fieldSize = MuiAppMessageRecord.FieldSize32; return true;
+		}
+		offset = 0;
+		fieldSize = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAppMessageField field, out APTR address,
+		out uint fieldSize) where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset, out var size) ||
-			cursor.Record.IsNull || cursor.Record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, size);
+		fieldSize = 0;
+		if (!TryResolve(field, out var offset, out fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiAppMessageRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, fieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -345,11 +444,9 @@ internal static class MuiAppMessageFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAppMessageFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
-			!TryResolve(field, out _, out var size) || size != 4) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != MuiAppMessageRecord.FieldSize32)
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -358,11 +455,9 @@ internal static class MuiAppMessageFieldCursorCodec
 		APTR record, MuiAppMessageField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAppMessageFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
-			!TryResolve(field, out _, out var size) || size != 4) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != MuiAppMessageRecord.FieldSize32)
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -372,11 +467,9 @@ internal static class MuiAppMessageFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAppMessageFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
-			!TryResolve(field, out _, out var size) || size != 2) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != MuiAppMessageRecord.FieldSize16)
+			return false;
 		value = platform.ReadUInt16(address, 0);
 		return true;
 	}
@@ -385,11 +478,9 @@ internal static class MuiAppMessageFieldCursorCodec
 		APTR record, MuiAppMessageField field, ushort value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAppMessageFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
-			!TryResolve(field, out _, out var size) || size != 2) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != MuiAppMessageRecord.FieldSize16)
+			return false;
 		platform.WriteUInt16(address, 0, value);
 		return true;
 	}
@@ -404,23 +495,23 @@ internal static class MuiAppMessageNodeCodec
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiAppMessageNodeState.Size)) return false;
-		if (!MuiAppMessageNodeFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiAppMessageNodeMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiAppMessageNodeField.Successor, out var rawSuccessor) ||
-			!MuiAppMessageNodeFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiAppMessageNodeMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiAppMessageNodeField.Predecessor, out var rawPredecessor) ||
-			!MuiAppMessageNodeFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiAppMessageNodeMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiAppMessageNodeField.Name, out var rawName) ||
-			!MuiAppMessageNodeFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiAppMessageNodeMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiAppMessageNodeField.ReplyPort, out var rawReplyPort)) return false;
 		value.Successor = APTR.FromPointer(rawSuccessor);
 		value.Predecessor = APTR.FromPointer(rawPredecessor);
 		value.Name = APTR.FromPointer(rawName);
 		value.ReplyPort = APTR.FromPointer(rawReplyPort);
-		if (!MuiAppMessageNodeFieldCursorCodec.TryReadUInt8(ref platform, address,
+		if (!MuiAppMessageNodeMemoryCodec.TryReadUInt8(ref platform, address,
 			MuiAppMessageNodeField.Type, out value.Type) ||
-			!MuiAppMessageNodeFieldCursorCodec.TryReadUInt8(ref platform, address,
+			!MuiAppMessageNodeMemoryCodec.TryReadUInt8(ref platform, address,
 				MuiAppMessageNodeField.Priority, out var rawPriority) ||
-			!MuiAppMessageNodeFieldCursorCodec.TryReadUInt16(ref platform, address,
+			!MuiAppMessageNodeMemoryCodec.TryReadUInt16(ref platform, address,
 				MuiAppMessageNodeField.Length, out value.Length)) return false;
 		value.Priority = unchecked((sbyte)rawPriority);
 		return true;
@@ -432,20 +523,20 @@ internal static class MuiAppMessageNodeCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiAppMessageNodeState.Size)) return false;
-		return MuiAppMessageNodeFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiAppMessageNodeMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiAppMessageNodeField.Successor, value.Successor.Raw) &&
-			MuiAppMessageNodeFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiAppMessageNodeMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiAppMessageNodeField.Predecessor, value.Predecessor.Raw) &&
-			MuiAppMessageNodeFieldCursorCodec.TryWriteUInt8(ref platform, address,
+			MuiAppMessageNodeMemoryCodec.TryWriteUInt8(ref platform, address,
 				MuiAppMessageNodeField.Type, value.Type) &&
-			MuiAppMessageNodeFieldCursorCodec.TryWriteUInt8(ref platform, address,
+			MuiAppMessageNodeMemoryCodec.TryWriteUInt8(ref platform, address,
 				MuiAppMessageNodeField.Priority,
 				unchecked((byte)value.Priority)) &&
-			MuiAppMessageNodeFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiAppMessageNodeMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiAppMessageNodeField.Name, value.Name.Raw) &&
-			MuiAppMessageNodeFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiAppMessageNodeMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiAppMessageNodeField.ReplyPort, value.ReplyPort.Raw) &&
-			MuiAppMessageNodeFieldCursorCodec.TryWriteUInt16(ref platform, address,
+			MuiAppMessageNodeMemoryCodec.TryWriteUInt16(ref platform, address,
 				MuiAppMessageNodeField.Length, value.Length);
 	}
 }
@@ -454,6 +545,9 @@ internal static class MuiAppMessageNodeCodec
 internal struct MuiWorkbenchArgumentRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint LockOffset = 0;
+	internal const uint NameOffset = 4;
 
 	internal BPTR Lock;
 	internal STRPTR Name;
@@ -478,46 +572,75 @@ internal static class MuiWorkbenchArgumentFieldCursorCodec
 		MuiWorkbenchArgumentFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		uint offset;
-		switch (cursor.Field)
-		{
-			case MuiWorkbenchArgumentField.Lock:
-				offset = 0;
-				break;
-			case MuiWorkbenchArgumentField.Name:
-				offset = 4;
-				break;
-			default:
-				return false;
-		}
-		if (cursor.Record.IsNull || cursor.Record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiWorkbenchArgumentRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR record, MuiWorkbenchArgumentField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiWorkbenchArgumentFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiWorkbenchArgumentRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR record, MuiWorkbenchArgumentField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiWorkbenchArgumentFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		return MuiWorkbenchArgumentRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+	}
+}
+
+// Fixed Workbench argument records are exposed as named BPTR/STRPTR fields.
+// Only this bounded adapter translates their two MorphOS guest LONG slots;
+// vector and message consumers use the semantic record.
+internal static class MuiWorkbenchArgumentRecordMemoryCodec
+{
+	private static bool TryResolve(MuiWorkbenchArgumentField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiWorkbenchArgumentField.Lock:
+				offset = MuiWorkbenchArgumentRecord.LockOffset; return true;
+			case MuiWorkbenchArgumentField.Name:
+				offset = MuiWorkbenchArgumentRecord.NameOffset; return true;
+		}
+		offset = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWorkbenchArgumentField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiWorkbenchArgumentRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiWorkbenchArgumentRecord.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWorkbenchArgumentField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWorkbenchArgumentField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -559,9 +682,9 @@ internal static class MuiWorkbenchArgumentRecordCodec
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiWorkbenchArgumentRecord.Size)) return false;
-		if (!MuiWorkbenchArgumentFieldCursorCodec.TryRead(ref platform, address,
+		if (!MuiWorkbenchArgumentRecordMemoryCodec.TryReadUInt32(ref platform, address,
 			MuiWorkbenchArgumentField.Lock, out var rawLock) ||
-			!MuiWorkbenchArgumentFieldCursorCodec.TryRead(ref platform, address,
+			!MuiWorkbenchArgumentRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiWorkbenchArgumentField.Name, out var rawName)) return false;
 		value.Lock = BPTR.FromRaw(rawLock);
 		value.Name = STRPTR.FromPointer(rawName);
@@ -574,9 +697,9 @@ internal static class MuiWorkbenchArgumentRecordCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiWorkbenchArgumentRecord.Size)) return false;
-		return MuiWorkbenchArgumentFieldCursorCodec.TryWrite(ref platform, address,
+		return MuiWorkbenchArgumentRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 			MuiWorkbenchArgumentField.Lock, value.Lock.Raw) &&
-			MuiWorkbenchArgumentFieldCursorCodec.TryWrite(ref platform, address,
+			MuiWorkbenchArgumentRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiWorkbenchArgumentField.Name, value.Name.Raw);
 	}
 }
@@ -704,7 +827,7 @@ public static class MuiApplicationMessageCore
 
 	private const uint ApplicationInitialized = 0x7FFE0044;
 	private const uint WindowOpen = 0x80428AA0;
-	private const uint RoutingStateKey = 0x7F0A001Au;
+	internal const uint RoutingStateKey = 0x7F0A001Au;
 	private const int MaximumArguments = 65535;
 	private const uint MaximumStringLength = 65536;
 
@@ -719,8 +842,10 @@ public static class MuiApplicationMessageCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			RoutingStateKey) != unchecked((int)
 			MuiApplicationMessageRoutingStateRecord.Size)) return false;
-		return MuiApplicationMessageRoutingStateRecordCodec.TryRead(ref platform,
-			block, out value);
+		return MuiApplicationMessageRoutingStateRecordCodec.TryReadStructural(
+			ref platform, block, out value) &&
+			MuiApplicationMessageRoutingStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static MuiApplicationMessageRoutingStateRecord ReadRoutingState<
@@ -729,6 +854,8 @@ public static class MuiApplicationMessageCore
 	{
 		if (PublishRoutingState(ref platform, state, obj, out var value))
 			return value;
+		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			RoutingStateKey) != 0) return default;
 		value = default;
 		value.Magic = MuiApplicationMessageRoutingStateRecord.Cookie;
 		FillRoutingState(ref platform, state, obj, ref value);
@@ -743,10 +870,19 @@ public static class MuiApplicationMessageCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			RoutingStateKey);
-		if (TryGetApplicationMessageRoutingState(ref platform, state, obj,
-			out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			RoutingStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationMessageRoutingStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!MuiApplicationMessageRoutingStateRecordCodec.TryReadStructural(
+				ref platform, block, out value) ||
+				!MuiApplicationMessageRoutingStateAdmission.ValidateLive(ref platform,
+					state, obj, value)) return false;
 			FillRoutingState(ref platform, state, obj, ref value);
+			if (!MuiApplicationMessageRoutingStateAdmission.ValidateLive(ref platform,
+				state, obj, value)) return false;
 			return MuiApplicationMessageRoutingStateRecordCodec.Write(ref platform,
 				block, value);
 		}
@@ -754,6 +890,8 @@ public static class MuiApplicationMessageCore
 		value = default;
 		value.Magic = MuiApplicationMessageRoutingStateRecord.Cookie;
 		FillRoutingState(ref platform, state, obj, ref value);
+		if (!MuiApplicationMessageRoutingStateAdmission.ValidateLive(ref platform,
+			state, obj, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationMessageRoutingStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -789,6 +927,7 @@ public static class MuiApplicationMessageCore
 			out var objectValue)) return false;
 		var obj = objectValue.Boopsi;
 		if (obj.IsNull) return false;
+		if (!PublishRoutingState(ref platform, state, obj, out _)) return false;
 		var previous = 0u;
 		MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
 			attribute, out previous);
@@ -914,6 +1053,9 @@ public static class MuiApplicationMessageCore
 	{
 		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, target);
 		if (record.IsNull) return false;
+		// Admit the existing transient sidecar before touching the caller-visible
+		// AppMessage attribute or firing its notification chain.
+		if (!PublishRoutingState(ref platform, state, target, out _)) return false;
 		var hadPrevious = MuiHeadlessObjectCore.GetRawAttribute(ref platform,
 			state, target, AppMessage, out var previous);
 		if (!MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state,

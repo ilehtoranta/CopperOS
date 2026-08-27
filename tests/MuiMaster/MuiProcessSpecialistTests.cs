@@ -124,6 +124,36 @@ public sealed class MuiProcessSpecialistTests
 			MuiProcessSpecialistClass.Process).IsNull);
 	}
 
+	[Fact]
+	public void MalformedProcessSidecarFailsClosedBeforeSchedulerCalls()
+	{
+		var p = NewPlatform();
+		var proc = Process(ref p);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref p, State, proc,
+			MuiProcessSpecialistLayout.SidecarAttribute, out var raw));
+		var sidecar = APTR.FromPointer(raw);
+		Assert.True(MuiProcessSpecialistCodec.TryReadStructural(ref p, sidecar,
+			out var record));
+		// The structural codec can represent the guest record, but the live
+		// admission boundary rejects flags that are not owned by Process.mui.
+		record.Flags = 0x80000000u;
+		Assert.True(MuiProcessSpecialistCodec.Write(ref p, sidecar, record));
+		Assert.False(MuiProcessSpecialistCore.Valid(ref p, State, proc));
+		Assert.False(MuiProcessSpecialistCore.Launch(ref p, State, proc));
+		Assert.Equal(0u, p.ProcessLaunchCount);
+
+		var slave = Slave(ref p);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref p, State, slave,
+			MuiProcessSpecialistLayout.SidecarAttribute, out raw));
+		sidecar = APTR.FromPointer(raw);
+		Assert.True(MuiProcessSpecialistCodec.TryReadStructural(ref p, sidecar,
+			out record));
+		record.State = (uint)MuiProcessState.Running;
+		Assert.True(MuiProcessSpecialistCodec.Write(ref p, sidecar, record));
+		Assert.False(MuiProcessSpecialistCore.Valid(ref p, State, slave));
+		Assert.False(MuiProcessSpecialistCore.Setup(ref p, State, slave));
+	}
+
 	// ---- Creation defaults ---------------------------------------------------
 
 	[Fact]
@@ -723,6 +753,56 @@ public sealed class MuiProcessSpecialistTests
 			APTR.FromPointer(Base + (uint)Size - 1), out _));
 		Assert.False(MuiProcessSpecialistMessageCodec.IsValidMethod(ref p, Message,
 			0x80420000u));
+	}
+
+	[Fact]
+	public void ProcessSpecialistMessageAdapterOwnsStructBounds()
+	{
+		var p = NewPlatform();
+		Assert.True(MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			Message, MuiProcessSpecialistPacketKind.Get,
+			MuiProcessSpecialistField.Storage, Storage.Raw));
+		Assert.True(MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Message, MuiProcessSpecialistPacketKind.Get,
+			MuiProcessSpecialistField.Storage, out var storage));
+		Assert.Equal(Storage.Raw, storage);
+		Assert.True(MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			Message, MuiProcessSpecialistPacketKind.Set,
+			MuiProcessSpecialistField.Value, 0x456));
+		Assert.True(MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Message, MuiProcessSpecialistPacketKind.Set,
+			MuiProcessSpecialistField.Value, out var value));
+		Assert.Equal(0x456u, value);
+		Assert.True(MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			Message, MuiProcessSpecialistPacketKind.Signal,
+			MuiProcessSpecialistField.Signals, 0x40));
+		Assert.True(MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Message, MuiProcessSpecialistPacketKind.Signal,
+			MuiProcessSpecialistField.Signals, out var signals));
+		Assert.Equal(0x40u, signals);
+		Assert.True(MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			Message, MuiProcessSpecialistPacketKind.Error,
+			MuiProcessSpecialistField.ErrorCode, 205));
+		Assert.True(MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Message, MuiProcessSpecialistPacketKind.Error,
+			MuiProcessSpecialistField.ErrorCode, out var error));
+		Assert.Equal(205u, error);
+		Assert.True(MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			Message, MuiProcessSpecialistPacketKind.Dispatch,
+			MuiProcessSpecialistField.Packet, Packet.Raw));
+		Assert.True(MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Message, MuiProcessSpecialistPacketKind.Dispatch,
+			MuiProcessSpecialistField.Packet, out var dispatch));
+		Assert.Equal(Packet.Raw, dispatch);
+		Assert.False(MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			APTR.FromPointer(0x40FFD), MuiProcessSpecialistPacketKind.Dispatch,
+			MuiProcessSpecialistField.Packet, out _));
+		Assert.False(MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			Message, MuiProcessSpecialistPacketKind.Method,
+			MuiProcessSpecialistField.Attribute, out _));
+		Assert.False(MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			APTR.Null, MuiProcessSpecialistPacketKind.Set,
+			MuiProcessSpecialistField.Value, out _));
 	}
 
 	[Fact]

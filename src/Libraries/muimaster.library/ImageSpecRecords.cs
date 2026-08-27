@@ -45,6 +45,27 @@ internal enum MuiImageSpecStateField : byte
 	Builtin,
 }
 
+internal static class MuiImageSpecStateAdmission
+{
+	private const uint BuiltinImageMaximum = 0x00000093;
+
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		MuiImageSpecStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (value.Magic != MuiImageSpecStateRecord.Cookie ||
+			value.Present > 1 || value.BuiltinPresent > 1) return false;
+		if (value.Present == 0 || value.Raw <= BuiltinImageMaximum) return true;
+		return platform.IsMapped(APTR.FromPointer(value.Raw), 2);
+	}
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiImageSpecStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(ref platform, value) && !obj.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
+}
+
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiImageSpecStateFieldCursor
 {
@@ -107,47 +128,83 @@ internal static class MuiImageSpecStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Image consumers use the named spec
+// record; this bounded adapter is the only layer that translates its fixed
+// guest layout into addresses. The cursor codec remains for compatibility and
+// malformed-state diagnostics.
+internal static class MuiImageSpecStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiImageSpecStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiImageSpecStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiImageSpecStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiImageSpecStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiImageSpecStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiImageSpecStateRecord.Size) ||
-			!MuiImageSpecStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiImageSpecStateField.Magic, out var magic) ||
-			magic != MuiImageSpecStateRecord.Cookie) return false;
-		value.Magic = magic;
-		if (!MuiImageSpecStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-			MuiImageSpecStateField.Present, out value.Present) ||
-			!MuiImageSpecStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiImageSpecStateField.Raw, out value.Raw) ||
-			!MuiImageSpecStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiImageSpecStateField.BuiltinPresent, out value.BuiltinPresent) ||
-			!MuiImageSpecStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiImageSpecStateField.Builtin, out value.Builtin)) return false;
-		return value.Present <= 1 && value.BuiltinPresent <= 1;
+		return MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) &&
+			MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out value.Present) &&
+			MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 8, out value.Raw) &&
+			MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 12, out value.BuiltinPresent) &&
+			MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 16, out value.Builtin);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiImageSpecStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiImageSpecStateAdmission.Validate(ref platform, value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiImageSpecStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiImageSpecStateRecord.Size) || value.Magic !=
-			MuiImageSpecStateRecord.Cookie || value.Present > 1 ||
-			value.BuiltinPresent > 1) return false;
-		return MuiImageSpecStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiImageSpecStateField.Magic, value.Magic) &&
-			MuiImageSpecStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiImageSpecStateField.Present, value.Present) &&
-			MuiImageSpecStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiImageSpecStateField.Raw, value.Raw) &&
-			MuiImageSpecStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiImageSpecStateField.BuiltinPresent, value.BuiltinPresent) &&
-			MuiImageSpecStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiImageSpecStateField.Builtin, value.Builtin);
+		if (!MuiImageSpecStateAdmission.Validate(ref platform, value)) return false;
+		return MuiImageSpecStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiImageSpecStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			4, value.Present) &&
+			MuiImageSpecStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			8, value.Raw) &&
+			MuiImageSpecStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			12, value.BuiltinPresent) &&
+			MuiImageSpecStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			16, value.Builtin);
 	}
 }

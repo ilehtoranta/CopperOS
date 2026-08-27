@@ -28,51 +28,127 @@ internal struct MuiListTestPosResult
 	internal short YOffset;
 }
 
+internal enum MuiListTestPosResultField : byte
+{
+	Entry,
+	Column,
+	Flags,
+	XOffset,
+	YOffset,
+}
+
+// Struct-first adapter for the mixed-width MUIM_List_TestPos result. The
+// result remains a named semantic struct; only this bounded boundary knows
+// the 68k byte/word/long slots.
+internal static class MuiListTestPosResultMemoryCodec
+{
+	private static bool TryResolve(MuiListTestPosResultField field,
+		out uint offset, out uint size)
+	{
+		switch (field)
+		{
+			case MuiListTestPosResultField.Entry:
+				offset = 0; size = 4; return true;
+			case MuiListTestPosResultField.Column:
+				offset = 4; size = 2; return true;
+			case MuiListTestPosResultField.Flags:
+				offset = 6; size = 2; return true;
+			case MuiListTestPosResultField.XOffset:
+				offset = 8; size = 2; return true;
+			case MuiListTestPosResultField.YOffset:
+				offset = 10; size = 2; return true;
+		}
+		offset = 0;
+		size = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiListTestPosResultField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset, out var size) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiListTestPosResult.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, size);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiListTestPosResultField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address) ||
+			field != MuiListTestPosResultField.Entry) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiListTestPosResultField field, out ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address) ||
+			field == MuiListTestPosResultField.Entry) return false;
+		value = platform.ReadUInt16(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiListTestPosResultField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address) ||
+			field != MuiListTestPosResultField.Entry) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+
+	internal static bool TryWriteUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiListTestPosResultField field, ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address) ||
+			field == MuiListTestPosResultField.Entry) return false;
+		platform.WriteUInt16(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiListTestPosResultCodec
 {
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR storage,
 		MuiListTestPosResult value) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (storage.IsNull || !platform.IsMapped(storage,
-			MuiListTestPosResult.Size)) return false;
-		return MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			storage, MuiListInputRecordKind.TestPos,
-			MuiListInputRecordField.Entry, unchecked((uint)value.Entry)) &&
-			MuiListInputRecordFieldCursorCodec.TryWriteUInt16(ref platform, storage,
-				MuiListInputRecordKind.TestPos, MuiListInputRecordField.Column,
-				unchecked((ushort)value.Column)) &&
-			MuiListInputRecordFieldCursorCodec.TryWriteUInt16(ref platform, storage,
-				MuiListInputRecordKind.TestPos, MuiListInputRecordField.Flags,
-				value.Flags) &&
-			MuiListInputRecordFieldCursorCodec.TryWriteUInt16(ref platform, storage,
-				MuiListInputRecordKind.TestPos, MuiListInputRecordField.XOffset,
-				unchecked((ushort)value.XOffset)) &&
-			MuiListInputRecordFieldCursorCodec.TryWriteUInt16(ref platform, storage,
-				MuiListInputRecordKind.TestPos, MuiListInputRecordField.YOffset,
-				unchecked((ushort)value.YOffset));
+		return MuiListTestPosResultMemoryCodec.TryWriteUInt32(ref platform,
+			storage, MuiListTestPosResultField.Entry, unchecked((uint)value.Entry)) &&
+			MuiListTestPosResultMemoryCodec.TryWriteUInt16(ref platform, storage,
+			MuiListTestPosResultField.Column, unchecked((ushort)value.Column)) &&
+			MuiListTestPosResultMemoryCodec.TryWriteUInt16(ref platform, storage,
+				MuiListTestPosResultField.Flags, value.Flags) &&
+			MuiListTestPosResultMemoryCodec.TryWriteUInt16(ref platform, storage,
+				MuiListTestPosResultField.XOffset, unchecked((ushort)value.XOffset)) &&
+			MuiListTestPosResultMemoryCodec.TryWriteUInt16(ref platform, storage,
+				MuiListTestPosResultField.YOffset, unchecked((ushort)value.YOffset));
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR storage,
 		out MuiListTestPosResult value) where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (storage.IsNull || !platform.IsMapped(storage,
-			MuiListTestPosResult.Size)) return false;
-		if (!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-			storage, MuiListInputRecordKind.TestPos,
-			MuiListInputRecordField.Entry, out var entry) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform, storage,
-				MuiListInputRecordKind.TestPos, MuiListInputRecordField.Column,
-				out var column) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform, storage,
-				MuiListInputRecordKind.TestPos, MuiListInputRecordField.Flags,
-				out value.Flags) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform, storage,
-				MuiListInputRecordKind.TestPos, MuiListInputRecordField.XOffset,
-				out var xOffset) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform, storage,
-				MuiListInputRecordKind.TestPos, MuiListInputRecordField.YOffset,
-				out var yOffset)) return false;
+		if (!MuiListTestPosResultMemoryCodec.TryReadUInt32(ref platform, storage,
+			MuiListTestPosResultField.Entry, out var entry) ||
+			!MuiListTestPosResultMemoryCodec.TryReadUInt16(ref platform, storage,
+				MuiListTestPosResultField.Column, out var column) ||
+			!MuiListTestPosResultMemoryCodec.TryReadUInt16(ref platform, storage,
+				MuiListTestPosResultField.Flags, out value.Flags) ||
+			!MuiListTestPosResultMemoryCodec.TryReadUInt16(ref platform, storage,
+				MuiListTestPosResultField.XOffset, out var xOffset) ||
+			!MuiListTestPosResultMemoryCodec.TryReadUInt16(ref platform, storage,
+				MuiListTestPosResultField.YOffset, out var yOffset)) return false;
 		value.Entry = unchecked((int)entry);
 		value.Column = unchecked((short)column);
 		value.XOffset = unchecked((short)xOffset);
@@ -94,17 +170,47 @@ internal struct MuiListScalarStorageRecord
 	internal uint Value;
 }
 
+internal static class MuiListScalarStorageRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || !platform.IsMapped(record,
+			MuiListScalarStorageRecord.Size)) return false;
+		address = record;
+		return platform.IsMapped(address, MuiListScalarStorageRecord.Size);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, out _)) return false;
+		value = platform.ReadUInt32(record, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, out _)) return false;
+		platform.WriteUInt32(record, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiListScalarStorageCodec
 {
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR storage,
 		MuiListScalarStorageRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (storage.IsNull || !platform.IsMapped(storage,
-			MuiListScalarStorageRecord.Size)) return false;
-		return MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			storage, MuiListInputRecordKind.Scalar,
-			MuiListInputRecordField.Value, value.Value);
+		return MuiListScalarStorageRecordMemoryCodec.TryWriteUInt32(ref platform,
+			storage, value.Value);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR storage,
@@ -112,11 +218,8 @@ internal static class MuiListScalarStorageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (storage.IsNull || !platform.IsMapped(storage,
-			MuiListScalarStorageRecord.Size)) return false;
-		return MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-			storage, MuiListInputRecordKind.Scalar,
-			MuiListInputRecordField.Value, out value.Value);
+		return MuiListScalarStorageRecordMemoryCodec.TryReadUInt32(ref platform,
+			storage, out value.Value);
 	}
 }
 
@@ -131,17 +234,47 @@ internal struct MuiListDisplayRowRecord
 	internal int Row;
 }
 
+internal static class MuiListDisplayRowRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || !platform.IsMapped(record,
+			MuiListDisplayRowRecord.Size)) return false;
+		address = record;
+		return platform.IsMapped(address, MuiListDisplayRowRecord.Size);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, out _)) return false;
+		value = platform.ReadUInt32(record, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, out _)) return false;
+		platform.WriteUInt32(record, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiListDisplayRowRecordCodec
 {
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR storage,
 		MuiListDisplayRowRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (storage.IsNull || !platform.IsMapped(storage,
-			MuiListDisplayRowRecord.Size)) return false;
-		return MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			storage, MuiListInputRecordKind.DisplayRow,
-			MuiListInputRecordField.Row, unchecked((uint)value.Row));
+		return MuiListDisplayRowRecordMemoryCodec.TryWriteUInt32(ref platform,
+			storage, unchecked((uint)value.Row));
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR storage,
@@ -149,11 +282,8 @@ internal static class MuiListDisplayRowRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (storage.IsNull || !platform.IsMapped(storage,
-			MuiListDisplayRowRecord.Size)) return false;
-		if (!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-			storage, MuiListInputRecordKind.DisplayRow,
-			MuiListInputRecordField.Row, out var row)) return false;
+		if (!MuiListDisplayRowRecordMemoryCodec.TryReadUInt32(ref platform,
+			storage, out var row)) return false;
 		value.Row = unchecked((int)row);
 		return true;
 	}
@@ -209,6 +339,216 @@ internal struct MuiIntuiRawKeyMessage
 	internal ushort Qualifier;
 }
 
+internal enum MuiIntuiPointerMessageField : byte
+{
+	Class,
+	Code,
+	Qualifier,
+	IAddress,
+	MouseX,
+	MouseY,
+	Seconds,
+	Micros,
+}
+
+// Struct-first adapter for the stable IntuiMessage pointer envelope. The
+// semantic message remains a named value; this bounded adapter is the only
+// place that translates its MorphOS byte/word/long guest representation.
+internal static class MuiIntuiPointerMessageMemoryCodec
+{
+	private static bool TryResolve(MuiIntuiPointerMessageField field,
+		out uint offset, out uint recordSize, out uint fieldSize)
+	{
+		offset = 0;
+		recordSize = MuiIntuiPointerMessage.MinimumSize;
+		fieldSize = 0;
+		switch (field)
+		{
+			case MuiIntuiPointerMessageField.Class:
+				offset = MuiIntuiPointerMessage.ClassOffset;
+				fieldSize = 4;
+				return true;
+			case MuiIntuiPointerMessageField.Code:
+				offset = MuiIntuiPointerMessage.CodeOffset;
+				fieldSize = 2;
+				return true;
+			case MuiIntuiPointerMessageField.Qualifier:
+				offset = MuiIntuiPointerMessage.QualifierOffset;
+				fieldSize = 2;
+				return true;
+			case MuiIntuiPointerMessageField.IAddress:
+				offset = MuiIntuiPointerMessage.IAddressOffset;
+				fieldSize = 4;
+				return true;
+			case MuiIntuiPointerMessageField.MouseX:
+				offset = MuiIntuiPointerMessage.MouseXOffset;
+				fieldSize = 2;
+				return true;
+			case MuiIntuiPointerMessageField.MouseY:
+				offset = MuiIntuiPointerMessage.MouseYOffset;
+				fieldSize = 2;
+				return true;
+			case MuiIntuiPointerMessageField.Seconds:
+				offset = MuiIntuiPointerMessage.SecondsOffset;
+				recordSize = MuiIntuiPointerMessage.TimestampSize;
+				fieldSize = 4;
+				return true;
+			case MuiIntuiPointerMessageField.Micros:
+				offset = MuiIntuiPointerMessage.MicrosOffset;
+				recordSize = MuiIntuiPointerMessage.TimestampSize;
+				fieldSize = 4;
+				return true;
+		}
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiIntuiPointerMessageField field, out APTR address,
+		out uint fieldSize) where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		fieldSize = 0;
+		if (!TryResolve(field, out var offset, out var recordSize,
+			out fieldSize) || record.IsNull || record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, recordSize)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, fieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiIntuiPointerMessageField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != 4) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiIntuiPointerMessageField field, out ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != 2) return false;
+		value = platform.ReadUInt16(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiIntuiPointerMessageField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != 4) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+
+	internal static bool TryWriteUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiIntuiPointerMessageField field, ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != 2) return false;
+		platform.WriteUInt16(address, 0, value);
+		return true;
+	}
+}
+
+internal enum MuiIntuiRawKeyMessageField : byte
+{
+	Class,
+	Code,
+	Qualifier,
+}
+
+// Struct-first adapter for the shorter raw-key envelope. Keeping it separate
+// prevents callers from accidentally requiring the optional pointer-message
+// suffix when MorphOS only supplied the raw-key prefix.
+internal static class MuiIntuiRawKeyMessageMemoryCodec
+{
+	private static bool TryResolve(MuiIntuiRawKeyMessageField field,
+		out uint offset, out uint fieldSize)
+	{
+		switch (field)
+		{
+			case MuiIntuiRawKeyMessageField.Class:
+				offset = MuiIntuiRawKeyMessage.ClassOffset;
+				fieldSize = 4;
+				return true;
+			case MuiIntuiRawKeyMessageField.Code:
+				offset = MuiIntuiRawKeyMessage.CodeOffset;
+				fieldSize = 2;
+				return true;
+			case MuiIntuiRawKeyMessageField.Qualifier:
+				offset = MuiIntuiRawKeyMessage.QualifierOffset;
+				fieldSize = 2;
+				return true;
+		}
+		offset = 0;
+		fieldSize = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiIntuiRawKeyMessageField field, out APTR address,
+		out uint fieldSize) where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		fieldSize = 0;
+		if (!TryResolve(field, out var offset, out fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiIntuiRawKeyMessage.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, fieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiIntuiRawKeyMessageField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != 4) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiIntuiRawKeyMessageField field, out ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != 2) return false;
+		value = platform.ReadUInt16(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiIntuiRawKeyMessageField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != 4) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+
+	internal static bool TryWriteUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiIntuiRawKeyMessageField field, ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != 2) return false;
+		platform.WriteUInt16(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiIntuiMessageCodec
 {
 	// IDCMP_RAWKEY is the only IntuiMessage class consumed by the bounded
@@ -224,36 +564,27 @@ internal static class MuiIntuiMessageCodec
 		value = default;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiIntuiPointerMessage.MinimumSize)) return false;
-		if (!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiListInputRecordKind.IntuiMessage,
-			MuiListInputRecordField.Class, out value.Class) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.Code, out value.Code) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.Qualifier, out value.Qualifier) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.IAddress, out value.IAddress) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.MouseX, out var mouseX) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.MouseY, out var mouseY)) return false;
+		if (!MuiIntuiPointerMessageMemoryCodec.TryReadUInt32(ref platform,
+			message, MuiIntuiPointerMessageField.Class, out value.Class) ||
+			!MuiIntuiPointerMessageMemoryCodec.TryReadUInt16(ref platform,
+				message, MuiIntuiPointerMessageField.Code, out value.Code) ||
+			!MuiIntuiPointerMessageMemoryCodec.TryReadUInt16(ref platform,
+				message, MuiIntuiPointerMessageField.Qualifier, out value.Qualifier) ||
+			!MuiIntuiPointerMessageMemoryCodec.TryReadUInt32(ref platform,
+				message, MuiIntuiPointerMessageField.IAddress, out value.IAddress) ||
+			!MuiIntuiPointerMessageMemoryCodec.TryReadUInt16(ref platform,
+				message, MuiIntuiPointerMessageField.MouseX, out var mouseX) ||
+			!MuiIntuiPointerMessageMemoryCodec.TryReadUInt16(ref platform,
+				message, MuiIntuiPointerMessageField.MouseY, out var mouseY)) return false;
 		value.MouseX = unchecked((short)mouseX);
 		value.MouseY = unchecked((short)mouseY);
 		// Seconds/Micros are an optional extension of the stable pointer prefix.
 		// A short synthetic IntuiMessage remains valid; double-click policy simply
 		// treats it as an untimed single click rather than guessing from host time.
-		if (platform.IsMapped(message, MuiIntuiPointerMessage.TimestampSize) &&
-			MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.Seconds, out value.Seconds) &&
-			MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.Micros, out value.Micros))
+		if (MuiIntuiPointerMessageMemoryCodec.TryReadUInt32(ref platform, message,
+			MuiIntuiPointerMessageField.Seconds, out value.Seconds) &&
+			MuiIntuiPointerMessageMemoryCodec.TryReadUInt32(ref platform, message,
+			MuiIntuiPointerMessageField.Micros, out value.Micros))
 			value.TimestampValid = 1;
 		return true;
 	}
@@ -268,16 +599,13 @@ internal static class MuiIntuiMessageCodec
 		ushort qualifier;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiIntuiRawKeyMessage.Size) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiListInputRecordKind.RawKey,
-				MuiListInputRecordField.Class, out messageClass) ||
+			!MuiIntuiRawKeyMessageMemoryCodec.TryReadUInt32(ref platform,
+				message, MuiIntuiRawKeyMessageField.Class, out messageClass) ||
 			messageClass != RawKeyClass ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform,
-				message, MuiListInputRecordKind.RawKey,
-				MuiListInputRecordField.Code, out code) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform,
-				message, MuiListInputRecordKind.RawKey,
-				MuiListInputRecordField.Qualifier, out qualifier)) return false;
+			!MuiIntuiRawKeyMessageMemoryCodec.TryReadUInt16(ref platform,
+				message, MuiIntuiRawKeyMessageField.Code, out code) ||
+			!MuiIntuiRawKeyMessageMemoryCodec.TryReadUInt16(ref platform,
+				message, MuiIntuiRawKeyMessageField.Qualifier, out qualifier)) return false;
 		value.Class = messageClass;
 		value.Code = code;
 		value.Qualifier = qualifier;
@@ -305,15 +633,12 @@ internal static class MuiIntuiMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiIntuiRawKeyMessage.Size)) return false;
-		return MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiListInputRecordKind.RawKey,
-			MuiListInputRecordField.Class, messageClass) &&
-			MuiListInputRecordFieldCursorCodec.TryWriteUInt16(ref platform,
-			message, MuiListInputRecordKind.RawKey,
-			MuiListInputRecordField.Code, code) &&
-			MuiListInputRecordFieldCursorCodec.TryWriteUInt16(ref platform,
-				message, MuiListInputRecordKind.RawKey,
-				MuiListInputRecordField.Qualifier, qualifier);
+		return MuiIntuiRawKeyMessageMemoryCodec.TryWriteUInt32(ref platform,
+			message, MuiIntuiRawKeyMessageField.Class, messageClass) &&
+			MuiIntuiRawKeyMessageMemoryCodec.TryWriteUInt16(ref platform,
+				message, MuiIntuiRawKeyMessageField.Code, code) &&
+			MuiIntuiRawKeyMessageMemoryCodec.TryWriteUInt16(ref platform,
+				message, MuiIntuiRawKeyMessageField.Qualifier, qualifier);
 	}
 
 	internal static bool WritePointer<TPlatform>(ref TPlatform platform,
@@ -323,35 +648,27 @@ internal static class MuiIntuiMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiIntuiPointerMessage.MinimumSize)) return false;
-		var written = MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiListInputRecordKind.IntuiMessage,
-			MuiListInputRecordField.Class, messageClass) &&
-			MuiListInputRecordFieldCursorCodec.TryWriteUInt16(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.Code, code) &&
-			MuiListInputRecordFieldCursorCodec.TryWriteUInt16(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.Qualifier, qualifier) &&
-			MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.IAddress, iAddress) &&
-			MuiListInputRecordFieldCursorCodec.TryWriteUInt16(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.MouseX, unchecked((ushort)mouseX)) &&
-			MuiListInputRecordFieldCursorCodec.TryWriteUInt16(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.MouseY, unchecked((ushort)mouseY));
+		var written = MuiIntuiPointerMessageMemoryCodec.TryWriteUInt32(ref platform,
+			message, MuiIntuiPointerMessageField.Class, messageClass) &&
+			MuiIntuiPointerMessageMemoryCodec.TryWriteUInt16(ref platform,
+				message, MuiIntuiPointerMessageField.Code, code) &&
+			MuiIntuiPointerMessageMemoryCodec.TryWriteUInt16(ref platform,
+				message, MuiIntuiPointerMessageField.Qualifier, qualifier) &&
+			MuiIntuiPointerMessageMemoryCodec.TryWriteUInt32(ref platform,
+				message, MuiIntuiPointerMessageField.IAddress, iAddress) &&
+			MuiIntuiPointerMessageMemoryCodec.TryWriteUInt16(ref platform,
+				message, MuiIntuiPointerMessageField.MouseX, unchecked((ushort)mouseX)) &&
+			MuiIntuiPointerMessageMemoryCodec.TryWriteUInt16(ref platform,
+				message, MuiIntuiPointerMessageField.MouseY, unchecked((ushort)mouseY));
 		if (!written) return false;
 		// Reusing a caller-owned envelope must not retain a previous timestamp.
 		// A full IntuiMessage maps the optional suffix, so clear it to the
 		// canonical zero value when this prefix-only helper is used.
 		if (platform.IsMapped(message, MuiIntuiPointerMessage.TimestampSize))
-			return MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.Seconds, 0) &&
-				MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-					message, MuiListInputRecordKind.IntuiMessage,
-					MuiListInputRecordField.Micros, 0);
+			return MuiIntuiPointerMessageMemoryCodec.TryWriteUInt32(ref platform,
+				message, MuiIntuiPointerMessageField.Seconds, 0) &&
+				MuiIntuiPointerMessageMemoryCodec.TryWriteUInt32(ref platform,
+					message, MuiIntuiPointerMessageField.Micros, 0);
 		return true;
 	}
 
@@ -364,12 +681,10 @@ internal static class MuiIntuiMessageCodec
 			iAddress, mouseX, mouseY) ||
 			!platform.IsMapped(message, MuiIntuiPointerMessage.TimestampSize))
 			return false;
-		return MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiListInputRecordKind.IntuiMessage,
-			MuiListInputRecordField.Seconds, seconds) &&
-			MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.Micros, micros);
+		return MuiIntuiPointerMessageMemoryCodec.TryWriteUInt32(ref platform,
+			message, MuiIntuiPointerMessageField.Seconds, seconds) &&
+			MuiIntuiPointerMessageMemoryCodec.TryWriteUInt32(ref platform, message,
+				MuiIntuiPointerMessageField.Micros, micros);
 	}
 }
 
@@ -380,6 +695,15 @@ internal static class MuiIntuiMessageCodec
 internal struct MuiListviewDragState
 {
 	internal const uint Size = 32;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint SourceOffset = 4;
+	internal const uint TargetOffset = 8;
+	internal const uint StartXOffset = 12;
+	internal const uint StartYOffset = 16;
+	internal const uint LastXOffset = 20;
+	internal const uint LastYOffset = 24;
+	internal const uint FlagsOffset = 28;
 	internal const uint ActiveFlag = 1;
 	internal const uint MovedFlag = 2;
 	internal const uint CapturedFlag = 4;
@@ -394,33 +718,8 @@ internal struct MuiListviewDragState
 	internal uint Flags;
 }
 
-internal enum MuiListInputRecordKind : byte
+internal enum MuiListviewDragStateField : byte
 {
-	TestPos,
-	Scalar,
-	DisplayRow,
-	IntuiMessage,
-	RawKey,
-	DragState,
-}
-
-internal enum MuiListInputRecordField : byte
-{
-	Entry,
-	Column,
-	Flags,
-	XOffset,
-	YOffset,
-	Value,
-	Row,
-	Class,
-	Code,
-	Qualifier,
-	IAddress,
-	MouseX,
-	MouseY,
-	Seconds,
-	Micros,
 	Magic,
 	Source,
 	Target,
@@ -428,178 +727,70 @@ internal enum MuiListInputRecordField : byte
 	StartY,
 	LastX,
 	LastY,
+	Flags,
 }
 
-[StructLayout(LayoutKind.Sequential, Pack = 2)]
-internal struct MuiListInputRecordFieldCursor
+// Struct-first adapter for the guest-resident Listview drag state. The drag
+// lifecycle consumes a named semantic value; this bounded adapter is the only
+// layer that translates its eight 68k LONG fields.
+internal static class MuiListviewDragStateMemoryCodec
 {
-	internal APTR Address;
-	internal MuiListInputRecordKind Record;
-	internal MuiListInputRecordField Field;
-}
-
-internal static class MuiListInputRecordFieldCursorCodec
-{
-	private static bool TryResolve(MuiListInputRecordKind record,
-		MuiListInputRecordField field, out uint offset, out uint size,
-		out uint fieldSize)
+	private static bool TryResolve(MuiListviewDragStateField field,
+		out uint offset)
 	{
 		offset = 0;
-		size = 0;
-		fieldSize = 0;
-		switch (record)
+		switch (field)
 		{
-			case MuiListInputRecordKind.TestPos:
-				size = MuiListTestPosResult.Size;
-				offset = field switch
-				{
-					MuiListInputRecordField.Entry => 0,
-					MuiListInputRecordField.Column => 4,
-					MuiListInputRecordField.Flags => 6,
-					MuiListInputRecordField.XOffset => 8,
-					MuiListInputRecordField.YOffset => 10,
-					_ => uint.MaxValue,
-				};
-				fieldSize = field == MuiListInputRecordField.Entry ? 4u : 2u;
-				break;
-			case MuiListInputRecordKind.Scalar:
-				size = MuiListScalarStorageRecord.Size;
-				offset = field == MuiListInputRecordField.Value ? 0u :
-					uint.MaxValue;
-				fieldSize = 4;
-				break;
-			case MuiListInputRecordKind.DisplayRow:
-				size = MuiListDisplayRowRecord.Size;
-				offset = field == MuiListInputRecordField.Row ? 0u :
-					uint.MaxValue;
-				fieldSize = 4;
-				break;
-			case MuiListInputRecordKind.IntuiMessage:
-				size = field == MuiListInputRecordField.Seconds ||
-					field == MuiListInputRecordField.Micros
-					? MuiIntuiPointerMessage.TimestampSize
-					: MuiIntuiPointerMessage.MinimumSize;
-				offset = field switch
-				{
-					MuiListInputRecordField.Class => MuiIntuiPointerMessage.ClassOffset,
-					MuiListInputRecordField.Code => MuiIntuiPointerMessage.CodeOffset,
-					MuiListInputRecordField.Qualifier => MuiIntuiPointerMessage.QualifierOffset,
-					MuiListInputRecordField.IAddress => MuiIntuiPointerMessage.IAddressOffset,
-					MuiListInputRecordField.MouseX => MuiIntuiPointerMessage.MouseXOffset,
-					MuiListInputRecordField.MouseY => MuiIntuiPointerMessage.MouseYOffset,
-					MuiListInputRecordField.Seconds => MuiIntuiPointerMessage.SecondsOffset,
-					MuiListInputRecordField.Micros => MuiIntuiPointerMessage.MicrosOffset,
-					_ => uint.MaxValue,
-				};
-				fieldSize = field == MuiListInputRecordField.Class ||
-					field == MuiListInputRecordField.IAddress ||
-					field == MuiListInputRecordField.Seconds ||
-					field == MuiListInputRecordField.Micros ? 4u : 2u;
-				break;
-			case MuiListInputRecordKind.RawKey:
-				size = MuiIntuiRawKeyMessage.Size;
-				offset = field switch
-				{
-					MuiListInputRecordField.Class => MuiIntuiRawKeyMessage.ClassOffset,
-					MuiListInputRecordField.Code => MuiIntuiRawKeyMessage.CodeOffset,
-					MuiListInputRecordField.Qualifier => MuiIntuiRawKeyMessage.QualifierOffset,
-					_ => uint.MaxValue,
-				};
-				fieldSize = field == MuiListInputRecordField.Class ? 4u : 2u;
-				break;
-			case MuiListInputRecordKind.DragState:
-				size = MuiListviewDragState.Size;
-				offset = field switch
-				{
-					MuiListInputRecordField.Magic => 0,
-					MuiListInputRecordField.Source => 4,
-					MuiListInputRecordField.Target => 8,
-					MuiListInputRecordField.StartX => 12,
-					MuiListInputRecordField.StartY => 16,
-					MuiListInputRecordField.LastX => 20,
-					MuiListInputRecordField.LastY => 24,
-					MuiListInputRecordField.Flags => 28,
-					_ => uint.MaxValue,
-				};
-				fieldSize = 4;
-				break;
+			case MuiListviewDragStateField.Magic:
+				offset = MuiListviewDragState.MagicOffset; return true;
+			case MuiListviewDragStateField.Source:
+				offset = MuiListviewDragState.SourceOffset; return true;
+			case MuiListviewDragStateField.Target:
+				offset = MuiListviewDragState.TargetOffset; return true;
+			case MuiListviewDragStateField.StartX:
+				offset = MuiListviewDragState.StartXOffset; return true;
+			case MuiListviewDragStateField.StartY:
+				offset = MuiListviewDragState.StartYOffset; return true;
+			case MuiListviewDragStateField.LastX:
+				offset = MuiListviewDragState.LastXOffset; return true;
+			case MuiListviewDragStateField.LastY:
+				offset = MuiListviewDragState.LastYOffset; return true;
+			case MuiListviewDragStateField.Flags:
+				offset = MuiListviewDragState.FlagsOffset; return true;
 		}
-		return offset != uint.MaxValue;
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiListInputRecordFieldCursor cursor, out APTR address,
-		out uint fieldSize) where TPlatform : struct, IMuiGuestMemory
+		APTR record, MuiListviewDragStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		fieldSize = 0;
-		if (!TryResolve(cursor.Record, cursor.Field, out var offset,
-			out var size, out fieldSize) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, size)) return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, fieldSize);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiListviewDragState.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiListviewDragState.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
-		APTR address, MuiListInputRecordKind record,
-		MuiListInputRecordField field, out uint value)
+		APTR record, MuiListviewDragStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiListInputRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress,
-			out var fieldSize) || fieldSize != 4) return false;
+		if (!TryGetAddress(ref platform, record, field, out var fieldAddress))
+			return false;
 		value = platform.ReadUInt32(fieldAddress, 0);
 		return true;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
-		APTR address, MuiListInputRecordKind record,
-		MuiListInputRecordField field, uint value)
+		APTR record, MuiListviewDragStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiListInputRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress,
-			out var fieldSize) || fieldSize != 4) return false;
+		if (!TryGetAddress(ref platform, record, field, out var fieldAddress))
+			return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
-		return true;
-	}
-
-	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
-		APTR address, MuiListInputRecordKind record,
-		MuiListInputRecordField field, out ushort value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = 0;
-		var cursor = default(MuiListInputRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress,
-			out var fieldSize) || fieldSize != 2) return false;
-		value = platform.ReadUInt16(fieldAddress, 0);
-		return true;
-	}
-
-	internal static bool TryWriteUInt16<TPlatform>(ref TPlatform platform,
-		APTR address, MuiListInputRecordKind record,
-		MuiListInputRecordField field, ushort value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		var cursor = default(MuiListInputRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress,
-			out var fieldSize) || fieldSize != 2) return false;
-		platform.WriteUInt16(fieldAddress, 0, value);
 		return true;
 	}
 }
@@ -611,30 +802,22 @@ internal static class MuiListviewDragStateCodec
 	internal static void Write<TPlatform>(ref TPlatform platform, APTR storage,
 		MuiListviewDragState value) where TPlatform : struct, IMuiGuestMemory
 	{
-		_ = MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			storage, MuiListInputRecordKind.DragState,
-			MuiListInputRecordField.Magic, value.Magic);
-		_ = MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			storage, MuiListInputRecordKind.DragState,
-			MuiListInputRecordField.Source, unchecked((uint)value.Source));
-		_ = MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			storage, MuiListInputRecordKind.DragState,
-			MuiListInputRecordField.Target, unchecked((uint)value.Target));
-		_ = MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			storage, MuiListInputRecordKind.DragState,
-			MuiListInputRecordField.StartX, unchecked((uint)value.StartX));
-		_ = MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			storage, MuiListInputRecordKind.DragState,
-			MuiListInputRecordField.StartY, unchecked((uint)value.StartY));
-		_ = MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			storage, MuiListInputRecordKind.DragState,
-			MuiListInputRecordField.LastX, unchecked((uint)value.LastX));
-		_ = MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			storage, MuiListInputRecordKind.DragState,
-			MuiListInputRecordField.LastY, unchecked((uint)value.LastY));
-		_ = MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			storage, MuiListInputRecordKind.DragState,
-			MuiListInputRecordField.Flags, value.Flags);
+		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			storage, MuiListviewDragStateField.Magic, value.Magic);
+		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			storage, MuiListviewDragStateField.Source, unchecked((uint)value.Source));
+		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			storage, MuiListviewDragStateField.Target, unchecked((uint)value.Target));
+		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			storage, MuiListviewDragStateField.StartX, unchecked((uint)value.StartX));
+		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			storage, MuiListviewDragStateField.StartY, unchecked((uint)value.StartY));
+		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			storage, MuiListviewDragStateField.LastX, unchecked((uint)value.LastX));
+		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			storage, MuiListviewDragStateField.LastY, unchecked((uint)value.LastY));
+		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			storage, MuiListviewDragStateField.Flags, value.Flags);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
@@ -647,37 +830,29 @@ internal static class MuiListviewDragStateCodec
 		return TryRead(ref platform, storage, out _);
 	}
 
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR storage,
-		out MuiListviewDragState value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR storage, out MuiListviewDragState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
 		if (storage.IsNull || !platform.IsMapped(storage,
 			MuiListviewDragState.Size) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				storage, MuiListInputRecordKind.DragState,
-				MuiListInputRecordField.Magic, out var magic) || magic != Cookie ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				storage, MuiListInputRecordKind.DragState,
-				MuiListInputRecordField.Source, out var source) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				storage, MuiListInputRecordKind.DragState,
-				MuiListInputRecordField.Target, out var target) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				storage, MuiListInputRecordKind.DragState,
-				MuiListInputRecordField.StartX, out var startX) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				storage, MuiListInputRecordKind.DragState,
-				MuiListInputRecordField.StartY, out var startY) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				storage, MuiListInputRecordKind.DragState,
-				MuiListInputRecordField.LastX, out var lastX) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				storage, MuiListInputRecordKind.DragState,
-				MuiListInputRecordField.LastY, out var lastY) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				storage, MuiListInputRecordKind.DragState,
-				MuiListInputRecordField.Flags, out var flags)) return false;
+			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
+				storage, MuiListviewDragStateField.Magic, out var magic) ||
+			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
+				storage, MuiListviewDragStateField.Source, out var source) ||
+			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
+				storage, MuiListviewDragStateField.Target, out var target) ||
+			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
+				storage, MuiListviewDragStateField.StartX, out var startX) ||
+			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
+				storage, MuiListviewDragStateField.StartY, out var startY) ||
+			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
+				storage, MuiListviewDragStateField.LastX, out var lastX) ||
+			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
+				storage, MuiListviewDragStateField.LastY, out var lastY) ||
+			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
+				storage, MuiListviewDragStateField.Flags, out var flags)) return false;
 		value.Magic = magic;
 		value.Source = unchecked((int)source);
 		value.Target = unchecked((int)target);
@@ -688,6 +863,12 @@ internal static class MuiListviewDragStateCodec
 		value.Flags = flags;
 		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR storage,
+		out MuiListviewDragState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, storage, out value) &&
+		value.Magic == Cookie;
 
 	internal static void Clear<TPlatform>(ref TPlatform platform, APTR storage)
 		where TPlatform : struct, IMuiGuestMemory

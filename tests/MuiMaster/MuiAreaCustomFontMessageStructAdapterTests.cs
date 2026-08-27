@@ -1,0 +1,55 @@
+using Amiga;
+using CopperOS.MuiMaster;
+
+namespace CopperOS.MuiMaster.Tests;
+
+public sealed class MuiAreaCustomFontMessageStructAdapterTests
+{
+	[Fact]
+	public void CustomFontMessageRecordsUseNamedFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var openAddress = APTR.FromPointer(0x3000);
+		var open = default(MuiAreaOpenCustomFontMessage);
+		open.MethodId = MuiAreaCustomFontMessageCodec.OpenCustomFont;
+		open.Spec = APTR.FromPointer(0x3400);
+		Assert.True(MuiAreaCustomFontMessageCodec.WriteOpen(ref platform,
+			openAddress, open.Spec));
+		Assert.True(MuiAreaCustomFontMessageMemoryCodec.TryReadUInt32(ref platform,
+			openAddress, MuiAreaCustomFontMessageKind.Open,
+			MuiAreaCustomFontMessageField.MethodId, out var openMethod));
+		Assert.Equal(open.MethodId, openMethod);
+		Assert.True(MuiAreaCustomFontMessageMemoryCodec.TryGetAddress(ref platform,
+			openAddress, MuiAreaCustomFontMessageKind.Open,
+			MuiAreaCustomFontMessageField.Pointer, out var specAddress));
+		Assert.Equal(APTR.FromPointer(0x3004), specAddress);
+		Assert.True(MuiAreaCustomFontMessageCodec.TryReadOpen(ref platform,
+			openAddress, out var decodedOpen));
+		Assert.Equal(open.Spec, decodedOpen.Spec);
+
+		var closeAddress = APTR.FromPointer(0x3040);
+		var close = default(MuiAreaCloseCustomFontMessage);
+		close.MethodId = MuiAreaCustomFontMessageCodec.CloseCustomFont;
+		close.Font = APTR.FromPointer(0x3500);
+		Assert.True(MuiAreaCustomFontMessageCodec.WriteClose(ref platform,
+			closeAddress, close.Font));
+		Assert.True(MuiAreaCustomFontMessageCodec.TryReadClose(ref platform,
+			closeAddress, out var decodedClose));
+		Assert.Equal(close.Font, decodedClose.Font);
+		Assert.True(MuiAreaCustomFontMessageMemoryCodec.TryReadUInt32(ref platform,
+			closeAddress, MuiAreaCustomFontMessageKind.Close,
+			MuiAreaCustomFontMessageField.Pointer, out var font));
+		Assert.Equal(close.Font.Raw, font);
+
+		Assert.False(MuiAreaCustomFontMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20FFC), MuiAreaCustomFontMessageKind.Open,
+			MuiAreaCustomFontMessageField.Pointer, out _));
+		Assert.False(MuiAreaCustomFontMessageMemoryCodec.TryGetAddress(ref platform,
+			openAddress, MuiAreaCustomFontMessageKind.Open,
+			(MuiAreaCustomFontMessageField)255, out _));
+		Assert.False(MuiAreaCustomFontMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiAreaCustomFontMessageKind.Close,
+			MuiAreaCustomFontMessageField.Pointer, out _));
+	}
+}

@@ -8,9 +8,9 @@ using System.Runtime.InteropServices;
 
 namespace CopperOS.MuiMaster;
 
-// Balance.mui exposes one initializer/getter policy flag.  Keep the value in
-// a fixed-width guest record so construction, generic Get, and persistence
-// synchronization share one typed representation.
+// Balance.mui exposes one initializer/getter policy value. Keep the complete
+// MorphOS LONG in a fixed-width guest record so construction, generic Get, and
+// persistence synchronization share one typed representation.
 public struct MuiBalancePolicyState
 {
 	public uint Quiet;
@@ -97,47 +97,103 @@ internal static class MuiBalancePolicyStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Balance policy consumers use the named
+// record; this bounded adapter is the only layer that translates its fixed
+// guest layout into addresses. The cursor codec remains for compatibility and
+// malformed-state diagnostics.
+internal static class MuiBalancePolicyStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiBalancePolicyStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiBalancePolicyStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiBalancePolicyStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiBalancePolicyStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiBalancePolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiBalancePolicyStateRecord.Size) ||
-			!MuiBalancePolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiBalancePolicyStateField.Magic, out var magic) ||
-			magic != MuiBalancePolicyStateRecord.Cookie ||
-			!MuiBalancePolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiBalancePolicyStateField.Quiet, out var quiet))
-			return false;
-		value.Magic = magic;
-		value.Quiet = quiet;
-		return true;
+		return MuiBalancePolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) &&
+			MuiBalancePolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out value.Quiet);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiBalancePolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiBalancePolicyStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiBalancePolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiBalancePolicyStateRecord.Size) || value.Magic !=
-			MuiBalancePolicyStateRecord.Cookie) return false;
-		return MuiBalancePolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiBalancePolicyStateField.Magic, value.Magic) &&
-			MuiBalancePolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiBalancePolicyStateField.Quiet, value.Quiet);
+		if (!MuiBalancePolicyStateAdmission.Validate(value)) return false;
+		return MuiBalancePolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiBalancePolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 4, value.Quiet);
 	}
 }
 
-// Keep the Balance policy wire field lossless for malformed-state diagnostics,
-// but admit only the canonical MorphOS BOOL representation.
+// Keep the Balance policy wire field lossless for malformed-state diagnostics.
+// MUIA_Balance_Quiet is an opaque MorphOS LONG, so its full bit pattern is
+// admitted after the record cookie and live owner are checked.
+internal static class MuiBalancePolicyStateAdmission
+{
+	internal static bool Validate(MuiBalancePolicyStateRecord value) =>
+		value.Magic == MuiBalancePolicyStateRecord.Cookie;
+
+	// MorphOS documents MUIA_Balance_Quiet as LONG, so every 32-bit guest
+	// pattern is retained. The value is intentionally opaque because the
+	// attribute remains undocumented beyond its wire type.
+	internal static bool Validate(MuiBalancePolicyState value) => true;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiBalancePolicyStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
+}
+
+// Compatibility alias for existing Balance policy call sites. New state
+// boundaries use MuiBalancePolicyStateAdmission directly so live ownership is
+// explicit.
 internal static class MuiBalancePolicyStateValidation
 {
 	internal static bool IsValidRecord(MuiBalancePolicyStateRecord value) =>
-		value.Quiet <= 1;
+		MuiBalancePolicyStateAdmission.Validate(value);
 
 	internal static bool IsValidState(MuiBalancePolicyState value) =>
-		value.Quiet <= 1;
+		MuiBalancePolicyStateAdmission.Validate(value);
 }

@@ -108,51 +108,99 @@ internal static class MuiImageRenderStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Image consumers use the named render
+// record; this bounded adapter is the only layer that translates its fixed
+// guest layout into addresses. The cursor codec remains for compatibility and
+// malformed-state diagnostics.
+internal static class MuiImageRenderStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiImageRenderStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiImageRenderStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
+internal static class MuiImageRenderStateAdmission
+{
+	internal static bool Validate(MuiImageRenderStateRecord value) =>
+		value.Magic == MuiImageRenderStateRecord.Cookie;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiImageRenderStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) && !obj.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
+}
+
 internal static class MuiImageRenderStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiImageRenderStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiImageRenderStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiImageRenderStateRecord.Size) ||
-			!MuiImageRenderStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiImageRenderStateField.Magic, out var magic) ||
-			magic != MuiImageRenderStateRecord.Cookie) return false;
-		value.Magic = magic;
-		if (!MuiImageRenderStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiImageRenderStateField.ImageState, out value.ImageState) ||
-			!MuiImageRenderStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiImageRenderStateField.Selected, out value.Selected) ||
-			!MuiImageRenderStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiImageRenderStateField.FreeHoriz, out value.FreeHoriz) ||
-			!MuiImageRenderStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiImageRenderStateField.FreeVert, out value.FreeVert))
-			return false;
-		return MuiImageRenderStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiImageRenderStateField.ShowSelState,
-			out value.ShowSelState);
+		return MuiImageRenderStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) &&
+			MuiImageRenderStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out value.ImageState) &&
+			MuiImageRenderStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 8, out value.Selected) &&
+			MuiImageRenderStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 12, out value.FreeHoriz) &&
+			MuiImageRenderStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 16, out value.FreeVert) &&
+			MuiImageRenderStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 20, out value.ShowSelState);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiImageRenderStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiImageRenderStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiImageRenderStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiImageRenderStateRecord.Size) || value.Magic !=
-			MuiImageRenderStateRecord.Cookie) return false;
-		return MuiImageRenderStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiImageRenderStateField.Magic, value.Magic) &&
-			MuiImageRenderStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiImageRenderStateField.ImageState, value.ImageState) &&
-			MuiImageRenderStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiImageRenderStateField.Selected, value.Selected) &&
-			MuiImageRenderStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiImageRenderStateField.FreeHoriz, value.FreeHoriz) &&
-			MuiImageRenderStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiImageRenderStateField.FreeVert, value.FreeVert) &&
-			MuiImageRenderStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiImageRenderStateField.ShowSelState, value.ShowSelState);
+		if (!MuiImageRenderStateAdmission.Validate(value)) return false;
+		return MuiImageRenderStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiImageRenderStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			4, value.ImageState) &&
+			MuiImageRenderStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			8, value.Selected) &&
+			MuiImageRenderStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			12, value.FreeHoriz) &&
+			MuiImageRenderStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			16, value.FreeVert) &&
+			MuiImageRenderStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			20, value.ShowSelState);
 	}
 }

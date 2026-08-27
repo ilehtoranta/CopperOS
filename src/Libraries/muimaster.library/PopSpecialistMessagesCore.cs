@@ -33,45 +33,67 @@ internal struct MuiPopSpecialistFieldCursor
 	internal MuiPopSpecialistField Field;
 }
 
-internal static class MuiPopSpecialistFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed Popstring/Popobject/Popasl
+// packets. Packet kinds own complete MorphOS record spans; field names select
+// members without exposing numeric positions to dispatch code.
+internal static class MuiPopSpecialistMessageMemoryCodec
 {
 	private static bool TryResolve(MuiPopSpecialistPacketKind packet,
-		MuiPopSpecialistField field, out uint offset)
+		MuiPopSpecialistField field, out uint offset, out uint size)
 	{
 		switch (packet)
 		{
 			case MuiPopSpecialistPacketKind.Method:
-				if (field == MuiPopSpecialistField.MethodId) { offset = 0; return true; }
-				break;
+				size = MuiPopSpecialistMethodMessage.Size;
+				if (field == MuiPopSpecialistField.MethodId)
+					offset = MuiPopSpecialistMethodMessage.MethodIdOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
 			case MuiPopSpecialistPacketKind.Get:
-				if (field == MuiPopSpecialistField.MethodId) { offset = 0; return true; }
-				if (field == MuiPopSpecialistField.Attribute) { offset = 4; return true; }
-				if (field == MuiPopSpecialistField.Storage) { offset = 8; return true; }
-				break;
+				size = MuiPopSpecialistGetMessage.Size;
+				if (field == MuiPopSpecialistField.MethodId)
+					offset = MuiPopSpecialistGetMessage.MethodIdOffset;
+				else if (field == MuiPopSpecialistField.Attribute)
+					offset = MuiPopSpecialistGetMessage.AttributeOffset;
+				else if (field == MuiPopSpecialistField.Storage)
+					offset = MuiPopSpecialistGetMessage.StorageOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
 			case MuiPopSpecialistPacketKind.Set:
-				if (field == MuiPopSpecialistField.MethodId) { offset = 0; return true; }
-				if (field == MuiPopSpecialistField.Attribute) { offset = 4; return true; }
-				if (field == MuiPopSpecialistField.Value) { offset = 8; return true; }
-				break;
+				size = MuiPopSpecialistSetMessage.Size;
+				if (field == MuiPopSpecialistField.MethodId)
+					offset = MuiPopSpecialistSetMessage.MethodIdOffset;
+				else if (field == MuiPopSpecialistField.Attribute)
+					offset = MuiPopSpecialistSetMessage.AttributeOffset;
+				else if (field == MuiPopSpecialistField.Value)
+					offset = MuiPopSpecialistSetMessage.ValueOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
 			case MuiPopSpecialistPacketKind.Close:
-				if (field == MuiPopSpecialistField.MethodId) { offset = 0; return true; }
-				if (field == MuiPopSpecialistField.Result) { offset = 4; return true; }
-				break;
+				size = MuiPopSpecialistCloseMessage.Size;
+				if (field == MuiPopSpecialistField.MethodId)
+					offset = MuiPopSpecialistCloseMessage.MethodIdOffset;
+				else if (field == MuiPopSpecialistField.Result)
+					offset = MuiPopSpecialistCloseMessage.ResultOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
 		}
 		offset = 0;
+		size = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiPopSpecialistFieldCursor cursor, out APTR address)
+		APTR message, MuiPopSpecialistPacketKind packet,
+		MuiPopSpecialistField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(packet, field, out var offset, out var size) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, size)) return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiPopSpecialistMethodMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -80,11 +102,8 @@ internal static class MuiPopSpecialistFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiPopSpecialistFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -94,14 +113,36 @@ internal static class MuiPopSpecialistFieldCursorCodec
 		MuiPopSpecialistField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiPopSpecialistFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// field cursor. The live message codecs route to the struct adapter above.
+internal static class MuiPopSpecialistFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiPopSpecialistFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiPopSpecialistMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Packet, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiPopSpecialistPacketKind packet,
+		MuiPopSpecialistField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+			message, packet, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiPopSpecialistPacketKind packet,
+		MuiPopSpecialistField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			message, packet, field, value);
 }
 
 // Central codec for the fixed MorphOS Popstring/Popobject/Popasl packet

@@ -1,5 +1,4958 @@
 # muimaster.library
 
+MG1313 moves the fixed Dataspace `Add`, `Find`, `Get`, `Merge`, `Remove`, and
+`Clear` packets to named semantic records backed by a bounded packet/field
+adapter. Host coverage is **2207/2207**. The focused MC68000 closure
+`DataspaceMessageStructRecordCodecRoot` returns **42** after **1416
+instructions / 13560 cycles** from a **2296-byte** HUNK with **1388 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **9 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2280/2292** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1312 moves the fixed `MUIM_CallHook` envelope to named semantic records
+backed by a bounded packet/field adapter; the variadic tail remains
+caller-owned. Host coverage is **2206/2206**. The focused MC68000 closure
+`CallHookMessageStructRecordCodecRoot` returns **42** after **1018 instructions
+/ 9646 cycles** from a **1936-byte** HUNK with **1038 bytes of ROM code**, **4
+bytes of ROM rodata**, and **9 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **1932/1932** bytes. The overall MorphOS MUI goal remains open.
+
+MG1311 moves the fixed BoopsiQuery envelope to named semantic records backed
+by a bounded packet/field adapter. Host coverage is **2205/2205**. The focused
+MC68000 closure `BoopsiQueryMessageStructRecordCodecRoot` returns **42** after
+**1526 instructions / 14816 cycles** from a **2164-byte** HUNK with **1250
+bytes of ROM code**, **4 bytes of ROM rodata**, and **9 reachable methods**.
+No relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2160/2160** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1310 moves fixed `MUIM_GetConfigItem` messages to named semantic records
+backed by a bounded packet/field adapter. Host coverage is **2204/2204**. The
+focused MC68000 closure `GetConfigItemMessageStructRecordCodecRoot` returns
+**42** after **1195 instructions / 11354 cycles** from a **1996-byte** HUNK
+with **1068 bytes of ROM code**, **4 bytes of ROM rodata**, and **9 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **1992/1992** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1309 moves fixed Boopsi/Dtpic wrapper update, OM_GET, Set, render-info,
+AskMinMax, and Layout messages to named semantic structs backed by a bounded
+packet/field adapter. Host coverage is **2203/2203**. The focused MC68000
+closure `ExternalWrapperMessageStructRecordCodecRoot` returns **42** after
+**2408 instructions / 23228 cycles** from a **2652-byte** HUNK with **1720
+bytes of ROM code**, **4 bytes of ROM rodata**, and **9 reachable methods**.
+No relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2660/2664** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1308 moves fixed Process/Slave get/set, signal, error, and dispatch messages
+to named semantic structs backed by a bounded packet/field adapter. Host
+coverage is **2202/2202**. The focused MC68000 closure
+`ProcessSpecialistMessageStructRecordCodecRoot` returns **42** after **2026
+instructions / 19740 cycles** from a **2492-byte** HUNK with **1544 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **9 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2492/2496** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1307 moves fixed Misc specialist lifecycle, OM_GET, Set, pointer/pair,
+HandleInput, and Mccprefs RegisterGadget messages to named semantic structs
+backed by a bounded packet/field adapter. Host coverage is **2201/2201**. The
+focused MC68000 closure `MiscSpecialistMessageStructRecordCodecRoot` returns
+**42** after **2762 instructions / 26646 cycles** from a **2776-byte** HUNK
+with **1848 bytes of ROM code**, **4 bytes of ROM rodata**, and **9 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **2784/2788** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1306 moves fixed Popstring/Popobject/Popasl Method, OM_GET, Set, and Close
+messages to named semantic structs backed by a bounded packet/field adapter.
+Host coverage is **2200/2200**. The focused MC68000 closure
+`PopSpecialistMessageStructRecordCodecRoot` returns **42** after **1821
+instructions / 17752 cycles** from a **2320-byte** HUNK with **1390 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **9 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2320/2320** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1305 moves fixed Menustrip/Menu/Menuitem Method, OM_GET, Set, hierarchy
+pointer/pair, and popup messages to named semantic structs backed by a bounded
+packet/field adapter. Host coverage is **2199/2199**. The focused MC68000
+closure `MenuSpecialistMessageStructRecordCodecRoot` returns **42** after
+**2515 instructions / 24300 cycles** from a **2592-byte** HUNK with **1664
+bytes of ROM code**, **4 bytes of ROM rodata**, and **9 reachable methods**.
+No relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2604/2608** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1304 moves fixed color/pen specialist Method, OM_GET, Set, pointer, and RGB
+messages to named semantic structs backed by a bounded packet/field adapter.
+Host coverage is **2198/2198**. The focused MC68000 closure
+`ColorSpecialistMessageStructRecordCodecRoot` returns **42** after **3348
+instructions / 31950 cycles** from a **2692-byte** HUNK with **1760 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **9 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2708/2712** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1303 moves fixed Area Add, Build, and Choice context-menu messages to named
+semantic structs backed by a bounded packet/field adapter. Host coverage is
+**2197/2197**. The focused MC68000 closure
+`AreaContextMenuMessageStructRecordCodecRoot` returns **42** after **2692
+instructions / 25498 cycles** from a **2488-byte** HUNK with **1554 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **9 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2480/2484** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1302 moves fixed Area CreateBubble and DeleteBubble messages to named
+semantic structs backed by a bounded packet/field adapter. Host coverage is
+**2196/2196**. The focused MC68000 closure
+`AreaBubbleMessageStructRecordCodecRoot` returns **42** after **1913
+instructions / 18122 cycles** from a **2236-byte** HUNK with **1328 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **9 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2228/2232** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1301 moves all remaining fixed Listtree mutation/query messages—Insert,
+Remove, Open/Close, Sort, GetNr, Move/Exchange, Rename, FindName, DropMark,
+and TestPos—to named semantic structs backed by the bounded packet/field
+adapter. Host coverage is **2195/2195**. The focused MC68000 closure
+`ListtreeRemainingMessageStructRecordCodecRoot` returns **42** after **9639
+instructions / 90714 cycles** from a **4688-byte** HUNK with **3468 bytes of
+ROM code**, **116 bytes of ROM rodata**, **10 reachable methods**, and **28
+relocations**. No loops, framework features, or managed allocations are
+present. MC68020/MC68040 HUNK artifacts are **4704/4712** bytes. The overall
+MorphOS MUI goal remains open.
+
+MG1300 moves fixed Listtree Method, Set, Get, and GetEntry messages to named
+semantic structs backed by a bounded packet/field adapter. Host coverage is
+**2194/2194**. The focused MC68000 closure
+`ListtreeBasicMessageStructRecordCodecRoot` returns **42** after **3357
+instructions / 31938 cycles** from a **2756-byte** HUNK with **1780 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **10 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2768/2772** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1299 moves fixed List CreateEditObject, Edit, EditDone, and EndEdit messages
+to named semantic structs backed by a bounded packet/field adapter. Host
+coverage is **2193/2193**. The focused MC68000 closure
+`CollectionEditMessageStructRecordCodecRoot` returns **42** after **4086
+instructions / 43258 cycles** from a **3188-byte** HUNK with **2044 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **11 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **3172/3176** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1298 moves shared collection surface Layout, AskMinMax, Draw, HandleInput,
+and attribute set messages to named semantic structs backed by a bounded
+packet/field adapter. Host coverage is **2192/2192**. The focused MC68000
+closure `CollectionSurfaceMessageStructRecordCodecRoot` returns **42** after
+**4501 instructions / 47590 cycles** from a **3328-byte** HUNK with **2154
+bytes of ROM code**, **4 bytes of ROM rodata**, and **11 reachable methods**.
+No relocations, loops, framework features, or managed allocations are
+present. MC68020/MC68040 HUNK artifacts are **3324/3328** bytes. The overall
+MorphOS MUI goal remains open.
+
+MG1297 moves fixed List Construct/Destruct, Display, Compare, and TestPos
+messages to named semantic structs backed by a bounded packet/field adapter.
+Host coverage is **2191/2191**. The focused MC68000 closure
+`CollectionRecordMessageStructRecordCodecRoot` returns **42** after **4293
+instructions / 45384 cycles** from a **3248-byte** HUNK with **2090 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **11 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **3228/3232** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1296 moves fixed List advanced Insert/InsertSingle, position, redraw,
+pointer, pair, and image messages to named semantic structs backed by a
+bounded packet/field adapter. Host coverage is **2190/2190**. The focused
+MC68000 closure `CollectionAdvancedMessageStructRecordCodecRoot` returns
+**42** after **5222 instructions / 55076 cycles** from a **3684-byte** HUNK
+with **2366 bytes of ROM code**, **68 bytes of ROM rodata**, **11 reachable
+methods**, and **16 relocations**. No loops, framework features, or managed
+allocations are present. MC68020/MC68040 HUNK artifacts are **3680/3684**
+bytes. The overall MorphOS MUI goal remains open.
+
+MG1295 moves fixed List basic GetEntry, Select, and method-only messages to
+named semantic structs backed by a bounded packet/field adapter. Host
+coverage is **2189/2189**. The focused MC68000 closure
+`CollectionBasicMessageStructRecordCodecRoot` returns **42** after **2764
+instructions / 29450 cycles** from a **2888-byte** HUNK with **1734 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **11 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2872/2872** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1294 moves fixed Area drag messages—begin, drag, drop, event, finish, query,
+report, and drag-image—to named semantic structs backed by a bounded
+packet/field adapter. Host coverage is **2188/2188**. The focused MC68000
+closure `AreaDragMessageStructRecordCodecRoot` returns **42** after **5844
+instructions / 61338 cycles** from a **4008-byte** HUNK with **2732 bytes of
+ROM code**, **84 bytes of ROM rodata**, **11 reachable methods**, and **20
+relocations**. No loops, framework features, or managed allocations are
+present. MC68020/MC68040 HUNK artifacts are **3996/4008** bytes. The overall
+MorphOS MUI goal remains open.
+
+MG1293 moves fixed `MUIP_OpenCustomFont`/`MUIP_CloseCustomFont` messages to
+named semantic structs backed by a bounded packet/field adapter. Host
+coverage is **2187/2187**. The focused MC68000 closure
+`AreaCustomFontMessageStructRecordCodecRoot` returns **42** after **1912
+instructions / 20316 cycles** from a **2668-byte** HUNK with **1522 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **11 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2652/2652** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1292 moves fixed ShortHelp Check/Create/Delete messages to named semantic
+structs backed by a bounded packet/field adapter. Host coverage is
+**2186/2186**. The focused MC68000 closure
+`AreaShortHelpMessageStructRecordCodecRoot` returns **42** after **2798
+instructions / 29718 cycles** from a **3392-byte** HUNK with **1902 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **14 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **3372/3376** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1291 moves fixed common-control messages—numeric, signed, scaling, event,
+get/set, and MinMax—to named semantic structs backed by a bounded packet/field
+adapter. Host coverage is **2185/2185**. The focused MC68000 closure
+`CommonControlMessagesStructRecordCodecRoot` returns **42** after **5792
+instructions / 58894 cycles** from a **3904-byte** HUNK with **2710 bytes of
+ROM code**, **52 bytes of ROM rodata**, **11 reachable methods**, and **12
+relocations**. No loops, framework features, or managed allocations are
+present. MC68020/MC68040 HUNK artifacts are **3900/3908** bytes. The overall
+MorphOS MUI goal remains open.
+
+MG1290 moves the fixed `MUIP_GoActive`/`MUIP_GoInactive` messages to a bounded
+struct-first named-field adapter. Method-only and `{MethodID, Flags}` records
+retain their distinct sizes. Host coverage is **2185/2185**. The focused
+MC68000 closure `AreaActivationMessageStructRecordCodecRoot` returns **42**
+after **1786 instructions / 17928 cycles** from a **2960-byte** HUNK with
+**1574 bytes of ROM code**, **4 bytes of ROM rodata**, and **13 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **2948/2948** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1289 moves the shared fixed application/window queue node to a bounded
+struct-first named-field adapter. Its Packet-to-payload boundary remains a
+separate cursor. Host coverage is **2184/2184**. The focused MC68000 closure
+`ApplicationWindowNodeStructRecordCodecRoot` returns **42** after **2303
+instructions / 23258 cycles** from a **3160-byte** HUNK with **1692 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **13 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **3180/3180** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1288 moves the fixed Application WindowList state and Exec-style entries to
+bounded struct-first named-field adapters. APTR members remain typed semantic
+fields; only the guest boundary translates packed 68k records. Host coverage
+is **2184/2184**. The focused MC68000 closure
+`ApplicationWindowListStructRecordCodecRoot` returns **42** after **5002
+instructions / 50450 cycles** from a **5304-byte** HUNK with **2922 bytes of
+ROM code**, **36 bytes of ROM rodata**, **19 reachable methods**, and **8
+relocations**. No loops, framework features, or managed allocations are
+present. MC68020/MC68040 HUNK artifacts are **5384/5384** bytes. The overall
+MorphOS MUI goal remains open.
+
+MG1286/MG1287 move the fixed MorphOS event-handler and input-handler node
+records to bounded struct-first named-field adapters. Event-handler mixed-width
+fields and typed input-handler APTR links remain semantic structs; only the
+guest boundary translates their packed 68k records. Host coverage is
+**2183/2183**. Focused MC68000 closures return **42**: event-handler after
+**3857 instructions / 39706 cycles** from a **5072-byte** HUNK with **2792
+bytes of ROM code**, and input-handler after **2751 instructions / 27762
+cycles** from a **3248-byte** HUNK with **1850 bytes of ROM code**. Both use
+**4 bytes of ROM rodata**, have no relocations, loops, framework features, or
+managed allocations, and expose **21/13 reachable methods**. MC68020/MC68040
+HUNK artifacts are **5108/5124** and **3276/3276** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1285 moves the fixed SetCycleChain header to a struct-first named-field
+adapter. MethodId and FirstObject remain typed semantic fields while the
+inline object-vector tail stays a bounded cursor. Host coverage is
+**2181/2181**. The focused MC68000 closure
+`WindowCycleChainPacketStructRecordCodecRoot` returns **42** after **1434
+instructions / 13880 cycles** from a **3520-byte** HUNK with **1628 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **16 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **3508/3512** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1284 moves the Add and Remove Window event-handler seams to a struct-first
+named-field adapter. Selector-specific typed handling remains the
+consumer-facing surface; bounded translation handles their MorphOS 68k ULONG
+members and rejects invalid selectors, null records, and unmapped tails. Host
+coverage is **2181/2181**. The focused MC68000 closure
+`WindowEventHandlerPacketStructRecordCodecRoot` returns **42** after **1923
+instructions / 19152 cycles** from a **2884-byte** HUNK with **1496 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **12 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2908/2908** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1283 moves the Application and Window query/set menu seams to a shared
+struct-first named-field adapter. Typed packet records remain the
+consumer-facing surface; bounded translation handles their MorphOS 68k ULONG
+members and rejects invalid selectors, cross-packet fields, null records, and
+unmapped tails. Host coverage is **2181/2181**. The focused MC68000 closure
+`ApplicationMenuPacketStructRecordCodecRoot` returns **42** after **4389
+instructions / 42852 cycles** from a **5156-byte** HUNK with **2844 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **19 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **5188/5200** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1282 moves the fixed ConfigId, CheckRefresh, Loop, WindowMethod, and
+Snapshot application/window method seams to a shared struct-first named-field
+adapter. Typed packet records remain the consumer-facing surface; bounded
+translation handles their MorphOS 68k ULONG members and rejects invalid
+selectors, cross-packet fields, null records, and unmapped tails. Host coverage
+is **2181/2181**. The focused MC68000 closure
+`ApplicationMethodPacketStructRecordCodecRoot` returns **42** after **3031
+instructions / 29604 cycles** from a **3240-byte** HUNK with **1860 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **12 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **3264/3268** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1281 moves the application `SetConfigItem`, `OpenConfigWindow`,
+`BuildSettingsPanel`, and Save/Load packet seams to a struct-first named-field
+adapter. Typed packet records remain the consumer-facing surface; bounded
+translation handles their MorphOS 68k ULONG members and rejects invalid
+selectors, null records, cross-packet fields, and unmapped tails. Host
+coverage is **2181/2181**. The focused MC68000 closure
+`ApplicationSettingsPacketStructRecordCodecRoot` returns **42** after
+**4214 instructions / 41326 cycles** from a **4196-byte** HUNK with **2378
+bytes of ROM code**, **4 bytes of ROM rodata**, and **15 reachable methods**.
+No relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **4248/4252** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1280 moves the application `ReturnId`, `Input`, `InputBuffered`, and
+`InputHandler` packet seams to a struct-first named-field adapter. Typed
+packet records remain the consumer-facing surface; bounded translation handles
+their MorphOS 68k ULONG members and rejects invalid selectors, null records,
+cross-packet fields, and unmapped tails. Host coverage is **2181/2181**. The
+focused MC68000 closure `ApplicationInputPacketStructRecordCodecRoot` returns
+**42** after **3440 instructions / 33458 cycles** from a **3872-byte** HUNK
+with **2090 bytes of ROM code**, **4 bytes of ROM rodata**, and **15 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **3888/3892** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1279 moves the application `ShowHelp` and `AboutMUI` presentation packet
+seam to a struct-first named-field adapter. Typed packet records remain the
+consumer-facing surface; bounded translation handles their MorphOS 68k ULONG
+members and rejects invalid selectors, null records, and unmapped tails. Host
+coverage is **2180/2180**. The focused MC68000 closure
+`ApplicationPresentationPacketStructRecordCodecRoot` returns **42** after
+**3208 instructions / 31282 cycles** from a **3456-byte** HUNK with **1896
+bytes of ROM code**, **4 bytes of ROM rodata**, and **13 reachable methods**.
+No relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **3492/3496** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1278 moves the application `PushMethod` and `UnpushMethod` queue packet seam
+to a struct-first named-field adapter. Typed packet records remain the
+consumer-facing surface; bounded translation handles their MorphOS 68k ULONG
+members and rejects cross-packet fields, invalid selectors, null records, and
+unmapped tails. Host coverage is **2180/2180**. The focused MC68000 closure
+`ApplicationQueuePacketStructRecordCodecRoot` returns **42** after **3360
+instructions / 32672 cycles** from a **3432-byte** HUNK with **1930 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **13 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **3468/3472** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1277 moves the normalized Virtgroup and Scrollgroup layout records to
+named-field adapters. Geometry, content/bar pointers, policy flags, and
+validation cookies remain typed semantic fields; only bounded adapters
+translate the MorphOS 68k ULONG slots. Host coverage is **2180/2180**. The
+focused MC68000 closure `SpecializedLayoutStructRecordCodecRoot` returns **42**
+after **5915 instructions / 57742 cycles** from a **6332-byte** HUNK with
+**3680 bytes of ROM code**, **4 bytes of ROM rodata**, and **23 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **6492/6496** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1276 moves the Virtgroup display and pointer records to a shared named-field
+adapter. Display geometry and pointer drag state remain separate typed structs;
+only the bounded adapter translates their MorphOS 68k ULONG slots. Host
+coverage is **2180/2180**. The focused MC68000 closure
+`VirtgroupInputStructRecordCodecRoot` returns **42** after **5985 instructions /
+58436 cycles** from a **5092-byte** HUNK with **3216 bytes of ROM code**, **4
+bytes of ROM rodata**, and **18 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **5232/5240** bytes. The overall MorphOS MUI goal remains open.
+
+MG1275 moves the Virtgroup policy-state record to a dedicated named-field
+adapter. Input/TryFit BOOLs, signed virtual geometry, and validation cookie
+remain typed semantic fields; only the bounded adapter translates the seven
+MorphOS 68k ULONG slots. Host coverage is **2180/2180**. The focused MC68000
+closure `VirtgroupPolicyStructRecordCodecRoot` returns **42** after **2687
+instructions / 26590 cycles** from a **3528-byte** HUNK with **2046 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **14 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **3596/3596** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1274 moves the Scrollgroup border-scroller record to a dedicated named-field
+adapter. Window ownership, requested/applied flags, reserved ABI state, and
+validation cookie remain typed semantic fields; only the bounded adapter
+translates the seven MorphOS 68k ULONG slots. Host coverage is **2180/2180**.
+The focused MC68000 closure `ScrollgroupBorderScrollerStructRecordCodecRoot`
+returns **42** after **2794 instructions / 27616 cycles** from a **3804-byte**
+HUNK with **2112 bytes of ROM code**, **4 bytes of ROM rodata**, and **14
+reachable methods**. No relocations, loops, framework features, or managed
+allocations are present. MC68020/MC68040 HUNK artifacts are **3880/3880**
+bytes. The overall MorphOS MUI goal remains open.
+
+MG1273 moves the Scrollgroup policy-state record to a dedicated named-field
+adapter. Contents and scrollbar pointers, canonical policy flags, and
+validation cookie remain typed semantic fields; only the bounded adapter
+translates the ten MorphOS 68k ULONG slots. Host coverage is **2180/2180**.
+The focused MC68000 closure `ScrollgroupPolicyStructRecordCodecRoot` returns
+**42** after **3974 instructions / 39104 cycles** from a **4296-byte** HUNK with
+**2548 bytes of ROM code**, **4 bytes of ROM rodata**, and **15 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **4404/4404** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1272 moves the Scrollgroup viewport-state record to a dedicated named-field
+adapter. Viewport/content geometry, bounded scroll coordinates, bar visibility,
+and validation cookie remain typed semantic fields; only the bounded adapter
+translates the eleven MorphOS 68k ULONG slots. Host coverage is **2180/2180**.
+The focused MC68000 closure `ScrollgroupViewportStructRecordCodecRoot` returns
+**42** after **4162 instructions / 40714 cycles** from a **4120-byte** HUNK with
+**2600 bytes of ROM code**, **4 bytes of ROM rodata**, and **14 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **4244/4244** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1271 moves the Group grid-state record to a dedicated named-field adapter.
+Axis sizes, signed spacing values, same-size flags, centering modes, and
+validation cookie remain typed semantic fields; only the bounded adapter
+translates the nine MorphOS 68k ULONG slots. Host coverage is **2180/2180**.
+The focused MC68000 closure `GroupGridStructRecordCodecRoot` returns **42**
+after **3522 instructions / 34034 cycles** from a **3876-byte** HUNK with
+**2314 bytes of ROM code**, **4 bytes of ROM rodata**, and **16 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **3968/3968** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1270 moves the Group layout-policy record to a dedicated named-field
+adapter. Boolean policies, signed spacing values, and validation cookie remain
+typed semantic fields; only the bounded adapter translates the seven MorphOS
+68k ULONG slots. Host coverage is **2180/2180**. The focused MC68000 closure
+`GroupLayoutPolicyStructRecordCodecRoot` returns **42** after **2850
+instructions / 27626 cycles** from a **3736-byte** HUNK with **2078 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **16 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **3808/3808** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1269 moves the Area layout-policy record to a dedicated named-field adapter.
+ShowMe, dimensions, insets, weights, and validation cookie remain typed
+semantic fields; only the bounded adapter translates the twelve MorphOS 68k
+ULONG slots. Host coverage is **2180/2180**. The focused MC68000 closure
+`AreaLayoutPolicyStructRecordCodecRoot` returns **42** after **4397
+instructions / 42602 cycles** from a **3988-byte** HUNK with **2498 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **14 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **4112/4116** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1268 moves the shared Area render-policy record to a dedicated named-field
+adapter. Fill/frame/font selectors, canonical policy flags, caller-owned
+frame-title pointer, and validation cookie remain typed semantic fields; only
+the bounded adapter translates the nine MorphOS 68k ULONG slots. Host coverage
+is **2180/2180**. The focused MC68000 closure
+`AreaRenderPolicyStructRecordCodecRoot` returns **42** after **3384
+instructions / 33048 cycles** from a **3676-byte** HUNK with **2186 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **14 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **3772/3772** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1267 moves the Area FixedText state record to a dedicated named-field
+adapter. Caller-owned width/height text pointers, publication generation, and
+validation cookie remain typed semantic fields; only the bounded adapter
+translates the four MorphOS 68k ULONG slots. Host coverage is **2180/2180**.
+The focused MC68000 closure `AreaFixedTextStructRecordCodecRoot` returns **42**
+after **1672 instructions / 16730 cycles** from a **2968-byte** HUNK with
+**1576 bytes of ROM code**, **4 bytes of ROM rodata**, and **13 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **3000/3000** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1266 moves the Area Timer event-state record to a dedicated named-field
+adapter. Canonical event flags, IntuiTick identity, publication generation,
+and validation cookie remain typed semantic fields; only the bounded adapter
+translates the six MorphOS 68k ULONG slots. Host coverage is **2179/2179**. The
+focused MC68000 closure `AreaTimerEventStructRecordCodecRoot` returns **42**
+after **2372 instructions / 23788 cycles** from a **3412-byte** HUNK with
+**1894 bytes of ROM code**, **4 bytes of ROM rodata**, and **14 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **3468/3468** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1265 moves the Area Timer state record to a named field adapter. The signed
+event counter, publication generation, and validation cookie remain typed
+semantic fields; only the bounded adapter translates the three MorphOS 68k
+ULONG slots. Host coverage is **2178/2178**. The focused MC68000 closure
+`AreaTimerStructRecordCodecRoot` returns **42** after **1444 instructions /
+14406 cycles** from a **2644-byte** HUNK with **1410 bytes of ROM code**, **4
+bytes of ROM rodata**, and **12 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **2668/2668** bytes. The overall MorphOS MUI goal remains open.
+
+MG1264 moves Area FontSelection state to named field access. The closed active
+choice, caller-owned source pointer, publication generation, and validation
+cookie remain typed semantic fields; only the bounded adapter translates the
+four MorphOS 68k ULONG slots. Host coverage is **2177/2177**. The focused
+MC68000 closure `AreaFontSelectionStructRecordCodecRoot` returns **42** after
+**1643 instructions / 16592 cycles** from a **3024-byte** HUNK with **1654 bytes
+of ROM code**, **4 bytes of ROM rodata**, and **13 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **3044/3048** bytes. The overall MorphOS MUI
+goal remains open.
+
+MG1263 moves CustomFont runtime state to named field access. Provider
+font/spec handles, active state, publication generation, and validation cookie
+remain typed semantic fields; only the bounded adapter translates the five
+MorphOS 68k ULONG slots. A legacy numeric memory overload remains only for
+source compatibility. Host coverage is **2176/2176**. The focused MC68000
+closure `AreaCustomFontRuntimeStructRecordCodecRoot` returns **42** after
+**2041 instructions / 20334 cycles** from a **2972-byte** HUNK with **1680 bytes
+of ROM code**, **4 bytes of ROM rodata**, and **12 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **3012/3012** bytes. The overall MorphOS MUI
+goal remains open.
+
+MG1262 moves the Area CustomFont state record to a named field adapter. The
+caller-owned font-spec pointer, presence flag, publication generation, and
+validation cookie remain typed semantic fields; only the bounded adapter
+translates the four MorphOS 68k ULONG slots. Host coverage is **2175/2175**.
+The focused MC68000 closure `AreaCustomFontStructRecordCodecRoot` returns
+**42** after **1605 instructions / 16078 cycles** from a **2804-byte** HUNK with
+**1534 bytes of ROM code**, **4 bytes of ROM rodata**, and **12 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **2828/2832** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1261 moves the Area Floating state record to a named field adapter. The
+canonical BOOL, publication generation, and validation cookie remain typed
+semantic fields; only the bounded adapter translates the three MorphOS 68k
+ULONG slots. Host coverage is **2174/2174**. The focused MC68000 closure
+`AreaFloatingStructRecordCodecRoot` returns **42** after **1442 instructions /
+14346 cycles** from a **2660-byte** HUNK with **1406 bytes of ROM code**, **4
+bytes of ROM rodata**, and **12 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **2684/2684** bytes. The overall MorphOS MUI goal remains open.
+
+MG1260 moves the Area DoubleBuffer state record to a named field adapter. The
+canonical BOOL, publication generation, and validation cookie remain typed
+semantic fields; only the bounded adapter translates the three MorphOS 68k
+ULONG slots. Host coverage is **2173/2173**. The focused MC68000 closure
+`AreaDoubleBufferStructRecordCodecRoot` returns **42** after **1442
+instructions / 14346 cycles** from a **2692-byte** HUNK with **1406 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **12 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2716/2716** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1259 moves the Area CycleChain state record to a named field adapter. The
+signed policy value, publication generation, and validation cookie remain
+typed semantic fields; only the bounded adapter translates the three MorphOS
+68k ULONG slots. Host coverage is **2172/2172**. The focused MC68000 closure
+`AreaCycleChainStructRecordCodecRoot` returns **42** after **1444 instructions
+/ 14406 cycles** from a **2680-byte** HUNK with **1410 bytes of ROM code**, **4
+bytes of ROM rodata**, and **12 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **2704/2704** bytes. The overall MorphOS MUI goal remains open.
+
+MG1258 moves the Area ShortHelp state record to a named field adapter. The
+caller-owned OBString pointer, publication generation, and validation cookie
+remain typed semantic fields; only the bounded adapter translates the three
+MorphOS 68k ULONG slots. Host coverage is **2171/2171**. The focused MC68000
+closure `AreaShortHelpStructRecordCodecRoot` returns **42** after **1318
+instructions / 13212 cycles** from a **2664-byte** HUNK with **1400 bytes of ROM
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**. No relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **2692/2692** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1257 moves the Area DoubleClick state record to a named field adapter. The
+signed signal value, publication generation, and validation cookie remain
+typed semantic fields; only the bounded adapter translates the three MorphOS
+68k ULONG slots. Host coverage is **2170/2170**. The focused MC68000 closure
+`AreaDoubleClickStructRecordCodecRoot` returns **42** after **1444 instructions
+/ 14406 cycles** from a **2692-byte** HUNK with **1410 bytes of ROM code**, **4
+bytes of ROM rodata**, and **12 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **2716/2716** bytes. The overall MorphOS MUI goal remains open.
+
+MG1256 moves the Area disappearance-policy state record to a named field
+adapter. Signed horizontal/vertical priorities and the validation cookie
+remain typed semantic fields; only the bounded adapter translates the three
+MorphOS 68k ULONG slots. Host coverage is **2169/2169**. The focused MC68000
+closure `AreaDisappearPolicyStructRecordCodecRoot` returns **42** after **1447
+instructions / 14418 cycles** from a **2708-byte** HUNK with **1396 bytes of ROM
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**. No relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **2728/2728** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1255 moves the Area drag-policy state record to a named field adapter.
+Draggable/dropable BOOLs and the validation cookie remain typed semantic fields;
+only the bounded adapter translates the three MorphOS 68k ULONG slots. Host
+coverage is **2168/2168**. The focused MC68000 closure
+`AreaDragPolicyStructRecordCodecRoot` returns **42** after **1442 instructions /
+14330 cycles** from a **2664-byte** HUNK with **1396 bytes of ROM code**, **4
+bytes of ROM rodata**, and **12 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **2692/2692** bytes. The overall MorphOS MUI goal remains open.
+
+MG1254 moves the Area ContextMenu state record to a named field adapter.
+Menu-strip and trigger capabilities, publication generation, and the validation
+cookie remain typed semantic fields; only the bounded adapter translates the
+four MorphOS 68k ULONG slots. Host coverage is **2167/2167**. The focused
+MC68000 closure `AreaContextMenuStructRecordCodecRoot` returns **42** after
+**1741 instructions / 17352 cycles** from a **2820-byte** HUNK with **1540 bytes
+of ROM code**, **4 bytes of ROM rodata**, and **12 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2852/2852** bytes. The overall MorphOS MUI
+goal remains open.
+
+MG1253 moves the Area presentation state record to a named field adapter. BOOL
+policies, unrestricted background/frame selectors, and the validation cookie
+remain typed semantic fields; only the bounded adapter translates the six
+MorphOS 68k ULONG slots. Host coverage is **2166/2166**. The focused MC68000
+closure `AreaPresentationStructRecordCodecRoot` returns **42** after **2359
+instructions / 23574 cycles** from a **3208-byte** HUNK with **1852 bytes of ROM
+code**, **4 bytes of ROM rodata**, and **13 reachable methods**. No relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **3264/3264** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1252 moves the Area BuiltinFont state record to a named field adapter. The
+signed-compatible selector bit pattern, presence flag, publication generation,
+and validation cookie remain typed semantic fields; only the bounded adapter
+translates the four MorphOS 68k ULONG slots. Host coverage is **2165/2165**.
+The focused MC68000 closure `AreaBuiltinFontStructRecordCodecRoot` returns
+**42** after **1757 instructions / 17620 cycles** from a **2976-byte** HUNK
+with **1624 bytes of ROM code**, **4 bytes of ROM rodata**, and **13 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **3004/3004** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1251 moves the Area TextColor state record to a named field adapter. The
+packed RGB value, setup-active flag, publication generation, and validation
+cookie remain typed semantic fields; only the bounded adapter translates the
+four MorphOS 68k ULONG slots. Host coverage is **2164/2164**. The focused
+MC68000 closure `AreaTextColorStructRecordCodecRoot` returns **42** after
+**1729 instructions / 17224 cycles** from a **2804-byte** HUNK with **1538 bytes
+of ROM code**, **4 bytes of ROM rodata**, and **12 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2832/2836** bytes. The overall MorphOS MUI
+goal remains open.
+
+MG1250 moves the Area ControlChar state record to a named field adapter. The
+normalized character, publication generation, and validation cookie remain
+typed semantic fields; only the bounded adapter translates the three MorphOS
+68k ULONG slots. Host coverage is **2163/2163**. The focused MC68000 closure
+`AreaControlCharStructRecordCodecRoot` returns **42** after **1443 instructions
+/ 14352 cycles** from a **2688-byte** HUNK with **1408 bytes of ROM code**, **4
+bytes of ROM rodata**, and **12 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **2716/2716** bytes. The overall MorphOS MUI goal remains open.
+
+MG1249 moves the BuildSettingsPanel state record to a named field adapter. The
+requested number, returned panel capability, request count, and validation
+cookie remain typed semantic fields; only the bounded adapter translates the
+four MorphOS 68k ULONG slots. Host coverage is **2162/2162**. The focused
+MC68000 closure `ApplicationSettingsPanelStructRecordCodecRoot` returns **42**
+after **1741 instructions / 17392 cycles** from a **2960-byte** HUNK with
+**1556 bytes of ROM code**, **4 bytes of ROM rodata**, and **12 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **2988/2988** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1248 moves the Numeric range/value state record to a named field adapter.
+Range, value, default, reverse, and validation fields remain typed semantic
+fields; only the bounded adapter translates the six MorphOS 68k ULONG slots.
+Host coverage is **2161/2161**. The focused MC68000 closure
+`NumericStructRecordCodecRoot` returns **42** after **2444 instructions / 24076
+cycles** from a **2916-byte** HUNK with **1700 bytes of ROM code**, **4 bytes of
+ROM rodata**, and **12 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **2972/2976** bytes. The overall MorphOS MUI goal remains open.
+
+MG1247 moves the String integer state record to a named field adapter. The
+signed parsed value and validation cookie remain typed semantic fields; only
+the bounded adapter translates the two MorphOS 68k ULONG slots. Host coverage
+is **2160/2160**. The focused MC68000 closure
+`StringIntegerStructRecordCodecRoot` returns **42** after **1145 instructions /
+11080 cycles** from a **2204-byte** HUNK with **1136 bytes of code**, **4 bytes
+of ROM rodata**, and **10 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **2216/2216** bytes. The overall MorphOS MUI goal remains open.
+
+MG1246 moves the Slider presentation state record to a named field adapter.
+BOOL orientation, quiet-display policy, and validation cookie remain typed
+semantic fields; only the bounded adapter translates the three MorphOS 68k
+ULONG slots. Host coverage is **2159/2159**. The focused MC68000 closure
+`SliderPresentationStructRecordCodecRoot` returns **42** after **1417
+instructions / 13780 cycles** from a **2304-byte** HUNK with **1206 bytes of
+code**, **4 bytes of ROM rodata**, and **10 reachable methods**. No relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **2324/2328** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1245 moves the Scale presentation state record to a named field adapter. The
+BOOL orientation and validation cookie remain typed semantic fields; only the
+bounded adapter translates the two MorphOS 68k ULONG slots. Host coverage is
+**2158/2158**. The focused MC68000 closure
+`ScalePresentationStructRecordCodecRoot` returns **42** after **1135
+instructions / 10968 cycles** from a **2208-byte** HUNK with **1114 bytes of
+code**, **4 bytes of ROM rodata**, and **10 reachable methods**. No relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **2216/2216** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1244 moves the Choice/Radio active-index state record to a named field
+adapter. The normalized active index and validation cookie remain typed
+semantic fields; only the bounded adapter translates the two MorphOS 68k ULONG
+slots. Host coverage is **2157/2157**. The focused MC68000 closure
+`ChoiceActiveStructRecordCodecRoot` returns **42** after **1135 instructions /
+10978 cycles** from a **2176-byte** HUNK with **1118 bytes of code**, **4 bytes
+of ROM rodata**, and **10 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **2184/2184** bytes. The overall MorphOS MUI goal remains open.
+
+MG1243 moves the Choice/Radio entries state record to a named field adapter.
+The caller-owned STRPTR-vector capability and validation cookie remain typed
+semantic fields; only the bounded adapter translates the two MorphOS 68k ULONG
+slots. Host coverage is **2156/2156**. The focused MC68000 closure
+`ChoiceEntriesStructRecordCodecRoot` returns **42** after **1155 instructions /
+11132 cycles** from a **2228-byte** HUNK with **1158 bytes of code**, **4 bytes
+of ROM rodata**, and **10 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **2236/2236** bytes. The overall MorphOS MUI goal remains open.
+
+MG1242 moves the Window event-reuse state record to a named field adapter.
+Context flags, event capabilities, signed MUI key, and validation cookie remain
+typed semantic fields; only the bounded adapter translates the seven MorphOS
+68k ULONG slots. Host coverage is **2155/2155**. The focused MC68000 closure
+`WindowEventReuseStateStructRecordCodecRoot` returns **42** after **2844
+instructions / 28110 cycles** from a **3436-byte** HUNK with **1966 bytes of
+code**, **4 bytes of ROM rodata**, and **13 reachable methods**. No relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **3508/3512** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1241 moves the Group_LayoutHook state record to a named field adapter. The
+hook capability and validation cookie remain typed semantic fields; only the
+bounded adapter translates the two MorphOS 68k ULONG slots. Host coverage is
+**2154/2154**. The focused MC68000 closure
+`GroupLayoutHookStructRecordCodecRoot` returns **42** after **1203 instructions /
+11852 cycles** from a **2664-byte** HUNK with **1310 bytes of code**, **4 bytes
+of ROM rodata**, and **13 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **2672/2672** bytes. The overall MorphOS MUI goal remains open.
+
+MG1240 moves the Gadget_Gadget state record to a named field adapter. The
+getter-only gadget capability and validation cookie remain typed semantic
+fields; only the bounded adapter translates the two MorphOS 68k ULONG slots.
+Host coverage is **2153/2153**. The focused MC68000 closure
+`GadgetGadgetStructRecordCodecRoot` returns **42** after **1195 instructions /
+11754 cycles** from a **2612-byte** HUNK with **1306 bytes of code**, **4 bytes
+of ROM rodata**, and **12 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **2620/2620** bytes. The overall MorphOS MUI goal remains open.
+
+MG1239 moves the bitmap policy state record to a named field adapter. Alpha,
+precision, source-color and mapping capabilities, transparent/use-friend
+policy, and the validation cookie remain typed semantic fields; only the
+bounded adapter translates the seven MorphOS 68k ULONG slots. Host coverage is
+**2152/2152**. The focused MC68000 closure
+`BitmapPolicyStructRecordCodecRoot` returns **42** after **2655 instructions /
+26220 cycles** from a **3124-byte** HUNK with **1820 bytes of code**, **4 bytes
+of ROM rodata**, and **12 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **3200/3200** bytes. The overall MorphOS MUI goal remains open.
+
+MG1238 moves the remapped-bitmap state record to a named field adapter. The
+renderer-produced APTR capability and validation cookie remain typed semantic
+fields; only the bounded adapter translates the two MorphOS 68k ULONG slots.
+Host coverage is **2151/2151**. The focused MC68000 closure
+`BitmapRemappedStructRecordCodecRoot` returns **42** after **1195 instructions /
+11754 cycles** from a **2632-byte** HUNK with **1306 bytes of code**, **4 bytes
+of ROM rodata**, and **12 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **2640/2640** bytes. The overall MorphOS MUI goal remains open.
+
+MG1237 moves the application object-relationship state record to a named field
+adapter. DiskObject, DropObject, Menustrip, and the validation cookie remain
+typed APTR fields; only the bounded adapter translates the four MorphOS 68k
+ULONG slots. Host coverage is **2150/2150**. The focused MC68000 closure
+`ApplicationObjectStructRecordCodecRoot` returns **42** after **1798
+instructions / 17956 cycles** from a **2988-byte** HUNK with **1638 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**. No relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **3016/3016** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1236 moves the Selectgroup active-index state record to a named field
+adapter. The canonical child index and validation cookie remain typed semantic
+fields; signed public selectors are interpreted before the bounded adapter
+translates the two MorphOS 68k ULONG slots. Host coverage is **2149/2149**.
+The focused MC68000 closure `SelectgroupActiveStructRecordCodecRoot` returns
+**42** after **1200 instructions / 11768 cycles** from a **2676-byte** HUNK with
+**1312 bytes of code**, **4 bytes of ROM rodata**, and **13 reachable methods**.
+No relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2684/2688** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1235 moves the Gauge state record to a named field adapter. Progress,
+maximum, divide, orientation, and the validation cookie remain typed semantic
+fields; only the bounded adapter translates the five MorphOS 68k ULONG slots.
+Host coverage is **2148/2148**. The focused MC68000 closure
+`GaugeStructRecordCodecRoot` returns **42** after **1868 instructions / 18210
+cycles** from a **2400-byte** HUNK with **1380 bytes of code**, **4 bytes of ROM
+rodata**, and **10 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **2444/2444** bytes. The overall MorphOS MUI goal remains open.
+
+MG1234 moves the Area activation state record to a named field adapter. Active
+state, flags, generation, and the validation signature remain typed semantic
+fields; only the bounded adapter translates the four MorphOS 68k ULONG slots.
+Host coverage is **2147/2147**. The focused MC68000 closure
+`AreaActivationStructRecordCodecRoot` returns **42** after **1560 instructions /
+15318 cycles** from a **2368-byte** HUNK with **1298 bytes of code**, **4 bytes
+of ROM rodata**, and **10 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **2396/2396** bytes. The overall MorphOS MUI goal remains open.
+
+MG1233 moves the Area weight state record to a named field adapter. The
+full-range weight value and validation cookie remain typed semantic fields;
+only the bounded adapter translates the two MorphOS 68k ULONG slots. Host
+coverage is **2146/2146**. The focused MC68000 closure
+`AreaWeightStructRecordCodecRoot` returns **42** after **1001 instructions /
+9802 cycles** from a **2164-byte** HUNK with **1116 bytes of code**, **4 bytes
+of ROM rodata**, and **10 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **2176/2176** bytes. The overall MorphOS MUI goal remains open.
+
+MG1232 moves the sleep state record to a named field adapter. Nesting depth,
+saved-disabled state, request depth, and the validation cookie remain typed
+semantic fields; only the bounded adapter translates the four MorphOS 68k
+ULONG slots. Host coverage is **2145/2145**. The focused MC68000 closure
+`SleepStructRecordCodecRoot` returns **42** after **1564 instructions / 15394
+cycles** from a **2324-byte** HUNK with **1304 bytes of code**, **4 bytes of ROM
+rodata**, and **10 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **2356/2356** bytes. The overall MorphOS MUI goal remains open.
+
+MG1231 moves the application-window relationship state record to a named field
+adapter. The last-window APTR capability, validation cookie, and saturating
+attachment count remain typed semantic fields; only the bounded adapter
+translates the three MorphOS 68k LONG slots. Host coverage is **2144/2144**.
+The focused MC68000 closure `ApplicationWindowRelationshipStructRecordCodecRoot`
+returns **42** after **1294 instructions / 12742 cycles** from a **2400-byte**
+HUNK with **1236 bytes of code**, **4 bytes of ROM rodata**, and **10 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **2424/2424** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1230 moves the application text state record to a named field adapter.
+Help-file and iconify-title pointers remain typed, caller-owned semantic
+fields; bounded C-string validation remains in admission, and only the
+adapter translates the three MorphOS 68k LONG slots. Host coverage is
+**2143/2143**. The focused MC68000 closure
+`ApplicationTextStructRecordCodecRoot` returns **42** after **1301
+instructions / 12790 cycles** from a **2332-byte** HUNK with **1256 bytes of
+code**, **4 bytes of ROM rodata**, and **10 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2356/2356** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1229 moves the application settings-persistence state record to a named
+field adapter. Operation, the environment selector, the validation cookie, and
+saturating request counters remain typed semantic fields; only the bounded
+adapter translates the six MorphOS 68k LONG slots. Host coverage is
+**2142/2142**. The focused MC68000 closure
+`ApplicationSettingsPersistenceStructRecordCodecRoot` returns **42** after
+**2158 instructions / 21152 cycles** from a **2672-byte** HUNK with **1502
+bytes of code**, **4 bytes of ROM rodata**, and **10 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2728/2728** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1228 moves the application help/presentation state record to a named field
+adapter. Typed APTR capabilities, request counters, the help line, and the
+validation cookie remain semantic struct fields; only the bounded adapter
+translates the eight MorphOS 68k LONG slots. Host coverage is **2141/2141**.
+The focused MC68000 closure `ApplicationHelpStructRecordCodecRoot` returns
+**42** after **2523 instructions / 24640 cycles** from a **2776-byte** HUNK
+with **1650 bytes of code**, **36 bytes of ROM rodata**, and **10 reachable
+methods**. Eight generated relocations are present; no loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **2856/2864** bytes. The overall MorphOS MUI goal remains open.
+
+MG1227 moves the application UsedClasses state record to a named field
+adapter. The validation cookie and caller-owned class-name vector pointer
+remain typed semantic fields; only the bounded adapter translates the two
+MorphOS 68k LONG slots. Host coverage is **2140/2140**. The focused MC68000
+closure `ApplicationUsedClassesStructRecordCodecRoot` returns **42** after
+**1278 instructions / 12372 cycles** from a **2320-byte** HUNK with **1198 bytes
+of code**, **4 bytes of ROM rodata**, and **10 reachable methods**; no
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2328/2328** bytes. The overall MorphOS MUI
+goal remains open.
+
+MG1226 moves the application CheckRefresh telemetry record to a named field
+adapter. The validation cookie and refresh counters remain typed semantic
+fields; only the bounded adapter translates the three MorphOS 68k LONG slots.
+Host coverage is **2139/2139**. The focused MC68000 closure
+`ApplicationRefreshStructRecordCodecRoot` returns **42** after **1739
+instructions / 17194 cycles** from a **2780-byte** HUNK with **1484 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **2800/2808** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1225 moves the application menu state record to a named field adapter. The
+validation cookie, MenuAction UserData, and MenuHelp UserData remain typed
+semantic fields; only the bounded adapter translates the three MorphOS 68k
+LONG slots. Host coverage is **2138/2138**. The focused MC68000 closure
+`ApplicationMenuStructRecordCodecRoot` returns **42** after **1744
+instructions / 17246 cycles** from a **2780-byte** HUNK with **1502 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **2804/2804** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1224 moves the application policy state record to a named field adapter. The
+validation cookie and three initializer BOOLs remain typed semantic fields;
+only the bounded adapter translates the four MorphOS 68k LONG slots. Host
+coverage is **2137/2137**. The focused MC68000 closure
+`ApplicationPolicyStructRecordCodecRoot` returns **42** after **2043
+instructions / 20166 cycles** from a **2912-byte** HUNK with **1618 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **2952/2952** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1223 moves the application identity state record to a named field adapter.
+The validation cookie and six caller-owned identity string pointers remain
+typed semantic fields; only the bounded adapter translates the seven MorphOS
+68k LONG pointer slots. Host coverage is **2136/2136**. The focused MC68000
+closure `ApplicationIdentityStructRecordCodecRoot` returns **42** after
+**3189 instructions / 31776 cycles** from a **3936-byte** HUNK with **2262 bytes
+of code**, **4 bytes of ROM rodata**, and **15 reachable methods**; one bounded
+CString validation loop is present, with no relocations, framework features, or
+managed allocations. MC68020/MC68040 HUNK artifacts are **4116/4008** bytes.
+The overall MorphOS MUI goal remains open.
+
+MG1222 moves the application DefaultConfigItem state record to a named field
+adapter. The validation cookie, requested config ID, returned value, and
+request counter remain typed semantic fields; only the bounded adapter
+translates the four MorphOS 68k LONG slots. Host coverage is **2135/2135**.
+The focused MC68000 closure `ApplicationDefaultConfigStructRecordCodecRoot`
+returns **42** after **2174 instructions / 21468 cycles** from a **2980-byte**
+HUNK with **1636 bytes of code**, **4 bytes of ROM rodata**, and **12 reachable
+methods**; no relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **3016/3024** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1221 moves the application lifecycle state record to a named field adapter.
+The validation cookie and seven BOOL projections remain typed semantic fields;
+only the bounded adapter translates the seven MorphOS 68k LONG slots. Host
+coverage is **2134/2134**. The focused MC68000 closure
+`ApplicationLifecycleStructRecordCodecRoot` returns **42** after **3088
+instructions / 30524 cycles** from a **3280-byte** HUNK with **1966 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **3356/3360** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1220 moves the application scheduler state record to a named field adapter.
+Queue heads/tails, input-handler head, signal mask, and push queues remain
+typed semantic fields; only the bounded adapter translates the seven MorphOS
+68k LONG slots. Host coverage is **2133/2133**. The focused MC68000 closure
+`ApplicationSchedulerStructRecordCodecRoot` returns **42** after **3225
+instructions / 32200 cycles** from a **6352-byte** HUNK with **3638 bytes of
+code**, **4 bytes of ROM rodata**, and **23 reachable methods**; one bounded
+queue-admission loop is present, with no relocations, framework features, or
+managed allocations. MC68020/MC68040 HUNK artifacts are **6512/6444** bytes.
+The overall MorphOS MUI goal remains open.
+
+MG1219 moves the application-message routing-state record to a dedicated named
+struct adapter. The transient message capability, validation cookie, and
+WindowAppWindow BOOL remain typed semantic fields; only the bounded adapter
+translates the three MorphOS 68k LONG slots. Host coverage is **2132/2132**.
+The focused MC68000 closure `ApplicationMessageRoutingStateStructRecordRoot`
+returns **42** after **370 instructions / 3568 cycles** from an **876-byte**
+HUNK with **404 bytes of code**, **4 bytes of ROM rodata**, and **4 reachable
+methods**; no relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **876/876** bytes. The overall
+MorphOS MUI goal remains open.
+
+MG1218 moves the Workbench argument record to a dedicated named struct
+adapter. Lock and name remain typed BPTR/STRPTR semantic fields; only the
+bounded adapter translates the two MorphOS 68k LONG slots used by the argument
+vector. Host coverage is **2131/2131**. The focused MC68000 closure
+`WorkbenchArgumentStructRecordCodecRoot` returns **42** after **370
+instructions / 3480 cycles** from an **808-byte** HUNK with **382 bytes of code**,
+**4 bytes of ROM rodata**, and **4 reachable methods**; no relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **808/808** bytes. The overall MorphOS MUI goal remains open.
+
+MG1217 moves the full Exec `AppMessage` record to a dedicated named mixed-width
+struct adapter. Message type, user data, argument count/list, input metadata,
+timestamps, and reserved values remain typed semantic fields; only the
+bounded adapter translates MorphOS guest slots. Host coverage is **2130/2130**.
+The focused MC68000 closure `AppMessageStructRecordCodecRoot` returns **42**
+after **612 instructions / 6076 cycles** from a **1392-byte** HUNK with **978
+bytes of code**, **4 bytes of ROM rodata**, and **4 reachable methods**; no
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1396/1404** bytes. The overall MorphOS MUI
+goal remains open.
+
+MG1216 moves the Exec application-message node to a dedicated named
+mixed-width struct adapter. List links, type, priority, name, reply port, and
+byte count remain typed semantic fields; only the bounded adapter translates
+the MorphOS guest representation. Host coverage is **2129/2129**. The focused
+MC68000 closure `AppMessageNodeStructRecordCodecRoot` returns **42** after
+**570 instructions / 5562 cycles** from a **1052-byte** HUNK with **644 bytes of
+code**, **4 bytes of ROM rodata**, and **4 reachable methods**; no relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **1064/1068** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1215 moves the `SetConfigItem` application state record to a dedicated named
+struct adapter. Cookie, item identifier, opaque data capability, and request
+count remain typed semantic fields; only the bounded adapter translates the
+four MorphOS 68k LONG slots. Host coverage is **2128/2128**. The focused
+MC68000 closure `ApplicationSetConfigItemStateStructRecordCodecRoot` returns
+**42** after **491 instructions / 4736 cycles** from a **928-byte** HUNK with
+**468 bytes of code**, **4 bytes of ROM rodata**, and **4 reachable methods**;
+no relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **928/928** bytes. The overall MorphOS MUI
+goal remains open.
+
+MG1214 moves the application config-window state record to a dedicated named
+struct adapter. Cookie, flags, class-id capability, and request count remain
+typed semantic fields; only the bounded adapter translates the four MorphOS
+68k LONG slots. Host coverage is **2127/2127**. The focused MC68000 closure
+`ApplicationConfigWindowStateStructRecordCodecRoot` returns **42** after **491
+instructions / 4736 cycles** from a **928-byte** HUNK with **468 bytes of code**,
+**4 bytes of ROM rodata**, and **4 reachable methods**; no relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **928/928** bytes. The overall MorphOS MUI goal remains open.
+
+MG1213 moves the stored application command-state record to a dedicated named
+struct adapter. The validation cookie and command-table capability remain
+typed semantic fields; only the bounded adapter translates the two MorphOS 68k
+LONG slots. Host coverage is **2126/2126**. The focused MC68000 closure
+`ApplicationCommandsStateStructRecordCodecRoot` returns **42** after **367
+instructions / 3490 cycles** from an **832-byte** HUNK with **382 bytes of
+code**, **4 bytes of ROM rodata**, and **4 reachable methods**; no relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **832/832** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1212 moves the application-command table record to a dedicated named struct
+adapter. Command name, template, parameter count, hook, and reserved values
+remain typed semantic fields; the existing cursor API delegates to the bounded
+adapter translating the nine MorphOS 68k LONG slots. Host coverage is
+**2125/2125**. The focused MC68000 closure
+`ApplicationCommandStructRecordCodecRoot` returns **42** after **511
+instructions / 4920 cycles** from an **1048-byte** HUNK with **560 bytes of
+code**, **40 bytes of ROM rodata**, and **4 reachable methods**; nine bounded
+switch-table relocations are present, with no loops, framework features, or
+managed allocations. MC68020/MC68040 HUNK artifacts are **1048/1048** bytes.
+The overall MorphOS MUI goal remains open.
+
+MG1211 moves the `MUI_LayoutMsg` record to a dedicated named mixed-width
+struct adapter. Layout type, child pointer, minimum/maximum/default sizes, and
+output dimensions remain typed semantic fields; only the bounded adapter
+translates MorphOS guest slots. Host coverage is **2124/2124**. The focused
+MC68000 closure `LayoutMessageStructRecordCodecRoot` returns **42** after
+**589 instructions / 5778 cycles** from an **1160-byte** HUNK with **778 bytes
+of code**, **4 bytes of ROM rodata**, and **4 reachable methods**; no
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1164/1172** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1210 moves the effective-font resolution record to a dedicated named
+semantic adapter. Present, inherited, depth, and font pointer fields remain
+typed; only the bounded adapter translates the five 68k LONG slots. Host
+coverage is **2123/2123**. The focused MC68000 closure
+`ControlFontResolutionStructRecordCodecRoot` returns **42** after **385
+instructions / 3684 cycles** from an **880-byte** HUNK with **442 bytes of code**,
+**4 bytes of ROM rodata**, and **4 reachable methods**; no relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040
+closures are **880/880** bytes. The overall MorphOS MUI goal remains open.
+
+MG1209 moves Listview drag state to a dedicated named semantic struct adapter
+and removes the shared List input cursor. Drag source/target, coordinates,
+flags, and lifecycle cookie remain typed fields; only the bounded adapter
+translates the eight 68k LONG slots. Host coverage is **2122/2122**. The
+focused MC68000 closure `ListviewDragStateStructRecordCodecRoot` returns **42**
+after **401 instructions / 3820 cycles** from a **964-byte** HUNK with **498
+bytes of code**, **36 bytes of ROM rodata**, and **4 reachable methods**; eight
+bounded switch-table relocations are present, with no loops, framework
+features, or managed allocations. MC68020/MC68040 closures are **964/964**
+bytes. The overall MorphOS MUI goal remains open.
+
+MG1208 moves the List IntuiMessage pointer envelope and shorter raw-key
+envelope to dedicated named adapters. Mixed byte, word, and long fields are
+translated only at those bounded guest boundaries, and List/Listtree consumers
+use the typed message codecs. Host coverage is **2122/2122**. The focused
+MC68000 closure `IntuiMessageStructRecordCodecRoot` returns **42** after **620
+instructions / 6030 cycles** from a **1532-byte** HUNK with **916 bytes of
+code**, **4 bytes of ROM rodata**, and **6 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **1540/1544** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1207 moves List `TestPos` results, scalar storage, and display-row values to
+named semantic structs with bounded guest-memory adapters. Mixed-width TestPos
+translation is isolated at that boundary, and List selection/iteration and
+display paths consume typed codecs. Host coverage is **2122/2122**. The focused
+MC68000 closure `ListResultStructRecordCodecRoot` returns **42** after **492
+instructions / 4832 cycles** from a **1740-byte** HUNK with **718 bytes of
+code**, **4 bytes of ROM rodata**, and **9 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **1736/1736** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1206 moves the fixed InputEvent codec behind a named field adapter while
+retaining the public `Amiga.InputEvent` semantic struct. Mixed byte, word, and
+long fields are translated only at that bounded guest boundary. Host coverage
+is **2120/2120**. The focused MC68000 closure
+`WindowInputEventStructRecordCodecRoot` returns **42** after **3616
+instructions / 35714 cycles** from a **4304-byte** HUNK with **2334 bytes of
+code**, **4 bytes of ROM rodata**, and **19 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **4400/4404** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1205 migrates the Window OpenWindow-policy record to a dedicated named
+struct codec. Signed geometry and MorphOS BOOL projections remain semantic
+struct fields; a bounded record-memory adapter owns the 22-word guest
+translation. Host coverage is **2119/2119**. The focused MC68000 closure
+`WindowOpenPolicyStructRecordCodecRoot` returns **42** after **6937
+instructions / 69376 cycles** from a **4808-byte** HUNK with **3082 bytes of
+code**, **4 bytes of ROM rodata**, and **15 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **5060/5064** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1204 migrates the Window relationship and visual policy records to dedicated
+named struct codecs. Relationship capabilities and visual policy remain
+semantic struct fields; bounded record-memory adapters own fixed guest
+translation. Host coverage is **2118/2118**. The focused MC68000 closure
+`WindowRelationshipVisualStructRecordCodecRoot` returns **42** after **3591
+instructions / 35522 cycles** from a **4732-byte** HUNK with **2582 bytes of
+code**, **4 bytes of ROM rodata**, and **18 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **4836/4844** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1203 migrates the Window interaction and presentation records to dedicated
+named struct codecs. Snapshot/cycle-chain state and caller-owned presentation
+capabilities remain semantic struct fields; bounded record-memory adapters own
+fixed guest translation. Host coverage is **2116/2116**. The focused MC68000
+closure `WindowInteractionPresentationStructRecordCodecRoot` returns **42**
+after **3830 instructions / 37798 cycles** from a **5380-byte** HUNK with
+**2836 bytes of code**, **4 bytes of ROM rodata**, and **21 reachable methods**;
+one bounded validation loop, no relocations, framework features, or managed
+allocations are present. MC68020/MC68040 closures are **5636/5500** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1202 migrates the Window event and event-reuse records to dedicated named
+struct codecs. Close requests, dispatch flags, event capabilities, and signed
+keys remain semantic struct fields; bounded record-memory adapters own fixed
+guest translation. Host coverage is **2114/2114**. The focused MC68000
+closure `WindowEventReuseStructRecordCodecRoot` returns **42** after **3824
+instructions / 37748 cycles** from a **4968-byte** HUNK with **2668 bytes of
+code**, **4 bytes of ROM rodata**, and **19 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **5084/5096** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1201 migrates the Window control, focus, and lifecycle state records to
+dedicated named struct codecs. Scalar projections and opaque APTR capabilities
+remain semantic struct fields; bounded record-memory adapters own fixed guest
+translation. Host coverage is **2112/2112**. The focused MC68000 closure
+`WindowControlFocusLifecycleStructRecordCodecRoot` returns **42** after
+**4846 instructions / 47590 cycles** from a **6156-byte** HUNK with **3282
+bytes of code**, **4 bytes of ROM rodata**, and **24 reachable methods**; no
+loops, relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **6308/6316** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1200 migrates the Application scheduler state record to a dedicated named
+struct codec. Queue heads/tails and signal selection remain semantic struct
+fields; a bounded record-memory adapter owns fixed guest translation while
+queue admission retains its bounded traversal check. Host coverage is
+**2109/2109**. The focused MC68000 closure `ApplicationSchedulerStructRecordCodecRoot`
+returns **42** after **2766 instructions / 27680 cycles** from a **6108-byte**
+HUNK with **3474 bytes of code**, **4 bytes of ROM rodata**, and **22 reachable
+methods**; one bounded admission loop, no relocations, framework features, or
+managed allocations are present. MC68020/MC68040 closures are **6260/6200**
+bytes. The overall MorphOS MUI goal remains open.
+
+MG1199 migrates the common Help node/line/generation record to a dedicated
+named struct codec. Node pointers, signed help lines, and generation remain
+semantic struct fields; a bounded record-memory adapter owns guest
+translation. Host coverage is **2108/2108**. The focused MC68000 closure
+`HelpStructRecordCodecRoot` returns **42** after **1848 instructions / 18250
+cycles** from a **2648-byte** HUNK with **1526 bytes of code**, **4 bytes of
+ROM rodata**, and **11 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**2684/2688** bytes. The overall MorphOS MUI goal remains open.
+
+MG1198 migrates Scrollgroup border-scroller, policy, and viewport records to
+dedicated named struct codecs. Pointer, BOOL, geometry, and visibility values
+remain semantic struct fields; bounded record-memory adapters own guest
+translation. Host coverage is **2107/2107**. The focused MC68000 closure
+`ScrollgroupStructRecordCodecRoot` returns **42** after **8629 instructions /
+85914 cycles** from an **8544-byte** HUNK with **5142 bytes of code**, **4 bytes
+of ROM rodata**, and **27 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**8880/8892** bytes. The overall MorphOS MUI goal remains open.
+
+MG1197 migrates Virtgroup display geometry, pointer-drag, and policy records
+to dedicated named struct codecs. Signed geometry, drag flags, and policy
+values remain semantic struct fields; a bounded shared input adapter owns
+guest translation. Host coverage is **2106/2106**. The focused MC68000 closure
+`VirtgroupInputPolicyStructRecordCodecRoot` returns **42** after **6480
+instructions / 63724 cycles** from a **6340-byte** HUNK with **3898 bytes of
+code**, **4 bytes of ROM rodata**, and **23 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **6548/6556** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1196 migrates the fixed Prop policy/range, Scrollbar layout, and Slider
+presentation records to dedicated named struct codecs. Range, policy,
+orientation, and presentation values remain semantic struct fields; bounded
+record-memory adapters own guest translation. Host coverage is **2105/2105**.
+The focused MC68000 closure `PropScrollbarSliderStructRecordCodecRoot` returns
+**42** after **5651 instructions / 55324 cycles** from a **7352-byte** HUNK with
+**3792 bytes of code**, **4 bytes of ROM rodata**, and **31 reachable methods**;
+no loops, relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **7512/7532** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1195 migrates the fixed Numeric format, Rectangle bar title/presentation,
+and Register policy records to dedicated named struct codecs. Pointer,
+presence, BOOL, and frame values remain semantic struct fields; bounded
+record-memory adapters own guest translation. Host coverage is **2101/2101**.
+The focused MC68000 closure `NumericRectangleRegisterStructRecordCodecRoot`
+returns **42** after **4673 instructions / 45908 cycles** from a **6976-byte**
+HUNK with **3198 bytes of code**, **4 bytes of ROM rodata**, and **31 reachable
+methods**; no loops, relocations, framework features, or managed allocations
+are present. MC68020/MC68040 closures are **7096/7108** bytes. The overall
+MorphOS MUI goal remains open.
+
+MG1194 migrates the fixed group layout hook, policy, and grid records to
+dedicated named struct codecs. Signed spacing and normalized layout flags
+remain semantic struct fields; bounded record-memory adapters own guest
+translation. Host coverage is **2097/2097**. The focused MC68000 closure
+`GroupLayoutStructRecordCodecRoot` returns **42** after **6139 instructions /
+60106 cycles** from a **7060-byte** HUNK with **3860 bytes of code**, **4 bytes
+of ROM rodata**, and **30 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**7268/7276** bytes. The overall MorphOS MUI goal remains open.
+
+MG1193 migrates the fixed Text presentation record to a dedicated named struct
+codec. Mixed BOOL, character, and shortening-selector values remain semantic
+struct fields; a bounded record-memory adapter owns guest translation. Host
+coverage is **2094/2094**. The focused MC68000 closure
+`TextPresentationRecordCodecRoot` returns **42** after **3207 instructions /
+32050 cycles** from a **3580-byte** HUNK with **2228 bytes of code**, **4 bytes
+of ROM rodata**, and **13 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**3692/3704** bytes. The overall MorphOS MUI goal remains open.
+
+MG1192 migrates the fixed Stringscroll pointer-drag record to a named struct
+codec with signed drag positions and capture flags. Numeric guest positions
+remain inside a bounded record-memory adapter; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Host coverage is
+**2093/2093**. The focused MC68000 closure
+`StringscrollPointerRecordCodecRoot` returns **42** after **2806 instructions /
+27216 cycles** from a **3012-byte** HUNK with **1596 bytes of code**, **4 bytes
+of ROM rodata**, and **12 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**3100/3104** bytes. The overall MorphOS MUI goal remains open.
+
+MG1191 migrates the fixed String interaction, presentation, and scroll-metrics
+records to dedicated named struct codecs. Scalar policy and metric values
+remain semantic struct fields; bounded record-memory adapters own guest
+translation. Host coverage is **2092/2092**. The focused MC68000 closure
+`StringInteractionPresentationMetricsRecordCodecRoot` returns **42** after
+**5385 instructions / 52626 cycles** from a **6100-byte** HUNK with **3316 bytes
+of code**, **4 bytes of ROM rodata**, and **23 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **6280/6296** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1190 migrates the fixed String cursor, edit-hook, and character-filter
+records to dedicated named struct codecs. Cursor positions, Hook/BOOL policy,
+and Accept/Reject pointers remain semantic struct fields; bounded record-memory
+adapters own guest translation. Host coverage is **2089/2089**. The focused
+MC68000 closure `StringCursorHookFilterRecordCodecRoot` returns **42** after
+**3745 instructions / 36638 cycles** from a **5392-byte** HUNK with **2450 bytes
+of code**, **4 bytes of ROM rodata**, and **19 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **5484/5492** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1189 migrates three compact fixed records—the String attached Listview
+relationship, String spell-checking BOOL, and Text PreParse pointer—to
+dedicated named struct codecs. Numeric guest positions remain inside bounded
+record-memory adapters; legacy field cursors remain only for compatibility and
+malformed-state diagnostics. Host coverage is **2086/2086**. The focused
+MC68000 closure `CompactStringTextRecordCodecRoot` returns **42** after **2942
+instructions / 28842 cycles** from a **4824-byte** HUNK with **2092 bytes of
+code**, **4 bytes of ROM rodata**, and **17 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **4888/4892** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1188 migrates the fixed String acknowledgement, String contents, and String
+placeholder pointer records to dedicated named struct codecs. Numeric guest
+positions remain inside bounded record-memory adapters; legacy field cursors
+remain only for compatibility and malformed-state diagnostics. Contents
+pointers remain opaque caller/object-owned C-string addresses. Host coverage is
+**2083/2083**. The focused MC68000 closure
+`StringPointerRecordCodecRoot` returns **42** after **2943 instructions /
+28894 cycles** from a **4812-byte** HUNK with **2086 bytes of code**, **4 bytes
+of ROM rodata**, and **17 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**4876/4876** bytes. The overall MorphOS MUI goal remains open.
+
+MG1187 migrates the fixed Text contents and Text Copy policy records to
+dedicated named struct codecs. Numeric guest positions remain inside bounded
+record-memory adapters; legacy field cursors remain only for compatibility and
+malformed-state diagnostics. Contents remains an opaque caller/object-owned
+C-string pointer, while Copy retains canonical MorphOS BOOL semantics. Host
+coverage is **2080/2080**. The focused MC68000 closure
+`TextContentsCopyRecordCodecRoot` returns **42** after **2029 instructions /
+19964 cycles** from a **3556-byte** HUNK with **1666 bytes of code**, **4 bytes
+of ROM rodata**, and **17 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**3588/3596** bytes. The overall MorphOS MUI goal remains open.
+
+MG1186 migrates the fixed Text Unicode and Text Shortened policy records to
+dedicated named struct codecs. Numeric guest positions remain inside bounded
+record-memory adapters; legacy field cursors remain only for compatibility and
+malformed-state diagnostics. Both policy values retain canonical MorphOS BOOL
+semantics. Host coverage is **2078/2078**. The focused MC68000 closure
+`TextPolicyRecordCodecRoot` returns **42** after **2053 instructions / 20308
+cycles** from a **3808-byte** HUNK with **1752 bytes of code**, **4 bytes of
+ROM rodata**, and **19 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**3840/3852** bytes. The overall MorphOS MUI goal remains open.
+
+MG1185 migrates the shared Numeric range/value state to a dedicated named
+struct codec. Numeric guest positions remain inside
+`MuiNumericStateRecordMemoryCodec`; the legacy field cursor remains only for
+compatibility and malformed-state diagnostics. Minimum, Maximum, Value,
+Default, and Reverse retain fixed-width MorphOS ULONG representation, with
+Reverse canonicalized as a BOOL. Host coverage is **2076/2076**. The focused
+MC68000 closure `NumericStateRecordCodecRoot` returns **42** after **2092
+instructions / 20646 cycles** from a **2704-byte** HUNK with **1562 bytes of
+code**, **4 bytes of ROM rodata**, and **11 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2756/2764** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1184 migrates the fixed String integer state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiStringIntegerStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. The signed
+`MUIA_String_Integer` value retains full-width LONG semantics. Host coverage is
+**2075/2075**. The focused MC68000 closure
+`StringIntegerStateRecordCodecRoot` returns **42** after **1120 instructions /
+11160 cycles** from a **2408-byte** HUNK with **1228 bytes of code**, **4 bytes
+of ROM rodata**, and **11 reachable methods**; no loops, relocations,
+framework features, or managed allocations are present. MC68020/MC68040
+closures are **2416/2420** bytes. The overall MorphOS MUI goal remains open.
+
+MG1183 migrates the fixed Selectgroup active-index state to a dedicated named
+struct codec. Numeric guest positions remain inside
+`MuiSelectgroupActiveStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. The signed public
+selector is normalized to a bounded canonical child index. Host coverage is
+**2074/2074**. The focused MC68000 closure
+`SelectgroupActiveStateRecordCodecRoot` returns **42** after **1131
+instructions / 11318 cycles** from a **2560-byte** HUNK with **1278 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2564/2572** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1182 migrates the fixed Scale presentation state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiScalePresentationStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Horizontal retains
+canonical MorphOS BOOL semantics. Host coverage is **2073/2073**. The focused
+MC68000 closure `ScalePresentationStateRecordCodecRoot` returns **42** after
+**1116 instructions / 11098 cycles** from a **2440-byte** HUNK with **1230
+bytes of code**, **4 bytes of ROM rodata**, and **11 reachable methods**; no
+loops, relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2444/2452** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1181 migrates the fixed Image render policy state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiImageRenderStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. Image state, selected
+visual, and free-axis policy values retain their full-width MorphOS ULONG
+semantics. Host coverage is **2072/2072**. The focused MC68000 closure
+`ImageRenderStateRecordCodecRoot` returns **42** after **2468 instructions /
+24312 cycles** from a **2820-byte** HUNK with **1526 bytes of code**, **4 bytes
+of ROM rodata**, and **12 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**2864/2868** bytes. The overall MorphOS MUI goal remains open.
+
+MG1180 migrates the fixed Image Spec state to a dedicated named struct codec.
+Numeric guest positions remain inside `MuiImageSpecStateRecordMemoryCodec`; the
+legacy field cursor remains only for compatibility and malformed-state
+diagnostics. Builtin and raw specifications remain distinct, with presence
+flags preserving supplied zero values. Host coverage is **2071/2071**. The
+focused MC68000 closure `ImageSpecStateRecordCodecRoot` returns **42** after
+**2140 instructions / 21220 cycles** from a **2840-byte** HUNK with **1508 bytes
+of code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2880/2880** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1179 migrates the fixed Image FontMatch scalar state to a dedicated named
+struct codec. Numeric guest positions remain inside
+`MuiImageFontMatchStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. Match, Height, and Width
+retain full-width MorphOS ULONG values. Host coverage is **2070/2070**. The
+focused MC68000 closure `ImageFontMatchStateRecordCodecRoot` returns **42** after
+**1735 instructions / 17166 cycles** from a **2644-byte** HUNK with **1336 bytes
+of code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2668/2668** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1178 migrates the fixed Image FontMatchString state to a dedicated named
+struct codec. Numeric guest positions remain inside
+`MuiImageFontMatchStringStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Presence remains
+canonical, while the caller-owned match-string pointer stays opaque with
+bounded text validation in live admission. Host coverage is **2069/2069**. The
+focused MC68000 closure `ImageFontMatchStringStateRecordCodecRoot` returns **42**
+after **1402 instructions / 13900 cycles** from a **2652-byte** HUNK with
+**1290 bytes of code**, **4 bytes of ROM rodata**, and **12 reachable methods**;
+no loops, relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2660/2664** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1177 migrates the fixed Image OldImage relationship to a dedicated named
+struct codec. Numeric guest positions remain inside
+`MuiImageOldImageStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. The caller-owned graphics
+Image pointer remains opaque and is admitted only when NULL or mapped. Host
+coverage is **2068/2068**. The focused MC68000 closure
+`ImageOldImageStateRecordCodecRoot` returns **42** after **1089 instructions /
+10960 cycles** from a **2572-byte** HUNK with **1208 bytes of code**, **4 bytes
+of ROM rodata**, and **12 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**2568/2568** bytes. The overall MorphOS MUI goal remains open.
+
+MG1176 migrates the fixed Gadget interaction state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiGadgetInteractionStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. InputMode retains its
+bounded MorphOS enum and Selected, Pressed, and ShowSelState retain canonical
+BOOL admission. Host coverage is **2067/2067**. The focused MC68000 closure
+`GadgetInteractionStateRecordCodecRoot` returns **42** after **2136
+instructions / 21032 cycles** from a **2816-byte** HUNK with **1474 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2852/2856** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1175 migrates the fixed GadgetGadget relationship to a dedicated named
+struct codec. Numeric guest positions remain inside
+`MuiGadgetGadgetStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. The getter-only Intuition
+gadget pointer remains opaque and is admitted only when NULL or mapped. Host
+coverage is **2066/2066**. The focused MC68000 closure
+`GadgetGadgetStateRecordCodecRoot` returns **42** after **1089 instructions /
+10960 cycles** from a **2560-byte** HUNK with **1208 bytes of code**, **4 bytes
+of ROM rodata**, and **12 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**2556/2556** bytes. The overall MorphOS MUI goal remains open.
+
+MG1174 migrates the fixed Gauge InfoText state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiGaugeInfoTextStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. The object-owned C-string
+pointer remains opaque, with bounded text validation in live admission. Host
+coverage is **2065/2065**. The focused MC68000 closure
+`GaugeInfoTextStateRecordCodecRoot` returns **42** after **1017 instructions /
+10212 cycles** from a **2464-byte** HUNK with **1156 bytes of code**, **4 bytes of
+ROM rodata**, and **12 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**2456/2460** bytes. The overall MorphOS MUI goal remains open.
+
+MG1173 migrates the fixed Levelmeter label state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiLevelmeterLabelStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. The object-owned
+C-string pointer remains opaque, with bounded text validation in live admission.
+Host coverage is **2064/2064**. The focused MC68000 closure
+`LevelmeterLabelStateRecordCodecRoot` returns **42** after **1017 instructions /
+10212 cycles** from a **2480-byte** HUNK with **1156 bytes of code**, **4 bytes of
+ROM rodata**, and **12 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**2472/2476** bytes. The overall MorphOS MUI goal remains open.
+
+MG1172 migrates the fixed Levelmeter presentation state to a dedicated named
+struct codec. Numeric guest positions remain inside
+`MuiLevelmeterPresentationStateRecordMemoryCodec`; the legacy field cursor
+remains only for compatibility and malformed-state diagnostics. Gauge_Horiz
+retains canonical BOOL admission. Host coverage is **2063/2063**. The focused
+MC68000 closure `LevelmeterPresentationStateRecordCodecRoot` returns **42**
+after **1011 instructions / 10108 cycles** from a **2528-byte** HUNK with
+**1156 bytes of code**, **4 bytes of ROM rodata**, and **12 reachable methods**;
+no loops, relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2520/2524** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1171 migrates the fixed Gauge state to a dedicated named struct codec.
+Numeric guest positions remain inside `MuiGaugeStateRecordMemoryCodec`; the
+legacy field cursor remains only for compatibility and malformed-state
+diagnostics. Maximum, Current, and Divide retain full-width MorphOS ULONG values
+while Horizontal retains canonical BOOL admission. Host coverage is **2062/2062**.
+The focused MC68000 closure `GaugeStateRecordCodecRoot` returns **42** after
+**2116 instructions / 20852 cycles** from a **2696-byte** HUNK with **1452 bytes
+of code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2732/2736** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1170 migrates the fixed ControlFont state to a dedicated named struct codec.
+Numeric guest positions remain inside
+`MuiControlFontStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. Canonical presence admission
+and the opaque TextFont pointer remain unchanged. Host coverage is **2061/2061**.
+The focused MC68000 closure `ControlFontStateRecordCodecRoot` returns **42**
+after **1402 instructions / 13900 cycles** from a **2584-byte** HUNK with
+**1290 bytes of code**, **4 bytes of ROM rodata**, and **12 reachable methods**;
+no loops, relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2592/2596** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1169 migrates the fixed Choice/Radio entries relationship to a dedicated
+named struct codec. Numeric guest positions remain inside
+`MuiChoiceEntriesStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. The caller-owned STRPTR
+vector remains opaque and bounded validation stays in the semantic admission
+layer. Host coverage is **2060/2060**. The focused MC68000 closure
+`ChoiceEntriesStateRecordCodecRoot` returns **42** after **693 instructions /
+6858 cycles** from a **1956-byte** HUNK with **968 bytes of code**, **4 bytes of
+ROM rodata**, and **9 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**1948/1952** bytes. The overall MorphOS MUI goal remains open.
+
+MG1168 migrates the fixed Choice/Radio active-index state to a dedicated named
+struct codec. Numeric guest positions remain inside
+`MuiChoiceActiveStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. Active retains the
+non-negative MorphOS selector admission while the semantic record remains
+ULONG-compatible. Host coverage is **2059/2059**. The focused MC68000 closure
+`ChoiceActiveStateRecordCodecRoot` returns **42** after **997 instructions /
+9896 cycles** from a **2500-byte** HUNK with **1126 bytes of code**, **4 bytes
+of ROM rodata**, and **13 reachable methods**; no loops, relocations,
+framework features, or managed allocations are present. MC68020/MC68040
+closures are **2496/2496** bytes. The overall MorphOS MUI goal remains open.
+
+MG1167 migrates the fixed Bodychunk format state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiBodychunkFormatStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Compression, Depth,
+and Masking retain the complete MorphOS ULONG range. Host coverage is
+**2058/2058**. The focused MC68000 closure
+`BodychunkFormatStateRecordCodecRoot` returns **42** after **1735
+instructions / 17158 cycles** from a **2656-byte** HUNK with **1332 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2684/2684** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1166 migrates the fixed Bitmap policy state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiBitmapPolicyStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. Decode selectors and
+pointer-valued fields remain lossless, while UseFriend retains canonical BOOL
+admission. Host coverage is **2057/2057**. The focused MC68000 closure
+`BitmapPolicyStateRecordCodecRoot` returns **42** after **2997 instructions /
+29414 cycles** from a **3088-byte** HUNK with **1730 bytes of code**, **4 bytes
+of ROM rodata**, and **12 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**3144/3148** bytes. The overall MorphOS MUI goal remains open.
+
+MG1165 migrates the fixed Bitmap geometry state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiBitmapGeometryStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. Width and Height retain the
+complete MorphOS ULONG range. Host coverage is **2056/2056**. The focused
+MC68000 closure `BitmapGeometryStateRecordCodecRoot` returns **42** after
+**1368 instructions / 13580 cycles** from a **2548-byte** HUNK with **1234 bytes
+of code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2556/2556** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1164 migrates the fixed Bitmap source and renderer-remapped pointer records
+to dedicated named struct codecs. Numeric guest positions remain inside
+`MuiBitmapSourceStateRecordMemoryCodec` and
+`MuiBitmapRemappedStateRecordMemoryCodec`; legacy field cursors remain only for
+compatibility and malformed-state diagnostics. Caller-owned and renderer-owned
+pointers remain opaque and lossless, with mapped-pointer admission unchanged.
+Host coverage is **2055/2055**. The focused MC68000 closure
+`BitmapSourceRemappedStateRecordCodecRoot` returns **42** after **2066
+instructions / 20624 cycles** from a **3992-byte** HUNK with **1690 bytes of
+code**, **4 bytes of ROM rodata**, and **19 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **4012/4016** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1163 migrates the fixed Balance policy state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiBalancePolicyStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. The full MorphOS LONG range
+of `MUIA_Balance_Quiet` remains lossless. Host coverage is **2054/2054**. The
+focused MC68000 closure `BalancePolicyStateRecordCodecRoot` returns **42** after
+**997 instructions / 10000 cycles** from a **2440-byte** HUNK with **1128 bytes
+of code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2432/2436** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1162 migrates the fixed Area layout-policy state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaLayoutPolicyStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. ShowMe retains BOOL
+admission while all other layout inputs remain lossless ULONG values. Host
+coverage is **2053/2053**. The focused MC68000 closure
+`AreaLayoutPolicyStateRecordCodecRoot` returns **42** after **4804 instructions /
+47734 cycles** from a **3604-byte** HUNK with **2196 bytes of code**, **4 bytes
+of ROM rodata**, and **13 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**3724/3728** bytes. The overall MorphOS MUI goal remains open.
+
+MG1161 migrates the fixed Area render-policy state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaRenderPolicyStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Selector values and
+the caller-owned FrameTitle pointer remain lossless, while FillArea,
+FrameVisible, FramePhantomHoriz, and FrameDynamic retain BOOL admission. Host
+coverage is **2052/2052**. The focused MC68000 closure
+`AreaRenderPolicyStateRecordCodecRoot` returns **42** after **3721 instructions /
+36966 cycles** from a **3352-byte** HUNK with **1944 bytes of code**, **4 bytes
+of ROM rodata**, and **13 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**3444/3448** bytes. The overall MorphOS MUI goal remains open.
+
+MG1160 migrates the fixed Area geometry state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaGeometryStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. Signed coordinates and
+extents remain lossless, with canonical derived-edge admission preserved. Host
+coverage is **2051/2051**. The focused MC68000 closure
+`AreaGeometryStateRecordCodecRoot` returns **42** after **3243 instructions /
+32362 cycles** from a **3652-byte** HUNK with **1932 bytes of code**, **4 bytes
+of ROM rodata**, and **16 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**3708/3712** bytes. The overall MorphOS MUI goal remains open.
+
+MG1159 migrates the fixed Area presentation policy state to a dedicated named
+struct codec. Numeric guest positions remain inside
+`MuiAreaPresentationStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Background and Frame
+ULONG selectors remain lossless, while Disabled, ShowMe, and CustomBackfill
+retain BOOL admission. Host coverage is **2050/2050**. The focused MC68000
+closure `AreaPresentationStateRecordCodecRoot` returns **42** after **2584
+instructions / 25912 cycles** from a **3124-byte** HUNK with **1720 bytes of
+code**, **4 bytes of ROM rodata**, and **13 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **3168/3168** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1158 migrates the fixed Area FixWidthTxt/FixHeightTxt state to a dedicated
+named struct codec. Numeric guest positions remain inside
+`MuiAreaFixedTextStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. Caller-owned text sample
+pointers remain opaque, with generation and live C-string validation unchanged.
+Host coverage is **2049/2049**. The focused MC68000 closure
+`AreaFixedTextCodecRoot` returns **42** after **1266 instructions / 12656
+cycles** from a **2696-byte** HUNK with **1400 bytes of code**, **4 bytes of ROM
+rodata**, and **12 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**2720/2724** bytes. The overall MorphOS MUI goal remains open.
+
+MG1157 completes the struct-first migration of the fixed Area drag-policy
+state. Numeric guest positions remain inside
+`MuiAreaDragPolicyStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. Canonical Draggable and
+Dropable BOOL values remain enforced. Host coverage is **2048/2048**. The
+focused MC68000 closure `AreaDragPolicyStateRecordCodecRoot` returns **42**
+after **1439 instructions / 14140 cycles** from a **2620-byte** HUNK with
+**1310 bytes of code**, **4 bytes of ROM rodata**, and **12 reachable methods**;
+no loops, relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2632/2636** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1156 migrates the fixed Area CycleChain policy state to a dedicated named
+struct codec. Numeric guest positions remain inside
+`MuiAreaCycleChainStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. The unrestricted
+signed LONG policy remains lossless, with nonzero generation validation
+protecting publication. Host coverage is **2047/2047**. The focused MC68000
+closure `AreaCycleChainStateRecordCodecRoot` returns **42** after **1442
+instructions / 14234 cycles** from a **2628-byte** HUNK with **1320 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2640/2644** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1155 migrates the fixed Area ContextMenu relationship state to a dedicated
+named struct codec. Numeric guest positions remain inside
+`MuiAreaContextMenuStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Menu-strip and trigger
+pointers remain opaque and lossless, while nonzero generation validation
+protects publication. Host coverage is **2046/2046**. The focused MC68000
+closure `AreaContextMenuStateRecordCodecRoot` returns **42** after **1835
+instructions / 17996 cycles** from a **2768-byte** HUNK with **1444 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2792/2796** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1154 migrates the fixed Area FontSelection state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaFontSelectionStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Last-writer selection
+is represented by a closed enum, the source pointer remains opaque, and
+nonzero generation validation remains enforced. Host coverage is **2045/2045**.
+The focused MC68000 closure `AreaFontSelectionStateRecordCodecRoot` returns
+**42** after **1892 instructions / 18914 cycles** from a **2980-byte** HUNK with
+**1566 bytes of code**, **4 bytes of ROM rodata**, and **13 reachable methods**;
+no loops, relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2992/3000** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1153 migrates the fixed CustomFont runtime publication state to a dedicated
+named struct codec. Numeric guest positions remain inside
+`MuiAreaCustomFontRuntimeRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Opaque provider font
+and source-spec pointers remain lossless, while Active and nonzero Generation
+validation remain enforced. Host coverage is **2044/2044**. The focused
+MC68000 closure `AreaCustomFontRuntimeRecordCodecRoot` returns **42** after
+**2219 instructions / 21846 cycles** from a **2932-byte** HUNK with **1598
+bytes of code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no
+loops, relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2960/2968** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1152 migrates the fixed Area CustomFont state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaCustomFontStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. The caller-owned font-spec
+pointer remains opaque, explicit NULL remains distinct through the presence
+flag, and nonzero generation validation remains enforced. Host coverage is
+**2043/2043**. The focused MC68000 closure
+`AreaCustomFontStateRecordCodecRoot` returns **42** after **1824 instructions /
+17960 cycles** from a **2752-byte** HUNK with **1444 bytes of code**, **4 bytes
+of ROM rodata**, and **12 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**2772/2776** bytes. The overall MorphOS MUI goal remains open.
+
+MG1151 migrates the fixed Area BuiltinFont state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaBuiltinFontStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Signed MorphOS font
+selectors remain lossless as ULONG values, while canonical presence and
+nonzero generation validation remain enforced. Host coverage is **2042/2042**.
+The focused MC68000 closure `AreaBuiltinFontStateRecordCodecRoot` returns **42**
+after **1877 instructions / 18720 cycles** from a **2928-byte** HUNK with
+**1530 bytes of code**, **4 bytes of ROM rodata**, and **13 reachable methods**;
+no loops, relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2944/2952** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1150 migrates the fixed Area ShortHelp state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaShortHelpStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. The caller-owned OBString
+pointer remains opaque and lossless, while nonzero generation validation
+protects publication. Host coverage is **2041/2041**. The focused MC68000
+closure `AreaShortHelpStateRecordCodecRoot` returns **42** after **1447
+instructions / 14258 cycles** from a **2640-byte** HUNK with **1332 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2652/2656** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1149 migrates the fixed Area TextColor state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaTextColorStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. Packed 24-bit color,
+setup-active BOOL, and nonzero generation validation remain in admission. Host
+coverage is **2040/2040**. The focused MC68000 closure
+`AreaTextColorStateRecordCodecRoot` returns **42** after **1821 instructions /
+17872 cycles** from a **2740-byte** HUNK with **1432 bytes of code**, **4 bytes
+of ROM rodata**, and **12 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**2764/2768** bytes. The overall MorphOS MUI goal remains open.
+
+MG1148 migrates the fixed Area ControlChar state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaControlCharStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Canonical byte-range
+character and nonzero generation validation remain in admission. Host coverage
+is **2039/2039**. The focused MC68000 closure
+`AreaControlCharStateRecordCodecRoot` returns **42** after **1442 instructions /
+14188 cycles** from a **2652-byte** HUNK with **1326 bytes of code**, **4 bytes
+of ROM rodata**, and **12 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**2660/2664** bytes. The overall MorphOS MUI goal remains open.
+
+MG1147 migrates the fixed Area timer state to a dedicated named struct codec.
+Numeric guest positions remain inside `MuiAreaTimerStateRecordMemoryCodec`; the
+legacy field cursor remains only for compatibility and malformed-state
+diagnostics. Signed event counters remain lossless while nonzero publication
+generation remains enforced in admission. Host coverage is **2038/2038**. The
+focused MC68000 closure `AreaTimerStateRecordCodecRoot` returns **42** after
+**1442 instructions / 14234 cycles** from a **2596-byte** HUNK with **1320 bytes
+of code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2608/2612** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1146 migrates the fixed Area drag-policy state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaDragPolicyStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. Canonical Draggable and
+Dropable BOOL validation remains in admission. Host coverage is **2037/2037**.
+The focused MC68000 closure `AreaDragPolicyStateRecordCodecRoot` returns **42**
+after **1875 instructions / 19182 cycles** from a **2936-byte** HUNK with
+**1548 bytes of code**, **4 bytes of ROM rodata**, and **13 reachable methods**;
+no loops, relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2940/2944** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1145 migrates the fixed Area DoubleClick state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaDoubleClickStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Signed event values
+remain lossless while nonzero publication generation remains enforced in
+admission. Host coverage is **2036/2036**. The focused MC68000 closure
+`AreaDoubleClickStateRecordCodecRoot` returns **42** after **1442 instructions
+/ 14234 cycles** from a **2644-byte** HUNK with **1320 bytes of code**, **4 bytes
+of ROM rodata**, and **12 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**2656/2660** bytes. The overall MorphOS MUI goal remains open.
+
+MG1144 migrates the fixed Area disappearance-policy state to a dedicated named
+struct codec. Numeric guest positions remain inside
+`MuiAreaDisappearPolicyStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Signed LONG priorities
+remain lossless. Host coverage is **2035/2035**. The focused MC68000 closure
+`AreaDisappearPolicyStateRecordCodecRoot` returns **42** after **1447
+instructions / 14270 cycles** from a **2668-byte** HUNK with **1310 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2672/2676** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1143 migrates the fixed Area floating state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaFloatingStateRecordMemoryCodec`; the legacy field cursor remains only
+for compatibility and malformed-state diagnostics. Canonical `Enabled` BOOL
+and nonzero publication generation remain enforced in admission while
+placement semantics remain provider-owned. Host coverage is **2034/2034**. The
+focused MC68000 closure `AreaFloatingStateRecordCodecRoot` returns **42** after
+**1440 instructions / 14172 cycles** from a **2616-byte** HUNK with **1320 bytes
+of code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2628/2632** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1142 migrates the fixed Area double-buffer state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaDoubleBufferStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Canonical `Enabled`
+BOOL and nonzero publication generation remain enforced in admission. Host
+coverage is **2033/2033**. The focused MC68000 closure
+`AreaDoubleBufferStateRecordCodecRoot` returns **42** after **1440 instructions
+/ 14172 cycles** from a **2648-byte** HUNK with **1320 bytes of code**, **4 bytes
+of ROM rodata**, and **12 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**2656/2664** bytes. The overall MorphOS MUI goal remains open.
+
+MG1141 migrates the fixed Area weight state to a dedicated named struct codec.
+Numeric guest positions remain inside `MuiAreaWeightStateRecordMemoryCodec`;
+the legacy field cursor remains only for compatibility and malformed-state
+diagnostics. The opaque Weight ULONG remains fully representable while the
+record cookie stays enforced in admission. Host coverage is **2032/2032**. The
+focused MC68000 closure `AreaWeightStateRecordCodecRoot` returns **42** after
+**1049 instructions / 10400 cycles** from a **2460-byte** HUNK with **1182 bytes
+of code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2448/2452** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1140 migrates the fixed Area activation state to a dedicated named struct
+codec. Numeric guest positions remain inside
+`MuiAreaActivationStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Canonical `Active`
+BOOL validation remains in admission while `Flags` and `Generation` retain
+their full ULONG ranges. Host coverage is **2031/2031**. The focused MC68000
+closure `AreaActivationStateRecordCodecRoot` returns **42** after **1813
+instructions / 17730 cycles** from a **2696-byte** HUNK with **1404 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2716/2724** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1139 migrates the shared fixed sleep-state record to a dedicated named
+struct codec. Numeric guest positions remain inside
+`MuiSleepStateRecordMemoryCodec`; the legacy field cursor remains only for
+compatibility and malformed-state diagnostics. The nesting/request relationship
+and canonical `SavedDisabled` BOOL remain enforced in admission. Host coverage
+is **2030/2030**. The focused MC68000 closure
+`SleepStateRecordCodecRoot` returns **42** after **1820 instructions / 17912
+cycles** from a **2660-byte** HUNK with
+**1414 bytes of code**, **4 bytes of ROM rodata**, and **12 reachable methods**;
+no loops, relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2676/2684** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1138 migrates the fixed application UsedClasses sidecar record to a
+dedicated named struct codec. Numeric guest positions remain inside
+`MuiApplicationUsedClassesStateRecordMemoryCodec`; the legacy field cursor
+remains only for compatibility and malformed-state diagnostics. Caller-owned
+UsedClasses vectors remain opaque pointers to the record codec, with bounded
+vector-entry and C-string validation in admission. Host coverage is
+**2029/2029**. The focused MC68000 closure
+`ApplicationUsedClassesStateRecordCodecRoot` returns **42** after **1125
+instructions / 11224 cycles** from a **4256-byte** HUNK with **1936 bytes of
+code**, **4 bytes of ROM rodata**, and **19 reachable methods**; two bounded
+validation loops are present, with no relocations, framework features, or
+managed allocations. MC68020/MC68040 closures are **4328/4240** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1137 migrates the fixed application lifecycle sidecar record to a dedicated
+named struct codec. Numeric guest positions remain inside
+`MuiApplicationLifecycleStateRecordMemoryCodec`; the legacy field cursor
+remains only for compatibility and malformed-state diagnostics. Canonical
+MorphOS BOOL validation remains in admission. Host coverage is **2028/2028**.
+The focused MC68000 closure
+`ApplicationLifecycleStateRecordCodecRoot` returns **42** after **2969
+instructions / 28954 cycles** from a **3088-byte** HUNK with **1728 bytes of
+code**, **4 bytes of ROM rodata**, and **12 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **3144/3148** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1136 migrates the fixed application identity sidecar record to a dedicated
+named struct codec. Numeric guest positions remain inside
+`MuiApplicationIdentityStateRecordMemoryCodec`; the legacy field cursor
+remains only for compatibility and malformed-state diagnostics. Guest text
+pointers remain opaque to the codec; bounded C-string validation stays in
+admission. Host coverage is **2027/2027**. The focused MC68000 closure
+`ApplicationIdentityStateRecordCodecRoot` returns **42** after **4139
+instructions / 39306 cycles** from a **3920-byte** HUNK with **2132 bytes of
+code**, **4 bytes of ROM rodata**, and **16 reachable methods**; one bounded
+validation loop is present, with no relocations, framework features, or managed
+allocations. MC68020/MC68040 closures are **4080/3980** bytes. The overall
+MorphOS MUI goal remains open.
+
+MG1135 migrates the fixed application settings-persistence sidecar record to a
+dedicated named struct codec. Numeric guest positions remain inside
+`MuiApplicationSettingsPersistenceStateRecordMemoryCodec`; the legacy field
+cursor remains only for compatibility and malformed-state diagnostics.
+MorphOS `NULL`/`ENVARC` selector handling and operation validation remain in
+admission. Host coverage is **2026/2026**. The focused MC68000 closure
+`ApplicationSettingsPersistenceStateRecordCodecRoot` returns **42** after
+**2597 instructions / 25444 cycles** from a **3468-byte** HUNK with **1794
+bytes of code**, **4 bytes of ROM rodata**, and **14 reachable methods**; one
+bounded validation loop is present, with no relocations, framework features, or
+managed allocations. MC68020/MC68040 closures are **3584/3512** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1134 migrates the fixed application config-window state sidecar record to a
+dedicated named struct codec. Numeric guest positions remain inside
+`MuiApplicationConfigWindowStateRecordMemoryCodec`; the legacy field cursor
+remains only for compatibility and malformed-state diagnostics. Class-id
+pointer/string validation remains in admission. Host coverage is
+**2025/2025**. The focused MC68000 closure
+`ApplicationConfigWindowStateRecordCodecRoot` returns **42** after **1842
+instructions / 18110 cycles** from a **3212-byte** HUNK with **1590 bytes of
+code**, **4 bytes of ROM rodata**, and **14 reachable methods**; one bounded
+validation loop is present, with no relocations, framework features, or
+managed allocations. MC68020/MC68040 closures are **3300/3236** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1133 migrates the fixed application object-state sidecar record to a
+dedicated named struct codec. Numeric guest positions remain inside
+`MuiApplicationObjectStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. DiskObject and MUI
+object capability validation remains in admission. Host coverage is
+**2024/2024**. The focused MC68000 closure
+`ApplicationObjectStateRecordCodecRoot` returns **42** after **1390 instructions /
+13684 cycles** from a **2692-byte** HUNK with **1426 bytes of code**, **4 bytes
+of ROM rodata**, and **11 reachable methods**; no loops, relocations, framework
+features, or managed allocations are present. MC68020/MC68040 closures are
+**2712/2716** bytes. The overall MorphOS MUI goal remains open.
+
+MG1132 migrates the fixed application text-state sidecar record to a dedicated
+named struct codec. Numeric guest positions remain inside
+`MuiApplicationTextStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Guest string pointers
+remain opaque to the codec; bounded validation stays in admission. Host
+coverage is **2023/2023**. The focused MC68000 closure
+`ApplicationTextStateRecordCodecRoot` returns **42** after **2056 instructions /
+18842 cycles** from a **3200-byte** HUNK with **1576 bytes of code**, **4 bytes
+of ROM rodata**, and **15 reachable methods**; one bounded string validation
+loop is present, with no relocations, framework features, or managed
+allocations. MC68020/MC68040 closures are **3284/3212** bytes. The overall
+MorphOS MUI goal remains open.
+
+MG1131 migrates the fixed application-window relationship sidecar record to a
+dedicated named struct codec. Numeric guest positions remain inside
+`MuiApplicationWindowRelationshipStateRecordMemoryCodec`; the legacy field
+cursor remains only for compatibility and malformed-state diagnostics. Direct
+child/live-window topology remains in admission. Host coverage is **2022/2022**.
+The focused MC68000 closure
+`ApplicationWindowRelationshipStateRecordCodecRoot` returns **42** after
+**1061 instructions / 10544 cycles** from a **2608-byte** HUNK with **1258
+bytes of code**, **4 bytes of ROM rodata**, and **11 reachable methods**; no
+loops, relocations, framework features, or managed allocations are present.
+MC68020/MC68040 closures are **2612/2616** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1130 migrates the fixed application BuildSettingsPanel result sidecar record
+to a dedicated named struct codec. Numeric guest positions remain inside
+`MuiApplicationSettingsPanelStateRecordMemoryCodec`; the legacy field cursor
+remains only for compatibility and malformed-state diagnostics. The returned
+panel pointer is not interpreted by the codec and is checked by admission. Host
+coverage is **2021/2021**. The focused MC68000 closure
+`ApplicationSettingsPanelStateRecordCodecRoot` returns **42** after **1311
+instructions / 12964 cycles** from a **2652-byte** HUNK with **1340 bytes of
+code**, **4 bytes of ROM rodata**, and **11 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2672/2676** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1129 migrates the fixed application SetConfigItem sidecar record to a
+dedicated named struct codec. Numeric guest positions remain inside
+`MuiApplicationSetConfigItemStateRecordMemoryCodec`; the legacy field cursor
+remains only for compatibility and malformed-state diagnostics. The opaque
+data pointer is not interpreted by the codec and is checked by admission. Host
+coverage is **2020/2020**. The focused MC68000 closure
+`ApplicationSetConfigItemStateRecordCodecRoot` returns **42** after **1311
+instructions / 12964 cycles** from a **2652-byte** HUNK with **1340 bytes of
+code**, **4 bytes of ROM rodata**, and **11 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2672/2676** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1128 migrates the fixed application AppMessage-routing sidecar record to a
+dedicated named struct codec. Numeric guest positions remain inside
+`MuiApplicationMessageRoutingStateRecordMemoryCodec`; the legacy field cursor
+remains only for compatibility and malformed-state diagnostics. Host coverage
+is **2019/2019**. The focused MC68000 closure
+`ApplicationMessageRoutingStateRecordCodecRoot` returns **42** after **1030
+instructions / 10224 cycles** from an **8020-byte** HUNK with **4512 bytes of
+code**, **4 bytes of ROM rodata**, and **30 reachable methods**; two bounded
+validation loops are present, with no relocations, framework features, or
+managed allocations. MC68020/MC68040 closures are **8244/8128** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1127 migrates the fixed application `DefaultConfigItem` result sidecar record
+to a dedicated named struct codec. Numeric guest positions remain inside
+`MuiApplicationDefaultConfigStateRecordMemoryCodec`; the legacy field cursor
+remains only for compatibility and malformed-state diagnostics. Host coverage
+is **2018/2018**. The focused MC68000 closure
+`ApplicationDefaultConfigStateRecordCodecRoot` returns **42** after **1265
+instructions / 12518 cycles** from a **2532-byte** HUNK with **1276 bytes of
+code**, **4 bytes of ROM rodata**, and **11 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2552/2556** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1126 migrates the fixed application initializer-policy sidecar record to a
+dedicated named struct codec. Numeric guest positions remain inside
+`MuiApplicationPolicyStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Host coverage is
+**2017/2017**. The focused MC68000 closure
+`ApplicationPolicyStateRecordCodecRoot` returns **42** after **1278
+instructions / 12616 cycles** from a **2516-byte** HUNK with **1308 bytes of
+code**, **4 bytes of ROM rodata**, and **11 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2540/2544** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1125 migrates the fixed application menu-action/help state sidecar record to
+a dedicated named struct codec. Numeric guest positions remain inside
+`MuiApplicationMenuStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Host coverage is
+**2016/2016**. The focused MC68000 closure
+`ApplicationMenuStateRecordCodecRoot` returns **42** after **1015
+instructions / 10098 cycles** from a **2392-byte** HUNK with **1196 bytes of
+code**, **4 bytes of ROM rodata**, and **11 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2400/2404** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1124 migrates the fixed CheckRefresh telemetry sidecar record to a dedicated
+named struct codec. Numeric guest positions remain inside
+`MuiApplicationRefreshStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Host coverage is
+**2015/2015**. The focused MC68000 closure
+`ApplicationRefreshStateRecordCodecRoot` returns **42** after **1015
+instructions / 10090 cycles** from a **2400-byte** HUNK with **1192 bytes of
+code**, **4 bytes of ROM rodata**, and **11 reachable methods**; no loops,
+relocations, framework features, or managed allocations are present. MC68020/
+MC68040 closures are **2408/2412** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1123 migrates the fixed application command-state sidecar record to a
+dedicated named struct codec. Numeric guest positions remain inside
+`MuiApplicationCommandsStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Host coverage is
+**2014/2014**. The focused MC68000 closure
+`ApplicationCommandsStateRecordCodecRoot` returns **42** after **777
+instructions / 7830 cycles** from a **4276-byte** HUNK with **2158 bytes of
+code**, **4 bytes of ROM rodata**, and **18 reachable methods**; two bounded
+validation loops are present, with no relocations, framework features, or
+managed allocations. MC68020/MC68040 closures are **4360/4284** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1122 migrates the fixed application AboutMUI/ShowHelp sidecar record to a
+dedicated named struct codec. Numeric guest positions remain inside
+`MuiApplicationHelpStateRecordMemoryCodec`; the legacy field cursor remains
+only for compatibility and malformed-state diagnostics. Host coverage is
+**2013/2013**. The focused MC68000 closure
+`ApplicationHelpStateRecordCodecRoot` returns **42** after **2307 instructions /
+22634 cycles** from a **3232-byte** HUNK with **1802 bytes of code**, **4 bytes
+of ROM rodata**, and **13 reachable methods**; one bounded string-validation
+loop is present, with no relocations, framework features, or managed
+allocations. MC68020/MC68040 closures are **3388/3304** bytes. The overall
+MorphOS MUI goal remains open.
+
+MG1121 migrates fixed MorphOS `MUI_Command` records used by
+`MUIA_Application_Commands` to a dedicated named struct codec. Numeric guest
+positions remain inside `MuiApplicationCommandRecordMemoryCodec`; the table
+cursor is retained only for bounded NULL-terminated array traversal and
+compatibility coverage. Host coverage is **2012/2012**. The focused MC68000
+closure `ApplicationCommandRecordCodecRoot` returns **42** after **2521
+instructions / 24454 cycles** from a **2720-byte** HUNK with **1616 bytes of
+code** and **10 reachable methods**; MC68020/MC68040 closures are
+**2804/2808** bytes. The overall MorphOS MUI goal remains open.
+
+MG1120 migrates common-control fixed method, numeric, input, attribute, Get,
+and AskMinMax records to dedicated named struct codecs. Layout, Draw, and
+Setup reuse named layout codecs; the legacy common field cursor remains only
+for compatibility coverage. Host coverage is **2011/2011**. The focused
+MC68000 closure returns **42** after **629 instructions / 6204 cycles** from a
+**1692-byte** HUNK with **880 bytes of code** and **8 reachable methods**;
+MC68020/MC68040 closures are **1684/1688** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1119 completes the fixed Listtree.mcc packet migration: SetDropMark and
+TestPos now use dedicated fixed-width codecs for named records, including the
+mixed TestPos result field. Numeric guest positions remain inside the ABI
+adapter; the legacy Listtree cursor remains only in compatibility coverage,
+while Intuition input uses a separate typed decoder. Host coverage is
+**2010/2010**. `ListtreeDropMarkTestPosPacketCodecRoot`
+returns **42** on MC68000 after **1310 instructions / 13134 cycles** from a
+**2260-byte** HUNK with **1190 bytes of code**, **4 bytes of ROM rodata**,
+**10 reachable methods**, and zero loops, relocations, framework features, or
+managed allocations. The overall MorphOS MUI goal remains open.
+
+MG1118 extends the Listtree.mcc packet migration to Move/Exchange, Rename,
+and FindName records. Production wrappers use dedicated fixed-width codecs for
+named structs; numeric guest positions remain inside the ABI adapter, with
+the compatibility cursor limited to remaining operation envelopes. Host
+coverage is **2010/2010**. `ListtreeLookupMutationPacketCodecRoot` returns
+**42** on MC68000 after **1831 instructions / 18256 cycles** from a
+**2420-byte** HUNK with **1338 bytes of code**, **4 bytes of ROM rodata**,
+**10 reachable methods**, and zero loops, relocations, framework features, or
+managed allocations. The overall MorphOS MUI goal remains open.
+
+MG1117 extends the Listtree.mcc packet migration to Sort and GetNr
+query/order records. Production wrappers use dedicated fixed-width codecs for
+named structs; numeric guest positions remain inside the ABI adapter, with
+the compatibility cursor limited to remaining operation envelopes. Host
+coverage is **2010/2010**. `ListtreeOrderingPacketCodecRoot` returns **42** on
+MC68000 after **1046 instructions / 10530 cycles** from a **2172-byte** HUNK
+with **1110 bytes of code**, **4 bytes of ROM rodata**, **10 reachable
+methods**, and zero loops, relocations, framework features, or managed
+allocations. The overall MorphOS MUI goal remains open.
+
+MG1116 extends the Listtree.mcc packet migration to Insert, Remove, and
+OpenClose mutation records. Production wrappers use dedicated fixed-width
+codecs for named structs; numeric guest positions remain inside the ABI
+adapter, with the compatibility cursor limited to remaining operation
+envelopes. Host coverage is **2010/2010**. `ListtreeMutationPacketCodecRoot`
+returns **42** on MC68000 after **1831 instructions / 18256 cycles** from a
+**2404-byte** HUNK with **1338 bytes of code**, **4 bytes of ROM rodata**,
+**10 reachable methods**, and zero loops, relocations, framework features, or
+managed allocations. The overall MorphOS MUI goal remains open.
+
+MG1115 moves the Listtree.mcc method, Set, Get, and GetEntry packets through
+dedicated fixed-width codecs for named MorphOS records. Numeric guest
+positions remain confined to the packet ABI adapter, and the compatibility
+cursor remains only for the Listtree operation envelopes not yet migrated.
+Host coverage is **2010/2010**. `ListtreeMessageCodecRoot` returns **42** on
+MC68000 after **1048 instructions / 10542 cycles** from a **2420-byte** HUNK
+with **1246 bytes of code**, **4 bytes of ROM rodata**, **11 reachable
+methods**, and zero loops, relocations, framework features, or managed
+allocations. The overall MorphOS MUI goal remains open.
+
+MG1114 routes Dirlist/Volumelist method, Set, rename/comment, protection, and
+GetEntry packets through dedicated fixed-width codecs for their named structs.
+Production dispatch no longer uses the shared packet/field selector; numeric
+guest positions remain confined to the packet ABI adapter. Host coverage is
+**2009/2009**, and `DirlistMessageCodecRoot` returns **42** on MC68000 after
+**1050 instructions / 10544 cycles** from a **2176-byte** HUNK with **1128
+bytes of code**, **4 bytes of ROM rodata**, **10 reachable methods**, no loops,
+and zero relocations, framework features, or managed allocations. MC68020 and
+MC68040 closures are **2184/2184** and **2188/2188** bytes. The overall
+MorphOS MUI goal remains open.
+
+MG1113 gives List title-array state a dedicated named fixed-width struct codec
+for owned pointer-table metadata. Structural reads preserve malformed cookies,
+table pointers, and counts while strict admission retains MorphOS cookie and
+bounded-table validation. Combined admission coverage passes **48/48**, the
+complete host suite passes **2008/2008**, and the freestanding closure returns
+**42** on MC68000 after **3176 instructions / 32498 cycles** from a
+**3372-byte** HUNK with **1772 bytes of code**, **4 bytes of ROM rodata**,
+**16 reachable methods**, no loops, and zero relocations; framework features
+and managed allocations remain zero. MC68020 and MC68040 closure builds
+succeed at **3372/3372** and **3376/3376** bytes with **1772/1774 bytes of code**.
+
+MG1112 gives List column-order state a dedicated named fixed-width struct codec
+for owned BYTE-permutation metadata. Structural reads preserve malformed
+cookies, counts, pointers, and reserved byte lengths while strict admission
+retains MorphOS cookie, bounded-vector, and storage checks. Combined admission
+coverage passes **46/46**, the complete host suite passes **2006/2006**, and the
+freestanding closure returns **42** on MC68000 after **3896 instructions /
+39940 cycles** from a **3148-byte** HUNK with **1732 bytes of code**, **4 bytes
+of ROM rodata**, **15 reachable methods**, no loops, and zero relocations;
+framework features and managed allocations remain zero. MC68020 and MC68040
+closure builds succeed at **3164/3164** bytes with **1748/1748 bytes of code**.
+
+MG1111 gives List column-visibility state a dedicated named fixed-width struct
+codec for its bounded eight-word mask. Structural reads preserve malformed
+cookies and mask words while strict admission retains the MorphOS cookie
+contract. Combined admission coverage passes **44/44**, the complete host suite
+passes **2004/2004**, and the freestanding closure returns **42** on MC68000
+after **7772 instructions / 79588 cycles** from a **3292-byte** HUNK with
+**1916 bytes of code**, **40 bytes of ROM rodata**, **13 reachable methods**, no
+loops, and **9 internal relocations**; framework features and managed
+allocations remain zero. MC68020 and MC68040 closure builds succeed at
+**3376/3376** bytes with **1998/1998 bytes of code** and **9 internal
+relocations**.
+
+MG1110 gives List presentation-policy state a dedicated named fixed-width
+struct codec for BOOL, enum, and line-height fields. Structural reads preserve
+malformed cookies and policy values while strict admission retains MorphOS
+cookie, policy, and line-height validation. Combined admission coverage passes
+**42/42**, the complete host suite passes **2002/2002**, and the freestanding
+closure returns **42** on MC68000 after **10166 instructions / 104202 cycles**
+from a **3556-byte** HUNK with **2154 bytes of code**, **52 bytes of ROM rodata**,
+**13 reachable methods**, no loops, and **12 internal relocations**; framework
+features and managed allocations remain zero. MC68020 and MC68040 closure
+builds succeed at **3672/3672** bytes with **2270/2270 bytes of code** and
+**12 internal relocations**.
+
+MG1109 gives List hook-policy and sort-state records dedicated named
+fixed-width struct codecs. Structural reads preserve malformed cookies, hook
+pointers, selected columns, and title-click fields while strict admission
+retains MorphOS cookie and bounded-column validation. Combined admission
+coverage passes **40/40**, the complete host suite passes **2000/2000**, and
+the freestanding closure returns **42** on MC68000 after **8034 instructions /
+82374 cycles** from a **4692-byte** HUNK with **2626 bytes of code**, **4 bytes
+of ROM rodata**, **21 reachable methods**, no loops, and zero relocations;
+framework features and managed allocations remain zero. MC68020 and MC68040
+closure builds succeed at **4756/4756** bytes with **2692/2692 bytes of code**.
+
+MG1108 gives List interaction-policy and click-state records dedicated named
+fixed-width struct codecs. Structural reads preserve malformed cookies and
+BOOL/enum/column/counter fields while strict admission retains MorphOS cookie
+and consumer validation. Combined admission coverage passes **38/38**, the
+complete host suite passes **1998/1998**, and the freestanding closure returns
+**42** on MC68000 after **8820 instructions / 90402 cycles** from a
+**4848-byte** HUNK with **2704 bytes of code**, **4 bytes of ROM rodata**,
+**21 reachable methods**, no loops, and zero relocations; framework features
+and managed allocations remain zero. MC68020 and MC68040 closure builds
+succeed at **4920/4920** bytes with **2776/2776 bytes of code**.
+
+MG1107 gives List redraw coalescing state a dedicated named fixed-width struct
+codec. Structural reads preserve malformed cookies, dirty flags, and request
+counts while strict admission retains MorphOS cookie and BOOL checks. Combined
+admission coverage passes **36/36**, the complete host suite passes
+**1996/1996**, and the freestanding closure returns **42** on MC68000 after
+**2883 instructions / 29506 cycles** from a **2688-byte** HUNK with **1452
+bytes of code**, **4 bytes of ROM rodata**, **13 reachable methods**, no loops,
+and zero relocations; framework features and managed allocations remain zero.
+MC68020 and MC68040 closure builds succeed at **2692/2692** bytes with
+**1454/1454 bytes of code**.
+
+MG1106 gives published List viewport metrics a dedicated named fixed-width
+struct codec. Structural reads preserve malformed cookies and pixel/row fields
+while strict admission retains MorphOS cookie and line-height checks. Combined
+admission coverage passes **34/34**, the complete host suite passes
+**1994/1994**, and the freestanding closure returns **42** on MC68000 after
+**6988 instructions / 71552 cycles** from a **3184-byte** HUNK with **1882
+bytes of code**, **36 bytes of ROM rodata**, **13 reachable methods**, no loops,
+and **8 internal relocations**; framework features and managed allocations
+remain zero. MC68020 and MC68040 closure builds succeed at **3252/3252** bytes
+with **1950/1950 bytes of code**, **8 internal relocations**, and the same
+zero-runtime profile.
+
+MG1105 gives the published List insertion-result state a dedicated named
+fixed-width struct codec. Structural reads preserve malformed cookies and
+positions while strict admission retains MorphOS cookie and bounded-result
+checks. Combined admission coverage passes **32/32**, the complete host suite
+passes **1992/1992**, and the freestanding closure returns **42** on MC68000
+after **2103 instructions / 21380 cycles** from a **2668-byte** HUNK with
+**1358 bytes of code**, **4 bytes of ROM rodata**, **13 reachable methods**, no
+loops, and zero relocations; framework features and managed allocations remain
+zero. MC68020 and MC68040 closure builds succeed at **2652/2652** bytes with
+**1344/1344 bytes of code**.
+
+MG1104 gives the published List active-cursor state a dedicated named
+fixed-width struct codec. Structural reads preserve malformed cookies and
+presence/row fields while strict admission retains MorphOS cookie and
+row-range checks. Combined admission coverage passes **30/30**, the complete
+host suite passes **1990/1990**, and the freestanding closure returns **42** on
+MC68000 after **2889 instructions / 29560 cycles** from a **2712-byte** HUNK
+with **1476 bytes of code**, **4 bytes of ROM rodata**, **13 reachable
+methods**, no loops, and zero relocations; framework features and managed
+allocations remain zero. MC68020 and MC68040 closure builds succeed at
+**2712/2716** bytes with **1474/1478 bytes of code**.
+
+MG1103 gives List title, selection-signal, FORMAT policy, and font policy
+their own named fixed-width struct codecs. Structural reads preserve malformed
+cookies while strict readers retain the MorphOS cookie and consumer validation
+rules. Combined admission coverage passes **28/28**, the complete host suite
+passes **1988/1988**, and the freestanding closure returns **42** on MC68000
+after **7914 instructions / 80484 cycles** from a **7244-byte** HUNK with
+**3908 bytes of code**, **4 bytes of ROM rodata**, **33 reachable methods**, no
+loops, and zero relocations; framework features and managed allocations remain
+zero. MC68020 and MC68040 closure builds succeed at **7292/7292** bytes with
+**3956/3956 bytes of code**.
+
+MG1102 applies the struct-first admission boundary to shared List FORMAT
+descriptor state and measured-column metrics. Their named fixed-width records
+and bounded vectors preserve all fields while strict admission retains MorphOS
+cookie, range, and mapped-vector checks. Combined admission coverage passes
+**26/26**, the complete host suite passes **1986/1986**, and the freestanding
+closure returns **42** on MC68000 after **8812 instructions / 88016 cycles**
+from a **6716-byte** HUNK with **3922 bytes of code**, **4 bytes of ROM rodata**,
+**27 reachable methods**, no loops, and zero relocations; framework features
+and managed allocations remain zero. MC68020 and MC68040 closure builds
+succeed at **6860/6864** bytes with **4068/4070 bytes of code**.
+
+MG1101 applies the struct-first admission boundary to shared List column-layout
+state and its bounded geometry vector. The named owner record and
+`{offset,width}` entries preserve all fields while strict admission retains
+MorphOS cookie, range, width, and mapped-vector checks. Combined admission
+coverage passes **24/24**, the complete host suite passes **1984/1984**, and
+the freestanding closure returns **42** on MC68000 after **4242 instructions /
+43624 cycles** from a **4252-byte** HUNK with **2474 bytes of code**, **4 bytes
+of ROM rodata**, **18 reachable methods**, no loops, and zero relocations;
+framework features and managed allocations remain zero. MC68020 and MC68040
+closure builds succeed at **4284/4284** bytes with **2508/2508 bytes of code**.
+
+MG1100 applies the struct-first admission boundary to shared List header and
+edit-state records. Their named fixed-width storage preserves capacity/count,
+index/image ownership, signed edit coordinates, and flags; malformed cookies
+remain structurally readable while strict codecs retain MorphOS/List
+validation. Combined admission coverage passes **22/22**, the complete host
+suite passes **1982/1982**, and the freestanding closure returns **42** on
+MC68000 after **7909 instructions / 81580 cycles** from a **4968-byte** HUNK
+with **2942 bytes of code**, **4 bytes of ROM rodata**, **20 reachable
+methods**, no loops, and zero relocations; framework features and managed
+allocations remain zero. MC68020 and MC68040 closure builds succeed at
+**5052/5052** bytes with **3026/3026 bytes of code**.
+
+MG1099 applies the struct-first admission boundary to shared List owner
+linkage, horizontal-scroller policy, and image-chain state. Their named
+fixed-width records preserve owner pointers, scroll policy/metrics, image
+links, and flags; malformed cookies remain structurally readable while strict
+codecs retain MorphOS validation. Combined admission coverage passes **20/20**,
+the complete host suite passes **1980/1980**, and the freestanding closure
+returns **42** on MC68000 after **9644 instructions / 98718 cycles** from a
+**6688-byte** HUNK with **3756 bytes of code**, **4 bytes of ROM rodata**, **26
+reachable methods**, no loops, and zero relocations; framework features and
+managed allocations remain zero. MC68020 and MC68040 closure builds succeed at
+**6784/6788** bytes with **3852/3854 bytes of code**.
+
+MG1098 applies the struct-first admission boundary to Floattext policy state.
+Its named fixed-width record preserves owned text pointers, tab size,
+justification, and wrap width; malformed cookies remain structurally readable
+while the strict codec retains MorphOS validation. Combined admission coverage
+passes **18/18**, the complete host suite passes **1978/1978**, and the
+freestanding closure returns **42** on MC68000 after **4374 instructions /
+45200 cycles** from a **3264-byte** HUNK with **1912 bytes of code**, **4 bytes
+of ROM rodata**, **13 reachable methods**, no loops, and zero relocations;
+framework features and managed allocations remain zero. MC68020 and MC68040
+closure builds succeed at **3296/3300** bytes with **1944/1946 bytes of code**.
+
+MG1097 applies the struct-first admission boundary to Listview drag-sort state.
+Its named fixed-width record preserves source/target rows, signed pointer
+coordinates, and transition flags; malformed cookies remain structurally
+readable while the strict codec retains MorphOS validation. Combined admission
+coverage passes **16/16**, the complete host suite passes **1976/1976**, and
+the freestanding closure returns **42** on MC68000 after **9684 instructions /
+102320 cycles** from a **4196-byte** HUNK with **2750 bytes of code**, **36
+bytes of ROM rodata**, **13 reachable methods**, no loops, and **8 generated
+switch-edge relocations**; framework features and managed allocations remain
+zero. MC68020 and MC68040 closure builds succeed at **4248/4284** bytes with
+**2802/2838 bytes of code**.
+
+MG1096 applies the struct-first admission boundary to Listview horizontal-
+scroller and horizontal/vertical drag state. Their named fixed-width records
+preserve track/thumb geometry, content widths, scroll positions, and signed
+pointer-grab fields; malformed cookies remain structurally readable while
+strict codecs retain MorphOS validation. Combined admission coverage passes
+**14/14**, the complete host suite passes **1974/1974**, and the freestanding
+closure returns **42** on MC68000 after **18178 instructions / 184682 cycles**
+from an **8724-byte** HUNK with **4558 bytes of code**, **56 bytes of ROM
+rodata**, **32 reachable methods**, no loops, and **13 generated switch-edge
+relocations**; framework features and managed allocations remain zero. MC68020
+and MC68040 closure builds succeed at **8924/8944** bytes with **4760/4778
+bytes of code**.
+
+MG1095 applies the struct-first admission boundary to Listview render,
+external-scroller connection, and vertical-scroller state. Their named
+fixed-width records preserve render pointers, external Prop ownership, and
+bounded row ranges; malformed cookies remain structurally readable for
+diagnostics while strict codecs retain MorphOS validation. Combined admission
+coverage passes **12/12**, the complete host suite passes **1972/1972**, and the
+freestanding closure returns **42** on MC68000 after **8014 instructions /
+80838 cycles** from a **6180-byte** HUNK with **3434 bytes of code**, **4 bytes
+of ROM rodata**, **26 reachable methods**, no loops, and zero relocations;
+framework features and managed allocations remain zero. MC68020 and MC68040
+closure builds succeed at **6224/6236** bytes with **3478/3492 bytes of code**.
+
+MG1094 applies the struct-first admission boundary to Listview child, click,
+interaction-policy, selection-signal, and layout state. Their named fixed-width
+records preserve child ownership, click publication, policy fields, edge
+signals, and signed geometry; malformed cookies remain structurally readable for
+diagnostics while strict codecs retain MorphOS validation. Combined admission
+coverage passes **10/10**, the complete host suite passes **1970/1970**, and the
+freestanding closure returns **42** on MC68000 after **18815 instructions /
+189812 cycles** from a **10560-byte** HUNK with **5990 bytes of code**, **40 bytes
+of ROM rodata**, **43 reachable methods**, no loops, and **9 generated switch-
+edge relocations**; framework features and managed allocations remain zero.
+MC68020 and MC68040 closure builds succeed at **10736/10772** bytes with
+**6168/6202 bytes of code**.
+
+MG1093 applies the struct-first admission boundary to Listtree node and
+display-snapshot state. Their named fixed-width records preserve topology,
+ownership, public-prefix, draw-vector, and display fields; malformed cookies
+remain structurally readable for diagnostics while strict codecs retain MorphOS
+validation. Combined admission coverage passes **8/8**, the complete host suite
+passes **1968/1968**, and the freestanding closure returns **42** on MC68000
+after **16447 instructions / 172466 cycles** from a **6608-byte** HUNK with
+**4344 bytes of code**, **4 bytes of ROM rodata**, **23 reachable methods**, no
+loops, and zero relocations; framework features and managed allocations remain
+zero. MC68020 and MC68040 closure builds succeed at **6828/6836** bytes with
+**4564/4572 bytes of code**.
+
+MG1092 applies the struct-first admission boundary to Listtree header and
+presentation state. Their named fixed-width records preserve topology counters,
+drop-entry state, presentation pointers, and canonical flags; malformed cookies
+remain structurally readable for diagnostics while strict codecs retain MorphOS
+validation. Combined admission coverage passes **6/6**, the complete host suite
+passes **1966/1966**, and the freestanding closure returns **42** on MC68000
+after **13131 instructions / 135126 cycles** from a **5676-byte** HUNK with
+**3560 bytes of code**, **52 bytes of ROM rodata**, **19 reachable methods**, no
+loops, and **12 generated switch-edge relocations**; framework features and
+managed allocations remain zero. MC68020 and MC68040 closure builds succeed at
+**5860/5864** bytes with **3744/3746 bytes of code**.
+
+MG1091 applies the struct-first admission boundary to Listtree click-column,
+surface, and lifecycle state. Their named fixed-width records preserve column
+validity, signed geometry, render pointers, and lifecycle flags; malformed
+cookies remain structurally readable for diagnostics while strict codecs retain
+MorphOS validation. Combined admission coverage passes **4/4**, the complete
+host suite passes **1964/1964**, and the freestanding closure returns **42** on
+MC68000 after **10298 instructions / 105690 cycles** from a **6532-byte** HUNK
+with **3848 bytes of code**, **4 bytes of ROM rodata**, **26 reachable methods**,
+no loops, and zero relocations; framework features and managed allocations
+remain zero. MC68020 and MC68040 closure builds succeed at **6628/6640** bytes
+with **3942/3954 bytes of code**.
+
+MG1090 applies the struct-first admission boundary to Listtree policy,
+hook-pool, and click state. Their named fixed-width records preserve policy
+fields, pool ownership, pointers, timestamps, and click flags; malformed
+cookies remain structurally readable for diagnostics while strict codecs retain
+MorphOS validation. Combined admission coverage passes **2/2**, the complete
+host suite passes **1962/1962**, and the freestanding closure returns **42** on
+MC68000 after **17713 instructions / 180838 cycles** from a **7324-byte** HUNK
+with **4666 bytes of code**, **4 bytes of ROM rodata**, **26 reachable methods**,
+no loops, and zero relocations; framework features and managed allocations
+remain zero. MC68020 and MC68040 closure builds succeed at **7572/7584** bytes
+with **4916/4928 bytes of code**.
+
+MG1089 applies the struct-first admission boundary to Stringscroll layout,
+render, and viewport state. Their named fixed-width records preserve signed
+geometry, render pointers, visibility, and scroll limits; malformed cookies
+remain structurally readable for diagnostics while strict codecs retain the
+existing cookie gate. Combined admission coverage passes **2/2**, the complete
+host suite passes **1960/1960**, and the freestanding closure returns **42** on
+MC68000 after **11789 instructions / 121152 cycles** from a **7840-byte** HUNK
+with **4078 bytes of code**, **4 bytes of ROM rodata**, **30 reachable methods**,
+no loops, and zero relocations; framework features and managed allocations
+remain zero. MC68020 and MC68040 closure builds succeed at **7976/7976** bytes
+with **4216/4216 bytes of code**.
+
+MG1088 applies the struct-first admission boundary to Stringscroll content,
+policy, scrollbar, and composition state. Their named fixed-width records
+preserve metrics, policy fields, pointers, and composition cursors; malformed
+cookies remain structurally readable for diagnostics while strict codecs retain
+the existing cookie gate. Combined admission coverage passes **2/2**, the
+complete host suite passes **1958/1958**, and the freestanding closure returns
+**42** on MC68000 after **16365 instructions / 167958 cycles** from a
+**9232-byte** HUNK with **5202 bytes of code**, **36 bytes of ROM rodata**,
+**33 reachable methods**, no loops, and **8 generated switch-edge relocations**;
+framework features and managed allocations remain zero. MC68020 and MC68040
+closure builds succeed at **9436/9436** bytes with **5406/5406 bytes of code**.
+
+MG1087 applies the struct-first admission boundary to the Misc specialist
+common header. Its named fixed-width record preserves class, flags, and
+notification fields; malformed cookies remain structurally readable for
+diagnostics while strict reads fail closed before class-owned regions are
+consumed. Combined admission coverage passes **2/2**, the complete host suite
+passes **1956/1956**, and the freestanding closure returns **42** on MC68000
+after **13616 instructions / 144354 cycles** from a **9588-byte** HUNK with
+**6186 bytes of code**, **68 bytes of ROM rodata**, **32 reachable methods**,
+**1 bounded loop**, and **16 generated switch-edge relocations**; framework
+features and managed allocations remain zero. MC68020 and MC68040 closure
+builds succeed at **9636/9608** bytes with **6234/6206 bytes of code**.
+
+MG1086 applies the struct-first admission boundary to Pop* specialist state.
+Its named fixed-width family record preserves class, flags, owned blocks, and
+class-specific topology; malformed cookies remain structurally readable for
+diagnostics while strict reads fail closed. Combined admission coverage passes
+**2/2**, the complete host suite passes **1954/1954**, and the freestanding
+closure returns **42** on MC68000 after **18297 instructions / 193214 cycles**
+from a **6196-byte** HUNK with **4656 bytes of code**, **4 bytes of ROM rodata**,
+**14 reachable methods**, no loops, and zero relocations; framework features and
+managed allocations remain zero. MC68020 and MC68040 closure builds succeed at
+**6532/6548** bytes with **4992/5008 bytes of code**.
+
+MG1085 applies the struct-first admission boundary to the Menu specialist
+sidecar. Its named fixed-width record preserves class, flags, owned strings,
+and reserved fields; malformed cookies remain structurally readable for
+diagnostics while strict reads fail closed. Combined admission coverage passes
+**2/2**, the complete host suite passes **1952/1952**, and the freestanding
+closure returns **42** on MC68000 after **9613 instructions / 98546 cycles**
+from a **4624-byte** HUNK with **2874 bytes of code**, **56 bytes of ROM rodata**,
+**16 reachable methods**, **1 bounded loop**, and **13 generated switch-edge
+relocations**; framework features and managed allocations remain zero. MC68020
+and MC68040 closure builds succeed at **4864/4756** bytes with **3114/3006 bytes
+of code**.
+
+MG1084 applies the struct-first admission boundary to Virtgroup layout,
+Scrollgroup layout, Virtgroup display, Virtgroup pointer, and Virtgroup policy
+state. Their named fixed-width records preserve geometry, mapped pointers, and
+canonical BOOL fields; malformed cookies remain structurally readable for
+diagnostics while strict codecs fail closed. Combined admission coverage passes
+**2/2**, the complete host suite passes **1950/1950**, and the freestanding
+closure returns **42** on MC68000 after **27169 instructions / 286868 cycles**
+from a **13536-byte** HUNK with **8294 bytes of code**, **52 bytes of ROM
+rodata**, **46 reachable methods**, no loops, and **12 generated switch-edge
+relocations**; framework features and managed allocations remain zero. MC68020
+and MC68040 closure builds succeed at **13856/13868** bytes with **8616/8628
+bytes of code**.
+
+MG1083 applies the struct-first admission boundary to Color specialist state.
+Its named fixed-width record preserves class, flags, pointers, and
+class-specific blocks; malformed cookies remain structurally readable for
+diagnostics while strict reads and admission fail closed. Combined admission
+coverage passes **2/2**, the complete host suite passes **1948/1948**, and the
+freestanding closure returns **42** on MC68000 after **13709 instructions /
+144670 cycles** from a **5848-byte** HUNK with **4078 bytes of code**, **100
+bytes of ROM rodata**, **21 reachable methods**, no loops, and **24 generated
+switch-edge relocations**; framework features and managed allocations remain
+zero. MC68020 and MC68040 closure builds succeed at **5980/6024** bytes with
+**4212/4256 bytes of code**.
+
+MG1082 applies the struct-first admission boundary to Dirlist sort, filter, and
+scan state. Their named fixed-width records preserve selector, BOOL, status,
+and counter bounds; malformed cookies remain structurally readable for
+diagnostics while strict codecs and writers fail closed. Combined admission
+coverage passes **2/2**, the complete host suite passes **1946/1946**, and the
+freestanding closure returns **42** on MC68000 after **19094 instructions /
+200796 cycles** from a **7432-byte** HUNK with **5076 bytes of code**, **96 bytes
+of ROM rodata**, **21 reachable methods**, no loops, and **23 generated
+switch-edge relocations**; framework features and managed allocations remain
+zero. MC68020 and MC68040 closure builds succeed at **7596/7640** bytes with
+**5240/5282 bytes of code**.
+
+MG1081 applies the struct-first admission boundary to Sleep counter and
+Volumelist example-mode state. Their named fixed-width records preserve
+depth/request equality and canonical BOOL fields; malformed cookies remain
+structurally readable for diagnostics while strict codecs fail closed. Combined
+admission coverage passes **2/2**, the complete host suite passes **1944/1944**,
+and the freestanding closure returns **42** on MC68000 after **4896
+instructions / 50498 cycles** from a **4660-byte** HUNK with **2560 bytes of
+code**, **4 bytes of ROM rodata**, **21 reachable methods**, no loops, and zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds succeed at **4680/4684** bytes with **2578/2582 bytes of code**.
+
+MG1080 applies the struct-first admission boundary to Slider presentation and
+Scale orientation state. Their named fixed-width records preserve canonical
+orientation and quiet-display BOOLs; malformed cookies remain structurally
+readable for diagnostics while strict codecs fail closed. Combined admission
+coverage passes **2/2**, the complete host suite passes **1942/1942**, and the
+freestanding closure returns **42** on MC68000 after **4376 instructions /
+44700 cycles** from a **4908-byte** HUNK with **2518 bytes of code**, **4 bytes
+of ROM rodata**, **21 reachable methods**, no loops, and zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure
+builds succeed at **4928/4936** bytes with **2538/2546 bytes of code**.
+
+MG1079 applies the struct-first admission boundary to Selectgroup active state,
+Scrollgroup policy, and Scrollgroup viewport state. Their named fixed-width
+records preserve active-index, mapped-pointer, canonical BOOL, and signed
+geometry/range fields; malformed cookies remain structurally readable for
+diagnostics while strict codecs fail closed. Combined admission coverage passes
+**2/2**, the complete host suite passes **1940/1940**, and the freestanding
+closure returns **42** on MC68000 after **17278 instructions / 181750 cycles**
+from a **9388-byte** HUNK with **5548 bytes of code**, **4 bytes of ROM rodata**,
+**33 reachable methods**, no loops, and zero relocations, framework features,
+and managed allocations. MC68020 and MC68040 closure builds succeed at
+**9648/9648** bytes with **5808/5808 bytes of code**.
+
+MG1078 applies the struct-first admission boundary to Rectangle decorative-bar
+and Scrollbar group-geometry state. Their named fixed-width records preserve
+canonical BOOL and scrollbar-type fields; malformed cookies remain
+structurally readable for diagnostics while strict codecs fail closed. Combined
+admission coverage passes **2/2**, the complete host suite passes **1938/1938**,
+and the freestanding closure returns **42** on MC68000 after **5156
+instructions / 53184 cycles** from a **5364-byte** HUNK with **2808 bytes of
+code**, **4 bytes of ROM rodata**, **23 reachable methods**, no loops, and zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds succeed at **5376/5388** bytes with **2820/2832 bytes of code**.
+
+MG1077 applies the struct-first admission boundary to Prop/Scrollbar policy and
+range state. Their named fixed-width records preserve policy BOOL/domain rules
+and signed LONG range bounds; malformed cookies remain structurally readable
+for diagnostics while strict codecs fail closed. Combined admission coverage
+passes **2/2**, the complete host suite passes **1936/1936**, and the
+freestanding closure returns **42** on MC68000 after **7213 instructions /
+74454 cycles** from a **5480-byte** HUNK with **3162 bytes of code**, **4 bytes
+of ROM rodata**, **22 reachable methods**, no loops, and zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure
+builds succeed at **5528/5544** bytes with **3212/3228 bytes of code**.
+
+MG1076 applies the struct-first admission boundary to Group-grid policy and
+shared Numeric range state. Their named fixed-width records preserve
+spacing/axis/BOOL limits and full-width signed numeric fields; malformed
+cookies remain structurally readable for diagnostics while strict codecs fail
+closed. Combined admission coverage passes **2/2**, the complete host suite
+passes **1934/1934**, and the freestanding closure returns **42** on MC68000
+after **11252 instructions / 116482 cycles** from a **6172-byte** HUNK with
+**3722 bytes of code**, **4 bytes of ROM rodata**, **24 reachable methods**, no
+loops, and zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds succeed at **6300/6312** bytes with
+**3850/3862 bytes of code**.
+
+MG1075 applies the struct-first admission boundary to Gauge progress and
+Levelmeter presentation state. Their named fixed-width records preserve
+full-width progress fields and canonical orientation BOOLs; malformed cookies
+remain structurally readable for diagnostics while strict codecs fail closed.
+Combined admission coverage passes **2/2**, the complete host suite passes
+**1932/1932**, and the freestanding closure returns **42** on MC68000 after
+**5736 instructions / 58790 cycles** from a **5052-byte** HUNK with **2722 bytes
+of code**, **4 bytes of ROM rodata**, **21 reachable methods**, no loops, and
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds succeed at **5080/5096** bytes with **2752/2766 bytes of
+code**.
+
+MG1074 applies the struct-first admission boundary to Intuition Gadget
+relationship and interaction state. Their named fixed-width records preserve
+mapped gadget pointers, input mode, and canonical interaction BOOL fields;
+malformed cookies remain structurally readable for diagnostics while strict
+codecs fail closed. Combined admission coverage passes **2/2**, the complete
+host suite passes **1930/1930**, and the freestanding closure returns **42** on
+MC68000 after **5851 instructions / 59920 cycles** from a **5196-byte** HUNK
+with **2808 bytes of code**, **4 bytes of ROM rodata**, **21 reachable methods**,
+no loops, and zero relocations, framework features, or managed allocations.
+MC68020 and MC68040 closure builds succeed at **5224/5236** bytes with
+**2836/2848 bytes of code**.
+
+MG1073 applies the struct-first admission boundary to Choice Active and
+caller-owned Choice Entries state. Their named fixed-width records preserve
+active-index, bounded entry-vector, and cookie fields; malformed cookies remain
+structurally readable for diagnostics while strict codecs fail closed. Combined
+admission coverage passes **2/2**, the complete host suite passes **1928/1928**,
+and the freestanding closure returns **42** on MC68000 after **6518
+instructions / 63634 cycles** from a **6068-byte** HUNK with **3010 bytes of
+code**, **4 bytes of ROM rodata**, **27 reachable methods**, one bounded
+entry-vector loop, and zero relocations, framework features, or managed
+allocations. MC68020 and MC68040 closure builds succeed at **6172/6064** bytes
+with **3114/3008 bytes of code**.
+
+MG1072 applies the struct-first admission boundary to Balance policy, Bitmap
+policy, and renderer-produced Bitmap remapping state. Their named fixed-width
+records preserve cookies, mapped guest pointers, canonical `UseFriend` BOOL,
+and full-width policy fields; malformed cookies remain structurally readable
+for diagnostics while strict codecs fail closed. Combined admission coverage
+passes **2/2**, the complete host suite passes **1926/1926**, and the
+freestanding closure returns **42** on MC68000 after **9088 instructions /
+93252 cycles** from a **7328-byte** HUNK with **3950 bytes of code**, **4 bytes
+of ROM rodata**, **29 reachable methods**, no loops, and zero relocations,
+framework features, or managed allocations. MC68020 and MC68040 closure builds
+succeed at **7384/7400** bytes with **4008/4024 bytes of code**.
+
+MG1071 applies the struct-first admission boundary to shared Area presentation,
+signed Timer, and Timer-event state. Their named fixed-width records preserve
+cookie, BOOL, signed-counter, and generation fields; malformed cookies remain
+structurally readable for diagnostics while strict codecs fail closed. Combined
+admission coverage passes **2/2**, the complete host suite passes **1924/1924**,
+and the freestanding closure returns **42** on MC68000 after **11438
+instructions / 119454 cycles** from a **7836-byte** HUNK with **4560 bytes of
+code**, **4 bytes of ROM rodata**, **30 reachable methods**, no loops, and zero
+relocations, framework features, or managed allocations. MC68020 and MC68040
+closure builds succeed at **7952/7964** bytes with **4676/4686 bytes of code**.
+
+MG1070 applies the struct-first admission boundary to Area `DoubleBuffer`,
+`Floating`, and `Weight` state. Their named fixed-width records preserve
+canonical BOOL, full ULONG, and generation fields; malformed cookies remain
+structurally readable for diagnostics while strict codecs fail closed.
+Combined admission coverage passes **2/2**, the complete host suite passes
+**1922/1922**, and the freestanding closure returns **42** on MC68000 after
+**6558 instructions / 67800 cycles** from a **6740-byte** HUNK with **3482 bytes
+of code**, **4 bytes of ROM rodata**, **29 reachable methods**, no loops, and
+zero relocations, framework features, or managed allocations. MC68020 and
+MC68040 closure builds succeed at **6784/6788** bytes with **3526/3532 bytes
+of code**.
+
+MG1069 applies the struct-first admission boundary to Area BuiltinFont and
+Font/CustomFont selection state. Their named fixed-width records preserve
+signed selectors, closed choice kinds, source capabilities, presence, and
+generation; malformed cookies remain structurally readable for diagnostics
+while strict codecs fail closed. Combined admission coverage passes **2/2**,
+the complete host suite passes **1920/1920**, and the freestanding closure
+returns **42** on MC68000 after **6565 instructions / 68026 cycles** from a
+**5644-byte** HUNK with **3136 bytes of code**, **4 bytes of ROM rodata**,
+**23 reachable methods**, no loops, and zero relocations, framework features,
+or managed allocations. MC68020 and MC68040 closure builds succeed at
+**5676/5692** bytes with **3166/3182 bytes of code**.
+
+MG1068 applies the struct-first admission boundary to Area `DoubleClick`,
+`ShortHelp`, and `TextColor` state. Their named fixed-width records preserve
+signed, pointer, packed-color, BOOL, and generation fields; malformed cookies
+remain structurally readable for diagnostics while strict codecs fail closed.
+Combined admission coverage passes **2/2**, the complete host suite passes
+**1918/1918**, and the freestanding closure returns **42** on MC68000 after
+**7962 instructions / 82410 cycles** from a **7096-byte** HUNK with **3802 bytes
+of code**, **4 bytes of ROM rodata**, **29 reachable methods**, no loops, and
+zero relocations, framework features, or managed allocations. MC68020 and
+MC68040 closure builds succeed at **7156/7164** bytes with **3862/3870 bytes
+of code**.
+
+MG1067 applies the struct-first admission boundary to Area `ControlChar`,
+`CycleChain`, and `ContextMenu` state. Their named fixed-width records remain
+structurally readable for diagnostics even with malformed cookies, while
+strict codecs retain canonical character/generation rules and fail closed
+before consumers. Combined admission coverage passes **2/2**, the complete
+host suite passes **1916/1916**, and the freestanding closure returns **42** on
+MC68000 after **7818 instructions / 81496 cycles** from a **7128-byte** HUNK
+with **3812 bytes of code**, **4 bytes of ROM rodata**, **29 reachable
+methods**, no loops, and zero relocations, framework features, or managed
+allocations. MC68020 and MC68040 closure builds are both **7196 bytes** with
+**3878 bytes of code**.
+
+MG1066 applies the struct-first admission boundary to Area activation state.
+The named fixed-width record preserves Signature, Active, Flags, and
+Generation; malformed signatures remain available to structural diagnostics,
+while strict admission requires the MorphOS cookie and canonical Active BOOL.
+The focused admission coverage passes **2/2**, the complete host suite passes
+**1914/1914**, and the freestanding admission closure returns **42** on
+MC68000 after **3819 instructions / 39706 cycles** from a **3120-byte** HUNK
+with **1768 bytes of code**, **4 bytes of ROM rodata**, **13 reachable
+methods**, no loops, and zero relocations, framework features, or managed
+allocations. MC68020 and MC68040 closure builds succeed at **3136/3140** bytes
+with **1784/1786 bytes of code**.
+
+MG1065 applies strict admission to repeated Application_Window initializer
+state. The named fixed-width guest struct keeps LastWindow as an explicit guest
+capability with live direct-child validation and AddedCount as a full MorphOS
+ULONG; structural reads remain diagnostic, and malformed present state fails
+closed without repair. Relationship admission coverage passes **2/2**, and the
+complete host suite passes **1912/1912**; the freestanding admission closure
+returns **42** on MC68000 after **3227 instructions / 33538 cycles** from a
+**3284-byte** HUNK with **1716 bytes of code**, **4 bytes of ROM rodata**, zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds also succeed at **3284/3284** bytes with **1716/1716 bytes of
+code**.
+
+MG1064 applies strict admission to Application UsedClasses state. The named
+fixed-width guest struct validates the bounded caller-owned class-name vector
+without a managed mirror; structural reads remain diagnostic, and malformed
+present state fails closed without repair. UsedClasses admission coverage
+passes **2/2**, and the complete host suite passes **1912/1912**; the
+freestanding admission closure returns **42** on MC68000 after **2687
+instructions / 27476 cycles** from a **4644-byte** HUNK with **2238 bytes of
+code**, **4 bytes of ROM rodata**, zero relocations, framework features, and
+managed allocations. MC68020 and MC68040 closure builds also succeed at
+**4712/4616** bytes with **2306/2212 bytes of code**.
+
+MG1063 applies strict admission to Application Save/Load settings state. The
+named fixed-width guest struct enforces canonical operation, preserves Null and
+ENVARC sentinels, and validates other selectors as bounded caller-owned C
+strings; structural reads remain diagnostic, and malformed present state fails
+closed without repair. Persistence admission coverage passes **2/2**, and the
+complete host suite passes **1912/1912**; the freestanding admission closure
+returns **42** on MC68000 after **6224 instructions / 64228 cycles** from a
+**4196-byte** HUNK with **2364 bytes of code**, **4 bytes of ROM rodata**, zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds also succeed at **4320/4232** bytes with **2486/2398 bytes of
+code**.
+
+MG1062 applies strict admission to BuildSettingsPanel result state. The named
+fixed-width guest struct preserves the requested MorphOS ULONG number and
+validates the returned panel capability as mapped/live guest state; structural
+reads remain diagnostic, and malformed present state fails closed without
+repair. Settings-panel admission coverage passes **2/2**, and the complete host
+suite passes **1912/1912**; the freestanding admission closure returns **42** on
+MC68000 after **4035 instructions / 41980 cycles** from a **3324-byte** HUNK
+with **1800 bytes of code**, **4 bytes of ROM rodata**, zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed at **3340/3340** bytes with **1814/1814 bytes of code**.
+
+MG1061 applies strict admission to Application SetConfigItem state. The named
+fixed-width guest struct preserves opaque item IDs and request counters while
+requiring NULL or one mapped guest byte for caller-owned data; structural reads
+remain diagnostic, and malformed present state fails closed without repair.
+SetConfigItem admission coverage passes **2/2**, and the complete host suite
+passes **1912/1912**; the freestanding admission closure returns **42** on
+MC68000 after **4036 instructions / 41984 cycles** from a **3328-byte** HUNK
+with **1802 bytes of code**, **4 bytes of ROM rodata**, zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed at **3340/3340** bytes with **1816/1816 bytes of code**.
+
+MG1060 applies strict admission to Application-owned object relationships. The
+named fixed-width guest struct keeps Workbench DiskObject memory and
+DropObject/Menustrip capabilities as explicit guest pointers with live topology
+validation; structural reads remain diagnostic, and malformed present state
+fails closed without repair. Object admission coverage passes **2/2**, and the
+complete host suite passes **1902/1902**; the freestanding admission closure
+returns **42** on MC68000 after **4216 instructions / 44354 cycles** from a
+**3456-byte** HUNK with **1994 bytes of code**, **4 bytes of ROM rodata**, zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds also succeed at **3468/3468** bytes with **2008/2008 bytes of
+code**.
+
+MG1059 applies strict admission to CheckRefresh telemetry. The named
+fixed-width guest struct preserves full-range MorphOS ULONG check and refresh
+counters while requiring a valid cookie and live Application owner; structural
+reads remain diagnostic, and malformed present state fails closed without
+repair. Refresh admission coverage passes **2/2**, and the complete host suite
+passes **1900/1900**; the freestanding admission closure returns **42** on
+MC68000 after **3094 instructions / 31884 cycles** from a **3008-byte** HUNK
+with **1586 bytes of code**, **4 bytes of ROM rodata**, zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed at **3008/3008** bytes with **1586/1586 bytes of code**.
+
+MG1058 applies strict admission to Application AboutMUI/ShowHelp state. The
+named fixed-width guest struct validates reference-window capabilities and
+caller-owned bounded help strings while retaining full MorphOS ULONG/LONG
+counters; structural reads remain diagnostic, and malformed present state fails
+closed without repair. Help admission coverage passes **2/2**, and the complete
+host suite passes **1898/1898**; the freestanding admission closure returns
+**42** on MC68000 after **8774 instructions / 89476 cycles** from a **4288-byte**
+HUNK with **2592 bytes of code**, **4 bytes of ROM rodata**, zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed at **4464** and **4352** bytes with **2766/2656 bytes of code**.
+
+MG1057 applies strict admission to DefaultConfigItem result state. The named
+fixed-width guest struct preserves opaque configuration IDs, values, and
+request counters as full MorphOS ULONGs; structural reads remain diagnostic,
+and malformed present state fails closed without repair. DefaultConfigItem
+admission coverage passes **2/2**, and the complete host suite passes
+**1896/1896**; the freestanding admission closure returns **42** on MC68000
+after **3903 instructions / 40306 cycles** from a **3148-byte** HUNK with
+**1678 bytes of code**, **4 bytes of ROM rodata**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **3160/3160** bytes with **1692/1692 bytes of code**.
+
+MG1056 applies strict admission to OpenConfigWindow state. The named
+fixed-width guest struct preserves raw MorphOS flags and request counts while
+requiring an optional caller-owned bounded class-id C string and a live
+Application owner before presentation getters and mutation; structural reads
+remain diagnostic, and malformed present state fails closed without repair.
+Config-window admission coverage passes **2/2**, and the complete host suite
+passes **1894/1894**; the freestanding admission closure returns **42** on
+MC68000 after **4547 instructions / 46170 cycles** from a **3804-byte** HUNK
+with **2036 bytes of code**, **4 bytes of ROM rodata**, zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed at **3896** and **3820** bytes.
+
+MG1055 applies strict admission to caller-owned Application command-table state.
+The named fixed-width guest struct requires NULL or a bounded MorphOS-compatible
+command table before command getters and mutation; structural reads remain
+diagnostic, and malformed present state fails closed without repair. Command-
+table admission coverage passes **2/2**, and the complete host suite passes
+**1892/1892**; the freestanding admission closure returns **42** on MC68000
+after **2261 instructions / 23430 cycles** from a **5188-byte** HUNK with
+**2746 bytes of code**, **40 bytes of ROM rodata**, zero framework features and
+managed allocations, and **9 internal relocations**. MC68020 and MC68040
+closure builds also succeed at **5304** and **5200** bytes.
+
+MG1054 applies strict admission to Application menu event state (`MenuAction`
+and `MenuHelp`). The named fixed-width guest struct preserves full-range
+MorphOS ULONG UserData values and requires a valid cookie before menu getters
+and mutation; structural reads remain diagnostic, and malformed present state
+fails closed without repair. Menu admission coverage passes **2/2**, and the
+complete host suite passes **1890/1890**; the freestanding admission closure
+returns **42** on MC68000 after **3094 instructions / 31892 cycles** from a
+**2988-byte** HUNK with **1590 bytes of code**, **4 bytes of ROM rodata**, zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds also succeed at **2988/2988** bytes with **1590/1590 bytes of
+code**.
+
+MG1053 applies strict admission to Application initializer policy (`UseRexx`,
+`UseCommodities`, and `UseScreenNotify`). The named fixed-width guest struct
+requires canonical MorphOS BOOL values and a live application owner before
+policy getters and mutation; structural reads remain diagnostic, and malformed
+present state fails closed without repair. Policy admission coverage passes
+**2/2**, and the complete host suite passes **1888/1888**; the freestanding
+admission closure returns **42** on MC68000 after **3279 instructions / 33962
+cycles** from a **3120-byte** HUNK with **1716 bytes of code**, **4 bytes of ROM
+rodata**, zero relocations, framework features, and managed allocations. MC68020
+and MC68040 closure builds also succeed at **3152/3152** bytes with **1746/1746
+bytes of code**.
+
+MG1052 applies strict admission to mutable Application text state (`HelpFile`
+and `IconifyTitle`). The named fixed-width guest struct requires caller-owned
+bounded guest C strings and a live application owner before text getters and
+mutation; structural reads remain diagnostic, and malformed present state fails
+closed without repair. Text admission coverage passes **2/2**, and the complete
+host suite passes **1886/1886**; the freestanding admission closure returns
+**42** on MC68000 after **11854 instructions / 116672 cycles** from a **6720-byte**
+HUNK with **3700 bytes of code**, **4 bytes of ROM rodata**, zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed at **7004/7004** and **6832/6832** bytes with **3982/3812 bytes of
+code**.
+
+MG1051 applies strict admission to Application identity state (`Author`,
+`Base`, `Copyright`, `Description`, `Title`, and `Version`). The named
+fixed-width guest struct requires caller-owned bounded guest C strings and a
+live application owner before identity getters and initializer mutation;
+structural reads remain diagnostic, and malformed present state fails closed
+without repair. Identity admission coverage passes **2/2**, and the complete
+host suite passes **1884/1884**; the freestanding admission closure returns
+**42** on MC68000 after **8442 instructions / 83672 cycles** from a **4888-byte**
+HUNK with **2762 bytes of code**, **4 bytes of ROM rodata**, zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed at **5100/5100** and **4976/4976** bytes with **2976/2852 bytes of
+code**.
+
+MG1050 applies strict admission to Application message-routing state
+(`AppMessage` and `WindowAppWindow`). The named fixed-width guest struct
+requires transient AppMessage shape, argument-list bounds, canonical
+WindowAppWindow, and a live owner before routing publication and consumers;
+structural reads remain diagnostic, and malformed present state fails closed
+without repair. Message-routing admission coverage passes **2/2**, and the
+complete host suite passes **1882/1882**; the freestanding admission closure
+returns **42** on MC68000 after **12545 instructions / 133266 cycles** from a
+**9036-byte** HUNK with **5182 bytes of code**, **4 bytes of ROM rodata**, zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds also succeed at **9300/9300** and **9144/9144** bytes with
+**5448/5290 bytes of code**.
+
+MG1049 applies strict admission to Application scheduler state (return-ID
+queue, input-handler list, signal mask, and pushed-method queue). The named
+fixed-width guest struct requires queue head/tail pairing, bounded guest-node
+topology, input-handler packet identity, pushed-method payload bounds, and a
+live application owner before scheduler consumers; structural reads remain
+diagnostic, and malformed present state fails closed without repair. Scheduler
+admission coverage passes **2/2**, and the complete host suite passes
+**1880/1880**; the freestanding admission closure returns **42** on MC68000
+after **14332 instructions / 150816 cycles** from a **7788-byte** HUNK with
+**4562 bytes of code**, **4 bytes of ROM rodata**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **7996/7996** and **7904/7904** bytes with **4770/4678 bytes of
+code**.
+
+MG1048 applies strict admission to Application lifecycle state (`Initialized`,
+`Iconified`, `Active`, `SingleTask`, `DoubleStart`, and `ForceQuit`). The named
+fixed-width guest struct requires canonical MorphOS BOOL values and a live
+application owner before lifecycle getters and mutation; structural reads remain
+diagnostic, and malformed present state fails closed without repair. Lifecycle
+admission coverage passes **2/2**, and the complete host suite passes
+**1878/1878**; the freestanding admission closure returns **42** on MC68000
+after **5351 instructions / 55998 cycles** from a **3552-byte** HUNK with
+**2120 bytes of code**, **4 bytes of ROM rodata**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **3636/3636 bytes** with **2204/2204 bytes of code**.
+
+MG1047 applies strict admission to Window event-reuse context (`ContextActive`,
+`Pending`, `EventMessage`, `InputEvent`, `EventClass`, and `MuiKey`). The named
+fixed-width guest struct requires canonical context flags, mapped event-message
+shape, context/event-class relationships, and a live owner before reuse
+queueing, draining, and dispatch; structural reads remain diagnostic, and
+malformed present state fails closed without repair. Event-reuse admission
+coverage passes **2/2**, and the complete host suite passes **1876/1876**; the
+freestanding admission closure returns **42** on MC68000 after **568
+instructions / 7404 cycles** from a **1740-byte** HUNK with **1208 bytes of code**,
+**4 bytes of ROM rodata**, zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed at **1760/1760
+bytes** with **1228/1228 bytes of code**.
+
+MG1046 applies strict admission to Window.mui interaction state
+(`SnapshotFlags`, snapshot request count, and cycle-chain head/count/requests).
+The named fixed-width guest struct requires canonical Snapshot flags, bounded
+chain shape, mapped chain storage, live owner, and live chain members before
+Snapshot, cycling, and spatial focus operations; structural reads remain
+diagnostic, and malformed present state fails closed without repair. Interaction
+admission coverage passes **2/2**, and the complete host suite passes
+**1874/1874**; the freestanding admission closure returns **42** on MC68000
+after **383 instructions / 4886 cycles** from a **1560-byte** HUNK with **1028
+bytes of code**, **4 bytes of ROM rodata**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **1560/1560 bytes** with **1028/1028 bytes of code**.
+
+MG1045 applies strict admission to Window.mui event state (`CloseRequest`,
+`InputEvent`, and `MouseObject`). The named fixed-width guest struct requires
+canonical CloseRequest, null-or-mapped event capabilities, and a live owner/
+MouseObject before event getters and publication; structural reads remain
+diagnostic, and malformed present state fails closed without repair. Event
+admission coverage passes **2/2**, and the complete host suite passes
+**1872/1872**; the freestanding admission closure returns **42** on MC68000
+after **421 instructions / 5144 cycles** from a **1468-byte** HUNK with **946
+bytes of code**, **4 bytes of ROM rodata**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **1464/1464 bytes** with **942/944 bytes of code**.
+
+MG1044 applies strict admission to Window.mui focus state (`ActiveObject` and
+`DefaultObject`). The named fixed-width guest pointer struct requires canonical
+magic and null-or-mapped object capabilities for structural inspection, while
+live owner/object validation is required before focus getters and operations;
+malformed present state fails closed without repair. Focus admission coverage
+passes **2/2**, and the complete host suite passes **1870/1870**; the
+freestanding admission closure returns **42** on MC68000 after **356
+instructions / 4274 cycles** from a **1368-byte** HUNK with **846 bytes of code**,
+**4 bytes of ROM rodata**, zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed at **1364/1364
+bytes** with **842/842 bytes of code**.
+
+MG1043 applies strict admission to Window.mui relationship state (`RootObject`,
+`Menustrip`, and `RefWindow`). The named fixed-width guest pointer struct
+requires canonical magic, null-or-mapped guest pointers, live owner, family
+topology, and Menustrip class validation before getters and relationship
+mutation; structural reads remain diagnostic, and malformed present state
+fails closed without repair. Relationship admission coverage passes **2/2**,
+and the complete host suite passes **1868/1868**; the freestanding admission
+closure returns **42** on MC68000 after **396 instructions / 4902 cycles** from
+a **1436-byte** HUNK with **890 bytes of code**, **4 bytes of ROM rodata**,
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed at **1432/1432 bytes** with **886/886
+bytes of code**.
+
+MG1042 applies strict admission to Window.mui initializer-only open policy
+containing signed alternate/primary geometry and all native-window BOOL policy
+fields. The named fixed-width guest struct requires canonical magic and BOOL
+values plus a live owner before policy getters, publication, or native
+configuration; structural reads remain diagnostic, and malformed present state
+fails closed without repair. Open-policy admission coverage passes **2/2**, and
+the complete host suite passes **1866/1866**; the freestanding admission
+closure returns **42** on MC68000 after **350 instructions / 5596 cycles** from
+a **900-byte** HUNK with **700 bytes of code**, zero ROM rodata, zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds also succeed at **968/968 bytes** with **768/768 bytes of code**.
+
+MG1041 applies strict admission to Window.mui presentation state (`Title`,
+`Screen`, `ScreenTitle`, and `PublicScreen`). The named fixed-width guest
+pointer struct requires canonical magic, null-or-mapped screen capability,
+valid guest strings, and a live owner before getters, publication, and
+mutation; structural reads remain diagnostic, and malformed present state
+fails closed without repair. Presentation admission coverage passes **2/2**,
+and the complete host suite passes **1864/1864**; the freestanding admission
+closure returns **42** on MC68000 after **417 instructions / 5296 cycles** from
+a **1796-byte** HUNK with **1074 bytes of code**, **4 bytes of ROM rodata**,
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed at **1848/1792 bytes** with **1126/1070
+bytes of code**.
+
+MG1040 applies strict admission to Window.mui visual policy (`NoMenus`,
+`HasAlpha`, `Opacity`, `FancyDrawing`, and `MenuAction`). The named
+fixed-width guest struct requires canonical magic, BOOL values, bounded
+opacity, and a live owner before getters, publication, or mutation; structural
+reads remain diagnostic, and malformed present state fails closed without
+raw/block repair. Visual admission coverage passes **2/2**, and the complete
+host suite passes **1862/1862**; the freestanding admission closure returns
+**42** on MC68000 after **237 instructions / 3248 cycles** from a **656-byte**
+HUNK with **464 bytes of code**, zero ROM rodata, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **656/656 bytes** with **462/464 bytes of code**.
+
+MG1039 applies strict admission to Window.mui lifecycle state containing the
+native-window capability, `Open`, `EventMask`, and `IconifiedOpen`. The named
+fixed-width guest struct requires canonical magic, bounded BOOL projections,
+capability topology, and a live owner before open/close, getters, IDCMP
+routing, and iconification transitions; structural reads remain diagnostic,
+and malformed present state fails closed without repair. Lifecycle admission
+coverage passes **2/2**, and the complete host suite passes **1860/1860**; the
+freestanding admission closure returns **42** on MC68000 after **220
+instructions / 2930 cycles** from a **640-byte** HUNK with **440 bytes of code**,
+zero ROM rodata, zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed at **636/636 bytes** with
+**436/436 bytes of code**.
+
+MG1038 applies strict admission to Window.mui scalar control state (`Id`,
+`DisableKeys`, `VisibleOnMaximize`, `IsSubWindow`, and `NeedsMouseObject`). The
+named fixed-width guest struct requires canonical magic and BOOL values plus a
+live owner before getters, publication, or mutation; structural reads remain
+diagnostic, and malformed present state fails closed without raw/block repair.
+Window control admission coverage passes **2/2**, and the complete host suite
+passes **1858/1858**; the freestanding admission closure returns **42** on
+MC68000 after **226 instructions / 3134 cycles** from a **644-byte** HUNK with
+**452 bytes of code**, zero ROM rodata, zero relocations, framework features,
+and managed allocations. MC68020 and MC68040 closure builds also succeed at
+**644/644 bytes** with **452/452 bytes of code**.
+
+MG1037 applies strict admission to the common MUI headless-state header. The
+named fixed-width guest struct requires canonical magic/version and bounded
+notification depth before object, notification, and service consumers;
+structural reads remain diagnostic, and initialization uses that path before
+repairing an uninitialized header. Headless-state admission coverage passes
+**2/2**, and the complete host suite passes **1856/1856**; the freestanding
+admission closure returns **42** on MC68000 after **191 instructions / 2744
+cycles** from a **588-byte** HUNK with **398 bytes of code**, zero ROM rodata,
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed at **632/636 bytes** with **442/446 bytes
+of code**.
+
+MG1036 applies strict admission to Register.mui Frame and Titles construction
+policy. The named fixed-width guest struct contains the normalized BOOL and
+caller-owned title-vector pointer; a canonical cookie, BOOL value, and
+null-or-mapped pointer are required before initialization, getters, page
+selection, or mutation. Malformed present records fail closed while structural
+reads remain diagnostic. Register policy admission coverage passes **2/2**, and
+the complete host suite passes **1854/1854**; the freestanding admission
+closure returns **42** on MC68000 after **392 instructions / 4996 cycles** from
+a **1452-byte** HUNK with **918 bytes of code**, **4 bytes of ROM rodata**, zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds also succeed at **1444/1448 bytes** with **912/914 bytes of
+code**.
+
+MG1035 applies strict admission to Image.mui `Image_Spec` and
+`Image_BuiltinSpec` union state. The named fixed-width guest struct contains
+separate presence bits and the union value; a canonical cookie and
+builtin-or-mapped-pointer admission are required before spec getters,
+reconciliation, mutation, or drawing. Malformed present records fail closed
+while structural reads remain diagnostic. Image spec admission coverage passes
+**2/2**, and the complete host suite passes **1852/1852**; the freestanding
+admission closure returns **42** on MC68000 after **344 instructions / 4216
+cycles** from a **1276-byte** HUNK with **886 bytes of code**, **4 bytes of ROM
+rodata**, zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed at **1288/1288 bytes** with
+**900/900 bytes of code**.
+
+MG1034 applies strict admission to Image.mui render policy. The named
+fixed-width guest struct contains selection, selected-visual, free-axis, and
+selected-state-display fields; a canonical cookie and live owner are required
+before render getters, reconciliation, mutation, or drawing. Malformed present
+records fail closed while structural reads remain diagnostic. Image render-
+policy admission coverage passes **2/2**, and the complete host suite passes
+**1850/1850**; the freestanding admission closure returns **42** on MC68000
+after **112 instructions / 1574 cycles** from a **480-byte** HUNK with **286
+bytes of code**, zero ROM rodata, zero relocations, framework features, and
+managed allocations. MC68020 and MC68040 closure builds also succeed at
+**508/508 bytes** with **314/314 bytes of code**.
+
+MG1033 applies strict admission to Image.mui OldImage state. The named
+fixed-width guest struct contains the caller-owned graphics Image pointer; a
+canonical cookie, null-or-mapped pointer, and live owner are required before
+old-image getters or raw reconciliation. Malformed present records fail closed
+while structural reads remain diagnostic. Image old-image admission coverage
+passes **2/2**, and the complete host suite passes **1848/1848**; the
+freestanding admission closure returns **42** on MC68000 after **271
+instructions / 3134 cycles** from a **1148-byte** HUNK with **750 bytes of code**,
+**4 bytes of ROM rodata**, zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed at **1144/1144
+bytes** with **746/746 bytes of code**.
+
+MG1032 applies strict admission to Bodychunk.mui compression, depth, and
+masking state. The named fixed-width guest struct contains the three MorphOS
+ULONG-compatible format fields; a canonical cookie and live owner are required
+before format getters, raw reconciliation, or mutation. Malformed present
+records fail closed while structural reads remain diagnostic. Bodychunk format
+admission coverage passes **2/2**, and the complete host suite passes
+**1846/1846**; the freestanding admission closure returns **42** on MC68000
+after **92 instructions / 1184 cycles** from a **428-byte** HUNK with **228 bytes
+of code**, zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed at **440/440 bytes** with
+**240/240 bytes of code**.
+
+MG1031 applies strict admission to shared Bitmap.mui/Bodychunk.mui source
+state. The named fixed-width guest struct contains the caller-owned source
+pointer; a canonical cookie, null-or-mapped pointer, and live owner are
+required before source getters, raw reconciliation, or mutation. Malformed
+present records fail closed while structural reads remain diagnostic. Bitmap
+source admission coverage passes **2/2**, and the complete host suite passes
+**1844/1844**; the freestanding admission closure returns **42** on MC68000
+after **271 instructions / 3134 cycles** from a **1148-byte** HUNK with **750
+bytes of code**, **4 bytes of ROM rodata**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **1144/1144 bytes** with **746/746 bytes of code**.
+
+MG1030 applies strict admission to shared Bitmap.mui/Bodychunk.mui geometry.
+The named fixed-width guest struct contains MorphOS ULONG-compatible width and
+height; a canonical cookie and live owner are required before geometry getters,
+raw reconciliation, or mutation. Malformed present records fail closed while
+structural reads remain diagnostic. Bitmap geometry admission coverage passes
+**2/2**, and the complete host suite passes **1842/1842**; the freestanding
+admission closure returns **42** on MC68000 after **77 instructions / 976
+cycles** from a **400-byte** HUNK with **202 bytes of code**, zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed at **396/396 bytes** with **200/200 bytes of code**.
+
+MG1029 applies strict admission to Text.mui initializer-only Unicode mode. The
+named fixed-width guest struct contains the canonical BOOL mode; a canonical
+cookie and live owner are required before Unicode metrics, rendering, getters,
+or raw reconciliation. Malformed present records fail closed while structural
+reads remain diagnostic. Text Unicode admission coverage passes **2/2**, and
+the complete host suite passes **1840/1840**; the freestanding admission
+closure returns **42** on MC68000 after **132 instructions / 1588 cycles** from
+a **520-byte** HUNK with **254 bytes of code**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **516/520 bytes** with **252/254 bytes of code**.
+
+MG1028 applies strict admission to the renderer-produced Text.mui
+`MUIA_Text_Shortened` status. The named fixed-width guest struct contains the
+canonical BOOL status; a canonical cookie and live owner are required before
+status getters, reconciliation, or publication. Malformed present records fail
+closed while structural reads remain diagnostic. Text shortened admission
+coverage passes **2/2**, and the complete host suite passes **1838/1838**; the
+freestanding admission closure returns **42** on MC68000 after **132
+instructions / 1588 cycles** from a **524-byte** HUNK with **254 bytes of code**,
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed at **520/524 bytes** with **252/254 bytes of
+code**.
+
+MG1027 applies strict admission to Text.mui presentation policy. The named
+fixed-width eight-field guest struct covers SetMin, SetMax, SetVMax, ControlChar,
+Marking, Shorten, HiChar, and HiCharPresent; a canonical cookie, existing field
+invariants, and live owner are required before raw reconciliation, getters, or
+mutation. Malformed present records fail closed while structural reads remain
+diagnostic. Text presentation admission coverage passes **2/2**, and the
+complete host suite passes **1836/1836**; the freestanding admission closure
+returns **42** on MC68000 after **488 instructions / 7468 cycles** from a
+**1204-byte** HUNK with **850 bytes of code**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **1264/1268 bytes** with **910/914 bytes of code**.
+
+MG1026 applies strict admission to String.mui scroll metrics. The named
+fixed-width seven-field guest struct covers width, height, visible extents, and
+offsets; a canonical cookie and live owner are required before metric
+recomputation, raw-offset clamping, getters, or mutation. Malformed present
+records fail closed while structural reads remain diagnostic. Scroll-metrics
+admission coverage passes **2/2**, and the complete host suite passes
+**1834/1834**; the freestanding admission closure returns **42** on MC68000
+after **122 instructions / 1766 cycles** from a **528-byte** HUNK with **320
+bytes of code**, zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed at **564/564 bytes** with
+**356/356 bytes of code**.
+
+MG1025 applies strict admission to String.mui BufferPos/DisplayPos cursor
+state. The named fixed guest struct contains nonnegative signed cursor
+positions; a canonical cookie and live owner are required before raw
+reconciliation, getters, cursor consumers, or mutation. Malformed blocks fail
+closed while structural reads remain diagnostic. String cursor admission
+coverage passes **2/2**, and the complete host suite passes **1832/1832**; the
+freestanding admission closure returns **42** on MC68000 after **117
+instructions / 1440 cycles** from a **464-byte** HUNK with **270 bytes of code**,
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed at **464/464 bytes** with **270/270 bytes of
+code**.
+
+MG1024 applies live admission to String.mui Integer64 state. The caller-facing
+pointer targets the named fixed-width QUAD value record and is accepted only
+when null or mapped with a live owning object. The boundary is enforced before
+normalization, getters, clearing, or replacement; malformed pointers fail
+closed without raw repair. Integer64 admission coverage passes **2/2**, and the
+complete host suite passes **1830/1830**; the freestanding admission closure
+returns **42** on MC68000 after **12 instructions / 80 cycles** from a
+**156-byte** HUNK with **26 bytes of code**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **156/156 bytes** with **26/26 bytes of code**.
+
+MG1023 applies strict admission to String.mui Integer state. The named fixed
+guest struct contains the signed 32-bit value; a canonical cookie and live
+owner are required before raw reconciliation, getters, or mutation. Malformed
+blocks fail closed while structural reads remain diagnostic. String integer
+admission coverage passes **2/2**, and the complete host suite passes
+**1828/1828**; the freestanding admission closure returns **42** on MC68000
+after **91 instructions / 1060 cycles** from a **376-byte** HUNK with **184
+bytes of code**, zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed at **376/376 bytes** with
+**182/182 bytes of code**.
+
+MG1022 applies strict admission to String.mui Accept/Reject filter policy. The
+named fixed guest struct contains caller-owned C-string pointers; each pointer
+must be null or a bounded mapped string, and a live owner is required before
+raw reconciliation, getters, or mutation. Malformed blocks fail closed while
+structural reads remain diagnostic. String filter admission coverage passes
+**2/2**, and the complete host suite passes **1826/1826**; the freestanding
+admission closure returns **42** on MC68000 after **111 instructions / 1388
+cycles** from a **456-byte** HUNK with **262 bytes of code**, zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed at **452/452 bytes** with **260/260 bytes of code**.
+
+MG1021 applies strict admission to String.mui edit-hook policy. The named fixed
+guest struct contains the caller-owned Hook pointer and LonelyEditHook BOOL; the
+hook must be null or a mapped Hook struct, the BOOL requires canonical 0/1
+representation, and a live owner is required before raw reconciliation,
+getters, edit-hook dispatch, or mutation. Malformed blocks fail closed while
+structural reads remain diagnostic. String edit-hook admission coverage passes
+**2/2**, and the complete host suite passes **1824/1824**; the freestanding
+admission closure returns **42** on MC68000 after **119 instructions / 1452
+cycles** from a **472-byte** HUNK with **274 bytes of code**, zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed at **468/472 bytes** with **272/274 bytes of code**.
+
+MG1020 applies strict admission to String.mui spell-checking policy. The named
+fixed guest struct contains the optional-service BOOL, requiring canonical 0/1
+representation and a live owner before raw reconciliation, getters, or
+mutation; malformed blocks fail closed while structural reads remain
+diagnostic. String spell-checking admission coverage passes **2/2**, and the
+complete host suite passes **1822/1822**; the freestanding admission closure
+returns **42** on MC68000 after **106 instructions / 1184 cycles** from a
+**424-byte** HUNK with **214 bytes of code**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **420/424 bytes** with **212/214 bytes of code**.
+
+MG1019 applies strict admission to String.mui presentation policy. The named
+fixed guest struct covers MaxLen, Secret, Format, and Unicode; MaxLen is bounded
+to the C-compatible signed range, Secret and Unicode require canonical 0/1
+values, and Format accepts MorphOS left/center/right selectors. A live owner is
+required before raw reconciliation, getters, or string copy/edit consumers, and malformed blocks fail closed
+while structural reads remain diagnostic. String presentation admission
+coverage passes **2/2**, and the complete host suite passes **1820/1820**; the
+freestanding admission closure returns **42** on MC68000 after **230
+instructions / 3148 cycles** from a **680-byte** HUNK with **474 bytes of code**,
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed at **688/696 bytes** with **484/490 bytes of
+code**.
+
+MG1018 applies strict admission to String.mui interaction policy. The named
+fixed guest struct covers Editable, AdvanceOnCR, and Multiline, requiring
+canonical 0/1 BOOL and live-owner validation before raw reconciliation, getters,
+input, or mutation; malformed present blocks fail closed while structural reads
+remain diagnostic. String interaction admission coverage passes **2/2**, and
+the complete host suite passes **1818/1818**; the freestanding admission
+closure returns **42** on MC68000 after **138 instructions / 1736 cycles** from
+a **512-byte** HUNK with **310 bytes of code**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **524 bytes** with **322 bytes of code**.
+
+MG1017 applies strict admission to String.mui AttachedList state. The named
+fixed guest struct requires strict cookie, live-owner, and live-Listview
+relationship validation before raw reconciliation, getters, navigation
+forwarding, or publication; malformed present blocks fail closed while
+structural reads remain diagnostic. String AttachedList admission coverage
+passes **2/2**, and the complete host suite passes **1816/1816**; the
+freestanding admission closure returns **42** on MC68000 after **98
+instructions / 1110 cycles** from a **412-byte** HUNK with **208 bytes of
+code**, zero relocations, framework features, and managed allocations. MC68020
+and MC68040 closure builds also succeed at **412 bytes** with **206 bytes of
+code**.
+
+MG1016 applies strict admission to String.mui Acknowledge state. The named
+fixed guest struct requires strict cookie, live-owner, and bounded-string
+validation before raw reconciliation, getters, or acknowledgement publication;
+malformed present blocks fail closed while structural reads remain diagnostic.
+String Acknowledge admission coverage passes **2/2**, and the complete host
+suite passes **1814/1814**; the freestanding admission closure returns **42** on
+MC68000 after **98 instructions / 1110 cycles** from a **408-byte** HUNK with
+**208 bytes of code**, zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed at **408 bytes**
+with **206 bytes of code**.
+
+MG1015 applies strict admission to Levelmeter.mui label state. The named fixed
+guest struct requires strict cookie, live-owner, and bounded-string validation
+before raw reconciliation, getters, formatting, or replacement; malformed
+present blocks fail closed while structural reads remain diagnostic. Levelmeter
+label admission coverage passes **2/2**, and the complete host suite passes
+**1812/1812**; the freestanding admission closure returns **42** on MC68000
+after **98 instructions / 1110 cycles** from a **408-byte** HUNK with **208
+bytes of code**, zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed at **408 bytes** with **206
+bytes of code**.
+
+MG1014 applies strict admission to Gauge.mui InfoText state. The named fixed
+guest struct requires strict cookie, live-owner, and bounded-string validation
+before raw reconciliation, getters, formatting, or replacement; malformed
+present blocks fail closed while structural reads remain diagnostic. Gauge
+InfoText admission coverage passes **2/2**, and the complete host suite passes
+**1810/1810**; the freestanding admission closure returns **42** on MC68000
+after **98 instructions / 1110 cycles** from a **400-byte** HUNK with **208
+bytes of code**, zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed at **400 bytes** with **206
+bytes of code**.
+
+MG1013 applies strict admission to Numeric.mui format state. The named fixed
+guest struct requires strict cookie, live-owner, and bounded-string validation
+before raw reconciliation, getters, formatting, or replacement; malformed
+present blocks fail closed while structural reads remain diagnostic. Numeric
+format admission coverage passes **2/2**, and the complete host suite passes
+**1808/1808**; the freestanding admission closure returns **42** on MC68000
+after **98 instructions / 1110 cycles** from a **400-byte** HUNK with **208
+bytes of code**, zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed at **400 bytes** with **206
+bytes of code**.
+
+MG1012 applies strict admission to String.mui placeholder state. The named
+fixed guest struct requires strict cookie, live-owner, and bounded-string
+validation before raw reconciliation, getters, drawing, or replacement;
+malformed present blocks fail closed while structural reads remain diagnostic.
+String placeholder admission coverage passes **2/2**, and the complete host
+suite passes **1806/1806**; the freestanding admission closure returns **42** on
+MC68000 after **98 instructions / 1110 cycles** from a **408-byte** HUNK with
+**208 bytes of code**, zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed at **408 bytes**
+with **206 bytes of code**.
+
+MG1011 applies strict admission to Text.mui PreParse state. The named fixed
+guest struct requires a strict cookie, a live owner, and a bounded mapped C
+string before raw reconciliation, getters, parsing, drawing, or replacement;
+malformed present blocks fail closed while structural reads remain diagnostic.
+Text PreParse admission coverage passes **2/2**, and the complete host suite
+passes **1804/1804**; the freestanding admission closure returns **42** on
+MC68000 after **98 instructions / 1110 cycles** from a **400-byte** HUNK with
+**208 bytes of code**, zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed at **400 bytes**
+with **206 bytes of code**.
+
+MG1010 applies strict admission to Text.mui contents state. The named fixed
+guest struct requires a strict cookie, a live owner, and a bounded mapped C
+string before raw reconciliation, getters, editing, drawing, or copy/clear
+mutation; malformed present blocks fail closed while structural reads remain
+diagnostic. Text contents admission coverage passes **2/2**, and the
+freestanding admission closure returns **42** on MC68000 after **98
+instructions / 1110 cycles** from a **400-byte** HUNK with **208 bytes of code**,
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed at **400 bytes** with **206 bytes of code**.
+
+MG1009 applies strict admission to Text.mui copy/reference policy. The named
+fixed guest struct requires a strict cookie, canonical value, and a live owner
+before ownership transitions, getters, or contents mutation; malformed present
+blocks fail closed while structural reads remain diagnostic. Text Copy
+admission coverage passes **2/2**, and the freestanding admission closure
+returns **42** on MC68000 after **135 instructions / 1492 cycles** from a
+**420-byte** HUNK with **236 bytes of code**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **420/424 bytes** with **236/238 bytes of code**.
+
+MG1008 applies strict admission to String.mui contents state. The named fixed
+guest struct requires a strict cookie, a live owner, and a bounded mapped C
+string before raw reconciliation, getters, editing, or copy/clear mutation;
+malformed present blocks fail closed while structural reads remain diagnostic.
+String contents admission coverage passes **2/2**, and the freestanding
+admission closure returns **42** on MC68000 after **98 instructions / 1110
+cycles** from a **404-byte** HUNK with **208 bytes of code**, zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed at **404 bytes** with **206 bytes of code**.
+
+MG1007 applies strict admission to Image.mui FontMatchString state. The named
+fixed guest struct requires a strict cookie, canonical presence, a live owner,
+and a bounded mapped C string before raw reconciliation, getters, or setters;
+malformed present blocks fail closed while structural reads remain diagnostic.
+Image FontMatchString admission coverage passes **2/2**, the complete host
+suite passes **1796/1796**, and the freestanding admission closure returns
+**42** on MC68000 after **155 instructions / 1848 cycles** from a **524-byte**
+HUNK with **316 bytes of code**, zero relocations, framework features, and
+managed allocations. MC68020 and MC68040 closure builds also succeed at
+**520/524 bytes** with **312/314 bytes of code**.
+
+MG1006 applies strict admission to Rectangle.mui bar-title state. The named
+fixed guest struct requires a strict cookie, canonical presence, a live owner,
+and a mapped NUL-terminated title before raw reconciliation, getters, or
+drawing; malformed present blocks fail closed while structural reads remain
+diagnostic. Rectangle bar-title admission coverage passes **2/2**, the
+complete host suite passes **1794/1794**, and the freestanding admission
+closure returns **42** on MC68000 after **155 instructions / 1848 cycles** from
+a **516-byte** HUNK with **316 bytes of code**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **512/516 bytes** with **312/314 bytes of code**.
+
+MG1005 applies strict admission to shared Control Font state. The named fixed
+guest struct requires a strict cookie, canonical presence, and a live owner
+before raw reconciliation, getters, or setters; malformed present blocks fail
+closed while structural reads remain diagnostic, and the opaque Font pointer
+stays lossless, including present NULL. Control Font admission coverage passes
+**2/2**, the complete host suite passes **1792/1792**, and the freestanding
+closure returns **42** on MC68000 after **155 instructions / 1848 cycles** from
+a **508-byte** HUNK with **316 bytes of code**, zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed at **504/508 bytes** with **312/314 bytes of code**.
+
+MG1004 applies strict admission to the shared Area layout-policy state. The
+named fixed guest struct requires strict cookie, canonical `ShowMe`, and a live
+owner before raw reconciliation, getters, min/max, weighted layout, or drawing;
+all other ULONG inputs remain lossless. Layout-policy admission coverage passes
+**1/1**, the AreaLayout slice passes **28/28**, and the complete host suite
+passes **1790/1790**; the freestanding admission closure returns **42** on
+MC68000 after **347 instructions / 5938 cycles** from a **960-byte** HUNK with
+**682 bytes of code**, zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed at **1036 bytes**
+with **758** and **760 bytes of code**.
+
+MG1003 applies strict admission to the shared Area render-policy state.
+Canonical BOOL-like fields, selector values, and the frame-title pointer stay
+in one named fixed guest struct; present blocks require a strict cookie, a live
+owner, and a mapped frame-title string before raw reconciliation, getters,
+setters, or drawing. Malformed blocks fail closed while structural reads remain
+available for diagnostics. Render-policy admission coverage passes **2/2**, the
+AreaLayout slice passes **27/27**, and the complete host suite passes
+**1789/1789**; the freestanding admission closure returns **42** on MC68000
+after **384 instructions / 6192 cycles** from a **948-byte** HUNK with **672
+bytes of code**, zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed at **996 bytes** with **720
+bytes of code**.
+
+MG1002 applies strict admission to Area FixedText state. Owned width/height
+sample pointers and setup generation remain in one named fixed-width guest
+struct; present blocks require a strict cookie, non-zero generation, mapped
+sample strings, and a live owner before initialization, getters, or measurement.
+Malformed blocks fail closed while structural reads remain available for
+diagnostics. FixedText-admission coverage passes **2/2**, the focused FixedText
+slice passes **3/3**, and the complete host suite passes **1787/1787**; the
+freestanding admission closure returns **42** on MC68000 after **125
+instructions / 1646 cycles** from a **484-byte** HUNK with **290 bytes of code**,
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed at **500 bytes** with **306 bytes of code**.
+
+MG1001 applies strict admission to Area geometry state. Signed coordinates,
+non-negative extents, and derived right/bottom edges remain in one named
+fixed-width guest struct with strict shape and live-owner validation. Present
+geometry blocks fail closed before raw reconciliation, getters, layout
+publication, or drawing while structural reads remain available for
+diagnostics. Geometry-admission coverage passes **2/2**, the AreaLayout slice
+passes **27/27**, and the complete host suite passes **1785/1785**; the
+freestanding admission closure returns **42** on MC68000 after **372
+instructions / 5326 cycles** from a **1108-byte** HUNK with **766 bytes of code**,
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed at **1132 bytes** with **792 bytes of code**.
+
+MG1000 applies strict admission to setup-owned CustomFont runtime state. Opaque
+font/spec pointers remain lossless while Active is canonical, generation is
+non-zero, and the owning object is live. Malformed present runtime blocks fail
+closed before provider close/open callbacks while structural reads remain
+available for diagnostics. The focused runtime-admission tests pass **2/2**,
+the complete CustomFont slice passes **23/23**, and the complete host suite
+passes **1784/1784**; the freestanding admission closure returns **42** on
+MC68000 after **185 instructions / 2606 cycles** from a **636-byte** HUNK with
+**426 bytes of code**, zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed at **648** and
+**652 bytes** with **440** and **442 bytes of code**.
+
+MG999 applies strict admission to the Area `MUIA_CustomFont` projection. The
+caller-owned spec pointer, explicit presence flag, and setup generation remain
+in one named fixed-width guest struct with strict cookie, canonical presence,
+non-zero generation, and live-owner validation. Present state is authoritative;
+malformed blocks fail closed before effective-font resolution, setters, or font
+opening while structural reads remain available for diagnostics. The focused
+CustomFont slice passes **21/21**, and the complete host suite passes
+**1782/1782**; the freestanding admission closure returns **42** on MC68000
+after **177 instructions / 2348 cycles** from a **580-byte** HUNK with **382
+bytes of code**, zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed at **588 bytes** with **390**
+and **392 bytes of code**.
+
+MG998 applies strict admission to the Area `MUIA_HorizDisappear` and
+`MUIA_VertDisappear` policy projection. Signed LONG priorities remain lossless
+in one named fixed-width guest struct with strict cookie and live-owner
+validation. Present policy state is authoritative; malformed blocks fail
+closed before getters, setters, or raw-state repair while structural reads
+remain available for diagnostics. The focused disappearance policy slice
+passes **4/4**, and the complete host suite passes **1780/1780**; the
+freestanding admission closure returns **42** on MC68000 after **77
+instructions / 988 cycles** from a **416-byte** HUNK with **206 bytes of code**,
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed at **412 bytes** with **204 bytes of code**.
+
+MG997 applies strict admission to the Area `MUIA_Draggable` and
+`MUIA_Dropable` policy projection. Both canonical BOOL values remain in one
+named fixed-width guest struct with strict cookie and live-owner validation.
+Present policy state is authoritative; malformed blocks fail closed before
+getters, setters, drag begin/query routing, or raw-state repair while
+structural reads remain available for diagnostics. The focused drag-policy
+slice passes **4/4**, and the complete host suite passes **1778/1778**; the
+freestanding admission closure returns **42** on MC68000 after **155
+instructions / 1864 cycles** from a **508-byte** HUNK with **310 bytes of code**,
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed at **508 bytes**.
+
+MG996 applies strict admission to the Area `MUIA_TextColor` setup-scoped
+projection. The named record remains a fixed guest struct with bounded 24-bit
+RGB, canonical Active BOOL, non-zero generation, and live-owner validation.
+Setup and cleanup validate the existing record before provider resolution or
+replacement; malformed present state fails closed while remaining available for
+structural diagnostics. The focused TextColor slice passes **5/5**, and the
+complete host suite passes **1776/1776**; the freestanding admission closure
+returns **42** on MC68000 after **177 instructions / 2334 cycles** from a
+**560-byte** HUNK with zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed at **572** and
+**576 bytes**.
+
+MG995 applies strict admission to the Area `MUIA_ShortHelp` projection. The
+named record remains a fixed guest struct with strict cookie, non-zero
+generation, and live-owner validation; the caller-owned OBString pointer
+remains opaque and lossless. Malformed present state fails closed before raw
+compatibility state or Check/Create/Delete provider paths can consume or repair
+it while remaining available for structural diagnostics. The focused ShortHelp
+slice passes **14/14**, and the complete host suite passes **1774/1774**; the
+freestanding admission closure returns **42** on MC68000 after **108
+instructions / 1382 cycles** from a **452-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed at **456 bytes**.
+
+MG994 applies strict admission to the Area `MUIA_Floating` projection. The
+named record remains a fixed guest struct with strict cookie, canonical BOOL,
+non-zero generation, and live-owner validation; the MorphOS placement effect
+remains provider-owned. Malformed present state fails closed before raw
+compatibility state can be repaired or consumed while remaining available for
+structural diagnostics. The focused Floating slice passes **7/7**, and the
+complete host suite passes **1772/1772**; the freestanding admission closure
+returns **42** on MC68000 after **142 instructions / 1826 cycles** from a
+**496-byte** HUNK with zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed at **496** and
+**500 bytes**.
+
+MG993 applies strict admission to the Area `MUIA_Timer` counter and its
+provider-owned relverify/tick event state. The named records remain fixed
+guest structs with strict cookies, canonical event BOOLs, non-zero generations,
+and live-owner validation; signed counter and tick identity remain lossless.
+Malformed present state fails closed before raw publication or event processing
+can replace it while remaining available for structural diagnostics. The
+focused Timer slice passes **10/10**, and the complete host suite passes
+**1770/1770**; the freestanding admission closure returns **42** on MC68000
+after **253 instructions / 3364 cycles** from an **836-byte** HUNK with zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds also succeed at **892 bytes**.
+
+MG992 applies strict admission to the Area `MUIA_DoubleBuffer` projection. The
+named record remains a fixed guest struct with strict cookie, canonical BOOL,
+non-zero generation, and live-owner validation. Malformed present state fails
+closed before raw compatibility state can be repaired or drawing can consume
+it while remaining available for structural diagnostics. The focused
+DoubleBuffer slice passes **9/9**, and the complete host suite passes
+**1766/1766**; the freestanding admission closure returns **42** on MC68000
+after **142 instructions / 1826 cycles** from a **504-byte** HUNK with zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds also succeed at **504** and **508 bytes**.
+
+MG991 applies strict admission to the Area `MUIA_DoubleClick` projection. The
+named record remains a fixed guest struct with strict cookie, non-zero
+generation, and live-owner validation; its getter-only signed LONG signal
+remains lossless. Malformed present state fails closed before signal getters
+or explicit publication can consume or repair it while remaining available for
+structural diagnostics. The focused DoubleClick slice passes **6/6**, and the
+complete host suite passes **1764/1764**; the freestanding admission closure
+returns **42** on MC68000 after **107 instructions / 1366 cycles** from a
+**452-byte** HUNK with zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed.
+
+MG990 applies strict admission to the Area `MUIA_CycleChain` projection. The
+named record remains a fixed guest struct with strict cookie, non-zero
+generation, and live-owner validation; its complete signed LONG value remains
+lossless. Malformed present state fails closed before CycleChain getters can
+treat it as absent or repair it from raw aliases while remaining available for
+structural diagnostics. The focused CycleChain slice passes **6/6**, and the
+complete host suite passes **1762/1762**; the freestanding admission closure
+returns **42** on MC68000 after **107 instructions / 1366 cycles** from a
+**448-byte** HUNK with zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed.
+
+MG989 applies strict admission to the Area `MUIA_ControlChar` projection. The
+named record remains a fixed guest struct with strict cookie, normalized
+low-byte character, non-zero generation, and live-owner validation. Structural
+reads preserve a wider malformed ULONG for diagnostics; typed consumers fail
+closed instead of normalizing and repairing a present malformed block. The
+focused ControlChar slice passes **6/6**, and the complete host suite passes
+**1760/1760**; the freestanding admission closure returns **42** on MC68000
+after **120 instructions / 1504 cycles** from a **472-byte** HUNK with zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds also succeed.
+
+MG988 applies strict admission to the Area context-menu state projection. The
+named record remains a fixed guest struct with strict cookie, non-zero
+generation, and live-owner validation. Opaque menu-strip and trigger pointers
+remain lossless. Malformed present state fails closed before context-menu
+getters, trigger publication, or choice handling can repair it from raw
+aliases while remaining available for structural diagnostics. The focused
+context-menu slice passes **6/6**, and the complete host suite passes
+**1758/1758**; the freestanding admission closure returns **42** on MC68000
+after **125 instructions / 1646 cycles** from a **492-byte** HUNK with zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds also succeed.
+
+MG987 applies strict admission to the Area Font/CustomFont last-writer
+projection. The named record remains a fixed guest struct with a closed
+selection kind, opaque source pointer, non-zero generation, and live-owner
+validation. Malformed present selection state fails closed before
+font-resolution consumers can repair it from raw aliases while remaining
+available for structural diagnostics. The focused CustomFont slice passes
+**19/19**, and the complete host suite passes **1756/1756**; the freestanding
+admission closure returns **42** on MC68000 after **300 instructions / 4140
+cycles** from a **744-byte** HUNK with zero relocations, framework features, and
+managed allocations. MC68020 and MC68040 closure builds also succeed.
+
+MG986 applies strict admission to the Area `MUIA_BuiltinFont` projection. The
+named record remains a fixed guest struct with strict cookie, canonical
+presence, non-zero generation, and live-owner validation. The selector keeps
+its complete ULONG bit pattern for signed MorphOS builtin-font constants and
+explicit inheritance. Malformed present state fails closed before font
+resolution or typed getters can repair it from raw attributes, while
+structural reads remain available for diagnostics. The focused BuiltinFont
+slice passes **5/5**, and the freestanding admission closure returns **42** on
+MC68000 after **229 instructions / 3142 cycles** from a **680-byte** HUNK with
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed. Structural codecs remain available for
+ABI qualification; the implementation remains freestanding C-like code with
+no exception path or managed runtime.
+
+MG985 applies strict admission to Virtgroup's transient pointer/capture state.
+The named record remains a fixed guest struct with strict cookie,
+Active/Captured flag invariants, signed pointer coordinates, and live-owner
+validation. Malformed present pointer state fails closed before input handling
+can consume or replace it while remaining available for structural diagnostics.
+The focused specialized-layout slice passes **34/34**, the complete host suite
+passes **1752/1752**, and the freestanding admission closure returns **42** on
+MC68000 after **202 instructions / 2984 cycles** from a **700-byte** HUNK with
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed. Structural codecs remain available for
+ABI qualification; the implementation remains freestanding C-like code with
+no exception path or managed runtime.
+
+MG984 applies strict admission to Virtgroup's display projection. The named
+record remains a fixed guest struct with strict cookie, lossless signed origin,
+nonnegative display dimensions, and live-owner validation. Malformed present
+display state fails closed before display/layout consumers can consume or
+replace it while remaining available for structural diagnostics. The focused
+specialized-layout slice passes **33/33**, the complete host suite passes
+**1751/1751**, and the freestanding admission closure returns **42** on
+MC68000 after **143 instructions / 2030 cycles** from a **608-byte** HUNK with
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed. Structural codecs remain available for
+ABI qualification; the implementation remains freestanding C-like code with
+no exception path or managed runtime.
+
+MG983 applies strict admission to Virtgroup's normalized layout projection.
+The named record remains a fixed guest struct with strict cookie, nonnegative
+layout geometry, canonical TryFit policy, and live-owner validation. Malformed
+present layout fails closed before display/layout consumers can consume or
+repair it while remaining available for structural diagnostics. The focused
+specialized-layout slice passes **32/32**, the complete host suite passes
+**1750/1750**, and the freestanding admission closure returns **42** on
+MC68000 after **163 instructions / 2406 cycles** from a **672-byte** HUNK with
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed. Structural codecs remain available for
+ABI qualification; the implementation remains freestanding C-like code with
+no exception path or managed runtime.
+
+MG982 applies strict admission to Virtgroup's public policy projection. The
+named record remains a fixed guest struct with strict cookie, canonical
+Input/TryFit BOOLs, lossless signed virtual geometry, and live-owner
+validation. Malformed present policy fails closed before Virtgroup getters,
+setters, input, or layout can consume or repair it while remaining available
+for structural diagnostics. The focused specialized-layout slice passes
+**31/31**, the complete host suite passes **1749/1749**, and the freestanding
+admission closure returns **42** on MC68000 after **169 instructions / 2558
+cycles** from a **684-byte** HUNK with zero relocations, framework features,
+and managed allocations. MC68020 and MC68040 closure builds also succeed.
+Structural codecs remain available for ABI qualification; the implementation
+remains freestanding C-like code with no exception path or managed runtime.
+
+MG981 applies strict admission to Scrollgroup's normalized layout projection.
+The named record remains a fixed guest struct with strict cookie, mapped child
+pointers, canonical policy BOOLs, and live-owner validation. Malformed present
+layout fails closed before layout consumers can consume or repair it while
+remaining available for structural diagnostics. The focused specialized-layout
+slice passes **30/30**, the complete host suite passes **1748/1748**, and the
+freestanding admission closure returns **42** on MC68000 after **347
+instructions / 4644 cycles** from a **1552-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure
+builds also succeed. Structural codecs remain available for ABI qualification;
+the implementation remains freestanding C-like code with no exception path or
+managed runtime.
+
+MG980 applies strict admission to Scrollgroup's viewport and content geometry
+sidecar. The named record remains a fixed guest struct with strict cookie,
+nonnegative geometry, bounded scroll ranges, canonical visibility BOOLs, and
+live-owner validation. Malformed present viewport fails closed before layout or
+viewport getters can consume or repair it while remaining available for
+structural diagnostics. The focused specialized-layout slice passes **29/29**,
+the complete host suite passes **1747/1747**, and the freestanding admission
+closure returns **42** on MC68000 after **404 instructions / 5676 cycles** from
+a **1372-byte** HUNK with zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed. Structural
+codecs remain available for ABI qualification; the implementation remains
+freestanding C-like code with no exception path or managed runtime.
+
+MG979 applies strict admission to Scrollgroup's shared policy sidecar. The
+named record remains a fixed guest struct with strict cookie, canonical BOOL,
+mapped-pointer, and live-owner validation. Malformed present policy fails
+closed before Scrollgroup getters, setters, layout, or event handling can
+consume or repair it while remaining available for structural diagnostics.
+The focused specialized-layout slice passes **28/28**, the complete host
+suite passes **1746/1746**, and the freestanding admission closure returns
+**42** on MC68000 after **401 instructions / 5524 cycles** from a **1760-byte**
+HUNK with zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed. Structural codecs remain
+available for ABI qualification; the implementation remains freestanding
+C-like code with no exception path or managed runtime.
+
+MG978 applies strict admission to Group's shared one-dimensional layout
+policy. The named record remains a fixed guest struct with strict cookie,
+canonical BOOL, signed spacing, and live-owner validation. Malformed present
+state fails closed before Group getters, min/max, or layout can consume or
+repair it while remaining available for structural diagnostics. The focused
+Group-layout-policy slice passes **21/21**, the complete host suite passes
+**1745/1745**, and the freestanding admission closure returns **42** on
+MC68000 after **345 instructions / 3890 cycles** from a **960-byte** HUNK with
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed. Structural codecs remain available for
+ABI qualification; the implementation remains freestanding C-like code with
+no exception path or managed runtime.
+
+MG977 applies strict admission to Scrollgroup's Window border-scroller
+sidecar. The named record remains a fixed guest struct with strict cookie,
+canonical BOOL fields, reserved-zero, mapped-window, and live-owner
+validation. Malformed present state fails closed before Window border
+ownership or Scrollgroup layout can consume or repair it while remaining
+available for structural diagnostics. The focused specialized-layout slice
+passes **27/27**, the complete host suite passes **1744/1744**, and the
+freestanding admission closure returns **42** on MC68000 after **306
+instructions / 4158 cycles** from a **1496-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure
+builds also succeed. Structural codecs remain available for ABI qualification;
+the implementation remains freestanding C-like code with no exception path or
+managed runtime.
+
+MG976 applies strict admission to Image's initializer-only
+FontMatch/FontMatchHeight/FontMatchWidth sidecar. The named scalar record
+remains a fixed guest struct with strict cookie and live-owner validation;
+Match remains a policy scalar while Height and Width retain their complete
+ULONG bit patterns. Malformed present state fails closed before Image getters
+or OM_GET projection can consume it while remaining available for structural
+diagnostics. The focused Image font-match slice passes **5/5**, the complete
+host suite passes **1743/1743**, and the freestanding admission closure
+returns **42** on MC68000 after **105 instructions / 1366 cycles** from a
+**428-byte** HUNK with zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed. Structural
+codecs remain available for ABI qualification; the implementation remains
+freestanding C-like code with no exception path or managed runtime.
+
+MG975 applies strict admission to the shared HelpNode/HelpLine sidecar. The
+named record remains a fixed guest struct with strict cookie, nonzero
+generation, and live-owner validation. HelpLine retains the complete signed
+LONG, HelpNode remains an opaque caller-owned pointer, and raw bootstrap is
+limited to true state absence. Malformed present state fails closed before
+help resolution or mutation can consume it while remaining available for
+structural diagnostics. The focused help-attribute slice passes **5/5**, the
+complete host suite passes **1741/1741**, and the freestanding admission
+closure returns **42** on MC68000 after **109 instructions / 1438 cycles**
+from a **432-byte** HUNK with zero relocations, framework features, and
+managed allocations. MC68020 and MC68040 closure builds also succeed.
+Structural codecs remain available for ABI qualification; the implementation
+remains freestanding C-like code with no exception path or managed runtime.
+
+MG974 applies strict admission to the Group layout-hook sidecar. The named
+record remains a fixed guest struct with strict cookie and live-owner
+validation; the callback pointer is opaque and preserves installed and null
+values. Malformed present state fails closed before Group hook getters,
+min/max, or layout dispatch can consume it while remaining available for
+structural diagnostics. The focused area/layout slice passes **23/23**, the
+complete host suite passes **1739/1739**, and the freestanding admission
+closure returns **42** on MC68000 after **127 instructions / 1580 cycles**
+from a **480-byte** HUNK with zero relocations, framework features, and
+managed allocations. MC68020 and MC68040 closure builds also succeed.
+Structural codecs remain available for ABI qualification; the implementation
+remains freestanding C-like code with no exception path or managed runtime.
+
+MG973 applies strict admission to the Selectgroup active sidecar. The named
+persisted child selector remains a fixed guest struct with strict cookie,
+traversal-bound, and live-owner validation. Signed `-1`/`-2` selectors remain
+setter-boundary commands and are never stored. Malformed present Dataspace
+state fails closed before Selectgroup getters, mutation, or selection cycling
+can consume it while remaining available for structural diagnostics. The
+focused specialized-layout slice passes **26/26**, the complete host suite
+passes **1738/1738**, and the freestanding admission closure returns **42** on
+MC68000 after **103 instructions / 1210 cycles** from a **472-byte** HUNK with
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed. Structural codecs remain available for
+ABI qualification; the implementation remains freestanding C-like code with
+no exception path or managed runtime.
+
+MG972 applies strict admission to the Group two-dimensional layout policy. The
+named guest record remains a fixed struct with strict cookie, axis/spacing/
+center policy, and live-owner validation. Malformed present Dataspace state
+fails closed before Group getters, min/max, or layout can consume it while
+remaining available for structural diagnostics. The focused GroupGrid slice
+passes **17/17**, the complete host suite passes **1737/1737**, and the
+freestanding admission closure returns **42** on MC68000 after **356
+instructions / 4278 cycles** from a **980-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure
+builds also succeed. Structural codecs remain available for ABI qualification;
+the implementation remains freestanding C-like code with no exception path or
+managed runtime.
+
+MG971 applies strict admission to the Cycle/Radio active sidecar. The named
+active LONG remains a fixed guest struct with strict cookie, nonnegative,
+entries-bounded persisted value, and live-owner validation. Cycle's `-1`/`-2` navigation
+selectors remain interpreted at the set boundary and are never stored as
+active state. Malformed present Dataspace state fails closed before Choice
+getters, mutation, or active-entry drawing can consume it and remains
+preserved, while valid raw writes still synchronize the named record. The
+focused common-control slice passes **195/195**, the complete host suite passes
+**1736/1736**, and the freestanding admission closure returns **42** on MC68000
+after **29 instructions / 224 cycles** from a **248-byte** HUNK with zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds also succeed. Structural codecs remain available for ABI
+qualification; the implementation remains freestanding C-like code with no
+exception path or managed runtime.
+
+MG970 applies strict admission to the caller-owned Cycle/Radio `Entries`
+sidecar. The named `STRPTR *` vector remains a fixed guest struct with strict
+cookie, bounded slot traversal, NUL termination, and live-owner validation.
+Malformed present Dataspace state fails closed before Choice getters,
+mutation, sizing, or active-entry drawing can consume it and remains
+preserved, while valid raw writes still synchronize the named record. The
+focused common-control slice passes **195/195**, the complete host suite passes
+**1736/1736**, and the freestanding admission closure returns **42** on
+MC68000 after **1187 instructions / 11556 cycles** from a **2376-byte** HUNK
+with zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed. Structural codecs remain available for
+ABI qualification; the implementation remains freestanding C-like code with
+no exception path or managed runtime.
+
+MG969 applies strict admission to the Rectangle presentation sidecar. The
+named `HBar` and `VBar` fields remain a fixed guest struct with strict cookie,
+canonical MorphOS BOOL, and live-owner validation. Malformed present Dataspace
+state fails closed before Rectangle getters, mutation, or decorative-bar
+drawing can consume it and remains preserved, while valid raw writes still
+synchronize the named record. The focused common-control slice passes
+**191/191**, the complete host suite passes **1732/1732**, and the freestanding
+admission closure returns **42** on MC68000 after **198 instructions / 2412
+cycles** from a **596-byte** HUNK with zero relocations, framework features,
+and managed allocations. MC68020 and MC68040 closure builds also succeed.
+Structural codecs remain available for ABI qualification; the implementation
+remains freestanding C-like code with no exception path or managed runtime.
+
+MG968 applies strict admission to the shared Area presentation sidecar. The
+named `Disabled`, `ShowMe`, `Background`, `Frame`, and `CustomBackfill` fields
+remain a fixed guest struct with strict cookie, canonical MorphOS BOOL, and
+live-owner validation. Malformed present Dataspace state fails closed before
+common-control visibility, disabled-state, background/frame policy, input,
+sizing, or drawing can consume it and remains preserved, while valid raw writes
+still synchronize the named record. The focused common-control slice passes
+**189/189**, the complete host suite passes **1730/1730**, and the freestanding
+admission closure returns **42** on MC68000 after **370 instructions / 5396
+cycles** from an **828-byte** HUNK with zero relocations, framework features,
+and managed allocations. MC68020 and MC68040 closure builds also succeed.
+Structural codecs remain available for ABI qualification; the implementation
+remains freestanding C-like code with no exception path or managed runtime.
+
+MG967 applies strict admission to the Levelmeter presentation sidecar. The
+named `Gauge_Horiz` `Horizontal` field remains a fixed guest struct with strict
+cookie, canonical MorphOS BOOL, and live-owner validation. Malformed present
+Dataspace state fails closed before Levelmeter getters, sizing/minmax, or
+drawing can consume it and remains preserved, while valid raw writes still
+synchronize the named record. The focused common-control slice passes
+**188/188**, the complete host suite passes **1729/1729**, and the freestanding
+admission closure returns **42** on MC68000 after **75 instructions / 790
+cycles** from a **364-byte** HUNK with zero relocations, framework features,
+and managed allocations. MC68020 and MC68040 closure builds also succeed.
+Structural codecs remain available for ABI qualification; the implementation
+remains freestanding C-like code with no exception path or managed runtime.
+
+MG966 applies strict admission to the Scale presentation sidecar. The named
+`Horizontal` field remains a fixed guest struct with strict cookie, canonical
+MorphOS BOOL, and live-owner validation. Malformed present Dataspace state
+fails closed before Scale getters, setters, sizing/minmax, or drawing can
+consume it and remains preserved, while valid raw writes still synchronize the
+  named record. The focused common-control slice passes **187/187**, the
+  complete host suite passes **1728/1728**, and the freestanding admission
+  closure returns **42** on MC68000 after **75
+instructions / 790 cycles** from a **352-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure
+builds also succeed. Structural codecs remain available for ABI
+qualification; the implementation remains freestanding C-like code with no
+exception path or managed runtime.
+
+MG965 applies strict admission to the Slider presentation sidecar. The named
+`Horizontal` and `Quiet` fields remain a fixed guest struct with strict cookie,
+canonical MorphOS BOOL, and live-owner validation. Malformed present Dataspace
+state fails closed before Slider getters, setters, sizing/minmax, or drawing
+  can consume it and remains preserved, while valid raw writes still synchronize
+  the named record. The focused common-control slice passes **186/186**, the
+  complete host suite passes **1727/1727**, and the
+freestanding admission closure returns **42** on MC68000 after **120
+instructions / 1374 cycles** from a **440-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure
+builds also succeed. Structural codecs remain available for ABI
+qualification; the implementation remains freestanding C-like code with no
+exception path or managed runtime.
+
+MG964 applies strict admission to the Balance policy sidecar. The named
+`Quiet` field remains a fixed guest struct with strict cookie and live-owner
+validation. MorphOS documents `MUIA_Balance_Quiet` as a `LONG`, so construction,
+raw compatibility synchronization, getters, and drawing retain the complete
+32-bit guest pattern instead of normalizing it to a BOOL. Malformed present
+Dataspace state fails closed before Balance getters, drawing, or policy
+publication can mutate or consume it and remains preserved, while valid raw
+writes still synchronize the named record. The focused common-control slice
+passes **184/184**, the complete host suite passes **1725/1725**, and the
+freestanding admission closure returns **42** on MC68000 after **60
+instructions / 672 cycles** from a **316-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure
+builds also succeed. Structural codecs remain available for ABI
+qualification; the implementation remains freestanding C-like code with no
+exception path or managed runtime.
+
+MG963 applies strict admission to the shared Scrollbar layout sidecar. Named
+`Horizontal` and `Type` fields remain a fixed guest struct with strict cookie,
+canonical `Group_Horiz` BOOL, documented type-enum, and live-owner validation.
+Malformed present Dataspace state fails closed before Scrollbar getters,
+synchronization, child forwarding, layout, or drawing can mutate or consume it
+and remains preserved, while valid raw writes still synchronize the named
+record. The focused common-control slice passes **183/183**, the complete host
+suite passes **1724/1724**, and the freestanding admission closure returns
+**42** on MC68000 after **196 instructions / 2444 cycles** from a **592-byte**
+HUNK with zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed. Structural codecs remain
+available for ABI qualification; the implementation remains freestanding
+C-like code with no exception path or managed runtime.
+
+MG962 applies strict admission to the shared Prop/Scrollbar range sidecar.
+Named `Entries`, `Visible`, and `First` fields remain a fixed guest struct
+with strict cookie, LONG-range, reachable-position, and live-owner validation.
+Malformed present Dataspace state fails closed before Prop/Scrollbar getters,
+movement, synchronization, range mutation, headless MultiSet, min/max,
+forwarding, or drawing can mutate or consume it and remains preserved, while
+valid raw writes still synchronize the named record. The focused common-control
+slice passes **182/182**, the complete host suite passes **1723/1723**, and the
+freestanding admission closure returns **42** on MC68000 after **322
+instructions / 4308 cycles** from a **736-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed. Structural codecs remain available for ABI qualification; the
+implementation remains freestanding C-like code with no exception path or
+managed runtime.
+
+MG961 applies strict admission to the shared Prop/Scrollbar policy sidecar.
+Named `Horizontal`, `DeltaFactor`, `Slider`, and `UseWinBorder` fields remain
+a guest struct; `Horizontal` and `Slider` are canonical BOOLs, `UseWinBorder`
+accepts only MorphOS's four policy selectors, and `DeltaFactor` preserves the
+complete signed LONG bit pattern. A live owning Prop-family object is required
+before publication or consumption. Malformed present Dataspace state fails
+closed before Prop/Scrollbar policy getters, runtime/headless setters,
+scrollbar forwarding, min/max, or drawing can mutate or consume it and remains
+preserved, while valid raw writes still synchronize the named record. The
+focused common-control slice passes **181/181**, the complete host suite passes
+**1722/1722**, and the freestanding admission closure returns **42** on MC68000
+after **184 instructions / 2392 cycles** from a **556-byte** HUNK with zero
+relocations, framework features, and managed allocations. MC68020 and MC68040
+closure builds also succeed. Structural codecs remain available for ABI
+qualification; the implementation remains freestanding C-like code with no
+exception path or managed runtime.
+
+MG960 applies strict admission to the shared Numeric-family sidecar. Named
+`Minimum`, `Maximum`, `Value`, `Default`, and `Reverse` fields remain a guest
+struct; scalar fields preserve the complete signed 32-bit guest value range
+and `Reverse` is a canonical BOOL, with a live owning Numeric-family object
+required before publication or consumption. Malformed present Dataspace state
+fails closed before Numeric/Slider/Knob/Numericbutton/Levelmeter getter
+projection, value/bounds setters, stepping, or drawing can mutate or consume
+it and remains preserved, while valid raw writes still synchronize the named
+record. The focused common-control slice passes **180/180**, the complete host
+suite passes **1721/1721**, and the freestanding admission closure returns
+**42** on MC68000 after **107 instructions / 1434 cycles** from a **468-byte**
+HUNK with zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed. Structural codecs remain
+available for ABI qualification; the implementation remains freestanding
+C-like code with no exception path or managed runtime.
+
+MG959 applies strict admission to the shared Gauge progress sidecar. Named
+`Maximum`, `Current`, `Divide`, and `Horizontal` fields remain a guest struct;
+the three progress scalars retain full-width MorphOS scalar values and
+`Horizontal` is a canonical BOOL, with a live owning MUI object required before
+publication or consumption. Malformed present Dataspace state fails closed
+before Gauge getter projection, `Current`/`Max`/`Divide` setters, clamping, or
+drawing can mutate or consume it and remains preserved, while valid raw writes
+still synchronize the named record. The focused common-control slice passes
+**179/179**, the complete host suite passes **1720/1720**, and the freestanding
+admission closure returns **42** on MC68000 after **99 instructions / 1258
+cycles** from a **424-byte** HUNK with zero relocations, framework features, and
+managed allocations. MC68020 and MC68040 closure builds also succeed.
+Structural codecs remain available for ABI qualification; the implementation
+remains freestanding C-like code with no exception path or managed runtime.
+
+MG958 applies strict admission to the shared Gadget interaction sidecar. Named
+`InputMode`, `Selected`, `Pressed`, and `ShowSelState` fields remain a guest
+struct; `InputMode` is the MorphOS four-value enum and the other fields are
+canonical BOOLs, with a live owning MUI object required before publication or
+consumption. Malformed present Dataspace state fails closed before getter
+projection, event-driven selection/press mutation, or raw synchronization and
+remains preserved, while valid state still synchronizes legacy raw attributes.
+The focused common-control slice passes **178/178**, the complete host suite
+passes **1719/1719**, and the freestanding admission closure returns **42** on
+MC68000 after **141 instructions / 1868 cycles** from a **512-byte** HUNK with
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed. Structural codecs remain available for
+ABI qualification; the implementation remains freestanding C-like code with no
+exception path or managed runtime.
+
+MG957 applies strict admission to the getter-only `MUIA_Gadget_Gadget`
+relationship. The named `Gadget` pointer remains a guest struct; NULL is valid,
+while non-NULL Intuition gadget pointers must be mapped, and the owning MUI
+Gadget object must be live before publication or consumption. Malformed
+present Dataspace state fails closed before getter projection and remains
+preserved, while absent state still bootstraps. The focused common-control slice
+passes **176/176**, the complete host suite passes **1717/1717**, and the
+freestanding admission closure returns **42** on MC68000 after **261
+instructions / 3002 cycles** from a **1112-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed. Structural codecs remain available for ABI qualification; the
+implementation remains freestanding C-like code with no exception path or
+managed runtime.
+
+MG956 applies strict admission to the Bitmap-only policy sidecar. Named
+`Alpha`, `MappingTable`, `Precision`, `SourceColors`, `Transparent`, and
+`UseFriend` fields remain a guest struct; the two pointer fields must be NULL
+or mapped guest memory, `UseFriend` is a canonical BOOL, and scalar values
+retain their full MorphOS ULONG/LONG ranges. Malformed present Dataspace state
+fails closed before policy getters or setters mutate or project it and remains
+preserved, while absent state still bootstraps. The focused common-control
+slice passes **174/174**, the complete host suite passes **1715/1715**, and the
+freestanding admission closure returns **42** on MC68000 after **432
+instructions / 5032 cycles** from a **1300-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure
+builds also succeed. Structural codecs remain available for ABI
+qualification; the implementation remains freestanding C-like code with no
+exception path or managed runtime.
+
+MG955 applies strict admission to the Bitmap/Bodychunk renderer sidecar. The
+named `Remapped` pointer requires a valid cookie, a live Bitmap/Bodychunk owner,
+and either NULL or mapped guest memory. Malformed present Dataspace state fails
+closed before setup, rebuild, setter, cleanup, or getter projection and remains
+preserved, while absent state still bootstraps. The focused common-control
+slice passes **172/172**, the complete host suite passes **1713/1713**, and the
+freestanding admission closure returns **42** on MC68000 after **261
+instructions / 3002 cycles** from a **1120-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure
+builds also succeed. Structural codecs remain available for ABI
+qualification; the implementation remains freestanding C-like code with no
+exception path or managed runtime.
+
+MG954 applies strict admission to the shared Area `MUIA_Weight` sidecar. The
+named `Weight` ULONG record requires a valid cookie and live Area owner. Raw
+compatibility synchronization remains available for valid state, but
+malformed present Dataspace state fails closed before getter projection or
+setter replacement and remains preserved, while absent state still
+bootstraps. The focused common-control slice passes **170/170**, the complete
+host suite passes **1711/1711**, and the freestanding admission closure
+returns **42** on MC68000 after **60 instructions / 672 cycles** from a
+**312-byte** HUNK with zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed. Structural
+codecs remain available for ABI qualification; the implementation remains
+freestanding C-like code with no exception path or managed runtime.
+
+MG953 applies strict admission to the Area activation sidecar. Named
+`Active`, `Flags`, and `Generation` fields remain a guest struct; `Active` is
+a canonical MorphOS BOOL, the other ULONG fields retain their complete
+ranges, and the owner must be a live Area. Malformed present state fails
+closed before active/inactive transitions or consumer projection and remains
+preserved, while absent state still bootstraps. The focused Area activation
+slice passes **9/9**, the complete host suite passes **1709/1709**, and the
+freestanding admission closure returns **42** on MC68000 after **121
+instructions / 1478 cycles** from a **440-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure
+builds also succeed. Structural codecs remain available for ABI
+qualification; the implementation remains freestanding C-like code with no
+exception path or managed runtime.
+
+MG952 applies strict admission to the repeated `MUIA_Application_Window`
+relationship sidecar. Named `LastWindow` and `AddedCount` fields remain a
+guest struct; `LastWindow` may be NULL before the first attachment, but a
+non-NULL value must be mapped and must be a direct child of the live
+Application. Malformed present relationship state fails closed before getter
+projection or another initializer mutates the family and remains preserved,
+while absent state still bootstraps. The focused application/window slice
+passes **234/234**, the complete host suite passes **1707/1707**, and the
+freestanding admission closure returns **42** on MC68000 after **269
+instructions / 3190 cycles** from a **1180-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure
+builds also succeed. Structural codecs remain available for ABI
+qualification; the implementation remains freestanding C-like code with no
+exception path or managed runtime.
+
+MG951 applies strict admission to the Application `SetConfigItem` sidecar.
+Named `Item`, opaque `Data`, and `Requests` fields remain a guest struct;
+`NULL` data is valid, non-NULL data must identify one mapped guest byte, and
+the owner must be a live Application. Malformed present state fails closed
+before the private setter replaces or mutates it and remains preserved, while
+absent state still bootstraps. The focused application/window slice passes
+**232/232**, the complete host suite passes **1705/1705**, and the freestanding
+admission closure returns **42** on MC68000 after **277 instructions / 3378
+cycles** from a **1196-byte** HUNK with zero relocations, framework features,
+and managed allocations. MC68020 and MC68040 closure builds also succeed.
+Structural codecs remain available for ABI qualification; the implementation
+remains freestanding C-like code with no exception path or managed runtime.
+
+MG950 applies strict admission to the Application command sidecar. The named
+`Table` pointer is validated by the bounded guest command-table codec (`NULL`
+or a valid NULL-terminated table), and the owner must be a live Application.
+Malformed present table state fails closed before command getters/setters
+publish or mutate it and remains preserved, while absent state still
+bootstraps. The focused application/window slice passes **230/230**, the
+complete host suite passes **1703/1703**, and the freestanding admission
+closure returns **42** on MC68000 after **2116 instructions / 21738 cycles**
+from a **3380-byte** HUNK with zero framework features or managed allocations.
+MC68020 and MC68040 closure builds also succeed. Structural codecs remain
+available for ABI qualification; the implementation remains freestanding
+C-like code with no exception path or managed runtime.
+
+MG949 applies strict admission to the Application menu sidecar. Named
+`MenuAction`/`MenuHelp` ULONG fields remain a guest struct, and the owner must
+be a live Application. Malformed present state fails closed before menu event
+publication or `GetMenu`/`SetMenu` traversal reaches a native capability and
+remains preserved, while absent state still bootstraps. The focused
+application/window slice passes **228/228**, the complete host suite passes
+**1701/1701**, and the freestanding admission closure returns **42** on
+MC68000 after **68 instructions / 836 cycles** from a **368-byte** HUNK with
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed. Structural codecs remain available for
+ABI qualification; the implementation remains freestanding C-like code with
+no exception path or managed runtime.
+
+MG948 applies strict admission to the Application `CheckRefresh` telemetry
+sidecar. Named `Checks`/`RefreshedWindows` fields remain a guest struct, and
+the owner must be a live Application. Malformed present state fails closed
+before child-window traversal or native refresh capability invocation and
+remains preserved, while absent state still bootstraps. The focused
+application/window slice passes **226/226**, the complete host suite passes
+**1699/1699**, and the freestanding admission closure returns **42** on
+MC68000 after **68 instructions / 828 cycles** from a **368-byte** HUNK with
+zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed. Structural codecs remain available for
+ABI qualification; the implementation remains freestanding C-like code with
+no exception path or managed runtime.
+
+MG947 applies strict admission to the Application Save/Load persistence
+sidecar. Named `Operation`/`Name`/counter fields remain a guest struct;
+MorphOS `NULL` and `ULONG(-1)` environment selectors are valid, other names
+must be bounded C strings, and the owner must be a live Application. Malformed
+present state fails closed before Save or Load capability invocation and
+remains preserved, while absent state still bootstraps. The focused
+application/window slice passes **224/224**, the complete host suite passes
+**1697/1697**, and the freestanding admission closure returns **42** on
+MC68000 after **856 instructions / 9,088 cycles** from a **1,888-byte** HUNK
+with zero relocations, framework features, and managed allocations. MC68020
+and MC68040 closure builds also succeed. Structural codecs remain available
+for ABI qualification; the implementation remains freestanding C-like code
+with no exception path or managed runtime.
+
+MG946 applies strict admission to the Application `BuildSettingsPanel`
+sidecar. Named `Number`/`Panel`/`Requests` fields remain a guest struct;
+non-NULL panel capabilities must be mapped and live, and the owner must be a
+live Application. Malformed present state fails closed before the panel
+capability is called and remains preserved, while absent state still
+bootstraps. The focused application/window slice passes **222/222**, the
+complete host suite passes **1695/1695**, and the freestanding admission
+closure returns **42** on MC68000 after **277 instructions / 3,378 cycles**
+from a **1,196-byte** HUNK with zero relocations, framework features, and
+managed allocations. MC68020 and MC68040 closure builds also succeed.
+Structural codecs remain available for ABI qualification; the implementation
+remains freestanding C-like code with no exception path or managed runtime.
+
+MG945 applies strict admission to the Application `OpenConfigWindow` sidecar.
+Named flags/class-id/request fields remain a guest struct; optional
+caller-owned class-id strings are bounded, and the owner must be a live
+Application. Malformed present state fails closed before the presentation
+capability is called and remains preserved, while absent state still
+bootstraps. The focused application/window slice passes **220/220**, the
+complete host suite passes **1693/1693**, and the freestanding admission
+closure returns **42** on MC68000 after **786 instructions / 7,628 cycles**
+from a **1,676-byte** HUNK with zero relocations, framework features, and
+managed allocations. MC68020 and MC68040 closure builds also succeed.
+Structural codecs remain available for ABI qualification; the implementation
+remains freestanding C-like code with no exception path or managed runtime.
+
+MG944 applies strict admission to the Application `DefaultConfigItem` result
+sidecar. The named MorphOS ULONG record requires a valid cookie and live
+Application owner; malformed present state fails closed before the override
+capability is called and remains preserved, while absent state still
+bootstraps. The focused application/window slice passes **218/218**, the
+complete host suite passes **1691/1691**, and the freestanding admission
+closure returns **42** on MC68000 after **76 instructions / 992 cycles** from a
+**412-byte** HUNK with zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed. Structural
+codecs remain available for ABI qualification; the implementation remains
+freestanding C-like code with no exception path or managed runtime.
+
+MG943 applies strict admission to the Application help/presentation sidecar.
+Named reference pointers must be mapped and live when non-NULL, while
+caller-owned `HelpName` and `HelpNode` pointers must be bounded C strings.
+Malformed present state fails closed before `AboutMUI` or `ShowHelp` reaches the
+presentation seam and remains preserved, while absent state still bootstraps.
+The focused application/window slice passes **216/216**, the complete host
+suite passes **1689/1689**, and the freestanding admission closure returns
+**42** on MC68000 after **1,726 instructions / 16,628 cycles** from a
+**1,928-byte** HUNK with zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed. Structural
+codecs remain available for ABI qualification; the implementation remains
+freestanding C-like code with no exception path or managed runtime.
+
+MG942 applies strict admission to the Application `UsedClasses` sidecar.
+Named vector/entry structs validate the mapped, bounded, NULL-terminated
+caller-owned class-name vector; malformed present state fails closed before
+getters or setters and remains preserved, while absent state still bootstraps.
+The focused application/window slice passes **214/214**, the complete host
+suite passes **1687/1687**, and the freestanding admission closure returns
+**42** on MC68000 after **546 instructions / 5,420 cycles** from a
+**2,740-byte** HUNK with zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed. Structural
+codecs remain available for ABI qualification; the implementation remains
+freestanding C-like code with no exception path or managed runtime.
+
+MG941 applies strict admission to the Application policy sidecar.
+`UseRexx`, `UseCommodities`, and `UseScreenNotify` are canonical MorphOS
+BOOLs; malformed present state fails closed before policy getters,
+initialization, or initializer-only setters and remains preserved, while
+absent state still bootstraps. The focused application/window slice passes
+**212/212**, the complete host suite passes **1685/1685**, and the focused
+freestanding admission closure returns **42** on MC68000 after **95
+instructions / 1,164 cycles** from a **432-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed. This remains a freestanding, C-like transition with no exception
+path, managed runtime, or consumer-facing numeric object-layout offset.
+
+MG940 applies strict admission to the Application object relationship sidecar.
+DiskObject must be completely mapped; DropObject and Menustrip pointers must be
+mapped live objects, with Menustrip attached to the Application family.
+Malformed present state fails closed before object getters or relationship
+setters and remains preserved, while absent state still bootstraps. The focused
+application/window slice passes **211/211**, the complete host suite passes
+**1684/1684**, and the focused freestanding admission closure returns **42** on
+MC68000 after **425 instructions / 5,180 cycles** from a **1,348-byte** HUNK
+with zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed. This remains a freestanding, C-like
+transition with no exception path, managed runtime, or consumer-facing numeric
+object-layout offset.
+
+MG939 applies strict admission to Application identity and text sidecars.
+Every non-NULL caller-owned pointer must be a bounded guest C string (up to
+65,536 bytes); malformed present state fails closed before identity/text
+getters or setters and remains preserved, while absent state still bootstraps.
+The focused application/window slice passes **208/208**, the complete host
+suite passes **1681/1681**, and the focused freestanding admission closure
+returns **42** on MC68000 after **2,282 instructions / 21,796 cycles** from a
+**2,524-byte** HUNK with zero relocations, framework features, and managed
+allocations. MC68020 and MC68040 closure builds also succeed. This remains a
+freestanding, C-like transition with no exception path, managed runtime, or
+consumer-facing numeric object-layout offset.
+
+MG938 applies strict admission to the transient Application/AppMessage/
+WindowAppWindow routing sidecar. `WindowAppWindow` is a canonical MorphOS
+BOOL, and non-NULL `AppMessage` values must be bounded, structurally valid
+messages. Present malformed state fails closed before routing getters,
+WindowAppWindow mutation, or transient AppMessage publication; absent state
+still bootstraps. The focused application/window slice passes **204/204**, the
+complete host suite passes **1677/1677**, and the focused freestanding
+admission closure returns **42** on MC68000 after **10,115 instructions /
+108,366 cycles** from a **7,152-byte** HUNK with zero relocations, framework
+features, and managed allocations. MC68020 and MC68040 closure builds also
+succeed. This remains a freestanding, C-like transition with no exception
+path, managed runtime, or consumer-facing numeric object-layout offset.
+
+MG937 applies strict admission to the Application scheduler sidecar.
+ReturnID and pushed-method queues require paired, reachable tails; the
+input-handler queue is a bounded head-only chain with matching packet identity;
+pushed-method payload counts are limited to one through seven. Malformed
+present state fails closed before Application initialization, ReturnID/Input,
+Push/Unpush, input-handler registration/dispatch, or Run, and queue mutations
+reconcile the sidecar before reclaiming guest nodes. The focused
+application/window slice passes **202/202**, the complete host suite passes
+**1675/1675**, and the focused freestanding admission closure returns **42**
+on MC68000 after **8,956 instructions / 94,502 cycles** from a **5,620-byte**
+HUNK with zero relocations, framework features, and managed allocations.
+MC68020 and MC68040 closure builds also succeed. This remains a freestanding,
+C-like transition with no exception path, managed runtime, or
+consumer-facing numeric object-layout offset.
+
+MG936 applies strict admission to the shared Window/Application sleep
+sidecar. `SavedDisabled` is a canonical MorphOS BOOL and the public `Request`
+counter must match `Depth`; malformed present state fails closed before
+sleep/wake mutation, application sleep inheritance, Window add/remove/open/
+close, or event dispatch, while absent state still bootstraps. The focused
+application/window slice passes **200/200**, the complete host suite passes
+**1673/1673**, and the focused freestanding admission closure returns **42**
+on MC68000 after **158 instructions / 2,062 cycles** from a **484-byte** HUNK
+with zero relocations, framework features, and managed allocations. MC68020
+and MC68040 closure builds also succeed. This remains a freestanding, C-like
+transition with no exception path, managed runtime, or consumer-facing numeric
+object-layout offset.
+
+MG935 applies strict admission to the typed Application lifecycle sidecar.
+`Initialized`, `Iconified`, `Active`, `SingleTask`, `DoubleStart`, and
+`ForceQuit` are canonical MorphOS BOOL values; malformed present state fails
+closed before lifecycle getters, initialization, iconification, or active-state
+writes, while absent state still bootstraps. The focused application/window
+slice passes **199/199**, the complete host suite passes **1672/1672**, and the
+focused freestanding admission closure returns **42** on MC68000 after **229
+instructions / 3,116 cycles** from a **660-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed. This remains a freestanding, C-like transition with no exception
+path, managed runtime, or consumer-facing numeric object-layout offset.
+
+MG934 applies strict admission to the typed Window event-reuse sidecar.
+`ContextActive` and `Pending` are canonical BOOLs; mapped retained
+`HandleEvent` packets are required when present, pending reuse requires a
+nonzero event class, and direct native dispatch may retain a NULL packet. The
+caller/native `InputEvent` value remains an opaque named capability because
+MorphOS can supply an address outside the MUI guest-memory window. Present
+malformed state fails closed before Window dispatch, queue, take, or drain;
+absent state still bootstraps. The focused application/window slice passes
+**198/198**, the complete host suite passes **1671/1671**, and the focused
+freestanding admission closure returns **42** on MC68000 after **528
+instructions / 6,814 cycles** from a **1,668-byte** HUNK with zero relocations,
+framework features, and managed allocations. MC68020 and MC68040 closure builds
+also succeed. This remains a freestanding, C-like transition with no exception
+path, managed runtime, or consumer-facing numeric object-layout offset.
+
+MG933 applies strict admission to the typed Window interaction-state sidecar.
+`Snapshot` is a canonical BOOL; a non-empty cycle chain must point to mapped
+named nodes whose sequence, payload, and successor fields form an exact bounded
+list of live guest objects, while an empty chain requires a NULL head. Present
+malformed state fails closed before Snapshot, active-object cycling, spatial
+selection, or cycle-chain membership traversal; valid raw compatibility changes
+refresh the named struct and absent state still bootstraps. The focused
+application/window slice passes **196/196**, the complete host suite passes
+**1669/1669**, and the focused freestanding admission closure returns **42** on
+MC68000 after **345 instructions / 4,348 cycles** from a **1,492-byte** HUNK
+with zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed. This remains a freestanding, C-like
+transition with no exception path, managed runtime, or consumer-facing numeric
+object-layout offset.
+
+MG932 applies strict mapped-pointer and live-object admission to the typed
+Window event-state sidecar. `CloseRequest` is a canonical BOOL; `InputEvent`
+must be NULL or a mapped Amiga `InputEvent`; and `MouseObject` must be NULL or
+a live non-self guest object. Present malformed state fails closed before event
+getters, pointer publication, or event polling; valid raw compatibility changes
+refresh the named struct and absent state still bootstraps. The focused
+application/window slice passes **194/194**, the complete host suite passes
+**1667/1667**, and the focused freestanding admission closure returns **42** on
+MC68000 after **385 instructions / 4,686 cycles** from a **1,408-byte** HUNK
+with zero relocations, framework features, and managed allocations. MC68020 and
+MC68040 closure builds also succeed. This remains a freestanding, C-like
+transition with no exception path, managed runtime, or consumer-facing numeric
+object-layout offset.
+
+MG931 applies strict mapped-pointer and live-object admission to the typed
+Window focus-state sidecar. `ActiveObject` and `DefaultObject` are NULL or
+live guest objects before focus getters, activation, or default/active setters
+consume them; malformed present state fails closed, while valid transitions
+refresh the named struct after raw compatibility mutation and absent state
+still bootstraps. The focused application/window slice passes **192/192**, the
+complete host suite passes **1665/1665**, and the focused freestanding
+admission closure returns **42** on MC68000 after **322 instructions / 3,868
+cycles** from a **1,308-byte** HUNK with zero relocations, framework features,
+and managed allocations. This remains a freestanding, C-like transition with
+no exception path, managed runtime, or consumer-facing numeric object-layout
+offset.
+
+MG930 applies strict mapped-pointer and live-topology admission to the typed
+Window relationship-state sidecar. `RootObject` and `Menustrip` must be live
+children of the Window family, `Menustrip` must be classified as a Menustrip
+specialist, and a non-NULL `RefWindow` must be a live non-self object.
+Relationship setters refresh the named struct after family detach/attach
+mutations; present malformed state fails closed before public relationship
+getters or setters can project or mutate raw attributes, while absent state
+still bootstraps. The focused application/window slice passes **190/190**, the
+complete host suite passes **1663/1663**, and the focused freestanding
+admission closure returns **42** on MC68000 after **360 instructions / 4,444
+cycles** from a **1,372-byte** HUNK with zero relocations, framework features,
+and managed allocations. This remains a freestanding, C-like transition with
+no exception path, managed runtime, or consumer-facing numeric object-layout
+offset.
+
+MG929 applies platform-aware strict admission to the typed Window
+presentation-state sidecar. Caller-owned `Title`, `ScreenTitle`, and
+`PublicScreen` pointers must resolve to bounded mapped C strings, while
+`Screen` must be a mapped guest capability. Present malformed state fails
+closed before public presentation getters or setters mutate raw attributes;
+absent state still bootstraps, and structural codecs remain available for ABI
+qualification. The malformed presentation-state regression proves an unmapped
+pointer cannot be projected or changed through a public Set packet. The focused
+application/window slice passes **188/188**, and the complete host suite passes
+**1661/1661**. The focused freestanding admission closure returns **42** on
+MC68000 after **380 instructions / 4,738 cycles**, with zero relocations,
+framework features, and managed allocations. This remains a freestanding,
+C-like transition with no exception path, managed runtime, or consumer-facing
+numeric object-layout offset.
+
+MG928 applies strict live admission to the typed Window control-state
+sidecar. Named `VisibleOnMaximize`, `IsSubWindow`, and `NeedsMouseObject` BOOL
+fields reject noncanonical values, while `Id` and `DisableKeys` remain opaque
+ULONG state. Present malformed control state fails closed before public
+getters or setters mutate raw attributes; absent state still bootstraps, and
+structural codecs remain available for ABI qualification. The malformed
+control-state regression proves a corrupted sidecar cannot be projected or
+changed through a public Set packet. The focused application/window slice
+passes **186/186**, and the complete host suite passes **1659/1659**. The
+focused freestanding admission closure returns **42** on MC68000 after **194
+instructions / 2,636 cycles**, with zero relocations, framework features, and
+managed allocations. This remains a freestanding, C-like transition with no
+exception path, managed runtime, or consumer-facing numeric object-layout
+offset.
+
+MG927 applies strict live admission to the typed Window visual-state sidecar.
+Named `NoMenus`, `HasAlpha`, and `FancyDrawing` BOOL fields reject
+noncanonical values, while `Opacity` is bounded to 0..255 and `MenuAction`
+remains opaque event data. Present malformed visual state fails closed before
+public getters or setters mutate raw attributes; absent state still
+bootstraps, and structural codecs remain available for ABI qualification. The
+malformed visual-state regression proves a corrupted sidecar cannot be
+projected or changed through a public Set packet. The focused
+application/window slice passes **184/184**, and the complete host suite
+passes **1657/1657**. The focused freestanding admission closure returns
+**42** on MC68000 after **205 instructions / 2,750 cycles**, with zero
+relocations, framework features, and managed allocations. This remains a
+freestanding, C-like transition with no exception path, managed runtime, or
+consumer-facing numeric object-layout offset.
+
+MG926 applies strict live admission to the shared Window LifecycleState
+sidecar. The named native-window capability, Open projection, and
+iconified-open request reject noncanonical BOOL values and impossible
+capability topology. Present malformed lifecycle storage fails closed before
+`OpenWindow` or `CloseWindow` can cross the platform boundary; absent state
+still bootstraps, and the structural codec remains available for ABI
+qualification. The malformed lifecycle regression proves no native open or
+close is attempted after corruption. The focused application/window slice
+passes **182/182**, and the complete host suite passes **1655/1655**. The
+focused freestanding admission closure returns **42** on MC68000 after **188
+instructions / 2,472 cycles**, with zero relocations, framework features, and
+managed allocations. This remains a freestanding, C-like transition with no
+exception path, managed runtime, or consumer-facing numeric object-layout
+offset.
+
+MG925 applies strict live admission to the typed Window open-policy sidecar.
+Signed alternate/normal geometry remains represented by named fields, while
+gadget, mode, tablet, and border-scroller BOOLs reject noncanonical values.
+Present malformed policy fails closed before public getters or native window
+configuration; absent state still bootstraps, and raw BOOLs are canonicalized
+when the record is first published. Structural codecs remain available for ABI
+qualification. The malformed Window policy regression proves getters fail
+closed and `OpenWindow` closes the tentative native window without applying
+policy. The focused application/window slice passes **180/180**, and the
+complete host suite passes **1653/1653**. The focused freestanding admission
+closure returns **42** on MC68000 after **287 instructions / 4,270 cycles**,
+with zero relocations, framework features, and managed allocations. This
+remains a freestanding, C-like transition with no exception path, managed
+runtime, or consumer-facing numeric object-layout offset.
+
+MG924 applies strict live admission to the shared Application initializer
+policy sidecar. Named `UseRexx`, `UseCommodities`, and `UseScreenNotify` BOOL
+fields reject noncanonical values; present malformed state fails closed before
+application getters, setters, or initialization can mutate raw compatibility
+storage, while absent state remains a bootstrap path. Structural codecs remain
+available for ABI qualification. The malformed Application policy regression
+proves consumer reads and writes fail closed without changing the prior raw
+value. The focused application/window slice passes **179/179**, and the
+complete host suite passes **1652/1652**. The focused freestanding admission
+closure returns **42** on MC68000 after **95 instructions / 1,164 cycles**,
+with zero relocations, framework features, and managed allocations. This
+remains a freestanding, C-like transition with no exception path, managed
+runtime, or consumer-facing numeric object-layout offset.
+
+MG923 extends strict live admission to the Volumelist-specific ExampleMode
+sidecar. The named MorphOS [I..] BOOL is canonicalized on writes, while a
+present malformed value fails closed before getters or population can consume
+it; absent state remains a bootstrap path. The structural codec remains
+available for ABI qualification. The malformed Volumelist regression proves
+the valid listing is left untouched when the mode record is invalid. The
+focused Dirlist/Volumelist slice passes **39/39**, and the complete host suite
+passes **1651/1651**. The focused freestanding admission closure returns **42**
+on MC68000 after **75 instructions / 790 cycles**, with zero relocations,
+framework features, and managed allocations. This remains a freestanding,
+C-like transition with no exception path, managed runtime, or consumer-facing
+numeric object-layout offset.
+
+MG922 applies strict live admission to the shared Dirlist/Volumelist policy and
+scan sidecars. Named SortState, FilterState, and ScanState records reject
+noncanonical selectors, BOOLs, status/counter bounds, and mismatched owned
+pattern storage; correctly sized malformed records fail closed instead of
+falling back to raw attributes, while absent records still bootstrap. The
+structural codecs remain available for ABI qualification. The malformed
+Dirlist regression proves consumer reads fail closed and `ReRead` repairs the
+scan record. The focused Dirlist/Volumelist slice passes **38/38**, and the
+complete host suite passes **1650/1650**. The focused freestanding admission
+closure returns **42** on MC68000 after **361 instructions / 4,910 cycles**,
+with zero relocations, framework features, and managed allocations. This
+remains a freestanding, C-like transition with no exception path, managed
+runtime, or consumer-facing numeric object-layout offset.
+
+MG921 gives the shared Boopsi/Dtpic external-wrapper family strict live
+admission over its named 136-byte sidecar. Unknown class/flag combinations,
+owned scratch blocks, Boopsi object ownership, Dtpic name/picture state, and
+cross-class residue are validated before wrapper operations; the structural
+header codec remains available for ABI qualification. The malformed-wrapper
+regression covers invalid flags and broken work ownership. The focused
+ExternalWrapper slice passes **84/84**, and the complete host suite passes
+**1649/1649**. The focused freestanding admission closure returns **42** on
+MC68000 after **221 instructions / 2,332 cycles**, with zero relocations,
+framework features, and managed allocations. This remains a freestanding,
+C-like transition with no exception path, managed runtime, or
+consumer-facing numeric object-layout offset.
+
+MG920 gives the shared Misc specialist family strict live admission over its
+named 196-byte sidecar. Unknown class/flag combinations, malformed owned
+string slots, Filepanel ASL/hook/row topology, Title page bounds, Mccprefs
+registry bounds, and Scrmodelist storage are rejected before class mutation,
+hooks, or disposal; `TryReadStructural` remains available for ABI
+qualification. The malformed Misc regression covers Keyadjust and Filepanel
+fail-closed behavior. The focused Misc slice passes **68/68**, and the complete
+host suite passes **1648/1648**. The focused freestanding admission closure
+returns **42** on MC68000 after **185 instructions / 2,190 cycles**. This
+remains a freestanding, C-like transition with no exception path, managed
+runtime, or consumer-facing numeric object-layout offset. Contract surface:
+the MorphOS 3.20 MUI inventory's Keyadjust, Panel, Filepanel, Fontdisplay,
+Scrmodelist, Argstring, Aboutmui, Mccprefs, FSProtectionBits, and Title
+specialists.
+
+MG919 gives the shared Pop* specialist family strict live admission over its
+named 108-byte sidecar. Class-specific flags, ASL requester topology, popup
+window/scratch blocks, and Poplist materialization bounds are validated before
+hooks, ASL, popup, or disposal operations; the structural codec remains
+available for ABI qualification. Malformed Popstring and Popasl states fail
+closed. The focused Pop* slice passes **35/35**, and the complete host suite
+passes **1647/1647**. NativeExecution builds with **0 errors** (two existing
+CopperMod/SourceLink warnings), NativeRoot builds with **0 errors** (12
+existing SDK type-overlap `CS0436` warnings), and the focused freestanding
+gate remains **2/2**. The focused admission closure returns **42** on MC68000
+after **729 instructions / 10,974 cycles**. This remains a freestanding,
+C-like transition with no exception path, managed runtime, or consumer-facing
+numeric object-layout offset. Contract surface: the MorphOS 3.20 MUI ABI
+inventory's Popstring/Popobject/Poplist/Popasl/Popcolor/Poppen specialists.
+
+MG918 gives the named 52-byte Process/Slave specialist sidecar strict live
+admission. Process state and task-token topology, the AutoLaunch flag, owned
+Name storage, and Slave setup/dispatch balance are validated before scheduler,
+signal, dispatch, or disposal paths. Terminal Process states clear their
+scheduler token, while the structural codec remains available for ABI
+qualification. The focused Process/Slave slice passes **47/47**, and the
+complete host suite passes **1646/1646**. NativeExecution builds with **0
+errors** (two existing CopperMod/SourceLink warnings), NativeRoot builds with
+**0 errors** (12 existing SDK type-overlap `CS0436` warnings), and the focused
+freestanding gate remains **2/2**. This remains a freestanding, C-like
+transition with no exception path, managed runtime, or consumer-facing
+numeric object-layout offset. Contract surface: the MorphOS 3.20 MUI ABI
+inventory's Process.mui and Slave.mui specialists.
+
+MG917 gives the named 64-byte pen/color specialist state strict live admission.
+Class-specific block topology, flag dependencies, setup bindings, pen
+ownership, and mapped guest blocks are validated before drawing or pen
+lifecycle operations. The structural codec remains available for ABI
+qualification. The focused color specialist slice passes **40/40**, and the
+complete host suite passes **1645/1645**. NativeExecution builds with **0
+errors** (two existing CopperMod/SourceLink warnings), NativeRoot builds with
+**0 errors** (12 existing SDK type-overlap `CS0436` warnings), and the focused
+freestanding gate remains **2/2**. This remains a freestanding, C-like
+transition with no exception path, managed runtime, or consumer-facing
+numeric object-layout offset. Contract surface: the MorphOS 3.20 MUI ABI
+inventory's pen/color specialist state.
+
+MG916 gives the named menu specialist sidecar strict live admission. The
+structural 52-byte codec remains available for ABI qualification, while
+production reads reject unknown flags, invalid class discriminators, impossible
+change depth, nonzero reserved data, and inconsistent or unmapped owned strings
+before menu mutation. The focused menu specialist slice passes **40/40**, and
+the complete host suite passes **1644/1644**. NativeExecution builds with **0
+errors** (two existing CopperMod/SourceLink warnings), NativeRoot builds with
+**0 errors** (12 existing SDK type-overlap `CS0436` warnings), and the focused
+freestanding gate remains **2/2**. This remains a freestanding, C-like
+transition with no exception path, managed runtime, or consumer-facing
+numeric object-layout offset. Contract surface: the MorphOS 3.20 MUI ABI
+inventory's menu specialist sidecar.
+
+MG915 gives the named ASL service-state and requester-lease records strict
+live admission. The bounded lease walk rejects malformed magic/version state,
+odd or unmapped lease links, null requesters, invalid tag lists, and cyclic
+chains before ASL capability calls or lease-list mutation. Structural packet
+codecs remain available for ABI qualification, while production traversal
+stays struct-first. The focused ASL service slice passes **9/9**, and the
+complete host suite passes **1643/1643**. NativeExecution builds with **0
+errors** (two existing CopperMod/SourceLink warnings), NativeRoot builds with
+**0 errors** (12 existing SDK type-overlap `CS0436` warnings), and the focused
+freestanding gate remains **2/2**. This remains a freestanding, C-like
+transition with no exception path, managed runtime, or consumer-facing
+numeric object-layout offset. Contract surface: the MorphOS 3.20 MUI ABI
+inventory's ASL requester service.
+
+MG914 gives the named Virtgroup display and pointer records strict,
+struct-first admission. Display dimensions must be non-negative; drag flags
+are limited to the named Active/Captured bits and cannot capture without being
+active. Present malformed state fails closed before display replacement or
+drag-state allocation; absent state still bootstraps atomically. The
+specialized layout slice passes **25/25**, and the complete host suite passes
+**1641/1641**. NativeExecution builds with **0 errors** (two existing
+CopperMod/SourceLink warnings), and NativeRoot builds with **0 errors** (12
+existing SDK type-overlap `CS0436` warnings); the focused freestanding gate
+remains **2/2**. This remains a freestanding, C-like transition with no
+exception path, managed runtime, or consumer-facing numeric object-layout
+offset. Contract surface: the MorphOS 3.20 MUI ABI inventory's Virtgroup
+display and pointer projections.
+
+MG913 gives the named `MuiScrollgroupLayoutStateRecord` and
+`MuiVirtgroupLayoutStateRecord` strict, struct-first admission. Scrollgroup
+layout pointers and BOOL fields are validated; Virtgroup layout geometry is
+non-negative and `TryFit` is canonical. Present malformed layout state fails
+closed before raw compatibility attributes can rebuild it or dependent
+projections can be published; absent state still bootstraps atomically. The
+regressions confirm that the private pointers, allocation count, and
+Virtgroup display projection remain unchanged. The specialized layout slice
+passes **23/23**, focused common-control coverage remains **168/168**, the
+focused dispatcher suite remains **95/95**, and the complete host suite passes
+**1639/1639**. NativeExecution builds with **0 errors** (two existing
+CopperMod/SourceLink warnings), and NativeRoot builds with **0 errors** (12
+existing SDK type-overlap `CS0436` warnings); the focused freestanding gate
+remains **2/2**. This remains a freestanding, C-like transition with no
+exception path, managed runtime, or consumer-facing numeric object-layout
+offset. Contract surface: the MorphOS 3.20 MUI ABI inventory's Scrollgroup
+and Virtgroup layout projections.
+
+MG912 gives `MuiScrollgroupViewportStateRecord` strict, struct-first admission:
+non-negative viewport/content geometry, bounded scroll maxima/positions, and
+canonical visibility BOOLs are validated before publication. Present malformed
+state fails closed before Scrollgroup layout or viewport reads; absent state
+still bootstraps atomically. The malformed viewport regression confirms that
+the private pointer and allocation count remain unchanged. The specialized
+layout slice passes **21/21**, focused common-control coverage remains
+**168/168**, the focused dispatcher suite remains **95/95**, and the complete
+host suite passes **1637/1637**. NativeExecution builds with **0 errors** (two
+existing CopperMod/SourceLink warnings), and NativeRoot builds with **0 errors**
+(12 existing SDK type-overlap `CS0436` warnings); the focused freestanding
+gate remains **2/2**. This remains a freestanding, C-like transition with no
+exception path, managed runtime, or consumer-facing numeric object-layout
+offset. Contract surface: the MorphOS 3.20 MUI ABI inventory's Scrollgroup
+viewport projection.
+
+MG911 gives `MuiScrollgroupBorderScrollerStateRecord` strict, struct-first
+admission: its Window pointer, canonical ownership flags, and reserved field
+are validated before publication. Present malformed projection state fails
+closed before Window border ownership or layout repair; absent state still
+bootstraps atomically. The malformed projection regression confirms that its
+private pointer and allocation count remain unchanged. The specialized layout
+slice passes **20/20**, focused common-control coverage remains **168/168**,
+the focused dispatcher suite remains **95/95**, and the complete host suite
+passes **1636/1636**. NativeExecution builds with **0 errors** (two existing
+CopperMod/SourceLink warnings), and NativeRoot builds with **0 errors** (12
+existing SDK type-overlap `CS0436` warnings); the focused freestanding gate
+remains **2/2**. This remains a freestanding, C-like transition with no
+exception path, managed runtime, or consumer-facing numeric object-layout
+offset. Contract surface: the MorphOS 3.20 MUI ABI inventory's Scrollgroup
+border-scroller projection.
+
+MG910 gives `MuiScrollgroupPolicyStateRecord` strict, struct-first admission:
+canonical BOOL fields and mapped object pointers are validated before
+publication. Present malformed state fails closed before Scrollgroup getters,
+setters, layout, or event handling and is not repaired through raw
+compatibility attributes; absent state still bootstraps atomically. The
+malformed Scrollgroup regression confirms that the private state pointer,
+allocation count, and raw AutoBars value remain unchanged. The specialized
+layout slice passes **19/19**, focused common-control coverage remains
+**168/168**, the focused dispatcher suite remains **95/95**, and the complete
+host suite passes **1635/1635**. NativeExecution builds with **0 errors** (two
+existing CopperMod/SourceLink warnings), and NativeRoot builds with **0
+errors** (12 existing SDK type-overlap `CS0436` warnings); the focused
+freestanding gate remains **2/2**. This remains a freestanding, C-like
+transition with no exception path, managed runtime, or consumer-facing numeric
+object-layout offset. Contract surface: the MorphOS 3.20 MUI ABI inventory's
+Scrollgroup policy attributes.
+
+MG909 gives `MuiRegisterPolicyStateRecord` strict, struct-first admission:
+canonical Frame and mapped Titles pointer state are validated before
+publication. Present malformed state fails closed before Register getters,
+initialization, or active-page transitions and is not repaired through raw
+compatibility attributes; absent state still bootstraps atomically. The
+malformed Register regression confirms that the private state pointer,
+allocation count, and raw Frame remain unchanged. The specialized layout slice
+passes **18/18**, focused common-control coverage remains **168/168**, the
+focused dispatcher suite remains **95/95**, and the complete host suite passes
+**1634/1634**. NativeExecution builds with **0 errors** (two existing
+CopperMod/SourceLink warnings), and NativeRoot builds with **0 errors** (12
+existing SDK type-overlap `CS0436` warnings); the focused freestanding gate
+remains **2/2**. This remains a freestanding, C-like transition with no
+exception path, managed runtime, or consumer-facing numeric object-layout
+offset. Contract surface: the MorphOS 3.20 MUI ABI inventory's Register
+policy attributes.
+
+MG908 gives `MuiVirtgroupPolicyStateRecord` strict, struct-first admission:
+canonical MorphOS BOOL values are validated before publication. Present
+malformed state fails closed before Virtgroup getters, setters, input handling,
+or layout and is not repaired through raw compatibility attributes; absent
+state still bootstraps atomically. The malformed Virtgroup regression confirms
+that the private state pointer, allocation count, and raw geometry remain
+unchanged. The specialized layout slice passes **17/17**, focused common-
+control coverage remains **168/168**, the focused dispatcher suite remains
+**95/95**, and the complete host suite passes **1633/1633**. NativeExecution
+builds with **0 errors** (two existing CopperMod/SourceLink warnings), and
+NativeRoot builds with **0 errors** (12 existing SDK type-overlap `CS0436`
+warnings); the focused freestanding gate remains **2/2**. This remains a
+freestanding, C-like transition with no exception path, managed runtime, or
+consumer-facing numeric object-layout offset. Contract surface: the MorphOS
+3.20 MUI ABI inventory's Virtgroup policy attributes.
+
+MG907 gives `MuiSelectgroupActiveStateRecord` strict, struct-first admission:
+its cookie and bounded canonical child index are validated before publication.
+Present malformed state fails closed before Selectgroup getters, next/previous
+selectors, or setters and is not repaired through the raw Active attribute;
+absent state still bootstraps atomically. The malformed Selectgroup regression
+confirms that the private state pointer, allocation count, and raw Active value
+remain unchanged. The specialized layout slice passes **16/16**, focused
+common-control coverage remains **168/168**, the focused dispatcher suite
+remains **95/95**, and the complete host suite passes **1632/1632**. The
+focused freestanding gate remains **2/2**. NativeExecution builds with
+**0 errors** (two existing CopperMod/SourceLink warnings). NativeRoot remains
+buildable with **0 errors** (12 existing SDK type-overlap `CS0436` warnings).
+This remains a freestanding, C-like transition
+with no exception path, managed runtime, or consumer-facing numeric
+object-layout offset. Contract surface: the MorphOS 3.20 MUI ABI inventory's
+`Selectgroup.Active` contract.
+
+MG906 gives `MuiGroupChangeState` strict, struct-first admission: its cookie and
+bounded nesting depth are validated before publication. Present malformed state
+fails closed before `InitChange`, `ExitChange`, depth/flag reads, or state
+cleanup; it is not repaired through a raw private attribute. Absent state still
+bootstraps atomically, and depth updates publish only after the named record
+write succeeds. The malformed change-state regression confirms that the private
+state pointer and allocation count remain unchanged. Focused common-control
+coverage is **168/168**, the focused dispatcher suite passes **95/95**, the
+complete host suite is **1631/1631**, and the focused freestanding gate remains
+**2/2**. NativeExecution builds with **0 errors** (two existing
+CopperMod/SourceLink warnings). NativeRoot remains blocked by pre-existing
+external CopperSharp68k AHI SDK `CS0266` errors in
+`Sdk.Amiga/AHI/Structures.cs`. This remains a freestanding, C-like transition
+with no exception path, managed runtime, or consumer-facing numeric
+object-layout offset. Contract surface: the official [MorphOS MUI Group
+documentation](https://morphos-team.net/sdk/MUI/MUI_Group.html).
+
+MG905 gives `MuiGroupChildListState` strict, struct-first admission: its cookie,
+Group/list/entry pointers, bounded count/capacity, and mapped projection storage
+are validated before publication. Present malformed state fails closed before
+Group `ChildList` or Family-list getters and never rebuilds or allocates a
+replacement projection; valid stale state still rebuilds after Family mutation.
+Projection publication is failure-atomic, and the malformed-list regression
+confirms that the private state pointer and Family child count remain unchanged.
+Focused common-control coverage is **168/168**, the Group-children slice passes
+**14/14**, the complete host suite is **1630/1630**, and the focused
+freestanding gate remains **2/2**. NativeExecution builds with **0 errors**
+(two existing CopperMod/SourceLink warnings). NativeRoot remains blocked by
+pre-existing external CopperSharp68k AHI SDK `CS0266` errors in
+`Sdk.Amiga/AHI/Structures.cs`. This remains a freestanding, C-like transition
+with no exception path, managed runtime, or consumer-facing numeric
+object-layout offset. Contract surface: the official [MorphOS MUI Group
+documentation](https://morphos-team.net/sdk/MUI/MUI_Group.html).
+
+MG904 gives `MuiGroupForwardState` strict, struct-first admission: its cookie
+and MorphOS BOOL fields must be canonical before publication. Present malformed
+state fails closed before `Forward`/`ForwardDepth` getters, forwarding setters,
+or descendant attribute propagation; malformed state is not repaired through
+raw compatibility storage. Absent state still bootstraps from raw forwarding
+attributes, and state writes are failure-atomic. The malformed-forwarding
+regression confirms that the prior child value and raw forward flag remain
+unchanged. Focused common-control coverage is **168/168**, the Group-children
+slice passes **13/13**, the complete host suite is **1629/1629**, and the
+focused freestanding gate remains **2/2**. NativeExecution builds with
+**0 errors** (two existing CopperMod/SourceLink warnings). NativeRoot remains
+blocked by pre-existing external CopperSharp68k AHI SDK `CS0266` errors in
+`Sdk.Amiga/AHI/Structures.cs`. This remains a freestanding, C-like transition
+with no exception path, managed runtime, or consumer-facing numeric
+object-layout offset. Contract surface: the official [MorphOS MUI Group
+documentation](https://morphos-team.net/sdk/MUI/MUI_Group.html).
+
+MG903 gives `MuiGroupLayoutHookStateRecord` strict, struct-first admission: its
+cookie is validated before publication. Present malformed hook state fails
+closed before the public hook getter, setter, Group min/max, or child layout;
+the common getter dispatcher cannot mask the failure with a raw compatibility
+slot. Absent state still bootstraps from the raw hook value, and the malformed-
+hook regression confirms that raw hook storage and child geometry remain
+unchanged. Focused common-control coverage is **168/168**, the AreaLayout slice
+passes **22/22**, the complete host suite is **1628/1628**, and the focused
+freestanding gate remains **2/2**. NativeExecution builds with **0 errors**
+(two existing CopperMod/SourceLink warnings). NativeRoot remains blocked by
+pre-existing external CopperSharp68k AHI SDK `CS0266` errors in
+`Sdk.Amiga/AHI/Structures.cs`. This remains a freestanding, C-like transition
+with no exception path, managed runtime, or consumer-facing numeric
+object-layout offset. Contract surface: the official [MorphOS MUI Group
+documentation](https://morphos-team.net/sdk/MUI/MUI_Group.html).
+
+MG902 gives `MuiGroupPageState` strict, struct-first admission: canonical active
+indices, MorphOS page selectors, and the state cookie are validated before
+publication. Present malformed state fails closed before `ActivePage` getters,
+setters, or page layout; absent state bootstraps atomically without repairing a
+malformed record through raw fallback. The malformed-page regression confirms
+that raw selection and child geometry remain unchanged. Focused common-control
+coverage is **168/168**, the Group-page slice passes **6/6**, the complete host
+suite is **1627/1627**, and the focused freestanding gate remains **2/2**.
+NativeExecution builds with **0 errors** (two existing CopperMod/SourceLink
+warnings). NativeRoot remains blocked by pre-existing external CopperSharp68k
+AHI SDK `CS0266` errors in `Sdk.Amiga/AHI/Structures.cs`. This remains a
+freestanding, C-like transition with no exception path, managed runtime, or
+consumer-facing numeric object-layout offset. Contract surface: the official
+[MorphOS MUI Group documentation](https://morphos-team.net/sdk/MUI/MUI_Group.html).
+
+MG901 gives `MuiGroupGridStateRecord` strict, struct-first admission:
+columns/rows, MorphOS spacing forms, equal-size BOOLs, and center modes are
+validated at the named guest-state boundary. Present malformed records fail
+closed before Group grid getters, min/max, or child layout; absent records still
+bootstrap from raw compatibility attributes, and sanitized values publish
+through the same struct. The malformed-grid regression confirms that raw
+attributes and child geometry remain unchanged. Focused common-control coverage
+is **168/168**, the Group-grid slice passes **16/16**, the complete host suite
+is **1626/1626**, and the focused freestanding gate remains **2/2**.
+NativeExecution builds with **0 errors** (two existing CopperMod/SourceLink
+warnings). NativeRoot remains blocked by pre-existing external CopperSharp68k
+AHI SDK `CS0266` errors in `Sdk.Amiga/AHI/Structures.cs`. This remains a
+freestanding, C-like transition with no exception path, managed runtime, or
+consumer-facing numeric object-layout offset. Contract surface: the official
+[MorphOS MUI Group documentation](https://morphos-team.net/sdk/MUI/MUI_Group.html).
+
 MG900 gives `MuiGroupLayoutPolicyStateRecord` struct-first semantic admission:
 MorphOS BOOL fields (`Horizontal`, `SameWidth`, `SameHeight`, `SameSize`, and
 `PageMode`) are restricted to 0/1, signed spacing retains documented default/percentage

@@ -1189,6 +1189,181 @@ public sealed class MuiListtreeTests
 	}
 
 	[Fact]
+	public void ListtreeCorePacketsUseDedicatedStructCodecs()
+	{
+		var p = CreatePlatform(out _);
+		var packet = APTR.FromPointer(0x2E00);
+
+		var set = default(MuiListtreeSetMessage);
+		set.MethodId = MuiListtreeMessageCodec.Set;
+		set.Attribute = 7;
+		set.Value = 9;
+		Assert.True(MuiListtreeSetMessageCodec.TryWrite(ref p, packet, set));
+		Assert.True(MuiListtreeSetMessageCodec.TryRead(ref p, packet,
+			out var setRead));
+		Assert.Equal(set.Attribute, setRead.Attribute);
+		Assert.Equal(set.Value, setRead.Value);
+
+		var get = default(MuiListtreeGetMessage);
+		get.MethodId = MuiListtreeMessageCodec.Get;
+		get.Attribute = 11;
+		get.Storage = 0x2E80;
+		Assert.True(MuiListtreeGetMessageCodec.TryWrite(ref p, packet, get));
+		Assert.True(MuiListtreeGetMessageCodec.TryRead(ref p, packet,
+			out var getRead));
+		Assert.Equal(get.Attribute, getRead.Attribute);
+		Assert.Equal(get.Storage, getRead.Storage);
+
+		var entry = default(MuiListtreeGetEntryMessage);
+		entry.MethodId = MuiListtreeMessageCodec.GetEntry;
+		entry.Node = 0x2F00;
+		entry.Position = unchecked((uint)-2);
+		entry.Flags = 3;
+		Assert.True(MuiListtreeGetEntryMessageCodec.TryWrite(ref p, packet,
+			entry));
+		Assert.True(MuiListtreeGetEntryMessageCodec.TryRead(ref p, packet,
+			out var entryRead));
+		Assert.Equal(entry.Node, entryRead.Node);
+		Assert.Equal(entry.Position, entryRead.Position);
+		Assert.Equal(entry.Flags, entryRead.Flags);
+
+		var method = default(MuiListtreeMethodMessage);
+		method.MethodId = MuiListtreeMessageCodec.Insert;
+		Assert.True(MuiListtreeMethodMessageCodec.TryWrite(ref p, packet,
+			method.MethodId));
+		Assert.True(MuiListtreeMethodMessageCodec.TryRead(ref p, packet,
+			out var methodRead));
+		Assert.Equal(method.MethodId, methodRead.MethodId);
+
+		var insert = default(MuiListtreeInsertMessage);
+		insert.MethodId = MuiListtreeMessageCodec.Insert;
+		insert.Name = 0x2F20;
+		insert.User = 0x2F24;
+		insert.ListNode = 0x2F28;
+		insert.PrevNode = 0x2F2C;
+		insert.Flags = 5;
+		Assert.True(MuiListtreeInsertMessageCodec.TryWrite(ref p, packet,
+			insert));
+		Assert.True(MuiListtreeInsertMessageCodec.TryRead(ref p, packet,
+			out var insertRead));
+		Assert.Equal(insert.Name, insertRead.Name);
+		Assert.Equal(insert.PrevNode, insertRead.PrevNode);
+		Assert.Equal(insert.Flags, insertRead.Flags);
+
+		var remove = default(MuiListtreeRemoveMessage);
+		remove.MethodId = MuiListtreeMessageCodec.Remove;
+		remove.ListNode = 0x2F30;
+		remove.TreeNode = 0x2F34;
+		remove.Flags = 6;
+		Assert.True(MuiListtreeRemoveMessageCodec.TryWrite(ref p, packet,
+			remove));
+		Assert.True(MuiListtreeRemoveMessageCodec.TryRead(ref p, packet,
+			out var removeRead));
+		Assert.Equal(remove.TreeNode, removeRead.TreeNode);
+		Assert.Equal(remove.Flags, removeRead.Flags);
+
+		var openClose = default(MuiListtreeOpenCloseMessage);
+		openClose.MethodId = MuiListtreeMessageCodec.Open;
+		openClose.ListNode = 0x2F40;
+		openClose.TreeNode = 0x2F44;
+		openClose.Flags = 7;
+		Assert.True(MuiListtreeOpenCloseMessageCodec.TryWrite(ref p, packet,
+			openClose));
+		Assert.True(MuiListtreeOpenCloseMessageCodec.TryRead(ref p, packet,
+			out var openCloseRead));
+		Assert.Equal(openClose.MethodId, openCloseRead.MethodId);
+		Assert.Equal(openClose.ListNode, openCloseRead.ListNode);
+		Assert.Equal(openClose.Flags, openCloseRead.Flags);
+
+		var sort = default(MuiListtreeSortMessage);
+		sort.MethodId = MuiListtreeMessageCodec.Sort;
+		sort.ListNode = 0x2F50;
+		sort.Flags = 8;
+		Assert.True(MuiListtreeSortMessageCodec.TryWrite(ref p, packet, sort));
+		Assert.True(MuiListtreeSortMessageCodec.TryRead(ref p, packet,
+			out var sortRead));
+		Assert.Equal(sort.ListNode, sortRead.ListNode);
+		Assert.Equal(sort.Flags, sortRead.Flags);
+
+		var getNr = default(MuiListtreeGetNrMessage);
+		getNr.MethodId = MuiListtreeMessageCodec.GetNr;
+		getNr.TreeNode = 0x2F54;
+		getNr.Flags = 9;
+		Assert.True(MuiListtreeGetNrMessageCodec.TryWrite(ref p, packet, getNr));
+		Assert.True(MuiListtreeGetNrMessageCodec.TryRead(ref p, packet,
+			out var getNrRead));
+		Assert.Equal(getNr.TreeNode, getNrRead.TreeNode);
+		Assert.Equal(getNr.Flags, getNrRead.Flags);
+
+		var move = default(MuiListtreeMoveExchangeMessage);
+		move.MethodId = MuiListtreeMessageCodec.Move;
+		move.OldListNode = 0x2F60;
+		move.OldTreeNode = 0x2F64;
+		move.NewListNode = 0x2F68;
+		move.NewTreeNode = 0x2F6C;
+		move.Flags = 10;
+		Assert.True(MuiListtreeMoveExchangeMessageCodec.TryWrite(ref p,
+			packet, move));
+		Assert.True(MuiListtreeMoveExchangeMessageCodec.TryRead(ref p, packet,
+			out var moveRead));
+		Assert.Equal(move.OldTreeNode, moveRead.OldTreeNode);
+		Assert.Equal(move.NewTreeNode, moveRead.NewTreeNode);
+		Assert.Equal(move.Flags, moveRead.Flags);
+
+		var rename = default(MuiListtreeRenameMessage);
+		rename.MethodId = MuiListtreeMessageCodec.Rename;
+		rename.TreeNode = 0x2F70;
+		rename.NewName = 0x2F74;
+		rename.Flags = 11;
+		Assert.True(MuiListtreeRenameMessageCodec.TryWrite(ref p, packet,
+			rename));
+		Assert.True(MuiListtreeRenameMessageCodec.TryRead(ref p, packet,
+			out var renameRead));
+		Assert.Equal(rename.TreeNode, renameRead.TreeNode);
+		Assert.Equal(rename.NewName, renameRead.NewName);
+		Assert.Equal(rename.Flags, renameRead.Flags);
+
+		var findName = default(MuiListtreeFindNameMessage);
+		findName.MethodId = MuiListtreeMessageCodec.FindName;
+		findName.ListNode = 0x2F80;
+		findName.Name = 0x2F84;
+		findName.Flags = 12;
+		Assert.True(MuiListtreeFindNameMessageCodec.TryWrite(ref p, packet,
+			findName));
+		Assert.True(MuiListtreeFindNameMessageCodec.TryRead(ref p, packet,
+			out var findNameRead));
+		Assert.Equal(findName.ListNode, findNameRead.ListNode);
+		Assert.Equal(findName.Name, findNameRead.Name);
+		Assert.Equal(findName.Flags, findNameRead.Flags);
+
+		var dropMark = default(MuiListtreeDropMarkMessage);
+		dropMark.MethodId = MuiListtreeMessageCodec.SetDropMark;
+		dropMark.Entry = 13;
+		dropMark.Values = 0x2F90;
+		Assert.True(MuiListtreeDropMarkMessageCodec.TryWrite(ref p, packet,
+			dropMark));
+		Assert.True(MuiListtreeDropMarkMessageCodec.TryRead(ref p, packet,
+			out var dropMarkRead));
+		Assert.Equal(dropMark.Entry, dropMarkRead.Entry);
+		Assert.Equal(dropMark.Values, dropMarkRead.Values);
+
+		var testPos = default(MuiListtreeTestPosMessage);
+		testPos.MethodId = MuiListtreeMessageCodec.TestPos;
+		testPos.X = 14;
+		testPos.Y = 15;
+		testPos.Result = 0x2FA0;
+		Assert.True(MuiListtreeTestPosMessageCodec.TryWrite(ref p, packet,
+			testPos));
+		Assert.True(MuiListtreeTestPosMessageCodec.TryRead(ref p, packet,
+			out var testPosRead));
+		Assert.Equal(testPos.X, testPosRead.X);
+		Assert.Equal(testPos.Y, testPosRead.Y);
+		Assert.Equal(testPos.Result, testPosRead.Result);
+		Assert.False(MuiListtreeGetEntryMessageCodec.TryRead(ref p,
+			APTR.FromPointer(0x200FFF), out _));
+	}
+
+	[Fact]
 	public void ListtreeHookPoolRecordUsesNamedFieldsAndRejectsMalformedBoundary()
 	{
 		var p = new MuiHeadlessTestPlatform(0x1000, 0x80, 0x1080, State);

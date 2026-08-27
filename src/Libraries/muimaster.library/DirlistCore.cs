@@ -79,6 +79,30 @@ internal struct MuiDirlistSortStateRecord
 	internal uint SortHighLow;
 }
 
+// Pure admission for the shared Dirlist/Volumelist policy records. The
+// structural codecs below own the packed guest layout; this small validator
+// owns only the MorphOS selector/BOOL/status invariants. Object-owned pointer
+// identity is checked by MuiDirlistCore when the record is read in context.
+internal static class MuiDirlistStateAdmission
+{
+	internal static bool ValidateSort(MuiDirlistSortStateRecord value) =>
+		value.Magic == MuiDirlistSortStateRecord.Cookie &&
+		value.SortType <= 5 && value.SortDirs <= 2 &&
+		value.SortHighLow <= 1;
+
+	internal static bool ValidateFilter(MuiDirlistFilterStateRecord value) =>
+		value.Magic == MuiDirlistFilterStateRecord.Cookie &&
+		value.DrawersOnly <= 1 && value.FilesOnly <= 1 &&
+		value.FilterDrawers <= 1 && value.MultiSelDirs <= 1 &&
+		value.RejectIcons <= 1;
+
+	internal static bool ValidateScan(MuiDirlistScanStateRecord value) =>
+		value.Magic == MuiDirlistScanStateRecord.Cookie &&
+		value.Status <= MuiDirlistCore.StatusValid &&
+		value.NumFiles <= 65536 && value.NumDrawers <= 65536 &&
+		value.NumFiles <= 65536 - value.NumDrawers;
+}
+
 // Scan publication is kept as one named result record so status, counters,
 // byte totals, and the captured AmigaDOS IoErr cannot become inconsistent at
 // a valid/invalid transition.
@@ -481,7 +505,8 @@ internal static class MuiDirlistRecordFieldCursorCodec
 
 internal static class MuiDirlistSortStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiDirlistSortStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -490,7 +515,7 @@ internal static class MuiDirlistSortStateRecordCodec
 			MuiDirlistSortStateRecord.Size) ||
 			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.SortState, MuiDirlistRecordField.Magic,
-				out var magic) || magic != MuiDirlistSortStateRecord.Cookie ||
+				out var magic) ||
 			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.SortState,
 				MuiDirlistRecordField.SortTypeValue, out value.SortType) ||
@@ -505,13 +530,22 @@ internal static class MuiDirlistSortStateRecordCodec
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiDirlistSortStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		return TryReadStructural(ref platform, address, out value) &&
+			MuiDirlistStateAdmission.ValidateSort(value);
+	}
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiDirlistSortStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistSortStateRecord.Size) || value.Magic !=
-			MuiDirlistSortStateRecord.Cookie) return false;
+			MuiDirlistSortStateRecord.Size) ||
+			!MuiDirlistStateAdmission.ValidateSort(value)) return false;
 		return MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
 			address, MuiDirlistRecordKind.SortState,
 			MuiDirlistRecordField.Magic, value.Magic) &&
@@ -529,7 +563,8 @@ internal static class MuiDirlistSortStateRecordCodec
 
 internal static class MuiDirlistFilterStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiDirlistFilterStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -538,7 +573,7 @@ internal static class MuiDirlistFilterStateRecordCodec
 			MuiDirlistFilterStateRecord.Size) ||
 			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.FilterState, MuiDirlistRecordField.Magic,
-				out var magic) || magic != MuiDirlistFilterStateRecord.Cookie ||
+				out var magic) ||
 			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.FilterState,
 				MuiDirlistRecordField.AcceptPatternValue,
@@ -586,13 +621,22 @@ internal static class MuiDirlistFilterStateRecordCodec
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiDirlistFilterStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		return TryReadStructural(ref platform, address, out value) &&
+			MuiDirlistStateAdmission.ValidateFilter(value);
+	}
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiDirlistFilterStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistFilterStateRecord.Size) || value.Magic !=
-			MuiDirlistFilterStateRecord.Cookie) return false;
+			MuiDirlistFilterStateRecord.Size) ||
+			!MuiDirlistStateAdmission.ValidateFilter(value)) return false;
 		return MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
 			address, MuiDirlistRecordKind.FilterState,
 			MuiDirlistRecordField.Magic, value.Magic) &&
@@ -634,7 +678,8 @@ internal static class MuiDirlistFilterStateRecordCodec
 
 internal static class MuiDirlistScanStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiDirlistScanStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -643,7 +688,7 @@ internal static class MuiDirlistScanStateRecordCodec
 			MuiDirlistScanStateRecord.Size) ||
 			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanState, MuiDirlistRecordField.Magic,
-				out var magic) || magic != MuiDirlistScanStateRecord.Cookie ||
+				out var magic) ||
 			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanState,
 				MuiDirlistRecordField.StatusValue, out value.Status) ||
@@ -664,13 +709,22 @@ internal static class MuiDirlistScanStateRecordCodec
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiDirlistScanStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		return TryReadStructural(ref platform, address, out value) &&
+			MuiDirlistStateAdmission.ValidateScan(value);
+	}
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiDirlistScanStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistScanStateRecord.Size) || value.Magic !=
-			MuiDirlistScanStateRecord.Cookie) return false;
+			MuiDirlistScanStateRecord.Size) ||
+			!MuiDirlistStateAdmission.ValidateScan(value)) return false;
 		return MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
 			address, MuiDirlistRecordKind.ScanState,
 			MuiDirlistRecordField.Magic, value.Magic) &&
@@ -930,6 +984,46 @@ public static class MuiDirlistCore
 		attribute == Path || IsFilterAttribute(attribute) ||
 		IsSortAttribute(attribute);
 
+	private static bool ValidateOwnedPattern<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, uint key, APTR value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var expected = MuiStoreCore.DataspaceFind(ref platform, state, obj, key);
+		if (expected.Raw != value.Raw) return false;
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj, key);
+		if (value.IsNull) return length == 0;
+		return length > 0 && length <= MaxPattern + 1 &&
+			CStringCodec.TryReadLength(ref platform, value, MaxPattern + 1,
+				out _);
+	}
+
+	private static bool ValidateFilterStateRecord<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		MuiDirlistFilterStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiDirlistStateAdmission.ValidateFilter(value) &&
+		ValidateOwnedPattern(ref platform, state, obj, AcceptKey,
+			value.AcceptPattern) &&
+		ValidateOwnedPattern(ref platform, state, obj, RejectKey,
+			value.RejectPattern) &&
+		ValidateOwnedPattern(ref platform, state, obj, PatternKey,
+			value.Pattern);
+
+	private static bool HasFilterStateStorage<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			FilterStateKey) == unchecked((int)MuiDirlistFilterStateRecord.Size);
+
+	private static bool HasSortStateStorage<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			SortStateKey) == unchecked((int)MuiDirlistSortStateRecord.Size);
+
+	private static bool HasScanStateStorage<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ScanStateKey) == unchecked((int)MuiDirlistScanStateRecord.Size);
+
 	private static bool TryReadFilterStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj,
 		out MuiDirlistFilterStateRecord value)
@@ -942,7 +1036,8 @@ public static class MuiDirlistCore
 			FilterStateKey) != unchecked((int)MuiDirlistFilterStateRecord.Size))
 			return false;
 		return MuiDirlistFilterStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && ValidateFilterStateRecord(ref platform, state, obj,
+			value);
 	}
 
 	private static void FillFilterStateRecord<TPlatform>(ref TPlatform platform,
@@ -1035,6 +1130,10 @@ public static class MuiDirlistCore
 			result.FilterHook = stored.FilterHook;
 			return true;
 		}
+		// A correctly sized record that fails admission is malformed, not a
+		// bootstrap miss. Do not fall back to raw attributes and let invalid
+		// policy reach filtering or hook dispatch.
+		if (HasFilterStateStorage(ref platform, state, obj)) return false;
 		result.AcceptPattern = MuiStoreCore.DataspaceFind(ref platform, state,
 			obj, AcceptKey);
 		result.RejectPattern = MuiStoreCore.DataspaceFind(ref platform, state,
@@ -1155,6 +1254,7 @@ public static class MuiDirlistCore
 			result.SortHighLow = stored.SortHighLow;
 			return true;
 		}
+		if (HasSortStateStorage(ref platform, state, obj)) return false;
 		result.SortType = NormalizeSortType(Read(ref platform, state, obj,
 			SortType, SortTypeName));
 		result.SortDirs = NormalizeSortDirs(Read(ref platform, state, obj,
@@ -1246,6 +1346,7 @@ public static class MuiDirlistCore
 			result.IoErr = stored.IoErr;
 			return true;
 		}
+		if (HasScanStateStorage(ref platform, state, obj)) return false;
 		result.Status = Read(ref platform, state, obj, Status, StatusInvalid);
 		result.NumFiles = Read(ref platform, state, obj, NumFiles, 0);
 		result.NumDrawers = Read(ref platform, state, obj, NumDrawers, 0);

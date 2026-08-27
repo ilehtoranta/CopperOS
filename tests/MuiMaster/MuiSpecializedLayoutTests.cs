@@ -11,6 +11,16 @@ public sealed class MuiSpecializedLayoutTests
 	private const uint Left = 0x8042BEC6;
 	private const uint FixWidth = 0x8042A3F1;
 	private const uint FixHeight = 0x8042A92B;
+	private const uint SelectgroupPolicyStateKey = 0x0D100016u;
+	private const uint VirtgroupPolicyStateKey = 0x0D100018u;
+	private const uint RegisterPolicyStateKey = 0x0D100015u;
+	private const uint ScrollgroupPolicyStateKey = 0x0D100017u;
+	private const uint ScrollgroupLayoutStateKey = 0x0D100012u;
+	private const uint VirtgroupLayoutStateKey = 0x0D100011u;
+	private const uint VirtgroupDisplayStateKey = 0x0D10001Au;
+	private const uint VirtgroupPointerStateKey = 0x0D10001Bu;
+	private const uint BorderScrollerStateKey = 0x0D10001Cu;
+	private const uint ViewportStateKey = 0x0D100019u;
 
 	[Fact]
 	public void RegisterAndSelectgroupSwitchPageGeometryDeterministically()
@@ -563,6 +573,67 @@ public sealed class MuiSpecializedLayoutTests
 	}
 
 	[Fact]
+	public void MalformedRegisterPolicyFailsClosedBeforeInitializationRepair()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		Assert.True(MuiHeadlessObjectCore.Initialize(ref platform, State));
+		var groupName = APTR.FromPointer(0x1100);
+		var registerName = APTR.FromPointer(0x1140);
+		platform.WriteCString(groupName, "Group.mui");
+		platform.WriteCString(registerName, "Register.mui");
+		var groupClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			groupName, APTR.Null, 0, APTR.FromPointer(1), false);
+		var registerClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			registerName, groupClass, 0, APTR.FromPointer(1), false);
+		var titles = APTR.FromPointer(0x1180);
+		platform.WriteCString(titles, "First");
+		var tags = APTR.FromPointer(0x1200);
+		platform.WriteUInt32(tags, 0, MuiRegisterCore.Frame);
+		platform.WriteUInt32(tags, 4, 1);
+		platform.WriteUInt32(tags, 8, MuiRegisterCore.Titles);
+		platform.WriteUInt32(tags, 12, titles.Raw);
+		platform.WriteUInt32(tags, 16, 0);
+		var register = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			registerClass, tags);
+		var child = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			groupClass, APTR.Null);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, register, child));
+		Assert.True(MuiRegisterCore.Initialize(ref platform, State, register));
+		Assert.True(MuiRegisterCore.TryGetPolicyState(ref platform, State, register,
+			out var initial));
+		Assert.Equal(1u, initial.Frame);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, register,
+			RegisterPolicyStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiRegisterPolicyStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiRegisterPolicyStateField.Frame, 2));
+		Assert.False(MuiRegisterPolicyStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		var allocationsBefore = platform.AllocationCount;
+
+		Assert.False(MuiRegisterCore.TryGetAttribute(ref platform, State, register,
+			MuiRegisterCore.Frame, out _));
+		Assert.False(MuiRegisterCore.TryGetPolicyState(ref platform, State, register,
+			out _));
+		Assert.False(MuiRegisterCore.Initialize(ref platform, State, register));
+		Assert.False(MuiRegisterCore.SetActive(ref platform, State, register, 0));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State,
+			register, RegisterPolicyStateKey));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			register, MuiRegisterCore.Frame, out var rawFrame));
+		Assert.Equal(1u, rawFrame);
+
+		Assert.True(MuiRegisterPolicyStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiRegisterPolicyStateField.Frame, 1));
+		Assert.True(MuiRegisterCore.TryGetPolicyState(ref platform, State, register,
+			out var restored));
+		Assert.Equal(1u, restored.Frame);
+	}
+
+	[Fact]
 	public void SelectgroupActiveUsesNamedStateAndSignedCyclingSelectors()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -619,6 +690,109 @@ public sealed class MuiSpecializedLayoutTests
 			selectgroup, MuiSelectgroupCore.Active, unchecked((uint)-2), false));
 		Assert.Equal(1u, Get(ref platform, selectgroup,
 			MuiSelectgroupCore.Active));
+	}
+
+	[Fact]
+	public void MalformedSelectgroupActiveStateFailsClosedBeforeRawRepair()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		Assert.True(MuiHeadlessObjectCore.Initialize(ref platform, State));
+		var groupName = APTR.FromPointer(0x1100);
+		var selectgroupName = APTR.FromPointer(0x1140);
+		platform.WriteCString(groupName, "Group.mui");
+		platform.WriteCString(selectgroupName, "Selectgroup.mui");
+		var groupClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			groupName, APTR.Null, 0, APTR.FromPointer(1), false);
+		var selectgroupClass = MuiHeadlessObjectCore.RegisterClass(ref platform,
+			State, selectgroupName, groupClass, 0, APTR.FromPointer(1), false);
+		var tags = APTR.FromPointer(0x1200);
+		platform.WriteUInt32(tags, 0, MuiSelectgroupCore.Active);
+		platform.WriteUInt32(tags, 4, 0);
+		platform.WriteUInt32(tags, 8, 0);
+		var selectgroup = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			selectgroupClass, tags);
+		var first = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			groupClass, APTR.Null);
+		var second = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			groupClass, APTR.Null);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, selectgroup, first));
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, selectgroup, second));
+		Assert.True(MuiRegisterCore.Initialize(ref platform, State, selectgroup));
+		Assert.True(MuiSelectgroupCore.TryGetPolicyState(ref platform, State,
+			selectgroup, out var initial));
+		Assert.Equal(0u, initial.Active);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, selectgroup,
+			SelectgroupPolicyStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiSelectgroupActiveStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiSelectgroupActiveStateField.Active,
+			MuiHeadlessLayout.MaximumTraversal + 1u));
+		Assert.True(MuiSelectgroupActiveStateRecordCodec.TryReadStructural(
+			ref platform, block, out var malformed));
+		Assert.Equal(MuiHeadlessLayout.MaximumTraversal + 1u, malformed.Active);
+		Assert.False(MuiSelectgroupActiveStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		var allocationsBefore = platform.AllocationCount;
+
+		Assert.False(MuiSelectgroupCore.TryGetAttribute(ref platform, State,
+			selectgroup, MuiSelectgroupCore.Active, out _));
+		Assert.False(MuiSelectgroupCore.TryGetPolicyState(ref platform, State,
+			selectgroup, out _));
+		Assert.False(MuiSelectgroupCore.SetActive(ref platform, State,
+			selectgroup, -1));
+		Assert.False(MuiHeadlessObjectCore.SetAttribute(ref platform, State,
+			selectgroup, MuiSelectgroupCore.Active, 1, false));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State,
+			selectgroup, SelectgroupPolicyStateKey));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			selectgroup, MuiSelectgroupCore.Active, out var rawActive));
+		Assert.Equal(0u, rawActive);
+
+		Assert.True(MuiSelectgroupActiveStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiSelectgroupActiveStateField.Active, 1));
+		Assert.True(MuiSelectgroupCore.TryGetPolicyState(ref platform, State,
+			selectgroup, out var restored));
+		Assert.Equal(0u, restored.Active);
+	}
+
+	[Fact]
+	public void SelectgroupActiveAdmissionValidatesShapeAndLiveOwner()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		Assert.True(MuiHeadlessObjectCore.Initialize(ref platform, State));
+		var groupName = APTR.FromPointer(0x1100);
+		var selectgroupName = APTR.FromPointer(0x1140);
+		platform.WriteCString(groupName, "Group.mui");
+		platform.WriteCString(selectgroupName, "Selectgroup.mui");
+		var groupClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			groupName, APTR.Null, 0, APTR.FromPointer(1), false);
+		var selectgroupClass = MuiHeadlessObjectCore.RegisterClass(ref platform,
+			State, selectgroupName, groupClass, 0, APTR.FromPointer(1), false);
+		var selectgroup = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			selectgroupClass, APTR.Null);
+		Assert.True(selectgroup.IsNotNull);
+
+		var value = default(MuiSelectgroupActiveStateRecord);
+		value.Magic = MuiSelectgroupActiveStateRecord.Cookie;
+		value.Active = 1;
+		Assert.True(MuiSelectgroupActiveStateAdmission.Validate(value));
+		Assert.True(MuiSelectgroupActiveStateAdmission.ValidateLive(ref platform,
+			State, selectgroup, value));
+		value.Active = MuiHeadlessLayout.MaximumTraversal + 1u;
+		Assert.False(MuiSelectgroupActiveStateAdmission.Validate(value));
+		Assert.False(MuiSelectgroupActiveStateAdmission.ValidateLive(ref platform,
+			State, selectgroup, value));
+		value.Active = 1;
+		Assert.False(MuiSelectgroupActiveStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x90000000), value));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			selectgroup));
+		Assert.False(MuiSelectgroupActiveStateAdmission.ValidateLive(ref platform,
+			State, selectgroup, value));
 	}
 
 	[Fact]
@@ -719,6 +893,382 @@ public sealed class MuiSpecializedLayoutTests
 			scrollgroup, MuiScrollgroupCore.FreeHorizontal, 0, false));
 		Assert.False(MuiHeadlessObjectCore.SetAttribute(ref platform, State,
 			scrollgroup, MuiScrollgroupCore.HorizontalBar, 0, false));
+	}
+
+	[Fact]
+	public void MalformedScrollgroupPolicyFailsClosedBeforeLayoutAndRawRepair()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		Assert.True(MuiHeadlessObjectCore.Initialize(ref platform, State));
+		var groupName = APTR.FromPointer(0x1100);
+		var scrollgroupName = APTR.FromPointer(0x1140);
+		platform.WriteCString(groupName, "Group.mui");
+		platform.WriteCString(scrollgroupName, "Scrollgroup.mui");
+		var groupClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			groupName, APTR.Null, 0, APTR.FromPointer(1), false);
+		var scrollgroupClass = MuiHeadlessObjectCore.RegisterClass(ref platform,
+			State, scrollgroupName, groupClass, 0, APTR.FromPointer(1), false);
+		var contents = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			groupClass, APTR.Null);
+		var tags = APTR.FromPointer(0x1200);
+		platform.WriteUInt32(tags, 0, MuiScrollgroupCore.AutoBars);
+		platform.WriteUInt32(tags, 4, 1);
+		platform.WriteUInt32(tags, 8, MuiScrollgroupCore.Contents);
+		platform.WriteUInt32(tags, 12, contents.Raw);
+		platform.WriteUInt32(tags, 16, MuiScrollgroupCore.FreeHorizontal);
+		platform.WriteUInt32(tags, 20, 1);
+		platform.WriteUInt32(tags, 24, MuiScrollgroupCore.FreeVertical);
+		platform.WriteUInt32(tags, 28, 0);
+		platform.WriteUInt32(tags, 32, MuiScrollgroupCore.NoHorizontalBar);
+		platform.WriteUInt32(tags, 36, 0);
+		platform.WriteUInt32(tags, 40, MuiScrollgroupCore.NoVerticalBar);
+		platform.WriteUInt32(tags, 44, 0);
+		platform.WriteUInt32(tags, 48, MuiScrollgroupCore.UseWindowBorder);
+		platform.WriteUInt32(tags, 52, 0);
+		platform.WriteUInt32(tags, 56, 0);
+		var scrollgroup = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			scrollgroupClass, tags);
+		Assert.True(MuiScrollgroupCore.TryGetPolicyState(ref platform, State,
+			scrollgroup, out var initial));
+		Assert.Equal(1u, initial.AutoBars);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, scrollgroup,
+			ScrollgroupPolicyStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiScrollgroupPolicyStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiScrollgroupPolicyStateField.AutoBars, 2));
+		Assert.True(MuiScrollgroupPolicyStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(2u, structural.AutoBars);
+		Assert.False(MuiScrollgroupPolicyStateAdmission.Validate(ref platform,
+			structural));
+		Assert.False(MuiScrollgroupPolicyStateAdmission.ValidateLive(ref platform,
+			State, scrollgroup, structural));
+		Assert.False(MuiScrollgroupPolicyStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		var allocationsBefore = platform.AllocationCount;
+
+		Assert.False(MuiScrollgroupCore.TryGetAttribute(ref platform, State,
+			scrollgroup, MuiScrollgroupCore.AutoBars, out _));
+		Assert.False(MuiScrollgroupCore.TryGetPolicyState(ref platform, State,
+			scrollgroup, out _));
+		Assert.False(MuiHeadlessObjectCore.SetAttribute(ref platform, State,
+			scrollgroup, MuiScrollgroupCore.AutoBars, 0, false));
+		Assert.False(MuiScrollgroupCore.Layout(ref platform, State, scrollgroup,
+			0, 0, 100, 80));
+		Assert.Equal(0u, MuiScrollgroupCore.HandleEvent(ref platform, State,
+			scrollgroup, APTR.Null, 9));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State,
+			scrollgroup, ScrollgroupPolicyStateKey));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			scrollgroup, MuiScrollgroupCore.AutoBars, out var rawAutoBars));
+		Assert.Equal(1u, rawAutoBars);
+
+		Assert.True(MuiScrollgroupPolicyStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiScrollgroupPolicyStateField.AutoBars, 1));
+		Assert.True(MuiScrollgroupCore.TryGetPolicyState(ref platform, State,
+			scrollgroup, out var restored));
+		Assert.Equal(1u, restored.AutoBars);
+	}
+
+	[Fact]
+	public void ScrollgroupPolicyAdmissionRequiresCookiePolicyAndOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var scrollgroup = Object(ref platform, cl);
+		var valid = default(MuiScrollgroupPolicyStateRecord);
+		valid.Magic = MuiScrollgroupPolicyStateRecord.Cookie;
+		valid.Contents = APTR.Null;
+		valid.FreeHorizontal = 1;
+		valid.FreeVertical = 0;
+		valid.HorizontalBar = APTR.Null;
+		valid.VerticalBar = APTR.Null;
+		valid.NoHorizontalBar = 0;
+		valid.NoVerticalBar = 1;
+		valid.AutoBars = 1;
+		valid.UseWindowBorder = 0;
+		Assert.True(MuiScrollgroupPolicyStateAdmission.Validate(ref platform,
+			valid));
+		Assert.True(MuiScrollgroupPolicyStateAdmission.ValidateLive(ref platform,
+			State, scrollgroup, valid));
+		var malformed = valid;
+		malformed.AutoBars = 2;
+		Assert.False(MuiScrollgroupPolicyStateAdmission.Validate(ref platform,
+			malformed));
+		Assert.False(MuiScrollgroupPolicyStateAdmission.ValidateLive(ref platform,
+			State, scrollgroup, malformed));
+		Assert.False(MuiScrollgroupPolicyStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedScrollgroupBorderScrollerStateFailsClosedBeforeRepair()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		Assert.True(MuiHeadlessObjectCore.Initialize(ref platform, State));
+		var groupName = APTR.FromPointer(0x1100);
+		var scrollgroupName = APTR.FromPointer(0x1140);
+		platform.WriteCString(groupName, "Group.mui");
+		platform.WriteCString(scrollgroupName, "Scrollgroup.mui");
+		var groupClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			groupName, APTR.Null, 0, APTR.FromPointer(1), false);
+		var scrollgroupClass = MuiHeadlessObjectCore.RegisterClass(ref platform,
+			State, scrollgroupName, groupClass, 0, APTR.FromPointer(1), false);
+		var contents = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			groupClass, APTR.Null);
+		var tags = APTR.FromPointer(0x1200);
+		platform.WriteUInt32(tags, 0, MuiScrollgroupCore.Contents);
+		platform.WriteUInt32(tags, 4, contents.Raw);
+		platform.WriteUInt32(tags, 8, MuiScrollgroupCore.FreeHorizontal);
+		platform.WriteUInt32(tags, 12, 0);
+		platform.WriteUInt32(tags, 16, MuiScrollgroupCore.FreeVertical);
+		platform.WriteUInt32(tags, 20, 0);
+		platform.WriteUInt32(tags, 24, MuiScrollgroupCore.UseWindowBorder);
+		platform.WriteUInt32(tags, 28, 0);
+		platform.WriteUInt32(tags, 32, 0);
+		var scrollgroup = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			scrollgroupClass, tags);
+		Assert.True(MuiScrollgroupCore.Layout(ref platform, State, scrollgroup,
+			0, 0, 100, 80));
+		Assert.True(MuiScrollgroupCore.TryGetBorderScrollerState(ref platform,
+			State, scrollgroup, out var initial));
+		Assert.Equal(0u, initial.Applied);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, scrollgroup,
+			BorderScrollerStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiScrollgroupBorderScrollerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block,
+			MuiScrollgroupBorderScrollerStateField.Applied, 2));
+		Assert.True(MuiScrollgroupBorderScrollerStateRecordCodec.TryReadStructural(
+			ref platform, block, out var malformed));
+		Assert.Equal(2u, malformed.Applied);
+		Assert.False(MuiScrollgroupBorderScrollerStateAdmission.Validate(
+			ref platform, malformed));
+		Assert.False(MuiScrollgroupBorderScrollerStateAdmission.ValidateLive(
+			ref platform, State, scrollgroup, malformed));
+		Assert.False(MuiScrollgroupBorderScrollerStateRecordCodec.TryRead(
+			ref platform, block, out _));
+		var allocationsBefore = platform.AllocationCount;
+
+		Assert.False(MuiScrollgroupCore.Layout(ref platform, State, scrollgroup,
+			0, 0, 100, 80));
+		Assert.False(MuiScrollgroupCore.TryGetBorderScrollerState(ref platform,
+			State, scrollgroup, out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State,
+			scrollgroup, BorderScrollerStateKey));
+
+		Assert.True(MuiScrollgroupBorderScrollerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block,
+			MuiScrollgroupBorderScrollerStateField.Applied, 0));
+		Assert.True(MuiScrollgroupCore.Layout(ref platform, State, scrollgroup,
+			0, 0, 100, 80));
+	}
+
+	[Fact]
+	public void ScrollgroupBorderScrollerAdmissionRequiresCookiePolicyAndOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var scrollgroup = Object(ref platform, cl);
+		var valid = default(MuiScrollgroupBorderScrollerStateRecord);
+		valid.Magic = MuiScrollgroupBorderScrollerStateRecord.Cookie;
+		valid.Window = APTR.Null;
+		valid.UseWindowBorder = 0;
+		valid.HorizontalRequested = 0;
+		valid.VerticalRequested = 0;
+		valid.Applied = 0;
+		valid.Reserved = 0;
+		Assert.True(MuiScrollgroupBorderScrollerStateAdmission.Validate(
+			ref platform, valid));
+		Assert.True(MuiScrollgroupBorderScrollerStateAdmission.ValidateLive(
+			ref platform, State, scrollgroup, valid));
+		var malformed = valid;
+		malformed.Reserved = 1;
+		Assert.False(MuiScrollgroupBorderScrollerStateAdmission.Validate(
+			ref platform, malformed));
+		Assert.False(MuiScrollgroupBorderScrollerStateAdmission.ValidateLive(
+			ref platform, State, scrollgroup, malformed));
+		Assert.False(MuiScrollgroupBorderScrollerStateAdmission.ValidateLive(
+			ref platform, State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedScrollgroupViewportFailsClosedBeforeLayoutRepair()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		Assert.True(MuiHeadlessObjectCore.Initialize(ref platform, State));
+		var groupName = APTR.FromPointer(0x1100);
+		var scrollgroupName = APTR.FromPointer(0x1140);
+		platform.WriteCString(groupName, "Group.mui");
+		platform.WriteCString(scrollgroupName, "Scrollgroup.mui");
+		var groupClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			groupName, APTR.Null, 0, APTR.FromPointer(1), false);
+		var scrollgroupClass = MuiHeadlessObjectCore.RegisterClass(ref platform,
+			State, scrollgroupName, groupClass, 0, APTR.FromPointer(1), false);
+		var contents = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			groupClass, APTR.Null);
+		var tags = APTR.FromPointer(0x1200);
+		platform.WriteUInt32(tags, 0, MuiScrollgroupCore.Contents);
+		platform.WriteUInt32(tags, 4, contents.Raw);
+		platform.WriteUInt32(tags, 8, MuiScrollgroupCore.FreeHorizontal);
+		platform.WriteUInt32(tags, 12, 1);
+		platform.WriteUInt32(tags, 16, MuiScrollgroupCore.FreeVertical);
+		platform.WriteUInt32(tags, 20, 0);
+		platform.WriteUInt32(tags, 24, 0);
+		var scrollgroup = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			scrollgroupClass, tags);
+		Assert.True(MuiScrollgroupCore.Layout(ref platform, State, scrollgroup,
+			0, 0, 100, 80));
+		Assert.True(MuiScrollgroupCore.TryGetViewportState(ref platform, State,
+			scrollgroup, out var initial));
+		Assert.Equal(0, initial.ScrollLeft);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, scrollgroup,
+			ViewportStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiScrollgroupViewportFieldCursorCodec.TryWriteUInt32(
+			ref platform, block,
+			MuiScrollgroupViewportField.HorizontalBarVisible, 2));
+		Assert.True(MuiScrollgroupViewportStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(2u, structural.HorizontalBarVisible);
+		Assert.False(MuiScrollgroupViewportStateAdmission.Validate(structural));
+		Assert.False(MuiScrollgroupViewportStateAdmission.ValidateLive(ref platform,
+			State, scrollgroup, structural));
+		Assert.False(MuiScrollgroupViewportStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		var allocationsBefore = platform.AllocationCount;
+
+		Assert.False(MuiScrollgroupCore.Layout(ref platform, State, scrollgroup,
+			0, 0, 100, 80));
+		Assert.False(MuiScrollgroupCore.TryGetViewportState(ref platform, State,
+			scrollgroup, out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State,
+			scrollgroup, ViewportStateKey));
+
+		Assert.True(MuiScrollgroupViewportFieldCursorCodec.TryWriteUInt32(
+			ref platform, block,
+			MuiScrollgroupViewportField.HorizontalBarVisible, 0));
+		Assert.True(MuiScrollgroupCore.Layout(ref platform, State, scrollgroup,
+			0, 0, 100, 80));
+	}
+
+	[Fact]
+	public void ScrollgroupViewportAdmissionRequiresShapeAndOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var scrollgroup = Object(ref platform, cl);
+		var valid = default(MuiScrollgroupViewportStateRecord);
+		valid.Magic = MuiScrollgroupViewportStateRecord.Cookie;
+		valid.ViewportWidth = 100;
+		valid.ViewportHeight = 80;
+		valid.ContentWidth = 200;
+		valid.ContentHeight = 120;
+		valid.MaximumScrollX = 100;
+		valid.MaximumScrollY = 40;
+		valid.ScrollLeft = 25;
+		valid.ScrollTop = 10;
+		valid.HorizontalBarVisible = 1;
+		valid.VerticalBarVisible = 0;
+		Assert.True(MuiScrollgroupViewportStateAdmission.Validate(valid));
+		Assert.True(MuiScrollgroupViewportStateAdmission.ValidateLive(ref platform,
+			State, scrollgroup, valid));
+		var malformed = valid;
+		malformed.HorizontalBarVisible = 2;
+		Assert.False(MuiScrollgroupViewportStateAdmission.Validate(malformed));
+		Assert.False(MuiScrollgroupViewportStateAdmission.ValidateLive(ref platform,
+			State, scrollgroup, malformed));
+		Assert.False(MuiScrollgroupViewportStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedScrollgroupLayoutFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var groupClass);
+		var scrollgroup = Object(ref platform, groupClass);
+		var contents = Object(ref platform, groupClass);
+		var horizontalBar = Object(ref platform, groupClass);
+		var verticalBar = Object(ref platform, groupClass);
+		Set(ref platform, scrollgroup, MuiScrollgroupCore.Contents,
+			contents.Raw);
+		Set(ref platform, scrollgroup, MuiScrollgroupCore.FreeHorizontal, 1);
+		Set(ref platform, scrollgroup, MuiScrollgroupCore.FreeVertical, 1);
+		Set(ref platform, scrollgroup, MuiScrollgroupCore.HorizontalBar,
+			horizontalBar.Raw);
+		Set(ref platform, scrollgroup, MuiScrollgroupCore.VerticalBar,
+			verticalBar.Raw);
+		Assert.True(MuiScrollgroupCore.Layout(ref platform, State, scrollgroup,
+			0, 0, 100, 80));
+		Assert.True(MuiScrollgroupCore.TryGetLayoutState(ref platform, State,
+			scrollgroup, out var initial));
+		Assert.Equal(1u, initial.FreeHorizontal);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, scrollgroup,
+			ScrollgroupLayoutStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiScrollgroupLayoutFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiScrollgroupLayoutField.FreeHorizontal, 2));
+		Assert.True(MuiScrollgroupLayoutStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(2u, structural.FreeHorizontal);
+		Assert.False(MuiScrollgroupLayoutStateAdmission.Validate(ref platform,
+			structural));
+		Assert.False(MuiScrollgroupLayoutStateAdmission.ValidateLive(ref platform,
+			State, scrollgroup, structural));
+		Assert.False(MuiScrollgroupLayoutStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		var allocationsBefore = platform.AllocationCount;
+
+		Assert.False(MuiScrollgroupCore.Layout(ref platform, State, scrollgroup,
+			0, 0, 100, 80));
+		Assert.False(MuiScrollgroupCore.TryGetLayoutState(ref platform, State,
+			scrollgroup, out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State,
+			scrollgroup, ScrollgroupLayoutStateKey));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			scrollgroup, MuiScrollgroupCore.FreeHorizontal, out var rawFree));
+		Assert.Equal(1u, rawFree);
+
+		Assert.True(MuiScrollgroupLayoutFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiScrollgroupLayoutField.FreeHorizontal, 1));
+		Assert.True(MuiScrollgroupCore.Layout(ref platform, State, scrollgroup,
+			0, 0, 100, 80));
+	}
+
+	[Fact]
+	public void ScrollgroupLayoutAdmissionRequiresCookiePolicyAndOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var scrollgroup = Object(ref platform, cl);
+		var valid = default(MuiScrollgroupLayoutStateRecord);
+		valid.Magic = MuiScrollgroupLayoutStateRecord.Cookie;
+		valid.Contents = APTR.Null;
+		valid.FreeHorizontal = 1;
+		valid.FreeVertical = 0;
+		valid.HorizontalBar = APTR.Null;
+		valid.VerticalBar = APTR.Null;
+		valid.NoHorizontalBar = 0;
+		valid.NoVerticalBar = 1;
+		Assert.True(MuiScrollgroupLayoutStateAdmission.Validate(ref platform,
+			valid));
+		Assert.True(MuiScrollgroupLayoutStateAdmission.ValidateLive(ref platform,
+			State, scrollgroup, valid));
+		var malformed = valid;
+		malformed.NoVerticalBar = 2;
+		Assert.False(MuiScrollgroupLayoutStateAdmission.Validate(ref platform,
+			malformed));
+		Assert.False(MuiScrollgroupLayoutStateAdmission.ValidateLive(ref platform,
+			State, scrollgroup, malformed));
+		Assert.False(MuiScrollgroupLayoutStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
 	}
 
 	[Fact]
@@ -942,6 +1492,342 @@ public sealed class MuiSpecializedLayoutTests
 			virtgroup, MuiVirtgroupCore.Input, 0, false));
 		Assert.False(MuiHeadlessObjectCore.SetAttribute(ref platform, State,
 			virtgroup, MuiVirtgroupCore.VirtualWidth, 0, false));
+	}
+
+	[Fact]
+	public void MalformedVirtgroupPolicyFailsClosedBeforeRawRepairAndLayout()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		Assert.True(MuiHeadlessObjectCore.Initialize(ref platform, State));
+		var groupName = APTR.FromPointer(0x1100);
+		var virtgroupName = APTR.FromPointer(0x1140);
+		platform.WriteCString(groupName, "Group.mui");
+		platform.WriteCString(virtgroupName, "Virtgroup.mui");
+		var groupClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			groupName, APTR.Null, 0, APTR.FromPointer(1), false);
+		var virtgroupClass = MuiHeadlessObjectCore.RegisterClass(ref platform,
+			State, virtgroupName, groupClass, 0, APTR.FromPointer(1), false);
+		var tags = APTR.FromPointer(0x1200);
+		platform.WriteUInt32(tags, 0, MuiVirtgroupCore.Input);
+		platform.WriteUInt32(tags, 4, 1);
+		platform.WriteUInt32(tags, 8, MuiVirtgroupCore.VirtualLeft);
+		platform.WriteUInt32(tags, 12, 0);
+		platform.WriteUInt32(tags, 16, MuiVirtgroupCore.VirtualTop);
+		platform.WriteUInt32(tags, 20, 0);
+		platform.WriteUInt32(tags, 24, MuiVirtgroupCore.TryFit);
+		platform.WriteUInt32(tags, 28, 0);
+		platform.WriteUInt32(tags, 32, 0);
+		var virtgroup = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			virtgroupClass, tags);
+		var virtgroupRecord = MuiHeadlessObjectCore.FindObject(ref platform,
+			State, virtgroup);
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			virtgroupRecord, MuiVirtgroupCore.VirtualWidth, 320, false));
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			virtgroupRecord, MuiVirtgroupCore.VirtualHeight, 180, false));
+		Assert.True(MuiVirtgroupCore.TryGetPolicyState(ref platform, State,
+			virtgroup, out var initial));
+		Assert.Equal(1u, initial.Input);
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, virtgroup,
+			VirtgroupPolicyStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiVirtgroupPolicyStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiVirtgroupPolicyStateField.Input, 2));
+		Assert.True(MuiVirtgroupPolicyStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(2u, structural.Input);
+		Assert.False(MuiVirtgroupPolicyStateAdmission.Validate(structural));
+		Assert.False(MuiVirtgroupPolicyStateAdmission.ValidateLive(ref platform,
+			State, virtgroup, structural));
+		Assert.False(MuiVirtgroupPolicyStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		var allocationsBefore = platform.AllocationCount;
+
+		Assert.False(MuiVirtgroupCore.TryGetAttribute(ref platform, State,
+			virtgroup, MuiVirtgroupCore.VirtualWidth, out _));
+		Assert.False(MuiVirtgroupCore.TryGetPolicyState(ref platform, State,
+			virtgroup, out _));
+		Assert.False(MuiHeadlessObjectCore.SetAttribute(ref platform, State,
+			virtgroup, MuiVirtgroupCore.VirtualLeft, 5, false));
+		Assert.False(MuiVirtgroupCore.Layout(ref platform, State, virtgroup,
+			0, 0, 100, 80));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State,
+			virtgroup, VirtgroupPolicyStateKey));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			virtgroup, MuiVirtgroupCore.VirtualLeft, out var rawLeft));
+		Assert.Equal(0u, rawLeft);
+
+		Assert.True(MuiVirtgroupPolicyStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiVirtgroupPolicyStateField.Input, 1));
+		Assert.True(MuiVirtgroupCore.TryGetPolicyState(ref platform, State,
+			virtgroup, out var restored));
+		Assert.Equal(1u, restored.Input);
+	}
+
+	[Fact]
+	public void VirtgroupPolicyAdmissionRequiresCookiePolicyAndOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var virtgroup = Object(ref platform, cl);
+		var valid = default(MuiVirtgroupPolicyStateRecord);
+		valid.Magic = MuiVirtgroupPolicyStateRecord.Cookie;
+		valid.Input = 1;
+		valid.Width = 320;
+		valid.Height = 180;
+		valid.Left = -12;
+		valid.Top = 7;
+		valid.TryFit = 0;
+		Assert.True(MuiVirtgroupPolicyStateAdmission.Validate(valid));
+		Assert.True(MuiVirtgroupPolicyStateAdmission.ValidateLive(ref platform,
+			State, virtgroup, valid));
+		var malformed = valid;
+		malformed.TryFit = 2;
+		Assert.False(MuiVirtgroupPolicyStateAdmission.Validate(malformed));
+		Assert.False(MuiVirtgroupPolicyStateAdmission.ValidateLive(ref platform,
+			State, virtgroup, malformed));
+		Assert.False(MuiVirtgroupPolicyStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedVirtgroupLayoutFailsClosedBeforeDisplayRepair()
+	{
+		var platform = CreatePlatform(out var groupClass);
+		var virtgroup = Object(ref platform, groupClass);
+		var child = Object(ref platform, groupClass);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, virtgroup, child));
+		Set(ref platform, virtgroup, MuiVirtgroupCore.VirtualWidth, 320);
+		Set(ref platform, virtgroup, MuiVirtgroupCore.VirtualHeight, 180);
+		Set(ref platform, virtgroup, MuiVirtgroupCore.VirtualLeft, 12);
+		Set(ref platform, virtgroup, MuiVirtgroupCore.VirtualTop, 7);
+		Set(ref platform, virtgroup, MuiVirtgroupCore.TryFit, 0);
+		Assert.True(MuiVirtgroupCore.Layout(ref platform, State, virtgroup,
+			4, 5, 100, 80));
+		Assert.True(MuiVirtgroupCore.TryGetDisplayState(ref platform, State,
+			virtgroup, out var initialDisplay));
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, virtgroup,
+			VirtgroupLayoutStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiVirtgroupLayoutFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiVirtgroupLayoutField.TryFit, 2));
+		Assert.True(MuiVirtgroupLayoutStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(2u, structural.TryFit);
+		Assert.False(MuiVirtgroupLayoutStateAdmission.Validate(structural));
+		Assert.False(MuiVirtgroupLayoutStateAdmission.ValidateLive(ref platform,
+			State, virtgroup, structural));
+		Assert.False(MuiVirtgroupLayoutStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		var allocationsBefore = platform.AllocationCount;
+
+		Assert.False(MuiVirtgroupCore.Layout(ref platform, State, virtgroup,
+			40, 50, 200, 160));
+		Assert.False(MuiVirtgroupCore.TryGetLayoutState(ref platform, State,
+			virtgroup, out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State,
+			virtgroup, VirtgroupLayoutStateKey));
+		Assert.True(MuiVirtgroupCore.TryGetDisplayState(ref platform, State,
+			virtgroup, out var displayAfter));
+		Assert.Equal(initialDisplay.Left, displayAfter.Left);
+		Assert.Equal(initialDisplay.Top, displayAfter.Top);
+		Assert.Equal(initialDisplay.Width, displayAfter.Width);
+		Assert.Equal(initialDisplay.Height, displayAfter.Height);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			virtgroup, MuiVirtgroupCore.TryFit, out var rawTryFit));
+		Assert.Equal(0u, rawTryFit);
+
+		Assert.True(MuiVirtgroupLayoutFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiVirtgroupLayoutField.TryFit, 0));
+		Assert.True(MuiVirtgroupCore.Layout(ref platform, State, virtgroup,
+			4, 5, 100, 80));
+	}
+
+	[Fact]
+	public void VirtgroupLayoutAdmissionRequiresCookiePolicyAndOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var virtgroup = Object(ref platform, cl);
+		var valid = default(MuiVirtgroupLayoutStateRecord);
+		valid.Magic = MuiVirtgroupLayoutStateRecord.Cookie;
+		valid.Width = 320;
+		valid.Height = 180;
+		valid.Left = 12;
+		valid.Top = 7;
+		valid.TryFit = 0;
+		Assert.True(MuiVirtgroupLayoutStateAdmission.Validate(valid));
+		Assert.True(MuiVirtgroupLayoutStateAdmission.ValidateLive(ref platform,
+			State, virtgroup, valid));
+		var malformed = valid;
+		malformed.Left = -1;
+		Assert.False(MuiVirtgroupLayoutStateAdmission.Validate(malformed));
+		Assert.False(MuiVirtgroupLayoutStateAdmission.ValidateLive(ref platform,
+			State, virtgroup, malformed));
+		Assert.False(MuiVirtgroupLayoutStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedVirtgroupDisplayFailsClosedBeforeReplacement()
+	{
+		var platform = CreatePlatform(out var groupClass);
+		var virtgroup = Object(ref platform, groupClass);
+		var child = Object(ref platform, groupClass);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, virtgroup, child));
+		Set(ref platform, virtgroup, MuiVirtgroupCore.VirtualWidth, 320);
+		Set(ref platform, virtgroup, MuiVirtgroupCore.VirtualHeight, 180);
+		Set(ref platform, virtgroup, MuiVirtgroupCore.VirtualLeft, 12);
+		Set(ref platform, virtgroup, MuiVirtgroupCore.VirtualTop, 7);
+		Assert.True(MuiVirtgroupCore.Layout(ref platform, State, virtgroup,
+			4, 5, 100, 80));
+		Assert.True(MuiVirtgroupCore.TryGetDisplayState(ref platform, State,
+			virtgroup, out var initial));
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, virtgroup,
+			VirtgroupDisplayStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiVirtgroupInputFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiVirtgroupInputRecordKind.Display,
+			MuiVirtgroupInputField.Width, unchecked((uint)-1)));
+		Assert.True(MuiVirtgroupDisplayStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(-1, structural.Width);
+		Assert.False(MuiVirtgroupDisplayStateAdmission.Validate(structural));
+		Assert.False(MuiVirtgroupDisplayStateAdmission.ValidateLive(ref platform,
+			State, virtgroup, structural));
+		Assert.False(MuiVirtgroupDisplayStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		var allocationsBefore = platform.AllocationCount;
+
+		Assert.False(MuiVirtgroupCore.Layout(ref platform, State, virtgroup,
+			40, 50, 200, 160));
+		Assert.False(MuiVirtgroupCore.TryGetDisplayState(ref platform, State,
+			virtgroup, out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State,
+			virtgroup, VirtgroupDisplayStateKey));
+		Assert.True(MuiVirtgroupInputFieldCursorCodec.TryReadUInt32(ref platform,
+			block, MuiVirtgroupInputRecordKind.Display,
+			MuiVirtgroupInputField.Width, out var rawWidth));
+		Assert.Equal(unchecked((uint)-1), rawWidth);
+
+		Assert.True(MuiVirtgroupInputFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiVirtgroupInputRecordKind.Display,
+			MuiVirtgroupInputField.Width, unchecked((uint)initial.Width)));
+		Assert.True(MuiVirtgroupCore.Layout(ref platform, State, virtgroup,
+			4, 5, 100, 80));
+	}
+
+	[Fact]
+	public void VirtgroupDisplayAdmissionRequiresShapeAndOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var virtgroup = Object(ref platform, cl);
+		var valid = default(MuiVirtgroupDisplayStateRecord);
+		valid.Magic = MuiVirtgroupDisplayStateRecord.Cookie;
+		valid.Left = -12;
+		valid.Top = 7;
+		valid.Width = 320;
+		valid.Height = 180;
+		Assert.True(MuiVirtgroupDisplayStateAdmission.Validate(valid));
+		Assert.True(MuiVirtgroupDisplayStateAdmission.ValidateLive(ref platform,
+			State, virtgroup, valid));
+		var malformed = valid;
+		malformed.Height = -1;
+		Assert.False(MuiVirtgroupDisplayStateAdmission.Validate(malformed));
+		Assert.False(MuiVirtgroupDisplayStateAdmission.ValidateLive(ref platform,
+			State, virtgroup, malformed));
+		Assert.False(MuiVirtgroupDisplayStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedVirtgroupPointerFailsClosedBeforeDragReplacement()
+	{
+		var platform = CreatePlatform(out var groupClass);
+		var virtgroupName = APTR.FromPointer(0x1140);
+		platform.WriteCString(virtgroupName, "Virtgroup.mui");
+		var virtgroupClass = MuiHeadlessObjectCore.RegisterClass(ref platform,
+			State, virtgroupName, groupClass, 0, APTR.FromPointer(1), false);
+		var virtgroup = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			virtgroupClass, APTR.Null);
+		var child = Object(ref platform, groupClass);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, virtgroup, child));
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, State,
+			virtgroup);
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			record, MuiVirtgroupCore.VirtualWidth, 320, false));
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			record, MuiVirtgroupCore.VirtualHeight, 180, false));
+		Assert.True(MuiVirtgroupCore.Layout(ref platform, State, virtgroup,
+			4, 5, 100, 80));
+
+		var intuiMessage = APTR.FromPointer(0x1E00);
+		Assert.True(MuiIntuiMessageCodec.WritePointer(ref platform, intuiMessage,
+			(uint)IDCMPFlags.MouseButtons, 0x0068, 0, 0, 50, 40));
+		Assert.True(MuiVirtgroupCore.HandleInput(ref platform, State, virtgroup,
+			intuiMessage, -1));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, virtgroup,
+			VirtgroupPointerStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiVirtgroupInputFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiVirtgroupInputRecordKind.Pointer,
+			MuiVirtgroupInputField.Flags, 4));
+		Assert.True(MuiVirtgroupPointerStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(4u, structural.Flags);
+		Assert.False(MuiVirtgroupPointerStateAdmission.Validate(structural));
+		Assert.False(MuiVirtgroupPointerStateAdmission.ValidateLive(ref platform,
+			State, virtgroup, structural));
+		Assert.False(MuiVirtgroupPointerStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		var allocationsBefore = platform.AllocationCount;
+
+		Assert.False(MuiVirtgroupCore.HandleInput(ref platform, State, virtgroup,
+			intuiMessage, -1));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State,
+			virtgroup, VirtgroupPointerStateKey));
+		Assert.Equal(0u, Get(ref platform, virtgroup,
+			MuiVirtgroupCore.VirtualLeft));
+
+		Assert.True(MuiVirtgroupInputFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiVirtgroupInputRecordKind.Pointer,
+			MuiVirtgroupInputField.Flags,
+			MuiVirtgroupPointerStateRecord.ActiveFlag |
+			MuiVirtgroupPointerStateRecord.CapturedFlag));
+		Assert.True(MuiVirtgroupCore.HandleInput(ref platform, State, virtgroup,
+			intuiMessage, -1));
+	}
+
+	[Fact]
+	public void VirtgroupPointerAdmissionRequiresShapeAndOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var virtgroup = Object(ref platform, cl);
+		var valid = default(MuiVirtgroupPointerStateRecord);
+		valid.Magic = MuiVirtgroupPointerStateRecord.Cookie;
+		valid.Flags = MuiVirtgroupPointerStateRecord.ActiveFlag |
+			MuiVirtgroupPointerStateRecord.CapturedFlag;
+		valid.StartX = 50;
+		valid.StartY = 40;
+		valid.StartLeft = 12;
+		valid.StartTop = 7;
+		valid.LastX = 52;
+		valid.LastY = 41;
+		Assert.True(MuiVirtgroupPointerStateAdmission.Validate(valid));
+		Assert.True(MuiVirtgroupPointerStateAdmission.ValidateLive(ref platform,
+			State, virtgroup, valid));
+		var malformed = valid;
+		malformed.Flags = MuiVirtgroupPointerStateRecord.CapturedFlag;
+		Assert.False(MuiVirtgroupPointerStateAdmission.Validate(malformed));
+		Assert.False(MuiVirtgroupPointerStateAdmission.ValidateLive(ref platform,
+			State, virtgroup, malformed));
+		Assert.False(MuiVirtgroupPointerStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR cl)

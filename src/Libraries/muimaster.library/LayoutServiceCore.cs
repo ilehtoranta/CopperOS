@@ -12,6 +12,13 @@ namespace CopperOS.MuiMaster;
 internal struct MuiLayoutMessage
 {
 	public const uint Size = 24;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint LeftOffset = 4;
+	public const uint TopOffset = 8;
+	public const uint WidthOffset = 12;
+	public const uint HeightOffset = 16;
+	public const uint FlagsOffset = 20;
 	public uint MethodId;
 	public uint Left;
 	public uint Top;

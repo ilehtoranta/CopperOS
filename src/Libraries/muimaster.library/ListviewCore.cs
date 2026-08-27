@@ -117,7 +117,7 @@ public static class MuiListviewCore
 
 	internal static class MuiListviewChildStateCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListviewChildState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -126,7 +126,6 @@ public static class MuiListviewCore
 				MuiListviewChildState.Size) ||
 				!MuiListviewChildStateFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListviewChildStateField.Magic, out var magic) ||
-				magic != MuiListviewChildState.Cookie ||
 				!MuiListviewChildStateFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListviewChildStateField.Child, out var child))
 				return false;
@@ -134,6 +133,12 @@ public static class MuiListviewCore
 			value.Child = APTR.FromPointer(child);
 			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListviewChildState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiListviewChildState.Cookie;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListviewChildState value)
@@ -252,7 +257,7 @@ public static class MuiListviewCore
 
 	internal static class MuiListviewClickStateCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListviewClickState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -261,29 +266,33 @@ public static class MuiListviewCore
 				MuiListviewClickState.Size) ||
 				!MuiListviewClickStateFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListviewClickStateField.Magic, out var magic) ||
-				magic != MuiListviewClickState.Cookie)
-				return false;
-			value.Magic = MuiListviewClickState.Cookie;
-			if (!MuiListviewClickStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListviewClickStateField.ClickColumn,
-				out value.ClickColumn) ||
+				!MuiListviewClickStateFieldCursorCodec.TryReadUInt32(ref platform,
+					address, MuiListviewClickStateField.ClickColumn,
+					out value.ClickColumn) ||
 				!MuiListviewClickStateFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListviewClickStateField.DoubleClick,
-					out var doubleClick) ||
+					out value.DoubleClick) ||
 				!MuiListviewClickStateFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListviewClickStateField.AgainClick,
-					out var againClick) ||
+					out value.AgainClick) ||
 				!MuiListviewClickStateFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListviewClickStateField.Clicks, out value.Clicks) ||
 				!MuiListviewClickStateFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListviewClickStateField.DefClickColumn,
-					out value.DefClickColumn))
-				return false;
+					out value.DefClickColumn)) return false;
+			value.Magic = magic;
+			return true;
+		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListviewClickState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!TryReadStructural(ref platform, address, out value) ||
+				value.Magic != MuiListviewClickState.Cookie) return false;
 			// Preserve the guest row exactly.  BOOL canonicalization belongs to
 			// semantic admission, not to the struct codec; otherwise a corrupted
 			// published record could be normalized before consumers can reject it.
-			value.DoubleClick = doubleClick;
-			value.AgainClick = againClick;
 			return true;
 		}
 
@@ -421,7 +430,7 @@ public static class MuiListviewCore
 
 	internal static class MuiListviewInteractionPolicyStateCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform, APTR address,
 			out MuiListviewInteractionPolicyState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -431,25 +440,30 @@ public static class MuiListviewCore
 				!MuiListviewInteractionPolicyFieldCursorCodec.TryReadUInt32(
 					ref platform, address,
 					MuiListviewInteractionPolicyField.Magic, out var magic) ||
-				magic != MuiListviewInteractionPolicyState.Cookie)
-				return false;
-			value.Magic = MuiListviewInteractionPolicyState.Cookie;
-			return MuiListviewInteractionPolicyFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiListviewInteractionPolicyField.Input, out value.Input) &&
-				MuiListviewInteractionPolicyFieldCursorCodec.TryReadUInt32(
+				!MuiListviewInteractionPolicyFieldCursorCodec.TryReadUInt32(
+					ref platform, address,
+					MuiListviewInteractionPolicyField.Input, out value.Input) ||
+				!MuiListviewInteractionPolicyFieldCursorCodec.TryReadUInt32(
 					ref platform, address,
 					MuiListviewInteractionPolicyField.MultiSelect,
-					out value.MultiSelect) &&
-				MuiListviewInteractionPolicyFieldCursorCodec.TryReadUInt32(
+					out value.MultiSelect) ||
+				!MuiListviewInteractionPolicyFieldCursorCodec.TryReadUInt32(
 					ref platform, address,
 					MuiListviewInteractionPolicyField.ScrollerPos,
-					out value.ScrollerPos) &&
-				MuiListviewInteractionPolicyFieldCursorCodec.TryReadUInt32(
+					out value.ScrollerPos) ||
+				!MuiListviewInteractionPolicyFieldCursorCodec.TryReadUInt32(
 					ref platform, address,
 					MuiListviewInteractionPolicyField.DragType,
-					out value.DragType);
+					out value.DragType)) return false;
+			value.Magic = magic;
+			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+			out MuiListviewInteractionPolicyState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiListviewInteractionPolicyState.Cookie;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 			MuiListviewInteractionPolicyState value)
@@ -562,7 +576,7 @@ public static class MuiListviewCore
 
 	internal static class MuiListviewSelectionSignalStateCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform, APTR address,
 			out MuiListviewSelectionSignalState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -572,13 +586,18 @@ public static class MuiListviewCore
 				!MuiListviewSelectionSignalFieldCursorCodec.TryReadUInt32(
 					ref platform, address,
 					MuiListviewSelectionSignalField.Magic, out var magic) ||
-				magic != MuiListviewSelectionSignalState.Cookie)
-				return false;
-			value.Magic = MuiListviewSelectionSignalState.Cookie;
-			return MuiListviewSelectionSignalFieldCursorCodec.TryReadUInt32(
+				!MuiListviewSelectionSignalFieldCursorCodec.TryReadUInt32(
 				ref platform, address,
-				MuiListviewSelectionSignalField.Value, out value.Value);
+				MuiListviewSelectionSignalField.Value, out value.Value)) return false;
+			value.Magic = magic;
+			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+			out MuiListviewSelectionSignalState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiListviewSelectionSignalState.Cookie;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 			MuiListviewSelectionSignalState value)
@@ -715,7 +734,7 @@ public static class MuiListviewCore
 
 	internal static class MuiListviewLayoutStateCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListviewLayoutState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -724,30 +743,35 @@ public static class MuiListviewCore
 				MuiListviewLayoutState.Size) ||
 				!MuiListviewLayoutFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListviewLayoutField.Magic, out var magic) ||
-				magic != MuiListviewLayoutState.Cookie)
-				return false;
-			value.Magic = magic;
-			return MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
-				address, MuiListviewLayoutField.Left, out value.Left) &&
-				MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
-					address, MuiListviewLayoutField.Top, out value.Top) &&
-				MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
-					address, MuiListviewLayoutField.Width, out value.Width) &&
-				MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
-					address, MuiListviewLayoutField.Height, out value.Height) &&
-				MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
+				!MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
+					address, MuiListviewLayoutField.Left, out value.Left) ||
+				!MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
+					address, MuiListviewLayoutField.Top, out value.Top) ||
+				!MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
+					address, MuiListviewLayoutField.Width, out value.Width) ||
+				!MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
+					address, MuiListviewLayoutField.Height, out value.Height) ||
+				!MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
 					address, MuiListviewLayoutField.ChildLeft,
-					out value.ChildLeft) &&
-				MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
+					out value.ChildLeft) ||
+				!MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
 					address, MuiListviewLayoutField.ChildTop,
-					out value.ChildTop) &&
-				MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
+					out value.ChildTop) ||
+				!MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
 					address, MuiListviewLayoutField.ChildWidth,
-					out value.ChildWidth) &&
-				MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
+					out value.ChildWidth) ||
+				!MuiListviewLayoutFieldCursorCodec.TryReadInt32(ref platform,
 					address, MuiListviewLayoutField.ChildHeight,
-					out value.ChildHeight);
+					out value.ChildHeight)) return false;
+			value.Magic = magic;
+			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListviewLayoutState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiListviewLayoutState.Cookie;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListviewLayoutState value)
@@ -861,7 +885,7 @@ public static class MuiListviewCore
 
 	internal static class MuiListviewRenderStateCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListviewRenderState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -870,7 +894,6 @@ public static class MuiListviewCore
 				MuiListviewRenderState.Size) ||
 				!MuiListviewRenderFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListviewRenderField.Magic, out var magic) ||
-				magic != MuiListviewRenderState.Cookie ||
 				!MuiListviewRenderFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListviewRenderField.RenderInfo, out var info) ||
 				!MuiListviewRenderFieldCursorCodec.TryReadUInt32(ref platform,
@@ -881,6 +904,12 @@ public static class MuiListviewCore
 			value.RastPort = APTR.FromPointer(rastPort);
 			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListviewRenderState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiListviewRenderState.Cookie;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListviewRenderState value)
@@ -1017,7 +1046,7 @@ public static class MuiListviewCore
 
 	internal static class MuiListviewExternalScrollerConnectionStateCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListviewExternalScrollerConnectionState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -1027,8 +1056,7 @@ public static class MuiListviewCore
 			if (!MuiListviewExternalScrollerConnectionFieldCursorCodec.TryReadUInt32(
 				ref platform, address,
 				MuiListviewExternalScrollerConnectionField.Magic,
-				out value.Magic) || value.Magic !=
-				MuiListviewExternalScrollerConnectionState.Cookie) return false;
+				out value.Magic)) return false;
 			if (!MuiListviewExternalScrollerConnectionFieldCursorCodec.TryReadUInt32(
 				ref platform, address,
 				MuiListviewExternalScrollerConnectionField.Prop,
@@ -1036,6 +1064,12 @@ public static class MuiListviewCore
 			value.Prop = APTR.FromPointer(prop);
 			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListviewExternalScrollerConnectionState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiListviewExternalScrollerConnectionState.Cookie;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListviewExternalScrollerConnectionState value)
@@ -1137,7 +1171,7 @@ public static class MuiListviewCore
 
 	internal static class MuiListviewScrollerStateCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListviewScrollerState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -1146,18 +1180,23 @@ public static class MuiListviewCore
 				MuiListviewScrollerState.Size) ||
 				!MuiListviewScrollerFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListviewScrollerField.Magic, out var magic) ||
-				magic != MuiListviewScrollerState.Cookie)
-				return false;
+				!MuiListviewScrollerFieldCursorCodec.TryReadUInt32(ref platform,
+				address, MuiListviewScrollerField.Entries, out value.Entries) ||
+				!MuiListviewScrollerFieldCursorCodec.TryReadUInt32(ref platform,
+					address, MuiListviewScrollerField.Visible, out value.Visible) ||
+				!MuiListviewScrollerFieldCursorCodec.TryReadUInt32(ref platform,
+					address, MuiListviewScrollerField.First, out value.First) ||
+				!MuiListviewScrollerFieldCursorCodec.TryReadUInt32(ref platform,
+					address, MuiListviewScrollerField.MaxFirst, out value.MaxFirst)) return false;
 			value.Magic = magic;
-			return MuiListviewScrollerFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListviewScrollerField.Entries, out value.Entries) &&
-				MuiListviewScrollerFieldCursorCodec.TryReadUInt32(ref platform,
-					address, MuiListviewScrollerField.Visible, out value.Visible) &&
-				MuiListviewScrollerFieldCursorCodec.TryReadUInt32(ref platform,
-					address, MuiListviewScrollerField.First, out value.First) &&
-				MuiListviewScrollerFieldCursorCodec.TryReadUInt32(ref platform,
-					address, MuiListviewScrollerField.MaxFirst, out value.MaxFirst);
+			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListviewScrollerState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiListviewScrollerState.Cookie;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListviewScrollerState value)

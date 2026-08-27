@@ -36,6 +36,67 @@ public sealed class MuiAreaDoubleBufferTests
 	}
 
 	[Fact]
+	public void DoubleBufferAdmissionRequiresCanonicalBoolGenerationAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var valid = new MuiAreaDoubleBufferStateRecord
+		{
+			Magic = MuiAreaDoubleBufferStateRecord.Cookie,
+			Enabled = 1,
+			Generation = 1,
+		};
+		Assert.True(MuiAreaDoubleBufferStateAdmission.Validate(valid));
+		Assert.True(MuiAreaDoubleBufferStateAdmission.ValidateLive(ref platform,
+			State, obj, valid));
+		var malformed = valid;
+		malformed.Enabled = 2;
+		Assert.False(MuiAreaDoubleBufferStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaDoubleBufferStateAdmission.ValidateLive(ref platform,
+			State, obj, malformed));
+		malformed = valid;
+		malformed.Generation = 0;
+		Assert.False(MuiAreaDoubleBufferStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaDoubleBufferStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedDoubleBufferFailsClosedBeforeRawRepairOrSet()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiAreaDoubleBufferPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		Assert.True(MuiAreaDoubleBufferPacketCore.Set(ref platform, State, obj,
+			1));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaDoubleBufferCore.StateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaDoubleBufferStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiAreaDoubleBufferStateField.Enabled, 2));
+		Assert.True(MuiAreaDoubleBufferStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(2u, structural.Enabled);
+		Assert.False(MuiAreaDoubleBufferStateAdmission.Validate(structural));
+		Assert.False(MuiAreaDoubleBufferStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		var allocationsBefore = platform.AllocationCount;
+		Assert.False(MuiAreaDoubleBufferPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.False(MuiAreaDoubleBufferPacketCore.Set(ref platform, State, obj,
+			0));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, obj,
+			MuiCommonControlCore.DoubleBuffer, out var raw));
+		Assert.Equal(1u, raw);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaDoubleBufferCore.StateKey));
+	}
+
+	[Fact]
 	public void TypedDoubleBufferStateNormalizesAndRoundTrips()
 	{
 		var platform = CreatePlatform(out var areaClass);

@@ -398,7 +398,8 @@ internal static class MuiProcessDispatchPacketCodec
 
 internal static class MuiProcessSpecialistCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiProcessSpecialistRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -449,6 +450,14 @@ internal static class MuiProcessSpecialistCodec
 				out record.NotifyAttribute)) return false;
 		record.NameOwned = APTR.FromPointer(nameOwned);
 		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiProcessSpecialistRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryReadStructural(ref platform, address, out record)) return false;
+		return MuiProcessSpecialistAdmission.Validate(ref platform, record);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
@@ -546,12 +555,70 @@ public static class MuiProcessSpecialistRecordPacketCore
 	public static uint DispatchRecord<TPlatform>(ref TPlatform platform,
 		APTR address) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiProcessSpecialistCodec.TryRead(ref platform, address,
+		if (!MuiProcessSpecialistCodec.TryReadStructural(ref platform, address,
 			out var record)) return 0;
 		return record.Magic ^ record.Class ^ record.State ^ record.TaskToken ^
 			record.NameOwned.Raw ^ record.NameOwnedSize ^ record.Error ^
 			record.SignalsReceived ^ record.Flags ^ record.DispatchDepth ^
 			record.SetupState ^ record.NotifyCount ^ record.NotifyAttribute;
+	}
+}
+
+// Structural decoding is intentionally separate from live admission. The
+// former is used by the scalar ABI qualification surface; every live
+// Process/Slave path below uses the strict wrapper so malformed guest state
+// cannot become a scheduler token, owned string, semaphore balance, or dispatch.
+internal static class MuiProcessSpecialistAdmission
+{
+	private const uint AllowedFlags = MuiProcessSpecialistLayout.FlagAutoLaunch;
+
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		MuiProcessSpecialistRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cls = (MuiProcessSpecialistClass)record.Class;
+		if (record.Magic != MuiProcessSpecialistLayout.Magic ||
+			(cls != MuiProcessSpecialistClass.Process &&
+			 cls != MuiProcessSpecialistClass.Slave) ||
+			(record.Flags & ~AllowedFlags) != 0 ||
+			!ValidateOwnedName(ref platform, record)) return false;
+		if (cls == MuiProcessSpecialistClass.Slave &&
+			(record.NameOwned.IsNotNull || record.NameOwnedSize != 0)) return false;
+
+		if (cls == MuiProcessSpecialistClass.Process)
+		{
+			var state = (MuiProcessState)record.State;
+			if (state < MuiProcessState.Pending ||
+				state > MuiProcessState.Failed ||
+				record.SetupState != 0 || record.DispatchDepth != 0 ||
+				(state == MuiProcessState.Running) == (record.TaskToken == 0))
+				return false;
+			return true;
+		}
+
+		// Slave has no process scheduler state or task token. Setup is a
+		// balanced latch, and dispatch depth is at most one while setup is held.
+		return record.State == (uint)MuiProcessState.None &&
+			record.TaskToken == 0 &&
+			record.Flags == 0 &&
+			record.SetupState <= 1 &&
+			record.DispatchDepth <= 1 &&
+			(record.DispatchDepth == 0 || record.SetupState == 1);
+	}
+
+	private static bool ValidateOwnedName<TPlatform>(ref TPlatform platform,
+		MuiProcessSpecialistRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (record.NameOwned.IsNull) return record.NameOwnedSize == 0;
+		if (record.NameOwnedSize == 0 ||
+			record.NameOwnedSize > MuiProcessSpecialistLayout.MaximumString + 1 ||
+			(record.NameOwned.Raw & 1) != 0 ||
+			!platform.IsMapped(record.NameOwned, record.NameOwnedSize) ||
+			!CStringCodec.TryReadLength(ref platform, record.NameOwned,
+				MuiProcessSpecialistLayout.MaximumString + 1, out var length))
+			return false;
+		return length + 1 == record.NameOwnedSize;
 	}
 }
 
@@ -669,6 +736,9 @@ public static class MuiProcessSpecialistCore
 		MuiProcessSpecialistRecord record = default;
 		record.Magic = MuiProcessSpecialistLayout.Magic;
 		record.Class = (uint)cls;
+		record.State = cls == MuiProcessSpecialistClass.Process
+			? (uint)MuiProcessState.Pending
+			: (uint)MuiProcessState.None;
 		if (!MuiProcessSpecialistCodec.Write(ref platform, sc, record))
 		{
 			platform.Clear(sc, MuiProcessSpecialistLayout.InstanceSize);
@@ -684,24 +754,6 @@ public static class MuiProcessSpecialistCore
 		}
 		if (cls == MuiProcessSpecialistClass.Process)
 		{
-			if (!MuiProcessSpecialistCodec.TryRead(ref platform, sc,
-				out record))
-			{
-				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
-					MuiProcessSpecialistLayout.SidecarAttribute, 0, false);
-				platform.Clear(sc, MuiProcessSpecialistLayout.InstanceSize);
-				platform.Free(sc, MuiProcessSpecialistLayout.InstanceSize);
-				return APTR.Null;
-			}
-			record.State = (uint)MuiProcessState.Pending;
-			if (!MuiProcessSpecialistCodec.Write(ref platform, sc, record))
-			{
-				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
-					MuiProcessSpecialistLayout.SidecarAttribute, 0, false);
-				platform.Clear(sc, MuiProcessSpecialistLayout.InstanceSize);
-				platform.Free(sc, MuiProcessSpecialistLayout.InstanceSize);
-				return APTR.Null;
-			}
 			if (!AdoptInitialProcessAttributes(ref platform, state, obj, sc))
 			{
 				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
@@ -928,12 +980,14 @@ public static class MuiProcessSpecialistCore
 		switch (status)
 		{
 			case MuiProcessSchedulerStatus.Completed:
+				record.TaskToken = 0;
 				record.State = (uint)MuiProcessState.Completed;
 				MuiProcessSpecialistCodec.Write(ref platform, sc, record);
 				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 					MuiProcessAttributes.Process_Task, 0, false);
 				return (uint)MuiProcessState.Completed;
 			case MuiProcessSchedulerStatus.Failed:
+				record.TaskToken = 0;
 				record.State = (uint)MuiProcessState.Failed;
 				MuiProcessSpecialistCodec.Write(ref platform, sc, record);
 				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
@@ -1435,6 +1489,7 @@ public static class MuiProcessSpecialistCore
 		{
 			var token = record.TaskToken;
 			platform.ProcessKill(token);
+			record.TaskToken = 0;
 			record.State = (uint)MuiProcessState.Killed;
 			MuiProcessSpecialistCodec.Write(ref platform, sc, record);
 		}

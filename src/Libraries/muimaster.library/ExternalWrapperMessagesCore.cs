@@ -43,69 +43,101 @@ internal struct MuiExternalWrapperFieldCursor
 	internal MuiExternalWrapperField Field;
 }
 
-internal static class MuiExternalWrapperFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed Boopsi/Dtpic wrapper
+// packets. Packet kinds own complete MorphOS record spans; field names select
+// members without exposing numeric positions to dispatch code.
+internal static class MuiExternalWrapperMessageMemoryCodec
 {
 	private static bool TryResolve(MuiExternalWrapperPacketKind packet,
-		MuiExternalWrapperField field, out uint offset)
+		MuiExternalWrapperField field, out uint offset, out uint size)
 	{
-		// Keep the packed ABI selector straight-line so native lowering does not
-		// depend on a managed switch/jump-table shape. All offsets remain confined
-		// to this codec; consumers receive the named packet structs below.
-		if (packet == MuiExternalWrapperPacketKind.Update)
+		switch (packet)
 		{
-			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-			if (field == MuiExternalWrapperField.AttributeList) { offset = 4; return true; }
-			if (field == MuiExternalWrapperField.GadgetInfo) { offset = 8; return true; }
-			if (field == MuiExternalWrapperField.Flags) { offset = 12; return true; }
-		}
-		else if (packet == MuiExternalWrapperPacketKind.Get)
-		{
-			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-			if (field == MuiExternalWrapperField.Attribute) { offset = 4; return true; }
-			if (field == MuiExternalWrapperField.Storage) { offset = 8; return true; }
-		}
-		else if (packet == MuiExternalWrapperPacketKind.Set)
-		{
-			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-			if (field == MuiExternalWrapperField.Attribute) { offset = 4; return true; }
-			if (field == MuiExternalWrapperField.Value) { offset = 8; return true; }
-		}
-		else if (packet == MuiExternalWrapperPacketKind.Method)
-		{
-			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-		}
-		else if (packet == MuiExternalWrapperPacketKind.RenderInfo)
-		{
-			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-			if (field == MuiExternalWrapperField.RenderInfo) { offset = 4; return true; }
-		}
-		else if (packet == MuiExternalWrapperPacketKind.AskMinMax)
-		{
-			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-			if (field == MuiExternalWrapperField.Storage) { offset = 4; return true; }
-		}
-		else if (packet == MuiExternalWrapperPacketKind.Layout)
-		{
-			if (field == MuiExternalWrapperField.MethodId) { offset = 0; return true; }
-			if (field == MuiExternalWrapperField.Left) { offset = 4; return true; }
-			if (field == MuiExternalWrapperField.Top) { offset = 8; return true; }
-			if (field == MuiExternalWrapperField.Width) { offset = 12; return true; }
-			if (field == MuiExternalWrapperField.Height) { offset = 16; return true; }
+			case MuiExternalWrapperPacketKind.Update:
+				size = MuiExternalUpdateMessage.Size;
+				if (field == MuiExternalWrapperField.MethodId)
+					offset = MuiExternalUpdateMessage.MethodIdOffset;
+				else if (field == MuiExternalWrapperField.AttributeList)
+					offset = MuiExternalUpdateMessage.AttributeListOffset;
+				else if (field == MuiExternalWrapperField.GadgetInfo)
+					offset = MuiExternalUpdateMessage.GadgetInfoOffset;
+				else if (field == MuiExternalWrapperField.Flags)
+					offset = MuiExternalUpdateMessage.FlagsOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
+			case MuiExternalWrapperPacketKind.Get:
+				size = MuiExternalGetMessage.Size;
+				if (field == MuiExternalWrapperField.MethodId)
+					offset = MuiExternalGetMessage.MethodIdOffset;
+				else if (field == MuiExternalWrapperField.Attribute)
+					offset = MuiExternalGetMessage.AttributeOffset;
+				else if (field == MuiExternalWrapperField.Storage)
+					offset = MuiExternalGetMessage.StorageOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
+			case MuiExternalWrapperPacketKind.Set:
+				size = MuiExternalSetMessage.Size;
+				if (field == MuiExternalWrapperField.MethodId)
+					offset = MuiExternalSetMessage.MethodIdOffset;
+				else if (field == MuiExternalWrapperField.Attribute)
+					offset = MuiExternalSetMessage.AttributeOffset;
+				else if (field == MuiExternalWrapperField.Value)
+					offset = MuiExternalSetMessage.ValueOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
+			case MuiExternalWrapperPacketKind.Method:
+				size = MuiExternalMethodMessage.Size;
+				if (field == MuiExternalWrapperField.MethodId)
+					offset = MuiExternalMethodMessage.MethodIdOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
+			case MuiExternalWrapperPacketKind.RenderInfo:
+				size = MuiExternalRenderInfoMessage.Size;
+				if (field == MuiExternalWrapperField.MethodId)
+					offset = MuiExternalRenderInfoMessage.MethodIdOffset;
+				else if (field == MuiExternalWrapperField.RenderInfo)
+					offset = MuiExternalRenderInfoMessage.RenderInfoOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
+			case MuiExternalWrapperPacketKind.AskMinMax:
+				size = MuiExternalAskMinMaxMessage.Size;
+				if (field == MuiExternalWrapperField.MethodId)
+					offset = MuiExternalAskMinMaxMessage.MethodIdOffset;
+				else if (field == MuiExternalWrapperField.Storage)
+					offset = MuiExternalAskMinMaxMessage.StorageOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
+			case MuiExternalWrapperPacketKind.Layout:
+				size = MuiExternalLayoutMessage.Size;
+				if (field == MuiExternalWrapperField.MethodId)
+					offset = MuiExternalLayoutMessage.MethodIdOffset;
+				else if (field == MuiExternalWrapperField.Left)
+					offset = MuiExternalLayoutMessage.LeftOffset;
+				else if (field == MuiExternalWrapperField.Top)
+					offset = MuiExternalLayoutMessage.TopOffset;
+				else if (field == MuiExternalWrapperField.Width)
+					offset = MuiExternalLayoutMessage.WidthOffset;
+				else if (field == MuiExternalWrapperField.Height)
+					offset = MuiExternalLayoutMessage.HeightOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
 		}
 		offset = 0;
+		size = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiExternalWrapperFieldCursor cursor, out APTR address)
+		APTR message, MuiExternalWrapperPacketKind packet,
+		MuiExternalWrapperField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(packet, field, out var offset, out var size) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, size)) return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiExternalMethodMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -114,11 +146,8 @@ internal static class MuiExternalWrapperFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiExternalWrapperFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -128,14 +157,36 @@ internal static class MuiExternalWrapperFieldCursorCodec
 		MuiExternalWrapperField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiExternalWrapperFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// field cursor. The live message codecs route to the struct adapter above.
+internal static class MuiExternalWrapperFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiExternalWrapperFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiExternalWrapperMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Packet, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiExternalWrapperPacketKind packet,
+		MuiExternalWrapperField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
+			message, packet, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiExternalWrapperPacketKind packet,
+		MuiExternalWrapperField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
+			message, packet, field, value);
 }
 
 // Central codec for the fixed MorphOS Boopsi.mui/Dtpic.mui wrapper packets.

@@ -14,7 +14,7 @@ public sealed class MuiAreaControlCharTests
 		var address = APTR.FromPointer(0x1500);
 		var expected = default(MuiAreaControlCharStateRecord);
 		expected.Magic = MuiAreaControlCharStateRecord.Cookie;
-		expected.Character = 0x141;
+		expected.Character = 0x41;
 		expected.Generation = 7;
 
 		Assert.True(MuiAreaControlCharStateRecordCodec.Write(ref platform,
@@ -22,7 +22,7 @@ public sealed class MuiAreaControlCharTests
 		Assert.True(MuiAreaControlCharStateRecordCodec.TryRead(ref platform,
 			address, out var actual));
 		Assert.Equal(expected.Magic, actual.Magic);
-		Assert.Equal(0x41u, actual.Character);
+		Assert.Equal(expected.Character, actual.Character);
 		Assert.Equal(expected.Generation, actual.Generation);
 
 		var cursor = default(MuiAreaControlCharStateFieldCursor);
@@ -33,6 +33,83 @@ public sealed class MuiAreaControlCharTests
 		Assert.Equal(address.Raw + 4, characterAddress.Raw);
 		Assert.False(MuiAreaControlCharStateRecordCodec.TryRead(ref platform,
 			APTR.FromPointer(0x21000u), out _));
+	}
+
+	[Fact]
+	public void AreaControlCharStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1580);
+		var value = default(MuiAreaControlCharStateRecord);
+		value.Magic = MuiAreaControlCharStateRecord.Cookie;
+		value.Character = 0xFF;
+		value.Generation = 7;
+
+		Assert.True(MuiAreaControlCharStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiAreaControlCharStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Character, decoded.Character);
+		Assert.Equal(value.Generation, decoded.Generation);
+		Assert.True(MuiAreaControlCharStateRecordCodec.TryRead(ref platform,
+			address, out decoded));
+		Assert.False(MuiAreaControlCharStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void ControlCharAdmissionRequiresCanonicalByteAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var valid = new MuiAreaControlCharStateRecord
+		{
+			Magic = MuiAreaControlCharStateRecord.Cookie,
+			Character = 0x41,
+			Generation = 1,
+		};
+		Assert.True(MuiAreaControlCharStateAdmission.Validate(valid));
+		Assert.True(MuiAreaControlCharStateAdmission.ValidateLive(ref platform,
+			State, obj, valid));
+		var malformed = valid;
+		malformed.Character = 0x141;
+		Assert.False(MuiAreaControlCharStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaControlCharStateAdmission.ValidateLive(ref platform,
+			State, obj, malformed));
+		malformed = valid;
+		malformed.Generation = 0;
+		Assert.False(MuiAreaControlCharStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaControlCharStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedControlCharFailsClosedBeforeNormalizationRepair()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiAreaControlCharPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaControlCharCore.StateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaControlCharStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiAreaControlCharStateField.Character, 0x141));
+		Assert.True(MuiAreaControlCharStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(0x141u, structural.Character);
+		Assert.False(MuiAreaControlCharStateAdmission.Validate(structural));
+		Assert.False(MuiAreaControlCharStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		var allocationsBefore = platform.AllocationCount;
+		Assert.False(MuiAreaControlCharPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaControlCharCore.StateKey));
 	}
 
 	[Fact]

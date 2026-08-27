@@ -15,6 +15,13 @@ namespace CopperOS.MuiMaster;
 internal struct MuiApplicationSettingsPersistenceStateRecord
 {
 	internal const uint Size = 24;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint OperationOffset = 4;
+	internal const uint NameOffset = 8;
+	internal const uint RequestsOffset = 12;
+	internal const uint SavesOffset = 16;
+	internal const uint LoadsOffset = 20;
 	internal const uint Cookie = 0x41505354u; // 'APST'
 
 	internal uint Magic;
@@ -23,6 +30,30 @@ internal struct MuiApplicationSettingsPersistenceStateRecord
 	internal uint Requests;
 	internal uint Saves;
 	internal uint Loads;
+}
+
+// Save/Load retains MorphOS's two sentinel selectors: Null selects the
+// default environment and ULONG(-1) selects ENVARC. Any other selector remains
+// a bounded caller-owned C string. Operation is the explicit Save/Load BOOL.
+internal static class MuiApplicationSettingsPersistenceStateAdmission
+{
+	private const uint MaximumStringLength = 65536;
+
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		MuiApplicationSettingsPersistenceStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		value.Magic == MuiApplicationSettingsPersistenceStateRecord.Cookie &&
+		value.Operation <= 1 &&
+		(value.Name.IsNull || value.Name.Raw == uint.MaxValue ||
+			CStringCodec.TryReadLength(ref platform, value.Name,
+				MaximumStringLength, out _));
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR application,
+		MuiApplicationSettingsPersistenceStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(ref platform, value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, application).IsNull;
 }
 
 internal enum MuiApplicationSettingsPersistenceStateField : byte
@@ -44,18 +75,59 @@ internal struct MuiApplicationSettingsPersistenceStateFieldCursor
 
 internal static class MuiApplicationSettingsPersistenceStateFieldCursorCodec
 {
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiApplicationSettingsPersistenceStateFieldCursor cursor,
+		out APTR address) where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor.Record, cursor.Field, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationSettingsPersistenceStateField field,
+		out uint value) where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationSettingsPersistenceStateField field,
+		uint value) where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, record, field, value);
+	}
+}
+
+// Fixed application settings persistence state is transferred as a named
+// record. Numeric guest positions are confined to this ABI adapter; the
+// compatibility cursor above remains available only to legacy callers and
+// malformed-state diagnostics.
+internal static class MuiApplicationSettingsPersistenceStateRecordMemoryCodec
+{
 	private static bool TryResolve(
 		MuiApplicationSettingsPersistenceStateField field, out uint offset)
 	{
 		switch (field)
 		{
 			case MuiApplicationSettingsPersistenceStateField.Magic:
+				offset = MuiApplicationSettingsPersistenceStateRecord.MagicOffset;
+				return true;
 			case MuiApplicationSettingsPersistenceStateField.Operation:
+				offset = MuiApplicationSettingsPersistenceStateRecord.OperationOffset;
+				return true;
 			case MuiApplicationSettingsPersistenceStateField.Name:
+				offset = MuiApplicationSettingsPersistenceStateRecord.NameOffset;
+				return true;
 			case MuiApplicationSettingsPersistenceStateField.Requests:
+				offset = MuiApplicationSettingsPersistenceStateRecord.RequestsOffset;
+				return true;
 			case MuiApplicationSettingsPersistenceStateField.Saves:
+				offset = MuiApplicationSettingsPersistenceStateRecord.SavesOffset;
+				return true;
 			case MuiApplicationSettingsPersistenceStateField.Loads:
-				offset = (uint)field * 4;
+				offset = MuiApplicationSettingsPersistenceStateRecord.LoadsOffset;
 				return true;
 		}
 		offset = 0;
@@ -63,39 +135,40 @@ internal static class MuiApplicationSettingsPersistenceStateFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiApplicationSettingsPersistenceStateFieldCursor cursor,
-		out APTR address) where TPlatform : struct, IMuiGuestMemory
+		APTR record, MuiApplicationSettingsPersistenceStateField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record,
-				MuiApplicationSettingsPersistenceStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset)
+			return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record,
+			MuiApplicationSettingsPersistenceStateRecord.Size) &&
+			platform.IsMapped(address,
+				MuiApplicationSettingsPersistenceStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiApplicationSettingsPersistenceStateField field,
-		out uint value) where TPlatform : struct, IMuiGuestMemory
+		out uint value)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiApplicationSettingsPersistenceStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiApplicationSettingsPersistenceStateField field,
-		uint value) where TPlatform : struct, IMuiGuestMemory
+		uint value)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationSettingsPersistenceStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -103,33 +176,31 @@ internal static class MuiApplicationSettingsPersistenceStateFieldCursorCodec
 
 internal static class MuiApplicationSettingsPersistenceStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiApplicationSettingsPersistenceStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationSettingsPersistenceStateRecord.Size) ||
-			!MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationSettingsPersistenceStateField.Magic, out var magic) ||
-			magic != MuiApplicationSettingsPersistenceStateRecord.Cookie ||
-			!MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryReadUInt32(
+		if (!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiApplicationSettingsPersistenceStateField.Magic,
+			out var magic) ||
+			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
 				ref platform, address,
 				MuiApplicationSettingsPersistenceStateField.Operation,
 				out value.Operation) ||
-			!MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationSettingsPersistenceStateField.Name, out var name) ||
-			!MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryReadUInt32(
+			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
+				ref platform, address, MuiApplicationSettingsPersistenceStateField.Name,
+				out var name) ||
+			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
 				ref platform, address,
 				MuiApplicationSettingsPersistenceStateField.Requests,
 				out value.Requests) ||
-			!MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryReadUInt32(
+			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
 				ref platform, address,
 				MuiApplicationSettingsPersistenceStateField.Saves,
 				out value.Saves) ||
-			!MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryReadUInt32(
+			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
 				ref platform, address,
 				MuiApplicationSettingsPersistenceStateField.Loads,
 				out value.Loads)) return false;
@@ -138,32 +209,40 @@ internal static class MuiApplicationSettingsPersistenceStateRecordCodec
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiApplicationSettingsPersistenceStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiApplicationSettingsPersistenceStateAdmission.Validate(ref platform,
+			value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiApplicationSettingsPersistenceStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationSettingsPersistenceStateRecord.Size) || value.Magic !=
-			MuiApplicationSettingsPersistenceStateRecord.Cookie) return false;
-		return MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryWriteUInt32(
+			MuiApplicationSettingsPersistenceStateRecord.Size) ||
+			!MuiApplicationSettingsPersistenceStateAdmission.Validate(ref platform,
+				value)) return false;
+		return MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address,
 			MuiApplicationSettingsPersistenceStateField.Magic, value.Magic) &&
-			MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiApplicationSettingsPersistenceStateField.Operation,
-			value.Operation) &&
-			MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiApplicationSettingsPersistenceStateField.Name, value.Name.Raw) &&
-			MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiApplicationSettingsPersistenceStateField.Requests,
-			value.Requests) &&
-			MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiApplicationSettingsPersistenceStateField.Saves, value.Saves) &&
-			MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiApplicationSettingsPersistenceStateField.Loads, value.Loads);
+			MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address,
+				MuiApplicationSettingsPersistenceStateField.Operation,
+				value.Operation) &&
+			MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, MuiApplicationSettingsPersistenceStateField.Name,
+				value.Name.Raw) &&
+			MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address,
+				MuiApplicationSettingsPersistenceStateField.Requests,
+				value.Requests) &&
+			MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address,
+				MuiApplicationSettingsPersistenceStateField.Saves, value.Saves) &&
+			MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address,
+				MuiApplicationSettingsPersistenceStateField.Loads, value.Loads);
 	}
 }

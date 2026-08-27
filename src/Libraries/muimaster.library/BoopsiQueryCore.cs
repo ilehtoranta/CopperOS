@@ -16,7 +16,18 @@ namespace CopperOS.MuiMaster;
 internal struct MuiBoopsiQueryMessage
 {
 	internal const uint Size = 40;
+	internal const uint FieldSize = 4;
 	internal const uint Method = 0x80427157;
+	internal const uint MethodIdOffset = 0;
+	internal const uint ScreenOffset = 4;
+	internal const uint FlagsOffset = 8;
+	internal const uint MinWidthOffset = 12;
+	internal const uint MinHeightOffset = 16;
+	internal const uint MaxWidthOffset = 20;
+	internal const uint MaxHeightOffset = 24;
+	internal const uint DefaultWidthOffset = 28;
+	internal const uint DefaultHeightOffset = 32;
+	internal const uint RenderInfoOffset = 36;
 
 	internal uint MethodId;
 	internal APTR Screen;
@@ -34,6 +45,8 @@ internal struct MuiBoopsiQueryMessage
 internal struct MuiBoopsiQueryMethodMessage
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
 
@@ -58,37 +71,54 @@ internal struct MuiBoopsiQueryPacketFieldCursor
 	internal MuiBoopsiQueryPacketField Field;
 }
 
-internal static class MuiBoopsiQueryPacketFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed BoopsiQuery envelope. The
+// complete 40-byte record is validated before any named member is accessed.
+internal static class MuiBoopsiQueryMessageMemoryCodec
 {
 	private static bool TryResolve(MuiBoopsiQueryPacketField field,
-		out uint offset)
+		out uint offset, out uint size)
 	{
+		size = MuiBoopsiQueryMessage.Size;
 		switch (field)
 		{
-			case MuiBoopsiQueryPacketField.MethodId: offset = 0; return true;
-			case MuiBoopsiQueryPacketField.Screen: offset = 4; return true;
-			case MuiBoopsiQueryPacketField.Flags: offset = 8; return true;
-			case MuiBoopsiQueryPacketField.MinWidth: offset = 12; return true;
-			case MuiBoopsiQueryPacketField.MinHeight: offset = 16; return true;
-			case MuiBoopsiQueryPacketField.MaxWidth: offset = 20; return true;
-			case MuiBoopsiQueryPacketField.MaxHeight: offset = 24; return true;
-			case MuiBoopsiQueryPacketField.DefaultWidth: offset = 28; return true;
-			case MuiBoopsiQueryPacketField.DefaultHeight: offset = 32; return true;
-			case MuiBoopsiQueryPacketField.RenderInfo: offset = 36; return true;
+			case MuiBoopsiQueryPacketField.MethodId:
+				offset = MuiBoopsiQueryMessage.MethodIdOffset;
+				size = MuiBoopsiQueryMethodMessage.Size;
+				return true;
+			case MuiBoopsiQueryPacketField.Screen:
+				offset = MuiBoopsiQueryMessage.ScreenOffset; return true;
+			case MuiBoopsiQueryPacketField.Flags:
+				offset = MuiBoopsiQueryMessage.FlagsOffset; return true;
+			case MuiBoopsiQueryPacketField.MinWidth:
+				offset = MuiBoopsiQueryMessage.MinWidthOffset; return true;
+			case MuiBoopsiQueryPacketField.MinHeight:
+				offset = MuiBoopsiQueryMessage.MinHeightOffset; return true;
+			case MuiBoopsiQueryPacketField.MaxWidth:
+				offset = MuiBoopsiQueryMessage.MaxWidthOffset; return true;
+			case MuiBoopsiQueryPacketField.MaxHeight:
+				offset = MuiBoopsiQueryMessage.MaxHeightOffset; return true;
+			case MuiBoopsiQueryPacketField.DefaultWidth:
+				offset = MuiBoopsiQueryMessage.DefaultWidthOffset; return true;
+			case MuiBoopsiQueryPacketField.DefaultHeight:
+				offset = MuiBoopsiQueryMessage.DefaultHeightOffset; return true;
+			case MuiBoopsiQueryPacketField.RenderInfo:
+				offset = MuiBoopsiQueryMessage.RenderInfoOffset; return true;
 		}
 		offset = 0;
+		size = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiBoopsiQueryPacketFieldCursor cursor, out APTR address)
+		APTR message, MuiBoopsiQueryPacketField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset, out var size) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, size)) return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiBoopsiQueryMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -96,10 +126,8 @@ internal static class MuiBoopsiQueryPacketFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiBoopsiQueryPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -108,13 +136,34 @@ internal static class MuiBoopsiQueryPacketFieldCursorCodec
 		APTR message, MuiBoopsiQueryPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiBoopsiQueryPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// field cursor. The live message codec routes to the struct adapter above.
+internal static class MuiBoopsiQueryPacketFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiBoopsiQueryPacketFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiBoopsiQueryMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiBoopsiQueryPacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform,
+			message, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiBoopsiQueryPacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
+			message, field, value);
 }
 
 // The packed guest record is decoded and encoded in one place.  Consumers use

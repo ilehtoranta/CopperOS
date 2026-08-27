@@ -29,6 +29,7 @@ public sealed class MuiAreaLayoutTests
 	private const uint HorizontalCenter = 0x8042CC64;
 	private const uint VerticalCenter = 0x8042C008;
 	private const uint LayoutHook = 0x8042C3B2;
+	private const uint LayoutHookStateAttribute = 0x7FFE0046;
 	private const uint LeftEdge = 0x8042BEC6;
 	private const uint TopEdge = 0x8042509B;
 	private const uint Width = 0x8042B59C;
@@ -137,6 +138,110 @@ public sealed class MuiAreaLayoutTests
 	}
 
 	[Fact]
+	public void AreaRenderPolicyRecordUsesDedicatedStructMemoryAdapter()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1C80);
+		var value = new MuiAreaRenderPolicyStateRecord
+		{
+			Magic = MuiAreaRenderPolicyStateRecord.Cookie,
+			FillArea = 1,
+			Background = 7,
+			Frame = 2,
+			Font = 0x2200,
+			FrameVisible = 1,
+			FramePhantomHoriz = 0,
+			FrameTitle = APTR.FromPointer(0x2300),
+			FrameDynamic = 1,
+		};
+
+		Assert.True(MuiAreaRenderPolicyStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiAreaRenderPolicyStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural));
+		Assert.Equal(value.Magic, structural.Magic);
+		Assert.Equal(value.FillArea, structural.FillArea);
+		Assert.Equal(value.Background, structural.Background);
+		Assert.Equal(value.Frame, structural.Frame);
+		Assert.Equal(value.Font, structural.Font);
+		Assert.Equal(value.FrameVisible, structural.FrameVisible);
+		Assert.Equal(value.FramePhantomHoriz, structural.FramePhantomHoriz);
+		Assert.Equal(value.FrameTitle, structural.FrameTitle);
+		Assert.Equal(value.FrameDynamic, structural.FrameDynamic);
+		Assert.True(MuiAreaRenderPolicyStateRecordCodec.TryRead(ref platform,
+			address, out _));
+		Assert.True(MuiAreaRenderPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiAreaRenderPolicyStateField.FrameDynamic,
+			out var lastField));
+		Assert.Equal(address.Raw + 32, lastField.Raw);
+		Assert.True(MuiAreaRenderPolicyStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaRenderPolicyStateField.FrameTitle,
+			out var frameTitle));
+		Assert.Equal(value.FrameTitle.Raw, frameTitle);
+		Assert.False(MuiAreaRenderPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, (MuiAreaRenderPolicyStateField)255, out _));
+		Assert.False(MuiAreaRenderPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiAreaRenderPolicyStateField.Magic, out _));
+		Assert.False(MuiAreaRenderPolicyStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void AreaLayoutPolicyRecordUsesDedicatedStructMemoryAdapter()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1D00);
+		var value = new MuiAreaLayoutPolicyStateRecord
+		{
+			Magic = MuiAreaLayoutPolicyStateRecord.Cookie,
+			ShowMe = 1,
+			FixWidth = 20,
+			FixHeight = 10,
+			MaxWidth = 100,
+			MaxHeight = 80,
+			InnerLeft = 2,
+			InnerRight = 3,
+			InnerTop = 1,
+			InnerBottom = 1,
+			HorizontalWeight = 7,
+			VerticalWeight = 9,
+		};
+
+		Assert.True(MuiAreaLayoutPolicyStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiAreaLayoutPolicyStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural));
+		Assert.Equal(value.Magic, structural.Magic);
+		Assert.Equal(value.ShowMe, structural.ShowMe);
+		Assert.Equal(value.FixWidth, structural.FixWidth);
+		Assert.Equal(value.FixHeight, structural.FixHeight);
+		Assert.Equal(value.MaxWidth, structural.MaxWidth);
+		Assert.Equal(value.MaxHeight, structural.MaxHeight);
+		Assert.Equal(value.InnerLeft, structural.InnerLeft);
+		Assert.Equal(value.InnerRight, structural.InnerRight);
+		Assert.Equal(value.InnerTop, structural.InnerTop);
+		Assert.Equal(value.InnerBottom, structural.InnerBottom);
+		Assert.Equal(value.HorizontalWeight, structural.HorizontalWeight);
+		Assert.Equal(value.VerticalWeight, structural.VerticalWeight);
+		Assert.True(MuiAreaLayoutPolicyStateRecordCodec.TryRead(ref platform,
+			address, out _));
+		Assert.True(MuiAreaLayoutPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiAreaLayoutPolicyField.VerticalWeight,
+			out var lastField));
+		Assert.Equal(address.Raw + 44, lastField.Raw);
+		Assert.True(MuiAreaLayoutPolicyStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaLayoutPolicyField.HorizontalWeight,
+			out var horizontalWeight));
+		Assert.Equal(value.HorizontalWeight, horizontalWeight);
+		Assert.False(MuiAreaLayoutPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, (MuiAreaLayoutPolicyField)255, out _));
+		Assert.False(MuiAreaLayoutPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiAreaLayoutPolicyField.Magic, out _));
+		Assert.False(MuiAreaLayoutPolicyStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
 	public void MalformedRenderPolicyFailsClosedBeforeGetterMutationAndDrawing()
 	{
 		var platform = CreatePlatform(out var cl);
@@ -213,6 +318,12 @@ public sealed class MuiAreaLayoutTests
 		Assert.True(MuiAreaLayoutPolicyFieldCursorCodec.TryReadUInt32(ref platform,
 			block, MuiAreaLayoutPolicyField.ShowMe, out var malformedShowMe));
 		Assert.Equal(2u, malformedShowMe);
+		Assert.True(MuiAreaLayoutPolicyStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(2u, structural.ShowMe);
+		Assert.False(MuiAreaLayoutPolicyStateAdmission.Validate(structural));
+		Assert.False(MuiAreaLayoutPolicyStateRecordCodec.TryRead(ref platform,
+			block, out _));
 
 		Assert.False(MuiAreaLayoutCore.TryGetLayoutPolicyState(ref platform, State,
 			area, out _));
@@ -260,6 +371,12 @@ public sealed class MuiAreaLayoutTests
 		Assert.True(block.IsNotNull);
 		Assert.True(MuiAreaGeometryStateFieldCursorCodec.TryWriteInt32(ref platform,
 			block, MuiAreaGeometryStateField.Width, -1));
+		Assert.True(MuiAreaGeometryStateRecordCodec.TryReadStructural(ref platform,
+			block, out var structural));
+		Assert.Equal(-1, structural.Width);
+		Assert.False(MuiAreaGeometryStateAdmission.Validate(structural));
+		Assert.False(MuiAreaGeometryStateRecordCodec.TryRead(ref platform, block,
+			out _));
 		Assert.True(MuiAreaGeometryStateFieldCursorCodec.TryReadInt32(ref platform,
 			block, MuiAreaGeometryStateField.Width, out var malformedWidth));
 		Assert.Equal(-1, malformedWidth);
@@ -288,6 +405,82 @@ public sealed class MuiAreaLayoutTests
 		Assert.True(MuiAreaGeometryStateFieldCursorCodec.TryReadInt32(ref platform,
 			block, MuiAreaGeometryStateField.Width, out malformedWidth));
 		Assert.Equal(-1, malformedWidth);
+	}
+
+	[Fact]
+	public void GeometryAdmissionRequiresCanonicalEdgesAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var area = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
+			APTR.Null);
+		var valid = new MuiAreaGeometryStateRecord
+		{
+			Magic = MuiAreaGeometryStateRecord.Cookie,
+			Left = -4,
+			Top = -2,
+			Width = 25,
+			Height = 12,
+			Right = 20,
+			Bottom = 9,
+		};
+		Assert.True(MuiAreaGeometryStateAdmission.Validate(valid));
+		Assert.True(MuiAreaGeometryStateAdmission.ValidateLive(ref platform, State,
+			area, valid));
+		var malformed = valid;
+		malformed.Width = -1;
+		Assert.False(MuiAreaGeometryStateAdmission.Validate(malformed));
+		malformed = valid;
+		malformed.Right = 21;
+		Assert.False(MuiAreaGeometryStateAdmission.Validate(malformed));
+		malformed = valid;
+		malformed.Left = int.MaxValue;
+		malformed.Width = 2;
+		Assert.False(MuiAreaGeometryStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaGeometryStateAdmission.ValidateLive(ref platform, State,
+			APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void AreaGeometryRecordUsesDedicatedStructMemoryAdapter()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1A80);
+		var value = new MuiAreaGeometryStateRecord
+		{
+			Magic = MuiAreaGeometryStateRecord.Cookie,
+			Left = -4,
+			Top = -2,
+			Width = 25,
+			Height = 12,
+			Right = 20,
+			Bottom = 9,
+		};
+
+		Assert.True(MuiAreaGeometryStateRecordCodec.Write(ref platform, address,
+			value));
+		Assert.True(MuiAreaGeometryStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural));
+		Assert.Equal(value.Magic, structural.Magic);
+		Assert.Equal(value.Left, structural.Left);
+		Assert.Equal(value.Top, structural.Top);
+		Assert.Equal(value.Width, structural.Width);
+		Assert.Equal(value.Height, structural.Height);
+		Assert.Equal(value.Right, structural.Right);
+		Assert.Equal(value.Bottom, structural.Bottom);
+		Assert.True(MuiAreaGeometryStateRecordCodec.TryRead(ref platform, address,
+			out _));
+		Assert.True(MuiAreaGeometryStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, 24, out var lastField));
+		Assert.Equal(address.Raw + 24, lastField.Raw);
+		Assert.True(MuiAreaGeometryStateRecordMemoryCodec.TryReadInt32(
+			ref platform, address, 4, out var left));
+		Assert.Equal(value.Left, left);
+		Assert.False(MuiAreaGeometryStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiAreaGeometryStateRecord.Size, out _));
+		Assert.False(MuiAreaGeometryStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, 0, out _));
+		Assert.False(MuiAreaGeometryStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _));
 	}
 
 	[Fact]
@@ -597,6 +790,126 @@ public sealed class MuiAreaLayoutTests
 			out var policy));
 		Assert.Equal(MuiGroupLayoutPolicyStateRecord.Cookie, policy.Magic);
 		Assert.Equal(1u, policy.Horizontal);
+	}
+
+	[Fact]
+	public void MalformedLayoutHookStateFailsClosedBeforeGetterAndLayout()
+	{
+		var platform = CreatePlatform(out var cl);
+		var groupName = APTR.FromPointer(0x1120);
+		platform.WriteCString(groupName, "Group.mui");
+		var groupClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			groupName, APTR.Null, 0, APTR.FromPointer(2), false);
+		var group = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			groupClass, APTR.Null);
+		var child = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
+			APTR.Null);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, group, child));
+		var hook = APTR.FromPointer(0x2800);
+		platform.WriteUInt32(hook, 8, HookEntryGroupLayout);
+		Set(ref platform, group, LayoutHook, hook.Raw);
+
+		var storage = APTR.FromPointer(0x1200);
+		Assert.True(MuiGroupLayoutCore.AskMinMax(ref platform, State, group,
+			storage));
+		Set(ref platform, child, LeftEdge, 77);
+		Assert.True(MuiGroupLayoutCore.Layout(ref platform, State, group, 5, 7,
+			100, 40));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, LeftEdge, out var beforeLeft));
+		var beforeMinMaxCount = platform.LayoutHookMinMaxCount;
+		var beforeLayoutCount = platform.LayoutHookLayoutCount;
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			group, LayoutHookStateAttribute, out var stateRaw));
+		var stateBlock = APTR.FromPointer(stateRaw);
+		var cursor = default(MuiGroupLayoutHookStateFieldCursor);
+		cursor.Record = stateBlock;
+		cursor.Field = MuiGroupLayoutHookStateField.Magic;
+		Assert.True(MuiGroupLayoutHookStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, stateBlock, cursor.Field, 0));
+
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, group,
+			LayoutHook, out _));
+		Assert.False(MuiGroupLayoutHookCore.TryGetAttribute(ref platform, State,
+			group, LayoutHook, out _));
+		Assert.False(MuiHeadlessObjectCore.SetAttribute(ref platform, State, group,
+			LayoutHook, hook.Raw, false));
+		Assert.False(MuiGroupLayoutCore.AskMinMax(ref platform, State, group,
+			storage));
+		Assert.False(MuiGroupLayoutCore.Layout(ref platform, State, group, 5, 7,
+			100, 40));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			child, LeftEdge, out var afterLeft));
+		Assert.Equal(beforeLeft, afterLeft);
+		Assert.Equal(beforeMinMaxCount, platform.LayoutHookMinMaxCount);
+		Assert.Equal(beforeLayoutCount, platform.LayoutHookLayoutCount);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			group, LayoutHook, out var rawHook));
+		Assert.Equal(hook.Raw, rawHook);
+		Assert.True(MuiGroupLayoutHookStateRecordCodec.TryReadStructural(
+			ref platform, stateBlock, out var malformed));
+		Assert.Equal(0u, malformed.Magic);
+		Assert.False(MuiGroupLayoutHookStateAdmission.Validate(malformed));
+		Assert.False(MuiGroupLayoutHookStateAdmission.ValidateLive(ref platform,
+			State, group, malformed));
+	}
+
+	[Fact]
+	public void LayoutHookStateAdmissionRequiresCookieAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var groupName = APTR.FromPointer(0x1120);
+		platform.WriteCString(groupName, "Group.mui");
+		var groupClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			groupName, APTR.Null, 0, APTR.FromPointer(2), false);
+		var group = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			groupClass, APTR.Null);
+		var valid = default(MuiGroupLayoutHookStateRecord);
+		valid.Magic = MuiGroupLayoutHookStateRecord.Cookie;
+		valid.Hook = APTR.FromPointer(0x2800);
+		Assert.True(MuiGroupLayoutHookStateAdmission.Validate(valid));
+		Assert.True(MuiGroupLayoutHookStateAdmission.ValidateLive(ref platform,
+			State, group, valid));
+		var malformed = valid;
+		malformed.Magic = 0;
+		Assert.False(MuiGroupLayoutHookStateAdmission.Validate(malformed));
+		Assert.False(MuiGroupLayoutHookStateAdmission.ValidateLive(ref platform,
+			State, group, malformed));
+		Assert.False(MuiGroupLayoutHookStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void LayoutHookRecordUsesDedicatedStructMemoryAdapter()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1D20);
+		var value = new MuiGroupLayoutHookStateRecord
+		{
+			Magic = MuiGroupLayoutHookStateRecord.Cookie,
+			Hook = APTR.FromPointer(0x1D80),
+		};
+		Assert.True(MuiGroupLayoutHookStateRecordCodec.Write(ref platform, address,
+			value));
+		Assert.True(MuiGroupLayoutHookStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiGroupLayoutHookStateField.Hook,
+			out var hookAddress));
+		Assert.Equal(address.Raw + MuiGroupLayoutHookStateRecord.HookOffset,
+			hookAddress.Raw);
+		Assert.True(MuiGroupLayoutHookStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiGroupLayoutHookStateField.Hook, out var hook));
+		Assert.Equal(0x1D80u, hook);
+		Assert.True(MuiGroupLayoutHookStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiGroupLayoutHookStateField.Hook, 0));
+		Assert.True(MuiGroupLayoutHookStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.True(decoded.Hook.IsNull);
+		Assert.False(MuiGroupLayoutHookStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, (MuiGroupLayoutHookStateField)255, out _));
+		Assert.False(MuiGroupLayoutHookStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiGroupLayoutHookStateField.Magic, out _));
+		Assert.False(MuiGroupLayoutHookStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
 	}
 
 	[Fact]

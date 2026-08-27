@@ -1,0 +1,43 @@
+using Amiga;
+using CopperOS.MuiMaster;
+
+namespace CopperOS.MuiMaster.Tests;
+
+public sealed class MuiAreaTimerEventStructAdapterTests
+{
+	[Fact]
+	public void AreaTimerEventStructAdapterUsesNamedFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3E00);
+		var value = new MuiAreaTimerEventStateRecord
+		{
+			Magic = MuiAreaTimerEventStateRecord.Cookie,
+			Armed = 1,
+			MouseOver = 1,
+			DelayElapsed = 0,
+			LastTick = 0xFEDCBA98,
+			Generation = 7,
+		};
+
+		Assert.True(MuiAreaTimerEventStateCodec.Write(ref platform, address, value));
+		Assert.True(MuiAreaTimerEventStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiAreaTimerEventStateField.LastTick,
+			out var tickAddress));
+		Assert.Equal(0x3E10u, tickAddress.Raw);
+		Assert.True(MuiAreaTimerEventStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaTimerEventStateField.LastTick,
+			0x12345678));
+		Assert.True(MuiAreaTimerEventStateCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(0x12345678u, decoded.LastTick);
+		Assert.Equal(1u, decoded.Armed);
+		Assert.False(MuiAreaTimerEventStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, (MuiAreaTimerEventStateField)255, out _));
+		Assert.False(MuiAreaTimerEventStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiAreaTimerEventStateField.Magic, out _));
+		Assert.False(MuiAreaTimerEventStateCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+}

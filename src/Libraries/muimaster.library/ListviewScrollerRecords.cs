@@ -174,7 +174,7 @@ internal static class MuiListviewHorizontalScrollerFieldCursorCodec
 
 internal static class MuiListviewHorizontalScrollerStateCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiListviewHorizontalScrollerState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -184,54 +184,60 @@ internal static class MuiListviewHorizontalScrollerStateCodec
 			!MuiListviewHorizontalScrollerFieldCursorCodec.TryReadUInt32(
 				ref platform, address,
 				MuiListviewHorizontalScrollerField.Magic, out var magic) ||
-			magic != MuiListviewHorizontalScrollerState.Cookie)
-			return false;
-		value.Magic = magic;
-		return MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
-			ref platform, address,
-			MuiListviewHorizontalScrollerField.TrackLeft, out value.TrackLeft) &&
-			MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
+			!MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
 				ref platform, address,
-				MuiListviewHorizontalScrollerField.TrackTop, out value.TrackTop) &&
-			MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
+				MuiListviewHorizontalScrollerField.TrackLeft, out value.TrackLeft) ||
+			!MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
+				ref platform, address,
+				MuiListviewHorizontalScrollerField.TrackTop, out value.TrackTop) ||
+			!MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
 				ref platform, address,
 				MuiListviewHorizontalScrollerField.TrackRight,
-				out value.TrackRight) &&
-			MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
+				out value.TrackRight) ||
+			!MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
 				ref platform, address,
 				MuiListviewHorizontalScrollerField.TrackBottom,
-				out value.TrackBottom) &&
-			MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
+				out value.TrackBottom) ||
+			!MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
 				ref platform, address,
-				MuiListviewHorizontalScrollerField.ThumbLeft, out value.ThumbLeft) &&
-			MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
+				MuiListviewHorizontalScrollerField.ThumbLeft, out value.ThumbLeft) ||
+			!MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
 				ref platform, address,
-				MuiListviewHorizontalScrollerField.ThumbTop, out value.ThumbTop) &&
-			MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
+				MuiListviewHorizontalScrollerField.ThumbTop, out value.ThumbTop) ||
+			!MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
 				ref platform, address,
 				MuiListviewHorizontalScrollerField.ThumbRight,
-				out value.ThumbRight) &&
-			MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
+				out value.ThumbRight) ||
+			!MuiListviewHorizontalScrollerFieldCursorCodec.TryReadInt32(
 				ref platform, address,
 				MuiListviewHorizontalScrollerField.ThumbBottom,
-				out value.ThumbBottom) &&
-			MuiListviewHorizontalScrollerFieldCursorCodec.TryReadUInt32(
+				out value.ThumbBottom) ||
+			!MuiListviewHorizontalScrollerFieldCursorCodec.TryReadUInt32(
 				ref platform, address,
 				MuiListviewHorizontalScrollerField.ContentWidth,
-				out value.ContentWidth) &&
-			MuiListviewHorizontalScrollerFieldCursorCodec.TryReadUInt32(
+				out value.ContentWidth) ||
+			!MuiListviewHorizontalScrollerFieldCursorCodec.TryReadUInt32(
 				ref platform, address,
 				MuiListviewHorizontalScrollerField.ViewWidth,
-				out value.ViewWidth) &&
-			MuiListviewHorizontalScrollerFieldCursorCodec.TryReadUInt32(
+				out value.ViewWidth) ||
+			!MuiListviewHorizontalScrollerFieldCursorCodec.TryReadUInt32(
 				ref platform, address,
 				MuiListviewHorizontalScrollerField.ScrollX,
-				out value.ScrollX) &&
-			MuiListviewHorizontalScrollerFieldCursorCodec.TryReadUInt32(
+				out value.ScrollX) ||
+			!MuiListviewHorizontalScrollerFieldCursorCodec.TryReadUInt32(
 				ref platform, address,
 				MuiListviewHorizontalScrollerField.MaxScrollX,
-				out value.MaxScrollX);
+				out value.MaxScrollX))
+			return false;
+		value.Magic = magic;
+		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiListviewHorizontalScrollerState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		value.Magic == MuiListviewHorizontalScrollerState.Cookie;
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiListviewHorizontalScrollerState value)
@@ -325,7 +331,7 @@ internal struct MuiListviewHorizontalScrollerDragStateFieldCursor
 
 internal static class MuiListviewHorizontalScrollerDragStateCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiListviewHorizontalScrollerDragState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -348,8 +354,14 @@ internal static class MuiListviewHorizontalScrollerDragStateCodec
 			return false;
 		value.GrabOffset = unchecked((int)grabOffset);
 		value.LastPointer = unchecked((int)lastPointer);
-		return value.Magic == MuiListviewHorizontalScrollerDragState.Cookie;
+		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiListviewHorizontalScrollerDragState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		value.Magic == MuiListviewHorizontalScrollerDragState.Cookie;
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiListviewHorizontalScrollerDragState value)
@@ -550,7 +562,7 @@ internal static class MuiListviewScrollerDragStateFieldCursorCodec
 
 internal static class MuiListviewScrollerDragStateCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiListviewScrollerDragState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -574,8 +586,14 @@ internal static class MuiListviewScrollerDragStateCodec
 		value.GrabOffset = unchecked((int)grabOffset);
 		value.StartFirst = unchecked((int)startFirst);
 		value.LastPointer = unchecked((int)lastPointer);
-		return value.Magic == MuiListviewScrollerDragState.Cookie;
+		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiListviewScrollerDragState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		value.Magic == MuiListviewScrollerDragState.Cookie;
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiListviewScrollerDragState value)

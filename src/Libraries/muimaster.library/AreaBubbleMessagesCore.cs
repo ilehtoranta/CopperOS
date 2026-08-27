@@ -12,6 +12,12 @@ namespace CopperOS.MuiMaster;
 internal struct MuiAreaCreateBubbleMessage
 {
 	internal const uint Size = 20;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint XOffset = 4;
+	internal const uint YOffset = 8;
+	internal const uint TextOffset = 12;
+	internal const uint FlagsOffset = 16;
 	internal uint MethodId;
 	internal int X;
 	internal int Y;
@@ -23,6 +29,9 @@ internal struct MuiAreaCreateBubbleMessage
 internal struct MuiAreaDeleteBubbleMessage
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint BubbleOffset = 4;
 	internal uint MethodId;
 	internal APTR Bubble;
 }
@@ -43,41 +52,95 @@ internal enum MuiAreaBubbleMessageField : byte
 	Bubble,
 }
 
-internal static class MuiAreaBubbleMessageCodec
+// Struct-first guest-memory adapter for the fixed CreateBubble/DeleteBubble
+// packets. The packet kind owns the complete record boundary; callers use the
+// named field enum and never supply a literal ABI offset.
+internal static class MuiAreaBubbleMessageMemoryCodec
 {
-	internal const uint CreateBubble = 0x80421C41u;
-	internal const uint DeleteBubble = 0x804211AFu;
+	private static bool TryResolve(MuiAreaBubblePacketKind packet,
+		MuiAreaBubbleMessageField field, out uint offset, out uint size)
+	{
+		switch (packet)
+		{
+			case MuiAreaBubblePacketKind.Create:
+				size = MuiAreaCreateBubbleMessage.Size;
+				if (field == MuiAreaBubbleMessageField.MethodId)
+					offset = MuiAreaCreateBubbleMessage.MethodIdOffset;
+				else if (field == MuiAreaBubbleMessageField.X)
+					offset = MuiAreaCreateBubbleMessage.XOffset;
+				else if (field == MuiAreaBubbleMessageField.Y)
+					offset = MuiAreaCreateBubbleMessage.YOffset;
+				else if (field == MuiAreaBubbleMessageField.Text)
+					offset = MuiAreaCreateBubbleMessage.TextOffset;
+				else if (field == MuiAreaBubbleMessageField.Flags)
+					offset = MuiAreaCreateBubbleMessage.FlagsOffset;
+				else
+				{
+					offset = 0;
+					size = 0;
+					return false;
+				}
+				return true;
+			case MuiAreaBubblePacketKind.Delete:
+				size = MuiAreaDeleteBubbleMessage.Size;
+				if (field == MuiAreaBubbleMessageField.MethodId)
+					offset = MuiAreaDeleteBubbleMessage.MethodIdOffset;
+				else if (field == MuiAreaBubbleMessageField.Bubble)
+					offset = MuiAreaDeleteBubbleMessage.BubbleOffset;
+				else
+				{
+					offset = 0;
+					size = 0;
+					return false;
+				}
+				return true;
+		}
+		offset = 0;
+		size = 0;
+		return false;
+	}
 
-	private static bool TryReadAddress<TPlatform>(ref TPlatform platform,
-		APTR message, uint offset, out APTR address)
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaBubblePacketKind packet,
+		MuiAreaBubbleMessageField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (message.IsNull || message.Raw > uint.MaxValue - offset) return false;
+		if (!TryResolve(packet, field, out var offset, out var size) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, size)) return false;
 		address = APTR.FromPointer(message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiAreaCreateBubbleMessage.FieldSize);
 	}
 
-	private static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
-		APTR message, uint offset, out uint value)
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaBubblePacketKind packet,
+		MuiAreaBubbleMessageField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryReadAddress(ref platform, message, offset, out var address))
-			return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
 
-	private static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
-		APTR message, uint offset, uint value)
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaBubblePacketKind packet,
+		MuiAreaBubbleMessageField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryReadAddress(ref platform, message, offset, out var address))
-			return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+internal static class MuiAreaBubbleMessageCodec
+{
+	internal const uint CreateBubble = 0x80421C41u;
+	internal const uint DeleteBubble = 0x804211AFu;
 
 	internal static bool IsMethod(uint method) => method == CreateBubble ||
 		method == DeleteBubble;
@@ -87,14 +150,22 @@ internal static class MuiAreaBubbleMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiAreaCreateBubbleMessage.Size) ||
-			!TryReadUInt32(ref platform, message, 0, out packet.MethodId) ||
+		if (!MuiAreaBubbleMessageMemoryCodec.TryReadUInt32(ref platform,
+			message, MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.MethodId, out packet.MethodId) ||
 			packet.MethodId != CreateBubble ||
-			!TryReadUInt32(ref platform, message, 4, out var x) ||
-			!TryReadUInt32(ref platform, message, 8, out var y) ||
-			!TryReadUInt32(ref platform, message, 12, out var text) ||
-			!TryReadUInt32(ref platform, message, 16, out packet.Flags)) return false;
+			!MuiAreaBubbleMessageMemoryCodec.TryReadUInt32(ref platform,
+				message, MuiAreaBubblePacketKind.Create,
+				MuiAreaBubbleMessageField.X, out var x) ||
+			!MuiAreaBubbleMessageMemoryCodec.TryReadUInt32(ref platform,
+				message, MuiAreaBubblePacketKind.Create,
+				MuiAreaBubbleMessageField.Y, out var y) ||
+			!MuiAreaBubbleMessageMemoryCodec.TryReadUInt32(ref platform,
+				message, MuiAreaBubblePacketKind.Create,
+				MuiAreaBubbleMessageField.Text, out var text) ||
+			!MuiAreaBubbleMessageMemoryCodec.TryReadUInt32(ref platform,
+				message, MuiAreaBubblePacketKind.Create,
+				MuiAreaBubbleMessageField.Flags, out packet.Flags)) return false;
 		packet.X = unchecked((int)x);
 		packet.Y = unchecked((int)y);
 		packet.Text = APTR.FromPointer(text);
@@ -106,11 +177,13 @@ internal static class MuiAreaBubbleMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiAreaDeleteBubbleMessage.Size) ||
-			!TryReadUInt32(ref platform, message, 0, out packet.MethodId) ||
+		if (!MuiAreaBubbleMessageMemoryCodec.TryReadUInt32(ref platform,
+			message, MuiAreaBubblePacketKind.Delete,
+			MuiAreaBubbleMessageField.MethodId, out packet.MethodId) ||
 			packet.MethodId != DeleteBubble ||
-			!TryReadUInt32(ref platform, message, 4, out var bubble)) return false;
+			!MuiAreaBubbleMessageMemoryCodec.TryReadUInt32(ref platform,
+				message, MuiAreaBubblePacketKind.Delete,
+				MuiAreaBubbleMessageField.Bubble, out var bubble)) return false;
 		packet.Bubble = APTR.FromPointer(bubble);
 		return true;
 	}
@@ -118,18 +191,27 @@ internal static class MuiAreaBubbleMessageCodec
 	internal static bool WriteCreate<TPlatform>(ref TPlatform platform,
 		APTR message, int x, int y, APTR text, uint flags)
 		where TPlatform : struct, IMuiGuestMemory =>
-		message.IsNotNull && platform.IsMapped(message,
-			MuiAreaCreateBubbleMessage.Size) &&
-		TryWriteUInt32(ref platform, message, 0, CreateBubble) &&
-		TryWriteUInt32(ref platform, message, 4, unchecked((uint)x)) &&
-		TryWriteUInt32(ref platform, message, 8, unchecked((uint)y)) &&
-		TryWriteUInt32(ref platform, message, 12, text.Raw) &&
-		TryWriteUInt32(ref platform, message, 16, flags);
+		MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform, message,
+			MuiAreaBubblePacketKind.Create, MuiAreaBubbleMessageField.MethodId,
+			CreateBubble) &&
+		MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform, message,
+			MuiAreaBubblePacketKind.Create, MuiAreaBubbleMessageField.X,
+			unchecked((uint)x)) &&
+		MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform, message,
+			MuiAreaBubblePacketKind.Create, MuiAreaBubbleMessageField.Y,
+			unchecked((uint)y)) &&
+		MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform, message,
+			MuiAreaBubblePacketKind.Create, MuiAreaBubbleMessageField.Text,
+			text.Raw) &&
+		MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform, message,
+			MuiAreaBubblePacketKind.Create, MuiAreaBubbleMessageField.Flags, flags);
 
 	internal static bool WriteDelete<TPlatform>(ref TPlatform platform,
 		APTR message, APTR bubble) where TPlatform : struct, IMuiGuestMemory =>
-		message.IsNotNull && platform.IsMapped(message,
-			MuiAreaDeleteBubbleMessage.Size) &&
-		TryWriteUInt32(ref platform, message, 0, DeleteBubble) &&
-		TryWriteUInt32(ref platform, message, 4, bubble.Raw);
+		MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform, message,
+			MuiAreaBubblePacketKind.Delete, MuiAreaBubbleMessageField.MethodId,
+			DeleteBubble) &&
+		MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform, message,
+			MuiAreaBubblePacketKind.Delete, MuiAreaBubbleMessageField.Bubble,
+			bubble.Raw);
 }

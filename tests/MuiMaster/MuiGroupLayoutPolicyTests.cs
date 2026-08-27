@@ -80,6 +80,73 @@ public sealed class MuiGroupLayoutPolicyTests
 	}
 
 	[Fact]
+	public void GroupLayoutPolicyRecordUsesDedicatedStructMemoryAdapter()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x4000,
+			State);
+		var address = APTR.FromPointer(0x1D20);
+		var value = new MuiGroupLayoutPolicyStateRecord
+		{
+			Magic = MuiGroupLayoutPolicyStateRecord.Cookie,
+			Horizontal = 1,
+			HorizontalSpacing = unchecked((uint)-25),
+			VerticalSpacing = 6,
+			SameWidth = 1,
+			SameHeight = 0,
+			PageMode = 1,
+		};
+		Assert.True(MuiGroupLayoutPolicyStateRecordCodec.Write(ref platform, address,
+			value));
+		Assert.True(MuiGroupLayoutPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiGroupLayoutPolicyField.PageMode,
+			out var pageModeAddress));
+		Assert.Equal(0x1D38u, pageModeAddress.Raw);
+		Assert.True(MuiGroupLayoutPolicyStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiGroupLayoutPolicyField.HorizontalSpacing,
+			out var horizontalSpacing));
+		Assert.Equal(unchecked((uint)-25), horizontalSpacing);
+		Assert.True(MuiGroupLayoutPolicyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiGroupLayoutPolicyField.PageMode, 0));
+		Assert.True(MuiGroupLayoutPolicyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(0u, decoded.PageMode);
+		Assert.False(MuiGroupLayoutPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, (MuiGroupLayoutPolicyField)255, out _));
+		Assert.False(MuiGroupLayoutPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiGroupLayoutPolicyField.Magic, out _));
+		Assert.False(MuiGroupLayoutPolicyStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void GroupLayoutPolicyAdmissionRequiresShapeAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var group = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
+			APTR.Null);
+		var valid = new MuiGroupLayoutPolicyStateRecord
+		{
+			Magic = MuiGroupLayoutPolicyStateRecord.Cookie,
+			Horizontal = 1,
+			HorizontalSpacing = 4,
+			VerticalSpacing = unchecked((uint)-25),
+			SameWidth = 1,
+			SameHeight = 0,
+			PageMode = 1,
+		};
+		Assert.True(MuiGroupLayoutPolicyStateAdmission.Validate(valid));
+		Assert.True(MuiGroupLayoutPolicyStateAdmission.ValidateLive(ref platform,
+			State, group, valid));
+		var malformed = valid;
+		malformed.PageMode = 2;
+		Assert.False(MuiGroupLayoutPolicyStateAdmission.Validate(malformed));
+		Assert.False(MuiGroupLayoutPolicyStateAdmission.ValidateLive(ref platform,
+			State, group, malformed));
+		Assert.False(MuiGroupLayoutPolicyStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
 	public void EqualExtentSelectionKeepsDefaultInsideFiniteBounds()
 	{
 		var selection = new MuiGroupEqualExtentSelection
@@ -194,6 +261,12 @@ public sealed class MuiGroupLayoutPolicyTests
 			LayoutPolicyStateKey);
 		Assert.True(MuiGroupLayoutPolicyFieldCursorCodec.TryWriteUInt32(
 			ref platform, block, MuiGroupLayoutPolicyField.PageMode, 2));
+		Assert.True(MuiGroupLayoutPolicyStateRecordCodec.TryReadStructural(
+			ref platform, block, out var malformed));
+		Assert.Equal(2u, malformed.PageMode);
+		Assert.False(MuiGroupLayoutPolicyStateAdmission.Validate(malformed));
+		Assert.False(MuiGroupLayoutPolicyStateRecordCodec.TryRead(ref platform,
+			block, out _));
 
 		Assert.False(MuiGroupLayoutCore.TryGetLayoutState(ref platform, State, group,
 			out _));

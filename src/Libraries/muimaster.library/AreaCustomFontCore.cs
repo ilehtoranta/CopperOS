@@ -24,20 +24,23 @@ internal static class MuiAreaCustomFontCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
-		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull)
 			return false;
-		var present = MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
-			obj, MuiCommonControlCore.CustomFont, out var raw) ? 1u : 0u;
-		var spec = APTR.FromPointer(raw);
-		if (present != 0 && spec.IsNotNull && !CStringCodec.TryReadLength(
-			ref platform, spec, MaximumSpecLength, out _)) return false;
-
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) ==
-			unchecked((int)MuiAreaCustomFontStateRecord.Size) &&
-			MuiAreaCustomFontStateRecordCodec.TryRead(ref platform, block,
-				out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey);
+		if (block.IsNotNull || length != 0)
 		{
+			if (length != unchecked((int)MuiAreaCustomFontStateRecord.Size) ||
+				!MuiAreaCustomFontStateRecordCodec.TryReadStructural(ref platform,
+					block, out var record) ||
+				!MuiAreaCustomFontStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
+			var present = MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
+				obj, MuiCommonControlCore.CustomFont, out var raw) ? 1u : 0u;
+			var spec = APTR.FromPointer(raw);
+			if (present != 0 && spec.IsNotNull && !CStringCodec.TryReadLength(
+				ref platform, spec, MaximumSpecLength, out _)) return false;
 			if (record.Present != present || (present != 0 &&
 				record.Spec.Raw != spec.Raw))
 			{
@@ -53,10 +56,14 @@ internal static class MuiAreaCustomFontCore
 			value.Generation = record.Generation;
 			return true;
 		}
-
-		if (!WriteState(ref platform, state, obj, spec, present, 1)) return false;
-		value.Spec = spec;
-		value.Present = present;
+		var rawPresent = MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
+			obj, MuiCommonControlCore.CustomFont, out var rawSpec) ? 1u : 0u;
+		var source = APTR.FromPointer(rawSpec);
+		if (rawPresent != 0 && source.IsNotNull && !CStringCodec.TryReadLength(
+			ref platform, source, MaximumSpecLength, out _)) return false;
+		if (!WriteState(ref platform, state, obj, source, rawPresent, 1)) return false;
+		value.Spec = source;
+		value.Present = rawPresent;
 		value.Generation = 1;
 		return true;
 	}
@@ -67,15 +74,17 @@ internal static class MuiAreaCustomFontCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
 			return false;
+		var record = default(MuiAreaCustomFontStateRecord);
+		record.Magic = MuiAreaCustomFontStateRecord.Cookie;
+		record.Spec = spec;
+		record.Present = present;
+		record.Generation = generation;
+		if (!MuiAreaCustomFontStateAdmission.ValidateLive(ref platform, state, obj,
+			record)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiAreaCustomFontStateRecord.Size);
 		if (scratch.IsNull) return false;
 		platform.Clear(scratch, MuiAreaCustomFontStateRecord.Size);
-		var record = default(MuiAreaCustomFontStateRecord);
-		record.Magic = MuiAreaCustomFontStateRecord.Cookie;
-		record.Spec = spec;
-		record.Present = present == 0 ? 0u : 1u;
-		record.Generation = generation == 0 ? 1u : generation;
 		var written = MuiAreaCustomFontStateRecordCodec.Write(ref platform,
 			scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
@@ -90,14 +99,18 @@ internal static class MuiAreaCustomFontCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
-		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull)
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			RuntimeStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			RuntimeStateKey) != unchecked((int)MuiAreaCustomFontRuntimeRecord.Size) ||
-			!MuiAreaCustomFontRuntimeRecordCodec.TryRead(ref platform, block,
-				out var record)) return false;
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			RuntimeStateKey);
+		if (length != unchecked((int)MuiAreaCustomFontRuntimeRecord.Size) ||
+			!MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(ref platform,
+				block, out var record) ||
+			!MuiAreaCustomFontRuntimeStateAdmission.ValidateLive(ref platform, state,
+				obj, record)) return false;
 		value.Font = record.Font;
 		value.Spec = record.Spec;
 		value.Generation = record.Generation;
@@ -109,12 +122,18 @@ internal static class MuiAreaCustomFontCore
 		APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			RuntimeStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			RuntimeStateKey) == 0) return true;
-		if (!MuiAreaCustomFontRuntimeRecordCodec.TryRead(ref platform, block,
-			out var record)) return false;
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			RuntimeStateKey);
+		if (block.IsNull && length == 0) return true;
+		if (length != unchecked((int)MuiAreaCustomFontRuntimeRecord.Size) ||
+			!MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(ref platform,
+				block, out var record) ||
+			!MuiAreaCustomFontRuntimeStateAdmission.ValidateLive(ref platform, state,
+				obj, record)) return false;
 		if (record.Active != 0 && record.Font.IsNotNull &&
 			!platform.CloseMuiCustomFont(record.Font)) return false;
 		return MuiStoreCore.DataspaceRemove(ref platform, state, obj,
@@ -125,16 +144,18 @@ internal static class MuiAreaCustomFontCore
 		APTR state, APTR obj, MuiAreaCustomFontHandleState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var scratch = MuiHeadlessMemory.Allocate(ref platform,
-			MuiAreaCustomFontRuntimeRecord.Size);
-		if (scratch.IsNull) return false;
-		platform.Clear(scratch, MuiAreaCustomFontRuntimeRecord.Size);
 		var record = default(MuiAreaCustomFontRuntimeRecord);
 		record.Magic = MuiAreaCustomFontRuntimeRecord.Cookie;
 		record.Font = value.Font;
 		record.Spec = value.Spec;
 		record.Generation = value.Generation;
 		record.Active = value.Active == 0 ? 0u : 1u;
+		if (!MuiAreaCustomFontRuntimeStateAdmission.ValidateLive(ref platform, state,
+			obj, record)) return false;
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiAreaCustomFontRuntimeRecord.Size);
+		if (scratch.IsNull) return false;
+		platform.Clear(scratch, MuiAreaCustomFontRuntimeRecord.Size);
 		var written = MuiAreaCustomFontRuntimeRecordCodec.Write(ref platform,
 			scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
@@ -173,6 +194,7 @@ internal static class MuiAreaCustomFontCore
 	internal static bool Setup<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadState(ref platform, state, obj, out _)) return false;
 		if (!MuiControlFontResolutionCore.TryResolveCustomSourceForOpen(
 			ref platform, state, obj, out var source))
 			return CloseRuntime(ref platform, state, obj);
@@ -228,6 +250,8 @@ public static class MuiAreaCustomFontPacketCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (!MuiAreaCustomFontCore.TryReadState(ref platform, state, obj,
+			out _)) return false;
 		if (!MuiControlFontResolutionCore.TryResolve(ref platform, state, obj,
 			out var resolution)) return false;
 		value.Present = resolution.Custom;

@@ -11,6 +11,9 @@ public sealed class MuiGroupChildrenTests
 	private const uint ChildList = 0x80424748;
 	private const uint Forward = 0x80421422;
 	private const uint ForwardDepth = 0x80428488;
+	private const uint ForwardStateAttribute = 0x7FFE0042;
+	private const uint ChildListStateAttribute = 0x7FFE0043;
+	private const uint FamilyList = 0x80424B9E;
 	private const uint Probe = 0x8042F8DC;
 
 	[Fact]
@@ -54,6 +57,10 @@ public sealed class MuiGroupChildrenTests
 			ChildCount, out var count));
 		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, group,
 			ChildList, out var list));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			group, ChildListStateAttribute, out var childListStateRaw));
+		Assert.True(MuiGroupChildListStateCodec.TryRead(ref platform,
+			APTR.FromPointer(childListStateRaw), out _));
 
 		// Compatibility writes to the public slots cannot replace the live
 		// family-derived count or the named ChildList projection.
@@ -172,6 +179,71 @@ public sealed class MuiGroupChildrenTests
 			record, ForwardDepth, 9, false));
 		Assert.Equal(1u, Get(ref platform, group, Forward));
 		Assert.Equal(1u, Get(ref platform, group, ForwardDepth));
+	}
+
+	[Fact]
+	public void MalformedForwardStateFailsClosedBeforeGetterSetterAndPropagation()
+	{
+		var platform = CreateClasses(out var groupClass, out var areaClass);
+		var group = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			groupClass, APTR.Null);
+		var child = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, group, child));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, group,
+			Forward, 1, false));
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, group,
+			Probe, 0x1111, false));
+		Assert.Equal(0x1111u, Get(ref platform, child, Probe));
+
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			group, ForwardStateAttribute, out var stateRaw));
+		var stateBlock = APTR.FromPointer(stateRaw);
+		Assert.True(MuiGroupRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			stateBlock, MuiGroupRecordKind.Forward, MuiGroupRecordField.Forward, 2));
+
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, group,
+			Forward, out _));
+		Assert.False(MuiHeadlessObjectCore.SetAttribute(ref platform, State, group,
+			Forward, 0, false));
+		Assert.False(MuiHeadlessObjectCore.SetAttribute(ref platform, State, group,
+			Probe, 0x2222, false));
+		Assert.Equal(0x1111u, Get(ref platform, child, Probe));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			group, Forward, out var rawForward));
+		Assert.Equal(1u, rawForward);
+	}
+
+	[Fact]
+	public void MalformedChildListStateFailsClosedBeforeGetterAndRebuild()
+	{
+		var platform = CreateClasses(out var groupClass, out var areaClass);
+		var group = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			groupClass, APTR.Null);
+		var child = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, group, child));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, group,
+			ChildList, out var list));
+		var allocations = platform.AllocationCount;
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			group, ChildListStateAttribute, out var stateRaw));
+		var stateBlock = APTR.FromPointer(stateRaw);
+		Assert.True(MuiGroupRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			stateBlock, MuiGroupRecordKind.ChildList, MuiGroupRecordField.List,
+			0x20FFC));
+
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, group,
+			ChildList, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, group,
+			FamilyList, out _));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, group,
+			ChildCount, out var count));
+		Assert.Equal(1u, count);
+		Assert.Equal(allocations, platform.AllocationCount);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			group, ChildListStateAttribute, out var unchangedStateRaw));
+		Assert.Equal(stateRaw, unchangedStateRaw);
 	}
 
 	[Fact]

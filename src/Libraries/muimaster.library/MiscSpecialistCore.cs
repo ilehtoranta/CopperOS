@@ -638,7 +638,8 @@ internal static class MuiKeyadjustPolicyStateCodec
 
 internal static class MuiMiscSpecialistHeaderCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiMiscSpecialistHeader value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -647,9 +648,9 @@ internal static class MuiMiscSpecialistHeaderCodec
 			MuiMiscSpecialistHeader.Size) ||
 			!MuiMiscRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiMiscRecordKind.Header, MuiMiscRecordField.Magic,
-				out var magic) || magic != MuiMiscSpecialistHeader.Cookie)
+				out var magic))
 			return false;
-		value.Magic = MuiMiscSpecialistHeader.Cookie;
+		value.Magic = magic;
 		if (!MuiMiscRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 			MuiMiscRecordKind.Header, MuiMiscRecordField.Class, out value.Class) ||
 			!MuiMiscRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
@@ -664,6 +665,14 @@ internal static class MuiMiscSpecialistHeaderCodec
 				MuiMiscRecordKind.Header, MuiMiscRecordField.NotifyCount,
 				out value.NotifyCount)) return false;
 		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiMiscSpecialistHeader value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryReadStructural(ref platform, address, out value)) return false;
+		return MuiMiscSpecialistAdmission.Validate(ref platform, address, value);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
@@ -688,6 +697,213 @@ internal static class MuiMiscSpecialistHeaderCodec
 			MuiMiscRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
 				MuiMiscRecordKind.Header, MuiMiscRecordField.NotifyCount,
 				value.NotifyCount);
+	}
+}
+
+// Structural decoding remains available for ABI qualification, while every
+// live Misc operation enters through this strict named-state admission. The
+// validator owns class/flag topology and the class-owned guest blocks that
+// teardown can otherwise mistake for valid allocations.
+internal static class MuiMiscSpecialistAdmission
+{
+	private const uint KeyadjustFlags = MuiMiscSpecialistLayout.FlagKaMultipleKeys |
+		MuiMiscSpecialistLayout.FlagKaDoubleClick |
+		MuiMiscSpecialistLayout.FlagKaTripleClick |
+		MuiMiscSpecialistLayout.FlagKaMouseEvents;
+	private const uint FilepanelFlags = MuiMiscSpecialistLayout.FlagFpDoMultiSelect |
+		MuiMiscSpecialistLayout.FlagFpDoPatterns |
+		MuiMiscSpecialistLayout.FlagFpDoSaveMode |
+		MuiMiscSpecialistLayout.FlagFpDrawersOnly |
+		MuiMiscSpecialistLayout.FlagFpFilterDrawers |
+		MuiMiscSpecialistLayout.FlagFpRejectIcons |
+		MuiMiscSpecialistLayout.FlagFpAslActive;
+	private const uint TitleFlags = MuiMiscSpecialistLayout.FlagTiClosable |
+		MuiMiscSpecialistLayout.FlagTiNewable |
+		MuiMiscSpecialistLayout.FlagTiSortable;
+	private const uint KnownFlags = MuiMiscSpecialistLayout.FlagDisabled |
+		KeyadjustFlags | FilepanelFlags | TitleFlags |
+		MuiMiscSpecialistLayout.FlagAboutOpen |
+		MuiMiscSpecialistLayout.FlagPanelRan |
+		MuiMiscSpecialistLayout.FlagSetupActive;
+
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		APTR instance, MuiMiscSpecialistHeader value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cls = (MuiMiscSpecialistClass)value.Class;
+		if (instance.IsNull || !platform.IsMapped(instance,
+			MuiMiscSpecialistLayout.InstanceSize) || !ValidateHeader(value) ||
+			!ValidateOwnedStrings(ref platform, instance) ||
+			!ValidateFilepanelState(ref platform, instance, cls) ||
+			!ValidateTitleState(ref platform, instance, cls) ||
+			!ValidateMccprefsState(ref platform, instance, cls) ||
+			!ValidateScrmodelistState(ref platform, instance, cls)) return false;
+		return true;
+	}
+
+	internal static bool ValidateHeader(MuiMiscSpecialistHeader value)
+	{
+		var cls = (MuiMiscSpecialistClass)value.Class;
+		return value.Magic == MuiMiscSpecialistHeader.Cookie &&
+			cls >= MuiMiscSpecialistClass.Keyadjust &&
+			cls <= MuiMiscSpecialistClass.Title &&
+			(value.Flags & ~KnownFlags) == 0 &&
+			ValidateClassFlags(cls, value.Flags);
+	}
+
+	private static bool ValidateClassFlags(MuiMiscSpecialistClass cls,
+		uint flags)
+	{
+		if (cls == MuiMiscSpecialistClass.Aboutmui &&
+			(flags & MuiMiscSpecialistLayout.FlagDisabled) != 0) return false;
+		if (cls != MuiMiscSpecialistClass.Keyadjust &&
+			(flags & KeyadjustFlags) != 0) return false;
+		if (cls != MuiMiscSpecialistClass.Filepanel &&
+			(flags & FilepanelFlags) != 0) return false;
+		if (cls != MuiMiscSpecialistClass.Title &&
+			(flags & TitleFlags) != 0) return false;
+		if (cls != MuiMiscSpecialistClass.Aboutmui &&
+			(flags & MuiMiscSpecialistLayout.FlagAboutOpen) != 0) return false;
+		if (cls != MuiMiscSpecialistClass.Panel &&
+			(flags & MuiMiscSpecialistLayout.FlagPanelRan) != 0) return false;
+		return true;
+	}
+
+	private static bool ValidateOwnedStrings<TPlatform>(ref TPlatform platform,
+		APTR instance)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		for (var index = 0u; index <= (uint)MuiMiscOwnedStringField.FilepanelRejectPattern;
+			index++)
+		{
+			var field = (MuiMiscOwnedStringField)index;
+			if (!MuiMiscOwnedStringSlotCodec.TryRead(ref platform,
+				OwnedStringSlotAddress(instance, field), out var slot)) return false;
+			if (slot.Value.IsNull)
+			{
+				if (slot.AllocationSize != 0) return false;
+				continue;
+			}
+			if (slot.AllocationSize == 0 ||
+				slot.AllocationSize > MuiMiscSpecialistLayout.MaximumString + 1 ||
+				!platform.IsMapped(slot.Value, slot.AllocationSize)) return false;
+		}
+		return true;
+	}
+
+	private static bool ValidateFilepanelState<TPlatform>(ref TPlatform platform,
+		APTR instance, MuiMiscSpecialistClass cls)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiMiscFilepanelServiceStateCodec.TryRead(ref platform,
+			FilepanelStateAddress(instance), out var state)) return false;
+		if (state.RowCount > MuiMiscSpecialistLayout.MaximumRows ||
+			(state.RowCount != 0 && state.Rows.IsNull) ||
+			(state.Rows.IsNotNull && !platform.IsMapped(state.Rows,
+				(uint)MuiMiscSpecialistLayout.MaximumRows *
+				MuiMiscSpecialistLayout.RowRecordSize))) return false;
+		if (cls == MuiMiscSpecialistClass.Filepanel)
+			return state.AslState.IsNotNull && state.HookMsg.IsNotNull &&
+			platform.IsMapped(state.AslState, MuiMiscSpecialistLayout.AslStateSize) &&
+			platform.IsMapped(state.HookMsg, MuiMiscSpecialistLayout.HookMsgSize);
+		return state.AslState.IsNull && state.HookMsg.IsNull &&
+			state.Rows.IsNull && state.RowCount == 0;
+	}
+
+	private static bool ValidateTitleState<TPlatform>(ref TPlatform platform,
+		APTR instance, MuiMiscSpecialistClass cls)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiMiscTitleStateCodec.TryRead(ref platform,
+			TitleStateAddress(instance), out var state)) return false;
+		if (cls != MuiMiscSpecialistClass.Title)
+			return state.Pages.IsNull && state.PageCount == 0 &&
+				state.ActivePage == 0;
+		return state.PageCount <= MuiMiscSpecialistLayout.MaximumPages &&
+			(state.PageCount == 0 ? state.ActivePage == 0 :
+				state.ActivePage < state.PageCount) &&
+			(state.PageCount == 0 || state.Pages.IsNotNull) &&
+			(state.Pages.IsNull || platform.IsMapped(state.Pages,
+				(uint)MuiMiscSpecialistLayout.MaximumPages *
+				MuiMiscSpecialistLayout.PageRecordSize));
+	}
+
+	private static bool ValidateMccprefsState<TPlatform>(ref TPlatform platform,
+		APTR instance, MuiMiscSpecialistClass cls)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiMiscMccprefsStateCodec.TryRead(ref platform,
+			MccprefsStateAddress(instance), out var state)) return false;
+		if (cls != MuiMiscSpecialistClass.Mccprefs)
+			return state.Registry.IsNull && state.RegistryCount == 0 &&
+				state.RegistryConfig.IsNull && state.RegistryOriginator.IsNull;
+		return state.RegistryCount <= MuiMiscSpecialistLayout.MaximumRegistry &&
+			(state.RegistryCount == 0 || state.Registry.IsNotNull) &&
+			(state.Registry.IsNull || platform.IsMapped(state.Registry,
+				(uint)MuiMiscSpecialistLayout.MaximumRegistry *
+				MuiMiscSpecialistLayout.RegistryRecordSize));
+	}
+
+	private static bool ValidateScrmodelistState<TPlatform>(
+		ref TPlatform platform, APTR instance, MuiMiscSpecialistClass cls)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiMiscScrmodelistStateCodec.TryRead(ref platform,
+			ScrmodelistStateAddress(instance), out var state)) return false;
+		if (cls != MuiMiscSpecialistClass.Scrmodelist)
+			return state.Modes.IsNull && state.ModeCount == 0 &&
+				state.ActiveMode == 0;
+		return state.ModeCount <= MuiMiscSpecialistLayout.MaximumModes &&
+			(state.ModeCount == 0 || state.Modes.IsNotNull) &&
+			(state.Modes.IsNull || platform.IsMapped(state.Modes,
+				(uint)MuiMiscSpecialistLayout.MaximumModes *
+				MuiMiscSpecialistLayout.ModeRecordSize));
+	}
+
+	private static APTR OwnedStringSlotAddress(APTR instance,
+		MuiMiscOwnedStringField field)
+	{
+		var cursor = default(MuiMiscOwnedStringCursor);
+		cursor.Instance = instance;
+		cursor.Field = field;
+		return MuiMiscOwnedStringCursorCodec.TryGetAddress(cursor,
+			out var address) ? address : APTR.Null;
+	}
+
+	private static APTR FilepanelStateAddress(APTR instance)
+	{
+		var cursor = default(MuiMiscStateCursor);
+		cursor.Instance = instance;
+		cursor.Region = MuiMiscStateRegion.FilepanelService;
+		return MuiMiscStateCursorCodec.TryGetAddress(cursor,
+			out var address) ? address : APTR.Null;
+	}
+
+	private static APTR TitleStateAddress(APTR instance)
+	{
+		var cursor = default(MuiMiscStateCursor);
+		cursor.Instance = instance;
+		cursor.Region = MuiMiscStateRegion.Title;
+		return MuiMiscStateCursorCodec.TryGetAddress(cursor,
+			out var address) ? address : APTR.Null;
+	}
+
+	private static APTR MccprefsStateAddress(APTR instance)
+	{
+		var cursor = default(MuiMiscStateCursor);
+		cursor.Instance = instance;
+		cursor.Region = MuiMiscStateRegion.Mccprefs;
+		return MuiMiscStateCursorCodec.TryGetAddress(cursor,
+			out var address) ? address : APTR.Null;
+	}
+
+	private static APTR ScrmodelistStateAddress(APTR instance)
+	{
+		var cursor = default(MuiMiscStateCursor);
+		cursor.Instance = instance;
+		cursor.Region = MuiMiscStateRegion.Scrmodelist;
+		return MuiMiscStateCursorCodec.TryGetAddress(cursor,
+			out var address) ? address : APTR.Null;
 	}
 }
 

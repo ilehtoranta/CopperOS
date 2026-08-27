@@ -94,7 +94,7 @@ public sealed class MuiPopSpecialistTests
 		expected.NotifyValue = 0x3400;
 		expected.NotifyCount = 2;
 		Assert.True(MuiPopSpecialistStateCodec.Write(ref p, address, expected));
-		Assert.True(MuiPopSpecialistStateCodec.TryRead(ref p, address,
+		Assert.True(MuiPopSpecialistStateCodec.TryReadStructural(ref p, address,
 			out var actual));
 		Assert.Equal(expected.Class, actual.Class);
 		Assert.Equal(expected.StringChild, actual.StringChild);
@@ -103,7 +103,7 @@ public sealed class MuiPopSpecialistTests
 		Assert.Equal(expected.NotifyAttribute, actual.NotifyAttribute);
 		Assert.Equal(expected.NotifyValue, actual.NotifyValue);
 		Assert.Equal(expected.NotifyCount, actual.NotifyCount);
-		Assert.False(MuiPopSpecialistStateCodec.TryRead(ref p,
+		Assert.False(MuiPopSpecialistStateCodec.TryReadStructural(ref p,
 			APTR.FromPointer(0x50000), out _));
 	}
 
@@ -131,6 +131,81 @@ public sealed class MuiPopSpecialistTests
 		cursor.Address = APTR.FromPointer(0xFFFFFFF0u);
 		Assert.False(MuiPopSpecialistRecordFieldCursorCodec.TryGetAddress(ref p,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void PopSpecialistMessageAdapterOwnsStructBounds()
+	{
+		var p = NewPlatform();
+		var packet = APTR.FromPointer(0x2F00);
+		Assert.True(MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			packet, MuiPopSpecialistPacketKind.Method,
+			MuiPopSpecialistField.MethodId, 0x1234));
+		Assert.True(MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			packet, MuiPopSpecialistPacketKind.Method,
+			MuiPopSpecialistField.MethodId, out var method));
+		Assert.Equal(0x1234u, method);
+		Assert.True(MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			packet, MuiPopSpecialistPacketKind.Get,
+			MuiPopSpecialistField.Attribute, 0x44));
+		Assert.True(MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			packet, MuiPopSpecialistPacketKind.Get,
+			MuiPopSpecialistField.Storage, 0x3000));
+		Assert.True(MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			packet, MuiPopSpecialistPacketKind.Get,
+			MuiPopSpecialistField.Storage, out var storage));
+		Assert.Equal(0x3000u, storage);
+		Assert.True(MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			packet, MuiPopSpecialistPacketKind.Set,
+			MuiPopSpecialistField.Value, 0x456));
+		Assert.True(MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			packet, MuiPopSpecialistPacketKind.Set,
+			MuiPopSpecialistField.Value, out var value));
+		Assert.Equal(0x456u, value);
+		Assert.True(MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			packet, MuiPopSpecialistPacketKind.Close,
+			MuiPopSpecialistField.Result, 1));
+		Assert.True(MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			packet, MuiPopSpecialistPacketKind.Close,
+			MuiPopSpecialistField.Result, out var result));
+		Assert.Equal(1u, result);
+		Assert.False(MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			APTR.FromPointer(0x40FFD), MuiPopSpecialistPacketKind.Close,
+			MuiPopSpecialistField.Result, out _));
+		Assert.False(MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			packet, MuiPopSpecialistPacketKind.Method,
+			MuiPopSpecialistField.Attribute, out _));
+		Assert.False(MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			APTR.Null, MuiPopSpecialistPacketKind.Set,
+			MuiPopSpecialistField.Value, out _));
+	}
+
+	[Fact]
+	public void MalformedPopSidecarFailsClosedBeforeHooksOrAsl()
+	{
+		var p = NewPlatform();
+		Assert.True(MuiPopSpecialistCore.Create(ref p, Instance,
+			MuiPopSpecialistClass.Popstring, StringChild, ButtonChild));
+		Assert.True(MuiPopSpecialistStateCodec.TryReadStructural(ref p, Instance,
+			out var state));
+		// Follow is an object-derived flag and cannot be smuggled into Popstring.
+		state.Flags = MuiPopSpecialistLayout.FlagFollow;
+		Assert.True(MuiPopSpecialistStateCodec.Write(ref p, Instance, state));
+		Assert.False(MuiPopSpecialistCore.Valid(ref p, Instance));
+		Assert.False(MuiPopSpecialistCore.Open(ref p, Instance));
+		Assert.Equal(0u, p.HookInvokeCount);
+
+		var aslInstance = APTR.FromPointer(0x4000);
+		Assert.True(MuiPopSpecialistCore.Create(ref p, aslInstance,
+			MuiPopSpecialistClass.Popasl, StringChild, ButtonChild));
+		Assert.True(MuiPopSpecialistStateCodec.TryReadStructural(ref p,
+			aslInstance, out state));
+		state.Flags = MuiPopSpecialistLayout.FlagAslActive;
+		state.AslRequester = APTR.Null;
+		Assert.True(MuiPopSpecialistStateCodec.Write(ref p, aslInstance, state));
+		Assert.False(MuiPopSpecialistCore.Valid(ref p, aslInstance));
+		Assert.False(MuiPopSpecialistCore.Open(ref p, aslInstance));
+		Assert.Equal(0u, p.AslAllocateCount);
 	}
 
 	// Two BOOPSI children so recursive disposal can be observed through the

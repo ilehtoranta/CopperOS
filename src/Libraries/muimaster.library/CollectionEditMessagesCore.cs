@@ -37,34 +37,58 @@ internal struct MuiCollectionEditFieldCursor
 	internal MuiCollectionEditField Field;
 }
 
-internal static class MuiCollectionEditFieldCursorCodec
+// Named packet adapters keep List edit payloads as semantic structs. Only
+// this memory layer translates their fixed guest boundaries and signed words.
+internal static class MuiCollectionEditMessageMemoryCodec
 {
+	private static bool TryGetPacketSize(MuiCollectionEditPacketKind packet,
+		out uint size)
+	{
+		switch (packet)
+		{
+			case MuiCollectionEditPacketKind.CreateEditObject:
+				size = MuiCollectionCreateEditObjectMessage.Size;
+				return true;
+			case MuiCollectionEditPacketKind.Edit:
+				size = MuiCollectionEditMessage.Size;
+				return true;
+			case MuiCollectionEditPacketKind.EditDone:
+				size = MuiCollectionEditDoneMessage.Size;
+				return true;
+			case MuiCollectionEditPacketKind.EndEdit:
+				size = MuiCollectionEndEditMessage.Size;
+				return true;
+		}
+		size = 0;
+		return false;
+	}
+
 	private static bool TryResolve(MuiCollectionEditPacketKind packet,
 		MuiCollectionEditField field, out uint offset)
 	{
 		switch (packet)
 		{
 			case MuiCollectionEditPacketKind.CreateEditObject:
-				if (field == MuiCollectionEditField.MethodId) { offset = 0; return true; }
-				if (field == MuiCollectionEditField.Row) { offset = 4; return true; }
-				if (field == MuiCollectionEditField.Column) { offset = 8; return true; }
-				if (field == MuiCollectionEditField.Entry) { offset = 12; return true; }
+				if (field == MuiCollectionEditField.MethodId) { offset = MuiCollectionCreateEditObjectMessage.MethodIdOffset; return true; }
+				if (field == MuiCollectionEditField.Row) { offset = MuiCollectionCreateEditObjectMessage.RowOffset; return true; }
+				if (field == MuiCollectionEditField.Column) { offset = MuiCollectionCreateEditObjectMessage.ColumnOffset; return true; }
+				if (field == MuiCollectionEditField.Entry) { offset = MuiCollectionCreateEditObjectMessage.EntryOffset; return true; }
 				break;
 			case MuiCollectionEditPacketKind.Edit:
-				if (field == MuiCollectionEditField.MethodId) { offset = 0; return true; }
-				if (field == MuiCollectionEditField.Row) { offset = 4; return true; }
-				if (field == MuiCollectionEditField.Column) { offset = 8; return true; }
+				if (field == MuiCollectionEditField.MethodId) { offset = MuiCollectionEditMessage.MethodIdOffset; return true; }
+				if (field == MuiCollectionEditField.Row) { offset = MuiCollectionEditMessage.RowOffset; return true; }
+				if (field == MuiCollectionEditField.Column) { offset = MuiCollectionEditMessage.ColumnOffset; return true; }
 				break;
 			case MuiCollectionEditPacketKind.EditDone:
-				if (field == MuiCollectionEditField.MethodId) { offset = 0; return true; }
-				if (field == MuiCollectionEditField.Row) { offset = 4; return true; }
-				if (field == MuiCollectionEditField.Column) { offset = 8; return true; }
-				if (field == MuiCollectionEditField.Entry) { offset = 12; return true; }
-				if (field == MuiCollectionEditField.EditObject) { offset = 16; return true; }
+				if (field == MuiCollectionEditField.MethodId) { offset = MuiCollectionEditDoneMessage.MethodIdOffset; return true; }
+				if (field == MuiCollectionEditField.Row) { offset = MuiCollectionEditDoneMessage.RowOffset; return true; }
+				if (field == MuiCollectionEditField.Column) { offset = MuiCollectionEditDoneMessage.ColumnOffset; return true; }
+				if (field == MuiCollectionEditField.Entry) { offset = MuiCollectionEditDoneMessage.EntryOffset; return true; }
+				if (field == MuiCollectionEditField.EditObject) { offset = MuiCollectionEditDoneMessage.EditObjectOffset; return true; }
 				break;
 			case MuiCollectionEditPacketKind.EndEdit:
-				if (field == MuiCollectionEditField.MethodId) { offset = 0; return true; }
-				if (field == MuiCollectionEditField.Mode) { offset = 4; return true; }
+				if (field == MuiCollectionEditField.MethodId) { offset = MuiCollectionEndEditMessage.MethodIdOffset; return true; }
+				if (field == MuiCollectionEditField.Mode) { offset = MuiCollectionEndEditMessage.ModeOffset; return true; }
 				break;
 		}
 		offset = 0;
@@ -77,10 +101,24 @@ internal static class MuiCollectionEditFieldCursorCodec
 	{
 		address = APTR.Null;
 		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset)
+			!TryGetPacketSize(cursor.Packet, out var packetSize) ||
+			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(cursor.Message, packetSize))
 			return false;
 		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiCollectionMethodMessage.FieldSize);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionEditPacketKind packet,
+		MuiCollectionEditField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiCollectionEditFieldCursor);
+		cursor.Message = message;
+		cursor.Packet = packet;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -111,6 +149,31 @@ internal static class MuiCollectionEditFieldCursorCodec
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper for existing dispatcher and host callers. New code
+// should use the packet-named memory adapter above.
+internal static class MuiCollectionEditFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiCollectionEditFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiCollectionEditMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionEditPacketKind packet,
+		MuiCollectionEditField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiCollectionEditMessageMemoryCodec.TryReadUInt32(ref platform,
+			message, packet, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionEditPacketKind packet,
+		MuiCollectionEditField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+			message, packet, field, value);
 }
 
 internal static class MuiCollectionEditMessageCodec

@@ -80,6 +80,57 @@ public sealed class MuiMenuSpecialistTests
 			out _));
 	}
 
+	[Fact]
+	public void MenuSpecialistMessageAdapterOwnsStructBounds()
+	{
+		var p = NewPlatform();
+		var packet = APTR.FromPointer(0x1500);
+		Assert.True(MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			packet, MuiMenuSpecialistPacketKind.Method,
+			MuiMenuSpecialistField.MethodId, 0x1234));
+		Assert.True(MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			packet, MuiMenuSpecialistPacketKind.Method,
+			MuiMenuSpecialistField.MethodId, out var method));
+		Assert.Equal(0x1234u, method);
+
+		Assert.True(MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			packet, MuiMenuSpecialistPacketKind.Get,
+			MuiMenuSpecialistField.Attribute, 0x44));
+		Assert.True(MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			packet, MuiMenuSpecialistPacketKind.Get,
+			MuiMenuSpecialistField.Storage, 0x1800));
+		Assert.True(MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			packet, MuiMenuSpecialistPacketKind.Get,
+			MuiMenuSpecialistField.Storage, out var storage));
+		Assert.Equal(0x1800u, storage);
+
+		Assert.True(MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			packet, MuiMenuSpecialistPacketKind.Pair,
+			MuiMenuSpecialistField.Second, 0x2300));
+		Assert.True(MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			packet, MuiMenuSpecialistPacketKind.Pair,
+			MuiMenuSpecialistField.Second, out var second));
+		Assert.Equal(0x2300u, second);
+
+		Assert.True(MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref p,
+			packet, MuiMenuSpecialistPacketKind.Popup,
+			MuiMenuSpecialistField.Y, 20));
+		Assert.True(MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			packet, MuiMenuSpecialistPacketKind.Popup,
+			MuiMenuSpecialistField.Y, out var y));
+		Assert.Equal(20u, y);
+
+		Assert.False(MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			APTR.FromPointer(0x40FF1), MuiMenuSpecialistPacketKind.Popup,
+			MuiMenuSpecialistField.Y, out _));
+		Assert.False(MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			packet, MuiMenuSpecialistPacketKind.Method,
+			MuiMenuSpecialistField.Attribute, out _));
+		Assert.False(MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref p,
+			APTR.Null, MuiMenuSpecialistPacketKind.Get,
+			MuiMenuSpecialistField.Storage, out _));
+	}
+
 	private static APTR Strip(ref MuiHeadlessTestPlatform p) =>
 		Create(ref p, MenustripName, MuiMenuSpecialistClass.Menustrip);
 	private static APTR Menu(ref MuiHeadlessTestPlatform p) =>
@@ -187,7 +238,7 @@ public sealed class MuiMenuSpecialistTests
 		value.NotifyValue = 0x1B00;
 		value.NotifyCount = 9;
 		Assert.True(MuiMenuSpecialistStateCodec.Write(ref p, address, value));
-		Assert.True(MuiMenuSpecialistStateCodec.TryRead(ref p, address,
+		Assert.True(MuiMenuSpecialistStateCodec.TryReadStructural(ref p, address,
 			out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.Class, decoded.Class);
@@ -203,6 +254,30 @@ public sealed class MuiMenuSpecialistTests
 		Assert.Equal(value.NotifyCount, decoded.NotifyCount);
 		Assert.False(MuiMenuSpecialistStateCodec.TryRead(ref p,
 			APTR.FromPointer(0x41000), out _));
+	}
+
+	[Fact]
+	public void MalformedMenuSidecarFailsClosedBeforeLiveMutation()
+	{
+		var p = NewPlatform();
+		var item = Item(ref p);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref p, State, item,
+			MuiMenuSpecialistLayout.SidecarAttribute, out var rawSidecar));
+		var sidecar = APTR.FromPointer(rawSidecar);
+		Assert.True(MuiMenuSpecialistStateCodec.TryReadStructural(ref p,
+			sidecar, out var value));
+		value.Flags |= 1u << 31;
+		Assert.True(MuiMenuSpecialistStateCodec.Write(ref p, sidecar, value));
+
+		Assert.False(MuiMenuSpecialistStateCodec.TryRead(ref p, sidecar,
+			out _));
+		Assert.False(MuiMenuSpecialistCore.Valid(ref p, State, item));
+		Assert.Equal(MuiMenuSpecialistClass.None,
+			MuiMenuSpecialistCore.Classify(ref p, State, item));
+		var changed = true;
+		Assert.False(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Enabled, 0, false, true, out changed));
+		Assert.False(changed);
 	}
 
 	// ---- Owned hierarchy -----------------------------------------------------

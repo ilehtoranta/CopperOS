@@ -27,8 +27,16 @@ internal static class MuiAreaFontSelectionCore
 	{
 		if (active > MuiAreaFontSelectionKind.CustomFont) return false;
 		var generation = 1u;
-		if (TryReadRecord(ref platform, state, obj, out var current))
+		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			StateKey);
+		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateKey);
+		if (existing.IsNotNull || existingLength != 0)
+		{
+			if (!TryReadRecord(ref platform, state, obj, out var current))
+				return false;
 			generation = current.Generation == uint.MaxValue ? 1u : current.Generation + 1u;
+		}
 		return WriteState(ref platform, state, obj, active, source, generation);
 	}
 
@@ -39,7 +47,18 @@ internal static class MuiAreaFontSelectionCore
 		value = default;
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
 			return false;
-		if (!TryReadRecord(ref platform, state, obj, out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			StateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateKey);
+		MuiAreaFontSelectionStateRecord record;
+		if (block.IsNotNull || length != 0)
+		{
+			// A present block is authoritative typed state. Do not silently
+			// rebuild malformed font precedence from raw aliases.
+			if (!TryReadRecord(ref platform, state, obj, out record)) return false;
+		}
+		else
 		{
 			if (!Initialize(ref platform, state, obj) ||
 				!TryReadRecord(ref platform, state, obj, out record)) return false;
@@ -59,9 +78,9 @@ internal static class MuiAreaFontSelectionCore
 			record.Source = rawSource;
 			record.Generation = record.Generation == uint.MaxValue ? 1u :
 				record.Generation + 1u;
-			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			var updateBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StateKey);
-			if (!MuiAreaFontSelectionStateRecordCodec.Write(ref platform, block,
+			if (!MuiAreaFontSelectionStateRecordCodec.Write(ref platform, updateBlock,
 				record)) return false;
 		}
 		value.Active = (MuiAreaFontSelectionKind)record.Active;
@@ -122,8 +141,9 @@ internal static class MuiAreaFontSelectionCore
 			StateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) !=
 			unchecked((int)MuiAreaFontSelectionStateRecord.Size)) return false;
-		return MuiAreaFontSelectionStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiAreaFontSelectionStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiAreaFontSelectionStateAdmission.ValidateLive(
+			ref platform, state, obj, value);
 	}
 
 	private static bool WriteState<TPlatform>(ref TPlatform platform, APTR state,
@@ -141,8 +161,9 @@ internal static class MuiAreaFontSelectionCore
 		record.Active = (uint)active;
 		record.Source = source;
 		record.Generation = generation == 0 ? 1u : generation;
-		var written = MuiAreaFontSelectionStateRecordCodec.Write(ref platform,
-			scratch, record);
+		var written = MuiAreaFontSelectionStateAdmission.ValidateLive(ref platform,
+			state, obj, record) && MuiAreaFontSelectionStateRecordCodec.Write(
+			ref platform, scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 			StateKey, scratch, unchecked((int)MuiAreaFontSelectionStateRecord.Size));
 		if (!stored)

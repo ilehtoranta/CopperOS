@@ -15,6 +15,16 @@ namespace CopperOS.MuiMaster;
 internal struct MuiApplicationCommandRecord
 {
 	internal const uint Size = 36;
+	internal const uint FieldSize = 4;
+	internal const uint NameOffset = 0;
+	internal const uint TemplateOffset = 4;
+	internal const uint ParametersOffset = 8;
+	internal const uint HookOffset = 12;
+	internal const uint Reserved0Offset = 16;
+	internal const uint Reserved1Offset = 20;
+	internal const uint Reserved2Offset = 24;
+	internal const uint Reserved3Offset = 28;
+	internal const uint Reserved4Offset = 32;
 	internal APTR Name;
 	internal APTR Template;
 	internal int Parameters;
@@ -48,77 +58,94 @@ internal struct MuiApplicationCommandFieldCursor
 
 internal static class MuiApplicationCommandFieldCursorCodec
 {
-	private static bool TryResolve(MuiApplicationCommandField field,
-		out uint offset)
-	{
-		switch (field)
-		{
-			case MuiApplicationCommandField.Name:
-				offset = 0;
-				break;
-			case MuiApplicationCommandField.Template:
-				offset = 4;
-				break;
-			case MuiApplicationCommandField.Parameters:
-				offset = 8;
-				break;
-			case MuiApplicationCommandField.Hook:
-				offset = 12;
-				break;
-			case MuiApplicationCommandField.Reserved0:
-				offset = 16;
-				break;
-			case MuiApplicationCommandField.Reserved1:
-				offset = 20;
-				break;
-			case MuiApplicationCommandField.Reserved2:
-				offset = 24;
-				break;
-			case MuiApplicationCommandField.Reserved3:
-				offset = 28;
-				break;
-			case MuiApplicationCommandField.Reserved4:
-				offset = 32;
-				break;
-			default:
-				offset = 0;
-				return false;
-		}
-		return true;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiApplicationCommandFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiApplicationCommandRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR record, MuiApplicationCommandField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiApplicationCommandFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR record, MuiApplicationCommandField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationCommandFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		return MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+	}
+}
+
+// Fixed MUI_Command records are read and written as named value types. Keep
+// the packed guest positions in this bounded ABI adapter; command-table
+// consumers never choose a numeric slot through the compatibility surface.
+internal static class MuiApplicationCommandRecordMemoryCodec
+{
+	private static bool TryResolve(MuiApplicationCommandField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiApplicationCommandField.Name:
+				offset = MuiApplicationCommandRecord.NameOffset; return true;
+			case MuiApplicationCommandField.Template:
+				offset = MuiApplicationCommandRecord.TemplateOffset; return true;
+			case MuiApplicationCommandField.Parameters:
+				offset = MuiApplicationCommandRecord.ParametersOffset; return true;
+			case MuiApplicationCommandField.Hook:
+				offset = MuiApplicationCommandRecord.HookOffset; return true;
+			case MuiApplicationCommandField.Reserved0:
+				offset = MuiApplicationCommandRecord.Reserved0Offset; return true;
+			case MuiApplicationCommandField.Reserved1:
+				offset = MuiApplicationCommandRecord.Reserved1Offset; return true;
+			case MuiApplicationCommandField.Reserved2:
+				offset = MuiApplicationCommandRecord.Reserved2Offset; return true;
+			case MuiApplicationCommandField.Reserved3:
+				offset = MuiApplicationCommandRecord.Reserved3Offset; return true;
+			case MuiApplicationCommandField.Reserved4:
+				offset = MuiApplicationCommandRecord.Reserved4Offset; return true;
+		}
+		offset = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationCommandField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset)
+			return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiApplicationCommandRecord.Size) &&
+			platform.IsMapped(address, MuiApplicationCommandRecord.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationCommandField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationCommandField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -131,29 +158,27 @@ internal static class MuiApplicationCommandRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationCommandRecord.Size)) return false;
-		if (!MuiApplicationCommandFieldCursorCodec.TryRead(ref platform, address,
-			MuiApplicationCommandField.Name, out var rawName) ||
-			!MuiApplicationCommandFieldCursorCodec.TryRead(ref platform, address,
-				MuiApplicationCommandField.Template, out var rawTemplate) ||
-			!MuiApplicationCommandFieldCursorCodec.TryRead(ref platform, address,
-				MuiApplicationCommandField.Hook, out var rawHook)) return false;
+		if (!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationCommandField.Name, out var rawName) ||
+			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiApplicationCommandField.Template, out var rawTemplate) ||
+			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiApplicationCommandField.Hook, out var rawHook)) return false;
 		value.Name = APTR.FromPointer(rawName);
 		value.Template = APTR.FromPointer(rawTemplate);
 		value.Hook = APTR.FromPointer(rawHook);
-		if (!MuiApplicationCommandFieldCursorCodec.TryRead(ref platform, address,
-			MuiApplicationCommandField.Parameters, out var rawParameters) ||
-			!MuiApplicationCommandFieldCursorCodec.TryRead(ref platform, address,
-				MuiApplicationCommandField.Reserved0, out var rawReserved0) ||
-			!MuiApplicationCommandFieldCursorCodec.TryRead(ref platform, address,
-				MuiApplicationCommandField.Reserved1, out var rawReserved1) ||
-			!MuiApplicationCommandFieldCursorCodec.TryRead(ref platform, address,
-				MuiApplicationCommandField.Reserved2, out var rawReserved2) ||
-			!MuiApplicationCommandFieldCursorCodec.TryRead(ref platform, address,
-				MuiApplicationCommandField.Reserved3, out var rawReserved3) ||
-			!MuiApplicationCommandFieldCursorCodec.TryRead(ref platform, address,
-				MuiApplicationCommandField.Reserved4, out var rawReserved4)) return false;
+		if (!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationCommandField.Parameters, out var rawParameters) ||
+			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiApplicationCommandField.Reserved0, out var rawReserved0) ||
+			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiApplicationCommandField.Reserved1, out var rawReserved1) ||
+			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiApplicationCommandField.Reserved2, out var rawReserved2) ||
+			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiApplicationCommandField.Reserved3, out var rawReserved3) ||
+			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiApplicationCommandField.Reserved4, out var rawReserved4)) return false;
 		value.Parameters = unchecked((int)rawParameters);
 		value.Reserved0 = unchecked((int)rawReserved0);
 		value.Reserved1 = unchecked((int)rawReserved1);
@@ -167,31 +192,29 @@ internal static class MuiApplicationCommandRecordCodec
 		MuiApplicationCommandRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationCommandRecord.Size)) return false;
-		return MuiApplicationCommandFieldCursorCodec.TryWrite(ref platform, address,
-			MuiApplicationCommandField.Name, value.Name.Raw) &&
-			MuiApplicationCommandFieldCursorCodec.TryWrite(ref platform, address,
-				MuiApplicationCommandField.Template, value.Template.Raw) &&
-			MuiApplicationCommandFieldCursorCodec.TryWrite(ref platform, address,
-				MuiApplicationCommandField.Parameters,
+		return MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationCommandField.Name, value.Name.Raw) &&
+			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationCommandField.Template, value.Template.Raw) &&
+			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationCommandField.Parameters,
 				unchecked((uint)value.Parameters)) &&
-			MuiApplicationCommandFieldCursorCodec.TryWrite(ref platform, address,
-				MuiApplicationCommandField.Hook, value.Hook.Raw) &&
-			MuiApplicationCommandFieldCursorCodec.TryWrite(ref platform, address,
-				MuiApplicationCommandField.Reserved0,
+			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationCommandField.Hook, value.Hook.Raw) &&
+			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationCommandField.Reserved0,
 				unchecked((uint)value.Reserved0)) &&
-			MuiApplicationCommandFieldCursorCodec.TryWrite(ref platform, address,
-				MuiApplicationCommandField.Reserved1,
+			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationCommandField.Reserved1,
 				unchecked((uint)value.Reserved1)) &&
-			MuiApplicationCommandFieldCursorCodec.TryWrite(ref platform, address,
-				MuiApplicationCommandField.Reserved2,
+			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationCommandField.Reserved2,
 				unchecked((uint)value.Reserved2)) &&
-			MuiApplicationCommandFieldCursorCodec.TryWrite(ref platform, address,
-				MuiApplicationCommandField.Reserved3,
+			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationCommandField.Reserved3,
 				unchecked((uint)value.Reserved3)) &&
-			MuiApplicationCommandFieldCursorCodec.TryWrite(ref platform, address,
-				MuiApplicationCommandField.Reserved4,
+			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationCommandField.Reserved4,
 				unchecked((uint)value.Reserved4));
 	}
 }
@@ -209,7 +232,7 @@ public static class MuiApplicationCommandsCore
 	// The public table has no count field, so validation is bounded by the same
 	// guest traversal ceiling used by every other MUI list/vector walk.
 	private const uint MaximumStringLength = 65536;
-	private const uint CommandsStateKey = 0x7F0A001Bu;
+	internal const uint CommandsStateKey = 0x7F0A001Bu;
 
 	internal static bool TryGetApplicationCommandsState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR application,
@@ -222,9 +245,22 @@ public static class MuiApplicationCommandsCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, application,
 			CommandsStateKey) != unchecked((int)
 			MuiApplicationCommandsStateRecord.Size)) return false;
-		return MuiApplicationCommandsStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiApplicationCommandsStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiApplicationCommandsStateAdmission.ValidateLive(
+			ref platform, state, application, value);
 	}
+
+	private static bool HasApplicationCommandsStateStorage<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, application,
+			CommandsStateKey) != 0;
+
+	internal static bool ApplicationCommandsStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR application)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		!HasApplicationCommandsStateStorage(ref platform, state, application) ||
+		TryGetApplicationCommandsState(ref platform, state, application, out _);
 
 	private static bool PublishApplicationCommandsState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR application,
@@ -234,11 +270,20 @@ public static class MuiApplicationCommandsCore
 		value = default;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, application,
 			CommandsStateKey);
-		if (TryGetApplicationCommandsState(ref platform, state, application,
-			out value))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, application,
+			CommandsStateKey);
+		if (length != 0 && length != unchecked((int)
+			MuiApplicationCommandsStateRecord.Size)) return false;
+		if (length != 0)
 		{
+			if (!MuiApplicationCommandsStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) ||
+				!MuiApplicationCommandsStateAdmission.ValidateLive(ref platform, state,
+					application, value)) return false;
 			FillApplicationCommandsState(ref platform, state, application,
 				ref value);
+			if (!MuiApplicationCommandsStateAdmission.ValidateLive(ref platform, state,
+				application, value)) return false;
 			return MuiApplicationCommandsStateRecordCodec.Write(ref platform,
 				block, value);
 		}
@@ -246,6 +291,8 @@ public static class MuiApplicationCommandsCore
 		value = default;
 		value.Magic = MuiApplicationCommandsStateRecord.Cookie;
 		FillApplicationCommandsState(ref platform, state, application, ref value);
+		if (!MuiApplicationCommandsStateAdmission.ValidateLive(ref platform, state,
+			application, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiApplicationCommandsStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -337,6 +384,8 @@ public static class MuiApplicationCommandsCore
 		if (!MuiHeadlessObjectCodec.TryRead(ref platform, record,
 			out var objectValue) || objectValue.Boopsi.IsNull) return false;
 		var owner = objectValue.Boopsi;
+		if (!ApplicationCommandsStateAvailable(ref platform, state, owner))
+			return false;
 		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, record,
 			Commands, out var previous)) previous = 0;
 		if (!MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state,

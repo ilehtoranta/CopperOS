@@ -95,39 +95,87 @@ internal static class MuiBitmapGeometryStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Bitmap geometry consumers use the named
+// record; this bounded adapter is the only layer that translates its fixed
+// guest layout into addresses. The cursor codec remains for compatibility and
+// malformed-state diagnostics.
+internal static class MuiBitmapGeometryStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiBitmapGeometryStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiBitmapGeometryStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiBitmapGeometryStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiBitmapGeometryStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiBitmapGeometryStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiBitmapGeometryStateRecord.Size) ||
-			!MuiBitmapGeometryStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiBitmapGeometryStateField.Magic, out var magic) ||
-			magic != MuiBitmapGeometryStateRecord.Cookie) return false;
-		value.Magic = magic;
-		if (!MuiBitmapGeometryStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiBitmapGeometryStateField.Width, out value.Width) ||
-			!MuiBitmapGeometryStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiBitmapGeometryStateField.Height, out value.Height))
-			return false;
-		return true;
+		return MuiBitmapGeometryStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) &&
+			MuiBitmapGeometryStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out value.Width) &&
+			MuiBitmapGeometryStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 8, out value.Height);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiBitmapGeometryStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiBitmapGeometryStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiBitmapGeometryStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiBitmapGeometryStateRecord.Size) || value.Magic !=
-			MuiBitmapGeometryStateRecord.Cookie) return false;
-		return MuiBitmapGeometryStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiBitmapGeometryStateField.Magic, value.Magic) &&
-			MuiBitmapGeometryStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiBitmapGeometryStateField.Width, value.Width) &&
-			MuiBitmapGeometryStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiBitmapGeometryStateField.Height, value.Height);
+		if (!MuiBitmapGeometryStateAdmission.Validate(value)) return false;
+		return MuiBitmapGeometryStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiBitmapGeometryStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 4, value.Width) &&
+			MuiBitmapGeometryStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 8, value.Height);
 	}
+}
+
+internal static class MuiBitmapGeometryStateAdmission
+{
+	internal static bool Validate(MuiBitmapGeometryStateRecord value) =>
+		value.Magic == MuiBitmapGeometryStateRecord.Cookie;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiBitmapGeometryStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) && !obj.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 }

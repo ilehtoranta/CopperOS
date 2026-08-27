@@ -15,6 +15,10 @@ namespace CopperOS.MuiMaster;
 internal struct MuiCallHookMessage
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint HookOffset = 4;
+	internal const uint Param1Offset = 8;
 	internal uint MethodId;
 	internal APTR Hook;
 	internal uint Param1;
@@ -24,6 +28,8 @@ internal struct MuiCallHookMessage
 internal struct MuiCallHookMethodMessage
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
 
@@ -41,27 +47,46 @@ internal struct MuiCallHookPacketFieldCursor
 	internal MuiCallHookPacketField Field;
 }
 
-internal static class MuiCallHookPacketFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed CallHook envelope. The
+// complete 12-byte record is admitted before any non-header member is used;
+// the 4-byte method record remains a deliberate header-only exception.
+internal static class MuiCallHookMessageMemoryCodec
 {
 	private static bool TryResolve(MuiCallHookPacketField field,
-		out uint offset)
+		out uint offset, out uint recordSize)
 	{
-		if (field == MuiCallHookPacketField.MethodId) { offset = 0; return true; }
-		if (field == MuiCallHookPacketField.Hook) { offset = 4; return true; }
-		if (field == MuiCallHookPacketField.Param1) { offset = 8; return true; }
+		recordSize = MuiCallHookMessage.Size;
+		if (field == MuiCallHookPacketField.MethodId)
+		{
+			offset = MuiCallHookMessage.MethodIdOffset;
+			recordSize = MuiCallHookMethodMessage.Size;
+			return true;
+		}
+		if (field == MuiCallHookPacketField.Hook)
+		{
+			offset = MuiCallHookMessage.HookOffset;
+			return true;
+		}
+		if (field == MuiCallHookPacketField.Param1)
+		{
+			offset = MuiCallHookMessage.Param1Offset;
+			return true;
+		}
 		offset = 0;
+		recordSize = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiCallHookPacketFieldCursor cursor, out APTR address)
+		APTR message, MuiCallHookPacketField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset, out var recordSize) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, recordSize)) return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiCallHookMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -69,10 +94,8 @@ internal static class MuiCallHookPacketFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiCallHookPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -81,13 +104,35 @@ internal static class MuiCallHookPacketFieldCursorCodec
 		APTR message, MuiCallHookPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiCallHookPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// field cursor. The live message codec routes through the named record
+// adapter above.
+internal static class MuiCallHookPacketFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiCallHookPacketFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiCallHookMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCallHookPacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiCallHookMessageMemoryCodec.TryReadUInt32(ref platform, message,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCallHookPacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiCallHookMessageMemoryCodec.TryWriteUInt32(ref platform, message,
+			field, value);
 }
 
 // Named cursor for the caller-owned ULONG vector beginning at param1 in a

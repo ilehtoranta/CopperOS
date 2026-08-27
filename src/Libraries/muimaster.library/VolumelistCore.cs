@@ -28,6 +28,16 @@ public static class MuiVolumelistCore
 		internal uint ExampleMode;
 	}
 
+	// The structural codec owns the packed guest representation. This
+	// admission boundary owns only the MorphOS [I..] BOOL invariant so a
+	// malformed mode cannot reach Volumelist population or public getters.
+	internal static class MuiVolumelistModeStateAdmission
+	{
+		internal static bool Validate(MuiVolumelistModeStateRecord value) =>
+			value.Magic == MuiVolumelistModeStateRecord.Cookie &&
+			value.ExampleMode <= 1;
+	}
+
 	internal enum MuiVolumelistModeField : byte
 	{
 		Magic,
@@ -102,7 +112,7 @@ public static class MuiVolumelistCore
 
 	internal static class MuiVolumelistModeStateRecordCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiVolumelistModeStateRecord value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -111,12 +121,20 @@ public static class MuiVolumelistCore
 				MuiVolumelistModeStateRecord.Size) ||
 				!MuiVolumelistModeFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiVolumelistModeField.Magic, out var magic) ||
-				magic != MuiVolumelistModeStateRecord.Cookie ||
 				!MuiVolumelistModeFieldCursorCodec.TryReadUInt32(ref platform, address,
 					MuiVolumelistModeField.ExampleMode, out value.ExampleMode))
 				return false;
 			value.Magic = magic;
 			return true;
+		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiVolumelistModeStateRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			return TryReadStructural(ref platform, address, out value) &&
+				MuiVolumelistModeStateAdmission.Validate(value);
 		}
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
@@ -125,7 +143,7 @@ public static class MuiVolumelistCore
 		{
 			if (address.IsNull || !platform.IsMapped(address,
 				MuiVolumelistModeStateRecord.Size) ||
-				value.Magic != MuiVolumelistModeStateRecord.Cookie) return false;
+				!MuiVolumelistModeStateAdmission.Validate(value)) return false;
 			return MuiVolumelistModeFieldCursorCodec.TryWriteUInt32(ref platform,
 				address, MuiVolumelistModeField.Magic, value.Magic) &&
 				MuiVolumelistModeFieldCursorCodec.TryWriteUInt32(ref platform, address,
@@ -135,7 +153,7 @@ public static class MuiVolumelistCore
 
 	private const uint ExampleMode = 0x804246a5u; // [I..] BOOL
 	private const uint Status = 0x804240deu;      // MUIA_Dirlist_Status
-	private const uint ModeStateKey = 0x7F0B0001u;
+	internal const uint ModeStateKey = 0x7F0B0001u;
 
 	private const int VolumeType = 2;             // ST_USERDIR: a volume is a root
 	private const int MaxVolumes = 4096;
@@ -166,13 +184,26 @@ public static class MuiVolumelistCore
 	}
 
 	// Attribute access is delegated to the Dirlist machinery (status, counters,
-	// path); ExampleMode falls through to the generic store there.
+	// path). ExampleMode is authoritative in its named sidecar once that record
+	// exists; a malformed record fails closed instead of falling back to raw data.
 	public static bool GetAttribute<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, uint attribute, out uint value)
-		where TPlatform : struct, IMuiHeadlessPlatform =>
-		attribute == ExampleMode && TryReadModeValue(ref platform, state, obj,
-			out value) ? true : MuiDirlistCore.GetAttribute(ref platform, state, obj,
-			attribute, out value);
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (attribute == ExampleMode)
+		{
+			if (TryReadModeValue(ref platform, state, obj, out value)) return true;
+			if (HasModeStateStorage(ref platform, state, obj))
+			{
+				value = 0;
+				return false;
+			}
+			return MuiDirlistCore.GetAttribute(ref platform, state, obj,
+				attribute, out value);
+		}
+		return MuiDirlistCore.GetAttribute(ref platform, state, obj, attribute,
+			out value);
+	}
 
 	internal static bool IsPublicGetterAttribute(uint attribute) =>
 		attribute == ExampleMode || MuiDirlistCore.IsPublicGetterAttribute(attribute);
@@ -198,6 +229,12 @@ public static class MuiVolumelistCore
 		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (!MuiListCore.HasBackbone(ref platform, state, obj)) return false;
+		// Read the named mode before changing the listing. A present malformed
+		// sidecar fails closed and leaves the previous population untouched;
+		// bootstrap from the raw initializer is allowed only when no sidecar
+		// exists yet.
+		if (!TryReadModeForPopulation(ref platform, state, obj,
+			out var exampleMode)) return false;
 		MuiDirlistCore.PublishScanStatus(ref platform, state, obj,
 			MuiDirlistCore.StatusReading, false);
 		MuiListCore.Clear(ref platform, state, obj);
@@ -210,7 +247,7 @@ public static class MuiVolumelistCore
 		}
 
 		uint drawers = 0;
-		var ok = ReadMode(ref platform, state, obj) != 0
+		var ok = exampleMode != 0
 			? PopulateExample(ref platform, state, obj, scratch, ref drawers)
 			: PopulateVolumes(ref platform, state, obj, scratch, ref drawers);
 		FreeScratch(ref platform, scratch);
@@ -322,10 +359,17 @@ public static class MuiVolumelistCore
 			out value);
 	}
 
+	private static bool HasModeStateStorage<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, obj, ModeStateKey) != 0;
+
 	private static bool EnsureModeStateRecord<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (TryReadModeRecord(ref platform, state, obj, out _)) return true;
+		// A present but malformed sidecar is not a bootstrap miss. Do not append a
+		// append a replacement under the same logical key.
+		if (HasModeStateStorage(ref platform, state, obj)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiVolumelistModeStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -365,15 +409,27 @@ public static class MuiVolumelistCore
 		return true;
 	}
 
-	private static uint ReadMode<TPlatform>(ref TPlatform platform, APTR state,
-		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform =>
-		TryReadModeValue(ref platform, state, obj, out var value)
-			? value : ReadRaw(ref platform, state, obj, ExampleMode, 0);
+	private static bool TryReadModeForPopulation<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, out uint value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (TryReadModeValue(ref platform, state, obj, out value)) return true;
+		if (HasModeStateStorage(ref platform, state, obj))
+		{
+			value = 0;
+			return false;
+		}
+		value = ReadRaw(ref platform, state, obj, ExampleMode, 0);
+		return true;
+	}
 
 	private static bool SetModeAttribute<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, uint value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (HasModeStateStorage(ref platform, state, obj) &&
+			!TryReadModeRecord(ref platform, state, obj, out _)) return false;
+		value = value == 0 ? 0u : 1u;
 		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			ExampleMode, value, false)) return false;
 		return SyncModeStateRecord(ref platform, state, obj);

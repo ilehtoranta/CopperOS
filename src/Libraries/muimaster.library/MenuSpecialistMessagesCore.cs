@@ -40,62 +40,89 @@ internal struct MuiMenuSpecialistFieldCursor
 	internal MuiMenuSpecialistField Field;
 }
 
-internal static class MuiMenuSpecialistFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed Menustrip/Menu/Menuitem
+// packets. Packet kinds own complete MorphOS record spans; field names select
+// members without exposing numeric positions to dispatch code.
+internal static class MuiMenuSpecialistMessageMemoryCodec
 {
 	private static bool TryResolve(MuiMenuSpecialistPacketKind packet,
-		MuiMenuSpecialistField field, out uint offset)
+		MuiMenuSpecialistField field, out uint offset, out uint size)
 	{
-		// Keep packed ABI selection straight-line for freestanding native
-		// lowering. The offset table remains confined to this codec; all
-		// dispatch-facing values are the named packet structs below.
-		if (packet == MuiMenuSpecialistPacketKind.Method)
+		switch (packet)
 		{
-			if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
-		}
-		else if (packet == MuiMenuSpecialistPacketKind.Get)
-		{
-			if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
-			if (field == MuiMenuSpecialistField.Attribute) { offset = 4; return true; }
-			if (field == MuiMenuSpecialistField.Storage) { offset = 8; return true; }
-		}
-		else if (packet == MuiMenuSpecialistPacketKind.Set)
-		{
-			if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
-			if (field == MuiMenuSpecialistField.Attribute) { offset = 4; return true; }
-			if (field == MuiMenuSpecialistField.Value) { offset = 8; return true; }
-		}
-		else if (packet == MuiMenuSpecialistPacketKind.Pointer)
-		{
-			if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
-			if (field == MuiMenuSpecialistField.ObjectPointer) { offset = 4; return true; }
-		}
-		else if (packet == MuiMenuSpecialistPacketKind.Pair)
-		{
-			if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
-			if (field == MuiMenuSpecialistField.First) { offset = 4; return true; }
-			if (field == MuiMenuSpecialistField.Second) { offset = 8; return true; }
-		}
-		else if (packet == MuiMenuSpecialistPacketKind.Popup)
-		{
-			if (field == MuiMenuSpecialistField.MethodId) { offset = 0; return true; }
-			if (field == MuiMenuSpecialistField.Window) { offset = 4; return true; }
-			if (field == MuiMenuSpecialistField.X) { offset = 8; return true; }
-			if (field == MuiMenuSpecialistField.Y) { offset = 12; return true; }
+			case MuiMenuSpecialistPacketKind.Method:
+				size = MuiMenuSpecialistMethodMessage.Size;
+				if (field == MuiMenuSpecialistField.MethodId)
+					offset = MuiMenuSpecialistMethodMessage.MethodIdOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
+			case MuiMenuSpecialistPacketKind.Get:
+				size = MuiMenuSpecialistGetMessage.Size;
+				if (field == MuiMenuSpecialistField.MethodId)
+					offset = MuiMenuSpecialistGetMessage.MethodIdOffset;
+				else if (field == MuiMenuSpecialistField.Attribute)
+					offset = MuiMenuSpecialistGetMessage.AttributeOffset;
+				else if (field == MuiMenuSpecialistField.Storage)
+					offset = MuiMenuSpecialistGetMessage.StorageOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
+			case MuiMenuSpecialistPacketKind.Set:
+				size = MuiMenuSpecialistSetMessage.Size;
+				if (field == MuiMenuSpecialistField.MethodId)
+					offset = MuiMenuSpecialistSetMessage.MethodIdOffset;
+				else if (field == MuiMenuSpecialistField.Attribute)
+					offset = MuiMenuSpecialistSetMessage.AttributeOffset;
+				else if (field == MuiMenuSpecialistField.Value)
+					offset = MuiMenuSpecialistSetMessage.ValueOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
+			case MuiMenuSpecialistPacketKind.Pointer:
+				size = MuiMenuSpecialistPointerMessage.Size;
+				if (field == MuiMenuSpecialistField.MethodId)
+					offset = MuiMenuSpecialistPointerMessage.MethodIdOffset;
+				else if (field == MuiMenuSpecialistField.ObjectPointer)
+					offset = MuiMenuSpecialistPointerMessage.ObjectPointerOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
+			case MuiMenuSpecialistPacketKind.Pair:
+				size = MuiMenuSpecialistPairMessage.Size;
+				if (field == MuiMenuSpecialistField.MethodId)
+					offset = MuiMenuSpecialistPairMessage.MethodIdOffset;
+				else if (field == MuiMenuSpecialistField.First)
+					offset = MuiMenuSpecialistPairMessage.FirstOffset;
+				else if (field == MuiMenuSpecialistField.Second)
+					offset = MuiMenuSpecialistPairMessage.SecondOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
+			case MuiMenuSpecialistPacketKind.Popup:
+				size = MuiMenuSpecialistPopupMessage.Size;
+				if (field == MuiMenuSpecialistField.MethodId)
+					offset = MuiMenuSpecialistPopupMessage.MethodIdOffset;
+				else if (field == MuiMenuSpecialistField.Window)
+					offset = MuiMenuSpecialistPopupMessage.WindowOffset;
+				else if (field == MuiMenuSpecialistField.X)
+					offset = MuiMenuSpecialistPopupMessage.XOffset;
+				else if (field == MuiMenuSpecialistField.Y)
+					offset = MuiMenuSpecialistPopupMessage.YOffset;
+				else { offset = 0; size = 0; return false; }
+				return true;
 		}
 		offset = 0;
+		size = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiMenuSpecialistFieldCursor cursor, out APTR address)
+		APTR message, MuiMenuSpecialistPacketKind packet,
+		MuiMenuSpecialistField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(packet, field, out var offset, out var size) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, size)) return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiMenuSpecialistMethodMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -104,11 +131,8 @@ internal static class MuiMenuSpecialistFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiMenuSpecialistFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -118,14 +142,36 @@ internal static class MuiMenuSpecialistFieldCursorCodec
 		MuiMenuSpecialistField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiMenuSpecialistFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// field cursor. The live message codecs route to the struct adapter above.
+internal static class MuiMenuSpecialistFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMenuSpecialistFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMenuSpecialistMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Packet, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiMenuSpecialistPacketKind packet,
+		MuiMenuSpecialistField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+			message, packet, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiMenuSpecialistPacketKind packet,
+		MuiMenuSpecialistField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			message, packet, field, value);
 }
 
 // Central codec for the fixed MorphOS Menustrip/Menu/Menuitem packet family.

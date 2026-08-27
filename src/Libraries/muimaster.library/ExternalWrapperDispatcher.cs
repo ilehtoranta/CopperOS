@@ -12,6 +12,11 @@ namespace CopperOS.MuiMaster;
 internal struct MuiExternalUpdateMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint AttributeListOffset = 4;
+	public const uint GadgetInfoOffset = 8;
+	public const uint FlagsOffset = 12;
 	public uint MethodId;
 	public uint AttributeList;
 	public uint GadgetInfo;
@@ -22,6 +27,10 @@ internal struct MuiExternalUpdateMessage
 internal struct MuiExternalGetMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint AttributeOffset = 4;
+	public const uint StorageOffset = 8;
 	public uint MethodId;
 	public uint Attribute;
 	public uint Storage;
@@ -31,6 +40,10 @@ internal struct MuiExternalGetMessage
 internal struct MuiExternalSetMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint AttributeOffset = 4;
+	public const uint ValueOffset = 8;
 	public uint MethodId;
 	public uint Attribute;
 	public uint Value;
@@ -40,6 +53,8 @@ internal struct MuiExternalSetMessage
 internal struct MuiExternalMethodMessage
 {
 	public const uint Size = 4;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -47,6 +62,9 @@ internal struct MuiExternalMethodMessage
 internal struct MuiExternalRenderInfoMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint RenderInfoOffset = 4;
 	public uint MethodId;
 	public uint RenderInfo;
 }
@@ -55,6 +73,9 @@ internal struct MuiExternalRenderInfoMessage
 internal struct MuiExternalAskMinMaxMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint StorageOffset = 4;
 	public uint MethodId;
 	public uint Storage;
 }
@@ -63,6 +84,12 @@ internal struct MuiExternalAskMinMaxMessage
 internal struct MuiExternalLayoutMessage
 {
 	public const uint Size = 20;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint LeftOffset = 4;
+	public const uint TopOffset = 8;
+	public const uint WidthOffset = 12;
+	public const uint HeightOffset = 16;
 	public uint MethodId;
 	public uint Left;
 	public uint Top;

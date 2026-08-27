@@ -76,10 +76,16 @@ internal static class MuiHelpStateCore
 		var hasRawLine = MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
 			obj, HelpLine, out var rawLine);
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) ==
-			unchecked((int)MuiHelpStateRecord.Size) &&
-			MuiHelpStateRecordCodec.TryRead(ref platform, block, out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateKey);
+		var present = block.IsNotNull || length != 0;
+		if (present)
 		{
+			if (length != unchecked((int)MuiHelpStateRecord.Size) ||
+				!MuiHelpStateRecordCodec.TryReadStructural(ref platform, block,
+					out var record) ||
+				!MuiHelpStateAdmission.ValidateLive(ref platform, state, obj,
+					record)) return false;
 			var node = hasRawNode ? APTR.FromPointer(rawNode) : record.Node;
 			var line = hasRawLine ? rawLine : record.Line;
 			if (node.Raw != record.Node.Raw || line != record.Line)
@@ -138,7 +144,8 @@ internal static class MuiHelpStateCore
 		record.Node = node;
 		record.Line = line;
 		record.Generation = generation == 0 ? 1u : generation;
-		var written = MuiHelpStateRecordCodec.Write(ref platform, scratch, record);
+		var written = MuiHelpStateAdmission.ValidateLive(ref platform, state, obj,
+			record) && MuiHelpStateRecordCodec.Write(ref platform, scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 			StateKey, scratch, unchecked((int)MuiHelpStateRecord.Size));
 		platform.Clear(scratch, MuiHelpStateRecord.Size);

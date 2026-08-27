@@ -32,6 +32,7 @@ public sealed class MuiHeadlessDispatcherTests
 	private const uint MUIA_Selected = 0x8042654B;
 	private const uint MUIA_Image_State = 0x8042A3AD;
 	private const uint MUIA_Group_ActivePage = 0x80424199;
+	private const uint GroupChangeStateAttribute = 0x7FFE0040;
 
 	[Fact]
 	public void HeadlessMethodHeaderUsesNamedField()
@@ -285,6 +286,37 @@ public sealed class MuiHeadlessDispatcherTests
 		cursor.Field = MuiDataspaceField.SizeStorage;
 		Assert.False(MuiDataspaceFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void DataspaceMessageAdapterOwnsStructBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1200);
+		Assert.True(MuiDataspaceMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiDataspacePacketKind.Add, MuiDataspaceField.Data,
+			out var dataAddress));
+		Assert.Equal(packet.Raw + MuiDataspaceAddMessage.DataOffset,
+			dataAddress.Raw);
+		Assert.True(MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiDataspacePacketKind.Add, MuiDataspaceField.Length,
+			unchecked((uint)-12)));
+		Assert.True(MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform,
+			packet, MuiDataspacePacketKind.Add, MuiDataspaceField.Length,
+			out var length));
+		Assert.Equal(unchecked((uint)-12), length);
+		Assert.False(MuiDataspaceMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20ff9), MuiDataspacePacketKind.Add,
+			MuiDataspaceField.Id, out _));
+		Assert.False(MuiDataspaceMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiDataspacePacketKind.Clear, MuiDataspaceField.Id, out _));
+		Assert.False(MuiDataspaceMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiDataspacePacketKind.Add, (MuiDataspaceField)255,
+			out _));
+		Assert.False(MuiDataspaceMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiDataspacePacketKind.Get,
+			MuiDataspaceField.SizeStorage, out _));
 	}
 
 	[Fact]
@@ -1015,6 +1047,40 @@ public sealed class MuiHeadlessDispatcherTests
 		cursor.Message = APTR.FromPointer(0x50000);
 		Assert.False(MuiDataspaceIffMethodFieldCursorCodec.TryGetAddress(ref
 			platform, cursor, out _));
+	}
+
+	[Fact]
+	public void DataspaceIffMessageAdaptersOwnStructBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var read = APTR.FromPointer(0x1400);
+		Assert.True(MuiDataspaceReadIffMessageMemoryCodec.TryGetAddress(ref
+			platform, read, MuiDataspaceReadIffField.Handle, out var handleAddress));
+		Assert.Equal(read.Raw + MuiDataspaceReadIffMessage.HandleOffset,
+			handleAddress.Raw);
+		Assert.True(MuiDataspaceReadIffMessageMemoryCodec.TryWrite(ref platform,
+			read, MuiDataspaceReadIffField.Handle, 0x1300));
+		Assert.True(MuiDataspaceReadIffMessageMemoryCodec.TryRead(ref platform,
+			read, MuiDataspaceReadIffField.Handle, out var handle));
+		Assert.Equal(0x1300u, handle);
+
+		var write = APTR.FromPointer(0x1500);
+		Assert.True(MuiDataspaceWriteIffMessageMemoryCodec.TryWrite(ref platform,
+			write, MuiDataspaceWriteIffField.Type, 0x464F524D));
+		Assert.True(MuiDataspaceWriteIffMessageMemoryCodec.TryRead(ref platform,
+			write, MuiDataspaceWriteIffField.Type, out var type));
+		Assert.Equal(0x464F524Du, type);
+		Assert.False(MuiDataspaceReadIffMessageMemoryCodec.TryGetAddress(ref
+			platform, APTR.FromPointer(0x20FFD), MuiDataspaceReadIffField.Handle,
+			out _));
+		Assert.False(MuiDataspaceWriteIffMessageMemoryCodec.TryGetAddress(ref
+			platform, APTR.FromPointer(0x20FF5),
+			MuiDataspaceWriteIffField.Id, out _));
+		Assert.False(MuiDataspaceWriteIffMessageMemoryCodec.TryGetAddress(ref
+			platform, write, (MuiDataspaceWriteIffField)255, out _));
+		Assert.False(MuiDataspaceReadIffMessageMemoryCodec.TryGetAddress(ref
+			platform, APTR.Null, MuiDataspaceReadIffField.Handle, out _));
 	}
 
 	[Fact]
@@ -1800,6 +1866,32 @@ public sealed class MuiHeadlessDispatcherTests
 		cursor.Field = MuiCallHookPacketField.Param1;
 		Assert.False(MuiCallHookPacketFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void CallHookMessageAdapterOwnsStructBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1400);
+		Assert.True(MuiCallHookMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiCallHookPacketField.MethodId, out var methodAddress));
+		Assert.Equal(packet.Raw + MuiCallHookMessage.MethodIdOffset,
+			methodAddress.Raw);
+		Assert.True(MuiCallHookMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiCallHookPacketField.Hook, 0x1500));
+		Assert.True(MuiCallHookMessageMemoryCodec.TryReadUInt32(ref platform,
+			packet, MuiCallHookPacketField.Hook, out var hook));
+		Assert.Equal(0x1500u, hook);
+		Assert.True(MuiCallHookMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiCallHookPacketField.Param1, 0xCAFEBABEu));
+		Assert.False(MuiCallHookMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20ff9), MuiCallHookPacketField.Param1,
+			out _));
+		Assert.False(MuiCallHookMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, (MuiCallHookPacketField)255, out _));
+		Assert.False(MuiCallHookMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiCallHookPacketField.Hook, out _));
 	}
 
 	[Fact]
@@ -2815,6 +2907,62 @@ public sealed class MuiHeadlessDispatcherTests
 			childGroup));
 		Assert.Equal(0u, MuiGroupChangeCore.ChangeDepth(ref platform, State,
 			childGroup));
+	}
+
+	[Fact]
+	public void MalformedGroupChangeStateFailsClosedBeforeTransitions()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var groupName = APTR.FromPointer(0x1100);
+		platform.WriteCString(groupName, "Group.mui");
+		Assert.True(MuiHeadlessObjectCore.Initialize(ref platform, State));
+		var groupClass = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			State, groupName, APTR.Null, 0, APTR.FromPointer(1));
+		var group = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			groupClass, APTR.Null);
+		Assert.True(group.IsNotNull);
+		Assert.Equal(group.Raw, MuiGroupChangeCore.InitChange(ref platform, State,
+			group));
+		var allocations = platform.AllocationCount;
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			group, GroupChangeStateAttribute, out var stateRaw));
+		var stateBlock = APTR.FromPointer(stateRaw);
+		Assert.True(MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(
+			ref platform, stateBlock, MuiGroupChangeRecordKind.State,
+			MuiGroupChangeRecordField.ExitFlags, 0xA5));
+		Assert.True(MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(
+			ref platform, stateBlock, MuiGroupChangeRecordKind.State,
+			MuiGroupChangeRecordField.Depth,
+			MuiHeadlessLayout.MaximumTraversal + 1));
+
+		Assert.False(MuiGroupChangeStateCodec.TryRead(ref platform, stateBlock,
+			out _));
+		Assert.Equal(0u, MuiGroupChangeCore.ChangeDepth(ref platform, State,
+			group));
+		Assert.Equal(0u, MuiGroupChangeCore.ChangeExitFlags(ref platform, State,
+			group));
+		Assert.Equal(0u, MuiGroupChangeCore.InitChange(ref platform, State,
+			group));
+		Assert.False(MuiGroupChangeCore.ExitChange(ref platform, State, group));
+		Assert.Equal(allocations, platform.AllocationCount);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			group, GroupChangeStateAttribute, out var unchangedStateRaw));
+		Assert.Equal(stateRaw, unchangedStateRaw);
+		Assert.False(MuiGroupChangeCore.WriteChangeRecord(ref platform,
+			APTR.FromPointer(0x1800), MuiHeadlessLayout.MaximumTraversal + 1,
+			0, 0));
+
+		Assert.True(MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(
+			ref platform, stateBlock, MuiGroupChangeRecordKind.State,
+			MuiGroupChangeRecordField.Cookie, MuiGroupChangeState.Magic));
+		Assert.True(MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(
+			ref platform, stateBlock, MuiGroupChangeRecordKind.State,
+			MuiGroupChangeRecordField.Depth, 1));
+		Assert.True(MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(
+			ref platform, stateBlock, MuiGroupChangeRecordKind.State,
+			MuiGroupChangeRecordField.ExitFlags, 0));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, group));
 	}
 
 	[Fact]

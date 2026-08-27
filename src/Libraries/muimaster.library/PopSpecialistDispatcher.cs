@@ -12,6 +12,8 @@ namespace CopperOS.MuiMaster;
 internal struct MuiPopSpecialistMethodMessage
 {
 	public const uint Size = 4;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -19,6 +21,10 @@ internal struct MuiPopSpecialistMethodMessage
 internal struct MuiPopSpecialistGetMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint AttributeOffset = 4;
+	public const uint StorageOffset = 8;
 	public uint MethodId;
 	public uint Attribute;
 	public uint Storage;
@@ -28,6 +34,10 @@ internal struct MuiPopSpecialistGetMessage
 internal struct MuiPopSpecialistSetMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint AttributeOffset = 4;
+	public const uint ValueOffset = 8;
 	public uint MethodId;
 	public uint Attribute;
 	public uint Value;
@@ -37,6 +47,9 @@ internal struct MuiPopSpecialistSetMessage
 internal struct MuiPopSpecialistCloseMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ResultOffset = 4;
 	public uint MethodId;
 	public uint Result;
 }

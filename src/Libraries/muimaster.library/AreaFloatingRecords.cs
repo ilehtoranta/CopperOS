@@ -20,11 +20,31 @@ public struct MuiAreaFloatingStateInput
 internal struct MuiAreaFloatingStateRecord
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint EnabledOffset = 4;
+	internal const uint GenerationOffset = 8;
 	internal const uint Cookie = 0x41464C54u; // 'AFLT'
 
 	internal uint Magic;
 	internal uint Enabled;
 	internal uint Generation;
+}
+
+// MUIA_Floating is a canonical BOOL policy.  Its placement effect remains a
+// MorphOS provider concern; this record admits only identity, BOOL shape, and
+// publication lifetime, with live ownership checked by consumers.
+internal static class MuiAreaFloatingStateAdmission
+{
+	internal static bool Validate(MuiAreaFloatingStateRecord value) =>
+		value.Magic == MuiAreaFloatingStateRecord.Cookie &&
+		value.Enabled <= 1 && value.Generation != 0;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiAreaFloatingStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 }
 
 internal enum MuiAreaFloatingStateField : byte
@@ -43,37 +63,66 @@ internal struct MuiAreaFloatingStateFieldCursor
 
 internal static class MuiAreaFloatingStateFieldCursorCodec
 {
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaFloatingStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaFloatingStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaFloatingStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaFloatingStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaFloatingStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaFloatingStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+	}
+}
+
+// Fixed Area floating state is transferred as a named record. Numeric guest
+// positions are confined to this ABI adapter; the compatibility cursor above
+// remains available only to legacy callers and malformed-state diagnostics.
+internal static class MuiAreaFloatingStateRecordMemoryCodec
+{
 	private static bool TryResolve(MuiAreaFloatingStateField field,
 		out uint offset)
 	{
 		switch (field)
 		{
 			case MuiAreaFloatingStateField.Magic:
-				offset = 0;
+				offset = MuiAreaFloatingStateRecord.MagicOffset;
 				return true;
 			case MuiAreaFloatingStateField.Enabled:
-				offset = 4;
+				offset = MuiAreaFloatingStateRecord.EnabledOffset;
 				return true;
 			case MuiAreaFloatingStateField.Generation:
-				offset = 8;
+				offset = MuiAreaFloatingStateRecord.GenerationOffset;
 				return true;
-			default:
-				offset = 0;
-				return false;
 		}
+		offset = 0;
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiAreaFloatingStateFieldCursor cursor, out APTR address)
+		APTR record, MuiAreaFloatingStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiAreaFloatingStateRecord.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset)
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiAreaFloatingStateRecord.Size) &&
+			platform.IsMapped(address, MuiAreaFloatingStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -81,10 +130,8 @@ internal static class MuiAreaFloatingStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaFloatingStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -93,10 +140,8 @@ internal static class MuiAreaFloatingStateFieldCursorCodec
 		APTR record, MuiAreaFloatingStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaFloatingStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -104,24 +149,27 @@ internal static class MuiAreaFloatingStateFieldCursorCodec
 
 internal static class MuiAreaFloatingStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiAreaFloatingStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaFloatingStateRecord.Size) ||
-			!MuiAreaFloatingStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiAreaFloatingStateField.Magic, out var magic) ||
-			magic != MuiAreaFloatingStateRecord.Cookie ||
-			!MuiAreaFloatingStateFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiAreaFloatingStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiAreaFloatingStateField.Magic, out value.Magic) ||
+			!MuiAreaFloatingStateRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiAreaFloatingStateField.Enabled, out value.Enabled) ||
-			!MuiAreaFloatingStateFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiAreaFloatingStateRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiAreaFloatingStateField.Generation,
 				out value.Generation)) return false;
-		value.Magic = magic;
 		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiAreaFloatingStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiAreaFloatingStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaFloatingStateRecord value)
@@ -129,14 +177,14 @@ internal static class MuiAreaFloatingStateRecordCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiAreaFloatingStateRecord.Size) || value.Magic !=
-			MuiAreaFloatingStateRecord.Cookie) return false;
-		return MuiAreaFloatingStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiAreaFloatingStateRecord.Cookie ||
+			!MuiAreaFloatingStateAdmission.Validate(value)) return false;
+		return MuiAreaFloatingStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiAreaFloatingStateField.Magic, value.Magic) &&
-			MuiAreaFloatingStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaFloatingStateField.Enabled, value.Enabled) &&
-			MuiAreaFloatingStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaFloatingStateField.Generation,
-				value.Generation);
+			MuiAreaFloatingStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiAreaFloatingStateField.Enabled, value.Enabled) &&
+			MuiAreaFloatingStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiAreaFloatingStateField.Generation, value.Generation);
 	}
 }
 
@@ -156,11 +204,17 @@ internal static class MuiAreaFloatingCore
 			MuiCommonControlCore.Floating, out var raw))
 			enabled = raw == 0 ? 0u : 1u;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) ==
-			unchecked((int)MuiAreaFloatingStateRecord.Size) &&
-			MuiAreaFloatingStateRecordCodec.TryRead(ref platform, block,
-				out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateKey);
+		MuiAreaFloatingStateRecord record;
+		if (block.IsNotNull || length != 0)
 		{
+			// A present block is authoritative typed state.  Do not repair a
+			// malformed BOOL or generation from the legacy raw attribute.
+			if (length != unchecked((int)MuiAreaFloatingStateRecord.Size) ||
+				!MuiAreaFloatingStateRecordCodec.TryReadStructural(ref platform, block,
+					out record) || !MuiAreaFloatingStateAdmission.ValidateLive(ref platform,
+					state, obj, record)) return false;
 			if (record.Enabled != enabled)
 			{
 				record.Enabled = enabled;
@@ -191,7 +245,8 @@ internal static class MuiAreaFloatingCore
 		record.Magic = MuiAreaFloatingStateRecord.Cookie;
 		record.Enabled = enabled == 0 ? 0u : 1u;
 		record.Generation = generation == 0 ? 1u : generation;
-		var written = MuiAreaFloatingStateRecordCodec.Write(ref platform,
+		var written = MuiAreaFloatingStateAdmission.ValidateLive(ref platform, state,
+			obj, record) && MuiAreaFloatingStateRecordCodec.Write(ref platform,
 			scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 			StateKey, scratch, unchecked((int)MuiAreaFloatingStateRecord.Size));

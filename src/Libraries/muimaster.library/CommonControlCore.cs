@@ -660,7 +660,7 @@ public static class MuiCommonControlCore
 	private const uint StringIntegerStateKey = 0x7F070018;
 	private const uint StringPlaceholderStateKey = 0x7F070019;
 	private const uint StringContentsStateKey = 0x7F07001A;
-	private const uint ChoiceEntriesStateKey = 0x7F07001B;
+	internal const uint ChoiceEntriesStateKey = 0x7F07001B;
 	private const uint TextContentsStateKey = 0x7F07001C;
 	private const uint TextPreParseStateKey = 0x7F07001D;
 	private const uint NumericFormatStateKey = 0x7F07001E;
@@ -675,31 +675,33 @@ public static class MuiCommonControlCore
 	private const uint BodychunkFormatStateKey = 0x7F070027;
 	private const uint BitmapGeometryStateKey = 0x7F070028;
 	private const uint ImageRenderStateKey = 0x7F070029;
-	private const uint NumericStateKey = 0x7F07002A;
+	internal const uint NumericStateKey = 0x7F07002A;
 	private const uint PropRangeStateKey = 0x7F07002B;
-	private const uint GaugeStateKey = 0x7F07002C;
+	internal const uint GaugeStateKey = 0x7F07002C;
 	private const uint ScrollbarLayoutStateKey = 0x7F07002D;
-	private const uint SliderPresentationStateKey = 0x7F07002E;
-	private const uint ScalePresentationStateKey = 0x7F07002F;
-	private const uint GadgetInteractionStateKey = 0x7F070030;
-	private const uint LevelmeterPresentationStateKey = 0x7F070031;
+	internal const uint SliderPresentationStateKey = 0x7F07002E;
+	internal const uint ScalePresentationStateKey = 0x7F07002F;
+	internal const uint GadgetInteractionStateKey = 0x7F070030;
+	internal const uint LevelmeterPresentationStateKey = 0x7F070031;
 	private const uint TextPresentationStateKey = 0x7F070032;
-	private const uint RectanglePresentationStateKey = 0x7F070033;
-	private const uint AreaPresentationStateKey = 0x7F070034;
+	internal const uint RectanglePresentationStateKey = 0x7F070033;
+	internal const uint AreaPresentationStateKey = 0x7F070034;
 	// Keep this record on a dedicated object-store key; 0x7F070035 belongs to
 	// AreaLayoutCore's geometry record and must not be shared by Text.
 	private const uint TextShortenedStateKey = 0x7F070072;
-	private const uint ChoiceActiveStateKey = 0x7F070036;
+	internal const uint ChoiceActiveStateKey = 0x7F070036;
 	// Keep this record on a dedicated object-store key; 0x7F070037 belongs to
 	// AreaLayoutCore's render-policy record and must not be shared by Text.
 	private const uint TextUnicodeStateKey = 0x7F070071;
 	private const uint ImageFontMatchStateKey = 0x7F070038;
-	private const uint BitmapPolicyStateKey = 0x7F070039;
-	private const uint BitmapRemappedStateKey = 0x7F07003A;
-	private const uint GadgetGadgetStateKey = 0x7F07003B;
-	private const uint PropPolicyStateKey = 0x7F07003C;
-	private const uint AreaWeightStateKey = 0x7F07003D;
-	private const uint BalancePolicyStateKey = 0x7F07003E;
+	internal const uint BitmapPolicyStateKey = 0x7F070039;
+	// 0x7F07003A belongs to AreaDragCore's policy record; keep remapped
+	// renderer state on its own object-store key.
+	internal const uint BitmapRemappedStateKey = 0x7F070074;
+	internal const uint GadgetGadgetStateKey = 0x7F07003B;
+	internal const uint PropPolicyStateKey = 0x7F07003C;
+	internal const uint AreaWeightStateKey = 0x7F07003D;
+	internal const uint BalancePolicyStateKey = 0x7F07003E;
 	private const uint TextCopyStateKey = 0x7F07003F;
 
 		// A small value record keeps Unicode input encoding explicit at the
@@ -1063,8 +1065,7 @@ public static class MuiCommonControlCore
 		{
 			EnsureDefault(ref platform, state, obj, BalanceQuiet, 0);
 			var balance = default(MuiBalancePolicyState);
-			balance.Quiet = ReadRaw(ref platform, state, obj, BalanceQuiet, 0) == 0 ?
-				0u : 1u;
+			balance.Quiet = ReadRaw(ref platform, state, obj, BalanceQuiet, 0);
 			return PublishBalancePolicyState(ref platform, state, obj, balance);
 		}
 		if (cls == MuiControlClass.Prop)
@@ -1092,8 +1093,9 @@ public static class MuiCommonControlCore
 			propRange.First = MuiPropRangeStateValidation.ClampFirst(propRange);
 			if (!PublishPropRangeState(ref platform, state, obj, propRange))
 				return false;
-			if (Read(ref platform, state, obj, PropUseWinBorder, 0) > 3)
-				return false;
+			if (!TryReadPropPolicyState(ref platform, state, obj,
+				out var initializedScrollbarPolicy) ||
+				initializedScrollbarPolicy.UseWinBorder > 3) return false;
 			ClampProp(ref platform, state, obj);
 			return true;
 		}
@@ -1136,8 +1138,9 @@ public static class MuiCommonControlCore
 				scrollbarRange);
 			if (!PublishPropRangeState(ref platform, state, obj, scrollbarRange))
 				return false;
-			if (Read(ref platform, state, obj, PropUseWinBorder, 0) > 3)
-				return false;
+			if (!TryReadPropPolicyState(ref platform, state, obj,
+				out var initializedPropPolicy) ||
+				initializedPropPolicy.UseWinBorder > 3) return false;
 			EnsureDefault(ref platform, state, obj, PropHoriz,
 				scrollbarLayout.Horizontal);
 			if (scrollbarLayout.Type > ScrollbarTypeNone) return false;
@@ -1345,7 +1348,13 @@ public static class MuiCommonControlCore
 		if (cls == MuiControlClass.String)
 		{
 			EnsureDefault(ref platform, state, obj, StringMaxLen, 80);
-			EnsureDefault(ref platform, state, obj, StringAttachedList, 0);
+			// A malformed caller-owned Listview pointer is still a present
+			// construction value. Do not let the semantic getter's fail-closed
+			// result make the generic default helper overwrite it before admission.
+			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+				StringAttachedList, out _))
+				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+					StringAttachedList, 0, false);
 			if (!EnsureStringAttachedListStateRecord(ref platform, state, obj))
 				return false;
 			EnsureDefault(ref platform, state, obj, StringEditable, 1);
@@ -1386,8 +1395,9 @@ public static class MuiCommonControlCore
 			// the object becomes visible to the application.
 			if (!TryReadStringFilterState(ref platform, state, obj, out _))
 				return false;
-			if (!CopyContents(ref platform, state, obj, StringContents,
-				StringCopyKey, StringMaxChars(ref platform, state, obj), false))
+			if (!TryGetStringMaxChars(ref platform, state, obj, out var maxChars) ||
+				!CopyContents(ref platform, state, obj, StringContents,
+					StringCopyKey, maxChars, false))
 				return false;
 			if (!EnsureStringIntegerStateRecord(ref platform, state, obj))
 				return false;
@@ -1735,13 +1745,13 @@ public static class MuiCommonControlCore
 		if (!TryReadPropRangeState(ref platform, state, scrollbar,
 			out var range)) return false;
 		if (!PublishPropRangeState(ref platform, state, target, range)) return false;
+		if (!TryReadPropPolicyState(ref platform, state, scrollbar,
+			out var sourcePolicy)) return false;
 		var policy = default(MuiPropPolicyState);
 		policy.Horizontal = layout.Horizontal;
-		policy.DeltaFactor = Read(ref platform, state, scrollbar,
-			PropDeltaFactor, 1);
-		policy.Slider = Read(ref platform, state, scrollbar, PropSlider, 0);
-		policy.UseWinBorder = Read(ref platform, state, scrollbar,
-			PropUseWinBorder, 0);
+		policy.DeltaFactor = sourcePolicy.DeltaFactor;
+		policy.Slider = sourcePolicy.Slider;
+		policy.UseWinBorder = sourcePolicy.UseWinBorder;
 		return PublishPropPolicyState(ref platform, state, target, policy);
 	}
 
@@ -1761,6 +1771,8 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var rawState = default(MuiAreaPresentationState);
 		rawState.Disabled = ReadRaw(ref platform, state, obj, Disabled, 0);
 		rawState.ShowMe = ReadRaw(ref platform, state, obj, ShowMe, 1);
@@ -1768,7 +1780,7 @@ public static class MuiCommonControlCore
 		rawState.Frame = ReadRaw(ref platform, state, obj, Frame, 0);
 		rawState.CustomBackfill = ReadRaw(ref platform, state, obj,
 			CustomBackfill, 0);
-		if (!MuiAreaPresentationStateValidation.IsValidState(rawState)) return false;
+		if (!MuiAreaPresentationStateAdmission.Validate(rawState)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			AreaPresentationStateKey);
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
@@ -1777,9 +1789,10 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiAreaPresentationStateRecord.Size) ||
-				!MuiAreaPresentationStateRecordCodec.TryRead(ref platform, block,
-					out var record) ||
-				!MuiAreaPresentationStateValidation.IsValidRecord(record)) return false;
+				!MuiAreaPresentationStateRecordCodec.TryReadStructural(ref platform,
+					block, out var record) ||
+				!MuiAreaPresentationStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			if (record.Disabled != rawState.Disabled || record.ShowMe != rawState.ShowMe ||
 				record.Background != rawState.Background || record.Frame != rawState.Frame ||
 				record.CustomBackfill != rawState.CustomBackfill)
@@ -1789,8 +1802,9 @@ public static class MuiCommonControlCore
 				record.Background = rawState.Background;
 				record.Frame = rawState.Frame;
 				record.CustomBackfill = rawState.CustomBackfill;
-				if (!MuiAreaPresentationStateRecordCodec.Write(ref platform, block,
-					record)) return false;
+				if (!MuiAreaPresentationStateAdmission.ValidateLive(ref platform, state,
+					obj, record) || !MuiAreaPresentationStateRecordCodec.Write(ref platform,
+					block, record)) return false;
 			}
 		}
 		result = rawState;
@@ -1803,26 +1817,43 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			AreaPresentationStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			AreaPresentationStateKey) != unchecked((int)
 			MuiAreaPresentationStateRecord.Size)) return false;
-		return MuiAreaPresentationStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiAreaPresentationStateValidation.IsValidRecord(value);
+		return MuiAreaPresentationStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiAreaPresentationStateAdmission.ValidateLive(
+				ref platform, state, obj, value);
+	}
+
+	internal static bool AreaPresentationStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			AreaPresentationStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			AreaPresentationStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiAreaPresentationStateRecord.Size) &&
+			TryReadAreaPresentationStateRecord(ref platform, state, obj, out _);
 	}
 
 	private static bool EnsureAreaPresentationStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!AreaPresentationStateAvailable(ref platform, state, obj))
+			return false;
 		if (TryReadAreaPresentationStateRecord(ref platform, state, obj,
 			out _)) return true;
-		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-			AreaPresentationStateKey);
-		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			AreaPresentationStateKey);
-		if (existing.IsNotNull || existingLength != 0) return false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiAreaPresentationStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -1835,7 +1866,8 @@ public static class MuiCommonControlCore
 		value.Frame = ReadRaw(ref platform, state, obj, Frame, 0);
 		value.CustomBackfill = ReadRaw(ref platform, state, obj,
 			CustomBackfill, 0);
-		if (!MuiAreaPresentationStateValidation.IsValidRecord(value))
+		if (!MuiAreaPresentationStateAdmission.ValidateLive(ref platform, state,
+			obj, value))
 		{
 			platform.Clear(scratch, MuiAreaPresentationStateRecord.Size);
 			platform.Free(scratch, MuiAreaPresentationStateRecord.Size);
@@ -1856,7 +1888,9 @@ public static class MuiCommonControlCore
 		MuiAreaPresentationState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiAreaPresentationStateValidation.IsValidState(value)) return false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!AreaPresentationStateAvailable(ref platform, state, obj) ||
+			!MuiAreaPresentationStateAdmission.Validate(value)) return false;
 		if (!EnsureAreaPresentationStateRecord(ref platform, state, obj))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -1868,8 +1902,9 @@ public static class MuiCommonControlCore
 		stored.Background = value.Background;
 		stored.Frame = value.Frame;
 		stored.CustomBackfill = value.CustomBackfill;
-		if (!MuiAreaPresentationStateValidation.IsValidRecord(stored)) return false;
-		if (!MuiAreaPresentationStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiAreaPresentationStateAdmission.ValidateLive(ref platform, state,
+			obj, stored) || !MuiAreaPresentationStateRecordCodec.Write(ref platform,
+			block, stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			Disabled, stored.Disabled, false) &&
@@ -1895,6 +1930,8 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var minimum = ReadRaw(ref platform, state, obj, NumericMin, 0);
 		var maximum = ReadRaw(ref platform, state, obj, NumericMax, 100);
 		var value = ReadRaw(ref platform, state, obj, NumericValue, minimum);
@@ -1906,7 +1943,7 @@ public static class MuiCommonControlCore
 		rawState.Value = value;
 		rawState.Default = numericDefault;
 		rawState.Reverse = reverse;
-		if (!MuiNumericStateValidation.IsValidState(rawState)) return false;
+		if (!MuiNumericStateAdmission.Validate(rawState)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			NumericStateKey);
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
@@ -1915,8 +1952,9 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiNumericStateRecord.Size) ||
-				!MuiNumericStateRecordCodec.TryRead(ref platform, block,
-					out var record) || !MuiNumericStateValidation.IsValidRecord(record))
+				!MuiNumericStateRecordCodec.TryReadStructural(ref platform, block,
+					out var record) || !MuiNumericStateAdmission.ValidateLive(ref platform,
+					state, obj, record))
 				return false;
 			if (record.Minimum != minimum || record.Maximum != maximum ||
 				record.Value != value || record.Default != numericDefault ||
@@ -1927,7 +1965,8 @@ public static class MuiCommonControlCore
 				record.Value = value;
 				record.Default = numericDefault;
 				record.Reverse = reverse;
-				if (!MuiNumericStateRecordCodec.Write(ref platform, block,
+				if (!MuiNumericStateAdmission.ValidateLive(ref platform, state, obj,
+					record) || !MuiNumericStateRecordCodec.Write(ref platform, block,
 					record)) return false;
 			}
 		}
@@ -1950,27 +1989,44 @@ public static class MuiCommonControlCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			NumericStateKey) != unchecked((int)MuiNumericStateRecord.Size))
 			return false;
-		return MuiNumericStateRecordCodec.TryRead(ref platform, block, out value) &&
-			MuiNumericStateValidation.IsValidRecord(value);
+		return MuiNumericStateRecordCodec.TryReadStructural(ref platform, block,
+			out value) && MuiNumericStateAdmission.ValidateLive(ref platform, state,
+			obj, value);
+	}
+
+	internal static bool NumericStateAvailable<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			NumericStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			NumericStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiNumericStateRecord.Size) &&
+			TryReadNumericStateRecord(ref platform, state, obj, out _);
 	}
 
 	private static bool EnsureNumericStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!NumericStateAvailable(ref platform, state, obj)) return false;
 		if (TryReadNumericStateRecord(ref platform, state, obj, out _)) return true;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiNumericStateRecord.Size);
 		if (scratch.IsNull) return false;
 		platform.Clear(scratch, MuiNumericStateRecord.Size);
 		var value = default(MuiNumericStateRecord);
 		value.Magic = MuiNumericStateRecord.Cookie;
-		value.Minimum = Read(ref platform, state, obj, NumericMin, 0);
-		value.Maximum = Read(ref platform, state, obj, NumericMax, 100);
-		value.Value = Read(ref platform, state, obj, NumericValue, value.Minimum);
-		value.Default = Read(ref platform, state, obj, NumericDefault, 0);
-		value.Reverse = Read(ref platform, state, obj, NumericReverse, 0);
-		if (!MuiNumericStateValidation.IsValidRecord(value))
+		value.Minimum = ReadRaw(ref platform, state, obj, NumericMin, 0);
+		value.Maximum = ReadRaw(ref platform, state, obj, NumericMax, 100);
+		value.Value = ReadRaw(ref platform, state, obj, NumericValue, value.Minimum);
+		value.Default = ReadRaw(ref platform, state, obj, NumericDefault, 0);
+		value.Reverse = ReadRaw(ref platform, state, obj, NumericReverse, 0);
+		if (!MuiNumericStateAdmission.ValidateLive(ref platform, state, obj, value))
 		{
 			platform.Clear(scratch, MuiNumericStateRecord.Size);
 			platform.Free(scratch, MuiNumericStateRecord.Size);
@@ -1988,7 +2044,9 @@ public static class MuiCommonControlCore
 		ref TPlatform platform, APTR state, APTR obj, MuiNumericState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiNumericStateValidation.IsValidState(value)) return false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!NumericStateAvailable(ref platform, state, obj) ||
+			!MuiNumericStateAdmission.Validate(value)) return false;
 		if (!EnsureNumericStateRecord(ref platform, state, obj)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			NumericStateKey);
@@ -1999,7 +2057,8 @@ public static class MuiCommonControlCore
 		stored.Value = value.Value;
 		stored.Default = value.Default;
 		stored.Reverse = value.Reverse;
-		if (!MuiNumericStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiNumericStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiNumericStateRecordCodec.Write(ref platform, block, stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			NumericMin, stored.Minimum, false) &&
@@ -2196,11 +2255,11 @@ public static class MuiCommonControlCore
 			return true;
 		}
 		if (MuiGroupLayoutHookCore.IsPublicGetterAttribute(attribute) &&
-			MuiGroupLayoutHookCore.TryGetAttribute(ref platform, state, obj,
-				attribute, out value))
+			MuiGroupChangeCore.IsGroupObject(ref platform, state, obj))
 		{
 			handled = true;
-			return true;
+			return MuiGroupLayoutHookCore.TryGetAttribute(ref platform, state,
+				obj, attribute, out value);
 		}
 		if (MuiGroupLayoutCore.IsPublicGetterAttribute(attribute) &&
 			MuiGroupLayoutCore.TryGetAttribute(ref platform, state, obj, attribute,
@@ -2652,13 +2711,8 @@ public static class MuiCommonControlCore
 		}
 		if (attribute == NumericFormat && IsNumericClass(cls))
 		{
-			// NumericFormat is an owned guest C string.  Read the raw attribute
-			// only for bootstrap/synchronization; the named record remains the
-			// authoritative projection for generic Get and OM_GET callers.
-			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out _) &&
-				!TryGetNumericFormatStateRecord(ref platform, state, obj, out _))
-				return false;
+			// NumericFormat is an owned guest C string. The named record remains
+			// the authoritative projection for generic Get and OM_GET callers.
 			handled = true;
 			if (!TryReadNumericFormatState(ref platform, state, obj,
 				out var format)) return false;
@@ -2667,12 +2721,8 @@ public static class MuiCommonControlCore
 		}
 		if (attribute == GaugeInfoText && cls == MuiControlClass.Gauge)
 		{
-			// InfoText is an owned guest C string. Consult raw storage only for
-			// bootstrap/synchronization; the named record is the getter shape.
-			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out _) &&
-				!TryGetGaugeInfoTextStateRecord(ref platform, state, obj, out _))
-				return false;
+			// InfoText is an owned guest C string. The named record is the getter
+			// shape for generic Get and OM_GET callers.
 			handled = true;
 			if (!TryReadGaugeInfoTextState(ref platform, state, obj,
 				out var infoText)) return false;
@@ -2695,12 +2745,8 @@ public static class MuiCommonControlCore
 		}
 		if (attribute == LevelmeterLabel && cls == MuiControlClass.Levelmeter)
 		{
-			// Label is an owned guest C string. Consult raw storage only for
-			// bootstrap/synchronization; the named record is the getter shape.
-			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out _) &&
-				!TryGetLevelmeterLabelStateRecord(ref platform, state, obj, out _))
-				return false;
+			// Label is an owned guest C string. The named record is the getter
+			// shape for generic Get and OM_GET callers.
 			handled = true;
 			if (!TryReadLevelmeterLabelState(ref platform, state, obj,
 				out var label)) return false;
@@ -2712,13 +2758,9 @@ public static class MuiCommonControlCore
 			// Copy/reference policy is a BOOL-shaped public state. Raw storage is
 			// consulted only to bootstrap or reconcile legacy writes; the named
 			// record is the generic Get/OM_GET projection.
-			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out _) &&
-				!TryGetTextCopyStateRecord(ref platform, state, obj, out _))
+			if (!TryReadTextCopyState(ref platform, state, obj, out var textCopy))
 				return false;
 			handled = true;
-			if (!TryReadTextCopyState(ref platform, state, obj,
-				out var textCopy)) return false;
 			value = textCopy.Copy;
 			return true;
 		}
@@ -2726,13 +2768,9 @@ public static class MuiCommonControlCore
 		{
 			// Contents may be caller-owned or an object-owned copy, as recorded
 			// by MuiTextContentsStateRecord. Raw storage only bootstraps/syncs.
-			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out _) &&
-				!TryGetTextContentsStateRecord(ref platform, state, obj, out _))
-				return false;
-			handled = true;
 			if (!TryReadTextContentsState(ref platform, state, obj,
 				out var contents)) return false;
+			handled = true;
 			value = contents.Contents.Raw;
 			return true;
 		}
@@ -2741,13 +2779,9 @@ public static class MuiCommonControlCore
 			// PreParse is always an object-owned guest C string. Consult raw
 			// storage only for bootstrap/synchronization; the named record is
 			// the getter shape.
-			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out _) &&
-				!TryGetTextPreParseStateRecord(ref platform, state, obj, out _))
-				return false;
-			handled = true;
 			if (!TryReadTextPreParseState(ref platform, state, obj,
 				out var preParse)) return false;
+			handled = true;
 			value = preParse.PreParse.Raw;
 			return true;
 		}
@@ -2958,13 +2992,9 @@ public static class MuiCommonControlCore
 		}
 		if (attribute == RectangleBarTitle && cls == MuiControlClass.Rectangle)
 		{
-			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out _) &&
-				!TryGetRectangleBarTitleStateRecord(ref platform, state, obj,
-					out _)) return false;
-			handled = true;
 			if (!TryReadRectangleBarTitleState(ref platform, state, obj,
 				out var title)) return false;
+			handled = true;
 			value = title.Present ? title.Title.Raw : 0;
 			return true;
 		}
@@ -2987,9 +3017,7 @@ public static class MuiCommonControlCore
 			// MorphOS Area resolves an absent/zero Font through the guest Parent
 			// chain. Keep the explicit local value in MuiControlFontStateRecord,
 			// but expose the effective pointer through the typed resolver.
-			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out _) &&
-				!TryGetControlFontStateRecord(ref platform, state, obj, out _))
+			if (!TryReadControlFontState(ref platform, state, obj, out _))
 				return false;
 			handled = true;
 			if (!MuiControlFontResolutionCore.TryResolve(ref platform, state, obj,
@@ -3019,13 +3047,9 @@ public static class MuiCommonControlCore
 		{
 			// MatchString is a bounded caller-owned C string. The named record
 			// validates and preserves its pointer for Get and OM_GET.
-			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out _) &&
-				!TryGetImageFontMatchStringStateRecord(ref platform, state, obj,
-					out _)) return false;
-			handled = true;
 			if (!TryReadImageFontMatchStringState(ref platform, state, obj,
 				out var matchString)) return false;
+			handled = true;
 			value = matchString.Present ? matchString.MatchString.Raw : 0;
 			return true;
 		}
@@ -3034,25 +3058,16 @@ public static class MuiCommonControlCore
 			// Contents are backed by the String-owned copy. Consult raw storage
 			// only for bootstrap/synchronization; the named record is the getter
 			// shape for generic Get and OM_GET.
-			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out _) &&
-				!TryGetStringContentsStateRecord(ref platform, state, obj, out _))
-				return false;
-			handled = true;
 			if (!TryReadStringContentsState(ref platform, state, obj,
 				out var contents)) return false;
+			handled = true;
 			value = contents.Contents.Raw;
 			return true;
 		}
 		if (attribute == StringPlaceholder && cls == MuiControlClass.String)
 		{
-			// Placeholder is an object-owned bounded guest C string. Consult raw
-			// storage only for bootstrap/synchronization; the named record is the
-			// getter shape for generic Get and OM_GET.
-			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out _) &&
-				!TryGetStringPlaceholderStateRecord(ref platform, state, obj, out _))
-				return false;
+			// Placeholder is an object-owned bounded guest C string. The named
+			// record is the getter shape for generic Get and OM_GET.
 			handled = true;
 			if (!TryReadStringPlaceholderState(ref platform, state, obj,
 				out var placeholder)) return false;
@@ -3062,12 +3077,7 @@ public static class MuiCommonControlCore
 		if (attribute == StringAcknowledge && cls == MuiControlClass.String)
 		{
 			// Acknowledge is getter-only and names the current contents buffer.
-			// Raw storage is consulted only for bootstrap/synchronization; the
-			// guest-resident record remains the public projection.
-			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out _) &&
-				!TryGetStringAcknowledgeStateRecord(ref platform, state, obj, out _))
-				return false;
+			// The guest-resident record remains the public projection.
 			handled = true;
 			if (!TryReadStringAcknowledgeState(ref platform, state, obj,
 				out var acknowledge)) return false;
@@ -3079,19 +3089,9 @@ public static class MuiCommonControlCore
 			// AttachedList is a caller-owned live Listview relationship. Raw
 			// storage only bootstraps/synchronizes; the named record performs the
 			// relationship validation and supplies the getter value.
-			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
-				attribute, out _) &&
-				!TryGetStringAttachedListStateRecord(ref platform, state, obj, out _))
-				return false;
-			if (!TryReadStringAttachedListState(ref platform, state, obj,
-				out var attached))
-			{
-				// Preserve malformed construction tags for the generic raw path so
-				// EnsureDefault cannot replace an invalid caller pointer with zero.
-				handled = false;
-				return false;
-			}
 			handled = true;
+			if (!TryReadStringAttachedListState(ref platform, state, obj,
+				out var attached)) return false;
 			value = attached.Listview.Raw;
 			return true;
 		}
@@ -3270,16 +3270,27 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			AreaWeightStateKey);
+		if (length != 0 && !TryReadAreaWeightStateRecord(ref platform, state,
+			obj, out _)) return false;
+		if (length == 0 && !EnsureAreaWeightStateRecord(ref platform, state, obj))
+			return false;
+		if (!TryReadAreaWeightStateRecord(ref platform, state, obj,
+			out var record)) return false;
 		// Weight is a shared legacy scalar, but the named guest record is the
 		// getter/layout projection. Raw storage is only the synchronization seam.
 		var rawWeight = ReadRaw(ref platform, state, obj, Weight, 100);
-		if (TryReadAreaWeightStateRecord(ref platform, state, obj, out var record) &&
-			record.Weight != rawWeight)
+		if (record.Weight != rawWeight)
 		{
 			record.Weight = rawWeight;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				AreaWeightStateKey);
-			if (!MuiAreaWeightStateRecordCodec.Write(ref platform, block, record))
+			if (!MuiAreaWeightStateAdmission.ValidateLive(ref platform, state, obj,
+				record) || !MuiAreaWeightStateRecordCodec.Write(ref platform, block,
+				record))
 				return false;
 		}
 		result.Weight = rawWeight;
@@ -3297,13 +3308,23 @@ public static class MuiCommonControlCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			AreaWeightStateKey) != unchecked((int)MuiAreaWeightStateRecord.Size))
 			return false;
-		return MuiAreaWeightStateRecordCodec.TryRead(ref platform, block, out value);
+		return MuiAreaWeightStateRecordCodec.TryReadStructural(ref platform, block,
+			out value) && MuiAreaWeightStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
+
+	internal static bool AreaWeightStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			AreaWeightStateKey) == 0 ||
+		TryReadAreaWeightStateRecord(ref platform, state, obj, out _);
 
 	private static bool EnsureAreaWeightStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!AreaWeightStateAvailable(ref platform, state, obj)) return false;
 		if (TryReadAreaWeightStateRecord(ref platform, state, obj, out _)) return true;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiAreaWeightStateRecord.Size);
@@ -3312,6 +3333,8 @@ public static class MuiCommonControlCore
 		var value = default(MuiAreaWeightStateRecord);
 		value.Magic = MuiAreaWeightStateRecord.Cookie;
 		value.Weight = ReadRaw(ref platform, state, obj, Weight, 100);
+		if (!MuiAreaWeightStateAdmission.ValidateLive(ref platform, state, obj,
+			value)) return false;
 		var written = MuiAreaWeightStateRecordCodec.Write(ref platform, scratch,
 			value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
@@ -3326,13 +3349,17 @@ public static class MuiCommonControlCore
 		ref TPlatform platform, APTR state, APTR obj, MuiAreaWeightState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!AreaWeightStateAvailable(ref platform, state, obj)) return false;
 		if (!EnsureAreaWeightStateRecord(ref platform, state, obj)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			AreaWeightStateKey);
 		var stored = default(MuiAreaWeightStateRecord);
 		stored.Magic = MuiAreaWeightStateRecord.Cookie;
 		stored.Weight = value.Weight;
-		if (!MuiAreaWeightStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiAreaWeightStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiAreaWeightStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			Weight, stored.Weight, false);
@@ -3377,6 +3404,8 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		// Getter projection uses this routine, so legacy attributes must be read
 		// raw-only to avoid recursing through CommonControlCore.TryGet.
 		var horizontal = ReadRaw(ref platform, state, obj, SliderHoriz, 1);
@@ -3384,7 +3413,7 @@ public static class MuiCommonControlCore
 		var rawState = default(MuiSliderPresentationState);
 		rawState.Horizontal = horizontal;
 		rawState.Quiet = quiet;
-		if (!MuiSliderPresentationStateValidation.IsValidState(rawState))
+		if (!MuiSliderPresentationStateAdmission.Validate(rawState))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			SliderPresentationStateKey);
@@ -3394,16 +3423,18 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiSliderPresentationStateRecord.Size) ||
-				!MuiSliderPresentationStateRecordCodec.TryRead(ref platform, block,
-					out var record) ||
-				!MuiSliderPresentationStateValidation.IsValidRecord(record))
+				!MuiSliderPresentationStateRecordCodec.TryReadStructural(ref platform,
+					block, out var record) ||
+				!MuiSliderPresentationStateAdmission.ValidateLive(ref platform, state,
+					obj, record))
 				return false;
 			if (record.Horizontal != horizontal || record.Quiet != quiet)
 			{
 				record.Horizontal = horizontal;
 				record.Quiet = quiet;
-				if (!MuiSliderPresentationStateRecordCodec.Write(ref platform,
-					block, record)) return false;
+				if (!MuiSliderPresentationStateAdmission.ValidateLive(ref platform,
+					state, obj, record) || !MuiSliderPresentationStateRecordCodec.Write(
+					ref platform, block, record)) return false;
 			}
 		}
 		result.Horizontal = horizontal;
@@ -3417,21 +3448,43 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			SliderPresentationStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			SliderPresentationStateKey) != unchecked((int)
 			MuiSliderPresentationStateRecord.Size)) return false;
-		return MuiSliderPresentationStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiSliderPresentationStateValidation.IsValidRecord(value);
+		return MuiSliderPresentationStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiSliderPresentationStateAdmission.ValidateLive(
+				ref platform, state, obj, value);
+	}
+
+	internal static bool SliderPresentationStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			SliderPresentationStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			SliderPresentationStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiSliderPresentationStateRecord.Size) &&
+			TryReadSliderPresentationStateRecord(ref platform, state, obj, out _);
 	}
 
 	private static bool EnsureSliderPresentationStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!SliderPresentationStateAvailable(ref platform, state, obj))
+			return false;
 		if (TryReadSliderPresentationStateRecord(ref platform, state, obj,
 			out _)) return true;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiSliderPresentationStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -3440,7 +3493,8 @@ public static class MuiCommonControlCore
 		value.Magic = MuiSliderPresentationStateRecord.Cookie;
 		value.Horizontal = ReadRaw(ref platform, state, obj, SliderHoriz, 1);
 		value.Quiet = ReadRaw(ref platform, state, obj, SliderQuiet, 0);
-		if (!MuiSliderPresentationStateValidation.IsValidRecord(value))
+		if (!MuiSliderPresentationStateAdmission.ValidateLive(ref platform, state,
+			obj, value))
 		{
 			platform.Clear(scratch, MuiSliderPresentationStateRecord.Size);
 			platform.Free(scratch, MuiSliderPresentationStateRecord.Size);
@@ -3461,7 +3515,9 @@ public static class MuiCommonControlCore
 		MuiSliderPresentationState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiSliderPresentationStateValidation.IsValidState(value))
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!SliderPresentationStateAvailable(ref platform, state, obj) ||
+			!MuiSliderPresentationStateAdmission.Validate(value))
 			return false;
 		if (!EnsureSliderPresentationStateRecord(ref platform, state, obj))
 			return false;
@@ -3471,8 +3527,9 @@ public static class MuiCommonControlCore
 		stored.Magic = MuiSliderPresentationStateRecord.Cookie;
 		stored.Horizontal = value.Horizontal;
 		stored.Quiet = value.Quiet;
-		if (!MuiSliderPresentationStateRecordCodec.Write(ref platform, block,
-			stored)) return false;
+		if (!MuiSliderPresentationStateAdmission.ValidateLive(ref platform, state,
+			obj, stored) || !MuiSliderPresentationStateRecordCodec.Write(ref platform,
+			block, stored)) return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			SliderHoriz, stored.Horizontal, false) &&
 			MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
@@ -3492,11 +3549,13 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		// Keep Scale getter synchronization on the raw legacy attribute path.
 		var horizontal = ReadRaw(ref platform, state, obj, ScaleHoriz, 1);
 		var rawState = default(MuiScalePresentationState);
 		rawState.Horizontal = horizontal;
-		if (!MuiScalePresentationStateValidation.IsValidState(rawState))
+		if (!MuiScalePresentationStateAdmission.Validate(rawState))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ScalePresentationStateKey);
@@ -3506,15 +3565,17 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiScalePresentationStateRecord.Size) ||
-				!MuiScalePresentationStateRecordCodec.TryRead(ref platform, block,
-					out var record) ||
-				!MuiScalePresentationStateValidation.IsValidRecord(record))
+				!MuiScalePresentationStateRecordCodec.TryReadStructural(ref platform,
+					block, out var record) ||
+				!MuiScalePresentationStateAdmission.ValidateLive(ref platform, state,
+					obj, record))
 				return false;
 			if (record.Horizontal != horizontal)
 			{
 				record.Horizontal = horizontal;
-				if (!MuiScalePresentationStateRecordCodec.Write(ref platform, block,
-					record)) return false;
+				if (!MuiScalePresentationStateAdmission.ValidateLive(ref platform,
+					state, obj, record) || !MuiScalePresentationStateRecordCodec.Write(
+					ref platform, block, record)) return false;
 			}
 		}
 		result.Horizontal = horizontal;
@@ -3527,21 +3588,43 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ScalePresentationStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			ScalePresentationStateKey) != unchecked((int)
 			MuiScalePresentationStateRecord.Size)) return false;
-		return MuiScalePresentationStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiScalePresentationStateValidation.IsValidRecord(value);
+		return MuiScalePresentationStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiScalePresentationStateAdmission.ValidateLive(
+				ref platform, state, obj, value);
+	}
+
+	internal static bool ScalePresentationStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ScalePresentationStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ScalePresentationStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiScalePresentationStateRecord.Size) &&
+			TryReadScalePresentationStateRecord(ref platform, state, obj, out _);
 	}
 
 	private static bool EnsureScalePresentationStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!ScalePresentationStateAvailable(ref platform, state, obj))
+			return false;
 		if (TryReadScalePresentationStateRecord(ref platform, state, obj,
 			out _)) return true;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiScalePresentationStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -3549,7 +3632,8 @@ public static class MuiCommonControlCore
 		var value = default(MuiScalePresentationStateRecord);
 		value.Magic = MuiScalePresentationStateRecord.Cookie;
 		value.Horizontal = ReadRaw(ref platform, state, obj, ScaleHoriz, 1);
-		if (!MuiScalePresentationStateValidation.IsValidRecord(value))
+		if (!MuiScalePresentationStateAdmission.ValidateLive(ref platform, state,
+			obj, value))
 		{
 			platform.Clear(scratch, MuiScalePresentationStateRecord.Size);
 			platform.Free(scratch, MuiScalePresentationStateRecord.Size);
@@ -3570,7 +3654,9 @@ public static class MuiCommonControlCore
 		MuiScalePresentationState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiScalePresentationStateValidation.IsValidState(value))
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!ScalePresentationStateAvailable(ref platform, state, obj) ||
+			!MuiScalePresentationStateAdmission.Validate(value))
 			return false;
 		if (!EnsureScalePresentationStateRecord(ref platform, state, obj))
 			return false;
@@ -3579,8 +3665,9 @@ public static class MuiCommonControlCore
 		var stored = default(MuiScalePresentationStateRecord);
 		stored.Magic = MuiScalePresentationStateRecord.Cookie;
 		stored.Horizontal = value.Horizontal;
-		if (!MuiScalePresentationStateRecordCodec.Write(ref platform, block,
-			stored)) return false;
+		if (!MuiScalePresentationStateAdmission.ValidateLive(ref platform, state,
+			obj, stored) || !MuiScalePresentationStateRecordCodec.Write(ref platform,
+			block, stored)) return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			ScaleHoriz, stored.Horizontal, false);
 	}
@@ -3598,6 +3685,8 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		// Getter projection uses this routine, so legacy Gadget attributes must be
 		// read raw-only to avoid recursing through CommonControlCore.TryGet.
 		var mode = ReadRaw(ref platform, state, obj, InputMode, InputModeNone);
@@ -3609,7 +3698,7 @@ public static class MuiCommonControlCore
 		rawState.Selected = selected;
 		rawState.Pressed = pressed;
 		rawState.ShowSelState = showSelState;
-		if (!MuiGadgetInteractionStateValidation.IsValidState(rawState))
+		if (!MuiGadgetInteractionStateAdmission.Validate(rawState))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			GadgetInteractionStateKey);
@@ -3619,9 +3708,10 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiGadgetInteractionStateRecord.Size) ||
-				!MuiGadgetInteractionStateRecordCodec.TryRead(ref platform, block,
-					out var record) ||
-				!MuiGadgetInteractionStateValidation.IsValidRecord(record))
+				!MuiGadgetInteractionStateRecordCodec.TryReadStructural(ref platform,
+					block, out var record) ||
+				!MuiGadgetInteractionStateAdmission.ValidateLive(ref platform, state,
+					obj, record))
 				return false;
 			if (record.InputMode != mode || record.Selected != selected ||
 				record.Pressed != pressed || record.ShowSelState != showSelState)
@@ -3630,8 +3720,10 @@ public static class MuiCommonControlCore
 				record.Selected = selected;
 				record.Pressed = pressed;
 				record.ShowSelState = showSelState;
-				if (!MuiGadgetInteractionStateRecordCodec.Write(ref platform, block,
-					record)) return false;
+				if (!MuiGadgetInteractionStateAdmission.ValidateLive(ref platform,
+					state, obj, record) ||
+					!MuiGadgetInteractionStateRecordCodec.Write(ref platform, block,
+						record)) return false;
 			}
 		}
 		result.InputMode = mode;
@@ -3652,16 +3744,35 @@ public static class MuiCommonControlCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			GadgetInteractionStateKey) != unchecked((int)
 			MuiGadgetInteractionStateRecord.Size)) return false;
-		return MuiGadgetInteractionStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiGadgetInteractionStateValidation.IsValidRecord(value);
+		return MuiGadgetInteractionStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) &&
+			MuiGadgetInteractionStateAdmission.ValidateLive(ref platform, state,
+				obj, value);
+	}
+
+	internal static bool GadgetInteractionStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			GadgetInteractionStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			GadgetInteractionStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiGadgetInteractionStateRecord.Size) &&
+			TryReadGadgetInteractionStateRecord(ref platform, state, obj, out _);
 	}
 
 	private static bool EnsureGadgetInteractionStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!GadgetInteractionStateAvailable(ref platform, state, obj))
+			return false;
 		if (TryReadGadgetInteractionStateRecord(ref platform, state, obj,
 			out _)) return true;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiGadgetInteractionStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -3673,7 +3784,8 @@ public static class MuiCommonControlCore
 		value.Selected = ReadRaw(ref platform, state, obj, Selected, 0);
 		value.Pressed = ReadRaw(ref platform, state, obj, Pressed, 0);
 		value.ShowSelState = ReadRaw(ref platform, state, obj, ShowSelState, 1);
-		if (!MuiGadgetInteractionStateValidation.IsValidRecord(value))
+		if (!MuiGadgetInteractionStateAdmission.ValidateLive(ref platform, state,
+			obj, value))
 		{
 			platform.Clear(scratch, MuiGadgetInteractionStateRecord.Size);
 			platform.Free(scratch, MuiGadgetInteractionStateRecord.Size);
@@ -3694,7 +3806,9 @@ public static class MuiCommonControlCore
 		MuiGadgetInteractionState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiGadgetInteractionStateValidation.IsValidState(value))
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!GadgetInteractionStateAvailable(ref platform, state, obj) ||
+			!MuiGadgetInteractionStateAdmission.Validate(value))
 			return false;
 		if (!EnsureGadgetInteractionStateRecord(ref platform, state, obj))
 			return false;
@@ -3706,7 +3820,9 @@ public static class MuiCommonControlCore
 		stored.Selected = value.Selected;
 		stored.Pressed = value.Pressed;
 		stored.ShowSelState = value.ShowSelState;
-		if (!MuiGadgetInteractionStateRecordCodec.Write(ref platform, block,
+		if (!MuiGadgetInteractionStateAdmission.ValidateLive(ref platform, state,
+			obj, stored) ||
+			!MuiGadgetInteractionStateRecordCodec.Write(ref platform, block,
 			stored)) return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			InputMode, stored.InputMode, false) &&
@@ -3731,24 +3847,26 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadGadgetGadgetStateRecord(ref platform, state, obj,
-			out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			GadgetGadgetStateKey);
+		if (length != 0 && !TryReadGadgetGadgetStateRecord(ref platform, state,
+			obj, out _)) return false;
+		if (length == 0 && !EnsureGadgetGadgetStateRecord(ref platform, state,
+			obj)) return false;
+		if (!TryReadGadgetGadgetStateRecord(ref platform, state, obj,
+			out var record)) return false;
+		var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
+			GadgetGadget, record.Gadget.Raw));
+		if (raw.Raw != record.Gadget.Raw)
 		{
-			var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
-				GadgetGadget, record.Gadget.Raw));
-			if (raw.Raw != record.Gadget.Raw)
-			{
-				record.Gadget = raw;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					GadgetGadgetStateKey);
-				if (!MuiGadgetGadgetStateRecordCodec.Write(ref platform, block,
-					record)) return false;
-			}
-			result.Gadget = raw;
-			return true;
+			record.Gadget = raw;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				GadgetGadgetStateKey);
+			if (!MuiGadgetGadgetStateAdmission.ValidateLive(ref platform, state, obj,
+				record) || !MuiGadgetGadgetStateRecordCodec.Write(ref platform, block,
+				record)) return false;
 		}
-		result.Gadget = APTR.FromPointer(ReadRaw(ref platform, state, obj,
-			GadgetGadget, 0));
+		result.Gadget = raw;
 		return true;
 	}
 
@@ -3763,24 +3881,35 @@ public static class MuiCommonControlCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			GadgetGadgetStateKey) != unchecked((int)
 				MuiGadgetGadgetStateRecord.Size)) return false;
-		return MuiGadgetGadgetStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiGadgetGadgetStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiGadgetGadgetStateAdmission.ValidateLive(
+				ref platform, state, obj, value);
 	}
+
+	internal static bool GadgetGadgetStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			GadgetGadgetStateKey) == 0 ||
+		TryReadGadgetGadgetStateRecord(ref platform, state, obj, out _);
 
 	private static bool EnsureGadgetGadgetStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!GadgetGadgetStateAvailable(ref platform, state, obj)) return false;
 		if (TryReadGadgetGadgetStateRecord(ref platform, state, obj,
 			out _)) return true;
-		var scratch = MuiHeadlessMemory.Allocate(ref platform,
-			MuiGadgetGadgetStateRecord.Size);
-		if (scratch.IsNull) return false;
-		platform.Clear(scratch, MuiGadgetGadgetStateRecord.Size);
 		var value = default(MuiGadgetGadgetStateRecord);
 		value.Magic = MuiGadgetGadgetStateRecord.Cookie;
 		value.Gadget = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			GadgetGadget, 0));
+		if (!MuiGadgetGadgetStateAdmission.ValidateLive(ref platform, state, obj,
+			value)) return false;
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiGadgetGadgetStateRecord.Size);
+		if (scratch.IsNull) return false;
+		platform.Clear(scratch, MuiGadgetGadgetStateRecord.Size);
 		var written = MuiGadgetGadgetStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
@@ -3796,6 +3925,8 @@ public static class MuiCommonControlCore
 		MuiGadgetGadgetState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!GadgetGadgetStateAvailable(ref platform, state, obj)) return false;
 		if (!EnsureGadgetGadgetStateRecord(ref platform, state, obj))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -3803,7 +3934,9 @@ public static class MuiCommonControlCore
 		var stored = default(MuiGadgetGadgetStateRecord);
 		stored.Magic = MuiGadgetGadgetStateRecord.Cookie;
 		stored.Gadget = value.Gadget;
-		if (!MuiGadgetGadgetStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiGadgetGadgetStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiGadgetGadgetStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			GadgetGadget, stored.Gadget.Raw, false);
@@ -3821,12 +3954,14 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		// Levelmeter shares MUIA_Gauge_Horiz; keep raw storage only as the
 		// bootstrap/synchronization seam and expose a validated named state.
 		var horizontal = ReadRaw(ref platform, state, obj, GaugeHoriz, 1);
 		var rawState = default(MuiLevelmeterPresentationState);
 		rawState.Horizontal = horizontal;
-		if (!MuiLevelmeterPresentationStateValidation.IsValidState(rawState))
+		if (!MuiLevelmeterPresentationStateAdmission.Validate(rawState))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			LevelmeterPresentationStateKey);
@@ -3836,15 +3971,17 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiLevelmeterPresentationStateRecord.Size) ||
-				!MuiLevelmeterPresentationStateRecordCodec.TryRead(ref platform, block,
-					out var record) ||
-				!MuiLevelmeterPresentationStateValidation.IsValidRecord(record))
+				!MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(ref platform,
+					block, out var record) ||
+				!MuiLevelmeterPresentationStateAdmission.ValidateLive(ref platform,
+					state, obj, record))
 				return false;
 			if (record.Horizontal != horizontal)
 			{
 				record.Horizontal = horizontal;
-				if (!MuiLevelmeterPresentationStateRecordCodec.Write(ref platform,
-					block, record)) return false;
+				if (!MuiLevelmeterPresentationStateAdmission.ValidateLive(ref platform,
+					state, obj, record) || !MuiLevelmeterPresentationStateRecordCodec.Write(
+					ref platform, block, record)) return false;
 			}
 		}
 		result.Horizontal = horizontal;
@@ -3857,27 +3994,44 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			LevelmeterPresentationStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			LevelmeterPresentationStateKey) != unchecked((int)
 			MuiLevelmeterPresentationStateRecord.Size)) return false;
-		return MuiLevelmeterPresentationStateRecordCodec.TryRead(ref platform,
-			block, out value) &&
-			MuiLevelmeterPresentationStateValidation.IsValidRecord(value);
+		return MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(ref
+			platform, block, out value) &&
+			MuiLevelmeterPresentationStateAdmission.ValidateLive(ref platform, state,
+				obj, value);
+	}
+
+	internal static bool LevelmeterPresentationStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			LevelmeterPresentationStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			LevelmeterPresentationStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiLevelmeterPresentationStateRecord.Size) &&
+			TryReadLevelmeterPresentationStateRecord(ref platform, state, obj, out _);
 	}
 
 	private static bool EnsureLevelmeterPresentationStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!LevelmeterPresentationStateAvailable(ref platform, state, obj))
+			return false;
 		if (TryReadLevelmeterPresentationStateRecord(ref platform, state, obj,
 			out _)) return true;
-		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-			LevelmeterPresentationStateKey);
-		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			LevelmeterPresentationStateKey);
-		if (existing.IsNotNull || existingLength != 0) return false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiLevelmeterPresentationStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -3885,7 +4039,8 @@ public static class MuiCommonControlCore
 		var value = default(MuiLevelmeterPresentationStateRecord);
 		value.Magic = MuiLevelmeterPresentationStateRecord.Cookie;
 		value.Horizontal = ReadRaw(ref platform, state, obj, GaugeHoriz, 1);
-		if (!MuiLevelmeterPresentationStateValidation.IsValidRecord(value))
+		if (!MuiLevelmeterPresentationStateAdmission.ValidateLive(ref platform,
+			state, obj, value))
 		{
 			platform.Clear(scratch, MuiLevelmeterPresentationStateRecord.Size);
 			platform.Free(scratch, MuiLevelmeterPresentationStateRecord.Size);
@@ -3906,7 +4061,9 @@ public static class MuiCommonControlCore
 		MuiLevelmeterPresentationState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiLevelmeterPresentationStateValidation.IsValidState(value))
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!LevelmeterPresentationStateAvailable(ref platform, state, obj) ||
+			!MuiLevelmeterPresentationStateAdmission.Validate(value))
 			return false;
 		if (!EnsureLevelmeterPresentationStateRecord(ref platform, state, obj))
 			return false;
@@ -3915,8 +4072,9 @@ public static class MuiCommonControlCore
 		var stored = default(MuiLevelmeterPresentationStateRecord);
 		stored.Magic = MuiLevelmeterPresentationStateRecord.Cookie;
 		stored.Horizontal = value.Horizontal;
-		if (!MuiLevelmeterPresentationStateRecordCodec.Write(ref platform,
-			block, stored)) return false;
+		if (!MuiLevelmeterPresentationStateAdmission.ValidateLive(ref platform,
+			state, obj, stored) || !MuiLevelmeterPresentationStateRecordCodec.Write(
+			ref platform, block, stored)) return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			GaugeHoriz, stored.Horizontal, false);
 	}
@@ -3950,9 +4108,8 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiTextCopyStateRecord.Size) ||
-				!MuiTextCopyStateRecordCodec.TryRead(ref platform, block,
-					out var record) ||
-				!MuiTextCopyStateValidation.IsValidRecord(record)) return false;
+				!TryReadTextCopyStateRecord(ref platform, state, obj,
+					out var record)) return false;
 			if (record.Copy != normalized)
 			{
 				record.Copy = normalized;
@@ -3975,29 +4132,33 @@ public static class MuiCommonControlCore
 		ref TPlatform platform, APTR state, APTR obj,
 		out MuiTextCopyStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
-	{
-		value = default;
-		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-			TextCopyStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			TextCopyStateKey) != unchecked((int)MuiTextCopyStateRecord.Size))
-			return false;
-		return MuiTextCopyStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiTextCopyStateValidation.IsValidRecord(value);
+		{
+			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				TextCopyStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				TextCopyStateKey);
+			return length == unchecked((int)MuiTextCopyStateRecord.Size) &&
+			MuiTextCopyStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiTextCopyStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureTextCopyStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
-	{
-		if (TryReadTextCopyStateRecord(ref platform, state, obj,
-			out _)) return true;
-		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-			TextCopyStateKey);
-		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			TextCopyStateKey);
-		if (existing.IsNotNull || existingLength != 0) return false;
-		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+		{
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				TextCopyStateKey);
+			var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				TextCopyStateKey);
+			if (existing.IsNotNull || existingLength != 0)
+				return TryReadTextCopyStateRecord(ref platform, state, obj, out _);
+			var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiTextCopyStateRecord.Size);
 		if (scratch.IsNull) return false;
 		platform.Clear(scratch, MuiTextCopyStateRecord.Size);
@@ -4008,7 +4169,8 @@ public static class MuiCommonControlCore
 		var defaultCopy = MuiHeadlessObjectCore.GetRawAttribute(ref platform,
 			state, obj, TextHiChar, out _) ? 0u : 1u;
 		value.Copy = (hasRaw ? raw : defaultCopy) == 0 ? 0u : 1u;
-		if (!MuiTextCopyStateValidation.IsValidRecord(value))
+		if (!MuiTextCopyStateAdmission.ValidateLive(ref platform, state, obj,
+			value))
 		{
 			platform.Clear(scratch, MuiTextCopyStateRecord.Size);
 			platform.Free(scratch, MuiTextCopyStateRecord.Size);
@@ -4029,7 +4191,9 @@ public static class MuiCommonControlCore
 		MuiTextCopyState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiTextCopyStateValidation.IsValidState(value)) return false;
+		if (!MuiTextCopyStateValidation.IsValidState(value) || obj.IsNull ||
+			MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		if (!EnsureTextCopyStateRecord(ref platform, state, obj))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -4037,7 +4201,8 @@ public static class MuiCommonControlCore
 		var stored = default(MuiTextCopyStateRecord);
 		stored.Magic = MuiTextCopyStateRecord.Cookie;
 		stored.Copy = value.Copy == 0 ? 0u : 1u;
-		return MuiTextCopyStateRecordCodec.Write(ref platform, block, stored) &&
+		return MuiTextCopyStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) && MuiTextCopyStateRecordCodec.Write(ref platform, block, stored) &&
 			MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj, TextCopy,
 				stored.Copy, false);
 	}
@@ -4054,6 +4219,8 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var rawState = default(MuiTextPresentationState);
 		rawState.SetMin = ReadRaw(ref platform, state, obj, TextSetMin, 1);
 		rawState.SetMax = ReadRaw(ref platform, state, obj, TextSetMax, 0);
@@ -4074,9 +4241,10 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiTextPresentationStateRecord.Size) ||
-				!MuiTextPresentationStateRecordCodec.TryRead(ref platform, block,
-					out var record) ||
-				!MuiTextPresentationStateValidation.IsValidRecord(record)) return false;
+				!MuiTextPresentationStateRecordCodec.TryReadStructural(ref platform,
+					block, out var record) ||
+				!MuiTextPresentationStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			if (record.SetMin != rawState.SetMin || record.SetMax != rawState.SetMax ||
 				record.SetVMax != rawState.SetVMax ||
 				record.ControlChar != rawState.ControlChar ||
@@ -4092,8 +4260,9 @@ public static class MuiCommonControlCore
 				record.Shorten = rawState.Shorten;
 				record.HiChar = rawState.HiChar;
 				record.HiCharPresent = rawState.HiCharPresent;
-				if (!MuiTextPresentationStateRecordCodec.Write(ref platform, block,
-					record)) return false;
+				if (!MuiTextPresentationStateAdmission.ValidateLive(ref platform, state,
+					obj, record) || !MuiTextPresentationStateRecordCodec.Write(
+					ref platform, block, record)) return false;
 			}
 		}
 		result = rawState;
@@ -4106,26 +4275,31 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			TextPresentationStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			TextPresentationStateKey) != unchecked((int)
 			MuiTextPresentationStateRecord.Size)) return false;
-		return MuiTextPresentationStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiTextPresentationStateValidation.IsValidRecord(value);
+		return MuiTextPresentationStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiTextPresentationStateAdmission.ValidateLive(
+				ref platform, state, obj, value);
 	}
 
 	private static bool EnsureTextPresentationStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryReadTextPresentationStateRecord(ref platform, state, obj,
-			out _)) return true;
 		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			TextPresentationStateKey);
 		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			TextPresentationStateKey);
-		if (existing.IsNotNull || existingLength != 0) return false;
+		if (existing.IsNotNull || existingLength != 0)
+			return TryReadTextPresentationStateRecord(ref platform, state, obj,
+				out _);
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiTextPresentationStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -4142,7 +4316,8 @@ public static class MuiCommonControlCore
 		value.HiCharPresent = MuiHeadlessObjectCore.GetRawAttribute(ref platform,
 				state, obj, TextHiChar, out var rawHiChar) ? 1u : 0u;
 		value.HiChar = value.HiCharPresent == 0 ? 0u : rawHiChar;
-		if (!MuiTextPresentationStateValidation.IsValidRecord(value))
+		if (!MuiTextPresentationStateAdmission.ValidateLive(ref platform, state, obj,
+			value))
 		{
 			platform.Clear(scratch, MuiTextPresentationStateRecord.Size);
 			platform.Free(scratch, MuiTextPresentationStateRecord.Size);
@@ -4178,8 +4353,8 @@ public static class MuiCommonControlCore
 		stored.Shorten = value.Shorten;
 		stored.HiChar = value.HiChar;
 		stored.HiCharPresent = value.HiCharPresent;
-		if (!MuiTextPresentationStateValidation.IsValidRecord(stored)) return false;
-		if (!MuiTextPresentationStateRecordCodec.Write(ref platform, block,
+		if (!MuiTextPresentationStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiTextPresentationStateRecordCodec.Write(ref platform, block,
 			stored)) return false;
 		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			TextSetMin, stored.SetMin, false) ||
@@ -4212,6 +4387,8 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var raw = ReadRaw(ref platform, state, obj, Unicode, 0);
 		var normalized = raw == 0 ? 0u : 1u;
 		var rawState = default(MuiTextUnicodeState);
@@ -4227,7 +4404,8 @@ public static class MuiCommonControlCore
 			if (length != unchecked((int)MuiTextUnicodeStateRecord.Size) ||
 				!MuiTextUnicodeStateRecordCodec.TryRead(ref platform, block,
 					out var record) ||
-				!MuiTextUnicodeStateValidation.IsValidRecord(record)) return false;
+				!MuiTextUnicodeStateAdmission.ValidateLive(ref platform, state, obj,
+					record)) return false;
 			if (record.Unicode != normalized)
 			{
 				record.Unicode = normalized;
@@ -4252,19 +4430,24 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			TextUnicodeStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			TextUnicodeStateKey) != unchecked((int)MuiTextUnicodeStateRecord.Size))
 			return false;
 		return MuiTextUnicodeStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiTextUnicodeStateValidation.IsValidRecord(value);
+			out value) && MuiTextUnicodeStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureTextUnicodeStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		if (TryReadTextUnicodeStateRecord(ref platform, state, obj,
 			out _)) return true;
 		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -4301,7 +4484,9 @@ public static class MuiCommonControlCore
 		MuiTextUnicodeState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiTextUnicodeStateValidation.IsValidState(value)) return false;
+		if (!MuiTextUnicodeStateValidation.IsValidState(value) || obj.IsNull ||
+			MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		if (!EnsureTextUnicodeStateRecord(ref platform, state, obj))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -4309,7 +4494,9 @@ public static class MuiCommonControlCore
 		var stored = default(MuiTextUnicodeStateRecord);
 		stored.Magic = MuiTextUnicodeStateRecord.Cookie;
 		stored.Unicode = value.Unicode == 0 ? 0u : 1u;
-		return MuiTextUnicodeStateRecordCodec.Write(ref platform, block, stored) &&
+		return MuiTextUnicodeStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) && MuiTextUnicodeStateRecordCodec.Write(ref platform, block,
+			stored) &&
 			MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj, Unicode,
 				stored.Unicode, false);
 	}
@@ -4326,6 +4513,8 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var raw = ReadRaw(ref platform, state, obj, TextShortened, 0);
 		var normalized = raw == 0 ? 0u : 1u;
 		var rawState = default(MuiTextShortenedState);
@@ -4341,7 +4530,8 @@ public static class MuiCommonControlCore
 			if (length != unchecked((int)MuiTextShortenedStateRecord.Size) ||
 				!MuiTextShortenedStateRecordCodec.TryRead(ref platform, block,
 					out var record) ||
-				!MuiTextShortenedStateValidation.IsValidRecord(record)) return false;
+				!MuiTextShortenedStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			if (record.Shortened != normalized)
 			{
 				record.Shortened = normalized;
@@ -4361,19 +4551,24 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			TextShortenedStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			TextShortenedStateKey) != unchecked((int)MuiTextShortenedStateRecord.Size))
 			return false;
 		return MuiTextShortenedStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiTextShortenedStateValidation.IsValidRecord(value);
+			out value) && MuiTextShortenedStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureTextShortenedStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		if (TryReadTextShortenedStateRecord(ref platform, state, obj,
 			out _)) return true;
 		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -4410,7 +4605,9 @@ public static class MuiCommonControlCore
 		MuiTextShortenedState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiTextShortenedStateValidation.IsValidState(value)) return false;
+		if (!MuiTextShortenedStateValidation.IsValidState(value) || obj.IsNull ||
+			MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		if (!EnsureTextShortenedStateRecord(ref platform, state, obj))
 			return false;
 		var normalized = value.Shortened;
@@ -4419,7 +4616,9 @@ public static class MuiCommonControlCore
 		var stored = default(MuiTextShortenedStateRecord);
 		stored.Magic = MuiTextShortenedStateRecord.Cookie;
 		stored.Shortened = normalized;
-		if (!MuiTextShortenedStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiTextShortenedStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiTextShortenedStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			TextShortened, normalized, false);
@@ -4437,19 +4636,38 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var horizontal = ReadRaw(ref platform, state, obj, RectangleHBar, 0);
 		var vertical = ReadRaw(ref platform, state, obj, RectangleVBar, 0);
-		if (TryReadRectanglePresentationStateRecord(ref platform, state, obj,
-			out var record))
+		var rawState = default(MuiRectanglePresentationState);
+		rawState.HorizontalBar = horizontal;
+		rawState.VerticalBar = vertical;
+		if (!MuiRectanglePresentationStateAdmission.Validate(rawState)) return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			RectanglePresentationStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			RectanglePresentationStateKey);
+		var present = block.IsNotNull || length != 0;
+		var record = default(MuiRectanglePresentationStateRecord);
+		if (present)
+		{
+			if (length != unchecked((int)MuiRectanglePresentationStateRecord.Size) ||
+				!MuiRectanglePresentationStateRecordCodec.TryReadStructural(ref platform,
+					block, out record) ||
+				!MuiRectanglePresentationStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
+		}
+		if (present)
 		{
 			if (record.HorizontalBar != horizontal || record.VerticalBar != vertical)
 			{
 				record.HorizontalBar = horizontal;
 				record.VerticalBar = vertical;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					RectanglePresentationStateKey);
-				if (!MuiRectanglePresentationStateRecordCodec.Write(ref platform,
-					block, record)) return false;
+				if (!MuiRectanglePresentationStateAdmission.ValidateLive(ref platform,
+					state, obj, record) ||
+					!MuiRectanglePresentationStateRecordCodec.Write(ref platform, block,
+						record)) return false;
 			}
 		}
 		result.HorizontalBar = horizontal;
@@ -4463,21 +4681,44 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			RectanglePresentationStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			RectanglePresentationStateKey) != unchecked((int)
-			MuiRectanglePresentationStateRecord.Size)) return false;
-		return MuiRectanglePresentationStateRecordCodec.TryRead(ref platform,
-			block, out value);
+			MuiRectanglePresentationStateRecord.Size) ||
+			!MuiRectanglePresentationStateRecordCodec.TryReadStructural(ref platform,
+				block, out value)) return false;
+		return MuiRectanglePresentationStateAdmission.ValidateLive(ref platform,
+			state, obj, value);
+	}
+
+	internal static bool RectanglePresentationStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			RectanglePresentationStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			RectanglePresentationStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiRectanglePresentationStateRecord.Size) &&
+			TryReadRectanglePresentationStateRecord(ref platform, state, obj, out _);
 	}
 
 	private static bool EnsureRectanglePresentationStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!RectanglePresentationStateAvailable(ref platform, state, obj))
+			return false;
 		if (TryReadRectanglePresentationStateRecord(ref platform, state, obj,
 			out _)) return true;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiRectanglePresentationStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -4486,6 +4727,13 @@ public static class MuiCommonControlCore
 		value.Magic = MuiRectanglePresentationStateRecord.Cookie;
 		value.HorizontalBar = ReadRaw(ref platform, state, obj, RectangleHBar, 0);
 		value.VerticalBar = ReadRaw(ref platform, state, obj, RectangleVBar, 0);
+		if (!MuiRectanglePresentationStateAdmission.ValidateLive(ref platform, state,
+			obj, value))
+		{
+			platform.Clear(scratch, MuiRectanglePresentationStateRecord.Size);
+			platform.Free(scratch, MuiRectanglePresentationStateRecord.Size);
+			return false;
+		}
 		var written = MuiRectanglePresentationStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
@@ -4501,7 +4749,10 @@ public static class MuiCommonControlCore
 		MuiRectanglePresentationState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!EnsureRectanglePresentationStateRecord(ref platform, state, obj))
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!RectanglePresentationStateAvailable(ref platform, state, obj) ||
+			!MuiRectanglePresentationStateAdmission.Validate(value) ||
+			!EnsureRectanglePresentationStateRecord(ref platform, state, obj))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			RectanglePresentationStateKey);
@@ -4509,8 +4760,9 @@ public static class MuiCommonControlCore
 		stored.Magic = MuiRectanglePresentationStateRecord.Cookie;
 		stored.HorizontalBar = value.HorizontalBar;
 		stored.VerticalBar = value.VerticalBar;
-		if (!MuiRectanglePresentationStateRecordCodec.Write(ref platform, block,
-			stored)) return false;
+		if (!MuiRectanglePresentationStateAdmission.ValidateLive(ref platform, state,
+			obj, stored) || !MuiRectanglePresentationStateRecordCodec.Write(
+			ref platform, block, stored)) return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			RectangleHBar, stored.HorizontalBar, false) &&
 			MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
@@ -4541,6 +4793,8 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var maximum = ReadRaw(ref platform, state, obj, GaugeMax, 100);
 		var current = ReadRaw(ref platform, state, obj, GaugeCurrent, 0);
 		var divide = ReadRaw(ref platform, state, obj, GaugeDivide, 0);
@@ -4550,7 +4804,7 @@ public static class MuiCommonControlCore
 		rawState.Current = current;
 		rawState.Divide = divide;
 		rawState.Horizontal = horizontal;
-		if (!MuiGaugeStateValidation.IsValidState(rawState)) return false;
+		if (!MuiGaugeStateAdmission.Validate(rawState)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			GaugeStateKey);
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
@@ -4559,8 +4813,9 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiGaugeStateRecord.Size) ||
-				!MuiGaugeStateRecordCodec.TryRead(ref platform, block,
-					out var record) || !MuiGaugeStateValidation.IsValidRecord(record))
+				!MuiGaugeStateRecordCodec.TryReadStructural(ref platform, block,
+					out var record) || !MuiGaugeStateAdmission.ValidateLive(ref platform,
+					state, obj, record))
 				return false;
 			if (record.Maximum != maximum || record.Current != current ||
 				record.Divide != divide || record.Horizontal != horizontal)
@@ -4569,7 +4824,8 @@ public static class MuiCommonControlCore
 				record.Current = current;
 				record.Divide = divide;
 				record.Horizontal = horizontal;
-				if (!MuiGaugeStateRecordCodec.Write(ref platform, block,
+				if (!MuiGaugeStateAdmission.ValidateLive(ref platform, state, obj,
+					record) || !MuiGaugeStateRecordCodec.Write(ref platform, block,
 					record)) return false;
 			}
 		}
@@ -4591,15 +4847,32 @@ public static class MuiCommonControlCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			GaugeStateKey) != unchecked((int)MuiGaugeStateRecord.Size))
 			return false;
-		return MuiGaugeStateRecordCodec.TryRead(ref platform, block, out value) &&
-			MuiGaugeStateValidation.IsValidRecord(value);
+		return MuiGaugeStateRecordCodec.TryReadStructural(ref platform, block,
+			out value) && MuiGaugeStateAdmission.ValidateLive(ref platform, state,
+			obj, value);
+	}
+
+	internal static bool GaugeStateAvailable<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			GaugeStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			GaugeStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiGaugeStateRecord.Size) &&
+			TryReadGaugeStateRecord(ref platform, state, obj, out _);
 	}
 
 	private static bool EnsureGaugeStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!GaugeStateAvailable(ref platform, state, obj)) return false;
 		if (TryReadGaugeStateRecord(ref platform, state, obj, out _)) return true;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiGaugeStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -4610,7 +4883,7 @@ public static class MuiCommonControlCore
 		value.Current = ReadRaw(ref platform, state, obj, GaugeCurrent, 0);
 		value.Divide = ReadRaw(ref platform, state, obj, GaugeDivide, 0);
 		value.Horizontal = ReadRaw(ref platform, state, obj, GaugeHoriz, 1);
-		if (!MuiGaugeStateValidation.IsValidRecord(value))
+		if (!MuiGaugeStateAdmission.ValidateLive(ref platform, state, obj, value))
 		{
 			platform.Clear(scratch, MuiGaugeStateRecord.Size);
 			platform.Free(scratch, MuiGaugeStateRecord.Size);
@@ -4628,7 +4901,9 @@ public static class MuiCommonControlCore
 		ref TPlatform platform, APTR state, APTR obj, MuiGaugeState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiGaugeStateValidation.IsValidState(value)) return false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!GaugeStateAvailable(ref platform, state, obj) ||
+			!MuiGaugeStateAdmission.Validate(value)) return false;
 		if (!EnsureGaugeStateRecord(ref platform, state, obj)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			GaugeStateKey);
@@ -4638,7 +4913,8 @@ public static class MuiCommonControlCore
 		stored.Current = value.Current;
 		stored.Divide = value.Divide;
 		stored.Horizontal = value.Horizontal;
-		if (!MuiGaugeStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiGaugeStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiGaugeStateRecordCodec.Write(ref platform, block, stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			GaugeMax, stored.Maximum, false) &&
@@ -4662,11 +4938,12 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		var quiet = ReadRaw(ref platform, state, obj, BalanceQuiet, 0) == 0 ?
-			0u : 1u;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var quiet = ReadRaw(ref platform, state, obj, BalanceQuiet, 0);
 		var rawState = default(MuiBalancePolicyState);
 		rawState.Quiet = quiet;
-		if (!MuiBalancePolicyStateValidation.IsValidState(rawState)) return false;
+		if (!MuiBalancePolicyStateAdmission.Validate(rawState)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			BalancePolicyStateKey);
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
@@ -4675,14 +4952,16 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiBalancePolicyStateRecord.Size) ||
-				!MuiBalancePolicyStateRecordCodec.TryRead(ref platform, block,
+				!MuiBalancePolicyStateRecordCodec.TryReadStructural(ref platform, block,
 					out var record) ||
-				!MuiBalancePolicyStateValidation.IsValidRecord(record)) return false;
+				!MuiBalancePolicyStateAdmission.ValidateLive(ref platform, state, obj,
+					record)) return false;
 			if (record.Quiet != quiet)
 			{
 				record.Quiet = quiet;
-				if (!MuiBalancePolicyStateRecordCodec.Write(ref platform, block,
-					record)) return false;
+				if (!MuiBalancePolicyStateAdmission.ValidateLive(ref platform, state,
+					obj, record) || !MuiBalancePolicyStateRecordCodec.Write(ref platform,
+					block, record)) return false;
 			}
 		}
 		result.Quiet = quiet;
@@ -4695,21 +4974,42 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			BalancePolicyStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			BalancePolicyStateKey) != unchecked((int)MuiBalancePolicyStateRecord.Size))
 			return false;
-		return MuiBalancePolicyStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiBalancePolicyStateValidation.IsValidRecord(value);
+		return MuiBalancePolicyStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiBalancePolicyStateAdmission.ValidateLive(
+				ref platform, state, obj, value);
+	}
+
+	internal static bool BalancePolicyStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			BalancePolicyStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			BalancePolicyStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiBalancePolicyStateRecord.Size) &&
+			TryReadBalancePolicyStateRecord(ref platform, state, obj, out _);
 	}
 
 	private static bool EnsureBalancePolicyStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!BalancePolicyStateAvailable(ref platform, state, obj)) return false;
 		if (TryReadBalancePolicyStateRecord(ref platform, state, obj,
 			out _)) return true;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			BalancePolicyStateKey);
 		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
@@ -4721,9 +5021,9 @@ public static class MuiCommonControlCore
 		platform.Clear(scratch, MuiBalancePolicyStateRecord.Size);
 		var value = default(MuiBalancePolicyStateRecord);
 		value.Magic = MuiBalancePolicyStateRecord.Cookie;
-		value.Quiet = ReadRaw(ref platform, state, obj, BalanceQuiet, 0) == 0 ?
-			0u : 1u;
-		if (!MuiBalancePolicyStateValidation.IsValidRecord(value))
+		value.Quiet = ReadRaw(ref platform, state, obj, BalanceQuiet, 0);
+		if (!MuiBalancePolicyStateAdmission.ValidateLive(ref platform, state, obj,
+			value))
 		{
 			platform.Clear(scratch, MuiBalancePolicyStateRecord.Size);
 			platform.Free(scratch, MuiBalancePolicyStateRecord.Size);
@@ -4744,15 +5044,19 @@ public static class MuiCommonControlCore
 		MuiBalancePolicyState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiBalancePolicyStateValidation.IsValidState(value)) return false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!BalancePolicyStateAvailable(ref platform, state, obj) ||
+			!MuiBalancePolicyStateAdmission.Validate(value)) return false;
 		if (!EnsureBalancePolicyStateRecord(ref platform, state, obj))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			BalancePolicyStateKey);
 		var stored = default(MuiBalancePolicyStateRecord);
 		stored.Magic = MuiBalancePolicyStateRecord.Cookie;
-		stored.Quiet = value.Quiet == 0 ? 0u : 1u;
-		if (!MuiBalancePolicyStateRecordCodec.Write(ref platform, block, stored))
+		stored.Quiet = value.Quiet;
+		if (!MuiBalancePolicyStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiBalancePolicyStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			BalanceQuiet, stored.Quiet, false);
@@ -4770,6 +5074,8 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		// Getter projection uses this routine, so legacy Scrollbar attributes are
 		// read raw-only to avoid recursing through CommonControlCore.TryGet.
 		var horizontal = ReadRaw(ref platform, state, obj, GroupHoriz, 0);
@@ -4778,7 +5084,7 @@ public static class MuiCommonControlCore
 		var rawState = default(MuiScrollbarLayoutState);
 		rawState.Horizontal = horizontal;
 		rawState.Type = type;
-		if (!MuiScrollbarLayoutStateValidation.IsValidState(rawState)) return false;
+		if (!MuiScrollbarLayoutStateAdmission.Validate(rawState)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ScrollbarLayoutStateKey);
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
@@ -4787,15 +5093,17 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiScrollbarLayoutStateRecord.Size) ||
-				!MuiScrollbarLayoutStateRecordCodec.TryRead(ref platform, block,
-					out var record) ||
-				!MuiScrollbarLayoutStateValidation.IsValidRecord(record)) return false;
+				!MuiScrollbarLayoutStateRecordCodec.TryReadStructural(ref platform,
+					block, out var record) ||
+				!MuiScrollbarLayoutStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			if (record.Horizontal != horizontal || record.Type != type)
 			{
 				record.Horizontal = horizontal;
 				record.Type = type;
-				if (!MuiScrollbarLayoutStateRecordCodec.Write(ref platform, block,
-					record)) return false;
+				if (!MuiScrollbarLayoutStateAdmission.ValidateLive(ref platform, state,
+					obj, record) || !MuiScrollbarLayoutStateRecordCodec.Write(ref platform,
+					block, record)) return false;
 			}
 		}
 		result.Horizontal = horizontal;
@@ -4809,21 +5117,42 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ScrollbarLayoutStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			ScrollbarLayoutStateKey) != unchecked((int)MuiScrollbarLayoutStateRecord.Size))
 			return false;
-		return MuiScrollbarLayoutStateRecordCodec.TryRead(ref platform, block,
-			out value) && MuiScrollbarLayoutStateValidation.IsValidRecord(value);
+		return MuiScrollbarLayoutStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiScrollbarLayoutStateAdmission.ValidateLive(
+				ref platform, state, obj, value);
+	}
+
+	internal static bool ScrollbarLayoutStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ScrollbarLayoutStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ScrollbarLayoutStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiScrollbarLayoutStateRecord.Size) &&
+			TryReadScrollbarLayoutStateRecord(ref platform, state, obj, out _);
 	}
 
 	private static bool EnsureScrollbarLayoutStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!ScrollbarLayoutStateAvailable(ref platform, state, obj)) return false;
 		if (TryReadScrollbarLayoutStateRecord(ref platform, state, obj,
 			out _)) return true;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ScrollbarLayoutStateKey);
 		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
@@ -4838,7 +5167,8 @@ public static class MuiCommonControlCore
 		value.Horizontal = ReadRaw(ref platform, state, obj, GroupHoriz, 0);
 		value.Type = ReadRaw(ref platform, state, obj, ScrollbarType,
 			ScrollbarTypeDefault);
-		if (!MuiScrollbarLayoutStateValidation.IsValidRecord(value))
+		if (!MuiScrollbarLayoutStateAdmission.ValidateLive(ref platform, state,
+			obj, value))
 		{
 			platform.Clear(scratch, MuiScrollbarLayoutStateRecord.Size);
 			platform.Free(scratch, MuiScrollbarLayoutStateRecord.Size);
@@ -4859,7 +5189,9 @@ public static class MuiCommonControlCore
 		MuiScrollbarLayoutState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiScrollbarLayoutStateValidation.IsValidState(value)) return false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!ScrollbarLayoutStateAvailable(ref platform, state, obj) ||
+			!MuiScrollbarLayoutStateAdmission.Validate(value)) return false;
 		if (!EnsureScrollbarLayoutStateRecord(ref platform, state, obj))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -4868,7 +5200,9 @@ public static class MuiCommonControlCore
 		stored.Magic = MuiScrollbarLayoutStateRecord.Cookie;
 		stored.Horizontal = value.Horizontal;
 		stored.Type = value.Type;
-		if (!MuiScrollbarLayoutStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiScrollbarLayoutStateAdmission.ValidateLive(ref platform, state,
+			obj, stored) || !MuiScrollbarLayoutStateRecordCodec.Write(ref platform,
+			block, stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			GroupHoriz, stored.Horizontal, false) &&
@@ -4888,6 +5222,8 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		// Getter projection uses this routine, so legacy Prop attributes are read
 		// raw-only to avoid recursing through CommonControlCore.TryGet.
 		var entries = ReadRaw(ref platform, state, obj, PropEntries, 0);
@@ -4897,7 +5233,7 @@ public static class MuiCommonControlCore
 		rawState.Entries = entries;
 		rawState.Visible = visible;
 		rawState.First = first;
-		if (!MuiPropRangeStateValidation.IsValidState(rawState)) return false;
+		if (!MuiPropRangeStateAdmission.Validate(rawState)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			PropRangeStateKey);
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
@@ -4906,8 +5242,9 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiPropRangeStateRecord.Size) ||
-				!MuiPropRangeStateRecordCodec.TryRead(ref platform, block,
-					out var record) || !MuiPropRangeStateValidation.IsValidRecord(record))
+				!MuiPropRangeStateRecordCodec.TryReadStructural(ref platform, block,
+					out var record) || !MuiPropRangeStateAdmission.ValidateLive(ref platform,
+					state, obj, record))
 				return false;
 			if (record.Entries != entries || record.Visible != visible ||
 				record.First != first)
@@ -4915,7 +5252,8 @@ public static class MuiCommonControlCore
 				record.Entries = entries;
 				record.Visible = visible;
 				record.First = first;
-				if (!MuiPropRangeStateRecordCodec.Write(ref platform, block,
+				if (!MuiPropRangeStateAdmission.ValidateLive(ref platform, state, obj,
+					record) || !MuiPropRangeStateRecordCodec.Write(ref platform, block,
 					record)) return false;
 			}
 		}
@@ -4931,20 +5269,39 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			PropRangeStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			PropRangeStateKey) != unchecked((int)MuiPropRangeStateRecord.Size))
 			return false;
-		return MuiPropRangeStateRecordCodec.TryRead(ref platform, block, out value) &&
-			MuiPropRangeStateValidation.IsValidRecord(value);
+		return MuiPropRangeStateRecordCodec.TryReadStructural(ref platform, block,
+			out value) && MuiPropRangeStateAdmission.ValidateLive(ref platform, state,
+			obj, value);
+	}
+
+	internal static bool PropRangeStateAvailable<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			PropRangeStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			PropRangeStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiPropRangeStateRecord.Size) &&
+			TryReadPropRangeStateRecord(ref platform, state, obj, out _);
 	}
 
 	private static bool EnsurePropRangeStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!PropRangeStateAvailable(ref platform, state, obj)) return false;
 		if (TryReadPropRangeStateRecord(ref platform, state, obj, out _)) return true;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			PropRangeStateKey);
 		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
@@ -4959,7 +5316,8 @@ public static class MuiCommonControlCore
 		value.Entries = ReadRaw(ref platform, state, obj, PropEntries, 0);
 		value.Visible = ReadRaw(ref platform, state, obj, PropVisible, 0);
 		value.First = ReadRaw(ref platform, state, obj, PropFirst, 0);
-		if (!MuiPropRangeStateValidation.IsValidRecord(value))
+		if (!MuiPropRangeStateAdmission.ValidateLive(ref platform, state, obj,
+			value))
 		{
 			platform.Clear(scratch, MuiPropRangeStateRecord.Size);
 			platform.Free(scratch, MuiPropRangeStateRecord.Size);
@@ -4978,7 +5336,9 @@ public static class MuiCommonControlCore
 		MuiPropRangeState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiPropRangeStateValidation.IsValidState(value)) return false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!PropRangeStateAvailable(ref platform, state, obj) ||
+			!MuiPropRangeStateAdmission.Validate(value)) return false;
 		if (!EnsurePropRangeStateRecord(ref platform, state, obj)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			PropRangeStateKey);
@@ -4987,7 +5347,9 @@ public static class MuiCommonControlCore
 		stored.Entries = value.Entries;
 		stored.Visible = value.Visible;
 		stored.First = value.First;
-		if (!MuiPropRangeStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiPropRangeStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiPropRangeStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			PropEntries, stored.Entries, false) &&
@@ -5009,6 +5371,8 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		// Generic Get and OM_GET project these values through this record. Raw
 		// storage is the compatibility seam for caller writes and bootstrap only.
 		var horizontal = ReadRaw(ref platform, state, obj, PropHoriz, 1);
@@ -5020,7 +5384,7 @@ public static class MuiCommonControlCore
 		rawState.DeltaFactor = deltaFactor;
 		rawState.Slider = slider;
 		rawState.UseWinBorder = useWinBorder;
-		if (!MuiPropPolicyStateValidation.IsValidState(rawState)) return false;
+		if (!MuiPropPolicyStateAdmission.Validate(rawState)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			PropPolicyStateKey);
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
@@ -5029,8 +5393,9 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiPropPolicyStateRecord.Size) ||
-				!MuiPropPolicyStateRecordCodec.TryRead(ref platform, block,
-					out var record) || !MuiPropPolicyStateValidation.IsValidRecord(record))
+				!MuiPropPolicyStateRecordCodec.TryReadStructural(ref platform, block,
+					out var record) || !MuiPropPolicyStateAdmission.ValidateLive(ref platform,
+					state, obj, record))
 				return false;
 			if (record.Horizontal != horizontal || record.DeltaFactor != deltaFactor ||
 				record.Slider != slider || record.UseWinBorder != useWinBorder)
@@ -5039,7 +5404,8 @@ public static class MuiCommonControlCore
 				record.DeltaFactor = deltaFactor;
 				record.Slider = slider;
 				record.UseWinBorder = useWinBorder;
-				if (!MuiPropPolicyStateRecordCodec.Write(ref platform, block,
+				if (!MuiPropPolicyStateAdmission.ValidateLive(ref platform, state, obj,
+					record) || !MuiPropPolicyStateRecordCodec.Write(ref platform, block,
 					record)) return false;
 			}
 		}
@@ -5056,20 +5422,39 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			PropPolicyStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			PropPolicyStateKey) != unchecked((int)MuiPropPolicyStateRecord.Size))
 			return false;
-		return MuiPropPolicyStateRecordCodec.TryRead(ref platform, block, out value) &&
-			MuiPropPolicyStateValidation.IsValidRecord(value);
+		return MuiPropPolicyStateRecordCodec.TryReadStructural(ref platform, block,
+			out value) && MuiPropPolicyStateAdmission.ValidateLive(ref platform, state,
+			obj, value);
+	}
+
+	internal static bool PropPolicyStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			PropPolicyStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			PropPolicyStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiPropPolicyStateRecord.Size) &&
+			TryReadPropPolicyStateRecord(ref platform, state, obj, out _);
 	}
 
 	private static bool EnsurePropPolicyStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!PropPolicyStateAvailable(ref platform, state, obj)) return false;
 		if (TryReadPropPolicyStateRecord(ref platform, state, obj, out _)) return true;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiPropPolicyStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -5080,7 +5465,8 @@ public static class MuiCommonControlCore
 		value.DeltaFactor = ReadRaw(ref platform, state, obj, PropDeltaFactor, 1);
 		value.Slider = ReadRaw(ref platform, state, obj, PropSlider, 0);
 		value.UseWinBorder = ReadRaw(ref platform, state, obj, PropUseWinBorder, 0);
-		if (!MuiPropPolicyStateValidation.IsValidRecord(value))
+		if (!MuiPropPolicyStateAdmission.ValidateLive(ref platform, state, obj,
+			value))
 		{
 			platform.Clear(scratch, MuiPropPolicyStateRecord.Size);
 			platform.Free(scratch, MuiPropPolicyStateRecord.Size);
@@ -5100,7 +5486,9 @@ public static class MuiCommonControlCore
 		ref TPlatform platform, APTR state, APTR obj, MuiPropPolicyState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiPropPolicyStateValidation.IsValidState(value)) return false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!PropPolicyStateAvailable(ref platform, state, obj) ||
+			!MuiPropPolicyStateAdmission.Validate(value)) return false;
 		if (!EnsurePropPolicyStateRecord(ref platform, state, obj)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			PropPolicyStateKey);
@@ -5110,7 +5498,9 @@ public static class MuiCommonControlCore
 		stored.DeltaFactor = value.DeltaFactor;
 		stored.Slider = value.Slider;
 		stored.UseWinBorder = value.UseWinBorder;
-		if (!MuiPropPolicyStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiPropPolicyStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiPropPolicyStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			PropHoriz, stored.Horizontal, false) &&
@@ -5628,7 +6018,7 @@ public static class MuiCommonControlCore
 		bool interpretSpecial, bool notify)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
-		if (entries.IsNull) return false;
+		if (!TryValidateChoiceEntries(ref platform, entries)) return false;
 		var count = CountEntries(ref platform, entries);
 		if (count == 0) return false;
 		if (!TryReadChoiceActiveState(ref platform, state, obj, activeAttribute,
@@ -5646,7 +6036,7 @@ public static class MuiCommonControlCore
 		if (target == currentRaw) return true;
 		activeState.Active = unchecked((uint)target);
 		if (!PublishChoiceActiveState(ref platform, state, obj, activeAttribute,
-			activeState, notify)) return false;
+			activeState, notify, entries)) return false;
 		return platform.ScheduleRedraw(obj, 2);
 	}
 
@@ -5660,7 +6050,7 @@ public static class MuiCommonControlCore
 		var entries = entriesState.Entries;
 		var count = entries.IsNull ? 0 : CountEntries(ref platform, entries);
 		if (!TryReadChoiceActiveState(ref platform, state, obj, activeAttribute,
-			out var activeState)) return false;
+			out var activeState, true)) return false;
 		var current = unchecked((int)activeState.Active);
 		var target = count == 0 || current < 0 || current >= count ? 0 : current;
 		if (current == target) return true;
@@ -5690,19 +6080,9 @@ public static class MuiCommonControlCore
 	private static bool TryValidateChoiceEntries<TPlatform>(ref TPlatform platform,
 		APTR entries) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (entries.IsNull) return true;
-		var cursor = default(MuiChoiceEntryCursor);
-		cursor.Base = entries;
-		for (var index = 0u; index < MuiChoiceEntryCursor.MaximumEntries;
-			index++)
-		{
-			cursor.Index = index;
-			if (!MuiChoiceEntryCursorCodec.TryGetEntry(ref platform, cursor,
-				out var slot) || !MuiChoiceEntryCodec.TryRead(ref platform, slot,
-				out var entry)) return false;
-			if (entry.Text.IsNull) return true;
-		}
-		return false;
+		var value = default(MuiChoiceEntriesState);
+		value.Entries = entries;
+		return MuiChoiceEntriesStateAdmission.Validate(ref platform, value);
 	}
 
 	internal static bool TryReadChoiceEntriesState<TPlatform>(
@@ -5711,9 +6091,21 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadChoiceEntriesStateRecord(ref platform, state, obj,
-			out var record))
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ChoiceEntriesStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ChoiceEntriesStateKey);
+		var present = block.IsNotNull || length != 0;
+		var record = default(MuiChoiceEntriesStateRecord);
+		if (present)
 		{
+			if (length != unchecked((int)MuiChoiceEntriesStateRecord.Size) ||
+				!MuiChoiceEntriesStateRecordCodec.TryReadStructural(ref platform,
+					block, out record) ||
+				!MuiChoiceEntriesStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			var raw = MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
 				obj, entriesAttribute, out var rawEntries) ?
 				APTR.FromPointer(rawEntries) : record.Entries;
@@ -5721,10 +6113,9 @@ public static class MuiCommonControlCore
 			if (raw.Raw != record.Entries.Raw)
 			{
 				record.Entries = raw;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					ChoiceEntriesStateKey);
-				if (!MuiChoiceEntriesStateRecordCodec.Write(ref platform, block,
-					record)) return false;
+				if (!MuiChoiceEntriesStateAdmission.ValidateLive(ref platform, state,
+					obj, record) || !MuiChoiceEntriesStateRecordCodec.Write(
+					ref platform, block, record)) return false;
 			}
 			result.Entries = raw;
 			return true;
@@ -5741,29 +6132,57 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ChoiceEntriesStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			ChoiceEntriesStateKey) != unchecked((int)MuiChoiceEntriesStateRecord.Size))
 			return false;
-		return MuiChoiceEntriesStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiChoiceEntriesStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiChoiceEntriesStateAdmission.ValidateLive(
+			ref platform, state, obj, value);
+	}
+
+	internal static bool ChoiceEntriesStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ChoiceEntriesStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ChoiceEntriesStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiChoiceEntriesStateRecord.Size) &&
+			TryReadChoiceEntriesStateRecord(ref platform, state, obj, out _);
 	}
 
 	private static bool EnsureChoiceEntriesStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj, uint entriesAttribute)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!ChoiceEntriesStateAvailable(ref platform, state, obj)) return false;
 		if (TryReadChoiceEntriesStateRecord(ref platform, state, obj,
 			out _)) return true;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiChoiceEntriesStateRecord.Size);
 		if (scratch.IsNull) return false;
 		platform.Clear(scratch, MuiChoiceEntriesStateRecord.Size);
 		var value = default(MuiChoiceEntriesStateRecord);
 		value.Magic = MuiChoiceEntriesStateRecord.Cookie;
-		value.Entries = APTR.FromPointer(ReadRaw(ref platform, state, obj,
+	value.Entries = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			entriesAttribute, 0));
+		if (!MuiChoiceEntriesStateAdmission.ValidateLive(ref platform, state, obj,
+			value))
+		{
+			platform.Clear(scratch, MuiChoiceEntriesStateRecord.Size);
+			platform.Free(scratch, MuiChoiceEntriesStateRecord.Size);
+			return false;
+		}
 		var written = MuiChoiceEntriesStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -5777,9 +6196,11 @@ public static class MuiCommonControlCore
 	private static bool PublishChoiceEntriesState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj, uint entriesAttribute,
 		MuiChoiceEntriesState value, bool notify = false)
-		where TPlatform : struct, IMuiHeadlessPlatform
+	where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!TryValidateChoiceEntries(ref platform, value.Entries) ||
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!ChoiceEntriesStateAvailable(ref platform, state, obj) ||
+			!MuiChoiceEntriesStateAdmission.Validate(ref platform, value) ||
 			!EnsureChoiceEntriesStateRecord(ref platform, state, obj,
 				entriesAttribute)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -5787,34 +6208,67 @@ public static class MuiCommonControlCore
 		var stored = default(MuiChoiceEntriesStateRecord);
 		stored.Magic = MuiChoiceEntriesStateRecord.Cookie;
 		stored.Entries = value.Entries;
-		if (!MuiChoiceEntriesStateRecordCodec.Write(ref platform, block, stored))
-			return false;
+		if (!MuiChoiceEntriesStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiChoiceEntriesStateRecordCodec.Write(ref platform, block,
+			stored)) return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			entriesAttribute, stored.Entries.Raw, notify);
 	}
 
 	internal static bool TryReadChoiceActiveState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj, uint activeAttribute,
-		out MuiChoiceActiveState result)
+		out MuiChoiceActiveState result, bool allowOutOfRange = false)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		if (!EnsureChoiceActiveStateRecord(ref platform, state, obj,
-			activeAttribute) || !TryReadChoiceActiveStateRecord(ref platform, state,
+			activeAttribute, allowOutOfRange) || !TryReadChoiceActiveStateRecord(ref platform, state,
 			obj, out var record)) return false;
 		var raw = ReadRaw(ref platform, state, obj, activeAttribute,
 			record.Active);
 		if (raw != record.Active)
 		{
 			record.Active = raw;
+			if (!MuiChoiceActiveStateAdmission.ValidateLive(ref platform, state, obj,
+				record)) return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				ChoiceActiveStateKey);
-			if (!MuiChoiceActiveStateRecordCodec.Write(ref platform, block,
-				record)) return false;
+			if (!MuiChoiceActiveStateRecordCodec.Write(ref platform, block, record))
+				return false;
 		}
+		if (!allowOutOfRange && !IsChoiceActiveValueValid(ref platform, state, obj,
+			activeAttribute, raw)) return false;
 		result.Active = raw;
 		return true;
 	}
+
+	private static bool IsChoiceActiveValueValid<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, uint activeAttribute, uint active,
+		APTR entriesOverride)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiChoiceActiveStateAdmission.ValidateActive(active)) return false;
+		var entries = entriesOverride;
+		if (entries.IsNull)
+		{
+			var entriesAttribute = activeAttribute == RadioActive ? RadioEntries :
+				CycleEntries;
+			if (!TryReadChoiceEntriesState(ref platform, state, obj,
+				entriesAttribute, out var entriesState)) return false;
+			entries = entriesState.Entries;
+		}
+		else if (!TryValidateChoiceEntries(ref platform, entries)) return false;
+		var count = entries.IsNull ? 0 : CountEntries(ref platform, entries);
+		return count == 0 ? active == 0 : active < (uint)count;
+	}
+
+	private static bool IsChoiceActiveValueValid<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, uint activeAttribute, uint active)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		IsChoiceActiveValueValid(ref platform, state, obj, activeAttribute, active,
+			APTR.Null);
 
 	private static bool TryReadChoiceActiveStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj,
@@ -5822,21 +6276,48 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ChoiceActiveStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			ChoiceActiveStateKey) != unchecked((int)MuiChoiceActiveStateRecord.Size))
 			return false;
-		return MuiChoiceActiveStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiChoiceActiveStateRecordCodec.TryReadStructural(ref platform, block,
+			out value) && MuiChoiceActiveStateAdmission.ValidateLive(ref platform,
+			state, obj, value);
+	}
+
+	internal static bool ChoiceActiveStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, uint activeAttribute = 0)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ChoiceActiveStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ChoiceActiveStateKey);
+		if (block.IsNull && length == 0) return true;
+		if (length != unchecked((int)MuiChoiceActiveStateRecord.Size) ||
+			!TryReadChoiceActiveStateRecord(ref platform, state, obj, out var value))
+			return false;
+		return activeAttribute == 0 || IsChoiceActiveValueValid(ref platform, state,
+			obj, activeAttribute, value.Active);
 	}
 
 	private static bool EnsureChoiceActiveStateRecord<TPlatform>(
-		ref TPlatform platform, APTR state, APTR obj, uint activeAttribute)
+		ref TPlatform platform, APTR state, APTR obj, uint activeAttribute,
+		bool allowOutOfRange = false)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!ChoiceActiveStateAvailable(ref platform, state, obj,
+			allowOutOfRange ? 0 : activeAttribute))
+			return false;
 		if (TryReadChoiceActiveStateRecord(ref platform, state, obj,
 			out _)) return true;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiChoiceActiveStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -5844,6 +6325,13 @@ public static class MuiCommonControlCore
 		var value = default(MuiChoiceActiveStateRecord);
 		value.Magic = MuiChoiceActiveStateRecord.Cookie;
 		value.Active = ReadRaw(ref platform, state, obj, activeAttribute, 0);
+		if (!MuiChoiceActiveStateAdmission.ValidateLive(ref platform, state, obj,
+			value))
+		{
+			platform.Clear(scratch, MuiChoiceActiveStateRecord.Size);
+			platform.Free(scratch, MuiChoiceActiveStateRecord.Size);
+			return false;
+		}
 		var written = MuiChoiceActiveStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -5858,16 +6346,29 @@ public static class MuiCommonControlCore
 		ref TPlatform platform, APTR state, APTR obj,
 		uint activeAttribute, MuiChoiceActiveState value, bool notify = false)
 		where TPlatform : struct, IMuiHeadlessPlatform
+		=> PublishChoiceActiveState(ref platform, state, obj, activeAttribute, value,
+			notify, APTR.Null);
+
+	private static bool PublishChoiceActiveState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		uint activeAttribute, MuiChoiceActiveState value, bool notify,
+		APTR entriesOverride)
+		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!EnsureChoiceActiveStateRecord(ref platform, state, obj,
-			activeAttribute)) return false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!ChoiceActiveStateAvailable(ref platform, state, obj) ||
+			!IsChoiceActiveValueValid(ref platform, state, obj, activeAttribute,
+				value.Active, entriesOverride) ||
+			!EnsureChoiceActiveStateRecord(ref platform, state, obj,
+			activeAttribute, true)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ChoiceActiveStateKey);
 		var stored = default(MuiChoiceActiveStateRecord);
 		stored.Magic = MuiChoiceActiveStateRecord.Cookie;
 		stored.Active = value.Active;
-		if (!MuiChoiceActiveStateRecordCodec.Write(ref platform, block, stored))
-			return false;
+		if (!MuiChoiceActiveStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiChoiceActiveStateRecordCodec.Write(ref platform, block,
+			stored)) return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			activeAttribute, stored.Active, notify);
 	}
@@ -5890,18 +6391,22 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadTextContentsStateRecord(ref platform, state, obj,
-			out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			TextContentsStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			TextContentsStateKey);
+		var recordPresent = block.IsNotNull || length != 0;
+		if (recordPresent)
 		{
+			if (!TryReadTextContentsStateRecord(ref platform, state, obj,
+				out var record)) return false;
 			var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				TextContents, record.Contents.Raw));
 			if (!raw.IsNull && !CStringCodec.TryReadLength(ref platform, raw,
-				65536, out _)) return false;
+				MuiTextContentsStateAdmission.MaximumLength, out _)) return false;
 			if (raw.Raw != record.Contents.Raw)
 			{
 				record.Contents = raw;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					TextContentsStateKey);
 				if (!MuiTextContentsStateRecordCodec.Write(ref platform, block,
 					record)) return false;
 			}
@@ -5911,7 +6416,8 @@ public static class MuiCommonControlCore
 		result.Contents = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			TextContents, 0));
 		return result.Contents.IsNull || CStringCodec.TryReadLength(ref platform,
-			result.Contents, 65536, out _);
+			result.Contents, MuiTextContentsStateAdmission.MaximumLength,
+			out _);
 	}
 
 	private static bool TryReadTextContentsStateRecord<TPlatform>(
@@ -5920,29 +6426,41 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			TextContentsStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			TextContentsStateKey) != unchecked((int)MuiTextContentsStateRecord.Size))
-			return false;
-		return MuiTextContentsStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			TextContentsStateKey);
+		return length == unchecked((int)MuiTextContentsStateRecord.Size) &&
+			MuiTextContentsStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiTextContentsStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureTextContentsStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryReadTextContentsStateRecord(ref platform, state, obj,
-			out _)) return true;
-		var scratch = MuiHeadlessMemory.Allocate(ref platform,
-			MuiTextContentsStateRecord.Size);
-		if (scratch.IsNull) return false;
-		platform.Clear(scratch, MuiTextContentsStateRecord.Size);
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			TextContentsStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			TextContentsStateKey);
+		if (block.IsNotNull || length != 0)
+			return TryReadTextContentsStateRecord(ref platform, state, obj,
+				out _);
 		var value = default(MuiTextContentsStateRecord);
 		value.Magic = MuiTextContentsStateRecord.Cookie;
 		value.Contents = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			TextContents, 0));
+		if (!MuiTextContentsStateAdmission.ValidateLive(ref platform, state,
+			obj, value)) return false;
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiTextContentsStateRecord.Size);
+		if (scratch.IsNull) return false;
+		platform.Clear(scratch, MuiTextContentsStateRecord.Size);
 		var written = MuiTextContentsStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -5959,15 +6477,17 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (!value.Contents.IsNull && !CStringCodec.TryReadLength(ref platform,
-			value.Contents, 65536, out _)) return false;
+			value.Contents, MuiTextContentsStateAdmission.MaximumLength,
+			out _)) return false;
 		if (!EnsureTextContentsStateRecord(ref platform, state, obj)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			TextContentsStateKey);
 		var stored = default(MuiTextContentsStateRecord);
 		stored.Magic = MuiTextContentsStateRecord.Cookie;
 		stored.Contents = value.Contents;
-		if (!MuiTextContentsStateRecordCodec.Write(ref platform, block, stored))
-			return false;
+		if (!MuiTextContentsStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiTextContentsStateRecordCodec.Write(ref platform, block,
+			stored)) return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			TextContents, stored.Contents.Raw, notify);
 	}
@@ -5984,18 +6504,22 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadTextPreParseStateRecord(ref platform, state, obj,
-			out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			TextPreParseStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			TextPreParseStateKey);
+		var recordPresent = block.IsNotNull || length != 0;
+		if (recordPresent)
 		{
+			if (!TryReadTextPreParseStateRecord(ref platform, state, obj,
+				out var record)) return false;
 			var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				TextPreParse, record.PreParse.Raw));
 			if (!raw.IsNull && !CStringCodec.TryReadLength(ref platform, raw,
-				65536, out _)) return false;
+				MuiTextPreParseStateAdmission.MaximumLength, out _)) return false;
 			if (raw.Raw != record.PreParse.Raw)
 			{
 				record.PreParse = raw;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					TextPreParseStateKey);
 				if (!MuiTextPreParseStateRecordCodec.Write(ref platform, block,
 					record)) return false;
 			}
@@ -6005,38 +6529,50 @@ public static class MuiCommonControlCore
 		result.PreParse = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			TextPreParse, 0));
 		return result.PreParse.IsNull || CStringCodec.TryReadLength(ref platform,
-			result.PreParse, 65536, out _);
+			result.PreParse, MuiTextPreParseStateAdmission.MaximumLength, out _);
 	}
 
 	private static bool TryReadTextPreParseStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj,
 		out MuiTextPreParseStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
-	{
-		value = default;
-		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-			TextPreParseStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			TextPreParseStateKey) != unchecked((int)MuiTextPreParseStateRecord.Size))
-			return false;
-		return MuiTextPreParseStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		{
+			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				TextPreParseStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				TextPreParseStateKey);
+			return length == unchecked((int)MuiTextPreParseStateRecord.Size) &&
+			MuiTextPreParseStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiTextPreParseStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureTextPreParseStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
-	{
-		if (TryReadTextPreParseStateRecord(ref platform, state, obj,
-			out _)) return true;
-		var scratch = MuiHeadlessMemory.Allocate(ref platform,
-			MuiTextPreParseStateRecord.Size);
-		if (scratch.IsNull) return false;
-		platform.Clear(scratch, MuiTextPreParseStateRecord.Size);
-		var value = default(MuiTextPreParseStateRecord);
-		value.Magic = MuiTextPreParseStateRecord.Cookie;
-		value.PreParse = APTR.FromPointer(ReadRaw(ref platform, state, obj,
-			TextPreParse, 0));
+		{
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				TextPreParseStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				TextPreParseStateKey);
+			if (block.IsNotNull || length != 0)
+				return TryReadTextPreParseStateRecord(ref platform, state, obj,
+					out _);
+			var value = default(MuiTextPreParseStateRecord);
+			value.Magic = MuiTextPreParseStateRecord.Cookie;
+			value.PreParse = APTR.FromPointer(ReadRaw(ref platform, state, obj,
+				TextPreParse, 0));
+			if (!MuiTextPreParseStateAdmission.ValidateLive(ref platform, state,
+				obj, value)) return false;
+			var scratch = MuiHeadlessMemory.Allocate(ref platform,
+				MuiTextPreParseStateRecord.Size);
+			if (scratch.IsNull) return false;
+			platform.Clear(scratch, MuiTextPreParseStateRecord.Size);
 		var written = MuiTextPreParseStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -6053,15 +6589,17 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (!value.PreParse.IsNull && !CStringCodec.TryReadLength(ref platform,
-			value.PreParse, 65536, out _)) return false;
+			value.PreParse, MuiTextPreParseStateAdmission.MaximumLength,
+			out _)) return false;
 		if (!EnsureTextPreParseStateRecord(ref platform, state, obj)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			TextPreParseStateKey);
 		var stored = default(MuiTextPreParseStateRecord);
 		stored.Magic = MuiTextPreParseStateRecord.Cookie;
 		stored.PreParse = value.PreParse;
-		if (!MuiTextPreParseStateRecordCodec.Write(ref platform, block, stored))
-			return false;
+		if (!MuiTextPreParseStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiTextPreParseStateRecordCodec.Write(ref platform, block,
+			stored)) return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			TextPreParse, stored.PreParse.Raw, notify);
 	}
@@ -6078,19 +6616,25 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadNumericFormatStateRecord(ref platform, state, obj,
-			out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			NumericFormatStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			NumericFormatStateKey);
+		var recordPresent = block.IsNotNull || length != 0;
+		if (recordPresent)
 		{
+			if (!TryReadNumericFormatStateRecord(ref platform, state, obj,
+				out var record)) return false;
 			var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				NumericFormat, record.Format.Raw));
 			if (!raw.IsNull && !CStringCodec.TryReadLength(ref platform, raw,
-				256, out _)) return false;
+				MuiNumericFormatStateAdmission.MaximumLength, out _)) return false;
 			if (raw.Raw != record.Format.Raw)
 			{
 				record.Format = raw;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				var currentBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 					NumericFormatStateKey);
-				if (!MuiNumericFormatStateRecordCodec.Write(ref platform, block,
+				if (!MuiNumericFormatStateRecordCodec.Write(ref platform, currentBlock,
 					record)) return false;
 			}
 			result.Format = raw;
@@ -6099,7 +6643,7 @@ public static class MuiCommonControlCore
 		result.Format = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			NumericFormat, 0));
 		return result.Format.IsNull || CStringCodec.TryReadLength(ref platform,
-			result.Format, 256, out _);
+			result.Format, MuiNumericFormatStateAdmission.MaximumLength, out _);
 	}
 
 	private static bool TryReadNumericFormatStateRecord<TPlatform>(
@@ -6108,21 +6652,31 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			NumericFormatStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			NumericFormatStateKey) != unchecked((int)MuiNumericFormatStateRecord.Size))
-			return false;
-		return MuiNumericFormatStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			NumericFormatStateKey);
+		return length == unchecked((int)MuiNumericFormatStateRecord.Size) &&
+			MuiNumericFormatStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiNumericFormatStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureNumericFormatStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryReadNumericFormatStateRecord(ref platform, state, obj,
-			out _)) return true;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			NumericFormatStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			NumericFormatStateKey);
+		if (block.IsNotNull || length != 0)
+			return TryReadNumericFormatStateRecord(ref platform, state, obj,
+				out _);
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiNumericFormatStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -6131,6 +6685,12 @@ public static class MuiCommonControlCore
 		value.Magic = MuiNumericFormatStateRecord.Cookie;
 		value.Format = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			NumericFormat, 0));
+		if (!MuiNumericFormatStateAdmission.ValidateLive(ref platform, state, obj,
+			value))
+		{
+			platform.Free(scratch, MuiNumericFormatStateRecord.Size);
+			return false;
+		}
 		var written = MuiNumericFormatStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -6147,14 +6707,17 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (!value.Format.IsNull && !CStringCodec.TryReadLength(ref platform,
-			value.Format, 256, out _)) return false;
+			value.Format, MuiNumericFormatStateAdmission.MaximumLength,
+			out _)) return false;
 		if (!EnsureNumericFormatStateRecord(ref platform, state, obj)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			NumericFormatStateKey);
 		var stored = default(MuiNumericFormatStateRecord);
 		stored.Magic = MuiNumericFormatStateRecord.Cookie;
 		stored.Format = value.Format;
-		if (!MuiNumericFormatStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiNumericFormatStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiNumericFormatStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			NumericFormat, stored.Format.Raw, notify);
@@ -6172,19 +6735,25 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadGaugeInfoTextStateRecord(ref platform, state, obj,
-			out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			GaugeInfoTextStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			GaugeInfoTextStateKey);
+		var recordPresent = block.IsNotNull || length != 0;
+		if (recordPresent)
 		{
+			if (!TryReadGaugeInfoTextStateRecord(ref platform, state, obj,
+				out var record)) return false;
 			var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				GaugeInfoText, record.InfoText.Raw));
 			if (!raw.IsNull && !CStringCodec.TryReadLength(ref platform, raw,
-				256, out _)) return false;
+				MuiGaugeInfoTextStateAdmission.MaximumLength, out _)) return false;
 			if (raw.Raw != record.InfoText.Raw)
 			{
 				record.InfoText = raw;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				var currentBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 					GaugeInfoTextStateKey);
-				if (!MuiGaugeInfoTextStateRecordCodec.Write(ref platform, block,
+				if (!MuiGaugeInfoTextStateRecordCodec.Write(ref platform, currentBlock,
 					record)) return false;
 			}
 			result.InfoText = raw;
@@ -6193,7 +6762,7 @@ public static class MuiCommonControlCore
 		result.InfoText = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			GaugeInfoText, 0));
 		return result.InfoText.IsNull || CStringCodec.TryReadLength(ref platform,
-			result.InfoText, 256, out _);
+			result.InfoText, MuiGaugeInfoTextStateAdmission.MaximumLength, out _);
 	}
 
 	private static bool TryReadGaugeInfoTextStateRecord<TPlatform>(
@@ -6202,21 +6771,31 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			GaugeInfoTextStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			GaugeInfoTextStateKey) != unchecked((int)MuiGaugeInfoTextStateRecord.Size))
-			return false;
-		return MuiGaugeInfoTextStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			GaugeInfoTextStateKey);
+		return length == unchecked((int)MuiGaugeInfoTextStateRecord.Size) &&
+			MuiGaugeInfoTextStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiGaugeInfoTextStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureGaugeInfoTextStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryReadGaugeInfoTextStateRecord(ref platform, state, obj,
-			out _)) return true;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			GaugeInfoTextStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			GaugeInfoTextStateKey);
+		if (block.IsNotNull || length != 0)
+			return TryReadGaugeInfoTextStateRecord(ref platform, state, obj,
+				out _);
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiGaugeInfoTextStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -6225,6 +6804,12 @@ public static class MuiCommonControlCore
 		value.Magic = MuiGaugeInfoTextStateRecord.Cookie;
 		value.InfoText = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			GaugeInfoText, 0));
+		if (!MuiGaugeInfoTextStateAdmission.ValidateLive(ref platform, state, obj,
+			value))
+		{
+			platform.Free(scratch, MuiGaugeInfoTextStateRecord.Size);
+			return false;
+		}
 		var written = MuiGaugeInfoTextStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -6241,14 +6826,17 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (!value.InfoText.IsNull && !CStringCodec.TryReadLength(ref platform,
-			value.InfoText, 256, out _)) return false;
+			value.InfoText, MuiGaugeInfoTextStateAdmission.MaximumLength,
+			out _)) return false;
 		if (!EnsureGaugeInfoTextStateRecord(ref platform, state, obj)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			GaugeInfoTextStateKey);
 		var stored = default(MuiGaugeInfoTextStateRecord);
 		stored.Magic = MuiGaugeInfoTextStateRecord.Cookie;
 		stored.InfoText = value.InfoText;
-		if (!MuiGaugeInfoTextStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiGaugeInfoTextStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiGaugeInfoTextStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			GaugeInfoText, stored.InfoText.Raw, notify);
@@ -6266,19 +6854,26 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadLevelmeterLabelStateRecord(ref platform, state, obj,
-			out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			LevelmeterLabelStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			LevelmeterLabelStateKey);
+		var recordPresent = block.IsNotNull || length != 0;
+		if (recordPresent)
 		{
+			if (!TryReadLevelmeterLabelStateRecord(ref platform, state, obj,
+				out var record)) return false;
 			var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				LevelmeterLabel, record.Label.Raw));
 			if (!raw.IsNull && !CStringCodec.TryReadLength(ref platform, raw,
-				64, out _)) return false;
+				MuiLevelmeterLabelStateAdmission.MaximumLength, out _)) return false;
 			if (raw.Raw != record.Label.Raw)
 			{
 				record.Label = raw;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				var currentBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 					LevelmeterLabelStateKey);
-				if (!MuiLevelmeterLabelStateRecordCodec.Write(ref platform, block,
+				if (!MuiLevelmeterLabelStateRecordCodec.Write(ref platform,
+					currentBlock,
 					record)) return false;
 			}
 			result.Label = raw;
@@ -6287,7 +6882,7 @@ public static class MuiCommonControlCore
 		result.Label = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			LevelmeterLabel, 0));
 		return result.Label.IsNull || CStringCodec.TryReadLength(ref platform,
-			result.Label, 64, out _);
+			result.Label, MuiLevelmeterLabelStateAdmission.MaximumLength, out _);
 	}
 
 	private static bool TryReadLevelmeterLabelStateRecord<TPlatform>(
@@ -6296,21 +6891,31 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			LevelmeterLabelStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			LevelmeterLabelStateKey) != unchecked((int)MuiLevelmeterLabelStateRecord.Size))
-			return false;
-		return MuiLevelmeterLabelStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			LevelmeterLabelStateKey);
+		return length == unchecked((int)MuiLevelmeterLabelStateRecord.Size) &&
+			MuiLevelmeterLabelStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiLevelmeterLabelStateAdmission.ValidateLive(
+				ref platform, state, obj, value);
 	}
 
 	private static bool EnsureLevelmeterLabelStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryReadLevelmeterLabelStateRecord(ref platform, state, obj,
-			out _)) return true;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			LevelmeterLabelStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			LevelmeterLabelStateKey);
+		if (block.IsNotNull || length != 0)
+			return TryReadLevelmeterLabelStateRecord(ref platform, state, obj,
+				out _);
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiLevelmeterLabelStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -6319,6 +6924,12 @@ public static class MuiCommonControlCore
 		value.Magic = MuiLevelmeterLabelStateRecord.Cookie;
 		value.Label = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			LevelmeterLabel, 0));
+		if (!MuiLevelmeterLabelStateAdmission.ValidateLive(ref platform, state, obj,
+			value))
+		{
+			platform.Free(scratch, MuiLevelmeterLabelStateRecord.Size);
+			return false;
+		}
 		var written = MuiLevelmeterLabelStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -6335,14 +6946,17 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (!value.Label.IsNull && !CStringCodec.TryReadLength(ref platform,
-			value.Label, 64, out _)) return false;
+			value.Label, MuiLevelmeterLabelStateAdmission.MaximumLength,
+			out _)) return false;
 		if (!EnsureLevelmeterLabelStateRecord(ref platform, state, obj)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			LevelmeterLabelStateKey);
 		var stored = default(MuiLevelmeterLabelStateRecord);
 		stored.Magic = MuiLevelmeterLabelStateRecord.Cookie;
 		stored.Label = value.Label;
-		if (!MuiLevelmeterLabelStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiLevelmeterLabelStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiLevelmeterLabelStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			LevelmeterLabel, stored.Label.Raw, notify);
@@ -6360,14 +6974,25 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var imageState = ReadRaw(ref platform, state, obj, ImageState, 0);
 		var selected = ReadRaw(ref platform, state, obj, Selected, 0);
 		var freeHoriz = ReadRaw(ref platform, state, obj, ImageFreeHoriz, 0);
 		var freeVert = ReadRaw(ref platform, state, obj, ImageFreeVert, 0);
 		var showSelState = ReadRaw(ref platform, state, obj, ShowSelState, 1);
-		if (TryReadImageRenderStateRecord(ref platform, state, obj,
-			out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ImageRenderStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ImageRenderStateKey);
+		var present = block.IsNotNull || length != 0;
+		if (present)
 		{
+			if (length != unchecked((int)MuiImageRenderStateRecord.Size) ||
+				!MuiImageRenderStateRecordCodec.TryRead(ref platform, block,
+					out var record) ||
+				!MuiImageRenderStateAdmission.ValidateLive(ref platform, state, obj,
+					record)) return false;
 			if (record.ImageState != imageState || record.Selected != selected ||
 				record.FreeHoriz != freeHoriz || record.FreeVert != freeVert ||
 				record.ShowSelState != showSelState)
@@ -6377,8 +7002,6 @@ public static class MuiCommonControlCore
 				record.FreeHoriz = freeHoriz;
 				record.FreeVert = freeVert;
 				record.ShowSelState = showSelState;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					ImageRenderStateKey);
 				if (!MuiImageRenderStateRecordCodec.Write(ref platform, block,
 					record)) return false;
 			}
@@ -6397,21 +7020,31 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ImageRenderStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			ImageRenderStateKey) != unchecked((int)MuiImageRenderStateRecord.Size))
 			return false;
 		return MuiImageRenderStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiImageRenderStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureImageRenderStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		if (TryReadImageRenderStateRecord(ref platform, state, obj,
 			out _)) return true;
+		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ImageRenderStateKey);
+		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ImageRenderStateKey);
+		if (existing.IsNotNull || existingLength != 0) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiImageRenderStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -6438,6 +7071,8 @@ public static class MuiCommonControlCore
 		MuiImageRenderState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		if (!EnsureImageRenderStateRecord(ref platform, state, obj))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -6449,7 +7084,9 @@ public static class MuiCommonControlCore
 		stored.FreeHoriz = value.FreeHoriz;
 		stored.FreeVert = value.FreeVert;
 		stored.ShowSelState = value.ShowSelState;
-		if (!MuiImageRenderStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiImageRenderStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiImageRenderStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			ImageState, stored.ImageState, false) &&
@@ -6475,16 +7112,25 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadImageOldImageStateRecord(ref platform, state, obj,
-			out var record))
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ImageOldImageStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ImageOldImageStateKey);
+		var present = block.IsNotNull || length != 0;
+		if (present)
 		{
+			if (length != unchecked((int)MuiImageOldImageStateRecord.Size) ||
+				!MuiImageOldImageStateRecordCodec.TryRead(ref platform, block,
+					out var record) ||
+				!MuiImageOldImageStateAdmission.ValidateLive(ref platform, state, obj,
+					record)) return false;
 			var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				ImageOldImage, record.Image.Raw));
 			if (raw.Raw != record.Image.Raw)
 			{
 				record.Image = raw;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					ImageOldImageStateKey);
 				if (!MuiImageOldImageStateRecordCodec.Write(ref platform, block,
 					record)) return false;
 			}
@@ -6502,21 +7148,31 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ImageOldImageStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			ImageOldImageStateKey) != unchecked((int)MuiImageOldImageStateRecord.Size))
 			return false;
 		return MuiImageOldImageStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiImageOldImageStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureImageOldImageStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		if (TryReadImageOldImageStateRecord(ref platform, state, obj,
 			out _)) return true;
+		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ImageOldImageStateKey);
+		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ImageOldImageStateKey);
+		if (existing.IsNotNull || existingLength != 0) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiImageOldImageStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -6540,6 +7196,8 @@ public static class MuiCommonControlCore
 		MuiImageOldImageState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		if (!EnsureImageOldImageStateRecord(ref platform, state, obj))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -6547,7 +7205,9 @@ public static class MuiCommonControlCore
 		var stored = default(MuiImageOldImageStateRecord);
 		stored.Magic = MuiImageOldImageStateRecord.Cookie;
 		stored.Image = value.Image;
-		if (!MuiImageOldImageStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiImageOldImageStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiImageOldImageStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			ImageOldImage, stored.Image.Raw, false);
@@ -6565,8 +7225,17 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadImageSpecStateRecord(ref platform, state, obj,
-			out var record))
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
+		var recordBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ImageSpecStateKey);
+		var recordLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ImageSpecStateKey);
+		var recordPresent = recordBlock.IsNotNull || recordLength != 0;
+		var record = default(MuiImageSpecStateRecord);
+		if (recordPresent && !TryReadImageSpecStateRecord(ref platform, state, obj,
+			out record)) return false;
+		if (recordPresent)
 		{
 			var present = MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
 				obj, ImageSpec, out var raw);
@@ -6582,10 +7251,9 @@ public static class MuiCommonControlCore
 				if (present) record.Raw = raw;
 				record.BuiltinPresent = builtinPresentValue;
 				if (builtinPresent) record.Builtin = builtin;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					ImageSpecStateKey);
-				if (!MuiImageSpecStateRecordCodec.Write(ref platform, block,
-					record)) return false;
+				if (!MuiImageSpecStateAdmission.ValidateLive(ref platform, state, obj,
+					record) || !MuiImageSpecStateRecordCodec.Write(ref platform,
+					recordBlock, record)) return false;
 			}
 			result.Present = present;
 			result.Raw = present ? raw : record.Raw;
@@ -6602,6 +7270,14 @@ public static class MuiCommonControlCore
 		result.Raw = hasSpec ? fallback : 0;
 		result.BuiltinPresent = hasBuiltin;
 		result.Builtin = hasBuiltin ? builtinFallback : 0;
+		var fallbackRecord = default(MuiImageSpecStateRecord);
+		fallbackRecord.Magic = MuiImageSpecStateRecord.Cookie;
+		fallbackRecord.Present = hasSpec ? 1u : 0u;
+		fallbackRecord.Raw = result.Raw;
+		fallbackRecord.BuiltinPresent = hasBuiltin ? 1u : 0u;
+		fallbackRecord.Builtin = result.Builtin;
+		if (!MuiImageSpecStateAdmission.ValidateLive(ref platform, state, obj,
+			fallbackRecord)) return false;
 		return true;
 	}
 
@@ -6614,18 +7290,25 @@ public static class MuiCommonControlCore
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ImageSpecStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			ImageSpecStateKey) != unchecked((int)MuiImageSpecStateRecord.Size))
-			return false;
-		return MuiImageSpecStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			ImageSpecStateKey) != unchecked((int)MuiImageSpecStateRecord.Size) ||
+			!MuiImageSpecStateRecordCodec.TryRead(ref platform, block,
+				out value)) return false;
+		return MuiImageSpecStateAdmission.ValidateLive(ref platform, state, obj,
+			value);
 	}
 
 	private static bool EnsureImageSpecStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryReadImageSpecStateRecord(ref platform, state, obj,
-			out _)) return true;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
+		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ImageSpecStateKey);
+		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state,
+			obj, ImageSpecStateKey);
+		if (existing.IsNotNull || existingLength != 0)
+			return TryReadImageSpecStateRecord(ref platform, state, obj, out _);
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiImageSpecStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -6643,6 +7326,13 @@ public static class MuiCommonControlCore
 		{
 			value.BuiltinPresent = 1;
 			value.Builtin = builtin;
+		}
+		if (!MuiImageSpecStateAdmission.ValidateLive(ref platform, state, obj,
+			value))
+		{
+			platform.Clear(scratch, MuiImageSpecStateRecord.Size);
+			platform.Free(scratch, MuiImageSpecStateRecord.Size);
+			return false;
 		}
 		var written = MuiImageSpecStateRecordCodec.Write(ref platform, scratch,
 			value);
@@ -6667,7 +7357,9 @@ public static class MuiCommonControlCore
 		stored.Raw = value.Raw;
 		stored.BuiltinPresent = value.BuiltinPresent ? 1u : 0u;
 		stored.Builtin = value.Builtin;
-		if (!MuiImageSpecStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiImageSpecStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiImageSpecStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		if (value.Present && !MuiHeadlessObjectCore.SetAttribute(ref platform,
 			state, obj, ImageSpec, stored.Raw, false)) return false;
@@ -6688,17 +7380,26 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var width = ReadRaw(ref platform, state, obj, BitmapWidth, 0);
 		var height = ReadRaw(ref platform, state, obj, BitmapHeight, 0);
-		if (TryReadBitmapGeometryStateRecord(ref platform, state, obj,
-			out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			BitmapGeometryStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			BitmapGeometryStateKey);
+		var present = block.IsNotNull || length != 0;
+		if (present)
 		{
+			if (length != unchecked((int)MuiBitmapGeometryStateRecord.Size) ||
+				!MuiBitmapGeometryStateRecordCodec.TryRead(ref platform, block,
+					out var record) ||
+				!MuiBitmapGeometryStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			if (record.Width != width || record.Height != height)
 			{
 				record.Width = width;
 				record.Height = height;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					BitmapGeometryStateKey);
 				if (!MuiBitmapGeometryStateRecordCodec.Write(ref platform, block,
 					record)) return false;
 			}
@@ -6714,21 +7415,31 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			BitmapGeometryStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			BitmapGeometryStateKey) !=
 			unchecked((int)MuiBitmapGeometryStateRecord.Size)) return false;
 		return MuiBitmapGeometryStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiBitmapGeometryStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureBitmapGeometryStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		if (TryReadBitmapGeometryStateRecord(ref platform, state, obj,
 			out _)) return true;
+		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			BitmapGeometryStateKey);
+		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state,
+			obj, BitmapGeometryStateKey);
+		if (existing.IsNotNull || existingLength != 0) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiBitmapGeometryStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -6752,6 +7463,8 @@ public static class MuiCommonControlCore
 		MuiBitmapGeometryState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		if (!EnsureBitmapGeometryStateRecord(ref platform, state, obj))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -6760,7 +7473,9 @@ public static class MuiCommonControlCore
 		stored.Magic = MuiBitmapGeometryStateRecord.Cookie;
 		stored.Width = value.Width;
 		stored.Height = value.Height;
-		if (!MuiBitmapGeometryStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiBitmapGeometryStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiBitmapGeometryStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			BitmapWidth, stored.Width, false) &&
@@ -6780,20 +7495,29 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var compression = ReadRaw(ref platform, state, obj, BodychunkCompression, 0);
 		var depth = ReadRaw(ref platform, state, obj, BodychunkDepth, 1);
 		var masking = ReadRaw(ref platform, state, obj, BodychunkMasking, 0);
-		if (TryReadBodychunkFormatStateRecord(ref platform, state, obj,
-			out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			BodychunkFormatStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			BodychunkFormatStateKey);
+		var present = block.IsNotNull || length != 0;
+		if (present)
 		{
+			if (length != unchecked((int)MuiBodychunkFormatStateRecord.Size) ||
+				!MuiBodychunkFormatStateRecordCodec.TryRead(ref platform, block,
+					out var record) ||
+				!MuiBodychunkFormatStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			if (record.Compression != compression || record.Depth != depth ||
 				record.Masking != masking)
 			{
 				record.Compression = compression;
 				record.Depth = depth;
 				record.Masking = masking;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					BodychunkFormatStateKey);
 				if (!MuiBodychunkFormatStateRecordCodec.Write(ref platform, block,
 					record)) return false;
 			}
@@ -6810,21 +7534,31 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			BodychunkFormatStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			BodychunkFormatStateKey) !=
 			unchecked((int)MuiBodychunkFormatStateRecord.Size)) return false;
 		return MuiBodychunkFormatStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiBodychunkFormatStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureBodychunkFormatStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		if (TryReadBodychunkFormatStateRecord(ref platform, state, obj,
 			out _)) return true;
+		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			BodychunkFormatStateKey);
+		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			BodychunkFormatStateKey);
+		if (existing.IsNotNull || existingLength != 0) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiBodychunkFormatStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -6850,6 +7584,8 @@ public static class MuiCommonControlCore
 		MuiBodychunkFormatState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		if (!EnsureBodychunkFormatStateRecord(ref platform, state, obj))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -6859,7 +7595,9 @@ public static class MuiCommonControlCore
 		stored.Compression = value.Compression;
 		stored.Depth = value.Depth;
 		stored.Masking = value.Masking;
-		if (!MuiBodychunkFormatStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiBodychunkFormatStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiBodychunkFormatStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			BodychunkCompression, stored.Compression, false) &&
@@ -6881,24 +7619,27 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadBitmapRemappedStateRecord(ref platform, state, obj,
-			out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			BitmapRemappedStateKey);
+		if (length != 0 && !TryReadBitmapRemappedStateRecord(ref platform, state,
+			obj, out _)) return false;
+		if (length == 0 && !EnsureBitmapRemappedStateRecord(ref platform, state,
+			obj)) return false;
+		if (!TryReadBitmapRemappedStateRecord(ref platform, state, obj,
+			out var record)) return false;
+		var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
+			BitmapRemapped, record.Remapped.Raw));
+		if (raw.Raw != record.Remapped.Raw)
 		{
-			var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
-				BitmapRemapped, record.Remapped.Raw));
-			if (raw.Raw != record.Remapped.Raw)
-			{
-				record.Remapped = raw;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					BitmapRemappedStateKey);
-				if (!MuiBitmapRemappedStateRecordCodec.Write(ref platform, block,
+			record.Remapped = raw;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				BitmapRemappedStateKey);
+			if (!MuiBitmapRemappedStateAdmission.ValidateLive(ref platform,
+				state, obj, record) ||
+				!MuiBitmapRemappedStateRecordCodec.Write(ref platform, block,
 					record)) return false;
-			}
-			result.Remapped = raw;
-			return true;
 		}
-		result.Remapped = APTR.FromPointer(ReadRaw(ref platform, state, obj,
-			BitmapRemapped, 0));
+		result.Remapped = raw;
 		return true;
 	}
 
@@ -6913,24 +7654,35 @@ public static class MuiCommonControlCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			BitmapRemappedStateKey) != unchecked((int)
 				MuiBitmapRemappedStateRecord.Size)) return false;
-		return MuiBitmapRemappedStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiBitmapRemappedStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiBitmapRemappedStateAdmission.ValidateLive(
+				ref platform, state, obj, value);
 	}
+
+	internal static bool BitmapRemappedStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			BitmapRemappedStateKey) == 0 ||
+		TryReadBitmapRemappedStateRecord(ref platform, state, obj, out _);
 
 	private static bool EnsureBitmapRemappedStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!BitmapRemappedStateAvailable(ref platform, state, obj)) return false;
 		if (TryReadBitmapRemappedStateRecord(ref platform, state, obj,
 			out _)) return true;
-		var scratch = MuiHeadlessMemory.Allocate(ref platform,
-			MuiBitmapRemappedStateRecord.Size);
-		if (scratch.IsNull) return false;
-		platform.Clear(scratch, MuiBitmapRemappedStateRecord.Size);
 		var value = default(MuiBitmapRemappedStateRecord);
 		value.Magic = MuiBitmapRemappedStateRecord.Cookie;
 		value.Remapped = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			BitmapRemapped, 0));
+		if (!MuiBitmapRemappedStateAdmission.ValidateLive(ref platform, state, obj,
+			value)) return false;
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiBitmapRemappedStateRecord.Size);
+		if (scratch.IsNull) return false;
+		platform.Clear(scratch, MuiBitmapRemappedStateRecord.Size);
 		var written = MuiBitmapRemappedStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
@@ -6946,6 +7698,8 @@ public static class MuiCommonControlCore
 		MuiBitmapRemappedState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		if (!EnsureBitmapRemappedStateRecord(ref platform, state, obj))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -6953,7 +7707,9 @@ public static class MuiCommonControlCore
 		var stored = default(MuiBitmapRemappedStateRecord);
 		stored.Magic = MuiBitmapRemappedStateRecord.Cookie;
 		stored.Remapped = value.Remapped;
-		if (!MuiBitmapRemappedStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiBitmapRemappedStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiBitmapRemappedStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			BitmapRemapped, stored.Remapped.Raw, false);
@@ -6971,53 +7727,47 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadBitmapPolicyStateRecord(ref platform, state, obj,
-			out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			BitmapPolicyStateKey);
+		if (length != 0 && !TryReadBitmapPolicyStateRecord(ref platform, state,
+			obj, out _)) return false;
+		if (length == 0 && !EnsureBitmapPolicyStateRecord(ref platform, state,
+			obj)) return false;
+		if (!TryReadBitmapPolicyStateRecord(ref platform, state, obj,
+			out var record)) return false;
+		var candidate = record;
+		candidate.Alpha = ReadRaw(ref platform, state, obj, BitmapAlpha,
+			record.Alpha);
+		candidate.MappingTable = ReadRaw(ref platform, state, obj,
+			BitmapMappingTable, record.MappingTable);
+		candidate.Precision = ReadRaw(ref platform, state, obj, BitmapPrecision,
+			record.Precision);
+		candidate.SourceColors = ReadRaw(ref platform, state, obj,
+			BitmapSourceColors, record.SourceColors);
+		candidate.Transparent = ReadRaw(ref platform, state, obj,
+			BitmapTransparent, record.Transparent);
+		candidate.UseFriend = ReadRaw(ref platform, state, obj, BitmapUseFriend,
+			record.UseFriend);
+		if (!MuiBitmapPolicyStateAdmission.ValidateLive(ref platform, state, obj,
+			candidate)) return false;
+		if (candidate.Alpha != record.Alpha ||
+			candidate.MappingTable != record.MappingTable ||
+			candidate.Precision != record.Precision ||
+			candidate.SourceColors != record.SourceColors ||
+			candidate.Transparent != record.Transparent ||
+			candidate.UseFriend != record.UseFriend)
 		{
-			var alpha = ReadRaw(ref platform, state, obj, BitmapAlpha,
-				record.Alpha);
-			var mappingTable = ReadRaw(ref platform, state, obj,
-				BitmapMappingTable, record.MappingTable);
-			var precision = ReadRaw(ref platform, state, obj, BitmapPrecision,
-				record.Precision);
-			var sourceColors = ReadRaw(ref platform, state, obj,
-				BitmapSourceColors, record.SourceColors);
-			var transparent = ReadRaw(ref platform, state, obj,
-				BitmapTransparent, record.Transparent);
-			var useFriend = ReadRaw(ref platform, state, obj, BitmapUseFriend,
-				record.UseFriend);
-			if (alpha != record.Alpha || mappingTable != record.MappingTable ||
-				precision != record.Precision || sourceColors != record.SourceColors ||
-				transparent != record.Transparent || useFriend != record.UseFriend)
-			{
-				record.Alpha = alpha;
-				record.MappingTable = mappingTable;
-				record.Precision = precision;
-				record.SourceColors = sourceColors;
-				record.Transparent = transparent;
-				record.UseFriend = useFriend;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					BitmapPolicyStateKey);
-				if (!MuiBitmapPolicyStateRecordCodec.Write(ref platform, block,
-					record)) return false;
-			}
-			result.Alpha = alpha;
-			result.MappingTable = mappingTable;
-			result.Precision = precision;
-			result.SourceColors = sourceColors;
-			result.Transparent = transparent;
-			result.UseFriend = useFriend;
-			return true;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				BitmapPolicyStateKey);
+			if (!MuiBitmapPolicyStateRecordCodec.Write(ref platform, block,
+				candidate)) return false;
 		}
-		result.Alpha = ReadRaw(ref platform, state, obj, BitmapAlpha, 0);
-		result.MappingTable = ReadRaw(ref platform, state, obj,
-			BitmapMappingTable, 0);
-		result.Precision = ReadRaw(ref platform, state, obj, BitmapPrecision, 0);
-		result.SourceColors = ReadRaw(ref platform, state, obj,
-			BitmapSourceColors, 0);
-		result.Transparent = ReadRaw(ref platform, state, obj,
-			BitmapTransparent, 0);
-		result.UseFriend = ReadRaw(ref platform, state, obj, BitmapUseFriend, 0);
+		result.Alpha = candidate.Alpha;
+		result.MappingTable = candidate.MappingTable;
+		result.Precision = candidate.Precision;
+		result.SourceColors = candidate.SourceColors;
+		result.Transparent = candidate.Transparent;
+		result.UseFriend = candidate.UseFriend;
 		return true;
 	}
 
@@ -7032,20 +7782,25 @@ public static class MuiCommonControlCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			BitmapPolicyStateKey) != unchecked((int)MuiBitmapPolicyStateRecord.Size))
 			return false;
-		return MuiBitmapPolicyStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiBitmapPolicyStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiBitmapPolicyStateAdmission.ValidateLive(
+				ref platform, state, obj, value);
 	}
+
+	internal static bool BitmapPolicyStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			BitmapPolicyStateKey) == 0 ||
+		TryReadBitmapPolicyStateRecord(ref platform, state, obj, out _);
 
 	private static bool EnsureBitmapPolicyStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!BitmapPolicyStateAvailable(ref platform, state, obj)) return false;
 		if (TryReadBitmapPolicyStateRecord(ref platform, state, obj,
 			out _)) return true;
-		var scratch = MuiHeadlessMemory.Allocate(ref platform,
-			MuiBitmapPolicyStateRecord.Size);
-		if (scratch.IsNull) return false;
-		platform.Clear(scratch, MuiBitmapPolicyStateRecord.Size);
 		var value = default(MuiBitmapPolicyStateRecord);
 		value.Magic = MuiBitmapPolicyStateRecord.Cookie;
 		value.Alpha = ReadRaw(ref platform, state, obj, BitmapAlpha, 0);
@@ -7057,6 +7812,12 @@ public static class MuiCommonControlCore
 		value.Transparent = ReadRaw(ref platform, state, obj,
 			BitmapTransparent, 0);
 		value.UseFriend = ReadRaw(ref platform, state, obj, BitmapUseFriend, 0);
+		if (!MuiBitmapPolicyStateAdmission.ValidateLive(ref platform, state, obj,
+			value)) return false;
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiBitmapPolicyStateRecord.Size);
+		if (scratch.IsNull) return false;
+		platform.Clear(scratch, MuiBitmapPolicyStateRecord.Size);
 		var written = MuiBitmapPolicyStateRecordCodec.Write(ref platform, scratch,
 			value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
@@ -7072,6 +7833,8 @@ public static class MuiCommonControlCore
 		MuiBitmapPolicyState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!BitmapPolicyStateAvailable(ref platform, state, obj)) return false;
 		if (!EnsureBitmapPolicyStateRecord(ref platform, state, obj)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			BitmapPolicyStateKey);
@@ -7083,7 +7846,9 @@ public static class MuiCommonControlCore
 		stored.SourceColors = value.SourceColors;
 		stored.Transparent = value.Transparent;
 		stored.UseFriend = value.UseFriend;
-		if (!MuiBitmapPolicyStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiBitmapPolicyStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiBitmapPolicyStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			BitmapAlpha, stored.Alpha, false) &&
@@ -7122,17 +7887,26 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var attribute = BitmapSourceAttribute(cls);
-		if (TryReadBitmapSourceStateRecord(ref platform, state, obj,
-			out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			BitmapSourceStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			BitmapSourceStateKey);
+		var present = block.IsNotNull || length != 0;
+		if (present)
 		{
+			if (length != unchecked((int)MuiBitmapSourceStateRecord.Size) ||
+				!MuiBitmapSourceStateRecordCodec.TryRead(ref platform, block,
+					out var record) ||
+				!MuiBitmapSourceStateAdmission.ValidateLive(ref platform, state, obj,
+					record)) return false;
 			var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj, attribute,
 				record.Source.Raw));
 			if (raw.Raw != record.Source.Raw)
 			{
 				record.Source = raw;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					BitmapSourceStateKey);
 				if (!MuiBitmapSourceStateRecordCodec.Write(ref platform, block,
 					record)) return false;
 			}
@@ -7150,21 +7924,31 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			BitmapSourceStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			BitmapSourceStateKey) != unchecked((int)MuiBitmapSourceStateRecord.Size))
 			return false;
 		return MuiBitmapSourceStateRecordCodec.TryRead(ref platform, block,
-			out value);
+			out value) && MuiBitmapSourceStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureBitmapSourceStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj, uint sourceAttribute)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		if (TryReadBitmapSourceStateRecord(ref platform, state, obj,
 			out _)) return true;
+		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			BitmapSourceStateKey);
+		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			BitmapSourceStateKey);
+		if (existing.IsNotNull || existingLength != 0) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiBitmapSourceStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -7188,6 +7972,8 @@ public static class MuiCommonControlCore
 		MuiBitmapSourceState value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		if (!EnsureBitmapSourceStateRecord(ref platform, state, obj,
 			sourceAttribute)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -7195,7 +7981,9 @@ public static class MuiCommonControlCore
 		var stored = default(MuiBitmapSourceStateRecord);
 		stored.Magic = MuiBitmapSourceStateRecord.Cookie;
 		stored.Source = value.Source;
-		if (!MuiBitmapSourceStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiBitmapSourceStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiBitmapSourceStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			sourceAttribute, stored.Source.Raw, false);
@@ -7213,9 +8001,15 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadRectangleBarTitleStateRecord(ref platform, state, obj,
-			out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			RectangleBarTitleStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			RectangleBarTitleStateKey);
+		var recordPresent = block.IsNotNull || length != 0;
+		if (recordPresent)
 		{
+			if (!TryReadRectangleBarTitleStateRecord(ref platform, state, obj,
+				out var record)) return false;
 			var present = MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
 				obj, RectangleBarTitle, out var raw);
 			var presentValue = present ? 1u : 0u;
@@ -7224,8 +8018,6 @@ public static class MuiCommonControlCore
 			{
 				record.Present = presentValue;
 				if (present) record.Title = APTR.FromPointer(raw);
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					RectangleBarTitleStateKey);
 				if (!MuiRectangleBarTitleStateRecordCodec.Write(ref platform, block,
 					record)) return false;
 			}
@@ -7245,25 +8037,31 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			RectangleBarTitleStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			RectangleBarTitleStateKey) != unchecked((int)MuiRectangleBarTitleStateRecord.Size))
-			return false;
-		return MuiRectangleBarTitleStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			RectangleBarTitleStateKey);
+		return length == unchecked((int)MuiRectangleBarTitleStateRecord.Size) &&
+			MuiRectangleBarTitleStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) && MuiRectangleBarTitleStateAdmission.ValidateLive(
+				ref platform, state, obj, value);
 	}
 
 	private static bool EnsureRectangleBarTitleStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryReadRectangleBarTitleStateRecord(ref platform, state, obj,
-			out _)) return true;
-		var scratch = MuiHeadlessMemory.Allocate(ref platform,
-			MuiRectangleBarTitleStateRecord.Size);
-		if (scratch.IsNull) return false;
-		platform.Clear(scratch, MuiRectangleBarTitleStateRecord.Size);
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			RectangleBarTitleStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			RectangleBarTitleStateKey);
+		if (block.IsNotNull || length != 0)
+			return TryReadRectangleBarTitleStateRecord(ref platform, state, obj,
+				out _);
 		var value = default(MuiRectangleBarTitleStateRecord);
 		value.Magic = MuiRectangleBarTitleStateRecord.Cookie;
 		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
@@ -7272,6 +8070,12 @@ public static class MuiCommonControlCore
 			value.Present = 1;
 			value.Title = APTR.FromPointer(title);
 		}
+		if (!MuiRectangleBarTitleStateAdmission.ValidateLive(ref platform, state,
+			obj, value)) return false;
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiRectangleBarTitleStateRecord.Size);
+		if (scratch.IsNull) return false;
+		platform.Clear(scratch, MuiRectangleBarTitleStateRecord.Size);
 		var written = MuiRectangleBarTitleStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -7295,8 +8099,9 @@ public static class MuiCommonControlCore
 		stored.Magic = MuiRectangleBarTitleStateRecord.Cookie;
 		stored.Present = value.Present ? 1u : 0u;
 		stored.Title = value.Title;
-		if (!MuiRectangleBarTitleStateRecordCodec.Write(ref platform, block,
-			stored)) return false;
+		if (!MuiRectangleBarTitleStateAdmission.ValidateLive(ref platform, state,
+			obj, stored) || !MuiRectangleBarTitleStateRecordCodec.Write(ref platform,
+			block, stored)) return false;
 		if (!value.Present) return true;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			RectangleBarTitle, stored.Title.Raw, false);
@@ -7314,9 +8119,15 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadControlFontStateRecord(ref platform, state, obj,
-			out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ControlFontStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ControlFontStateKey);
+		var recordPresent = block.IsNotNull || length != 0;
+		if (recordPresent)
 		{
+			if (!TryReadControlFontStateRecord(ref platform, state, obj,
+				out var record)) return false;
 			var present = MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
 				obj, Font, out var raw);
 			var presentValue = present ? 1u : 0u;
@@ -7325,8 +8136,6 @@ public static class MuiCommonControlCore
 			{
 				record.Present = presentValue;
 				if (present) record.Font = APTR.FromPointer(raw);
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					ControlFontStateKey);
 				if (!MuiControlFontStateRecordCodec.Write(ref platform, block,
 					record)) return false;
 			}
@@ -7346,25 +8155,31 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ControlFontStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			ControlFontStateKey) != unchecked((int)MuiControlFontStateRecord.Size))
-			return false;
-		return MuiControlFontStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ControlFontStateKey);
+		if (block.IsNull && length == 0) return false;
+		return length == unchecked((int)MuiControlFontStateRecord.Size) &&
+			MuiControlFontStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiControlFontStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureControlFontStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryReadControlFontStateRecord(ref platform, state, obj,
-			out _)) return true;
-		var scratch = MuiHeadlessMemory.Allocate(ref platform,
-			MuiControlFontStateRecord.Size);
-		if (scratch.IsNull) return false;
-		platform.Clear(scratch, MuiControlFontStateRecord.Size);
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ControlFontStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ControlFontStateKey);
+		if (block.IsNotNull || length != 0)
+			return TryReadControlFontStateRecord(ref platform, state, obj, out _);
 		var value = default(MuiControlFontStateRecord);
 		value.Magic = MuiControlFontStateRecord.Cookie;
 		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj, Font,
@@ -7373,6 +8188,12 @@ public static class MuiCommonControlCore
 			value.Present = 1;
 			value.Font = APTR.FromPointer(font);
 		}
+		if (!MuiControlFontStateAdmission.ValidateLive(ref platform, state, obj,
+			value)) return false;
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiControlFontStateRecord.Size);
+		if (scratch.IsNull) return false;
+		platform.Clear(scratch, MuiControlFontStateRecord.Size);
 		var written = MuiControlFontStateRecordCodec.Write(ref platform, scratch,
 			value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -7395,7 +8216,9 @@ public static class MuiCommonControlCore
 		stored.Magic = MuiControlFontStateRecord.Cookie;
 		stored.Present = value.Present ? 1u : 0u;
 		stored.Font = value.Font;
-		if (!MuiControlFontStateRecordCodec.Write(ref platform, block, stored))
+		if (!MuiControlFontStateAdmission.ValidateLive(ref platform, state, obj,
+			stored) || !MuiControlFontStateRecordCodec.Write(ref platform, block,
+			stored))
 			return false;
 		if (!value.Present) return true;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
@@ -7421,9 +8244,14 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadImageFontMatchStateRecord(ref platform, state, obj,
-			out var record))
+		var stateBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ImageFontMatchStateKey);
+		var stateLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ImageFontMatchStateKey);
+		if (stateBlock.IsNotNull || stateLength != 0)
 		{
+			if (!TryReadImageFontMatchStateRecord(ref platform, state, obj,
+				out var record)) return false;
 			var match = ReadRaw(ref platform, state, obj, ImageFontMatch,
 				record.Match);
 			var height = ReadRaw(ref platform, state, obj, ImageFontMatchHeight,
@@ -7459,19 +8287,32 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ImageFontMatchStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			ImageFontMatchStateKey) != unchecked((int)
-				MuiImageFontMatchStateRecord.Size)) return false;
-		return MuiImageFontMatchStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ImageFontMatchStateKey);
+		if (block.IsNull && length == 0) return false;
+		return length == unchecked((int)MuiImageFontMatchStateRecord.Size) &&
+			MuiImageFontMatchStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiImageFontMatchStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool EnsureImageFontMatchStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ImageFontMatchStateKey);
+		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ImageFontMatchStateKey);
+		if (existing.IsNotNull || existingLength != 0)
+			return TryReadImageFontMatchStateRecord(ref platform, state, obj,
+				out _);
 		if (TryReadImageFontMatchStateRecord(ref platform, state, obj,
 			out _)) return true;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
@@ -7483,7 +8324,8 @@ public static class MuiCommonControlCore
 		value.Match = ReadRaw(ref platform, state, obj, ImageFontMatch, 0);
 		value.Height = ReadRaw(ref platform, state, obj, ImageFontMatchHeight, 0);
 		value.Width = ReadRaw(ref platform, state, obj, ImageFontMatchWidth, 0);
-		var written = MuiImageFontMatchStateRecordCodec.Write(ref platform,
+		var written = MuiImageFontMatchStateAdmission.ValidateLive(ref platform,
+			state, obj, value) && MuiImageFontMatchStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
 			obj, ImageFontMatchStateKey, scratch,
@@ -7523,7 +8365,8 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform =>
 		TryReadImageFontMatchStateRecord(ref platform, state, obj, out value);
 
-	private const int ImageFontMatchStringCapacity = 128;
+	private const int ImageFontMatchStringCapacity =
+		MuiImageFontMatchStringStateAdmission.MaximumLength;
 
 	private static bool IsValidImageFontMatchString<TPlatform>(
 		ref TPlatform platform, APTR value)
@@ -7537,9 +8380,15 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		result = default;
-		if (TryReadImageFontMatchStringStateRecord(ref platform, state, obj,
-			out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ImageFontMatchStringStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ImageFontMatchStringStateKey);
+		var recordPresent = block.IsNotNull || length != 0;
+		if (recordPresent)
 		{
+			if (!TryReadImageFontMatchStringStateRecord(ref platform, state, obj,
+				out var record)) return false;
 			var present = MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
 				obj, ImageFontMatchString, out var raw);
 			var pointer = APTR.FromPointer(raw);
@@ -7551,8 +8400,6 @@ public static class MuiCommonControlCore
 			{
 				record.Present = presentValue;
 				if (present) record.MatchString = pointer;
-				var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-					ImageFontMatchStringStateKey);
 				if (!MuiImageFontMatchStringStateRecordCodec.Write(ref platform,
 					block, record)) return false;
 			}
@@ -7573,25 +8420,32 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ImageFontMatchStringStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			ImageFontMatchStringStateKey) != unchecked((int)
-				MuiImageFontMatchStringStateRecord.Size)) return false;
-		return MuiImageFontMatchStringStateRecordCodec.TryRead(ref platform,
-			block, out value);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ImageFontMatchStringStateKey);
+		return length == unchecked((int)MuiImageFontMatchStringStateRecord.Size) &&
+			MuiImageFontMatchStringStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) &&
+			MuiImageFontMatchStringStateAdmission.ValidateLive(ref platform, state,
+				obj, value);
 	}
 
 	private static bool EnsureImageFontMatchStringStateRecord<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryReadImageFontMatchStringStateRecord(ref platform, state, obj,
-			out _)) return true;
-		var scratch = MuiHeadlessMemory.Allocate(ref platform,
-			MuiImageFontMatchStringStateRecord.Size);
-		if (scratch.IsNull) return false;
-		platform.Clear(scratch, MuiImageFontMatchStringStateRecord.Size);
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ImageFontMatchStringStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ImageFontMatchStringStateKey);
+		if (block.IsNotNull || length != 0)
+			return TryReadImageFontMatchStringStateRecord(ref platform, state, obj,
+				out _);
 		var value = default(MuiImageFontMatchStringStateRecord);
 		value.Magic = MuiImageFontMatchStringStateRecord.Cookie;
 		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
@@ -7600,6 +8454,12 @@ public static class MuiCommonControlCore
 			value.Present = 1;
 			value.MatchString = APTR.FromPointer(raw);
 		}
+		if (!MuiImageFontMatchStringStateAdmission.ValidateLive(ref platform,
+			state, obj, value)) return false;
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiImageFontMatchStringStateRecord.Size);
+		if (scratch.IsNull) return false;
+		platform.Clear(scratch, MuiImageFontMatchStringStateRecord.Size);
 		var written = MuiImageFontMatchStringStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -7625,8 +8485,10 @@ public static class MuiCommonControlCore
 		stored.Magic = MuiImageFontMatchStringStateRecord.Cookie;
 		stored.Present = value.Present ? 1u : 0u;
 		stored.MatchString = value.MatchString;
-		if (!MuiImageFontMatchStringStateRecordCodec.Write(ref platform, block,
-			stored)) return false;
+		if (!MuiImageFontMatchStringStateAdmission.ValidateLive(ref platform,
+			state, obj, stored) ||
+			!MuiImageFontMatchStringStateRecordCodec.Write(ref platform, block,
+				stored)) return false;
 		if (!value.Present) return true;
 		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			ImageFontMatchString, stored.MatchString.Raw, notify);
@@ -7638,6 +8500,8 @@ public static class MuiCommonControlCore
 	{
 		var matchString = APTR.FromPointer(value);
 		if (!IsValidImageFontMatchString(ref platform, matchString)) return false;
+		if (!TryReadImageFontMatchStringState(ref platform, state, obj,
+			out _)) return false;
 		if (MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj,
 			ImageFontMatchString, out var current) && current == value) return true;
 		var semantic = default(MuiImageFontMatchStringState);
@@ -7798,6 +8662,13 @@ public static class MuiCommonControlCore
 		APTR state, APTR obj, uint selected, uint pressed)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
+		var isGadget = Classify(ref platform, state, obj) == MuiControlClass.Gadget;
+		var gadget = default(MuiGadgetInteractionState);
+		// Event-driven state changes must admit the complete named record before
+		// touching either raw compatibility attribute. This keeps malformed present
+		// Dataspace state fail-closed instead of allowing a partial transition.
+		if (isGadget && !TryReadGadgetInteractionState(ref platform, state, obj,
+			out gadget)) return 0;
 		var changed = false;
 		if (!MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj, Selected,
 			out var currentSelected) || currentSelected != selected)
@@ -7813,10 +8684,8 @@ public static class MuiCommonControlCore
 				pressed, true)) return 0;
 			changed = true;
 		}
-		if (Classify(ref platform, state, obj) == MuiControlClass.Gadget)
+		if (isGadget)
 		{
-			if (!TryReadGadgetInteractionState(ref platform, state, obj,
-				out var gadget)) return 0;
 			gadget.Selected = selected;
 			gadget.Pressed = pressed;
 			if (!PublishGadgetInteractionState(ref platform, state, obj,
@@ -8304,9 +9173,11 @@ public static class MuiCommonControlCore
 	{
 		var acknowledge = default(MuiStringAcknowledgeState);
 		acknowledge.Contents = contents;
-		if (!acknowledge.Contents.IsNull &&
-			!CStringCodec.TryReadLength(ref platform, acknowledge.Contents, 4096,
-				out _)) return false;
+		var candidate = default(MuiStringAcknowledgeStateRecord);
+		candidate.Magic = MuiStringAcknowledgeStateRecord.Cookie;
+		candidate.Contents = acknowledge.Contents;
+		if (!MuiStringAcknowledgeStateAdmission.ValidateLive(ref platform, state,
+			obj, candidate)) return false;
 		if (!EnsureStringAcknowledgeStateRecord(ref platform, state, obj))
 			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -8478,7 +9349,15 @@ public static class MuiCommonControlCore
 			// MorphOS accepts the WorkBuffer prefix described by SGWork.NumChars.
 			// Never split a UTF-8 code point when the hook supplies a logical
 			// count, and force an owned-buffer copy when that count changed.
-			var copyMaxChars = StringMaxChars(ref platform, state, obj);
+			if (!TryGetStringMaxChars(ref platform, state, obj,
+				out var copyMaxChars))
+			{
+				RestoreStringEditSnapshot(ref platform, hookContents.Contents,
+					snapshotAddress, snapshotLength);
+				ReleaseStringEditSnapshot(ref platform, snapshotAddress,
+					snapshotLength + 1);
+				return 0;
+			}
 			var hookChangedNumChars = work.NumChars != initialNumChars;
 			if (work.NumChars < 0)
 			{
@@ -8676,9 +9555,17 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			result = default;
-			if (TryReadStringInteractionStateRecord(ref platform, state, obj,
-				out var record))
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringInteractionStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringInteractionStateKey);
+			var recordPresent = block.IsNotNull || length != 0;
+			if (recordPresent)
 			{
+				if (!TryReadStringInteractionStateRecord(ref platform, state, obj,
+					out var record)) return false;
 				var editable = ReadRaw(ref platform, state, obj, StringEditable,
 					record.Editable);
 				var advance = ReadRaw(ref platform, state, obj, StringAdvanceOnCR,
@@ -8691,14 +9578,14 @@ public static class MuiCommonControlCore
 					record.Editable = editable;
 					record.AdvanceOnCR = advance;
 					record.Multiline = multiline;
-					var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-						StringInteractionStateKey);
-					MuiStringInteractionStateRecordCodec.Write(ref platform, block,
-						record);
+					if (!MuiStringInteractionStateAdmission.ValidateLive(ref platform,
+						state, obj, record) ||
+						!MuiStringInteractionStateRecordCodec.Write(ref platform, block,
+							record)) return false;
 				}
-				result.Editable = record.Editable == 0 ? 0u : 1u;
-				result.AdvanceOnCR = record.AdvanceOnCR == 0 ? 0u : 1u;
-				result.Multiline = record.Multiline == 0 ? 0u : 1u;
+				result.Editable = record.Editable;
+				result.AdvanceOnCR = record.AdvanceOnCR;
+				result.Multiline = record.Multiline;
 				return true;
 			}
 			result.Editable = ReadRaw(ref platform, state, obj, StringEditable,
@@ -8716,31 +9603,51 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StringInteractionStateKey);
 			if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 				StringInteractionStateKey) !=
 				unchecked((int)MuiStringInteractionStateRecord.Size)) return false;
-			return MuiStringInteractionStateRecordCodec.TryRead(ref platform,
-				block, out value);
+			return MuiStringInteractionStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) &&
+				MuiStringInteractionStateAdmission.ValidateLive(ref platform, state,
+					obj, value);
 		}
 
 		private static bool EnsureStringInteractionStateRecord<TPlatform>(
 			ref TPlatform platform, APTR state, APTR obj)
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
-			if (TryReadStringInteractionStateRecord(ref platform, state, obj,
-				out _)) return true;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringInteractionStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringInteractionStateKey);
+			if (block.IsNotNull || length != 0)
+				return TryReadStringInteractionStateRecord(ref platform, state, obj,
+					out _);
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var scratch = MuiHeadlessMemory.Allocate(ref platform,
 				MuiStringInteractionStateRecord.Size);
 			if (scratch.IsNull) return false;
 			platform.Clear(scratch, MuiStringInteractionStateRecord.Size);
 			var value = default(MuiStringInteractionStateRecord);
 			value.Magic = MuiStringInteractionStateRecord.Cookie;
-			value.Editable = ReadRaw(ref platform, state, obj, StringEditable, 1);
+			value.Editable = ReadRaw(ref platform, state, obj, StringEditable, 1) ==
+				0 ? 0u : 1u;
 			value.AdvanceOnCR = ReadRaw(ref platform, state, obj,
-				StringAdvanceOnCR, 0);
-			value.Multiline = ReadRaw(ref platform, state, obj, StringMultiline, 0);
+				StringAdvanceOnCR, 0) == 0 ? 0u : 1u;
+			value.Multiline = ReadRaw(ref platform, state, obj, StringMultiline, 0) ==
+				0 ? 0u : 1u;
+			if (!MuiStringInteractionStateAdmission.ValidateLive(ref platform, state,
+				obj, value))
+			{
+				platform.Clear(scratch, MuiStringInteractionStateRecord.Size);
+				platform.Free(scratch, MuiStringInteractionStateRecord.Size);
+				return false;
+			}
 			var written = MuiStringInteractionStateRecordCodec.Write(ref platform,
 				scratch, value);
 			var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -8765,8 +9672,9 @@ public static class MuiCommonControlCore
 			stored.Editable = value.Editable == 0 ? 0u : 1u;
 			stored.AdvanceOnCR = value.AdvanceOnCR == 0 ? 0u : 1u;
 			stored.Multiline = value.Multiline == 0 ? 0u : 1u;
-			if (!MuiStringInteractionStateRecordCodec.Write(ref platform, block,
-				stored)) return false;
+			if (!MuiStringInteractionStateAdmission.ValidateLive(ref platform, state,
+				obj, stored) || !MuiStringInteractionStateRecordCodec.Write(ref platform,
+				block, stored)) return false;
 			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 				StringEditable, stored.Editable, false) &&
 				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
@@ -8895,37 +9803,41 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			result = default;
-			if (TryReadStringFilterStateRecord(ref platform, state, obj,
-				out var record))
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringFilterStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringFilterStateKey);
+			if (block.IsNotNull || length != 0)
 			{
-				// Generic bootstrap/persistence may write either public pointer
-				// directly. Validate both before updating the named pair.
+				if (!TryReadStringFilterStateRecord(ref platform, state, obj,
+					out var record)) return false;
 				var rawAccept = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 					StringAccept, record.Accept.Raw));
 				var rawReject = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 					StringReject, record.Reject.Raw));
-				if (!IsValidStringFilterPointer(ref platform, rawAccept) ||
-					!IsValidStringFilterPointer(ref platform, rawReject)) return false;
 				if (rawAccept.Raw != record.Accept.Raw || rawReject.Raw !=
 					record.Reject.Raw)
 				{
-					record.Accept = rawAccept;
-					record.Reject = rawReject;
-					var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-						StringFilterStateKey);
-					if (!MuiStringFilterStateRecordCodec.Write(ref platform, block,
-						record)) return false;
+					var candidate = record;
+					candidate.Accept = rawAccept;
+					candidate.Reject = rawReject;
+					if (!MuiStringFilterStateAdmission.ValidateLive(ref platform, state,
+						obj, candidate) || !MuiStringFilterStateRecordCodec.Write(
+						ref platform, block, candidate)) return false;
+					record = candidate;
 				}
-				result.Accept = rawAccept;
-				result.Reject = rawReject;
+				result.Accept = record.Accept;
+				result.Reject = record.Reject;
 				return true;
 			}
 			result.Accept = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringAccept, 0));
 			result.Reject = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringReject, 0));
-			return IsValidStringFilterPointer(ref platform, result.Accept) &&
-				IsValidStringFilterPointer(ref platform, result.Reject);
+		return IsValidStringFilterPointer(ref platform, result.Accept) &&
+			IsValidStringFilterPointer(ref platform, result.Reject);
 		}
 
 		private static bool TryReadStringFilterStateRecord<TPlatform>(
@@ -8934,21 +9846,32 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StringFilterStateKey);
 			if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 				StringFilterStateKey) !=
 				unchecked((int)MuiStringFilterStateRecord.Size)) return false;
-			return MuiStringFilterStateRecordCodec.TryRead(ref platform, block,
-				out value);
+			return MuiStringFilterStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) &&
+				MuiStringFilterStateAdmission.ValidateLive(ref platform, state, obj,
+					value);
 		}
 
 		private static bool EnsureStringFilterStateRecord<TPlatform>(
 			ref TPlatform platform, APTR state, APTR obj)
-			where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiHeadlessPlatform
 		{
-			if (TryReadStringFilterStateRecord(ref platform, state, obj,
-				out _)) return true;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringFilterStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringFilterStateKey);
+			if (block.IsNotNull || length != 0)
+				return TryReadStringFilterStateRecord(ref platform, state, obj,
+					out _);
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var scratch = MuiHeadlessMemory.Allocate(ref platform,
 				MuiStringFilterStateRecord.Size);
 			if (scratch.IsNull) return false;
@@ -8959,6 +9882,13 @@ public static class MuiCommonControlCore
 				StringAccept, 0));
 			value.Reject = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringReject, 0));
+			if (!MuiStringFilterStateAdmission.ValidateLive(ref platform, state, obj,
+				value))
+			{
+				platform.Clear(scratch, MuiStringFilterStateRecord.Size);
+				platform.Free(scratch, MuiStringFilterStateRecord.Size);
+				return false;
+			}
 			var written = MuiStringFilterStateRecordCodec.Write(ref platform,
 				scratch, value);
 			var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -8966,7 +9896,10 @@ public static class MuiCommonControlCore
 				unchecked((int)MuiStringFilterStateRecord.Size));
 			platform.Clear(scratch, MuiStringFilterStateRecord.Size);
 			platform.Free(scratch, MuiStringFilterStateRecord.Size);
-			return added;
+			return added && MuiHeadlessObjectCore.SetAttribute(ref platform, state,
+				obj, StringAccept, value.Accept.Raw, false) &&
+				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+					StringReject, value.Reject.Raw, false);
 		}
 
 		private static bool PublishStringFilterState<TPlatform>(
@@ -8974,9 +9907,7 @@ public static class MuiCommonControlCore
 			MuiStringFilterState value)
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
-			if (!IsValidStringFilterPointer(ref platform, value.Accept) ||
-				!IsValidStringFilterPointer(ref platform, value.Reject) ||
-				!EnsureStringFilterStateRecord(ref platform, state, obj))
+			if (!EnsureStringFilterStateRecord(ref platform, state, obj))
 				return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StringFilterStateKey);
@@ -8984,7 +9915,8 @@ public static class MuiCommonControlCore
 			stored.Magic = MuiStringFilterStateRecord.Cookie;
 			stored.Accept = value.Accept;
 			stored.Reject = value.Reject;
-			if (!MuiStringFilterStateRecordCodec.Write(ref platform, block,
+			if (!MuiStringFilterStateAdmission.ValidateLive(ref platform, state, obj,
+				stored) || !MuiStringFilterStateRecordCodec.Write(ref platform, block,
 				stored)) return false;
 			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 				StringAccept, stored.Accept.Raw, false) &&
@@ -9015,20 +9947,27 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			result = default;
-			if (TryReadStringPlaceholderStateRecord(ref platform, state, obj,
-				out var record))
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringPlaceholderStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringPlaceholderStateKey);
+			var recordPresent = block.IsNotNull || length != 0;
+			if (recordPresent)
 			{
+				if (!TryReadStringPlaceholderStateRecord(ref platform, state, obj,
+					out var record)) return false;
 				var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 					StringPlaceholder, record.Contents.Raw));
 				if (!raw.IsNull && !CStringCodec.TryReadLength(ref platform, raw,
-					128, out _)) return false;
+					MuiStringPlaceholderStateAdmission.MaximumLength, out _))
+					return false;
 				if (raw.Raw != record.Contents.Raw)
 				{
 					record.Contents = raw;
-					var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+					var currentBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 						StringPlaceholderStateKey);
 					if (!MuiStringPlaceholderStateRecordCodec.Write(ref platform,
-						block, record)) return false;
+						currentBlock, record)) return false;
 				}
 				result.Contents = raw;
 				return true;
@@ -9036,7 +9975,8 @@ public static class MuiCommonControlCore
 			result.Contents = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringPlaceholder, 0));
 			return result.Contents.IsNull || CStringCodec.TryReadLength(
-				ref platform, result.Contents, 128, out _);
+				ref platform, result.Contents,
+				MuiStringPlaceholderStateAdmission.MaximumLength, out _);
 		}
 
 		private static bool TryReadStringPlaceholderStateRecord<TPlatform>(
@@ -9045,21 +9985,32 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StringPlaceholderStateKey);
-			if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-				StringPlaceholderStateKey) !=
-				unchecked((int)MuiStringPlaceholderStateRecord.Size)) return false;
-			return MuiStringPlaceholderStateRecordCodec.TryRead(ref platform,
-				block, out value);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringPlaceholderStateKey);
+			return length == unchecked((int)MuiStringPlaceholderStateRecord.Size) &&
+				MuiStringPlaceholderStateRecordCodec.TryReadStructural(ref platform,
+					block, out value) &&
+				MuiStringPlaceholderStateAdmission.ValidateLive(ref platform, state,
+					obj, value);
 		}
 
 		private static bool EnsureStringPlaceholderStateRecord<TPlatform>(
 			ref TPlatform platform, APTR state, APTR obj)
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
-			if (TryReadStringPlaceholderStateRecord(ref platform, state, obj,
-				out _)) return true;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringPlaceholderStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringPlaceholderStateKey);
+			if (block.IsNotNull || length != 0)
+				return TryReadStringPlaceholderStateRecord(ref platform, state, obj,
+					out _);
 			var scratch = MuiHeadlessMemory.Allocate(ref platform,
 				MuiStringPlaceholderStateRecord.Size);
 			if (scratch.IsNull) return false;
@@ -9068,6 +10019,12 @@ public static class MuiCommonControlCore
 			value.Magic = MuiStringPlaceholderStateRecord.Cookie;
 			value.Contents = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringPlaceholder, 0));
+			if (!MuiStringPlaceholderStateAdmission.ValidateLive(ref platform,
+				state, obj, value))
+			{
+				platform.Free(scratch, MuiStringPlaceholderStateRecord.Size);
+				return false;
+			}
 			var written = MuiStringPlaceholderStateRecordCodec.Write(ref platform,
 				scratch, value);
 			var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -9084,7 +10041,8 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			if (!value.Contents.IsNull && !CStringCodec.TryReadLength(ref platform,
-				value.Contents, 128, out _)) return false;
+				value.Contents, MuiStringPlaceholderStateAdmission.MaximumLength,
+				out _)) return false;
 			if (!EnsureStringPlaceholderStateRecord(ref platform, state, obj))
 				return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
@@ -9092,10 +10050,11 @@ public static class MuiCommonControlCore
 			var stored = default(MuiStringPlaceholderStateRecord);
 			stored.Magic = MuiStringPlaceholderStateRecord.Cookie;
 			stored.Contents = value.Contents;
-			if (!MuiStringPlaceholderStateRecordCodec.Write(ref platform, block,
-				stored)) return false;
-		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
-			StringPlaceholder, stored.Contents.Raw, notify);
+			if (!MuiStringPlaceholderStateAdmission.ValidateLive(ref platform, state,
+				obj, stored) || !MuiStringPlaceholderStateRecordCodec.Write(
+				ref platform, block, stored)) return false;
+			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+				StringPlaceholder, stored.Contents.Raw, notify);
 		}
 
 		internal static bool TryGetStringPlaceholderStateRecord<TPlatform>(
@@ -9111,18 +10070,22 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			result = default;
-			if (TryReadStringContentsStateRecord(ref platform, state, obj,
-				out var record))
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringContentsStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringContentsStateKey);
+			var recordPresent = block.IsNotNull || length != 0;
+			if (recordPresent)
 			{
+				if (!TryReadStringContentsStateRecord(ref platform, state, obj,
+					out var record)) return false;
 				var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 					StringContents, record.Contents.Raw));
 				if (!raw.IsNull && !CStringCodec.TryReadLength(ref platform, raw,
-					65536, out _)) return false;
+					MuiStringContentsStateAdmission.MaximumLength, out _)) return false;
 				if (raw.Raw != record.Contents.Raw)
 				{
 					record.Contents = raw;
-					var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-						StringContentsStateKey);
 					if (!MuiStringContentsStateRecordCodec.Write(ref platform, block,
 						record)) return false;
 				}
@@ -9132,7 +10095,8 @@ public static class MuiCommonControlCore
 			result.Contents = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringContents, 0));
 			return result.Contents.IsNull || CStringCodec.TryReadLength(
-				ref platform, result.Contents, 65536, out _);
+				ref platform, result.Contents,
+				MuiStringContentsStateAdmission.MaximumLength, out _);
 		}
 
 		private static bool TryReadStringContentsStateRecord<TPlatform>(
@@ -9141,29 +10105,41 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StringContentsStateKey);
-			if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-				StringContentsStateKey) !=
-				unchecked((int)MuiStringContentsStateRecord.Size)) return false;
-			return MuiStringContentsStateRecordCodec.TryRead(ref platform, block,
-				out value);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringContentsStateKey);
+			return length == unchecked((int)MuiStringContentsStateRecord.Size) &&
+				MuiStringContentsStateRecordCodec.TryReadStructural(ref platform,
+					block, out value) && MuiStringContentsStateAdmission.ValidateLive(
+					ref platform, state, obj, value);
 		}
 
 		private static bool EnsureStringContentsStateRecord<TPlatform>(
 			ref TPlatform platform, APTR state, APTR obj)
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
-			if (TryReadStringContentsStateRecord(ref platform, state, obj,
-				out _)) return true;
-			var scratch = MuiHeadlessMemory.Allocate(ref platform,
-				MuiStringContentsStateRecord.Size);
-			if (scratch.IsNull) return false;
-			platform.Clear(scratch, MuiStringContentsStateRecord.Size);
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringContentsStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringContentsStateKey);
+			if (block.IsNotNull || length != 0)
+				return TryReadStringContentsStateRecord(ref platform, state, obj,
+					out _);
 			var value = default(MuiStringContentsStateRecord);
 			value.Magic = MuiStringContentsStateRecord.Cookie;
 			value.Contents = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringContents, 0));
+			if (!MuiStringContentsStateAdmission.ValidateLive(ref platform, state,
+				obj, value)) return false;
+			var scratch = MuiHeadlessMemory.Allocate(ref platform,
+				MuiStringContentsStateRecord.Size);
+			if (scratch.IsNull) return false;
+			platform.Clear(scratch, MuiStringContentsStateRecord.Size);
 			var written = MuiStringContentsStateRecordCodec.Write(ref platform,
 				scratch, value);
 			var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -9188,8 +10164,9 @@ public static class MuiCommonControlCore
 			var stored = default(MuiStringContentsStateRecord);
 			stored.Magic = MuiStringContentsStateRecord.Cookie;
 			stored.Contents = value.Contents;
-			if (!MuiStringContentsStateRecordCodec.Write(ref platform, block,
-				stored)) return false;
+			if (!MuiStringContentsStateAdmission.ValidateLive(ref platform, state,
+				obj, stored) || !MuiStringContentsStateRecordCodec.Write(ref platform,
+				block, stored)) return false;
 			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 				StringContents, stored.Contents.Raw, notify);
 		}
@@ -9206,9 +10183,17 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			result = default;
-			if (TryReadStringPresentationStateRecord(ref platform, state, obj,
-				out var record))
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringPresentationStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringPresentationStateKey);
+			var recordPresent = block.IsNotNull || length != 0;
+			if (recordPresent)
 			{
+				if (!TryReadStringPresentationStateRecord(ref platform, state, obj,
+					out var record)) return false;
 				// Accept direct guest scalar writes from persistence/bootstrap code,
 				// then fold them back into the named projection before consumers read
 				// the policy.
@@ -9227,16 +10212,16 @@ public static class MuiCommonControlCore
 					record.Secret = secret;
 					record.Format = format;
 					record.Unicode = unicode;
-					var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-						StringPresentationStateKey);
-					MuiStringPresentationStateRecordCodec.Write(ref platform, block,
-						record);
+					if (!MuiStringPresentationStateAdmission.ValidateLive(ref platform,
+						state, obj, record) ||
+						!MuiStringPresentationStateRecordCodec.Write(ref platform, block,
+							record)) return false;
 				}
 				result.MaxLen = record.MaxLen;
-				result.Secret = record.Secret == 0 ? 0u : 1u;
+				result.Secret = record.Secret;
 				result.Format = record.Format;
-				result.Unicode = record.Unicode == 0 ? 0u : 1u;
-				return result.Format <= StringFormatRight;
+				result.Unicode = record.Unicode;
+				return true;
 			}
 			result.MaxLen = ReadRaw(ref platform, state, obj, StringMaxLen, 80);
 			result.Secret = ReadRaw(ref platform, state, obj, StringSecret, 0) == 0 ?
@@ -9245,7 +10230,8 @@ public static class MuiCommonControlCore
 				StringFormatLeft);
 			result.Unicode = ReadRaw(ref platform, state, obj, Unicode, 0) == 0 ?
 				0u : 1u;
-			return result.Format <= StringFormatRight;
+			return result.MaxLen <= 0x7FFFFFFFu &&
+				result.Format <= StringFormatRight;
 		}
 
 		private static bool TryReadStringPresentationStateRecord<TPlatform>(
@@ -9254,21 +10240,32 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StringPresentationStateKey);
 			if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 				StringPresentationStateKey) !=
 				unchecked((int)MuiStringPresentationStateRecord.Size)) return false;
-			return MuiStringPresentationStateRecordCodec.TryRead(ref platform,
-				block, out value);
+			return MuiStringPresentationStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) &&
+				MuiStringPresentationStateAdmission.ValidateLive(ref platform, state,
+					obj, value);
 		}
 
 		private static bool EnsureStringPresentationStateRecord<TPlatform>(
 			ref TPlatform platform, APTR state, APTR obj)
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
-			if (TryReadStringPresentationStateRecord(ref platform, state, obj,
-				out _)) return true;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringPresentationStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringPresentationStateKey);
+			if (block.IsNotNull || length != 0)
+				return TryReadStringPresentationStateRecord(ref platform, state, obj,
+					out _);
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var scratch = MuiHeadlessMemory.Allocate(ref platform,
 				MuiStringPresentationStateRecord.Size);
 			if (scratch.IsNull) return false;
@@ -9276,10 +10273,20 @@ public static class MuiCommonControlCore
 			var value = default(MuiStringPresentationStateRecord);
 			value.Magic = MuiStringPresentationStateRecord.Cookie;
 			value.MaxLen = ReadRaw(ref platform, state, obj, StringMaxLen, 80);
-			value.Secret = ReadRaw(ref platform, state, obj, StringSecret, 0);
-			value.Format = ReadRaw(ref platform, state, obj, StringFormat,
+			value.Secret = ReadRaw(ref platform, state, obj, StringSecret, 0) == 0 ?
+				0u : 1u;
+			var format = ReadRaw(ref platform, state, obj, StringFormat,
 				StringFormatLeft);
-			value.Unicode = ReadRaw(ref platform, state, obj, Unicode, 0);
+			value.Format = format <= StringFormatRight ? format : StringFormatLeft;
+			value.Unicode = ReadRaw(ref platform, state, obj, Unicode, 0) == 0 ?
+				0u : 1u;
+			if (!MuiStringPresentationStateAdmission.ValidateLive(ref platform, state,
+				obj, value))
+			{
+				platform.Clear(scratch, MuiStringPresentationStateRecord.Size);
+				platform.Free(scratch, MuiStringPresentationStateRecord.Size);
+				return false;
+			}
 			var written = MuiStringPresentationStateRecordCodec.Write(ref platform,
 				scratch, value);
 			var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -9287,7 +10294,18 @@ public static class MuiCommonControlCore
 				unchecked((int)MuiStringPresentationStateRecord.Size));
 			platform.Clear(scratch, MuiStringPresentationStateRecord.Size);
 			platform.Free(scratch, MuiStringPresentationStateRecord.Size);
-			return added;
+			if (!added) return false;
+			// Bootstrap normalization is allowed only while the record is absent;
+			// keep the public projections canonical before any consumer can observe
+			// the newly admitted state.
+			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+				StringMaxLen, value.MaxLen, false) &&
+				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+					StringSecret, value.Secret, false) &&
+				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+					StringFormat, value.Format, false) &&
+				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+					Unicode, value.Unicode, false);
 		}
 
 		private static bool PublishStringPresentationState<TPlatform>(
@@ -9302,19 +10320,21 @@ public static class MuiCommonControlCore
 			var stored = default(MuiStringPresentationStateRecord);
 			stored.Magic = MuiStringPresentationStateRecord.Cookie;
 			stored.MaxLen = value.MaxLen;
-			stored.Secret = value.Secret;
-			stored.Format = value.Format;
-			stored.Unicode = value.Unicode;
-			if (!MuiStringPresentationStateRecordCodec.Write(ref platform, block,
-				stored)) return false;
+			stored.Secret = value.Secret == 0 ? 0u : 1u;
+			stored.Format = value.Format <= StringFormatRight ? value.Format :
+				StringFormatLeft;
+			stored.Unicode = value.Unicode == 0 ? 0u : 1u;
+			if (!MuiStringPresentationStateAdmission.ValidateLive(ref platform, state,
+				obj, stored) || !MuiStringPresentationStateRecordCodec.Write(
+				ref platform, block, stored)) return false;
 			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
-				StringMaxLen, value.MaxLen, false) &&
+				StringMaxLen, stored.MaxLen, false) &&
 				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
-					StringSecret, value.Secret, false) &&
+					StringSecret, stored.Secret, false) &&
 				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
-					StringFormat, value.Format, false) &&
+					StringFormat, stored.Format, false) &&
 				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
-					Unicode, value.Unicode, false);
+					Unicode, stored.Unicode, false);
 		}
 
 		internal static bool TryGetStringPresentationStateRecord<TPlatform>(
@@ -9330,31 +10350,33 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			result = default;
-			if (TryReadStringSpellCheckingStateRecord(ref platform, state, obj,
-				out var record))
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringSpellCheckingStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringSpellCheckingStateKey);
+			if (block.IsNotNull || length != 0)
 			{
-				// Generic bootstrap and persistence paths may stage the public BOOL
-				// directly. Absorb that write into the named record before returning
-				// the canonical value.
+				if (!TryReadStringSpellCheckingStateRecord(ref platform, state, obj,
+					out var record)) return false;
 				var raw = ReadRaw(ref platform, state, obj, StringSpellChecking,
 					record.Enabled);
-				var normalized = raw == 0 ? 0u : 1u;
-				if (normalized != record.Enabled)
+				if (raw != record.Enabled)
 				{
-					record.Enabled = normalized;
-					var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-						StringSpellCheckingStateKey);
-					if (!MuiStringSpellCheckingStateRecordCodec.Write(ref platform,
-						block, record)) return false;
+					var candidate = record;
+					candidate.Enabled = raw;
+					if (!MuiStringSpellCheckingStateAdmission.ValidateLive(ref platform,
+						state, obj, candidate) ||
+						!MuiStringSpellCheckingStateRecordCodec.Write(ref platform, block,
+							candidate)) return false;
+						record = candidate;
 				}
-				result.Enabled = normalized;
-				if (raw != normalized && !MuiHeadlessObjectCore.SetAttribute(
-					ref platform, state, obj, StringSpellChecking, normalized,
-					false)) return false;
+				result.Enabled = record.Enabled;
 				return true;
 			}
-			result.Enabled = ReadRaw(ref platform, state, obj,
-				StringSpellChecking, 0) == 0 ? 0u : 1u;
+			result.Enabled = ReadRaw(ref platform, state, obj, StringSpellChecking,
+				0) == 0 ? 0u : 1u;
 			return true;
 		}
 
@@ -9364,28 +10386,47 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StringSpellCheckingStateKey);
 			if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 				StringSpellCheckingStateKey) !=
 				unchecked((int)MuiStringSpellCheckingStateRecord.Size)) return false;
-			return MuiStringSpellCheckingStateRecordCodec.TryRead(ref platform,
-				block, out value);
+			return MuiStringSpellCheckingStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) &&
+				MuiStringSpellCheckingStateAdmission.ValidateLive(ref platform, state,
+					obj, value);
 		}
 
 		private static bool EnsureStringSpellCheckingStateRecord<TPlatform>(
 			ref TPlatform platform, APTR state, APTR obj)
-			where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiHeadlessPlatform
 		{
-			if (TryReadStringSpellCheckingStateRecord(ref platform, state, obj,
-				out _)) return true;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringSpellCheckingStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringSpellCheckingStateKey);
+			if (block.IsNotNull || length != 0)
+				return TryReadStringSpellCheckingStateRecord(ref platform, state, obj,
+					out _);
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var scratch = MuiHeadlessMemory.Allocate(ref platform,
 				MuiStringSpellCheckingStateRecord.Size);
 			if (scratch.IsNull) return false;
 			platform.Clear(scratch, MuiStringSpellCheckingStateRecord.Size);
 			var value = default(MuiStringSpellCheckingStateRecord);
 			value.Magic = MuiStringSpellCheckingStateRecord.Cookie;
-			value.Enabled = ReadRaw(ref platform, state, obj, StringSpellChecking, 0);
+			value.Enabled = ReadRaw(ref platform, state, obj, StringSpellChecking,
+				0) == 0 ? 0u : 1u;
+			if (!MuiStringSpellCheckingStateAdmission.ValidateLive(ref platform,
+				state, obj, value))
+			{
+				platform.Clear(scratch, MuiStringSpellCheckingStateRecord.Size);
+				platform.Free(scratch, MuiStringSpellCheckingStateRecord.Size);
+				return false;
+			}
 			var written = MuiStringSpellCheckingStateRecordCodec.Write(ref platform,
 				scratch, value);
 			var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -9393,7 +10434,8 @@ public static class MuiCommonControlCore
 				unchecked((int)MuiStringSpellCheckingStateRecord.Size));
 			platform.Clear(scratch, MuiStringSpellCheckingStateRecord.Size);
 			platform.Free(scratch, MuiStringSpellCheckingStateRecord.Size);
-			return added;
+			return added && MuiHeadlessObjectCore.SetAttribute(ref platform, state,
+				obj, StringSpellChecking, value.Enabled, false);
 		}
 
 		private static bool PublishStringSpellCheckingState<TPlatform>(
@@ -9408,8 +10450,10 @@ public static class MuiCommonControlCore
 			var stored = default(MuiStringSpellCheckingStateRecord);
 			stored.Magic = MuiStringSpellCheckingStateRecord.Cookie;
 			stored.Enabled = value.Enabled == 0 ? 0u : 1u;
-			if (!MuiStringSpellCheckingStateRecordCodec.Write(ref platform, block,
-				stored)) return false;
+			if (!MuiStringSpellCheckingStateAdmission.ValidateLive(ref platform,
+				state, obj, stored) ||
+				!MuiStringSpellCheckingStateRecordCodec.Write(ref platform, block,
+					stored)) return false;
 			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 				StringSpellChecking, stored.Enabled, false);
 		}
@@ -9427,32 +10471,34 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			result = default;
-			if (TryReadStringEditHookStateRecord(ref platform, state, obj,
-				out var record))
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringEditHookStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringEditHookStateKey);
+			if (block.IsNotNull || length != 0)
 			{
-				// Generic bootstrap and persistence can stage either public field
-				// directly. Validate the Hook before allowing it into the record.
+				if (!TryReadStringEditHookStateRecord(ref platform, state, obj,
+					out var record)) return false;
 				var rawHook = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 					StringEditHook, record.EditHook.Raw));
-				if (!IsValidStringEditHook(ref platform, rawHook)) return false;
 				var rawLonely = ReadRaw(ref platform, state, obj,
 					StringLonelyEditHook, record.LonelyEditHook);
-				var lonely = rawLonely == 0 ? 0u : 1u;
-				if (rawHook.Raw != record.EditHook.Raw || lonely !=
+				if (rawHook.Raw != record.EditHook.Raw || rawLonely !=
 					record.LonelyEditHook)
 				{
-					record.EditHook = rawHook;
-					record.LonelyEditHook = lonely;
-					var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-						StringEditHookStateKey);
-					if (!MuiStringEditHookStateRecordCodec.Write(ref platform,
-						block, record)) return false;
+					var candidate = record;
+					candidate.EditHook = rawHook;
+					candidate.LonelyEditHook = rawLonely;
+					if (!MuiStringEditHookStateAdmission.ValidateLive(ref platform,
+						state, obj, candidate) ||
+						!MuiStringEditHookStateRecordCodec.Write(ref platform, block,
+							candidate)) return false;
+					record = candidate;
 				}
-				result.EditHook = rawHook;
-				result.LonelyEditHook = lonely;
-				if (rawLonely != lonely && !MuiHeadlessObjectCore.SetAttribute(
-					ref platform, state, obj, StringLonelyEditHook, lonely, false))
-					return false;
+				result.EditHook = record.EditHook;
+				result.LonelyEditHook = record.LonelyEditHook;
 				return true;
 			}
 			result.EditHook = APTR.FromPointer(ReadRaw(ref platform, state, obj,
@@ -9469,21 +10515,32 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StringEditHookStateKey);
 			if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 				StringEditHookStateKey) !=
 				unchecked((int)MuiStringEditHookStateRecord.Size)) return false;
-			return MuiStringEditHookStateRecordCodec.TryRead(ref platform, block,
-				out value);
+			return MuiStringEditHookStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) &&
+				MuiStringEditHookStateAdmission.ValidateLive(ref platform, state, obj,
+					value);
 		}
 
 		private static bool EnsureStringEditHookStateRecord<TPlatform>(
 			ref TPlatform platform, APTR state, APTR obj)
-			where TPlatform : struct, IMuiHeadlessPlatform
+		where TPlatform : struct, IMuiHeadlessPlatform
 		{
-			if (TryReadStringEditHookStateRecord(ref platform, state, obj,
-				out _)) return true;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringEditHookStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringEditHookStateKey);
+			if (block.IsNotNull || length != 0)
+				return TryReadStringEditHookStateRecord(ref platform, state, obj,
+					out _);
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var scratch = MuiHeadlessMemory.Allocate(ref platform,
 				MuiStringEditHookStateRecord.Size);
 			if (scratch.IsNull) return false;
@@ -9492,8 +10549,21 @@ public static class MuiCommonControlCore
 			value.Magic = MuiStringEditHookStateRecord.Cookie;
 			value.EditHook = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringEditHook, 0));
+			if (!IsValidStringEditHook(ref platform, value.EditHook))
+			{
+				platform.Clear(scratch, MuiStringEditHookStateRecord.Size);
+				platform.Free(scratch, MuiStringEditHookStateRecord.Size);
+				return false;
+			}
 			value.LonelyEditHook = ReadRaw(ref platform, state, obj,
-				StringLonelyEditHook, 0);
+				StringLonelyEditHook, 0) == 0 ? 0u : 1u;
+			if (!MuiStringEditHookStateAdmission.ValidateLive(ref platform, state, obj,
+				value))
+			{
+				platform.Clear(scratch, MuiStringEditHookStateRecord.Size);
+				platform.Free(scratch, MuiStringEditHookStateRecord.Size);
+				return false;
+			}
 			var written = MuiStringEditHookStateRecordCodec.Write(ref platform,
 				scratch, value);
 			var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -9501,7 +10571,10 @@ public static class MuiCommonControlCore
 				unchecked((int)MuiStringEditHookStateRecord.Size));
 			platform.Clear(scratch, MuiStringEditHookStateRecord.Size);
 			platform.Free(scratch, MuiStringEditHookStateRecord.Size);
-			return added;
+			return added && MuiHeadlessObjectCore.SetAttribute(ref platform, state,
+				obj, StringEditHook, value.EditHook.Raw, false) &&
+				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+					StringLonelyEditHook, value.LonelyEditHook, false);
 		}
 
 		private static bool PublishStringEditHookState<TPlatform>(
@@ -9509,8 +10582,7 @@ public static class MuiCommonControlCore
 			MuiStringEditHookState value)
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
-			if (!IsValidStringEditHook(ref platform, value.EditHook) ||
-				!EnsureStringEditHookStateRecord(ref platform, state, obj))
+			if (!EnsureStringEditHookStateRecord(ref platform, state, obj))
 				return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StringEditHookStateKey);
@@ -9518,8 +10590,9 @@ public static class MuiCommonControlCore
 			stored.Magic = MuiStringEditHookStateRecord.Cookie;
 			stored.EditHook = value.EditHook;
 			stored.LonelyEditHook = value.LonelyEditHook == 0 ? 0u : 1u;
-			if (!MuiStringEditHookStateRecordCodec.Write(ref platform, block,
-				stored)) return false;
+			if (!MuiStringEditHookStateAdmission.ValidateLive(ref platform, state,
+				obj, stored) || !MuiStringEditHookStateRecordCodec.Write(ref platform,
+				block, stored)) return false;
 			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 				StringEditHook, stored.EditHook.Raw, false) &&
 				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
@@ -9539,29 +10612,41 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			result = default;
-			if (TryReadStringAttachedListStateRecord(ref platform, state, obj,
-				out var record))
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringAttachedListStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringAttachedListStateKey);
+			var recordPresent = block.IsNotNull || length != 0;
+			if (recordPresent)
 			{
+				if (!TryReadStringAttachedListStateRecord(ref platform, state, obj,
+					out var record)) return false;
 				// Bootstrap/persistence may stage the public pointer directly. Keep
 				// the typed relationship authoritative after validating the target.
-			var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
-				StringAttachedList, record.Listview.Raw));
+				var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
+					StringAttachedList, record.Listview.Raw));
 				if (!IsValidStringAttachedList(ref platform, state, raw))
 					return false;
+				var candidate = default(MuiStringAttachedListStateRecord);
+				candidate.Magic = MuiStringAttachedListStateRecord.Cookie;
+				candidate.Listview = raw;
+				if (!MuiStringAttachedListStateAdmission.ValidateLive(ref platform,
+					state, obj, candidate)) return false;
 				if (raw.Raw != record.Listview.Raw)
 				{
 					record.Listview = raw;
-					var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+					var currentBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 						StringAttachedListStateKey);
 					if (!MuiStringAttachedListStateRecordCodec.Write(ref platform,
-						block, record)) return false;
+						currentBlock, record)) return false;
 				}
 				result.Listview = raw;
 				return true;
 			}
 			result.Listview = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringAttachedList, 0));
-			return IsValidStringAttachedList(ref platform, state, result.Listview);
+		return result.Listview.IsNull || IsValidStringAttachedList(ref platform,
+			state, result.Listview);
 		}
 
 		private static bool TryReadStringAttachedListStateRecord<TPlatform>(
@@ -9570,21 +10655,32 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StringAttachedListStateKey);
-			if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-				StringAttachedListStateKey) !=
-				unchecked((int)MuiStringAttachedListStateRecord.Size)) return false;
-			return MuiStringAttachedListStateRecordCodec.TryRead(ref platform,
-				block, out value);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringAttachedListStateKey);
+			return length == unchecked((int)MuiStringAttachedListStateRecord.Size) &&
+				MuiStringAttachedListStateRecordCodec.TryReadStructural(ref platform,
+					block, out value) &&
+				MuiStringAttachedListStateAdmission.ValidateLive(ref platform, state,
+					obj, value);
 		}
 
 		private static bool EnsureStringAttachedListStateRecord<TPlatform>(
 			ref TPlatform platform, APTR state, APTR obj)
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
-			if (TryReadStringAttachedListStateRecord(ref platform, state, obj,
-				out _)) return true;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringAttachedListStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringAttachedListStateKey);
+			if (block.IsNotNull || length != 0)
+				return TryReadStringAttachedListStateRecord(ref platform, state, obj,
+					out _);
 			var scratch = MuiHeadlessMemory.Allocate(ref platform,
 				MuiStringAttachedListStateRecord.Size);
 			if (scratch.IsNull) return false;
@@ -9593,6 +10689,12 @@ public static class MuiCommonControlCore
 			value.Magic = MuiStringAttachedListStateRecord.Cookie;
 			value.Listview = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringAttachedList, 0));
+			if (!MuiStringAttachedListStateAdmission.ValidateLive(ref platform, state,
+				obj, value))
+			{
+				platform.Free(scratch, MuiStringAttachedListStateRecord.Size);
+				return false;
+			}
 			var written = MuiStringAttachedListStateRecordCodec.Write(ref platform,
 				scratch, value);
 			var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -9616,8 +10718,9 @@ public static class MuiCommonControlCore
 			var stored = default(MuiStringAttachedListStateRecord);
 			stored.Magic = MuiStringAttachedListStateRecord.Cookie;
 			stored.Listview = value.Listview;
-			if (!MuiStringAttachedListStateRecordCodec.Write(ref platform, block,
-				stored)) return false;
+			if (!MuiStringAttachedListStateAdmission.ValidateLive(ref platform, state,
+				obj, stored) || !MuiStringAttachedListStateRecordCodec.Write(
+				ref platform, block, stored)) return false;
 			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 				StringAttachedList, stored.Listview.Raw, false);
 		}
@@ -9635,23 +10738,31 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			result = default;
-			if (TryReadStringAcknowledgeStateRecord(ref platform, state, obj,
-				out var record))
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringAcknowledgeStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringAcknowledgeStateKey);
+			var recordPresent = block.IsNotNull || length != 0;
+			if (recordPresent)
 			{
+				if (!TryReadStringAcknowledgeStateRecord(ref platform, state, obj,
+					out var record)) return false;
 				// Persistence/bootstrap code can still stage the public pointer
 				// directly. Absorb it only after bounded guest-string validation so
 				// the record never publishes an invalid caller address.
 				var raw = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 					StringAcknowledge, record.Contents.Raw));
 				if (!raw.IsNull && !CStringCodec.TryReadLength(ref platform, raw,
-					4096, out _)) return false;
+					MuiStringAcknowledgeStateAdmission.MaximumLength, out _))
+					return false;
 				if (raw.Raw != record.Contents.Raw)
 				{
 					record.Contents = raw;
-					var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+					var currentBlock = MuiStoreCore.DataspaceFind(ref platform, state,
+						obj,
 						StringAcknowledgeStateKey);
 					if (!MuiStringAcknowledgeStateRecordCodec.Write(ref platform,
-						block, record)) return false;
+						currentBlock, record)) return false;
 				}
 				result.Contents = raw;
 				return true;
@@ -9659,7 +10770,8 @@ public static class MuiCommonControlCore
 			result.Contents = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringAcknowledge, 0));
 			return result.Contents.IsNull || CStringCodec.TryReadLength(ref platform,
-				result.Contents, 4096, out _);
+				result.Contents, MuiStringAcknowledgeStateAdmission.MaximumLength,
+				out _);
 		}
 
 		private static bool TryReadStringAcknowledgeStateRecord<TPlatform>(
@@ -9668,21 +10780,32 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StringAcknowledgeStateKey);
-			if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-				StringAcknowledgeStateKey) !=
-				unchecked((int)MuiStringAcknowledgeStateRecord.Size)) return false;
-			return MuiStringAcknowledgeStateRecordCodec.TryRead(ref platform,
-				block, out value);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringAcknowledgeStateKey);
+			return length == unchecked((int)MuiStringAcknowledgeStateRecord.Size) &&
+				MuiStringAcknowledgeStateRecordCodec.TryReadStructural(ref platform,
+					block, out value) &&
+				MuiStringAcknowledgeStateAdmission.ValidateLive(ref platform, state,
+					obj, value);
 		}
 
 		private static bool EnsureStringAcknowledgeStateRecord<TPlatform>(
 			ref TPlatform platform, APTR state, APTR obj)
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
-			if (TryReadStringAcknowledgeStateRecord(ref platform, state, obj,
-				out _)) return true;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringAcknowledgeStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringAcknowledgeStateKey);
+			if (block.IsNotNull || length != 0)
+				return TryReadStringAcknowledgeStateRecord(ref platform, state, obj,
+					out _);
 			var scratch = MuiHeadlessMemory.Allocate(ref platform,
 				MuiStringAcknowledgeStateRecord.Size);
 			if (scratch.IsNull) return false;
@@ -9691,6 +10814,12 @@ public static class MuiCommonControlCore
 			value.Magic = MuiStringAcknowledgeStateRecord.Cookie;
 			value.Contents = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringAcknowledge, 0));
+			if (!MuiStringAcknowledgeStateAdmission.ValidateLive(ref platform, state,
+				obj, value))
+			{
+				platform.Free(scratch, MuiStringAcknowledgeStateRecord.Size);
+				return false;
+			}
 			var written = MuiStringAcknowledgeStateRecordCodec.Write(ref platform,
 				scratch, value);
 			var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -9714,9 +10843,16 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			result = default;
-			if (TryReadStringCursorStateRecord(ref platform, state, obj,
-				out var record))
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringCursorStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringCursorStateKey);
+		if (block.IsNotNull || length != 0)
 			{
+				if (!TryReadStringCursorStateRecord(ref platform, state, obj,
+					out var record)) return false;
 				// The generic guest attribute seam is also used by persistence and
 				// bootstrap code.  If it staged a public scalar directly, absorb that
 				// change into the named record before returning the canonical value.
@@ -9726,21 +10862,33 @@ public static class MuiCommonControlCore
 					StringDisplayPos, unchecked((uint)record.DisplayPos)));
 				if (rawBuffer != record.BufferPos || rawDisplay != record.DisplayPos)
 				{
-					record.BufferPos = rawBuffer;
-					record.DisplayPos = rawDisplay;
-					var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-						StringCursorStateKey);
-					MuiStringCursorStateRecordCodec.Write(ref platform, block,
-						record);
+					var candidate = record;
+					candidate.BufferPos = rawBuffer;
+					candidate.DisplayPos = rawDisplay;
+					if (!MuiStringCursorStateAdmission.ValidateLive(ref platform, state,
+						obj, candidate) || !MuiStringCursorStateRecordCodec.Write(
+						ref platform, block, candidate)) return false;
+					record = candidate;
 				}
 				result.BufferPos = record.BufferPos;
 				result.DisplayPos = record.DisplayPos;
 				return true;
 			}
-			result.BufferPos = unchecked((int)ReadRaw(ref platform, state, obj,
+			var fallback = default(MuiStringCursorStateRecord);
+			fallback.Magic = MuiStringCursorStateRecord.Cookie;
+			fallback.BufferPos = unchecked((int)ReadRaw(ref platform, state, obj,
 				StringBufferPos, 0));
-			result.DisplayPos = unchecked((int)ReadRaw(ref platform, state, obj,
+			fallback.DisplayPos = unchecked((int)ReadRaw(ref platform, state, obj,
 				StringDisplayPos, 0));
+			// Absent legacy scalar storage is bootstrap input, so preserve the
+			// established public clamp for negative positions before materialising
+			// the strict named record.
+			if (fallback.BufferPos < 0) fallback.BufferPos = 0;
+			if (fallback.DisplayPos < 0) fallback.DisplayPos = 0;
+			if (!MuiStringCursorStateAdmission.ValidateLive(ref platform, state, obj,
+				fallback)) return false;
+			result.BufferPos = fallback.BufferPos;
+			result.DisplayPos = fallback.DisplayPos;
 			return true;
 		}
 
@@ -9750,21 +10898,31 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StringCursorStateKey);
 			if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 				StringCursorStateKey) != unchecked((int)MuiStringCursorStateRecord.Size))
 				return false;
-			return MuiStringCursorStateRecordCodec.TryRead(ref platform, block,
-				out value);
+			return MuiStringCursorStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiStringCursorStateAdmission.ValidateLive(ref platform,
+					state, obj, value);
 		}
 
 		private static bool EnsureStringCursorStateRecord<TPlatform>(
 			ref TPlatform platform, APTR state, APTR obj)
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
-			if (TryReadStringCursorStateRecord(ref platform, state, obj,
-				out _)) return true;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringCursorStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringCursorStateKey);
+			if (block.IsNotNull || length != 0)
+				return TryReadStringCursorStateRecord(ref platform, state, obj,
+					out _);
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var scratch = MuiHeadlessMemory.Allocate(ref platform,
 				MuiStringCursorStateRecord.Size);
 			if (scratch.IsNull) return false;
@@ -9775,6 +10933,15 @@ public static class MuiCommonControlCore
 				StringBufferPos, 0));
 			value.DisplayPos = unchecked((int)ReadRaw(ref platform, state, obj,
 				StringDisplayPos, 0));
+			if (value.BufferPos < 0) value.BufferPos = 0;
+			if (value.DisplayPos < 0) value.DisplayPos = 0;
+			if (!MuiStringCursorStateAdmission.ValidateLive(ref platform, state, obj,
+				value))
+			{
+				platform.Clear(scratch, MuiStringCursorStateRecord.Size);
+				platform.Free(scratch, MuiStringCursorStateRecord.Size);
+				return false;
+			}
 			var written = MuiStringCursorStateRecordCodec.Write(ref platform,
 				scratch, value);
 			var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -9798,7 +10965,8 @@ public static class MuiCommonControlCore
 			stored.Magic = MuiStringCursorStateRecord.Cookie;
 			stored.BufferPos = value.BufferPos;
 			stored.DisplayPos = value.DisplayPos;
-			if (!MuiStringCursorStateRecordCodec.Write(ref platform, block,
+			if (!MuiStringCursorStateAdmission.ValidateLive(ref platform, state, obj,
+				stored) || !MuiStringCursorStateRecordCodec.Write(ref platform, block,
 				stored)) return false;
 			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 				StringBufferPos, unchecked((uint)value.BufferPos),
@@ -9825,7 +10993,8 @@ public static class MuiCommonControlCore
 		{
 			var value = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringInteger64, 0));
-			if (!IsValidStringInteger64Pointer(ref platform, value)) return false;
+			if (!MuiStringInteger64StateAdmission.ValidateLive(ref platform, state,
+				obj, value)) return false;
 			if (value.IsNull) return true;
 			if (!MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 				StringInteger64Key, value,
@@ -9840,6 +11009,10 @@ public static class MuiCommonControlCore
 			ref TPlatform platform, APTR state, APTR obj, bool notify)
 			where TPlatform : struct, IMuiLayoutPlatform
 		{
+			var current = APTR.FromPointer(ReadRaw(ref platform, state, obj,
+				StringInteger64, 0));
+			if (!MuiStringInteger64StateAdmission.ValidateLive(ref platform, state,
+				obj, current)) return false;
 			// Retire the object-owned QUAD copy before publishing the NULL pointer;
 			// this keeps a later GET from observing stale caller data while retaining
 			// the public layout as a named state transition.
@@ -9858,8 +11031,12 @@ public static class MuiCommonControlCore
 		{
 			result = default;
 			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			result.Value = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 				StringInteger64, 0));
+			if (!MuiStringInteger64StateAdmission.ValidateLive(ref platform, state,
+				obj, result.Value)) return false;
 			return MuiStringInteger64Codec.TryRead(ref platform, result.Value,
 				out value);
 		}
@@ -10026,7 +11203,12 @@ public static class MuiCommonControlCore
 		APTR state, APTR obj, uint value, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var maxChars = StringMaxChars(ref platform, state, obj);
+		// Admit the complete named integer record before changing owned contents;
+		// malformed present state must fail closed without partial mutation.
+		if (!TryReadStringIntegerState(ref platform, state, obj,
+			out _)) return false;
+		if (!TryGetStringMaxChars(ref platform, state, obj, out var maxChars))
+			return false;
 		var capacity = maxChars < 0 ? 12 : maxChars + 1;
 		// MUIA_String_MaxLen includes the terminating NUL.  A MaxLen of one
 		// therefore represents a valid empty field and must not be widened to
@@ -10100,6 +11282,10 @@ public static class MuiCommonControlCore
 		APTR state, APTR obj, APTR source, bool notify)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		var current = APTR.FromPointer(ReadRaw(ref platform, state, obj,
+			StringInteger64, 0));
+		if (!MuiStringInteger64StateAdmission.ValidateLive(ref platform, state,
+			obj, current)) return false;
 		if (!MuiStringInteger64Codec.TryRead(ref platform, source, out var value))
 			return false;
 		var mutation = default(MuiStringInteger64Mutation);
@@ -10137,7 +11323,12 @@ public static class MuiCommonControlCore
 			mutation.OwnedChanged = true;
 		}
 
-		var maxChars = StringMaxChars(ref platform, state, obj);
+		if (!TryGetStringMaxChars(ref platform, state, obj, out var maxChars))
+		{
+			RollbackStringInteger64Mutation(ref platform, state, obj,
+				ref mutation);
+			return false;
+		}
 		var capacity = maxChars < 0 ? 22 : maxChars + 1;
 		// Keep the MaxLen contract exact even for the smallest legal buffer.
 		if (capacity < 1) capacity = 1;
@@ -10220,18 +11411,25 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			result = default;
-			if (TryReadStringIntegerStateRecord(ref platform, state, obj,
-				out var record))
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringIntegerStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringIntegerStateKey);
+			if (block.IsNotNull || length != 0)
 			{
+				if (!TryReadStringIntegerStateRecord(ref platform, state, obj,
+					out var record)) return false;
 				var raw = unchecked((int)ReadRaw(ref platform, state, obj,
 					StringInteger, unchecked((uint)record.Value)));
 				if (raw != record.Value)
 				{
 					record.Value = raw;
-					var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-						StringIntegerStateKey);
-					if (!MuiStringIntegerStateRecordCodec.Write(ref platform, block,
-						record)) return false;
+					if (!MuiStringIntegerStateAdmission.ValidateLive(ref platform,
+						state, obj, record) ||
+						!MuiStringIntegerStateRecordCodec.Write(ref platform, block,
+							record)) return false;
 				}
 				result.Value = raw;
 				return true;
@@ -10247,21 +11445,31 @@ public static class MuiCommonControlCore
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
 			value = default;
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 				StringIntegerStateKey);
 			if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 				StringIntegerStateKey) !=
 				unchecked((int)MuiStringIntegerStateRecord.Size)) return false;
-			return MuiStringIntegerStateRecordCodec.TryRead(ref platform, block,
-				out value);
+		return MuiStringIntegerStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiStringIntegerStateAdmission.ValidateLive(
+			ref platform, state, obj, value);
 		}
 
 		private static bool EnsureStringIntegerStateRecord<TPlatform>(
 			ref TPlatform platform, APTR state, APTR obj)
 			where TPlatform : struct, IMuiHeadlessPlatform
 		{
-			if (TryReadStringIntegerStateRecord(ref platform, state, obj,
-				out _)) return true;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				StringIntegerStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				StringIntegerStateKey);
+			if (block.IsNotNull || length != 0)
+				return TryReadStringIntegerStateRecord(ref platform, state, obj,
+					out _);
+			if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+				obj).IsNull) return false;
 			var scratch = MuiHeadlessMemory.Allocate(ref platform,
 				MuiStringIntegerStateRecord.Size);
 			if (scratch.IsNull) return false;
@@ -10270,6 +11478,13 @@ public static class MuiCommonControlCore
 			value.Magic = MuiStringIntegerStateRecord.Cookie;
 			value.Value = unchecked((int)ReadRaw(ref platform, state, obj,
 				StringInteger, 0));
+			if (!MuiStringIntegerStateAdmission.ValidateLive(ref platform, state, obj,
+				value))
+			{
+				platform.Clear(scratch, MuiStringIntegerStateRecord.Size);
+				platform.Free(scratch, MuiStringIntegerStateRecord.Size);
+				return false;
+			}
 			var written = MuiStringIntegerStateRecordCodec.Write(ref platform,
 				scratch, value);
 			var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
@@ -10292,7 +11507,8 @@ public static class MuiCommonControlCore
 			var stored = default(MuiStringIntegerStateRecord);
 			stored.Magic = MuiStringIntegerStateRecord.Cookie;
 			stored.Value = value.Value;
-			if (!MuiStringIntegerStateRecordCodec.Write(ref platform, block,
+			if (!MuiStringIntegerStateAdmission.ValidateLive(ref platform, state, obj,
+				stored) || !MuiStringIntegerStateRecordCodec.Write(ref platform, block,
 				stored)) return false;
 			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 				StringInteger, unchecked((uint)stored.Value), false);
@@ -10375,6 +11591,68 @@ public static class MuiCommonControlCore
 			return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 				attribute, value, notify);
 		var cls = Classify(ref platform, state, obj);
+		if ((attribute == BitmapWidth || attribute == BitmapHeight) &&
+			IsBitmapFamily(cls))
+		{
+			var geometryBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				BitmapGeometryStateKey);
+			var geometryLength = MuiStoreCore.DataspaceLength(ref platform, state,
+				obj, BitmapGeometryStateKey);
+			if ((geometryBlock.IsNotNull || geometryLength != 0) &&
+				!TryReadBitmapGeometryStateRecord(ref platform, state, obj,
+					out _)) return false;
+		}
+		if ((attribute == BitmapBitmap && cls == MuiControlClass.Bitmap) ||
+			(attribute == BodychunkBody && cls == MuiControlClass.Bodychunk))
+		{
+			if (value != 0 && !platform.IsMapped(APTR.FromPointer(value), 4))
+				return false;
+			var sourceBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				BitmapSourceStateKey);
+			var sourceLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				BitmapSourceStateKey);
+			if ((sourceBlock.IsNotNull || sourceLength != 0) &&
+				!TryReadBitmapSourceStateRecord(ref platform, state, obj,
+					out _)) return false;
+		}
+		if (cls == MuiControlClass.Bodychunk &&
+			(attribute == BodychunkCompression || attribute == BodychunkDepth ||
+			attribute == BodychunkMasking))
+		{
+			var formatBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				BodychunkFormatStateKey);
+			var formatLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				BodychunkFormatStateKey);
+			if ((formatBlock.IsNotNull || formatLength != 0) &&
+				!TryReadBodychunkFormatStateRecord(ref platform, state, obj,
+					out _)) return false;
+		}
+		if (cls == MuiControlClass.Image &&
+			(attribute == ImageState || attribute == Selected ||
+			attribute == ImageFreeHoriz || attribute == ImageFreeVert ||
+			attribute == ShowSelState))
+		{
+			var renderBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				ImageRenderStateKey);
+			var renderLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				ImageRenderStateKey);
+			if ((renderBlock.IsNotNull || renderLength != 0) &&
+				!TryReadImageRenderStateRecord(ref platform, state, obj,
+				out _)) return false;
+		}
+		if (cls == MuiControlClass.Image &&
+			(attribute == ImageSpec || attribute == ImageBuiltinSpec))
+		{
+			var specBlock = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				ImageSpecStateKey);
+			var specLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				ImageSpecStateKey);
+			if ((specBlock.IsNotNull || specLength != 0) &&
+				!TryReadImageSpecStateRecord(ref platform, state, obj,
+					out _)) return false;
+			if (attribute == ImageSpec && value != 0 && value > MUIImageBuiltinMax &&
+				!platform.IsMapped(APTR.FromPointer(value), 2)) return false;
+		}
 		var copiedCStringMaximum = CopiedCStringMaximum(attribute);
 		if (copiedCStringMaximum != 0 && value != 0 &&
 			!IsValidGuestCStringPointer(ref platform, APTR.FromPointer(value),
@@ -10420,6 +11698,8 @@ public static class MuiCommonControlCore
 			// resolves the one written last. Compare the raw pointer here so a
 			// repeated Font write can still become the active choice after a
 			// CustomFont write.
+			if (!TryReadControlFontState(ref platform, state, obj, out _))
+				return false;
 			if (!ChangeDetectedRawSet(ref platform, state, obj, attribute, value,
 				notify)) return false;
 			if (!MuiAreaFontSelectionCore.Mark(ref platform, state, obj,
@@ -10430,6 +11710,8 @@ public static class MuiCommonControlCore
 		{
 			if (value != 0 && !CStringCodec.TryReadLength(ref platform,
 				APTR.FromPointer(value), MuiAreaCustomFontCore.MaximumSpecLength,
+				out _)) return false;
+			if (!MuiAreaCustomFontCore.TryReadState(ref platform, state, obj,
 				out _)) return false;
 			if (!ChangeDetectedSet(ref platform, state, obj, attribute, value,
 				notify)) return false;
@@ -10455,6 +11737,8 @@ public static class MuiCommonControlCore
 			(attribute == Draggable || attribute == Dropable))
 		{
 			var normalized = value == 0 ? 0u : 1u;
+			if (!MuiAreaDragCore.TryReadPolicyState(ref platform, state, obj,
+				out _)) return false;
 			if (!ChangeDetectedSet(ref platform, state, obj, attribute, normalized,
 				notify)) return false;
 			return MuiAreaDragCore.TryReadPolicyState(ref platform, state, obj,
@@ -10495,6 +11779,10 @@ public static class MuiCommonControlCore
 		if (cls != MuiControlClass.Unknown && attribute == DoubleBuffer)
 		{
 			var normalized = value == 0 ? 0u : 1u;
+			// Validate the authoritative typed policy before mutating the raw
+			// compatibility slot.  A malformed present record must fail closed.
+			if (!MuiAreaDoubleBufferCore.TryReadState(ref platform, state, obj,
+				out _)) return false;
 			if (!ChangeDetectedSet(ref platform, state, obj, attribute, normalized,
 				notify)) return false;
 			// ChangeDetectedSet has synchronized the legacy raw attribute. Keep the
@@ -10505,6 +11793,10 @@ public static class MuiCommonControlCore
 		if (cls != MuiControlClass.Unknown && attribute == Floating)
 		{
 			var normalized = value == 0 ? 0u : 1u;
+			// Validate the authoritative typed policy before mutating the raw
+			// compatibility slot.  A malformed present record must fail closed.
+			if (!MuiAreaFloatingCore.TryReadState(ref platform, state, obj,
+				out _)) return false;
 			if (!ChangeDetectedSet(ref platform, state, obj, attribute,
 				normalized, notify)) return false;
 			// Keep the public BOOL in a named record. MorphOS's autodoc does not
@@ -10515,6 +11807,10 @@ public static class MuiCommonControlCore
 		}
 		if (cls != MuiControlClass.Unknown && attribute == ShortHelp)
 		{
+			// Validate the authoritative typed pointer record before mutating the
+			// raw compatibility slot. Malformed present state fails closed.
+			if (!MuiAreaShortHelpCore.TryReadState(ref platform, state, obj,
+				out _)) return false;
 			if (!ChangeDetectedSet(ref platform, state, obj, attribute, value,
 				notify)) return false;
 			return MuiAreaShortHelpCore.TryReadState(ref platform, state, obj,
@@ -10684,6 +11980,10 @@ public static class MuiCommonControlCore
 		}
 		if (cls == MuiControlClass.String && attribute == StringAttachedList)
 		{
+			// Admit the complete named relationship before changing raw storage;
+			// malformed state must fail closed without repair.
+			if (!TryReadStringAttachedListState(ref platform, state, obj,
+				out _)) return false;
 			var listview = APTR.FromPointer(value);
 			if (!IsValidStringAttachedList(ref platform, state, listview))
 				return false;
@@ -10705,6 +12005,10 @@ public static class MuiCommonControlCore
 		}
 		if (cls == MuiControlClass.String && attribute == StringSpellChecking)
 		{
+			// Admit the complete named BOOL record before changing raw storage;
+			// malformed present state must fail closed without repair.
+			if (!TryReadStringSpellCheckingState(ref platform, state, obj,
+				out _)) return false;
 			var normalized = value == 0 ? 0u : 1u;
 			if (!ChangeDetectedSet(ref platform, state, obj, attribute,
 				normalized, notify)) return false;
@@ -10717,6 +12021,10 @@ public static class MuiCommonControlCore
 		if (cls == MuiControlClass.String &&
 			(attribute == StringEditable || attribute == StringAdvanceOnCR))
 		{
+			// Admit the complete interaction record before changing any raw BOOL;
+			// malformed state must fail closed without repair.
+			if (!TryReadStringInteractionState(ref platform, state, obj,
+				out _)) return false;
 			var normalized = value == 0 ? 0u : 1u;
 			if (!ChangeDetectedSet(ref platform, state, obj, attribute,
 				normalized, notify)) return false;
@@ -10734,6 +12042,8 @@ public static class MuiCommonControlCore
 			var hook = APTR.FromPointer(value);
 			if (!IsValidStringEditHook(ref platform, hook))
 				return false;
+			if (!TryReadStringEditHookState(ref platform, state, obj,
+				out _)) return false;
 			if (!ChangeDetectedSet(ref platform, state, obj, attribute, value,
 				notify)) return false;
 			if (!TryReadStringEditHookState(ref platform, state, obj,
@@ -10744,6 +12054,8 @@ public static class MuiCommonControlCore
 		if (cls == MuiControlClass.String && attribute == StringLonelyEditHook)
 		{
 			var normalized = value == 0 ? 0u : 1u;
+			if (!TryReadStringEditHookState(ref platform, state, obj,
+				out _)) return false;
 			if (!ChangeDetectedSet(ref platform, state, obj, attribute,
 				normalized, notify)) return false;
 			if (!TryReadStringEditHookState(ref platform, state, obj,
@@ -10773,6 +12085,12 @@ public static class MuiCommonControlCore
 		{
 			if (value != 0 && !IsValidStringContentsPointer(ref platform,
 				APTR.FromPointer(value))) return false;
+			if (cls == MuiControlClass.String && !TryReadStringCursorState(
+				ref platform, state, obj, out _)) return false;
+			if (!TryReadStringContentsState(ref platform, state, obj,
+				out _)) return false;
+			if (!TryGetStringMaxChars(ref platform, state, obj,
+				out var contentsMaxChars)) return false;
 			var previousContents = Read(ref platform, state, obj,
 				StringContents, 0);
 			if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
@@ -10800,7 +12118,7 @@ public static class MuiCommonControlCore
 				}
 			}
 			else if (!CopyContents(ref platform, state, obj, StringContents,
-				StringCopyKey, StringMaxChars(ref platform, state, obj), notify))
+				StringCopyKey, contentsMaxChars, notify))
 			{
 				// CopyContents allocates the replacement before retiring the old
 				// buffer.  Restore the public pointer when that allocation/admission
@@ -10852,6 +12170,10 @@ public static class MuiCommonControlCore
 		}
 		if (attribute == StringPlaceholder)
 		{
+			// Admit the complete named placeholder state before changing raw
+			// storage; malformed state must fail closed without repair.
+			if (!TryReadStringPlaceholderState(ref platform, state, obj,
+				out _)) return false;
 			var source = APTR.FromPointer(value);
 			if (!source.IsNull && !CStringCodec.TryReadLength(ref platform, source,
 				128, out _)) return false;
@@ -10922,6 +12244,8 @@ public static class MuiCommonControlCore
 				out var textCopy)) return false;
 			if (value != 0 && !IsValidStringContentsPointer(ref platform,
 				APTR.FromPointer(value))) return false;
+			if (!TryReadTextContentsState(ref platform, state, obj,
+				out _)) return false;
 			var previousTextContents = Read(ref platform, state, obj,
 				TextContents, 0);
 			if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
@@ -10972,6 +12296,8 @@ public static class MuiCommonControlCore
 		}
 		if (attribute == TextPreParse)
 		{
+			if (!TryReadTextPreParseState(ref platform, state, obj,
+				out _)) return false;
 			if (value == 0)
 			{
 				if (!ClearCopiedCStringState(ref platform, state, obj,
@@ -11021,6 +12347,10 @@ public static class MuiCommonControlCore
 				unchecked((int)value), false, notify);
 		if (attribute == NumericFormat)
 		{
+			// Admit the complete named format state before changing raw storage;
+			// malformed state must fail closed without repair.
+			if (!TryReadNumericFormatState(ref platform, state, obj,
+				out _)) return false;
 			if (value == 0)
 			{
 				if (!ClearCopiedCStringState(ref platform, state, obj,
@@ -11042,6 +12372,10 @@ public static class MuiCommonControlCore
 		}
 		if (attribute == LevelmeterLabel && cls == MuiControlClass.Levelmeter)
 		{
+			// Admit the complete named label state before changing raw storage;
+			// malformed state must fail closed without repair.
+			if (!TryReadLevelmeterLabelState(ref platform, state, obj,
+				out _)) return false;
 			if (value == 0)
 			{
 				if (!ClearCopiedCStringState(ref platform, state, obj,
@@ -11083,10 +12417,10 @@ public static class MuiCommonControlCore
 			return SetGauge(ref platform, state, obj, value, notify);
 		if (attribute == GaugeMax)
 		{
-			if (!ChangeDetectedSet(ref platform, state, obj, attribute, value, notify))
-				return false;
 			if (!TryReadGaugeState(ref platform, state, obj,
 				out var gauge)) return false;
+			if (!ChangeDetectedSet(ref platform, state, obj, attribute, value, notify))
+				return false;
 			gauge.Maximum = value;
 			if (!PublishGaugeState(ref platform, state, obj, gauge)) return false;
 			return SetGauge(ref platform, state, obj, Read(ref platform, state, obj,
@@ -11094,15 +12428,19 @@ public static class MuiCommonControlCore
 		}
 		if (attribute == GaugeDivide)
 		{
-			if (!ChangeDetectedSet(ref platform, state, obj, attribute, value, notify))
-				return false;
 			if (!TryReadGaugeState(ref platform, state, obj,
 				out var gauge)) return false;
+			if (!ChangeDetectedSet(ref platform, state, obj, attribute, value, notify))
+				return false;
 			gauge.Divide = value;
 			return PublishGaugeState(ref platform, state, obj, gauge);
 		}
 		if (attribute == GaugeInfoText)
 		{
+			// Admit the complete named InfoText state before changing raw storage;
+			// malformed state must fail closed without repair.
+			if (!TryReadGaugeInfoTextState(ref platform, state, obj,
+				out _)) return false;
 			if (value == 0)
 			{
 				if (!ClearCopiedCStringState(ref platform, state, obj,
@@ -11131,6 +12469,8 @@ public static class MuiCommonControlCore
 		if (cls != MuiControlClass.Unknown &&
 			(attribute == HorizDisappear || attribute == VertDisappear))
 		{
+			if (!MuiAreaDisappearCore.TryReadState(ref platform, state, obj,
+				out _)) return false;
 			if (!ChangeDetectedSet(ref platform, state, obj, attribute, value,
 				notify)) return false;
 			return MuiAreaDisappearCore.TryReadState(ref platform, state, obj,
@@ -11179,12 +12519,14 @@ public static class MuiCommonControlCore
 		if (source.IsNull || !platform.IsMapped(source, 1)) return false;
 		if (attribute == StringContents && cls == MuiControlClass.String)
 		{
+			if (!TryGetStringMaxChars(ref platform, state, obj,
+				out var contentsMaxChars)) return false;
 			var previousContents = Read(ref platform, state, obj,
 				StringContents, 0);
 			if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 				attribute, source.Raw, false)) return false;
 			if (!CopyContents(ref platform, state, obj, StringContents,
-				StringCopyKey, StringMaxChars(ref platform, state, obj), false))
+				StringCopyKey, contentsMaxChars, false))
 			{
 				MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 					StringContents, previousContents, false);
@@ -11358,6 +12700,9 @@ public static class MuiCommonControlCore
 		}
 
 		if (!TryReadPropPolicyState(ref platform, state, obj, out _)) return false;
+		if ((attribute == PropHoriz || attribute == PropSlider) && value > 1)
+			return false;
+		if (attribute == PropUseWinBorder && value > 3) return false;
 		var normalized = attribute == PropSlider && value != 0 ? 1u : value;
 		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			attribute, normalized, false)) return false;
@@ -11407,6 +12752,7 @@ public static class MuiCommonControlCore
 		{
 			if (!TryReadPropPolicyState(ref platform, state, obj,
 				out _)) return false;
+			if (attribute == PropUseWinBorder && value > 3) return false;
 			var normalized = attribute == PropSlider && value != 0 ? 1u : value;
 			if (!ChangeDetectedSet(ref platform, state, obj, attribute, normalized,
 				notify)) return false;
@@ -11693,13 +13039,16 @@ public static class MuiCommonControlCore
 
 	private static bool IsStringWordSeparator(uint codePoint) => codePoint <= 32;
 
-	private static int StringMaxChars<TPlatform>(ref TPlatform platform, APTR state,
-		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
+	private static bool TryGetStringMaxChars<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, out int maxChars)
+		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var maxLen = TryReadStringPresentationState(ref platform, state, obj,
-			out var presentation) ? presentation.MaxLen : Read(ref platform, state,
-				obj, StringMaxLen, 80);
-		return maxLen == 0 ? -1 : unchecked((int)maxLen) - 1;
+		maxChars = 0;
+		if (!TryReadStringPresentationState(ref platform, state, obj,
+			out var presentation)) return false;
+		maxChars = presentation.MaxLen == 0 ? -1 :
+			unchecked((int)presentation.MaxLen) - 1;
+		return true;
 	}
 
 	private static bool ClearTextContentsCopy<TPlatform>(ref TPlatform platform,
@@ -12821,13 +14170,18 @@ public static class MuiCommonControlCore
 		switch (cls)
 		{
 			case MuiControlClass.Numeric:
-			case MuiControlClass.Levelmeter:
 			case MuiControlClass.Numericbutton:
 				Fill(ref result, 48, 14, 48, 14, 10000, 14);
 				break;
+			case MuiControlClass.Levelmeter:
+				if (!TryReadLevelmeterPresentationState(ref platform, state, obj,
+					out _)) return result;
+				Fill(ref result, 48, 14, 48, 14, 10000, 14);
+				break;
 			case MuiControlClass.Slider:
-				if (TryReadSliderPresentationState(ref platform, state, obj,
-					out var sliderPresentation) && sliderPresentation.Horizontal != 0)
+				if (!TryReadSliderPresentationState(ref platform, state, obj,
+					out var sliderPresentation)) return result;
+				if (sliderPresentation.Horizontal != 0)
 					Fill(ref result, 48, 14, 48, 14, 10000, 14);
 				else
 					Fill(ref result, 14, 48, 14, 48, 14, 10000);
@@ -12839,13 +14193,16 @@ public static class MuiCommonControlCore
 				Fill(ref result, 64, 16, 64, 16, 10000, 16);
 				break;
 			case MuiControlClass.Prop:
-				if (Read(ref platform, state, obj, PropUseWinBorder, 0) != 0)
+				if (!TryReadPropPolicyState(ref platform, state, obj,
+					out var propPolicy) || propPolicy.UseWinBorder != 0)
 					break;
 				Fill(ref result, 16, 16, 16, 16, 10000, 10000);
 				break;
 			case MuiControlClass.Scrollbar:
 				return MuiGroupLayoutCore.ComputeMinMax(ref platform, state, obj);
 			case MuiControlClass.Scale:
+				if (!TryReadScalePresentationState(ref platform, state, obj,
+					out _)) return result;
 				Fill(ref result, 64, 8, 64, 8, 10000, 8);
 				break;
 			case MuiControlClass.String:
@@ -12946,8 +14303,8 @@ public static class MuiCommonControlCore
 				// minimum to the widest entry plus the image and inner spacing,
 				// with a fixed row height and horizontal growth.
 				var entries = default(MuiChoiceEntriesState);
-				TryReadChoiceEntriesState(ref platform, state, obj,
-					CycleEntries, out entries);
+				if (!TryReadChoiceEntriesState(ref platform, state, obj,
+					CycleEntries, out entries)) return result;
 				var widest = 0;
 				if (entries.Entries.IsNotNull)
 				{
@@ -13303,10 +14660,10 @@ public static class MuiCommonControlCore
 		{
 			var horizontal = cls == MuiControlClass.Knob;
 			var quiet = 0u;
-			if (cls == MuiControlClass.Slider &&
-				TryReadSliderPresentationState(ref platform, state, obj,
-					out var sliderPresentation))
+			if (cls == MuiControlClass.Slider)
 			{
+				if (!TryReadSliderPresentationState(ref platform, state, obj,
+					out var sliderPresentation)) return;
 				horizontal = sliderPresentation.Horizontal != 0;
 				quiet = sliderPresentation.Quiet;
 			}
@@ -13347,14 +14704,15 @@ public static class MuiCommonControlCore
 		}
 		if (cls == MuiControlClass.Prop)
 		{
-			if (Read(ref platform, state, obj, PropUseWinBorder, 0) != 0)
+			if (!TryReadPropPolicyState(ref platform, state, obj,
+				out var propPolicy) || propPolicy.UseWinBorder != 0)
 				return;
 			if (!TryReadPropRangeState(ref platform, state, obj,
 				out var range)) return;
 			var entries = range.Entries;
 			var visible = range.Visible;
 			var first = range.First;
-			var horizontal = Read(ref platform, state, obj, PropHoriz, 1) != 0;
+			var horizontal = propPolicy.Horizontal != 0;
 			var track = horizontal ? width : height;
 			var span = entries == 0 ? track :
 				(int)(visible * (uint)track / entries);
@@ -13438,10 +14796,13 @@ public static class MuiCommonControlCore
 			var entries = default(MuiChoiceEntriesState);
 			var entriesAttribute = cls == MuiControlClass.Cycle ? CycleEntries :
 				RadioEntries;
+			var activeAttribute = cls == MuiControlClass.Cycle ? CycleActive :
+				RadioActive;
 			if (!TryReadChoiceEntriesState(ref platform, state, obj,
 				entriesAttribute, out entries)) return;
-			var active = Read(ref platform, state, obj,
-				cls == MuiControlClass.Cycle ? CycleActive : RadioActive, 0);
+			if (!TryReadChoiceActiveState(ref platform, state, obj,
+				activeAttribute, out var activeState)) return;
+			var active = activeState.Active;
 			var choice = ChoiceEntry(ref platform, entries.Entries, active);
 			var length = StringLength(ref platform, choice);
 			if (length > 0)
@@ -13530,6 +14891,8 @@ public static class MuiCommonControlCore
 		APTR state, APTR obj, APTR rastPort, int left, int top, int width,
 		int height) where TPlatform : struct, IMuiLayoutPlatform
 	{
+		if (!TryReadPropPolicyState(ref platform, state, obj,
+			out _)) return;
 		if (!TryReadScrollbarLayoutState(ref platform, state, obj,
 			out var layout)) return;
 		var horizontal = layout.Horizontal != 0;
@@ -13987,6 +15350,7 @@ public static class MuiCommonControlCore
 	public static bool SetupBitmap<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, APTR renderInfo) where TPlatform : struct, IMuiLayoutPlatform
 	{
+		if (!BitmapRemappedStateAvailable(ref platform, state, obj)) return false;
 		if (!MuiAreaLayoutCore.Setup(ref platform, state, obj, renderInfo))
 			return false;
 		if (!RebuildBitmapRemap(ref platform, state, obj))
@@ -14006,6 +15370,7 @@ public static class MuiCommonControlCore
 	private static bool RebuildBitmapRemap<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj) where TPlatform : struct, IMuiLayoutPlatform
 	{
+		if (!BitmapRemappedStateAvailable(ref platform, state, obj)) return false;
 		var cls = Classify(ref platform, state, obj);
 		if (cls == MuiControlClass.Bodychunk && MuiStoreCore.DataspaceFind(
 			ref platform, state, obj, BodychunkDecodedKey).IsNotNull)
@@ -14034,6 +15399,36 @@ public static class MuiCommonControlCore
 		APTR state, APTR obj, uint attribute, uint value, bool notify)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
+		if (!BitmapRemappedStateAvailable(ref platform, state, obj)) return false;
+		var cls = Classify(ref platform, state, obj);
+		if (cls == MuiControlClass.Bitmap &&
+			(attribute == BitmapAlpha || attribute == BitmapMappingTable ||
+			attribute == BitmapPrecision || attribute == BitmapSourceColors ||
+			attribute == BitmapTransparent || attribute == BitmapUseFriend))
+		{
+			if (!BitmapPolicyStateAvailable(ref platform, state, obj) ||
+				!TryReadBitmapPolicyState(ref platform, state, obj,
+					out var candidate)) return false;
+			if (attribute == BitmapAlpha) candidate.Alpha = value;
+			else if (attribute == BitmapMappingTable)
+				candidate.MappingTable = value;
+			else if (attribute == BitmapPrecision) candidate.Precision = value;
+			else if (attribute == BitmapSourceColors)
+				candidate.SourceColors = value;
+			else if (attribute == BitmapTransparent)
+				candidate.Transparent = value;
+			else candidate.UseFriend = value;
+			var candidateRecord = default(MuiBitmapPolicyStateRecord);
+			candidateRecord.Magic = MuiBitmapPolicyStateRecord.Cookie;
+			candidateRecord.Alpha = candidate.Alpha;
+			candidateRecord.MappingTable = candidate.MappingTable;
+			candidateRecord.Precision = candidate.Precision;
+			candidateRecord.SourceColors = candidate.SourceColors;
+			candidateRecord.Transparent = candidate.Transparent;
+			candidateRecord.UseFriend = candidate.UseFriend;
+			if (!MuiBitmapPolicyStateAdmission.ValidateLive(ref platform, state, obj,
+				candidateRecord)) return false;
+		}
 		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj, attribute,
 			out var current) && current == value) return true;
 		var live = ReadRaw(ref platform, state, obj, BitmapRemapped, 0) != 0;
@@ -14054,7 +15449,7 @@ public static class MuiCommonControlCore
 			if (!PublishBitmapGeometryState(ref platform, state, obj, geometry))
 				return false;
 		}
-		if (Classify(ref platform, state, obj) == MuiControlClass.Bodychunk &&
+		if (cls == MuiControlClass.Bodychunk &&
 			(attribute == BodychunkCompression || attribute == BodychunkDepth ||
 			attribute == BodychunkMasking))
 		{
@@ -14066,7 +15461,7 @@ public static class MuiCommonControlCore
 			if (!PublishBodychunkFormatState(ref platform, state, obj, format))
 				return false;
 		}
-		if (Classify(ref platform, state, obj) == MuiControlClass.Bitmap &&
+		if (cls == MuiControlClass.Bitmap &&
 			(attribute == BitmapAlpha || attribute == BitmapMappingTable ||
 			attribute == BitmapPrecision || attribute == BitmapSourceColors ||
 			attribute == BitmapTransparent || attribute == BitmapUseFriend))
@@ -14091,6 +15486,7 @@ public static class MuiCommonControlCore
 	public static bool CleanupBitmap<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj) where TPlatform : struct, IMuiLayoutPlatform
 	{
+		if (!BitmapRemappedStateAvailable(ref platform, state, obj)) return false;
 		var cleared = default(MuiBitmapRemappedState);
 		if (!PublishBitmapRemappedState(ref platform, state, obj, cleared))
 			return false;

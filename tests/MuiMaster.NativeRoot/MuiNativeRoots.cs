@@ -4,6 +4,7 @@
 */
 
 using Amiga;
+using Amiga.MUI;
 using CopperOS.MuiMaster;
 
 namespace CopperOS.MuiMaster.NativeRoot;
@@ -690,6 +691,36 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Focused ABI proof for the struct-first CallHook guest-memory adapter.
+	// Header admission remains 4 bytes; hook and param1 require the complete
+	// fixed 12-byte envelope before the named fields are accessed.
+	public static uint CallHookMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiCallHookMessageMemoryCodec.TryWriteUInt32(ref platform, packet,
+			MuiCallHookPacketField.MethodId, MuiCallHookMessageCodec.Method))
+			return 1;
+		if (!MuiCallHookMessageMemoryCodec.TryWriteUInt32(ref platform, packet,
+			MuiCallHookPacketField.Hook, 0x00050D00) ||
+			!MuiCallHookMessageMemoryCodec.TryWriteUInt32(ref platform, packet,
+				MuiCallHookPacketField.Param1, 0xCAFEBABEu)) return 2;
+		if (!MuiCallHookMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+			MuiCallHookPacketField.Hook, out var hook) || hook != 0x00050D00 ||
+			!MuiCallHookMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiCallHookPacketField.Param1, out var param1) ||
+			param1 != 0xCAFEBABEu) return 3;
+		if (MuiCallHookMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FF9), MuiCallHookPacketField.Param1, out _) ||
+			MuiCallHookMessageMemoryCodec.TryGetAddress(ref platform, packet,
+				(MuiCallHookPacketField)255, out _) ||
+			MuiCallHookMessageMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiCallHookPacketField.Hook, out _)) return 4;
+		return 42;
+	}
+
 	// Focused MorphOS Dataspace packet closure. All packets are constructed by
 	// the named Dataspace message writers, then routed through the same focused
 	// dispatcher seam used by host tests.
@@ -817,6 +848,44 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Focused ABI proof for the struct-first Dataspace guest-memory adapter.
+	// Each payload field admits its complete named packet record; the method
+	// header remains a 4-byte record for selector probing.
+	public static uint DataspaceMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, packet,
+			MuiDataspacePacketKind.Add, MuiDataspaceField.MethodId,
+			MuiDataspaceMessageCodec.AddMethod) ||
+			!MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, packet,
+				MuiDataspacePacketKind.Add, MuiDataspaceField.Data, 0x00050D00) ||
+			!MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, packet,
+				MuiDataspacePacketKind.Add, MuiDataspaceField.Length,
+				unchecked((uint)-4)) ||
+			!MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, packet,
+				MuiDataspacePacketKind.Add, MuiDataspaceField.Id, 19)) return 1;
+		if (!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+			MuiDataspacePacketKind.Add, MuiDataspaceField.Data, out var data) ||
+			data != 0x00050D00 ||
+			!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiDataspacePacketKind.Add, MuiDataspaceField.Length,
+				out var length) || length != unchecked((uint)-4)) return 2;
+		if (MuiDataspaceMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FF5), MuiDataspacePacketKind.Add,
+			MuiDataspaceField.Id, out _) ||
+			MuiDataspaceMessageMemoryCodec.TryGetAddress(ref platform, packet,
+				MuiDataspacePacketKind.Clear, MuiDataspaceField.Id, out _) ||
+			MuiDataspaceMessageMemoryCodec.TryGetAddress(ref platform, packet,
+				MuiDataspacePacketKind.Add, (MuiDataspaceField)255, out _) ||
+			MuiDataspaceMessageMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiDataspacePacketKind.Get, MuiDataspaceField.SizeStorage,
+				out _)) return 3;
+		return 42;
+	}
+
 	// Focused Dataspace method-header closure. Named Dataspace payload records
 	// remain covered by DataspaceMessageCodecRoot and the host packet tests.
 	public static uint DataspaceMethodHeaderCodecRoot()
@@ -867,6 +936,43 @@ public static class MuiNativeRoots
 			decodedWrite.Type != write.Type || decodedWrite.Id != write.Id) return 2;
 		if (MuiDataspaceIffMessageCodec.TryReadWriteIff(ref platform,
 			APTR.FromPointer(0x00050FF5), out _)) return 3;
+		return 42;
+	}
+
+	// Focused ABI proof for the struct-first Dataspace IFF packet adapters.
+	// ReadIFF and WriteIFF payload fields require their complete named records;
+	// the method selector remains a separate 4-byte header record.
+	public static uint DataspaceIffMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var read = APTR.FromPointer(0x00050F20);
+		if (!MuiDataspaceReadIffMessageMemoryCodec.TryWrite(ref platform, read,
+			MuiDataspaceReadIffField.MethodId, MuiDataspaceIffMessageCodec.ReadIffMethod) ||
+			!MuiDataspaceReadIffMessageMemoryCodec.TryWrite(ref platform, read,
+				MuiDataspaceReadIffField.Handle, 0x00050D00) ||
+			!MuiDataspaceReadIffMessageMemoryCodec.TryRead(ref platform, read,
+				MuiDataspaceReadIffField.Handle, out var handle) ||
+			handle != 0x00050D00) return 1;
+		var write = APTR.FromPointer(0x00050F40);
+		if (!MuiDataspaceWriteIffMessageMemoryCodec.TryWrite(ref platform, write,
+			MuiDataspaceWriteIffField.MethodId,
+			MuiDataspaceIffMessageCodec.WriteIffMethod) ||
+			!MuiDataspaceWriteIffMessageMemoryCodec.TryWrite(ref platform, write,
+				MuiDataspaceWriteIffField.Type, 0x464F524D) ||
+			!MuiDataspaceWriteIffMessageMemoryCodec.TryWrite(ref platform, write,
+				MuiDataspaceWriteIffField.Id, 0x44415441) ||
+			!MuiDataspaceWriteIffMessageMemoryCodec.TryRead(ref platform, write,
+				MuiDataspaceWriteIffField.Type, out var type) ||
+			type != 0x464F524D) return 2;
+		if (MuiDataspaceReadIffMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFD), MuiDataspaceReadIffField.Handle, out _) ||
+			MuiDataspaceWriteIffMessageMemoryCodec.TryGetAddress(ref platform,
+				APTR.FromPointer(0x00050FF5), MuiDataspaceWriteIffField.Id, out _) ||
+			MuiDataspaceWriteIffMessageMemoryCodec.TryGetAddress(ref platform, write,
+				(MuiDataspaceWriteIffField)255, out _) ||
+			MuiDataspaceReadIffMessageMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiDataspaceReadIffField.Handle, out _)) return 3;
 		return 42;
 	}
 
@@ -1146,6 +1252,103 @@ public static class MuiNativeRoots
 			0x80420000u, 1, 2)) return 9;
 		if (MuiExternalWrapperMessageCodec.IsValidMethod(ref platform, packet,
 			0x80420000u)) return 10;
+		return 42;
+	}
+
+	// Focused MG1309 proof that every fixed Boopsi/Dtpic wrapper packet field
+	// crosses the guest boundary through named packet structs and one bounded
+	// memory adapter. Update, get/set, render-info, AskMinMax, and Layout records
+	// are covered without importing the wrapper state machine.
+	public static uint ExternalWrapperMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050E00);
+		if (!MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiExternalWrapperPacketKind.Update,
+			MuiExternalWrapperField.Flags, 3) ||
+			!MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiExternalWrapperPacketKind.Update, MuiExternalWrapperField.Flags,
+				out var flags) || flags != 3) return 1;
+		if (!MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiExternalWrapperPacketKind.Get,
+			MuiExternalWrapperField.Storage, 0x00050F00) ||
+			!MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiExternalWrapperPacketKind.Get, MuiExternalWrapperField.Storage,
+				out var storage) || storage != 0x00050F00) return 2;
+		if (!MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiExternalWrapperPacketKind.Set,
+			MuiExternalWrapperField.Value, 0x456) ||
+			!MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiExternalWrapperPacketKind.Set, MuiExternalWrapperField.Value,
+				out var value) || value != 0x456) return 3;
+		if (!MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiExternalWrapperPacketKind.RenderInfo,
+			MuiExternalWrapperField.RenderInfo, 0x00050F20) ||
+			!MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiExternalWrapperPacketKind.RenderInfo,
+				MuiExternalWrapperField.RenderInfo, out var renderInfo) ||
+			renderInfo != 0x00050F20) return 4;
+		if (!MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiExternalWrapperPacketKind.AskMinMax,
+			MuiExternalWrapperField.Storage, 0x00050F30) ||
+			!MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiExternalWrapperPacketKind.AskMinMax,
+				MuiExternalWrapperField.Storage, out var minMax) ||
+			minMax != 0x00050F30) return 5;
+		if (!MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiExternalWrapperPacketKind.Layout,
+			MuiExternalWrapperField.Height, 40) ||
+			!MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Height,
+				out var height) || height != 40) return 6;
+		if (MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x00050FED), MuiExternalWrapperPacketKind.Layout,
+			MuiExternalWrapperField.Height, out _) ||
+			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiExternalWrapperPacketKind.Method,
+				MuiExternalWrapperField.Value, out _) ||
+			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
+				APTR.Null, MuiExternalWrapperPacketKind.Set,
+				MuiExternalWrapperField.Value, out _)) return 7;
+		return 42;
+	}
+
+	// Focused MG1311 proof that the complete MorphOS BoopsiQuery envelope is
+	// accessed through its named record and bounded guest-memory adapter.
+	public static uint BoopsiQueryMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050E00);
+		if (!MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiBoopsiQueryPacketField.MethodId,
+			MuiBoopsiQueryMessage.Method) ||
+			!MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiBoopsiQueryPacketField.MethodId, out var method) ||
+			method != MuiBoopsiQueryMessage.Method) return 1;
+		if (!MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiBoopsiQueryPacketField.Screen, 0x00050F00) ||
+			!MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
+				packet, MuiBoopsiQueryPacketField.MinWidth,
+				unchecked((uint)-10)) ||
+			!MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
+				packet, MuiBoopsiQueryPacketField.MaxHeight, 200) ||
+			!MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
+				packet, MuiBoopsiQueryPacketField.RenderInfo, 0x00050F20)) return 2;
+		if (!MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+			MuiBoopsiQueryPacketField.MinWidth, out var minWidth) ||
+			minWidth != unchecked((uint)-10)) return 3;
+		if (!MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+			MuiBoopsiQueryPacketField.MaxHeight, out var maxHeight) ||
+			maxHeight != 200) return 4;
+		if (MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x00050FD9), MuiBoopsiQueryPacketField.RenderInfo,
+			out _) ||
+			MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				(MuiBoopsiQueryPacketField)255, out _) ||
+			MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform,
+				APTR.Null, MuiBoopsiQueryPacketField.Flags, out _)) return 5;
 		return 42;
 	}
 
@@ -1770,6 +1973,332 @@ public static class MuiNativeRoots
 			return 1;
 		input.Available = 0;
 		if (MuiWindowDoubleClickProducerCore.Accept(input, validation)) return 2;
+		return 42;
+	}
+
+	// MG925/MG1042 focused Window open-policy admission proof. Named signed
+	// geometry remains representable while every native-window BOOL policy field
+	// and cookie reject noncanonical state before configuration.
+	public static uint WindowOpenPolicyAdmissionRoot()
+	{
+		var policy = default(MuiWindowOpenPolicyStateRecord);
+		policy.Magic = MuiWindowOpenPolicyStateRecord.Cookie;
+		policy.AlternateHeight = -1;
+		policy.Width = 640;
+		policy.CloseGadget = 1;
+		policy.AppWindow = 1;
+		policy.UseRightBorderScroller = 1;
+		if (!MuiWindowOpenPolicyStateAdmission.Validate(policy)) return 1;
+		policy.Borderless = 2;
+		if (MuiWindowOpenPolicyStateAdmission.Validate(policy)) return 2;
+		policy.Borderless = 0;
+		policy.Magic = 0;
+		if (MuiWindowOpenPolicyStateAdmission.Validate(policy)) return 3;
+		return 42;
+	}
+
+	// MG926/MG1039 focused Window lifecycle admission proof. The named record
+	// keeps native capability topology and canonical BOOL state together at the
+	// freestanding boundary.
+	public static uint WindowLifecycleAdmissionRoot()
+	{
+		var lifecycle = default(MuiWindowLifecycleStateRecord);
+		lifecycle.Magic = MuiWindowLifecycleStateRecord.Cookie;
+		lifecycle.NativeWindow = APTR.FromPointer(0x00044000);
+		lifecycle.Open = 1;
+		if (!MuiWindowLifecycleStateAdmission.Validate(lifecycle)) return 1;
+		lifecycle.Open = 2;
+		if (MuiWindowLifecycleStateAdmission.Validate(lifecycle)) return 2;
+		lifecycle.Open = 1;
+		lifecycle.NativeWindow = APTR.Null;
+		if (MuiWindowLifecycleStateAdmission.Validate(lifecycle)) return 3;
+		lifecycle.Open = 0;
+		lifecycle.NativeWindow = APTR.FromPointer(0x00044000);
+		if (MuiWindowLifecycleStateAdmission.Validate(lifecycle)) return 4;
+		lifecycle.NativeWindow = APTR.Null;
+		lifecycle.Magic = 0;
+		if (MuiWindowLifecycleStateAdmission.Validate(lifecycle)) return 5;
+		return 42;
+	}
+
+	// MG927/MG1040 focused Window visual-state admission proof. Named BOOLs and
+	// the bounded opacity value reject malformed state before public projection.
+	public static uint WindowVisualAdmissionRoot()
+	{
+		var visual = default(MuiWindowVisualStateRecord);
+		visual.Magic = MuiWindowVisualStateRecord.Cookie;
+		visual.NoMenus = 1;
+		visual.HasAlpha = 1;
+		visual.Opacity = 255;
+		visual.FancyDrawing = 1;
+		if (!MuiWindowVisualStateAdmission.Validate(visual)) return 1;
+		visual.NoMenus = 2;
+		if (MuiWindowVisualStateAdmission.Validate(visual)) return 2;
+		visual.NoMenus = 1;
+		visual.Opacity = 256;
+		if (MuiWindowVisualStateAdmission.Validate(visual)) return 3;
+		visual.Opacity = 255;
+		visual.FancyDrawing = 2;
+		if (MuiWindowVisualStateAdmission.Validate(visual)) return 4;
+		visual.FancyDrawing = 1;
+		visual.Magic = 0;
+		if (MuiWindowVisualStateAdmission.Validate(visual)) return 5;
+		return 42;
+	}
+
+	// MG928/MG1038 focused Window control-state admission proof. Named scalar
+	// identity stays opaque while the three public BOOL projections and cookie
+	// remain canonical.
+	public static uint WindowControlAdmissionRoot()
+	{
+		var control = default(MuiWindowControlStateRecord);
+		control.Magic = MuiWindowControlStateRecord.Cookie;
+		control.Id = 0x12345678;
+		control.DisableKeys = 0xA5;
+		control.VisibleOnMaximize = 1;
+		control.IsSubWindow = 1;
+		control.NeedsMouseObject = 1;
+		if (!MuiWindowControlStateAdmission.Validate(control)) return 1;
+		control.VisibleOnMaximize = 2;
+		if (MuiWindowControlStateAdmission.Validate(control)) return 2;
+		control.VisibleOnMaximize = 1;
+		control.IsSubWindow = 2;
+		if (MuiWindowControlStateAdmission.Validate(control)) return 3;
+		control.IsSubWindow = 1;
+		control.NeedsMouseObject = 2;
+		if (MuiWindowControlStateAdmission.Validate(control)) return 4;
+		control.NeedsMouseObject = 1;
+		control.Magic = 0;
+		if (MuiWindowControlStateAdmission.Validate(control)) return 5;
+		return 42;
+	}
+
+	// MG929/MG1041 focused Window presentation-pointer admission proof. Null
+	// caller pointers remain valid, while unmapped screens, strings, and cookies
+	// are rejected.
+	public static uint WindowPresentationAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var presentation = default(MuiWindowPresentationStateRecord);
+		presentation.Magic = MuiWindowPresentationStateRecord.Cookie;
+		if (!MuiWindowPresentationStateAdmission.Validate(ref platform,
+			presentation)) return 1;
+		presentation.Screen = APTR.FromPointer(0x00060000);
+		if (MuiWindowPresentationStateAdmission.Validate(ref platform,
+			presentation)) return 2;
+		presentation.Screen = APTR.Null;
+		presentation.Title = APTR.FromPointer(0x00060000);
+		if (MuiWindowPresentationStateAdmission.Validate(ref platform,
+			presentation)) return 3;
+		presentation.Title = APTR.Null;
+		presentation.Magic = 0;
+		if (MuiWindowPresentationStateAdmission.Validate(ref platform,
+			presentation)) return 4;
+		return 42;
+	}
+
+	// MG930/MG1043 focused Window relationship-pointer admission proof. The
+	// named record accepts NULL caller relationships and rejects unmapped guest
+	// pointers or cookies before any object/family projection is attempted.
+	public static uint WindowRelationshipAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var relationship = default(MuiWindowRelationshipStateRecord);
+		relationship.Magic = MuiWindowRelationshipStateRecord.Cookie;
+		if (!MuiWindowRelationshipStateAdmission.Validate(ref platform,
+			relationship)) return 1;
+		relationship.RootObject = APTR.FromPointer(0x00060000);
+		if (MuiWindowRelationshipStateAdmission.Validate(ref platform,
+			relationship)) return 2;
+		relationship.RootObject = APTR.Null;
+		relationship.RefWindow = APTR.FromPointer(0x00060000);
+		if (MuiWindowRelationshipStateAdmission.Validate(ref platform,
+			relationship)) return 3;
+		relationship.RefWindow = APTR.Null;
+		relationship.Magic = 0;
+		if (MuiWindowRelationshipStateAdmission.Validate(ref platform,
+			relationship)) return 4;
+		return 42;
+	}
+
+	// MG931/MG1044 focused Window focus-pointer admission proof. The named focus
+	// record accepts NULL object capabilities and rejects unmapped pointers or
+	// cookies before ActiveObject or DefaultObject can be projected.
+	public static uint WindowFocusAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var focus = default(MuiWindowFocusStateRecord);
+		focus.Magic = MuiWindowFocusStateRecord.Cookie;
+		if (!MuiWindowFocusStateAdmission.Validate(ref platform, focus)) return 1;
+		focus.ActiveObject = APTR.FromPointer(0x00060000);
+		if (MuiWindowFocusStateAdmission.Validate(ref platform, focus)) return 2;
+		focus.ActiveObject = APTR.Null;
+		focus.DefaultObject = APTR.FromPointer(0x00060000);
+		if (MuiWindowFocusStateAdmission.Validate(ref platform, focus)) return 3;
+		focus.DefaultObject = APTR.Null;
+		focus.Magic = 0;
+		if (MuiWindowFocusStateAdmission.Validate(ref platform, focus)) return 4;
+		return 42;
+	}
+
+	// MG932/MG1045 focused Window event-state admission proof. CloseRequest
+	// remains a canonical BOOL and InputEvent/MouseObject are NULL or mapped
+	// capabilities; the cookie is also strict.
+	public static uint WindowEventAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var eventState = default(MuiWindowEventStateRecord);
+		eventState.Magic = MuiWindowEventStateRecord.Cookie;
+		if (!MuiWindowEventStateAdmission.Validate(ref platform, eventState))
+			return 1;
+		eventState.CloseRequest = 2;
+		if (MuiWindowEventStateAdmission.Validate(ref platform, eventState))
+			return 2;
+		eventState.CloseRequest = 0;
+		eventState.InputEvent = APTR.FromPointer(0x00060000);
+		if (MuiWindowEventStateAdmission.Validate(ref platform, eventState))
+			return 3;
+		eventState.InputEvent = APTR.Null;
+		eventState.MouseObject = APTR.FromPointer(0x00060000);
+		if (MuiWindowEventStateAdmission.Validate(ref platform, eventState))
+			return 4;
+		eventState.MouseObject = APTR.Null;
+		eventState.Magic = 0;
+		if (MuiWindowEventStateAdmission.Validate(ref platform, eventState))
+			return 5;
+		return 42;
+	}
+
+	// MG933/MG1046 focused Window interaction-state admission proof. Snapshot's
+	// BOOL and the cycle-chain capability/count pair are admitted as named
+	// fields, including the strict cookie.
+	public static uint WindowInteractionAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var interaction = default(MuiWindowInteractionStateRecord);
+		interaction.Magic = MuiWindowInteractionStateRecord.Cookie;
+		interaction.SnapshotFlags = 1;
+		if (!MuiWindowInteractionStateAdmission.Validate(ref platform,
+			interaction)) return 1;
+		interaction.SnapshotFlags = 2;
+		if (MuiWindowInteractionStateAdmission.Validate(ref platform,
+			interaction)) return 2;
+		interaction.SnapshotFlags = 0;
+		interaction.CycleChainCount = 1;
+		interaction.CycleChainHead = APTR.FromPointer(0x00060000);
+		if (MuiWindowInteractionStateAdmission.Validate(ref platform,
+			interaction)) return 3;
+		interaction.CycleChainCount = 0;
+		if (MuiWindowInteractionStateAdmission.Validate(ref platform,
+			interaction)) return 4;
+		interaction.CycleChainHead = APTR.Null;
+		interaction.Magic = 0;
+		if (MuiWindowInteractionStateAdmission.Validate(ref platform,
+			interaction)) return 5;
+		return 42;
+	}
+
+	// MG934/MG1047 focused Window event-reuse admission proof. Dispatch context
+	// flags and retained event pointers remain named, canonical guest state,
+	// including the strict cookie.
+	public static uint WindowEventReuseAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var reuse = default(MuiWindowEventReuseStateRecord);
+		reuse.Magic = MuiWindowEventReuseStateRecord.Cookie;
+		reuse.MuiKey = -1;
+		if (!MuiWindowEventReuseStateAdmission.Validate(ref platform, reuse))
+			return 1;
+		reuse.ContextActive = 2;
+		if (MuiWindowEventReuseStateAdmission.Validate(ref platform, reuse))
+			return 2;
+		reuse.ContextActive = 1;
+		reuse.EventClass = 4;
+		if (!MuiWindowEventReuseStateAdmission.Validate(ref platform, reuse))
+			return 3;
+		reuse.Pending = 1;
+		if (MuiWindowEventReuseStateAdmission.Validate(ref platform, reuse))
+			return 4;
+		reuse.Pending = 0;
+		reuse.ContextActive = 0;
+		reuse.EventClass = 0;
+		reuse.EventMessage = APTR.FromPointer(0x00060000);
+		if (MuiWindowEventReuseStateAdmission.Validate(ref platform, reuse))
+			return 5;
+		reuse.EventMessage = APTR.Null;
+		reuse.InputEvent = APTR.FromPointer(0x00060000);
+		if (!MuiWindowEventReuseStateAdmission.Validate(ref platform, reuse))
+			return 6;
+		reuse.InputEvent = APTR.Null;
+		reuse.Magic = 0;
+		if (MuiWindowEventReuseStateAdmission.Validate(ref platform, reuse))
+			return 7;
+		return 42;
+	}
+
+	// MG935/MG1048 struct-first Application lifecycle admission closure. All
+	// public lifecycle flags are canonical MorphOS BOOL values; the native root
+	// also round-trips the guest record and proves malformed storage remains
+	// structurally readable while strict consumers reject it.
+	public static uint ApplicationLifecycleAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationLifecycleStateRecord);
+		value.Magic = MuiApplicationLifecycleStateRecord.Cookie;
+		value.Initialized = 1;
+		value.Iconified = 1;
+		value.Active = 1;
+		value.SingleTask = 1;
+		value.DoubleStart = 1;
+		value.ForceQuit = 1;
+		if (!MuiApplicationLifecycleStateAdmission.Validate(value)) return 1;
+		value.Active = 2;
+		if (MuiApplicationLifecycleStateAdmission.Validate(value)) return 2;
+		value.Active = 1;
+		value.Iconified = 2;
+		if (MuiApplicationLifecycleStateAdmission.Validate(value)) return 3;
+		value.Iconified = 1;
+		value.DoubleStart = 0;
+		if (!MuiApplicationLifecycleStateAdmission.Validate(value)) return 4;
+		var address = APTR.FromPointer(0x0004F000);
+		if (!MuiApplicationLifecycleStateRecordCodec.Write(ref platform, address,
+			value)) return 5;
+		if (!MuiApplicationLifecycleStateRecordCodec.TryRead(ref platform, address,
+			out var decoded) || decoded.Active != value.Active ||
+			decoded.Iconified != value.Iconified) return 6;
+		if (!MuiApplicationLifecycleStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationLifecycleStateField.Magic, 0)) return 7;
+		if (!MuiApplicationLifecycleStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural) || structural.Magic != 0) return 8;
+		if (MuiApplicationLifecycleStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 9;
+		return 42;
+	}
+
+	// MG936 struct-first shared Sleep admission closure. Depth and the public
+	// request are one nesting counter, while SavedDisabled is a canonical BOOL.
+	public static uint SleepAdmissionRoot()
+	{
+		var value = default(MuiSleepStateRecord);
+		value.Magic = MuiSleepStateRecord.Cookie;
+		value.Depth = 3;
+		value.SavedDisabled = 1;
+		value.Request = 3;
+		if (!MuiSleepStateAdmission.Validate(value)) return 1;
+		value.SavedDisabled = 2;
+		if (MuiSleepStateAdmission.Validate(value)) return 2;
+		value.SavedDisabled = 1;
+		value.Request = 2;
+		if (MuiSleepStateAdmission.Validate(value)) return 3;
+		value.Request = 3;
+		if (!MuiSleepStateAdmission.Validate(value)) return 4;
 		return 42;
 	}
 
@@ -4394,6 +4923,73 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Focused MG1305 proof that every fixed menu-specialist packet field crosses
+	// the guest boundary through the named packet structs and their bounded
+	// memory adapter. No dispatch state machine is required for this record
+	// qualification closure.
+	public static uint MenuSpecialistMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050E00);
+		if (!MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiMenuSpecialistPacketKind.Method,
+			MuiMenuSpecialistField.MethodId, MuiMenuSpecialistMessageCodec.OmDispose) ||
+			!MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMenuSpecialistPacketKind.Method, MuiMenuSpecialistField.MethodId,
+				out var method) || method != MuiMenuSpecialistMessageCodec.OmDispose)
+			return 1;
+		if (!MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiMenuSpecialistPacketKind.Get,
+			MuiMenuSpecialistField.Attribute, 0x120) ||
+			!MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+				packet, MuiMenuSpecialistPacketKind.Get,
+				MuiMenuSpecialistField.Storage, 0x00050F00) ||
+			!MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMenuSpecialistPacketKind.Get, MuiMenuSpecialistField.Storage,
+				out var storage) || storage != 0x00050F00)
+			return 2;
+		if (!MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiMenuSpecialistPacketKind.Set,
+			MuiMenuSpecialistField.Value, 0x456) ||
+			!MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMenuSpecialistPacketKind.Set, MuiMenuSpecialistField.Value,
+				out var value) || value != 0x456)
+			return 3;
+		if (!MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiMenuSpecialistPacketKind.Pointer,
+			MuiMenuSpecialistField.ObjectPointer, 0x00050F20) ||
+			!MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMenuSpecialistPacketKind.Pointer,
+				MuiMenuSpecialistField.ObjectPointer, out var objectPointer) ||
+			objectPointer != 0x00050F20)
+			return 4;
+		if (!MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiMenuSpecialistPacketKind.Pair,
+			MuiMenuSpecialistField.Second, 0x00050F30) ||
+			!MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMenuSpecialistPacketKind.Pair, MuiMenuSpecialistField.Second,
+				out var second) || second != 0x00050F30)
+			return 5;
+		if (!MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiMenuSpecialistPacketKind.Popup,
+			MuiMenuSpecialistField.Y, 20) ||
+			!MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMenuSpecialistPacketKind.Popup, MuiMenuSpecialistField.Y,
+				out var y) || y != 20)
+			return 6;
+		if (MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x00050FF1), MuiMenuSpecialistPacketKind.Popup,
+			MuiMenuSpecialistField.Y, out _) ||
+			MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMenuSpecialistPacketKind.Method,
+				MuiMenuSpecialistField.Attribute, out _) ||
+			MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+				APTR.Null, MuiMenuSpecialistPacketKind.Set,
+				MuiMenuSpecialistField.Value, out _)) return 7;
+		return 42;
+	}
+
 	// MG09 Process/Slave public service dispatch closure. A factory-created
 	// Process object is routed through the service-capable headless seam, which
 	// claims OM_GET, MUIM_Process_Launch and OM_DISPOSE while the ordinary
@@ -4787,6 +5383,39 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG1267 native struct-first FixedText closure. Named field resolution is
+	// used for both pointer samples and generation; no positional caller state
+	// or managed text participates in this freestanding proof.
+	public static uint AreaFixedTextStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x00036B80);
+		var record = new MuiAreaFixedTextStateRecord
+		{
+			Magic = MuiAreaFixedTextStateRecord.Cookie,
+			WidthText = APTR.FromPointer(0x00036BC0),
+			HeightText = APTR.FromPointer(0x00036C40),
+			Generation = 9,
+		};
+		if (!MuiAreaFixedTextStateRecordCodec.Write(ref platform, address, record))
+			return 1;
+		if (!MuiAreaFixedTextStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaFixedTextStateField.WidthText, out var widthAddress) ||
+			widthAddress.Raw != address.Raw + MuiAreaFixedTextStateRecord.WidthTextOffset)
+			return 2;
+		if (!MuiAreaFixedTextStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaFixedTextStateField.Generation, 11)) return 3;
+		if (!MuiAreaFixedTextStateRecordCodec.TryRead(ref platform, address,
+			out var decoded)) return 4;
+		if (decoded.Magic != record.Magic || decoded.WidthText != record.WidthText ||
+			decoded.HeightText != record.HeightText || decoded.Generation != 11)
+			return 5;
+		if (MuiAreaFixedTextStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaFixedTextStateField)255, out _)) return 6;
+		return 42;
+	}
+
 	// MG722 native Floating state closure. MUIA_Floating is an [ISG] BOOL;
 	// MorphOS's public autodoc leaves its placement effect undocumented, so the
 	// native proof covers only the named normalized state record and codec.
@@ -5090,6 +5719,27 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG988 context-menu state admission proof. Menu-strip and trigger values
+	// remain opaque guest pointers; only record identity and lifetime are
+	// admitted by the struct boundary.
+	public static uint AreaContextMenuAdmissionRoot()
+	{
+		var value = new MuiAreaContextMenuStateRecord
+		{
+			Magic = MuiAreaContextMenuStateRecord.Cookie,
+			MenuStrip = APTR.FromPointer(0x00037C20),
+			Trigger = APTR.FromPointer(0x00037C80),
+			Generation = 1,
+		};
+		if (!MuiAreaContextMenuStateAdmission.Validate(value)) return 1;
+		value.Generation = 0;
+		if (MuiAreaContextMenuStateAdmission.Validate(value)) return 2;
+		value.Generation = 1;
+		value.Magic = 0;
+		if (MuiAreaContextMenuStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
 	// MG749 native Area control-character state closure. The shared Area
 	// character is normalized through the named fixed record; no managed
 	// string or runtime object participates in the guest projection.
@@ -5101,7 +5751,7 @@ public static class MuiNativeRoots
 		var record = new MuiAreaControlCharStateRecord
 		{
 			Magic = MuiAreaControlCharStateRecord.Cookie,
-			Character = 0x141,
+			Character = 0x41,
 			Generation = 7,
 		};
 		if (!MuiAreaControlCharStateRecordCodec.Write(ref platform, address,
@@ -5110,6 +5760,26 @@ public static class MuiNativeRoots
 			out var decoded)) return 2;
 		if (decoded.Magic != record.Magic || decoded.Character != 0x41u ||
 			decoded.Generation != record.Generation) return 3;
+		return 42;
+	}
+
+	// MG989 ControlChar admission proof. The fixed record accepts only the
+	// normalized byte and a live generation; structural reads preserve any
+	// malformed wider value for diagnostics.
+	public static uint AreaControlCharAdmissionRoot()
+	{
+		var value = new MuiAreaControlCharStateRecord
+		{
+			Magic = MuiAreaControlCharStateRecord.Cookie,
+			Character = 0x41,
+			Generation = 1,
+		};
+		if (!MuiAreaControlCharStateAdmission.Validate(value)) return 1;
+		value.Character = 0x141;
+		if (MuiAreaControlCharStateAdmission.Validate(value)) return 2;
+		value.Character = 0x41;
+		value.Generation = 0;
+		if (MuiAreaControlCharStateAdmission.Validate(value)) return 3;
 		return 42;
 	}
 
@@ -5133,6 +5803,26 @@ public static class MuiNativeRoots
 			out var decoded)) return 2;
 		if (decoded.Magic != record.Magic || decoded.Value != -2 ||
 			decoded.Generation != record.Generation) return 3;
+		return 42;
+	}
+
+	// MG990 CycleChain admission proof. The signed LONG policy remains
+	// lossless in the named record; admission adds only identity and lifetime
+	// checks.
+	public static uint AreaCycleChainAdmissionRoot()
+	{
+		var value = new MuiAreaCycleChainStateRecord
+		{
+			Magic = MuiAreaCycleChainStateRecord.Cookie,
+			Value = -2,
+			Generation = 1,
+		};
+		if (!MuiAreaCycleChainStateAdmission.Validate(value)) return 1;
+		value.Generation = 0;
+		if (MuiAreaCycleChainStateAdmission.Validate(value)) return 2;
+		value.Generation = 1;
+		value.Magic = 0;
+		if (MuiAreaCycleChainStateAdmission.Validate(value)) return 3;
 		return 42;
 	}
 
@@ -5179,6 +5869,914 @@ public static class MuiNativeRoots
 			out var decoded)) return 2;
 		if (decoded.Magic != record.Magic || decoded.Value != -2 ||
 			decoded.Generation != record.Generation) return 3;
+		return 42;
+	}
+
+	// MG991 DoubleClick admission proof. The getter-only signed LONG remains
+	// lossless; admission adds only record identity and lifetime checks.
+	public static uint AreaDoubleClickAdmissionRoot()
+	{
+		var value = new MuiAreaDoubleClickStateRecord
+		{
+			Magic = MuiAreaDoubleClickStateRecord.Cookie,
+			Value = -2,
+			Generation = 1,
+		};
+		if (!MuiAreaDoubleClickStateAdmission.Validate(value)) return 1;
+		value.Generation = 0;
+		if (MuiAreaDoubleClickStateAdmission.Validate(value)) return 2;
+		value.Generation = 1;
+		value.Magic = 0;
+		if (MuiAreaDoubleClickStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG992 DoubleBuffer admission proof.  The BOOL remains canonical in the
+	// named record and malformed generation/identity is rejected before any
+	// consumer can use the policy.
+	public static uint AreaDoubleBufferAdmissionRoot()
+	{
+		var value = new MuiAreaDoubleBufferStateRecord
+		{
+			Magic = MuiAreaDoubleBufferStateRecord.Cookie,
+			Enabled = 1,
+			Generation = 1,
+		};
+		if (!MuiAreaDoubleBufferStateAdmission.Validate(value)) return 1;
+		value.Enabled = 2;
+		if (MuiAreaDoubleBufferStateAdmission.Validate(value)) return 2;
+		value.Enabled = 1;
+		value.Generation = 0;
+		if (MuiAreaDoubleBufferStateAdmission.Validate(value)) return 3;
+		value.Generation = 1;
+		value.Magic = 0;
+		if (MuiAreaDoubleBufferStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG994 Floating admission proof.  The public placement policy remains a
+	// canonical BOOL in a named Area record; layout effects stay provider-owned.
+	public static uint AreaFloatingAdmissionRoot()
+	{
+		var value = new MuiAreaFloatingStateRecord
+		{
+			Magic = MuiAreaFloatingStateRecord.Cookie,
+			Enabled = 1,
+			Generation = 1,
+		};
+		if (!MuiAreaFloatingStateAdmission.Validate(value)) return 1;
+		value.Enabled = 2;
+		if (MuiAreaFloatingStateAdmission.Validate(value)) return 2;
+		value.Enabled = 1;
+		value.Generation = 0;
+		if (MuiAreaFloatingStateAdmission.Validate(value)) return 3;
+		value.Generation = 1;
+		value.Magic = 0;
+		if (MuiAreaFloatingStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG995 ShortHelp admission proof.  The caller-owned OBString pointer is
+	// preserved as an opaque value while record identity and generation remain
+	// strictly admitted by the named state boundary.
+	public static uint AreaShortHelpAdmissionRoot()
+	{
+		var value = new MuiAreaShortHelpStateRecord
+		{
+			Magic = MuiAreaShortHelpStateRecord.Cookie,
+			Text = APTR.FromPointer(0x00037F20),
+			Generation = 1,
+		};
+		if (!MuiAreaShortHelpStateAdmission.Validate(value)) return 1;
+		value.Generation = 0;
+		if (MuiAreaShortHelpStateAdmission.Validate(value)) return 2;
+		value.Generation = 1;
+		value.Magic = 0;
+		if (MuiAreaShortHelpStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG996 TextColor admission proof. Packed RGB remains bounded to 24 bits,
+	// Active is a canonical BOOL, and setup/cleanup generation is non-zero.
+	public static uint AreaTextColorAdmissionRoot()
+	{
+		var value = new MuiAreaTextColorStateRecord
+		{
+			Magic = MuiAreaTextColorStateRecord.Cookie,
+			Color = 0x00C0FFEE,
+			Active = 1,
+			Generation = 1,
+		};
+		if (!MuiAreaTextColorStateAdmission.Validate(value)) return 1;
+		value.Color = 0x01000000;
+		if (MuiAreaTextColorStateAdmission.Validate(value)) return 2;
+		value.Color = 0x00C0FFEE;
+		value.Active = 2;
+		if (MuiAreaTextColorStateAdmission.Validate(value)) return 3;
+		value.Active = 1;
+		value.Generation = 0;
+		if (MuiAreaTextColorStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG997 Area drag policy admission proof. Both MorphOS BOOL values stay in
+	// one named guest record and only canonical values cross the boundary.
+	public static uint AreaDragPolicyAdmissionRoot()
+	{
+		var value = new MuiAreaDragPolicyStateRecord
+		{
+			Magic = MuiAreaDragPolicyStateRecord.Cookie,
+			Draggable = 1,
+			Dropable = 1,
+		};
+		if (!MuiAreaDragPolicyStateAdmission.Validate(value)) return 1;
+		value.Draggable = 2;
+		if (MuiAreaDragPolicyStateAdmission.Validate(value)) return 2;
+		value.Draggable = 1;
+		value.Dropable = 2;
+		if (MuiAreaDragPolicyStateAdmission.Validate(value)) return 3;
+		value.Dropable = 1;
+		value.Magic = 0;
+		if (MuiAreaDragPolicyStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG998 Area disappearance policy admission proof. Signed LONG priorities
+	// remain lossless in the named record while identity is strictly admitted.
+	public static uint AreaDisappearPolicyAdmissionRoot()
+	{
+		var value = new MuiAreaDisappearPolicyStateRecord
+		{
+			Magic = MuiAreaDisappearPolicyStateRecord.Cookie,
+			HorizDisappear = -2147483648,
+			VertDisappear = 2147483647,
+		};
+		if (!MuiAreaDisappearPolicyStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiAreaDisappearPolicyStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG999 Area CustomFont admission proof. Presence is separate from the
+	// caller-owned spec pointer, and only a non-zero generation is accepted.
+	public static uint AreaCustomFontAdmissionRoot()
+	{
+		var value = new MuiAreaCustomFontStateRecord
+		{
+			Magic = MuiAreaCustomFontStateRecord.Cookie,
+			Spec = APTR.Null,
+			Present = 1,
+			Generation = 1,
+		};
+		if (!MuiAreaCustomFontStateAdmission.Validate(value)) return 1;
+		value.Present = 2;
+		if (MuiAreaCustomFontStateAdmission.Validate(value)) return 2;
+		value.Present = 1;
+		value.Generation = 0;
+		if (MuiAreaCustomFontStateAdmission.Validate(value)) return 3;
+		value.Generation = 1;
+		value.Present = 0;
+		value.Spec = APTR.FromPointer(0x00037F20);
+		if (MuiAreaCustomFontStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG1000 setup-owned CustomFont handle admission proof. Opaque font/spec
+	// handles remain lossless while active and generation are canonical.
+	public static uint AreaCustomFontRuntimeAdmissionRoot()
+	{
+		var value = new MuiAreaCustomFontRuntimeRecord
+		{
+			Magic = MuiAreaCustomFontRuntimeRecord.Cookie,
+			Font = APTR.FromPointer(0x00035F00),
+			Spec = APTR.FromPointer(0x00035F20),
+			Generation = 1,
+			Active = 1,
+		};
+		if (!MuiAreaCustomFontRuntimeStateAdmission.Validate(value)) return 1;
+		value.Active = 2;
+		if (MuiAreaCustomFontRuntimeStateAdmission.Validate(value)) return 2;
+		value.Active = 1;
+		value.Generation = 0;
+		if (MuiAreaCustomFontRuntimeStateAdmission.Validate(value)) return 3;
+		value.Generation = 1;
+		value.Active = 0;
+		if (MuiAreaCustomFontRuntimeStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG1001 Area geometry admission proof. Signed coordinates and extents stay
+	// in the named record, with derived edges and overflow checked explicitly.
+	public static uint AreaGeometryAdmissionRoot()
+	{
+		var value = new MuiAreaGeometryStateRecord
+		{
+			Magic = MuiAreaGeometryStateRecord.Cookie,
+			Left = -4,
+			Top = -2,
+			Width = 25,
+			Height = 12,
+			Right = 20,
+			Bottom = 9,
+		};
+		if (!MuiAreaGeometryStateAdmission.Validate(value)) return 1;
+		value.Width = -1;
+		if (MuiAreaGeometryStateAdmission.Validate(value)) return 2;
+		value = new MuiAreaGeometryStateRecord
+		{
+			Magic = MuiAreaGeometryStateRecord.Cookie,
+			Left = -4,
+			Top = -2,
+			Width = 25,
+			Height = 12,
+			Right = 21,
+			Bottom = 9,
+		};
+		if (MuiAreaGeometryStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1002 Area FixedText admission proof. Owned sample pointers are optional,
+	// while the cookie and generation remain canonical record fields.
+	public static uint AreaFixedTextAdmissionRoot()
+	{
+		var value = new MuiAreaFixedTextStateRecord
+		{
+			Magic = MuiAreaFixedTextStateRecord.Cookie,
+			WidthText = APTR.FromPointer(0x00037F20),
+			HeightText = APTR.FromPointer(0x00037F40),
+			Generation = 1,
+		};
+		if (!MuiAreaFixedTextStateAdmission.Validate(value)) return 1;
+		value.Generation = 0;
+		if (MuiAreaFixedTextStateAdmission.Validate(value)) return 2;
+		value.Generation = 1;
+		value.Magic = 0;
+		if (MuiAreaFixedTextStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1003 shared Area render-policy admission proof. BOOL-like fields are
+	// canonical while selector and title pointers remain lossless.
+	public static uint AreaRenderPolicyAdmissionRoot()
+	{
+		var value = new MuiAreaRenderPolicyStateRecord
+		{
+			Magic = MuiAreaRenderPolicyStateRecord.Cookie,
+			FillArea = 1,
+			Background = 7,
+			Frame = 2,
+			Font = 0x00037F20,
+			FrameVisible = 1,
+			FramePhantomHoriz = 0,
+			FrameTitle = APTR.Null,
+			FrameDynamic = 1,
+		};
+		if (!MuiAreaRenderPolicyStateAdmission.Validate(value)) return 1;
+		value.FrameVisible = 2;
+		if (MuiAreaRenderPolicyStateAdmission.Validate(value)) return 2;
+		value.FrameVisible = 1;
+		value.FrameTitle = APTR.FromPointer(0x00038000);
+		if (!MuiAreaRenderPolicyStateAdmission.Validate(value)) return 3;
+		value.Magic = 0;
+		if (MuiAreaRenderPolicyStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG1004 Area layout-policy admission proof. ShowMe remains a canonical
+	// BOOL-like field while all other ULONG inputs stay lossless.
+	public static uint AreaLayoutPolicyAdmissionRoot()
+	{
+		var value = new MuiAreaLayoutPolicyStateRecord
+		{
+			Magic = MuiAreaLayoutPolicyStateRecord.Cookie,
+			ShowMe = 1,
+			FixWidth = 20,
+			FixHeight = 10,
+			MaxWidth = 100,
+			MaxHeight = 80,
+			InnerLeft = 2,
+			InnerRight = 3,
+			InnerTop = 1,
+			InnerBottom = 1,
+			HorizontalWeight = 7,
+			VerticalWeight = 9,
+		};
+		if (!MuiAreaLayoutPolicyStateAdmission.Validate(value)) return 1;
+		value.ShowMe = 2;
+		if (MuiAreaLayoutPolicyStateAdmission.Validate(value)) return 2;
+		value.ShowMe = 1;
+		value.Magic = 0;
+		if (MuiAreaLayoutPolicyStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1005 shared Control Font admission proof. Presence is canonical while
+	// the opaque Font pointer remains lossless, including a present NULL value.
+	public static uint ControlFontAdmissionRoot()
+	{
+		var value = new MuiControlFontStateRecord
+		{
+			Magic = MuiControlFontStateRecord.Cookie,
+			Present = 1,
+			Font = APTR.FromPointer(0x00037F20),
+		};
+		if (!MuiControlFontStateAdmission.Validate(value)) return 1;
+		value.Present = 2;
+		if (MuiControlFontStateAdmission.Validate(value)) return 2;
+		value.Present = 0;
+		value.Font = APTR.Null;
+		if (!MuiControlFontStateAdmission.Validate(value)) return 3;
+		value.Magic = 0;
+		if (MuiControlFontStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG1006 Rectangle bar-title admission proof. Presence is canonical while
+	// the caller-owned title pointer remains lossless.
+	public static uint RectangleBarTitleAdmissionRoot()
+	{
+		var value = new MuiRectangleBarTitleStateRecord
+		{
+			Magic = MuiRectangleBarTitleStateRecord.Cookie,
+			Present = 1,
+			Title = APTR.FromPointer(0x00037F20),
+		};
+		if (!MuiRectangleBarTitleStateAdmission.Validate(value)) return 1;
+		value.Present = 2;
+		if (MuiRectangleBarTitleStateAdmission.Validate(value)) return 2;
+		value.Present = 0;
+		value.Title = APTR.Null;
+		if (!MuiRectangleBarTitleStateAdmission.Validate(value)) return 3;
+		value.Magic = 0;
+		if (MuiRectangleBarTitleStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG1007 Image FontMatchString admission proof. Presence is canonical while
+	// the caller-owned match string pointer remains lossless.
+	public static uint ImageFontMatchStringAdmissionRoot()
+	{
+		var value = new MuiImageFontMatchStringStateRecord
+		{
+			Magic = MuiImageFontMatchStringStateRecord.Cookie,
+			Present = 1,
+			MatchString = APTR.FromPointer(0x00037F20),
+		};
+		if (!MuiImageFontMatchStringStateAdmission.Validate(value)) return 1;
+		value.Present = 2;
+		if (MuiImageFontMatchStringStateAdmission.Validate(value)) return 2;
+		value.Present = 0;
+		value.MatchString = APTR.Null;
+		if (!MuiImageFontMatchStringStateAdmission.Validate(value)) return 3;
+		value.Magic = 0;
+		if (MuiImageFontMatchStringStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG1008 String contents admission proof. The owned contents pointer stays
+	// lossless while the state cookie remains canonical.
+	public static uint StringContentsAdmissionRoot()
+	{
+		var value = new MuiStringContentsStateRecord
+		{
+			Magic = MuiStringContentsStateRecord.Cookie,
+			Contents = APTR.FromPointer(0x00037F20),
+		};
+		if (!MuiStringContentsStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiStringContentsStateAdmission.Validate(value)) return 2;
+		value.Magic = MuiStringContentsStateRecord.Cookie;
+		value.Contents = APTR.Null;
+		if (!MuiStringContentsStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1009 Text Copy admission proof. The BOOL-shaped policy remains
+	// canonical in its named guest record.
+	public static uint TextCopyAdmissionRoot()
+	{
+		var value = new MuiTextCopyStateRecord
+		{
+			Magic = MuiTextCopyStateRecord.Cookie,
+			Copy = 1,
+		};
+		if (!MuiTextCopyStateAdmission.Validate(value)) return 1;
+		value.Copy = 2;
+		if (MuiTextCopyStateAdmission.Validate(value)) return 2;
+		value.Copy = 0;
+		if (!MuiTextCopyStateAdmission.Validate(value)) return 3;
+		value.Magic = 0;
+		if (MuiTextCopyStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG1010 Text contents admission proof. The caller/owned contents pointer
+	// remains lossless while the state cookie stays canonical.
+	public static uint TextContentsAdmissionRoot()
+	{
+		var value = new MuiTextContentsStateRecord
+		{
+			Magic = MuiTextContentsStateRecord.Cookie,
+			Contents = APTR.FromPointer(0x00037F20),
+		};
+		if (!MuiTextContentsStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiTextContentsStateAdmission.Validate(value)) return 2;
+		value.Magic = MuiTextContentsStateRecord.Cookie;
+		value.Contents = APTR.Null;
+		if (!MuiTextContentsStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1011 Text PreParse admission proof. The copied string pointer remains
+	// lossless while the state cookie stays canonical.
+	public static uint TextPreParseAdmissionRoot()
+	{
+		var value = new MuiTextPreParseStateRecord
+		{
+			Magic = MuiTextPreParseStateRecord.Cookie,
+			PreParse = APTR.FromPointer(0x00037F20),
+		};
+		if (!MuiTextPreParseStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiTextPreParseStateAdmission.Validate(value)) return 2;
+		value.Magic = MuiTextPreParseStateRecord.Cookie;
+		value.PreParse = APTR.Null;
+		if (!MuiTextPreParseStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1012 String placeholder admission proof. The copied pointer remains
+	// lossless while the state cookie stays canonical.
+	public static uint StringPlaceholderAdmissionRoot()
+	{
+		var value = new MuiStringPlaceholderStateRecord
+		{
+			Magic = MuiStringPlaceholderStateRecord.Cookie,
+			Contents = APTR.FromPointer(0x00037F20),
+		};
+		if (!MuiStringPlaceholderStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiStringPlaceholderStateAdmission.Validate(value)) return 2;
+		value.Magic = MuiStringPlaceholderStateRecord.Cookie;
+		value.Contents = APTR.Null;
+		if (!MuiStringPlaceholderStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1013 Numeric format admission proof. The copied format pointer remains
+	// lossless while the state cookie stays canonical.
+	public static uint NumericFormatAdmissionRoot()
+	{
+		var value = new MuiNumericFormatStateRecord
+		{
+			Magic = MuiNumericFormatStateRecord.Cookie,
+			Format = APTR.FromPointer(0x00037F20),
+		};
+		if (!MuiNumericFormatStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiNumericFormatStateAdmission.Validate(value)) return 2;
+		value.Magic = MuiNumericFormatStateRecord.Cookie;
+		value.Format = APTR.Null;
+		if (!MuiNumericFormatStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1014 Gauge info-text admission proof. The copied pointer remains
+	// lossless while the state cookie stays canonical.
+	public static uint GaugeInfoTextAdmissionRoot()
+	{
+		var value = new MuiGaugeInfoTextStateRecord
+		{
+			Magic = MuiGaugeInfoTextStateRecord.Cookie,
+			InfoText = APTR.FromPointer(0x00037F20),
+		};
+		if (!MuiGaugeInfoTextStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiGaugeInfoTextStateAdmission.Validate(value)) return 2;
+		value.Magic = MuiGaugeInfoTextStateRecord.Cookie;
+		value.InfoText = APTR.Null;
+		if (!MuiGaugeInfoTextStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1015 Levelmeter label admission proof. The copied pointer remains
+	// lossless while the state cookie stays canonical.
+	public static uint LevelmeterLabelAdmissionRoot()
+	{
+		var value = new MuiLevelmeterLabelStateRecord
+		{
+			Magic = MuiLevelmeterLabelStateRecord.Cookie,
+			Label = APTR.FromPointer(0x00037F20),
+		};
+		if (!MuiLevelmeterLabelStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiLevelmeterLabelStateAdmission.Validate(value)) return 2;
+		value.Magic = MuiLevelmeterLabelStateRecord.Cookie;
+		value.Label = APTR.Null;
+		if (!MuiLevelmeterLabelStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1016 String Acknowledge admission proof. The contents pointer remains
+	// lossless while the state cookie stays canonical.
+	public static uint StringAcknowledgeAdmissionRoot()
+	{
+		var value = new MuiStringAcknowledgeStateRecord
+		{
+			Magic = MuiStringAcknowledgeStateRecord.Cookie,
+			Contents = APTR.FromPointer(0x00037F20),
+		};
+		if (!MuiStringAcknowledgeStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiStringAcknowledgeStateAdmission.Validate(value)) return 2;
+		value.Magic = MuiStringAcknowledgeStateRecord.Cookie;
+		value.Contents = APTR.Null;
+		if (!MuiStringAcknowledgeStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1017 String AttachedList admission proof. The Listview pointer remains
+	// lossless while the relationship record's cookie stays canonical.
+	public static uint StringAttachedListAdmissionRoot()
+	{
+		var value = new MuiStringAttachedListStateRecord
+		{
+			Magic = MuiStringAttachedListStateRecord.Cookie,
+			Listview = APTR.FromPointer(0x00037F20),
+		};
+		if (!MuiStringAttachedListStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiStringAttachedListStateAdmission.Validate(value)) return 2;
+		value.Magic = MuiStringAttachedListStateRecord.Cookie;
+		value.Listview = APTR.Null;
+		if (!MuiStringAttachedListStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1018 String interaction admission proof. The three BOOL values remain
+	// canonical named fields while the state cookie stays explicit.
+	public static uint StringInteractionAdmissionRoot()
+	{
+		var value = new MuiStringInteractionStateRecord
+		{
+			Magic = MuiStringInteractionStateRecord.Cookie,
+			Editable = 1,
+			AdvanceOnCR = 0,
+			Multiline = 1,
+		};
+		if (!MuiStringInteractionStateAdmission.Validate(value)) return 1;
+		value.Editable = 2;
+		if (MuiStringInteractionStateAdmission.Validate(value)) return 2;
+		value.Editable = 1;
+		value.Magic = 0;
+		if (MuiStringInteractionStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1019 String presentation admission proof. MaxLen remains bounded for
+	// C-compatible buffer sizing while the policy selectors and BOOLs are named
+	// canonical fields in the guest record.
+	public static uint StringPresentationAdmissionRoot()
+	{
+		var value = new MuiStringPresentationStateRecord
+		{
+			Magic = MuiStringPresentationStateRecord.Cookie,
+			MaxLen = 80,
+			Secret = 1,
+			Format = 2,
+			Unicode = 1,
+		};
+		if (!MuiStringPresentationStateAdmission.Validate(value)) return 1;
+		value.MaxLen = uint.MaxValue;
+		if (MuiStringPresentationStateAdmission.Validate(value)) return 2;
+		value.MaxLen = 80;
+		value.Secret = 2;
+		if (MuiStringPresentationStateAdmission.Validate(value)) return 3;
+		value.Secret = 1;
+		value.Format = 3;
+		if (MuiStringPresentationStateAdmission.Validate(value)) return 4;
+		value.Format = 2;
+		value.Magic = 0;
+		if (MuiStringPresentationStateAdmission.Validate(value)) return 5;
+		return 42;
+	}
+
+	// MG1020 String spell-checking admission proof. The optional service flag is
+	// represented by a canonical named BOOL in the guest record.
+	public static uint StringSpellCheckingAdmissionRoot()
+	{
+		var value = new MuiStringSpellCheckingStateRecord
+		{
+			Magic = MuiStringSpellCheckingStateRecord.Cookie,
+			Enabled = 1,
+		};
+		if (!MuiStringSpellCheckingStateAdmission.Validate(value)) return 1;
+		value.Enabled = 2;
+		if (MuiStringSpellCheckingStateAdmission.Validate(value)) return 2;
+		value.Enabled = 1;
+		value.Magic = 0;
+		if (MuiStringSpellCheckingStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1021 String edit-hook admission proof. The caller-owned Hook pointer is
+	// kept lossless while LonelyEditHook remains a canonical named BOOL.
+	public static uint StringEditHookAdmissionRoot()
+	{
+		var value = new MuiStringEditHookStateRecord
+		{
+			Magic = MuiStringEditHookStateRecord.Cookie,
+			EditHook = APTR.FromPointer(0x00037F20),
+			LonelyEditHook = 1,
+		};
+		if (!MuiStringEditHookStateAdmission.Validate(value)) return 1;
+		value.LonelyEditHook = 2;
+		if (MuiStringEditHookStateAdmission.Validate(value)) return 2;
+		value.LonelyEditHook = 1;
+		value.Magic = 0;
+		if (MuiStringEditHookStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1022 String filter admission proof. Accept and Reject remain caller-owned
+	// guest C-string pointers; the named record admits only its canonical cookie.
+	public static uint StringFilterAdmissionRoot()
+	{
+		var value = new MuiStringFilterStateRecord
+		{
+			Magic = MuiStringFilterStateRecord.Cookie,
+			Accept = APTR.Null,
+			Reject = APTR.Null,
+		};
+		if (!MuiStringFilterStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiStringFilterStateAdmission.Validate(value)) return 2;
+		value.Magic = MuiStringFilterStateRecord.Cookie;
+		value.Accept = APTR.FromPointer(0x00037F20);
+		value.Reject = APTR.FromPointer(0x00037F24);
+		return MuiStringFilterStateAdmission.Validate(value) ? 42u : 3u;
+	}
+
+	// MG1023 String integer admission proof. The signed value is carried in a
+	// fixed-width guest record; only its cookie and owning object are admitted.
+	public static uint StringIntegerAdmissionRoot()
+	{
+		var value = new MuiStringIntegerStateRecord
+		{
+			Magic = MuiStringIntegerStateRecord.Cookie,
+			Value = -37,
+		};
+		if (!MuiStringIntegerStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiStringIntegerStateAdmission.Validate(value)) return 2;
+		value.Magic = MuiStringIntegerStateRecord.Cookie;
+		return MuiStringIntegerStateAdmission.Validate(value) ? 42u : 3u;
+	}
+
+	// MG1024 String Integer64 admission proof. The public state is a guest APTR
+	// to the named QUAD value record; mapping and owner checks stay live-only.
+	public static uint StringInteger64AdmissionRoot()
+	{
+		var nullValue = APTR.Null;
+		var mappedValue = APTR.FromPointer(0x00037F20);
+		if (!MuiStringInteger64StateAdmission.Validate(nullValue) ||
+			!MuiStringInteger64StateAdmission.Validate(mappedValue)) return 1;
+		return 42;
+	}
+
+	// MG1025 String cursor admission proof. Cursor positions are named signed
+	// fields and must remain nonnegative before they reach editing consumers.
+	public static uint StringCursorAdmissionRoot()
+	{
+		var value = new MuiStringCursorStateRecord
+		{
+			Magic = MuiStringCursorStateRecord.Cookie,
+			BufferPos = 2,
+			DisplayPos = 1,
+		};
+		if (!MuiStringCursorStateAdmission.Validate(value)) return 1;
+		value.BufferPos = -1;
+		if (MuiStringCursorStateAdmission.Validate(value)) return 2;
+		value.BufferPos = 2;
+		value.Magic = 0;
+		if (MuiStringCursorStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1026 String scroll-metrics admission proof. Geometry and scroll values
+	// remain named fixed-width fields; the cookie is the structural boundary.
+	public static uint StringScrollMetricsAdmissionRoot()
+	{
+		var value = new MuiStringScrollMetricsStateRecord
+		{
+			Magic = MuiStringScrollMetricsStateRecord.Cookie,
+			Width = 80,
+			Height = 20,
+			VisibleWidth = 40,
+			VisibleHeight = 10,
+			Left = 0,
+			Top = 0,
+		};
+		if (!MuiStringScrollMetricsStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiStringScrollMetricsStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG1027 Text presentation admission proof. BOOL, byte, and selector fields
+	// remain named fixed-width policy values behind one canonical cookie.
+	public static uint TextPresentationAdmissionRoot()
+	{
+		var value = new MuiTextPresentationStateRecord
+		{
+			Magic = MuiTextPresentationStateRecord.Cookie,
+			SetMin = 1,
+			SetMax = 0,
+			SetVMax = 1,
+			ControlChar = 13,
+			Marking = 1,
+			Shorten = 1,
+			HiChar = 94,
+			HiCharPresent = 1,
+		};
+		if (!MuiTextPresentationStateAdmission.Validate(value)) return 1;
+		value.Shorten = 3;
+		if (MuiTextPresentationStateAdmission.Validate(value)) return 2;
+		value.Shorten = 1;
+		value.Magic = 0;
+		if (MuiTextPresentationStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1028 Text shortened admission proof. The renderer-produced BOOL status
+	// remains a named fixed-width value behind one canonical cookie.
+	public static uint TextShortenedAdmissionRoot()
+	{
+		var value = new MuiTextShortenedStateRecord
+		{
+			Magic = MuiTextShortenedStateRecord.Cookie,
+			Shortened = 1,
+		};
+		if (!MuiTextShortenedStateAdmission.Validate(value)) return 1;
+		value.Shortened = 2;
+		if (MuiTextShortenedStateAdmission.Validate(value)) return 2;
+		value.Shortened = 1;
+		value.Magic = 0;
+		if (MuiTextShortenedStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1029 Text Unicode admission proof. The initializer-only BOOL remains a
+	// named fixed-width policy value behind one canonical cookie.
+	public static uint TextUnicodeAdmissionRoot()
+	{
+		var value = new MuiTextUnicodeStateRecord
+		{
+			Magic = MuiTextUnicodeStateRecord.Cookie,
+			Unicode = 1,
+		};
+		if (!MuiTextUnicodeStateAdmission.Validate(value)) return 1;
+		value.Unicode = 2;
+		if (MuiTextUnicodeStateAdmission.Validate(value)) return 2;
+		value.Unicode = 1;
+		value.Magic = 0;
+		if (MuiTextUnicodeStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG1030 bitmap geometry admission proof. Width and height remain named
+	// MorphOS ULONG-compatible fields behind one canonical cookie.
+	public static uint BitmapGeometryAdmissionRoot()
+	{
+		var value = new MuiBitmapGeometryStateRecord
+		{
+			Magic = MuiBitmapGeometryStateRecord.Cookie,
+			Width = 32,
+			Height = 12,
+		};
+		if (!MuiBitmapGeometryStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiBitmapGeometryStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG1031 bitmap source admission proof. The caller-owned source pointer is
+	// NULL or mapped guest memory behind one named fixed-width record.
+	public static uint BitmapSourceAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = new MuiBitmapSourceStateRecord
+		{
+			Magic = MuiBitmapSourceStateRecord.Cookie,
+			Source = APTR.Null,
+		};
+		if (!MuiBitmapSourceStateAdmission.Validate(ref platform, value)) return 1;
+		value.Source = APTR.FromPointer(0x0004D000);
+		if (!MuiBitmapSourceStateAdmission.Validate(ref platform, value)) return 2;
+		value.Source = APTR.FromPointer(0xFFFFFF00u);
+		if (MuiBitmapSourceStateAdmission.Validate(ref platform, value)) return 3;
+		return 42;
+	}
+
+	// MG1032 Bodychunk format admission proof. Compression, depth, and masking
+	// remain named MorphOS ULONG-compatible fields behind one canonical cookie.
+	public static uint BodychunkFormatAdmissionRoot()
+	{
+		var value = new MuiBodychunkFormatStateRecord
+		{
+			Magic = MuiBodychunkFormatStateRecord.Cookie,
+			Compression = 1,
+			Depth = 2,
+			Masking = 0,
+		};
+		if (!MuiBodychunkFormatStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiBodychunkFormatStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG1033 Image old-image admission proof. The caller-owned graphics Image
+	// pointer is NULL or mapped guest memory behind one named fixed-width record.
+	public static uint ImageOldImageAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = new MuiImageOldImageStateRecord
+		{
+			Magic = MuiImageOldImageStateRecord.Cookie,
+			Image = APTR.Null,
+		};
+		if (!MuiImageOldImageStateAdmission.Validate(ref platform, value)) return 1;
+		value.Image = APTR.FromPointer(0x0004D000);
+		if (!MuiImageOldImageStateAdmission.Validate(ref platform, value)) return 2;
+		value.Image = APTR.FromPointer(0xFFFFFF00u);
+		if (MuiImageOldImageStateAdmission.Validate(ref platform, value)) return 3;
+		return 42;
+	}
+
+	// MG1034 Image render admission proof. Selection and free-axis policy remain
+	// named MorphOS ULONG-compatible fields behind one canonical cookie.
+	public static uint ImageRenderAdmissionRoot()
+	{
+		var value = new MuiImageRenderStateRecord
+		{
+			Magic = MuiImageRenderStateRecord.Cookie,
+			ImageState = 0,
+			Selected = 1,
+			FreeHoriz = 1,
+			FreeVert = 0,
+			ShowSelState = 1,
+		};
+		if (!MuiImageRenderStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiImageRenderStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG1035 Image spec admission proof. A supplied value is either a builtin
+	// image number or a mapped guest pointer to a specification/legacy image.
+	public static uint ImageSpecAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = new MuiImageSpecStateRecord
+		{
+			Magic = MuiImageSpecStateRecord.Cookie,
+			Present = 1,
+			Raw = 3,
+			BuiltinPresent = 1,
+			Builtin = 7,
+		};
+		if (!MuiImageSpecStateAdmission.Validate(ref platform, value)) return 1;
+		value.Raw = 0x0004D000;
+		if (!MuiImageSpecStateAdmission.Validate(ref platform, value)) return 2;
+		value.Raw = 0xFFFFFF00u;
+		if (MuiImageSpecStateAdmission.Validate(ref platform, value)) return 3;
+		return 42;
+	}
+
+	// MG1036 Register policy admission proof. Frame is a normalized BOOL and
+	// Titles is NULL or a mapped guest pointer behind one named record.
+	public static uint RegisterPolicyAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = new MuiRegisterPolicyStateRecord
+		{
+			Magic = MuiRegisterPolicyStateRecord.Cookie,
+			Frame = 1,
+			Titles = APTR.FromPointer(0x0004D000),
+		};
+		if (!MuiRegisterPolicyStateAdmission.Validate(ref platform, value)) return 1;
+		value.Titles = APTR.FromPointer(0xFFFFFF00u);
+		if (MuiRegisterPolicyStateAdmission.Validate(ref platform, value)) return 2;
+		value.Titles = APTR.Null;
+		if (!MuiRegisterPolicyStateAdmission.Validate(ref platform, value)) return 3;
+		value.Frame = 2;
+		if (MuiRegisterPolicyStateAdmission.Validate(ref platform, value)) return 4;
 		return 42;
 	}
 
@@ -5298,6 +6896,38 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG993 Timer admission proof.  Counter values and tick identities remain
+	// lossless while event flags are admitted as canonical BOOLs with a
+	// non-zero generation.
+	public static uint AreaTimerAdmissionRoot()
+	{
+		var timer = new MuiAreaTimerStateRecord
+		{
+			Magic = MuiAreaTimerStateRecord.Cookie,
+			Value = -9,
+			Generation = 1,
+		};
+		if (!MuiAreaTimerStateAdmission.Validate(timer)) return 1;
+		timer.Generation = 0;
+		if (MuiAreaTimerStateAdmission.Validate(timer)) return 2;
+		var events = new MuiAreaTimerEventStateRecord
+		{
+			Magic = MuiAreaTimerEventStateRecord.Cookie,
+			Armed = 1,
+			MouseOver = 1,
+			DelayElapsed = 0,
+			LastTick = 24,
+			Generation = 1,
+		};
+		if (!MuiAreaTimerEventStateAdmission.Validate(events)) return 3;
+		events.MouseOver = 2;
+		if (MuiAreaTimerEventStateAdmission.Validate(events)) return 4;
+		events.MouseOver = 1;
+		events.Generation = 0;
+		if (MuiAreaTimerEventStateAdmission.Validate(events)) return 5;
+		return 42;
+	}
+
 	// MG741 native MUIM_TextDim argument closure. A native provider fills the
 	// named width/height result fields; the core retains a graphics fallback
 	// when no provider metrics are available.
@@ -5343,6 +6973,27 @@ public static class MuiNativeRoots
 		if (decoded.Magic != record.Magic || decoded.Selector != record.Selector ||
 			decoded.Present != record.Present ||
 			decoded.Generation != record.Generation) return 3;
+		return 42;
+	}
+
+	// MG986 BuiltinFont admission proof. The MorphOS selector remains a
+	// lossless ULONG while presence and generation are canonical fields in the
+	// named guest record.
+	public static uint AreaBuiltinFontAdmissionRoot()
+	{
+		var value = new MuiAreaBuiltinFontStateRecord
+		{
+			Magic = MuiAreaBuiltinFontStateRecord.Cookie,
+			Selector = unchecked((uint)-7),
+			Present = 1,
+			Generation = 1,
+		};
+		if (!MuiAreaBuiltinFontStateAdmission.Validate(value)) return 1;
+		value.Present = 2;
+		if (MuiAreaBuiltinFontStateAdmission.Validate(value)) return 2;
+		value.Present = 1;
+		value.Generation = 0;
+		if (MuiAreaBuiltinFontStateAdmission.Validate(value)) return 3;
 		return 42;
 	}
 
@@ -5501,6 +7152,29 @@ public static class MuiNativeRoots
 		if (decoded.Magic != record.Magic || decoded.Active != record.Active ||
 			decoded.Source != record.Source || decoded.Generation != record.Generation)
 			return 3;
+		return 42;
+	}
+
+	// MG987 Font/CustomFont selection admission proof. Active is a closed
+	// semantic choice, Source is opaque guest state, and generation is required
+	// to identify an initialized record.
+	public static uint AreaFontSelectionAdmissionRoot()
+	{
+		var value = new MuiAreaFontSelectionStateRecord
+		{
+			Magic = MuiAreaFontSelectionStateRecord.Cookie,
+			Active = (uint)MuiAreaFontSelectionKind.CustomFont,
+			Source = APTR.FromPointer(0x00037840),
+			Generation = 1,
+		};
+		if (!MuiAreaFontSelectionStateAdmission.Validate(value)) return 1;
+		value.Active = 3;
+		if (MuiAreaFontSelectionStateAdmission.Validate(value)) return 2;
+		value.Active = (uint)MuiAreaFontSelectionKind.None;
+		if (MuiAreaFontSelectionStateAdmission.Validate(value)) return 3;
+		value.Active = (uint)MuiAreaFontSelectionKind.CustomFont;
+		value.Generation = 0;
+		if (MuiAreaFontSelectionStateAdmission.Validate(value)) return 4;
 		return 42;
 	}
 
@@ -7124,6 +8798,5176 @@ public static class MuiNativeRoots
 			APTR.FromPointer(privateRoot))) return 8;
 			return 42;
 		}
+
+	// MG924/MG1053 focused Application initializer-policy admission proof. The
+	// named policy record accepts canonical MorphOS BOOLs and rejects malformed
+	// state before application consumers can publish it; the guest codec keeps
+	// malformed cookies structurally inspectable but strictly unreadable.
+	public static uint ApplicationPolicyAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var policy = default(MuiApplicationPolicyStateRecord);
+		policy.Magic = MuiApplicationPolicyStateRecord.Cookie;
+		policy.UseRexx = 1;
+		policy.UseCommodities = 1;
+		policy.UseScreenNotify = 1;
+		if (!MuiApplicationPolicyStateAdmission.Validate(policy)) return 1;
+		var address = APTR.FromPointer(0x4D300);
+		if (!MuiApplicationPolicyStateRecordCodec.Write(ref platform, address,
+			policy)) return 2;
+		if (!MuiApplicationPolicyStateRecordCodec.TryRead(ref platform, address,
+			out var decoded) || decoded.UseScreenNotify != policy.UseScreenNotify)
+			return 3;
+		if (!MuiApplicationPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationPolicyStateField.Magic, 0)) return 4;
+		if (!MuiApplicationPolicyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural) || structural.Magic != 0) return 5;
+		if (MuiApplicationPolicyStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 6;
+		policy.Magic = MuiApplicationPolicyStateRecord.Cookie;
+		policy.UseCommodities = 2;
+		if (MuiApplicationPolicyStateAdmission.Validate(policy)) return 7;
+		return 42;
+	}
+
+	public static int ApplicationPolicyStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationPolicyStateRecord);
+		value.Magic = MuiApplicationPolicyStateRecord.Cookie;
+		value.UseRexx = 0;
+		value.UseCommodities = 1;
+		value.UseScreenNotify = 1;
+		var address = APTR.FromPointer(0x4D2C0);
+		if (!MuiApplicationPolicyStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationPolicyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.UseRexx != value.UseRexx ||
+			decoded.UseCommodities != value.UseCommodities ||
+			decoded.UseScreenNotify != value.UseScreenNotify) return 2;
+		if (MuiApplicationPolicyStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 3;
+		return 42;
+	}
+
+	// MG942/MG1064 UsedClasses admission proof. The record carries a named guest
+	// vector pointer; the admission layer validates the bounded caller-owned
+	// class-name vector without managed storage.
+	public static uint ApplicationUsedClassesAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationUsedClassesStateRecord);
+		value.Magic = MuiApplicationUsedClassesStateRecord.Cookie;
+		var address = APTR.FromPointer(0x4D600);
+		if (!MuiApplicationUsedClassesStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationUsedClassesStateField.Magic,
+			value.Magic) || !MuiApplicationUsedClassesStateRecordMemoryCodec
+			.TryWriteUInt32(ref platform, address,
+				MuiApplicationUsedClassesStateField.Vector, value.Vector.Raw)) return 1;
+		if (!MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural)) return 2;
+		if (!MuiApplicationUsedClassesStateAdmission.Validate(ref platform,
+			structural)) return 3;
+		if (!MuiApplicationUsedClassesStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 4;
+		value.Vector = APTR.FromPointer(0xFFFFFF00u);
+		if (MuiApplicationUsedClassesStateAdmission.Validate(ref platform, value))
+			return 5;
+		if (!MuiApplicationUsedClassesStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationUsedClassesStateField.Magic, 0))
+			return 6;
+		if (!MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(
+			ref platform, address, out structural) || structural.Magic != 0)
+			return 7;
+		if (MuiApplicationUsedClassesStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 8;
+		return 42;
+	}
+
+	// MG943 Application help admission proof. Named reference pointers and
+	// caller-owned help strings remain fixed-width guest fields; malformed
+	// pointers are rejected without exceptions or managed storage.
+	public static uint ApplicationHelpAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationHelpStateRecord);
+		value.Magic = MuiApplicationHelpStateRecord.Cookie;
+		var address = APTR.FromPointer(0x4D440);
+		if (!MuiApplicationHelpStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationHelpStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (!MuiApplicationHelpStateAdmission.Validate(ref platform,
+			structural)) return 3;
+		if (!MuiApplicationHelpStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		value.HelpName = APTR.FromPointer(0xFFFFFF00u);
+		if (MuiApplicationHelpStateAdmission.Validate(ref platform, value))
+			return 5;
+		value.HelpName = APTR.FromPointer(0x0004D000);
+		value.HelpNode = APTR.FromPointer(0x0004D040);
+		WriteCString(value.HelpName, (byte)'S', (byte)'Y', (byte)'S', (byte)':',
+			(byte)'H', (byte)'e', (byte)'l', (byte)'p');
+		WriteCString(value.HelpNode, (byte)'m', (byte)'a', (byte)'i', (byte)'n',
+			0, 0, 0, 0);
+		if (!MuiApplicationHelpStateAdmission.Validate(ref platform, value))
+			return 6;
+		value.HelpNode = APTR.FromPointer(0xFFFFFF00u);
+		if (MuiApplicationHelpStateAdmission.Validate(ref platform, value))
+			return 7;
+		if (!MuiApplicationHelpStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationHelpStateField.Magic, 0)) return 8;
+		if (!MuiApplicationHelpStateRecordCodec.TryReadStructural(ref platform,
+			address, out structural) || structural.Magic != 0) return 9;
+		if (MuiApplicationHelpStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 10;
+		return 42;
+	}
+
+	// MG944 DefaultConfigItem admission proof. The result record keeps the
+	// complete MorphOS ULONG fields in a named struct and rejects a bad cookie
+	// before the application override capability is consumed.
+	public static uint ApplicationDefaultConfigAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationDefaultConfigStateRecord);
+		value.Magic = MuiApplicationDefaultConfigStateRecord.Cookie;
+		value.ConfigId = 0x44;
+		value.Value = 0x12345678;
+		value.Requests = 1;
+		var address = APTR.FromPointer(0x4D400);
+		if (!MuiApplicationDefaultConfigStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural)) return 2;
+		if (!MuiApplicationDefaultConfigStateAdmission.Validate(structural))
+			return 3;
+		if (!MuiApplicationDefaultConfigStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 4;
+		if (!MuiApplicationDefaultConfigStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationDefaultConfigStateField.Magic, 0))
+			return 5;
+		if (!MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
+			ref platform, address, out structural) || structural.Magic != 0)
+			return 6;
+		if (MuiApplicationDefaultConfigStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 7;
+		value.Magic = 0;
+		if (MuiApplicationDefaultConfigStateAdmission.Validate(value))
+			return 8;
+		return 42;
+	}
+
+	// MG945 OpenConfigWindow admission proof. The optional class-id remains a
+	// caller-owned C string in the named record; malformed pointers are rejected
+	// before a presentation capability can be reached.
+	public static uint ApplicationConfigWindowAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationConfigWindowStateRecord);
+		value.Magic = MuiApplicationConfigWindowStateRecord.Cookie;
+		value.Flags = 3;
+		var address = APTR.FromPointer(0x4D3C0);
+		if (!MuiApplicationConfigWindowStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationConfigWindowStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural)) return 2;
+		if (!MuiApplicationConfigWindowStateAdmission.Validate(ref platform,
+			structural)) return 3;
+		if (!MuiApplicationConfigWindowStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 4;
+		value.ClassId = APTR.FromPointer(0xFFFFFF00u);
+		if (MuiApplicationConfigWindowStateAdmission.Validate(ref platform, value))
+			return 5;
+		value.ClassId = APTR.FromPointer(0x0004D000);
+		WriteCString(value.ClassId, (byte)'M', (byte)'U', (byte)'I', (byte)':',
+			(byte)'C', (byte)'o', (byte)'n', (byte)'f');
+		if (!MuiApplicationConfigWindowStateAdmission.Validate(ref platform, value))
+			return 6;
+		if (!MuiApplicationConfigWindowStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationConfigWindowStateField.Magic, 0))
+			return 7;
+		if (!MuiApplicationConfigWindowStateRecordCodec.TryReadStructural(
+			ref platform, address, out structural) || structural.Magic != 0)
+			return 8;
+		if (MuiApplicationConfigWindowStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 9;
+		return 42;
+	}
+
+	// MG1134 application config-window state struct-codec proof. The fixed
+	// record is transferred through named fields; packed guest positions remain
+	// confined to the memory adapter and a null record is rejected.
+	public static uint ApplicationConfigWindowStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationConfigWindowStateRecord);
+		value.Magic = MuiApplicationConfigWindowStateRecord.Cookie;
+		value.Flags = 0xA5A5A5A5u;
+		value.ClassId = APTR.Null;
+		value.Requests = 7;
+		var address = APTR.FromPointer(0x4D700);
+		if (!MuiApplicationConfigWindowStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationConfigWindowStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Flags != value.Flags ||
+			structural.ClassId != value.ClassId || structural.Requests !=
+			value.Requests) return 3;
+		if (!MuiApplicationConfigWindowStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 4;
+		if (MuiApplicationConfigWindowStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG946 BuildSettingsPanel admission proof. The named result record accepts
+	// a MorphOS NULL panel, rejects an unmapped capability, and accepts a mapped
+	// guest pointer structurally without managed storage.
+	public static uint ApplicationSettingsPanelAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationSettingsPanelStateRecord);
+		value.Magic = MuiApplicationSettingsPanelStateRecord.Cookie;
+		var address = APTR.FromPointer(0x4D580);
+		if (!MuiApplicationSettingsPanelStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural)) return 2;
+		if (!MuiApplicationSettingsPanelStateAdmission.Validate(ref platform,
+			structural)) return 3;
+		if (!MuiApplicationSettingsPanelStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 4;
+		value.Panel = APTR.FromPointer(0xFFFFFF00u);
+		if (MuiApplicationSettingsPanelStateAdmission.Validate(ref platform, value))
+			return 5;
+		value.Panel = APTR.FromPointer(0x0004D000);
+		if (!MuiApplicationSettingsPanelStateAdmission.Validate(ref platform, value))
+			return 6;
+		if (!MuiApplicationSettingsPanelStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSettingsPanelStateField.Magic, 0))
+			return 7;
+		if (!MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
+			ref platform, address, out structural) || structural.Magic != 0)
+			return 8;
+		if (MuiApplicationSettingsPanelStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 9;
+		return 42;
+	}
+
+	public static int ApplicationSettingsPanelStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationSettingsPanelStateRecord);
+		value.Magic = MuiApplicationSettingsPanelStateRecord.Cookie;
+		value.Number = 9;
+		value.Panel = APTR.FromPointer(0x4D000);
+		value.Requests = 4;
+		var address = APTR.FromPointer(0x4D640);
+		if (!MuiApplicationSettingsPanelStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.Number != value.Number || decoded.Panel != value.Panel ||
+			decoded.Requests != value.Requests) return 2;
+		if (MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 3;
+		return 42;
+	}
+
+	// MG1135 application settings persistence state struct-codec proof. The
+	// MorphOS ENVARC sentinel remains an opaque ULONG in the named record;
+	// bounds and operation validation stay in admission.
+	public static uint ApplicationSettingsPersistenceStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationSettingsPersistenceStateRecord);
+		value.Magic = MuiApplicationSettingsPersistenceStateRecord.Cookie;
+		value.Operation = 0;
+		value.Name = APTR.FromPointer(uint.MaxValue);
+		value.Requests = 9;
+		value.Saves = 4;
+		value.Loads = 5;
+		var address = APTR.FromPointer(0x4D680);
+		if (!MuiApplicationSettingsPersistenceStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationSettingsPersistenceStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Operation !=
+			value.Operation || structural.Name != value.Name ||
+			structural.Requests != value.Requests || structural.Saves !=
+			value.Saves || structural.Loads != value.Loads) return 3;
+		if (!MuiApplicationSettingsPersistenceStateRecordCodec.TryRead(
+			ref platform, address, out _)) return 4;
+		if (MuiApplicationSettingsPersistenceStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1136 application identity state struct-codec proof. Guest text pointers
+	// remain opaque in the wire record; bounded C-string checks are admission
+	// policy and a null record is rejected before any field is consumed.
+	public static uint ApplicationIdentityStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationIdentityStateRecord);
+		value.Magic = MuiApplicationIdentityStateRecord.Cookie;
+		value.Title = APTR.FromPointer(0x4D000);
+		WriteCString(value.Title, (byte)'C', (byte)'o', (byte)'p', (byte)'p',
+			(byte)'e', (byte)'r', (byte)'O', (byte)'S');
+		var address = APTR.FromPointer(0x4D700);
+		if (!MuiApplicationIdentityStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationIdentityStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Author != value.Author ||
+			structural.Base != value.Base || structural.Copyright != value.Copyright ||
+			structural.Description != value.Description || structural.Title !=
+			value.Title || structural.Version != value.Version) return 3;
+		if (!MuiApplicationIdentityStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiApplicationIdentityStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1137 application lifecycle state struct-codec proof. Lifecycle BOOLs
+	// remain canonical ULONGs in the named record; admission owns range checks
+	// and the null record is rejected before field consumption.
+	public static uint ApplicationLifecycleStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationLifecycleStateRecord);
+		value.Magic = MuiApplicationLifecycleStateRecord.Cookie;
+		value.Initialized = 1;
+		value.Iconified = 0;
+		value.Active = 1;
+		value.SingleTask = 1;
+		value.DoubleStart = 0;
+		value.ForceQuit = 1;
+		var address = APTR.FromPointer(0x4D780);
+		if (!MuiApplicationLifecycleStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationLifecycleStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Initialized !=
+			value.Initialized || structural.Iconified != value.Iconified ||
+			structural.Active != value.Active || structural.SingleTask !=
+			value.SingleTask || structural.DoubleStart != value.DoubleStart ||
+			structural.ForceQuit != value.ForceQuit) return 3;
+		if (!MuiApplicationLifecycleStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiApplicationLifecycleStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1138 application UsedClasses state struct-codec proof. The vector
+	// remains a caller-owned guest capability; vector-entry and string bounds
+	// stay in admission, while a null record is rejected by the codec.
+	public static uint ApplicationUsedClassesStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationUsedClassesStateRecord);
+		value.Magic = MuiApplicationUsedClassesStateRecord.Cookie;
+		value.Vector = APTR.Null;
+		var address = APTR.FromPointer(0x4D880);
+		if (!MuiApplicationUsedClassesStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Vector != value.Vector)
+			return 3;
+		if (!MuiApplicationUsedClassesStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 4;
+		if (MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1139 sleep-state struct-codec proof. The named record carries the
+	// nesting/request relationship and canonical SavedDisabled BOOL; a null
+	// record remains rejected before any field is consumed.
+	public static uint SleepStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiSleepStateRecord);
+		value.Magic = MuiSleepStateRecord.Cookie;
+		value.Depth = 2;
+		value.SavedDisabled = 1;
+		value.Request = 2;
+		var address = APTR.FromPointer(0x4DA00);
+		if (!MuiSleepStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiSleepStateRecordCodec.TryReadStructural(ref platform, address,
+			out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Depth != value.Depth ||
+			structural.SavedDisabled != value.SavedDisabled ||
+			structural.Request != value.Request) return 3;
+		if (!MuiSleepStateRecordCodec.TryRead(ref platform, address, out _))
+			return 4;
+		if (MuiSleepStateRecordCodec.TryReadStructural(ref platform, APTR.Null,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG1140 Area activation struct-codec proof. The named record keeps the
+	// canonical Active BOOL with opaque Flags/Generation values; a null record
+	// remains rejected before any field is consumed.
+	public static uint AreaActivationStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaActivationStateRecord);
+		value.Signature = MuiAreaActivationStateRecord.Cookie;
+		value.Active = 1;
+		value.Flags = 0xA5A5;
+		value.Generation = 9;
+		var address = APTR.FromPointer(0x4DB00);
+		if (!MuiAreaActivationStateCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaActivationStateCodec.TryReadStructural(ref platform, address,
+			out var structural)) return 2;
+		if (structural.Signature != value.Signature ||
+			structural.Active != value.Active || structural.Flags != value.Flags ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaActivationStateCodec.TryRead(ref platform, address, out _))
+			return 4;
+		if (MuiAreaActivationStateCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1141 Area weight struct-codec proof. Weight remains an opaque ULONG in
+	// the named record and the cookie is checked before the value is published.
+	public static uint AreaWeightStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaWeightStateRecord);
+		value.Magic = MuiAreaWeightStateRecord.Cookie;
+		value.Weight = uint.MaxValue;
+		var address = APTR.FromPointer(0x4DC00);
+		if (!MuiAreaWeightStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaWeightStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Weight != value.Weight)
+			return 3;
+		if (!MuiAreaWeightStateRecordCodec.TryRead(ref platform, address, out _))
+			return 4;
+		if (MuiAreaWeightStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1142 Area double-buffer struct-codec proof. The named record retains
+	// canonical Enabled BOOL and nonzero publication generation while rejecting
+	// an unmapped record before field access.
+	public static uint AreaDoubleBufferStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaDoubleBufferStateRecord);
+		value.Magic = MuiAreaDoubleBufferStateRecord.Cookie;
+		value.Enabled = 1;
+		value.Generation = 3;
+		var address = APTR.FromPointer(0x4DD00);
+		if (!MuiAreaDoubleBufferStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaDoubleBufferStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Enabled != value.Enabled ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaDoubleBufferStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaDoubleBufferStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1143 Area floating struct-codec proof. The named record retains
+	// canonical Enabled BOOL and nonzero publication generation while leaving
+	// placement semantics to the MorphOS provider.
+	public static uint AreaFloatingStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaFloatingStateRecord);
+		value.Magic = MuiAreaFloatingStateRecord.Cookie;
+		value.Enabled = 0;
+		value.Generation = 5;
+		var address = APTR.FromPointer(0x4DE00);
+		if (!MuiAreaFloatingStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaFloatingStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Enabled != value.Enabled ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaFloatingStateRecordCodec.TryRead(ref platform, address, out _))
+			return 4;
+		if (MuiAreaFloatingStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1144 Area disappearance-policy struct-codec proof. Signed LONG
+	// priorities remain lossless in the named record while cookie and mapping
+	// checks stay at the guest boundary.
+	public static uint AreaDisappearPolicyStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaDisappearPolicyStateRecord);
+		value.Magic = MuiAreaDisappearPolicyStateRecord.Cookie;
+		value.HorizDisappear = int.MinValue;
+		value.VertDisappear = int.MaxValue;
+		var address = APTR.FromPointer(0x4DF00);
+		if (!MuiAreaDisappearPolicyStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaDisappearPolicyStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural)) return 2;
+		if (structural.Magic != value.Magic ||
+			structural.HorizDisappear != value.HorizDisappear ||
+			structural.VertDisappear != value.VertDisappear) return 3;
+		if (!MuiAreaDisappearPolicyStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaDisappearPolicyStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1145 Area DoubleClick struct-codec proof. The signed LONG event value
+	// remains lossless while nonzero publication generation protects readers.
+	public static uint AreaDoubleClickStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaDoubleClickStateRecord);
+		value.Magic = MuiAreaDoubleClickStateRecord.Cookie;
+		value.Value = int.MinValue;
+		value.Generation = 7;
+		var address = APTR.FromPointer(0x4E000);
+		if (!MuiAreaDoubleClickStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaDoubleClickStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Value != value.Value ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaDoubleClickStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaDoubleClickStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1146 Area drag-policy struct-codec proof. Draggable and Dropable remain
+	// canonical MorphOS BOOL values in the named record.
+	public static uint AreaDragPolicyStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaDragPolicyStateRecord);
+		value.Magic = MuiAreaDragPolicyStateRecord.Cookie;
+		value.Draggable = 1;
+		value.Dropable = 0;
+		var address = APTR.FromPointer(0x4E100);
+		if (!MuiAreaDragPolicyStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaDragPolicyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic ||
+			structural.Draggable != value.Draggable ||
+			structural.Dropable != value.Dropable) return 3;
+		if (!MuiAreaDragPolicyStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaDragPolicyStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1147 Area timer state struct-codec proof. The signed event counter
+	// remains lossless while nonzero publication generation protects readers.
+	public static uint AreaTimerStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaTimerStateRecord);
+		value.Magic = MuiAreaTimerStateRecord.Cookie;
+		value.Value = int.MinValue;
+		value.Generation = 7;
+		var address = APTR.FromPointer(0x4E200);
+		if (!MuiAreaTimerStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform, address,
+			out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Value != value.Value ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaTimerStateRecordCodec.TryRead(ref platform, address, out _))
+			return 4;
+		if (MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1148 Area ControlChar struct-codec proof. The normalized character
+	// remains an unsigned byte-compatible value with a nonzero generation.
+	public static uint AreaControlCharStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaControlCharStateRecord);
+		value.Magic = MuiAreaControlCharStateRecord.Cookie;
+		value.Character = 0xFF;
+		value.Generation = 7;
+		var address = APTR.FromPointer(0x4E300);
+		if (!MuiAreaControlCharStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaControlCharStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic ||
+			structural.Character != value.Character ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaControlCharStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaControlCharStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1149 Area TextColor struct-codec proof. The packed 24-bit RGB value,
+	// setup-active BOOL, and publication generation remain named fields.
+	public static uint AreaTextColorStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaTextColorStateRecord);
+		value.Magic = MuiAreaTextColorStateRecord.Cookie;
+		value.Color = 0x00C0FFEE;
+		value.Active = 1;
+		value.Generation = 7;
+		var address = APTR.FromPointer(0x4E400);
+		if (!MuiAreaTextColorStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaTextColorStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Color != value.Color ||
+			structural.Active != value.Active ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaTextColorStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaTextColorStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1150 Area ShortHelp struct-codec proof. The caller-owned OBString
+	// pointer remains lossless while publication generation protects readers.
+	public static uint AreaShortHelpStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaShortHelpStateRecord);
+		value.Magic = MuiAreaShortHelpStateRecord.Cookie;
+		value.Text = APTR.FromPointer(0x1A00);
+		value.Generation = 7;
+		var address = APTR.FromPointer(0x4E500);
+		if (!MuiAreaShortHelpStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaShortHelpStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Text != value.Text ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaShortHelpStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaShortHelpStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1151 Area BuiltinFont struct-codec proof. The signed MorphOS selector
+	// remains lossless as a ULONG while presence and publication generation are
+	// named, validated fields.
+	public static uint AreaBuiltinFontStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaBuiltinFontStateRecord);
+		value.Magic = MuiAreaBuiltinFontStateRecord.Cookie;
+		value.Selector = 0x80000000u;
+		value.Present = 1;
+		value.Generation = 7;
+		var address = APTR.FromPointer(0x4E600);
+		if (!MuiAreaBuiltinFontStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaBuiltinFontStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic ||
+			structural.Selector != value.Selector ||
+			structural.Present != value.Present ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaBuiltinFontStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaBuiltinFontStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1152 Area CustomFont struct-codec proof. The caller-owned font-spec
+	// pointer remains opaque while Present and publication generation are named
+	// and validated fields.
+	public static uint AreaCustomFontStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaCustomFontStateRecord);
+		value.Magic = MuiAreaCustomFontStateRecord.Cookie;
+		value.Spec = APTR.FromPointer(0x1A00);
+		value.Present = 1;
+		value.Generation = 7;
+		var address = APTR.FromPointer(0x4E700);
+		if (!MuiAreaCustomFontStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaCustomFontStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Spec != value.Spec ||
+			structural.Present != value.Present ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaCustomFontStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaCustomFontStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1153 CustomFont runtime struct-codec proof. Provider font and source
+	// specification handles remain opaque while Active and generation are named
+	// publication fields.
+	public static uint AreaCustomFontRuntimeRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = new MuiAreaCustomFontRuntimeRecord
+		{
+			Magic = MuiAreaCustomFontRuntimeRecord.Cookie,
+			Font = APTR.FromPointer(0x2B00),
+			Spec = APTR.FromPointer(0x2C00),
+			Generation = 7,
+			Active = 1,
+		};
+		var address = APTR.FromPointer(0x4E800);
+		if (!MuiAreaCustomFontRuntimeRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Font != value.Font ||
+			structural.Spec != value.Spec ||
+			structural.Generation != value.Generation ||
+			structural.Active != value.Active) return 3;
+		if (!MuiAreaCustomFontRuntimeRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1154 Area FontSelection struct-codec proof. Last-writer selection is a
+	// named enum value and its caller-owned source pointer remains opaque.
+	public static uint AreaFontSelectionStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaFontSelectionStateRecord);
+		value.Magic = MuiAreaFontSelectionStateRecord.Cookie;
+		value.Active = (uint)MuiAreaFontSelectionKind.CustomFont;
+		value.Source = APTR.FromPointer(0x1F00);
+		value.Generation = 7;
+		var address = APTR.FromPointer(0x4E900);
+		if (!MuiAreaFontSelectionStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaFontSelectionStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic ||
+			structural.Active != value.Active ||
+			structural.Source != value.Source ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaFontSelectionStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaFontSelectionStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1155 Area ContextMenu struct-codec proof. Menu-strip and trigger
+	// relationships remain opaque caller-owned pointers with named generation.
+	public static uint AreaContextMenuStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaContextMenuStateRecord);
+		value.Magic = MuiAreaContextMenuStateRecord.Cookie;
+		value.MenuStrip = APTR.FromPointer(0x2000);
+		value.Trigger = APTR.FromPointer(0x2100);
+		value.Generation = 7;
+		var address = APTR.FromPointer(0x4EA00);
+		if (!MuiAreaContextMenuStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaContextMenuStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic ||
+			structural.MenuStrip != value.MenuStrip ||
+			structural.Trigger != value.Trigger ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaContextMenuStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaContextMenuStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1156 Area CycleChain struct-codec proof. The unrestricted signed LONG
+	// policy remains lossless in the named record with a publication generation.
+	public static uint AreaCycleChainStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaCycleChainStateRecord);
+		value.Magic = MuiAreaCycleChainStateRecord.Cookie;
+		value.Value = int.MinValue;
+		value.Generation = 7;
+		var address = APTR.FromPointer(0x4EB00);
+		if (!MuiAreaCycleChainStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaCycleChainStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Value != value.Value ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaCycleChainStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaCycleChainStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1159 Area presentation policy struct-codec proof. The fixed MorphOS
+	// ULONG record is read and written through its named layout adapter.
+	public static uint AreaPresentationStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaPresentationStateRecord);
+		value.Magic = MuiAreaPresentationStateRecord.Cookie;
+		value.Disabled = 1;
+		value.ShowMe = 0;
+		value.Background = uint.MaxValue;
+		value.Frame = 7;
+		value.CustomBackfill = 1;
+		var address = APTR.FromPointer(0x4EC00);
+		if (!MuiAreaPresentationStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaPresentationStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Disabled != value.Disabled ||
+			structural.ShowMe != value.ShowMe ||
+			structural.Background != value.Background ||
+			structural.Frame != value.Frame ||
+			structural.CustomBackfill != value.CustomBackfill) return 3;
+		if (!MuiAreaPresentationStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaPresentationStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1160 Area geometry struct-codec proof. Signed coordinates and extents
+	// remain lossless in the named record while canonical edge admission stays
+	// separate from guest-memory translation.
+	public static uint AreaGeometryStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaGeometryStateRecord);
+		value.Magic = MuiAreaGeometryStateRecord.Cookie;
+		value.Left = -4;
+		value.Top = -2;
+		value.Width = 25;
+		value.Height = 12;
+		value.Right = 20;
+		value.Bottom = 9;
+		var address = APTR.FromPointer(0x4ED00);
+		if (!MuiAreaGeometryStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaGeometryStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Left != value.Left ||
+			structural.Top != value.Top || structural.Width != value.Width ||
+			structural.Height != value.Height || structural.Right != value.Right ||
+			structural.Bottom != value.Bottom) return 3;
+		if (!MuiAreaGeometryStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaGeometryStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1161 Area render-policy struct-codec proof. Selector values and the
+	// caller-owned frame-title pointer remain lossless alongside canonical BOOLs.
+	public static uint AreaRenderPolicyStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaRenderPolicyStateRecord);
+		value.Magic = MuiAreaRenderPolicyStateRecord.Cookie;
+		value.FillArea = 1;
+		value.Background = 7;
+		value.Frame = 2;
+		value.Font = 0x2200;
+		value.FrameVisible = 1;
+		value.FramePhantomHoriz = 0;
+		value.FrameTitle = APTR.FromPointer(0x2300);
+		value.FrameDynamic = 1;
+		var address = APTR.FromPointer(0x4EE00);
+		if (!MuiAreaRenderPolicyStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaRenderPolicyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.FillArea != value.FillArea ||
+			structural.Background != value.Background ||
+			structural.Frame != value.Frame || structural.Font != value.Font ||
+			structural.FrameVisible != value.FrameVisible ||
+			structural.FramePhantomHoriz != value.FramePhantomHoriz ||
+			structural.FrameTitle != value.FrameTitle ||
+			structural.FrameDynamic != value.FrameDynamic) return 3;
+		if (!MuiAreaRenderPolicyStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaRenderPolicyStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1268 native struct-first render-policy closure. Every public policy
+	// member is selected by its named field enum; the guest layout is confined
+	// to the bounded adapter and remains freestanding.
+	public static uint AreaRenderPolicyStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = new MuiAreaRenderPolicyStateRecord
+		{
+			Magic = MuiAreaRenderPolicyStateRecord.Cookie,
+			FillArea = 1,
+			Background = 7,
+			Frame = 2,
+			Font = 0x2200,
+			FrameVisible = 1,
+			FramePhantomHoriz = 0,
+			FrameTitle = APTR.FromPointer(0x0004F040),
+			FrameDynamic = 1,
+		};
+		var address = APTR.FromPointer(0x0004F000);
+		if (!MuiAreaRenderPolicyStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaRenderPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaRenderPolicyStateField.FrameTitle, out var titleAddress) ||
+			titleAddress.Raw != address.Raw + MuiAreaRenderPolicyStateRecord.FrameTitleOffset)
+			return 2;
+		if (!MuiAreaRenderPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaRenderPolicyStateField.FrameVisible, 0)) return 3;
+		if (!MuiAreaRenderPolicyStateRecordCodec.TryRead(ref platform, address,
+			out var decoded)) return 4;
+		if (decoded.Magic != value.Magic || decoded.FillArea != value.FillArea ||
+			decoded.Background != value.Background || decoded.Frame != value.Frame ||
+			decoded.Font != value.Font || decoded.FrameVisible != 0 ||
+			decoded.FramePhantomHoriz != value.FramePhantomHoriz ||
+			decoded.FrameTitle != value.FrameTitle ||
+			decoded.FrameDynamic != value.FrameDynamic) return 5;
+		if (MuiAreaRenderPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaRenderPolicyStateField)255, out _)) return 6;
+		return 42;
+	}
+
+	// MG1162 Area layout-policy struct-codec proof. ShowMe remains a canonical
+	// BOOL while all other layout inputs stay lossless named ULONG fields.
+	public static uint AreaLayoutPolicyStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiAreaLayoutPolicyStateRecord);
+		value.Magic = MuiAreaLayoutPolicyStateRecord.Cookie;
+		value.ShowMe = 1;
+		value.FixWidth = 20;
+		value.FixHeight = 10;
+		value.MaxWidth = 100;
+		value.MaxHeight = 80;
+		value.InnerLeft = 2;
+		value.InnerRight = 3;
+		value.InnerTop = 1;
+		value.InnerBottom = 1;
+		value.HorizontalWeight = 7;
+		value.VerticalWeight = 9;
+		var address = APTR.FromPointer(0x4EF00);
+		if (!MuiAreaLayoutPolicyStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaLayoutPolicyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.ShowMe != value.ShowMe ||
+			structural.FixWidth != value.FixWidth ||
+			structural.FixHeight != value.FixHeight ||
+			structural.MaxWidth != value.MaxWidth ||
+			structural.MaxHeight != value.MaxHeight ||
+			structural.InnerLeft != value.InnerLeft ||
+			structural.InnerRight != value.InnerRight ||
+			structural.InnerTop != value.InnerTop ||
+			structural.InnerBottom != value.InnerBottom ||
+			structural.HorizontalWeight != value.HorizontalWeight ||
+			structural.VerticalWeight != value.VerticalWeight) return 3;
+		if (!MuiAreaLayoutPolicyStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiAreaLayoutPolicyStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1269 native struct-first layout-policy closure. ShowMe and every
+	// dimension/weight are selected by named fields; the fixed 68k record is
+	// translated only by the bounded adapter.
+	public static uint AreaLayoutPolicyStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = new MuiAreaLayoutPolicyStateRecord
+		{
+			Magic = MuiAreaLayoutPolicyStateRecord.Cookie,
+			ShowMe = 1,
+			FixWidth = 20,
+			FixHeight = 10,
+			MaxWidth = 100,
+			MaxHeight = 80,
+			InnerLeft = 2,
+			InnerRight = 3,
+			InnerTop = 1,
+			InnerBottom = 1,
+			HorizontalWeight = 7,
+			VerticalWeight = 9,
+		};
+		var address = APTR.FromPointer(0x0004EF80);
+		if (!MuiAreaLayoutPolicyStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaLayoutPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaLayoutPolicyField.VerticalWeight, out var weightAddress) ||
+			weightAddress.Raw != address.Raw + MuiAreaLayoutPolicyStateRecord.VerticalWeightOffset)
+			return 2;
+		if (!MuiAreaLayoutPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaLayoutPolicyField.ShowMe, 0)) return 3;
+		if (!MuiAreaLayoutPolicyStateRecordCodec.TryRead(ref platform, address,
+			out var decoded)) return 4;
+		if (decoded.Magic != value.Magic || decoded.ShowMe != 0 ||
+			decoded.FixWidth != value.FixWidth || decoded.FixHeight != value.FixHeight ||
+			decoded.MaxWidth != value.MaxWidth || decoded.MaxHeight != value.MaxHeight ||
+			decoded.InnerLeft != value.InnerLeft || decoded.InnerRight != value.InnerRight ||
+			decoded.InnerTop != value.InnerTop || decoded.InnerBottom != value.InnerBottom ||
+			decoded.HorizontalWeight != value.HorizontalWeight ||
+			decoded.VerticalWeight != value.VerticalWeight) return 5;
+		if (MuiAreaLayoutPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaLayoutPolicyField)255, out _)) return 6;
+		return 42;
+	}
+
+	// MG1163 Balance policy struct-codec proof. The complete MorphOS LONG range
+	// remains lossless in the named record while the cookie stays mandatory.
+	public static uint BalancePolicyStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiBalancePolicyStateRecord);
+		value.Magic = MuiBalancePolicyStateRecord.Cookie;
+		value.Quiet = uint.MaxValue;
+		var address = APTR.FromPointer(0x4F000);
+		if (!MuiBalancePolicyStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiBalancePolicyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Quiet != value.Quiet)
+			return 3;
+		if (!MuiBalancePolicyStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiBalancePolicyStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1164 Bitmap source/remapped struct-codec proof. Caller-owned source and
+	// renderer-produced remapped pointers stay opaque and lossless in records.
+	public static uint BitmapSourceRemappedStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var source = default(MuiBitmapSourceStateRecord);
+		source.Magic = MuiBitmapSourceStateRecord.Cookie;
+		source.Source = APTR.FromPointer(0x4D000);
+		var remapped = default(MuiBitmapRemappedStateRecord);
+		remapped.Magic = MuiBitmapRemappedStateRecord.Cookie;
+		remapped.Remapped = APTR.FromPointer(0x4D004);
+		var sourceAddress = APTR.FromPointer(0x4F100);
+		var remappedAddress = APTR.FromPointer(0x4F120);
+		if (!MuiBitmapSourceStateRecordCodec.Write(ref platform, sourceAddress,
+			source) || !MuiBitmapRemappedStateRecordCodec.Write(ref platform,
+			remappedAddress, remapped)) return 1;
+		if (!MuiBitmapSourceStateRecordCodec.TryReadStructural(ref platform,
+			sourceAddress, out var sourceStructural) ||
+			!MuiBitmapRemappedStateRecordCodec.TryReadStructural(ref platform,
+			remappedAddress, out var remappedStructural)) return 2;
+		if (sourceStructural.Magic != source.Magic ||
+			sourceStructural.Source != source.Source ||
+			remappedStructural.Magic != remapped.Magic ||
+			remappedStructural.Remapped != remapped.Remapped) return 3;
+		if (!MuiBitmapSourceStateRecordCodec.TryRead(ref platform, sourceAddress,
+			out _) || !MuiBitmapRemappedStateRecordCodec.TryRead(ref platform,
+			remappedAddress, out _)) return 4;
+		if (MuiBitmapSourceStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _) || MuiBitmapRemappedStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1165 Bitmap geometry struct-codec proof. Width and height retain the
+	// complete MorphOS ULONG range in a bounded named guest record.
+	public static uint BitmapGeometryStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiBitmapGeometryStateRecord);
+		value.Magic = MuiBitmapGeometryStateRecord.Cookie;
+		value.Width = uint.MaxValue;
+		value.Height = 12;
+		var address = APTR.FromPointer(0x4F200);
+		if (!MuiBitmapGeometryStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiBitmapGeometryStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Width != value.Width ||
+			structural.Height != value.Height) return 3;
+		if (!MuiBitmapGeometryStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiBitmapGeometryStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1166 Bitmap policy struct-codec proof. Decode selectors and pointer
+	// values remain full-width while UseFriend stays a canonical BOOL.
+	public static uint BitmapPolicyStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiBitmapPolicyStateRecord);
+		value.Magic = MuiBitmapPolicyStateRecord.Cookie;
+		value.Alpha = 0x11223344;
+		value.MappingTable = 0x4D000;
+		value.Precision = 0x55667788;
+		value.SourceColors = 0x4D004;
+		value.Transparent = 0x99AABBCC;
+		value.UseFriend = 1;
+		var address = APTR.FromPointer(0x4F300);
+		if (!MuiBitmapPolicyStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiBitmapPolicyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Alpha != value.Alpha ||
+			structural.MappingTable != value.MappingTable ||
+			structural.Precision != value.Precision ||
+			structural.SourceColors != value.SourceColors ||
+			structural.Transparent != value.Transparent ||
+			structural.UseFriend != value.UseFriend) return 3;
+		if (!MuiBitmapPolicyStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiBitmapPolicyStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1167 Bodychunk format struct-codec proof. Compression, depth, and
+	// masking retain full-width MorphOS ULONG values in the named record.
+	public static uint BodychunkFormatStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiBodychunkFormatStateRecord);
+		value.Magic = MuiBodychunkFormatStateRecord.Cookie;
+		value.Compression = uint.MaxValue;
+		value.Depth = 2;
+		value.Masking = 0;
+		var address = APTR.FromPointer(0x4F400);
+		if (!MuiBodychunkFormatStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiBodychunkFormatStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic ||
+			structural.Compression != value.Compression ||
+			structural.Depth != value.Depth || structural.Masking != value.Masking)
+			return 3;
+		if (!MuiBodychunkFormatStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiBodychunkFormatStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1168 Choice/Radio active-index struct-codec proof. The semantic record
+	// keeps the non-negative active-index admission while the memory adapter
+	// owns the fixed guest layout.
+	public static uint ChoiceActiveStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiChoiceActiveStateRecord);
+		value.Magic = MuiChoiceActiveStateRecord.Cookie;
+		value.Active = 0x7FFFFFFFu;
+		var address = APTR.FromPointer(0x4F480);
+		if (!MuiChoiceActiveStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiChoiceActiveStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Active != value.Active)
+			return 3;
+		if (!MuiChoiceActiveStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiChoiceActiveStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1169 Choice/Radio entries struct-codec proof. The caller-owned STRPTR
+	// vector remains opaque; the native closure exercises the null-vector ABI
+	// path while host coverage validates a bounded non-null vector.
+	public static uint ChoiceEntriesStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiChoiceEntriesStateRecord);
+		value.Magic = MuiChoiceEntriesStateRecord.Cookie;
+		value.Entries = APTR.Null;
+		var address = APTR.FromPointer(0x4F580);
+		if (!MuiChoiceEntriesStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiChoiceEntriesStateField.Magic, value.Magic) ||
+			!MuiChoiceEntriesStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiChoiceEntriesStateField.Entries, value.Entries.Raw)) return 1;
+		if (!MuiChoiceEntriesStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Entries != value.Entries)
+			return 3;
+		if (MuiChoiceEntriesStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1170 ControlFont struct-codec proof. Presence stays canonical while
+	// the TextFont pointer remains opaque and lossless.
+	public static uint ControlFontStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiControlFontStateRecord);
+		value.Magic = MuiControlFontStateRecord.Cookie;
+		value.Present = 1;
+		value.Font = APTR.FromPointer(0x8042BE50);
+		var address = APTR.FromPointer(0x4F600);
+		if (!MuiControlFontStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiControlFontStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Present != value.Present ||
+			structural.Font != value.Font) return 3;
+		if (!MuiControlFontStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiControlFontStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1171 Gauge state struct-codec proof. Progress values remain full-width
+	// ULONGs while Horizontal retains canonical BOOL admission.
+	public static uint GaugeStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiGaugeStateRecord);
+		value.Magic = MuiGaugeStateRecord.Cookie;
+		value.Maximum = uint.MaxValue;
+		value.Current = 0x80000000u;
+		value.Divide = uint.MaxValue;
+		value.Horizontal = 1;
+		var address = APTR.FromPointer(0x4F680);
+		if (!MuiGaugeStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiGaugeStateRecordCodec.TryReadStructural(ref platform, address,
+			out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Maximum != value.Maximum ||
+			structural.Current != value.Current || structural.Divide != value.Divide ||
+			structural.Horizontal != value.Horizontal) return 3;
+		if (!MuiGaugeStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiGaugeStateRecordCodec.TryReadStructural(ref platform, APTR.Null,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG1172 Levelmeter presentation struct-codec proof. Gauge_Horiz remains
+	// canonical BOOL data in the named presentation record.
+	public static uint LevelmeterPresentationStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiLevelmeterPresentationStateRecord);
+		value.Magic = MuiLevelmeterPresentationStateRecord.Cookie;
+		value.Horizontal = 1;
+		var address = APTR.FromPointer(0x4F700);
+		if (!MuiLevelmeterPresentationStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic ||
+			structural.Horizontal != value.Horizontal) return 3;
+		if (!MuiLevelmeterPresentationStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1173 Levelmeter label struct-codec proof. The object-owned C-string
+	// pointer remains opaque; bounded text validation stays in live admission.
+	public static uint LevelmeterLabelStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiLevelmeterLabelStateRecord);
+		value.Magic = MuiLevelmeterLabelStateRecord.Cookie;
+		value.Label = APTR.FromPointer(0x4F7A0);
+		var address = APTR.FromPointer(0x4F7C0);
+		if (!MuiLevelmeterLabelStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiLevelmeterLabelStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Label != value.Label)
+			return 3;
+		if (!MuiLevelmeterLabelStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiLevelmeterLabelStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1174 Gauge InfoText struct-codec proof. The object-owned C-string
+	// pointer remains opaque; bounded text validation stays in live admission.
+	public static uint GaugeInfoTextStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiGaugeInfoTextStateRecord);
+		value.Magic = MuiGaugeInfoTextStateRecord.Cookie;
+		value.InfoText = APTR.FromPointer(0x4F820);
+		var address = APTR.FromPointer(0x4F840);
+		if (!MuiGaugeInfoTextStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiGaugeInfoTextStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic ||
+			structural.InfoText != value.InfoText) return 3;
+		if (!MuiGaugeInfoTextStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiGaugeInfoTextStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1175 GadgetGadget struct-codec proof. The getter-only Intuition gadget
+	// pointer remains opaque and is admitted only when NULL or mapped.
+	public static uint GadgetGadgetStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiGadgetGadgetStateRecord);
+		value.Magic = MuiGadgetGadgetStateRecord.Cookie;
+		value.Gadget = APTR.FromPointer(0x4D000);
+		var address = APTR.FromPointer(0x4F880);
+		if (!MuiGadgetGadgetStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiGadgetGadgetStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Gadget != value.Gadget)
+			return 3;
+		if (!MuiGadgetGadgetStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiGadgetGadgetStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1176 Gadget interaction struct-codec proof. InputMode retains its
+	// bounded enum and the selected-state fields retain canonical BOOL values.
+	public static uint GadgetInteractionStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiGadgetInteractionStateRecord);
+		value.Magic = MuiGadgetInteractionStateRecord.Cookie;
+		value.InputMode = 3;
+		value.Selected = 1;
+		value.Pressed = 0;
+		value.ShowSelState = 1;
+		var address = APTR.FromPointer(0x4F900);
+		if (!MuiGadgetInteractionStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiGadgetInteractionStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic ||
+			structural.InputMode != value.InputMode ||
+			structural.Selected != value.Selected ||
+			structural.Pressed != value.Pressed ||
+			structural.ShowSelState != value.ShowSelState) return 3;
+		if (!MuiGadgetInteractionStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiGadgetInteractionStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1177 Image OldImage struct-codec proof. The caller-owned graphics
+	// Image pointer remains opaque and is admitted only when NULL or mapped.
+	public static uint ImageOldImageStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiImageOldImageStateRecord);
+		value.Magic = MuiImageOldImageStateRecord.Cookie;
+		value.Image = APTR.FromPointer(0x4D000);
+		var address = APTR.FromPointer(0x4F980);
+		if (!MuiImageOldImageStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiImageOldImageStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Image != value.Image)
+			return 3;
+		if (!MuiImageOldImageStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiImageOldImageStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1178 Image FontMatchString struct-codec proof. Presence remains
+	// canonical and the caller-owned match string pointer stays opaque.
+	public static uint ImageFontMatchStringStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiImageFontMatchStringStateRecord);
+		value.Magic = MuiImageFontMatchStringStateRecord.Cookie;
+		value.Present = 1;
+		value.MatchString = APTR.FromPointer(0x4F9E0);
+		var address = APTR.FromPointer(0x4FA00);
+		if (!MuiImageFontMatchStringStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiImageFontMatchStringStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic ||
+			structural.Present != value.Present ||
+			structural.MatchString != value.MatchString) return 3;
+		if (!MuiImageFontMatchStringStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiImageFontMatchStringStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1179 Image FontMatch scalar struct-codec proof. Match, Height, and
+	// Width remain lossless MorphOS ULONG values in the named record.
+	public static uint ImageFontMatchStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiImageFontMatchStateRecord);
+		value.Magic = MuiImageFontMatchStateRecord.Cookie;
+		value.Match = uint.MaxValue;
+		value.Height = 0x80000000u;
+		value.Width = uint.MaxValue;
+		var address = APTR.FromPointer(0x4FA80);
+		if (!MuiImageFontMatchStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiImageFontMatchStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic || structural.Match != value.Match ||
+			structural.Height != value.Height || structural.Width != value.Width)
+			return 3;
+		if (!MuiImageFontMatchStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiImageFontMatchStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1180 Image Spec struct-codec proof. Builtin and raw spec values remain
+	// distinct, with presence flags preserving supplied zero values.
+	public static uint ImageSpecStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiImageSpecStateRecord);
+		value.Magic = MuiImageSpecStateRecord.Cookie;
+		value.Present = 1;
+		value.Raw = 3;
+		value.BuiltinPresent = 1;
+		value.Builtin = 7;
+		var address = APTR.FromPointer(0x4FB00);
+		if (!MuiImageSpecStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiImageSpecStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic ||
+			structural.Present != value.Present || structural.Raw != value.Raw ||
+			structural.BuiltinPresent != value.BuiltinPresent ||
+			structural.Builtin != value.Builtin) return 3;
+		if (!MuiImageSpecStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiImageSpecStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1181 Image render policy struct-codec proof. Image state and free-axis
+	// policy values remain lossless MorphOS ULONG data.
+	public static uint ImageRenderStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiImageRenderStateRecord);
+		value.Magic = MuiImageRenderStateRecord.Cookie;
+		value.ImageState = uint.MaxValue;
+		value.Selected = 1;
+		value.FreeHoriz = 0x80000000u;
+		value.FreeVert = uint.MaxValue;
+		value.ShowSelState = 0;
+		var address = APTR.FromPointer(0x4FC00);
+		if (!MuiImageRenderStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiImageRenderStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (structural.Magic != value.Magic ||
+			structural.ImageState != value.ImageState ||
+			structural.Selected != value.Selected ||
+			structural.FreeHoriz != value.FreeHoriz ||
+			structural.FreeVert != value.FreeVert ||
+			structural.ShowSelState != value.ShowSelState) return 3;
+		if (!MuiImageRenderStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (MuiImageRenderStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG947 Application Save/Load admission proof. The named persistence record
+	// accepts MorphOS Null and ENVARC selectors, validates bounded C strings, and
+	// rejects non-BOOL operations without managed storage.
+	public static uint ApplicationSettingsPersistenceAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationSettingsPersistenceStateRecord);
+		value.Magic = MuiApplicationSettingsPersistenceStateRecord.Cookie;
+		value.Operation = 1;
+		var address = APTR.FromPointer(0x4D5C0);
+		if (!MuiApplicationSettingsPersistenceStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationSettingsPersistenceStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural)) return 2;
+		if (!MuiApplicationSettingsPersistenceStateAdmission.Validate(ref platform,
+			structural)) return 3;
+		if (!MuiApplicationSettingsPersistenceStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 4;
+		value.Operation = 2;
+		if (MuiApplicationSettingsPersistenceStateAdmission.Validate(ref platform,
+			value)) return 5;
+		value.Operation = 0;
+		value.Name = APTR.FromPointer(uint.MaxValue);
+		if (!MuiApplicationSettingsPersistenceStateAdmission.Validate(ref platform,
+			value)) return 6;
+		value.Name = APTR.FromPointer(0xFFFFFF00u);
+		if (MuiApplicationSettingsPersistenceStateAdmission.Validate(ref platform,
+			value)) return 7;
+		value.Name = APTR.FromPointer(0x0004D000);
+		WriteCString(value.Name, (byte)'E', (byte)'N', (byte)'V', (byte)':',
+			(byte)'C', (byte)'o', (byte)'p', 0);
+		if (!MuiApplicationSettingsPersistenceStateAdmission.Validate(ref platform,
+			value)) return 8;
+		if (!MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiApplicationSettingsPersistenceStateField.Magic, 0)) return 9;
+		if (!MuiApplicationSettingsPersistenceStateRecordCodec.TryReadStructural(
+			ref platform, address, out structural) || structural.Magic != 0)
+			return 10;
+		if (MuiApplicationSettingsPersistenceStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 11;
+		return 42;
+	}
+
+	// MG948 CheckRefresh admission proof. The named telemetry record keeps full
+	// MorphOS ULONG counters and rejects a malformed cookie without managed
+	// storage.
+	public static uint ApplicationRefreshAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationRefreshStateRecord);
+		value.Magic = MuiApplicationRefreshStateRecord.Cookie;
+		value.Checks = uint.MaxValue;
+		value.RefreshedWindows = 7;
+		var address = APTR.FromPointer(0x4D480);
+		if (!MuiApplicationRefreshStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationRefreshStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (!MuiApplicationRefreshStateAdmission.Validate(structural)) return 3;
+		if (!MuiApplicationRefreshStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (!MuiApplicationRefreshStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationRefreshStateField.Magic, 0))
+			return 5;
+		if (!MuiApplicationRefreshStateRecordCodec.TryReadStructural(ref platform,
+			address, out structural) || structural.Magic != 0) return 6;
+		if (MuiApplicationRefreshStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 7;
+		value.Magic = 0;
+		if (MuiApplicationRefreshStateAdmission.Validate(value)) return 8;
+		return 42;
+	}
+
+	public static int ApplicationRefreshStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationRefreshStateRecord);
+		value.Magic = MuiApplicationRefreshStateRecord.Cookie;
+		value.Checks = uint.MaxValue;
+		value.RefreshedWindows = 7;
+		var address = APTR.FromPointer(0x4D460);
+		if (!MuiApplicationRefreshStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationRefreshStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.Checks != value.Checks ||
+			decoded.RefreshedWindows != value.RefreshedWindows) return 2;
+		if (MuiApplicationRefreshStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 3;
+		return 42;
+	}
+
+	// MG949 application menu admission proof. Menu UserData remains full ULONG
+	// state in a named struct; malformed cookies are rejected without managed
+	// storage or pointer interpretation.
+	public static uint ApplicationMenuAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationMenuStateRecord);
+		value.Magic = MuiApplicationMenuStateRecord.Cookie;
+		value.MenuAction = uint.MaxValue;
+		value.MenuHelp = 0xCAFE;
+		var address = APTR.FromPointer(0x4D340);
+		if (!MuiApplicationMenuStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationMenuStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (!MuiApplicationMenuStateAdmission.Validate(structural)) return 3;
+		if (!MuiApplicationMenuStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (!MuiApplicationMenuStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationMenuStateField.Magic, 0)) return 5;
+		if (!MuiApplicationMenuStateRecordCodec.TryReadStructural(ref platform,
+			address, out structural) || structural.Magic != 0) return 6;
+		if (MuiApplicationMenuStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 7;
+		value.Magic = 0;
+		if (MuiApplicationMenuStateAdmission.Validate(value)) return 8;
+		return 42;
+	}
+
+	public static int ApplicationMenuStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationMenuStateRecord);
+		value.Magic = MuiApplicationMenuStateRecord.Cookie;
+		value.MenuAction = uint.MaxValue;
+		value.MenuHelp = 0xBEEF;
+		var address = APTR.FromPointer(0x4D320);
+		if (!MuiApplicationMenuStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationMenuStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.MenuAction != value.MenuAction ||
+			decoded.MenuHelp != value.MenuHelp) return 2;
+		if (MuiApplicationMenuStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 3;
+		return 42;
+	}
+
+	// MG950 Application command-table admission proof. NULL or a bounded named
+	// command table is accepted; unmapped table pointers are rejected without
+	// managed storage.
+	public static uint ApplicationCommandsAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationCommandsStateRecord);
+		value.Magic = MuiApplicationCommandsStateRecord.Cookie;
+		var address = APTR.FromPointer(0x4D380);
+		if (!MuiApplicationCommandsStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationCommandsStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (!MuiApplicationCommandsStateAdmission.Validate(ref platform,
+			structural)) return 3;
+		if (!MuiApplicationCommandsStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		if (!MuiApplicationCommandsStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationCommandsStateField.Magic, 0))
+			return 5;
+		if (!MuiApplicationCommandsStateRecordCodec.TryReadStructural(ref platform,
+			address, out structural) || structural.Magic != 0) return 6;
+		if (MuiApplicationCommandsStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 7;
+		value.Magic = 0;
+		if (MuiApplicationCommandsStateAdmission.Validate(ref platform, value))
+			return 8;
+		return 42;
+	}
+
+	public static int ApplicationCommandsStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationCommandsStateRecord);
+		value.Magic = MuiApplicationCommandsStateRecord.Cookie;
+		value.Table = APTR.Null;
+		var address = APTR.FromPointer(0x4D300);
+		if (!MuiApplicationCommandsStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationCommandsStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.Table != value.Table) return 2;
+		if (MuiApplicationCommandsStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 3;
+		return 42;
+	}
+
+	// MG951 Application SetConfigItem admission proof. The opaque data APTR
+	// remains NULL or one mapped guest byte; unmapped payloads are rejected
+	// without managed storage or payload interpretation.
+	public static uint ApplicationSetConfigItemAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationSetConfigItemStateRecord);
+		value.Magic = MuiApplicationSetConfigItemStateRecord.Cookie;
+		var address = APTR.FromPointer(0x4D500);
+		if (!MuiApplicationSetConfigItemStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationSetConfigItemStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural)) return 2;
+		if (!MuiApplicationSetConfigItemStateAdmission.Validate(ref platform,
+			structural)) return 3;
+		if (!MuiApplicationSetConfigItemStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 4;
+		value.Data = APTR.FromPointer(0x0004D000);
+		if (!MuiApplicationSetConfigItemStateAdmission.Validate(ref platform,
+			value)) return 5;
+		value.Data = APTR.FromPointer(0xFFFFFF00u);
+		if (MuiApplicationSetConfigItemStateAdmission.Validate(ref platform,
+			value)) return 6;
+		if (!MuiApplicationSetConfigItemStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSetConfigItemStateField.Magic, 0))
+			return 7;
+		if (!MuiApplicationSetConfigItemStateRecordCodec.TryReadStructural(
+			ref platform, address, out structural) || structural.Magic != 0)
+			return 8;
+		if (MuiApplicationSetConfigItemStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 9;
+		return 42;
+	}
+
+	public static int ApplicationSetConfigItemStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationSetConfigItemStateRecord);
+		value.Magic = MuiApplicationSetConfigItemStateRecord.Cookie;
+		value.Item = 0x22;
+		value.Data = APTR.FromPointer(0x4D000);
+		value.Requests = 3;
+		var address = APTR.FromPointer(0x4D580);
+		if (!MuiApplicationSetConfigItemStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationSetConfigItemStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.Item != value.Item || decoded.Data != value.Data ||
+			decoded.Requests != value.Requests) return 2;
+		if (MuiApplicationSetConfigItemStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 3;
+		return 42;
+	}
+
+	// MG952/MG1065 Application_Window relationship admission proof. LastWindow
+	// is a NULL or mapped guest capability; topology is checked by the live-owner
+	// path, while this closure proves the freestanding struct boundary.
+	public static uint ApplicationWindowRelationshipAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationWindowRelationshipStateRecord);
+		value.Magic = MuiApplicationWindowRelationshipStateRecord.Cookie;
+		var address = APTR.FromPointer(0x4D640);
+		if (!MuiApplicationWindowRelationshipStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural)) return 2;
+		if (!MuiApplicationWindowRelationshipStateAdmission.Validate(ref platform,
+			structural)) return 3;
+		if (!MuiApplicationWindowRelationshipStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 4;
+		value.LastWindow = APTR.FromPointer(0x0004D000);
+		if (!MuiApplicationWindowRelationshipStateAdmission.Validate(ref platform,
+			value)) return 5;
+		value.LastWindow = APTR.FromPointer(0xFFFFFF00u);
+		if (MuiApplicationWindowRelationshipStateAdmission.Validate(ref platform,
+			value)) return 6;
+		if (!MuiApplicationWindowRelationshipStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiApplicationWindowRelationshipStateField.Magic, 0)) return 7;
+		if (!MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+			ref platform, address, out structural) || structural.Magic != 0)
+			return 8;
+		if (MuiApplicationWindowRelationshipStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 9;
+		return 42;
+	}
+
+	public static int ApplicationWindowRelationshipStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationWindowRelationshipStateRecord);
+		value.Magic = MuiApplicationWindowRelationshipStateRecord.Cookie;
+		value.LastWindow = APTR.FromPointer(0x4D000);
+		value.AddedCount = 3;
+		var address = APTR.FromPointer(0x4D6C0);
+		if (!MuiApplicationWindowRelationshipStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.LastWindow != value.LastWindow ||
+			decoded.AddedCount != value.AddedCount) return 2;
+		if (MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 3;
+		return 42;
+	}
+
+	// MG1066 Area activation admission proof. Active remains a canonical BOOL;
+	// Flags and Generation retain full ULONG state without managed storage.
+	public static uint AreaActivationAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x4D680);
+		var value = default(MuiAreaActivationStateRecord);
+		value.Signature = MuiAreaActivationStateRecord.Cookie;
+		value.Active = 1;
+		value.Flags = 0xA5A5A5A5;
+		value.Generation = 7;
+		if (!MuiAreaActivationStateAdmission.Validate(value)) return 1;
+		if (!MuiAreaActivationStateCodec.Write(ref platform, address, value))
+			return 2;
+		if (!MuiAreaActivationStateCodec.TryReadStructural(ref platform, address,
+			out var structural) || structural.Signature != value.Signature ||
+			structural.Active != value.Active || structural.Flags != value.Flags ||
+			structural.Generation != value.Generation) return 3;
+		if (!MuiAreaActivationStateCodec.TryRead(ref platform, address, out _))
+			return 4;
+		if (!MuiAreaActivationStateFieldCursorCodec.TryWrite(ref platform, address,
+			MuiAreaActivationStateField.Signature, 0)) return 5;
+		if (!MuiAreaActivationStateCodec.TryReadStructural(ref platform, address,
+			out structural) || structural.Signature != 0) return 6;
+		if (MuiAreaActivationStateCodec.TryRead(ref platform, address, out _))
+			return 7;
+		value.Active = 2;
+		if (MuiAreaActivationStateAdmission.Validate(value)) return 8;
+		return 42;
+	}
+
+	// MG1067 Area policy admission proof. ControlChar, CycleChain, and
+	// ContextMenu retain named guest records; malformed cookies stay readable
+	// structurally but are rejected by strict codecs.
+	public static uint AreaPolicyAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var controlAddress = APTR.FromPointer(0x4D6C0);
+		var cycleAddress = APTR.FromPointer(0x4D6E0);
+		var contextAddress = APTR.FromPointer(0x4D700);
+		var control = new MuiAreaControlCharStateRecord
+		{
+			Magic = MuiAreaControlCharStateRecord.Cookie,
+			Character = 0x41,
+			Generation = 3,
+		};
+		var cycle = new MuiAreaCycleChainStateRecord
+		{
+			Magic = MuiAreaCycleChainStateRecord.Cookie,
+			Value = -2,
+			Generation = 5,
+		};
+		var context = new MuiAreaContextMenuStateRecord
+		{
+			Magic = MuiAreaContextMenuStateRecord.Cookie,
+			MenuStrip = APTR.FromPointer(0x4D720),
+			Trigger = APTR.FromPointer(0x4D724),
+			Generation = 7,
+		};
+		if (!MuiAreaControlCharStateRecordCodec.Write(ref platform, controlAddress,
+			control) || !MuiAreaCycleChainStateRecordCodec.Write(ref platform,
+			cycleAddress, cycle) || !MuiAreaContextMenuStateRecordCodec.Write(
+			ref platform, contextAddress, context)) return 1;
+		if (!MuiAreaControlCharStateRecordCodec.TryRead(ref platform, controlAddress,
+			out var controlRead) || controlRead.Character != control.Character)
+			return 2;
+		if (!MuiAreaCycleChainStateRecordCodec.TryRead(ref platform, cycleAddress,
+			out var cycleRead) || cycleRead.Value != cycle.Value) return 3;
+		if (!MuiAreaContextMenuStateRecordCodec.TryRead(ref platform, contextAddress,
+			out var contextRead) || contextRead.MenuStrip != context.MenuStrip ||
+			contextRead.Trigger != context.Trigger) return 4;
+		if (!MuiAreaControlCharStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			controlAddress, MuiAreaControlCharStateField.Magic, 0) ||
+			!MuiAreaCycleChainStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			cycleAddress, MuiAreaCycleChainStateField.Magic, 0) ||
+			!MuiAreaContextMenuStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			contextAddress, MuiAreaContextMenuStateField.Magic, 0)) return 5;
+		if (!MuiAreaControlCharStateRecordCodec.TryReadStructural(ref platform,
+			controlAddress, out controlRead) || controlRead.Magic != 0) return 6;
+		if (!MuiAreaCycleChainStateRecordCodec.TryReadStructural(ref platform,
+			cycleAddress, out cycleRead) || cycleRead.Magic != 0) return 7;
+		if (!MuiAreaContextMenuStateRecordCodec.TryReadStructural(ref platform,
+			contextAddress, out contextRead) || contextRead.Magic != 0) return 8;
+		if (MuiAreaControlCharStateRecordCodec.TryRead(ref platform, controlAddress,
+			out _) || MuiAreaCycleChainStateRecordCodec.TryRead(ref platform,
+			cycleAddress, out _) || MuiAreaContextMenuStateRecordCodec.TryRead(
+			ref platform, contextAddress, out _)) return 9;
+		return 42;
+	}
+
+	// MG1068 Area presentation-policy admission proof. DoubleClick, ShortHelp,
+	// and TextColor retain named signed/pointer/scalar records; malformed
+	// cookies stay structurally readable but are rejected by strict codecs.
+	public static uint AreaPresentationPolicyAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var doubleClickAddress = APTR.FromPointer(0x4D740);
+		var shortHelpAddress = APTR.FromPointer(0x4D760);
+		var textColorAddress = APTR.FromPointer(0x4D780);
+		var doubleClick = new MuiAreaDoubleClickStateRecord
+		{
+			Magic = MuiAreaDoubleClickStateRecord.Cookie,
+			Value = -2,
+			Generation = 3,
+		};
+		var shortHelp = new MuiAreaShortHelpStateRecord
+		{
+			Magic = MuiAreaShortHelpStateRecord.Cookie,
+			Text = APTR.FromPointer(0x4D7A0),
+			Generation = 5,
+		};
+		var textColor = new MuiAreaTextColorStateRecord
+		{
+			Magic = MuiAreaTextColorStateRecord.Cookie,
+			Color = 0x00C0FFEE,
+			Active = 1,
+			Generation = 7,
+		};
+		if (!MuiAreaDoubleClickStateRecordCodec.Write(ref platform,
+			doubleClickAddress, doubleClick) ||
+			!MuiAreaShortHelpStateRecordCodec.Write(ref platform, shortHelpAddress,
+			shortHelp) || !MuiAreaTextColorStateRecordCodec.Write(ref platform,
+			textColorAddress, textColor)) return 1;
+		if (!MuiAreaDoubleClickStateRecordCodec.TryRead(ref platform,
+			doubleClickAddress, out var doubleClickRead) ||
+			doubleClickRead.Value != doubleClick.Value) return 2;
+		if (!MuiAreaShortHelpStateRecordCodec.TryRead(ref platform, shortHelpAddress,
+			out var shortHelpRead) || shortHelpRead.Text != shortHelp.Text) return 3;
+		if (!MuiAreaTextColorStateRecordCodec.TryRead(ref platform,
+			textColorAddress, out var textColorRead) ||
+			textColorRead.Color != textColor.Color ||
+			textColorRead.Active != textColor.Active) return 4;
+		if (!MuiAreaDoubleClickStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			doubleClickAddress, MuiAreaDoubleClickStateField.Magic, 0) ||
+			!MuiAreaShortHelpStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			shortHelpAddress, MuiAreaShortHelpStateField.Magic, 0) ||
+			!MuiAreaTextColorStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			textColorAddress, MuiAreaTextColorStateField.Magic, 0)) return 5;
+		if (!MuiAreaDoubleClickStateRecordCodec.TryReadStructural(ref platform,
+			doubleClickAddress, out doubleClickRead) || doubleClickRead.Magic != 0)
+			return 6;
+		if (!MuiAreaShortHelpStateRecordCodec.TryReadStructural(ref platform,
+			shortHelpAddress, out shortHelpRead) || shortHelpRead.Magic != 0) return 7;
+		if (!MuiAreaTextColorStateRecordCodec.TryReadStructural(ref platform,
+			textColorAddress, out textColorRead) || textColorRead.Magic != 0) return 8;
+		if (MuiAreaDoubleClickStateRecordCodec.TryRead(ref platform,
+			doubleClickAddress, out _) || MuiAreaShortHelpStateRecordCodec.TryRead(
+			ref platform, shortHelpAddress, out _) || MuiAreaTextColorStateRecordCodec
+			.TryRead(ref platform, textColorAddress, out _)) return 9;
+		return 42;
+	}
+
+	// MG1069 Area font admission proof. BuiltinFont and the Font/CustomFont
+	// selection record keep signed selectors, source capabilities, and
+	// generation in named guest structs; malformed cookies stay structural but
+	// fail strict admission.
+	public static uint AreaFontAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var builtinAddress = APTR.FromPointer(0x4D7C0);
+		var selectionAddress = APTR.FromPointer(0x4D7E0);
+		var builtin = new MuiAreaBuiltinFontStateRecord
+		{
+			Magic = MuiAreaBuiltinFontStateRecord.Cookie,
+			Selector = unchecked((uint)-7),
+			Present = 1,
+			Generation = 3,
+		};
+		var selection = new MuiAreaFontSelectionStateRecord
+		{
+			Magic = MuiAreaFontSelectionStateRecord.Cookie,
+			Active = (uint)MuiAreaFontSelectionKind.CustomFont,
+			Source = APTR.FromPointer(0x4D800),
+			Generation = 5,
+		};
+		if (!MuiAreaBuiltinFontStateRecordCodec.Write(ref platform, builtinAddress,
+			builtin) || !MuiAreaFontSelectionStateRecordCodec.Write(ref platform,
+			selectionAddress, selection)) return 1;
+		if (!MuiAreaBuiltinFontStateRecordCodec.TryRead(ref platform, builtinAddress,
+			out var builtinRead) || builtinRead.Selector != builtin.Selector ||
+			builtinRead.Present != builtin.Present) return 2;
+		if (!MuiAreaFontSelectionStateRecordCodec.TryRead(ref platform,
+			selectionAddress, out var selectionRead) ||
+			selectionRead.Active != selection.Active ||
+			selectionRead.Source != selection.Source) return 3;
+		if (!MuiAreaBuiltinFontStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			builtinAddress, MuiAreaBuiltinFontStateField.Magic, 0) ||
+			!MuiAreaFontSelectionStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			selectionAddress, MuiAreaFontSelectionStateField.Magic, 0)) return 4;
+		if (!MuiAreaBuiltinFontStateRecordCodec.TryReadStructural(ref platform,
+			builtinAddress, out builtinRead) || builtinRead.Magic != 0) return 5;
+		if (!MuiAreaFontSelectionStateRecordCodec.TryReadStructural(ref platform,
+			selectionAddress, out selectionRead) || selectionRead.Magic != 0) return 6;
+		if (MuiAreaBuiltinFontStateRecordCodec.TryRead(ref platform, builtinAddress,
+			out _) || MuiAreaFontSelectionStateRecordCodec.TryRead(ref platform,
+			selectionAddress, out _)) return 7;
+		return 42;
+	}
+
+	// MG1070 Area buffer/weight admission proof. DoubleBuffer, Floating, and
+	// Weight retain named BOOL/ULONG records; malformed cookies stay structural
+	// but are rejected by strict codecs.
+	public static uint AreaBufferWeightAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var doubleBufferAddress = APTR.FromPointer(0x4D820);
+		var floatingAddress = APTR.FromPointer(0x4D840);
+		var weightAddress = APTR.FromPointer(0x4D860);
+		var doubleBuffer = new MuiAreaDoubleBufferStateRecord
+		{
+			Magic = MuiAreaDoubleBufferStateRecord.Cookie,
+			Enabled = 1,
+			Generation = 3,
+		};
+		var floating = new MuiAreaFloatingStateRecord
+		{
+			Magic = MuiAreaFloatingStateRecord.Cookie,
+			Enabled = 0,
+			Generation = 5,
+		};
+		var weight = new MuiAreaWeightStateRecord
+		{
+			Magic = MuiAreaWeightStateRecord.Cookie,
+			Weight = uint.MaxValue,
+		};
+		if (!MuiAreaDoubleBufferStateRecordCodec.Write(ref platform,
+			doubleBufferAddress, doubleBuffer) ||
+			!MuiAreaFloatingStateRecordCodec.Write(ref platform, floatingAddress,
+			floating) || !MuiAreaWeightStateRecordCodec.Write(ref platform,
+			weightAddress, weight)) return 1;
+		if (!MuiAreaDoubleBufferStateRecordCodec.TryRead(ref platform,
+			doubleBufferAddress, out var doubleBufferRead) ||
+			doubleBufferRead.Enabled != doubleBuffer.Enabled) return 2;
+		if (!MuiAreaFloatingStateRecordCodec.TryRead(ref platform, floatingAddress,
+			out var floatingRead) || floatingRead.Enabled != floating.Enabled) return 3;
+		if (!MuiAreaWeightStateRecordCodec.TryRead(ref platform, weightAddress,
+			out var weightRead) || weightRead.Weight != weight.Weight) return 4;
+		if (!MuiAreaDoubleBufferStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			doubleBufferAddress, MuiAreaDoubleBufferStateField.Magic, 0) ||
+			!MuiAreaFloatingStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			floatingAddress, MuiAreaFloatingStateField.Magic, 0) ||
+			!MuiAreaWeightStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			weightAddress, MuiAreaWeightStateField.Magic, 0)) return 5;
+		if (!MuiAreaDoubleBufferStateRecordCodec.TryReadStructural(ref platform,
+			doubleBufferAddress, out doubleBufferRead) || doubleBufferRead.Magic != 0)
+			return 6;
+		if (!MuiAreaFloatingStateRecordCodec.TryReadStructural(ref platform,
+			floatingAddress, out floatingRead) || floatingRead.Magic != 0) return 7;
+		if (!MuiAreaWeightStateRecordCodec.TryReadStructural(ref platform,
+			weightAddress, out weightRead) || weightRead.Magic != 0) return 8;
+		if (MuiAreaDoubleBufferStateRecordCodec.TryRead(ref platform,
+			doubleBufferAddress, out _) || MuiAreaFloatingStateRecordCodec.TryRead(
+			ref platform, floatingAddress, out _) || MuiAreaWeightStateRecordCodec
+			.TryRead(ref platform, weightAddress, out _)) return 9;
+		return 42;
+	}
+
+	// MG1071 Area presentation/timer admission proof. Shared presentation,
+	// signed timer, and timer-event state remain complete named guest structs;
+	// malformed cookies stay structurally readable but fail strict admission.
+	public static uint AreaPresentationTimerAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var presentationAddress = APTR.FromPointer(0x4D8A0);
+		var timerAddress = APTR.FromPointer(0x4D8C0);
+		var eventAddress = APTR.FromPointer(0x4D8E0);
+		var presentation = new MuiAreaPresentationStateRecord
+		{
+			Magic = MuiAreaPresentationStateRecord.Cookie,
+			Disabled = 1,
+			ShowMe = 1,
+			Background = uint.MaxValue,
+			Frame = 7,
+			CustomBackfill = 1,
+		};
+		var timer = new MuiAreaTimerStateRecord
+		{
+			Magic = MuiAreaTimerStateRecord.Cookie,
+			Value = -9,
+			Generation = 3,
+		};
+		var timerEvent = new MuiAreaTimerEventStateRecord
+		{
+			Magic = MuiAreaTimerEventStateRecord.Cookie,
+			Armed = 1,
+			MouseOver = 1,
+			DelayElapsed = 0,
+			LastTick = 42,
+			Generation = 5,
+		};
+		if (!MuiAreaPresentationStateRecordCodec.Write(ref platform,
+			presentationAddress, presentation) ||
+			!MuiAreaTimerStateRecordCodec.Write(ref platform, timerAddress, timer) ||
+			!MuiAreaTimerEventStateCodec.Write(ref platform, eventAddress, timerEvent))
+			return 1;
+		if (!MuiAreaPresentationStateRecordCodec.TryRead(ref platform,
+			presentationAddress, out var presentationRead) ||
+			presentationRead.Background != presentation.Background) return 2;
+		if (!MuiAreaTimerStateRecordCodec.TryRead(ref platform, timerAddress,
+			out var timerRead) || timerRead.Value != timer.Value) return 3;
+		if (!MuiAreaTimerEventStateCodec.TryRead(ref platform, eventAddress,
+			out var eventRead) || eventRead.LastTick != timerEvent.LastTick) return 4;
+		if (!MuiAreaPresentationStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			presentationAddress, MuiAreaPresentationStateField.Magic, 0) ||
+			!MuiAreaTimerStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				timerAddress, MuiAreaTimerStateField.Magic, 0) ||
+			!MuiAreaTimerEventStateCodec.TryWriteUInt32(ref platform, eventAddress,
+				MuiAreaTimerEventStateField.Magic, 0)) return 5;
+		if (!MuiAreaPresentationStateRecordCodec.TryReadStructural(ref platform,
+			presentationAddress, out presentationRead) ||
+			presentationRead.Magic != 0) return 6;
+		if (!MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform,
+			timerAddress, out timerRead) || timerRead.Magic != 0) return 7;
+		if (!MuiAreaTimerEventStateCodec.TryReadStructural(ref platform, eventAddress,
+			out eventRead) || eventRead.Magic != 0) return 8;
+		if (MuiAreaPresentationStateRecordCodec.TryRead(ref platform,
+			presentationAddress, out _) || MuiAreaTimerStateRecordCodec.TryRead(
+			ref platform, timerAddress, out _) || MuiAreaTimerEventStateCodec.TryRead(
+			ref platform, eventAddress, out _)) return 9;
+		return 42;
+	}
+
+	// MG1072 Balance and Bitmap policy admission proof. Quiet, Bitmap policy
+	// scalars/pointers, and renderer remapping remain complete named records;
+	// malformed cookies stay structural but fail strict admission.
+	public static uint BalanceBitmapAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var balanceAddress = APTR.FromPointer(0x4D920);
+		var policyAddress = APTR.FromPointer(0x4D940);
+		var remappedAddress = APTR.FromPointer(0x4D980);
+		var balance = new MuiBalancePolicyStateRecord
+		{
+			Magic = MuiBalancePolicyStateRecord.Cookie,
+			Quiet = uint.MaxValue,
+		};
+		var policy = new MuiBitmapPolicyStateRecord
+		{
+			Magic = MuiBitmapPolicyStateRecord.Cookie,
+			Alpha = 0x11223344,
+			MappingTable = 0x4D000,
+			Precision = 0x55667788,
+			SourceColors = 0x4D004,
+			Transparent = 0x99AABBCC,
+			UseFriend = 1,
+		};
+		var remapped = new MuiBitmapRemappedStateRecord
+		{
+			Magic = MuiBitmapRemappedStateRecord.Cookie,
+			Remapped = APTR.FromPointer(0x4D008),
+		};
+		if (!MuiBalancePolicyStateRecordCodec.Write(ref platform, balanceAddress,
+			balance) || !MuiBitmapPolicyStateRecordCodec.Write(ref platform,
+			policyAddress, policy) || !MuiBitmapRemappedStateRecordCodec.Write(
+			ref platform, remappedAddress, remapped)) return 1;
+		if (!MuiBalancePolicyStateRecordCodec.TryRead(ref platform, balanceAddress,
+			out var balanceRead) || balanceRead.Quiet != balance.Quiet) return 2;
+		if (!MuiBitmapPolicyStateRecordCodec.TryRead(ref platform, policyAddress,
+			out var policyRead) || policyRead.MappingTable != policy.MappingTable ||
+			policyRead.SourceColors != policy.SourceColors) return 3;
+		if (!MuiBitmapRemappedStateRecordCodec.TryRead(ref platform,
+			remappedAddress, out var remappedRead) ||
+			remappedRead.Remapped != remapped.Remapped) return 4;
+		if (!MuiBalancePolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			balanceAddress, MuiBalancePolicyStateField.Magic, 0) ||
+			!MuiBitmapPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				policyAddress, MuiBitmapPolicyStateField.Magic, 0) ||
+			!MuiBitmapRemappedStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				remappedAddress, MuiBitmapRemappedStateField.Magic, 0)) return 5;
+		if (!MuiBalancePolicyStateRecordCodec.TryReadStructural(ref platform,
+			balanceAddress, out balanceRead) || balanceRead.Magic != 0) return 6;
+		if (!MuiBitmapPolicyStateRecordCodec.TryReadStructural(ref platform,
+			policyAddress, out policyRead) || policyRead.Magic != 0) return 7;
+		if (!MuiBitmapRemappedStateRecordCodec.TryReadStructural(ref platform,
+			remappedAddress, out remappedRead) || remappedRead.Magic != 0) return 8;
+		if (MuiBalancePolicyStateRecordCodec.TryRead(ref platform, balanceAddress,
+			out _) || MuiBitmapPolicyStateRecordCodec.TryRead(ref platform,
+			policyAddress, out _) || MuiBitmapRemappedStateRecordCodec.TryRead(
+			ref platform, remappedAddress, out _)) return 9;
+		return 42;
+	}
+
+	// MG1073 Choice admission proof. Active and caller-owned entry vectors stay
+	// in complete named records; malformed cookies remain structural but fail
+	// strict admission before selection consumers use them.
+	public static uint ChoiceAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var activeAddress = APTR.FromPointer(0x37000);
+		var entriesAddress = APTR.FromPointer(0x37020);
+		var entries = APTR.FromPointer(0x37040);
+		var text = APTR.FromPointer(0x37080);
+		APTR.WriteUInt8(text, 0, (byte)'F');
+		APTR.WriteUInt8(text, 1, (byte)'i');
+		APTR.WriteUInt8(text, 2, (byte)'r');
+		APTR.WriteUInt8(text, 3, (byte)'s');
+		APTR.WriteUInt8(text, 4, (byte)'t');
+		APTR.WriteUInt8(text, 5, 0);
+		APTR.WriteUInt32(entries, 0, text.Raw);
+		APTR.WriteUInt32(entries, 4, 0);
+		var active = new MuiChoiceActiveStateRecord
+		{
+			Magic = MuiChoiceActiveStateRecord.Cookie,
+			Active = 1,
+		};
+		var choiceEntries = new MuiChoiceEntriesStateRecord
+		{
+			Magic = MuiChoiceEntriesStateRecord.Cookie,
+			Entries = entries,
+		};
+		if (!MuiChoiceActiveStateAdmission.ValidateRecord(active.Magic,
+			active.Active)) return 1;
+		if (!MuiChoiceActiveStateRecordCodec.Write(ref platform, activeAddress,
+			active)) return 2;
+		if (!MuiChoiceEntriesStateRecordCodec.Write(ref platform, entriesAddress,
+			choiceEntries)) return 3;
+		if (!MuiChoiceActiveStateRecordCodec.TryRead(ref platform, activeAddress,
+			out var activeRead) || activeRead.Active != active.Active) return 4;
+		if (!MuiChoiceEntriesStateRecordCodec.TryRead(ref platform, entriesAddress,
+			out var entriesRead) || entriesRead.Entries != entries) return 5;
+		if (!MuiChoiceActiveStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			activeAddress, MuiChoiceActiveStateField.Magic, 0) ||
+			!MuiChoiceEntriesStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				entriesAddress, MuiChoiceEntriesStateField.Magic, 0)) return 5;
+		if (!MuiChoiceActiveStateRecordCodec.TryReadStructural(ref platform,
+			activeAddress, out activeRead) || activeRead.Magic != 0) return 6;
+		if (!MuiChoiceEntriesStateRecordCodec.TryReadStructural(ref platform,
+			entriesAddress, out entriesRead) || entriesRead.Magic != 0) return 7;
+		if (MuiChoiceActiveStateRecordCodec.TryRead(ref platform, activeAddress,
+			out _) || MuiChoiceEntriesStateRecordCodec.TryRead(ref platform,
+			entriesAddress, out _)) return 8;
+		return 42;
+	}
+
+	// MG1074 Gadget admission proof. The Intuition gadget capability and
+	// interaction policy remain complete named records; malformed cookies stay
+	// structurally readable but fail strict admission.
+	public static uint GadgetAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var gadgetAddress = APTR.FromPointer(0x37000);
+		var interactionAddress = APTR.FromPointer(0x37020);
+		var gadget = new MuiGadgetGadgetStateRecord
+		{
+			Magic = MuiGadgetGadgetStateRecord.Cookie,
+			Gadget = APTR.FromPointer(0x37080),
+		};
+		var interaction = new MuiGadgetInteractionStateRecord
+		{
+			Magic = MuiGadgetInteractionStateRecord.Cookie,
+			InputMode = 1,
+			Selected = 1,
+			Pressed = 0,
+			ShowSelState = 1,
+		};
+		if (!MuiGadgetGadgetStateRecordCodec.Write(ref platform, gadgetAddress,
+			gadget)) return 1;
+		if (!MuiGadgetInteractionStateRecordCodec.Write(ref platform,
+			interactionAddress, interaction)) return 2;
+		if (!MuiGadgetGadgetStateRecordCodec.TryRead(ref platform, gadgetAddress,
+			out var gadgetRead) || gadgetRead.Gadget != gadget.Gadget) return 3;
+		if (!MuiGadgetInteractionStateRecordCodec.TryRead(ref platform,
+			interactionAddress, out var interactionRead) ||
+			interactionRead.InputMode != interaction.InputMode ||
+			interactionRead.Selected != interaction.Selected) return 4;
+		if (!MuiGadgetGadgetStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			gadgetAddress, MuiGadgetGadgetStateField.Magic, 0) ||
+			!MuiGadgetInteractionStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				interactionAddress, MuiGadgetInteractionStateField.Magic, 0)) return 5;
+		if (!MuiGadgetGadgetStateRecordCodec.TryReadStructural(ref platform,
+			gadgetAddress, out gadgetRead) || gadgetRead.Magic != 0) return 6;
+		if (!MuiGadgetInteractionStateRecordCodec.TryReadStructural(ref platform,
+			interactionAddress, out interactionRead) || interactionRead.Magic != 0)
+			return 7;
+		if (MuiGadgetGadgetStateRecordCodec.TryRead(ref platform, gadgetAddress,
+			out _) || MuiGadgetInteractionStateRecordCodec.TryRead(ref platform,
+			interactionAddress, out _)) return 8;
+		return 42;
+	}
+
+	// MG1075 Gauge/Levelmeter admission proof. Progress values and presentation
+	// orientation remain complete named records; malformed cookies stay
+	// structurally readable but fail strict admission.
+	public static uint GaugeLevelmeterAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var gaugeAddress = APTR.FromPointer(0x370A0);
+		var levelmeterAddress = APTR.FromPointer(0x370C0);
+		var gauge = new MuiGaugeStateRecord
+		{
+			Magic = MuiGaugeStateRecord.Cookie,
+			Maximum = 100,
+			Current = 35,
+			Divide = 2,
+			Horizontal = 1,
+		};
+		var levelmeter = new MuiLevelmeterPresentationStateRecord
+		{
+			Magic = MuiLevelmeterPresentationStateRecord.Cookie,
+			Horizontal = 0,
+		};
+		if (!MuiGaugeStateRecordCodec.Write(ref platform, gaugeAddress, gauge))
+			return 1;
+		if (!MuiLevelmeterPresentationStateRecordCodec.Write(ref platform,
+			levelmeterAddress, levelmeter)) return 2;
+		if (!MuiGaugeStateRecordCodec.TryRead(ref platform, gaugeAddress,
+			out var gaugeRead) || gaugeRead.Current != gauge.Current ||
+			gaugeRead.Divide != gauge.Divide) return 3;
+		if (!MuiLevelmeterPresentationStateRecordCodec.TryRead(ref platform,
+			levelmeterAddress, out var levelmeterRead) ||
+			levelmeterRead.Horizontal != levelmeter.Horizontal) return 4;
+		if (!MuiGaugeStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			gaugeAddress, MuiGaugeStateField.Magic, 0) ||
+			!MuiLevelmeterPresentationStateFieldCursorCodec.TryWriteUInt32(
+				ref platform, levelmeterAddress,
+				MuiLevelmeterPresentationStateField.Magic, 0)) return 5;
+		if (!MuiGaugeStateRecordCodec.TryReadStructural(ref platform, gaugeAddress,
+			out gaugeRead) || gaugeRead.Magic != 0) return 6;
+		if (!MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(
+			ref platform, levelmeterAddress, out levelmeterRead) ||
+			levelmeterRead.Magic != 0) return 7;
+		if (MuiGaugeStateRecordCodec.TryRead(ref platform, gaugeAddress, out _) ||
+			MuiLevelmeterPresentationStateRecordCodec.TryRead(ref platform,
+				levelmeterAddress, out _)) return 8;
+		return 42;
+	}
+
+	// MG1076 Group-grid/Numeric admission proof. Layout policy and shared
+	// numeric range state remain complete named records; malformed cookies stay
+	// structurally readable but fail strict admission.
+	public static uint GroupGridNumericAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var gridAddress = APTR.FromPointer(0x37100);
+		var numericAddress = APTR.FromPointer(0x37140);
+		var grid = new MuiGroupGridStateRecord
+		{
+			Magic = MuiGroupGridStateRecord.Cookie,
+			Columns = 3,
+			Rows = 2,
+			HorizontalSpacing = unchecked((uint)-4),
+			VerticalSpacing = 6,
+			SameWidth = 1,
+			SameHeight = 0,
+			HorizontalCenter = 1,
+			VerticalCenter = 2,
+		};
+		var numeric = new MuiNumericStateRecord
+		{
+			Magic = MuiNumericStateRecord.Cookie,
+			Minimum = unchecked((uint)-10),
+			Maximum = 100,
+			Value = 35,
+			Default = 50,
+			Reverse = 1,
+		};
+		if (!MuiGroupGridStateRecordCodec.Write(ref platform, gridAddress, grid))
+			return 1;
+		if (!MuiNumericStateRecordCodec.Write(ref platform, numericAddress, numeric))
+			return 2;
+		if (!MuiGroupGridStateRecordCodec.TryRead(ref platform, gridAddress,
+			out var gridRead) || gridRead.Columns != grid.Columns ||
+			gridRead.HorizontalSpacing != grid.HorizontalSpacing ||
+			gridRead.VerticalCenter != grid.VerticalCenter) return 3;
+		if (!MuiNumericStateRecordCodec.TryRead(ref platform, numericAddress,
+			out var numericRead) || numericRead.Minimum != numeric.Minimum ||
+			numericRead.Value != numeric.Value ||
+			numericRead.Reverse != numeric.Reverse) return 4;
+		if (!MuiGroupGridStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			gridAddress, MuiGroupGridStateField.Magic, 0) ||
+			!MuiNumericStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				numericAddress, MuiNumericStateField.Magic, 0)) return 5;
+		if (!MuiGroupGridStateRecordCodec.TryReadStructural(ref platform,
+			gridAddress, out gridRead) || gridRead.Magic != 0) return 6;
+		if (!MuiNumericStateRecordCodec.TryReadStructural(ref platform,
+			numericAddress, out numericRead) || numericRead.Magic != 0) return 7;
+		if (MuiGroupGridStateRecordCodec.TryRead(ref platform, gridAddress, out _) ||
+			MuiNumericStateRecordCodec.TryRead(ref platform, numericAddress, out _))
+			return 8;
+		return 42;
+	}
+
+	// MG1077 Prop policy/range admission proof. Scrollbar policy and movement
+	// state remain complete named records; malformed cookies stay structurally
+	// readable but fail strict admission.
+	public static uint PropAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var policyAddress = APTR.FromPointer(0x37200);
+		var rangeAddress = APTR.FromPointer(0x37230);
+		var policy = new MuiPropPolicyStateRecord
+		{
+			Magic = MuiPropPolicyStateRecord.Cookie,
+			Horizontal = 1,
+			DeltaFactor = unchecked((uint)-2),
+			Slider = 1,
+			UseWinBorder = 2,
+		};
+		var range = new MuiPropRangeStateRecord
+		{
+			Magic = MuiPropRangeStateRecord.Cookie,
+			Entries = 100,
+			Visible = 10,
+			First = 5,
+		};
+		if (!MuiPropPolicyStateRecordCodec.Write(ref platform, policyAddress,
+			policy)) return 1;
+		if (!MuiPropRangeStateRecordCodec.Write(ref platform, rangeAddress, range))
+			return 2;
+		if (!MuiPropPolicyStateRecordCodec.TryRead(ref platform, policyAddress,
+			out var policyRead) || policyRead.DeltaFactor != policy.DeltaFactor ||
+			policyRead.UseWinBorder != policy.UseWinBorder) return 3;
+		if (!MuiPropRangeStateRecordCodec.TryRead(ref platform, rangeAddress,
+			out var rangeRead) || rangeRead.Entries != range.Entries ||
+			rangeRead.First != range.First) return 4;
+		if (!MuiPropPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			policyAddress, MuiPropPolicyStateField.Magic, 0) ||
+			!MuiPropRangeStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				rangeAddress, MuiPropRangeStateField.Magic, 0)) return 5;
+		if (!MuiPropPolicyStateRecordCodec.TryReadStructural(ref platform,
+			policyAddress, out policyRead) || policyRead.Magic != 0) return 6;
+		if (!MuiPropRangeStateRecordCodec.TryReadStructural(ref platform,
+			rangeAddress, out rangeRead) || rangeRead.Magic != 0) return 7;
+		if (MuiPropPolicyStateRecordCodec.TryRead(ref platform, policyAddress,
+			out _) || MuiPropRangeStateRecordCodec.TryRead(ref platform, rangeAddress,
+			out _)) return 8;
+		return 42;
+	}
+
+	// MG1078 Rectangle/Scrollbar admission proof. Decorative bars and group
+	// geometry remain complete named records; malformed cookies stay
+	// structurally readable but fail strict admission.
+	public static uint RectangleScrollbarAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var rectangleAddress = APTR.FromPointer(0x37280);
+		var scrollbarAddress = APTR.FromPointer(0x372A0);
+		var rectangle = new MuiRectanglePresentationStateRecord
+		{
+			Magic = MuiRectanglePresentationStateRecord.Cookie,
+			HorizontalBar = 1,
+			VerticalBar = 0,
+		};
+		var scrollbar = new MuiScrollbarLayoutStateRecord
+		{
+			Magic = MuiScrollbarLayoutStateRecord.Cookie,
+			Horizontal = 1,
+			Type = 3,
+		};
+		if (!MuiRectanglePresentationStateRecordCodec.Write(ref platform,
+			rectangleAddress, rectangle)) return 1;
+		if (!MuiScrollbarLayoutStateRecordCodec.Write(ref platform,
+			scrollbarAddress, scrollbar)) return 2;
+		if (!MuiRectanglePresentationStateRecordCodec.TryRead(ref platform,
+			rectangleAddress, out var rectangleRead) ||
+			rectangleRead.HorizontalBar != rectangle.HorizontalBar) return 3;
+		if (!MuiScrollbarLayoutStateRecordCodec.TryRead(ref platform,
+			scrollbarAddress, out var scrollbarRead) ||
+			scrollbarRead.Type != scrollbar.Type) return 4;
+		if (!MuiRectanglePresentationStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, rectangleAddress,
+			MuiRectanglePresentationStateField.Magic, 0) ||
+			!MuiScrollbarLayoutStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				scrollbarAddress, MuiScrollbarLayoutStateField.Magic, 0)) return 5;
+		if (!MuiRectanglePresentationStateRecordCodec.TryReadStructural(
+			ref platform, rectangleAddress, out rectangleRead) ||
+			rectangleRead.Magic != 0) return 6;
+		if (!MuiScrollbarLayoutStateRecordCodec.TryReadStructural(ref platform,
+			scrollbarAddress, out scrollbarRead) || scrollbarRead.Magic != 0) return 7;
+		if (MuiRectanglePresentationStateRecordCodec.TryRead(ref platform,
+			rectangleAddress, out _) ||
+			MuiScrollbarLayoutStateRecordCodec.TryRead(ref platform,
+				scrollbarAddress, out _)) return 8;
+		return 42;
+	}
+
+	// MG1079 Selectgroup/Scrollgroup admission proof. Active selection,
+	// scrollbar policy, and viewport geometry remain complete named records;
+	// malformed cookies stay structurally readable but fail strict admission.
+	public static uint SelectgroupScrollgroupAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var selectgroupAddress = APTR.FromPointer(0x37300);
+		var policyAddress = APTR.FromPointer(0x37320);
+		var viewportAddress = APTR.FromPointer(0x37350);
+		var selectgroup = new MuiSelectgroupActiveStateRecord
+		{
+			Magic = MuiSelectgroupActiveStateRecord.Cookie,
+			Active = 3,
+		};
+		var policy = new MuiScrollgroupPolicyStateRecord
+		{
+			Magic = MuiScrollgroupPolicyStateRecord.Cookie,
+			Contents = APTR.FromPointer(0x37380),
+			FreeHorizontal = 1,
+			FreeVertical = 0,
+			HorizontalBar = APTR.FromPointer(0x373A0),
+			VerticalBar = APTR.Null,
+			NoHorizontalBar = 0,
+			NoVerticalBar = 1,
+			AutoBars = 1,
+			UseWindowBorder = 0,
+		};
+		var viewport = new MuiScrollgroupViewportStateRecord
+		{
+			Magic = MuiScrollgroupViewportStateRecord.Cookie,
+			ViewportWidth = 640,
+			ViewportHeight = 480,
+			ContentWidth = 1280,
+			ContentHeight = 960,
+			MaximumScrollX = 640,
+			MaximumScrollY = 480,
+			ScrollLeft = 100,
+			ScrollTop = 200,
+			HorizontalBarVisible = 1,
+			VerticalBarVisible = 0,
+		};
+		if (!MuiSelectgroupActiveStateRecordCodec.Write(ref platform,
+			selectgroupAddress, selectgroup)) return 1;
+		if (!MuiScrollgroupPolicyStateRecordCodec.Write(ref platform,
+			policyAddress, policy)) return 2;
+		if (!MuiScrollgroupViewportStateRecordCodec.Write(ref platform,
+			viewportAddress, viewport)) return 3;
+		if (!MuiSelectgroupActiveStateRecordCodec.TryRead(ref platform,
+			selectgroupAddress, out var selectgroupRead) ||
+			selectgroupRead.Active != selectgroup.Active) return 4;
+		if (!MuiScrollgroupPolicyStateRecordCodec.TryRead(ref platform,
+			policyAddress, out var policyRead) ||
+			policyRead.Contents != policy.Contents ||
+			policyRead.NoVerticalBar != policy.NoVerticalBar) return 5;
+		if (!MuiScrollgroupViewportStateRecordCodec.TryRead(ref platform,
+			viewportAddress, out var viewportRead) ||
+			viewportRead.ScrollTop != viewport.ScrollTop ||
+			viewportRead.HorizontalBarVisible != viewport.HorizontalBarVisible)
+			return 6;
+		if (!MuiSelectgroupActiveStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, selectgroupAddress,
+			MuiSelectgroupActiveStateField.Magic, 0) ||
+			!MuiScrollgroupPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				policyAddress, MuiScrollgroupPolicyStateField.Magic, 0) ||
+			!MuiScrollgroupViewportFieldCursorCodec.TryWriteUInt32(ref platform,
+				viewportAddress, MuiScrollgroupViewportField.Magic, 0)) return 7;
+		if (!MuiSelectgroupActiveStateRecordCodec.TryReadStructural(ref platform,
+			selectgroupAddress, out selectgroupRead) ||
+			selectgroupRead.Magic != 0) return 8;
+		if (!MuiScrollgroupPolicyStateRecordCodec.TryReadStructural(ref platform,
+			policyAddress, out policyRead) || policyRead.Magic != 0) return 9;
+		if (!MuiScrollgroupViewportStateRecordCodec.TryReadStructural(ref platform,
+			viewportAddress, out viewportRead) || viewportRead.Magic != 0) return 10;
+		if (MuiSelectgroupActiveStateRecordCodec.TryRead(ref platform,
+			selectgroupAddress, out _) ||
+			MuiScrollgroupPolicyStateRecordCodec.TryRead(ref platform, policyAddress,
+				out _) ||
+			MuiScrollgroupViewportStateRecordCodec.TryRead(ref platform,
+				viewportAddress, out _)) return 11;
+		return 42;
+	}
+
+	// MG1080 Slider/Scale admission proof. Orientation and quiet-display
+	// policy remain complete named records; malformed cookies stay structurally
+	// readable but fail strict admission.
+	public static uint SliderScaleAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var sliderAddress = APTR.FromPointer(0x37400);
+		var scaleAddress = APTR.FromPointer(0x37420);
+		var slider = new MuiSliderPresentationStateRecord
+		{
+			Magic = MuiSliderPresentationStateRecord.Cookie,
+			Horizontal = 1,
+			Quiet = 0,
+		};
+		var scale = new MuiScalePresentationStateRecord
+		{
+			Magic = MuiScalePresentationStateRecord.Cookie,
+			Horizontal = 0,
+		};
+		if (!MuiSliderPresentationStateRecordCodec.Write(ref platform, sliderAddress,
+			slider)) return 1;
+		if (!MuiScalePresentationStateRecordCodec.Write(ref platform, scaleAddress,
+			scale)) return 2;
+		if (!MuiSliderPresentationStateRecordCodec.TryRead(ref platform,
+			sliderAddress, out var sliderRead) ||
+			sliderRead.Horizontal != slider.Horizontal ||
+			sliderRead.Quiet != slider.Quiet) return 3;
+		if (!MuiScalePresentationStateRecordCodec.TryRead(ref platform,
+			scaleAddress, out var scaleRead) ||
+			scaleRead.Horizontal != scale.Horizontal) return 4;
+		if (!MuiSliderPresentationStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, sliderAddress, MuiSliderPresentationStateField.Magic, 0) ||
+			!MuiScalePresentationStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				scaleAddress, MuiScalePresentationStateField.Magic, 0)) return 5;
+		if (!MuiSliderPresentationStateRecordCodec.TryReadStructural(ref platform,
+			sliderAddress, out sliderRead) || sliderRead.Magic != 0) return 6;
+		if (!MuiScalePresentationStateRecordCodec.TryReadStructural(ref platform,
+			scaleAddress, out scaleRead) || scaleRead.Magic != 0) return 7;
+		if (MuiSliderPresentationStateRecordCodec.TryRead(ref platform,
+			sliderAddress, out _) ||
+			MuiScalePresentationStateRecordCodec.TryRead(ref platform, scaleAddress,
+				out _)) return 8;
+		return 42;
+	}
+
+	// MG1081 Sleep/Volumelist admission proof. Sleep counters and Volumelist
+	// mode remain complete named records; malformed cookies stay structurally
+	// readable but fail strict admission.
+	public static uint SleepVolumelistAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var sleepAddress = APTR.FromPointer(0x37500);
+		var volumeAddress = APTR.FromPointer(0x37520);
+		var sleep = new MuiSleepStateRecord
+		{
+			Magic = MuiSleepStateRecord.Cookie,
+			Depth = 3,
+			SavedDisabled = 1,
+			Request = 3,
+		};
+		var volume = new MuiVolumelistCore.MuiVolumelistModeStateRecord
+		{
+			Magic = MuiVolumelistCore.MuiVolumelistModeStateRecord.Cookie,
+			ExampleMode = 1,
+		};
+		if (!MuiSleepStateRecordCodec.Write(ref platform, sleepAddress, sleep))
+			return 1;
+		if (!MuiVolumelistCore.MuiVolumelistModeStateRecordCodec.Write(
+			ref platform, volumeAddress, volume)) return 2;
+		if (!MuiSleepStateRecordCodec.TryRead(ref platform, sleepAddress,
+			out var sleepRead) || sleepRead.Depth != sleep.Depth ||
+			sleepRead.Request != sleep.Request) return 3;
+		if (!MuiVolumelistCore.MuiVolumelistModeStateRecordCodec.TryRead(
+			ref platform, volumeAddress, out var volumeRead) ||
+			volumeRead.ExampleMode != volume.ExampleMode) return 4;
+		if (!MuiSleepStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			sleepAddress, MuiSleepStateField.Magic, 0) ||
+			!MuiVolumelistCore.MuiVolumelistModeFieldCursorCodec.TryWriteUInt32(
+				ref platform, volumeAddress,
+				MuiVolumelistCore.MuiVolumelistModeField.Magic, 0)) return 5;
+		if (!MuiSleepStateRecordCodec.TryReadStructural(ref platform, sleepAddress,
+			out sleepRead) || sleepRead.Magic != 0) return 6;
+		if (!MuiVolumelistCore.MuiVolumelistModeStateRecordCodec
+			.TryReadStructural(ref platform, volumeAddress, out volumeRead) ||
+			volumeRead.Magic != 0) return 7;
+		if (MuiSleepStateRecordCodec.TryRead(ref platform, sleepAddress, out _) ||
+			MuiVolumelistCore.MuiVolumelistModeStateRecordCodec.TryRead(
+				ref platform, volumeAddress, out _)) return 8;
+		return 42;
+	}
+
+	// MG1082 Dirlist admission proof. Sort, filter, and scan state remain
+	// complete named records; malformed cookies stay structurally readable but
+	// fail strict admission before collection consumers.
+	public static uint DirlistAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var sortAddress = APTR.FromPointer(0x37600);
+		var filterAddress = APTR.FromPointer(0x37620);
+		var scanAddress = APTR.FromPointer(0x37660);
+		var sort = new MuiDirlistSortStateRecord
+		{
+			Magic = MuiDirlistSortStateRecord.Cookie,
+			SortType = 3,
+			SortDirs = 2,
+			SortHighLow = 1,
+		};
+		var filter = new MuiDirlistFilterStateRecord
+		{
+			Magic = MuiDirlistFilterStateRecord.Cookie,
+			AcceptPattern = APTR.Null,
+			RejectPattern = APTR.Null,
+			Pattern = APTR.Null,
+			DrawersOnly = 1,
+			FilesOnly = 0,
+			FilterDrawers = 1,
+			MultiSelDirs = 0,
+			RejectIcons = 1,
+			ExAllType = 2,
+			FilterHook = APTR.Null,
+		};
+		var scan = new MuiDirlistScanStateRecord
+		{
+			Magic = MuiDirlistScanStateRecord.Cookie,
+			Status = MuiDirlistCore.StatusValid,
+			NumFiles = 8,
+			NumDrawers = 2,
+			NumBytes = 4096,
+			IoErr = 0,
+		};
+		if (!MuiDirlistSortStateRecordCodec.Write(ref platform, sortAddress, sort))
+			return 1;
+		if (!MuiDirlistFilterStateRecordCodec.Write(ref platform, filterAddress,
+			filter)) return 2;
+		if (!MuiDirlistScanStateRecordCodec.Write(ref platform, scanAddress, scan))
+			return 3;
+		if (!MuiDirlistSortStateRecordCodec.TryRead(ref platform, sortAddress,
+			out var sortRead) || sortRead.SortType != sort.SortType ||
+			sortRead.SortHighLow != sort.SortHighLow) return 4;
+		if (!MuiDirlistFilterStateRecordCodec.TryRead(ref platform, filterAddress,
+			out var filterRead) || filterRead.DrawersOnly != filter.DrawersOnly ||
+			filterRead.ExAllType != filter.ExAllType) return 5;
+		if (!MuiDirlistScanStateRecordCodec.TryRead(ref platform, scanAddress,
+			out var scanRead) || scanRead.NumFiles != scan.NumFiles ||
+			scanRead.NumBytes != scan.NumBytes) return 6;
+		if (!MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			sortAddress, MuiDirlistRecordKind.SortState,
+			MuiDirlistRecordField.Magic, 0) ||
+			!MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+				filterAddress, MuiDirlistRecordKind.FilterState,
+				MuiDirlistRecordField.Magic, 0) ||
+			!MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+				scanAddress, MuiDirlistRecordKind.ScanState,
+				MuiDirlistRecordField.Magic, 0)) return 7;
+		if (!MuiDirlistSortStateRecordCodec.TryReadStructural(ref platform,
+			sortAddress, out sortRead) || sortRead.Magic != 0) return 8;
+		if (!MuiDirlistFilterStateRecordCodec.TryReadStructural(ref platform,
+			filterAddress, out filterRead) || filterRead.Magic != 0) return 9;
+		if (!MuiDirlistScanStateRecordCodec.TryReadStructural(ref platform,
+			scanAddress, out scanRead) || scanRead.Magic != 0) return 10;
+		if (MuiDirlistSortStateRecordCodec.TryRead(ref platform, sortAddress, out _) ||
+			MuiDirlistFilterStateRecordCodec.TryRead(ref platform, filterAddress,
+				out _) || MuiDirlistScanStateRecordCodec.TryRead(ref platform,
+				scanAddress, out _)) return 11;
+		return 42;
+	}
+
+	// MG1083 color-specialist admission proof. Pendisplay state keeps the full
+	// named specialist record and guest-owned sidecar pointers; malformed
+	// cookies remain structurally readable but fail strict admission.
+	public static uint ColorAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x37780);
+		var value = new MuiColorSpecialistState
+		{
+			Magic = MuiColorSpecialistState.Cookie,
+			Class = (uint)MuiColorSpecialistClass.Pendisplay,
+			Flags = 0,
+			RenderInfo = APTR.Null,
+			DrawState = APTR.Null,
+			Pen = 0,
+			SpecBlock = APTR.FromPointer(0x37800),
+			RgbBlock = APTR.FromPointer(0x37840),
+			Reference = APTR.Null,
+			ModeID = 7,
+			Alpha = uint.MaxValue,
+			Entries = APTR.Null,
+			Names = APTR.Null,
+			NotifyAttribute = 1,
+			NotifyValue = 2,
+			NotifyCount = 3,
+		};
+		if (!MuiColorSpecialistStateCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiColorSpecialistStateCodec.TryRead(ref platform, address,
+			out var read) || read.Magic != value.Magic ||
+			read.SpecBlock != value.SpecBlock || read.RgbBlock != value.RgbBlock)
+			return 2;
+		if (!MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiColorRecordKind.State, MuiColorRecordField.Magic, 0)) return 3;
+		if (!MuiColorSpecialistStateCodec.TryReadStructural(ref platform, address,
+			out read) || read.Magic != 0) return 4;
+		if (MuiColorSpecialistStateCodec.TryRead(ref platform, address, out _))
+			return 5;
+		return 42;
+	}
+
+	// MG1084 Virtgroup/Scrollgroup admission proof. Layout, display, pointer,
+	// and policy state remain complete named records; malformed cookies stay
+	// structurally readable but fail strict admission.
+	public static uint VirtgroupAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var layoutAddress = APTR.FromPointer(0x37900);
+		var scrollAddress = APTR.FromPointer(0x37940);
+		var displayAddress = APTR.FromPointer(0x37980);
+		var pointerAddress = APTR.FromPointer(0x379A0);
+		var policyAddress = APTR.FromPointer(0x379E0);
+		var layout = new MuiVirtgroupLayoutStateRecord
+		{
+			Magic = MuiVirtgroupLayoutStateRecord.Cookie,
+			Width = 320,
+			Height = 180,
+			Left = 12,
+			Top = 7,
+			TryFit = 1,
+		};
+		var scroll = new MuiScrollgroupLayoutStateRecord
+		{
+			Magic = MuiScrollgroupLayoutStateRecord.Cookie,
+			Contents = APTR.FromPointer(0x37A00),
+			FreeHorizontal = 1,
+			FreeVertical = 1,
+			HorizontalBar = APTR.FromPointer(0x37A40),
+			VerticalBar = APTR.FromPointer(0x37A80),
+			NoHorizontalBar = 0,
+			NoVerticalBar = 1,
+		};
+		var display = new MuiVirtgroupDisplayStateRecord
+		{
+			Magic = MuiVirtgroupDisplayStateRecord.Cookie,
+			Left = 10,
+			Top = 15,
+			Width = 100,
+			Height = 80,
+		};
+		var pointer = new MuiVirtgroupPointerStateRecord
+		{
+			Magic = MuiVirtgroupPointerStateRecord.Cookie,
+			Flags = MuiVirtgroupPointerStateRecord.ActiveFlag |
+				MuiVirtgroupPointerStateRecord.CapturedFlag,
+			StartX = 50,
+			StartY = 40,
+			StartLeft = 30,
+			StartTop = 20,
+			LastX = 42,
+			LastY = 31,
+		};
+		var policy = new MuiVirtgroupPolicyStateRecord
+		{
+			Magic = MuiVirtgroupPolicyStateRecord.Cookie,
+			Input = 1,
+			Width = 300,
+			Height = 180,
+			Left = -15,
+			Top = 20,
+			TryFit = 0,
+		};
+		if (!MuiVirtgroupLayoutStateRecordCodec.Write(ref platform, layoutAddress,
+			layout) || !MuiScrollgroupLayoutStateRecordCodec.Write(ref platform,
+			scrollAddress, scroll) || !MuiVirtgroupDisplayStateRecordCodec.Write(
+			ref platform, displayAddress, display) ||
+			!MuiVirtgroupPointerStateRecordCodec.Write(ref platform, pointerAddress,
+				pointer) || !MuiVirtgroupPolicyStateRecordCodec.Write(ref platform,
+				policyAddress, policy)) return 1;
+		if (!MuiVirtgroupLayoutStateRecordCodec.TryRead(ref platform, layoutAddress,
+			out var readLayout) || readLayout.Width != layout.Width ||
+			readLayout.Left != layout.Left) return 2;
+		if (!MuiScrollgroupLayoutStateRecordCodec.TryRead(ref platform,
+			scrollAddress, out var readScroll) ||
+			readScroll.Contents != scroll.Contents ||
+			readScroll.NoVerticalBar != scroll.NoVerticalBar) return 3;
+		if (!MuiVirtgroupDisplayStateRecordCodec.TryRead(ref platform,
+			displayAddress, out var readDisplay) ||
+			readDisplay.Width != display.Width) return 4;
+		if (!MuiVirtgroupPointerStateRecordCodec.TryRead(ref platform,
+			pointerAddress, out var readPointer) ||
+			readPointer.StartLeft != pointer.StartLeft ||
+			readPointer.Flags != pointer.Flags) return 5;
+		if (!MuiVirtgroupPolicyStateRecordCodec.TryRead(ref platform, policyAddress,
+			out var readPolicy) || readPolicy.Left != policy.Left ||
+			readPolicy.Input != policy.Input) return 6;
+		if (!MuiVirtgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform,
+			layoutAddress, MuiVirtgroupLayoutField.Magic, 0) ||
+			!MuiScrollgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform,
+				scrollAddress, MuiScrollgroupLayoutField.Magic, 0) ||
+			!MuiVirtgroupInputFieldCursorCodec.TryWriteUInt32(ref platform,
+				displayAddress, MuiVirtgroupInputRecordKind.Display,
+				MuiVirtgroupInputField.Magic, 0) ||
+			!MuiVirtgroupInputFieldCursorCodec.TryWriteUInt32(ref platform,
+				pointerAddress, MuiVirtgroupInputRecordKind.Pointer,
+				MuiVirtgroupInputField.Magic, 0) ||
+			!MuiVirtgroupPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				policyAddress, MuiVirtgroupPolicyStateField.Magic, 0)) return 7;
+		if (!MuiVirtgroupLayoutStateRecordCodec.TryReadStructural(ref platform,
+			layoutAddress, out readLayout) || readLayout.Magic != 0 ||
+			MuiVirtgroupLayoutStateRecordCodec.TryRead(ref platform, layoutAddress,
+				out _)) return 8;
+		if (!MuiScrollgroupLayoutStateRecordCodec.TryReadStructural(ref platform,
+			scrollAddress, out readScroll) || readScroll.Magic != 0 ||
+			MuiScrollgroupLayoutStateRecordCodec.TryRead(ref platform, scrollAddress,
+				out _)) return 9;
+		if (!MuiVirtgroupDisplayStateRecordCodec.TryReadStructural(ref platform,
+			displayAddress, out readDisplay) || readDisplay.Magic != 0 ||
+			MuiVirtgroupDisplayStateRecordCodec.TryRead(ref platform, displayAddress,
+				out _)) return 10;
+		if (!MuiVirtgroupPointerStateRecordCodec.TryReadStructural(ref platform,
+			pointerAddress, out readPointer) || readPointer.Magic != 0 ||
+			MuiVirtgroupPointerStateRecordCodec.TryRead(ref platform, pointerAddress,
+				out _)) return 11;
+		if (!MuiVirtgroupPolicyStateRecordCodec.TryReadStructural(ref platform,
+			policyAddress, out readPolicy) || readPolicy.Magic != 0 ||
+			MuiVirtgroupPolicyStateRecordCodec.TryRead(ref platform, policyAddress,
+				out _)) return 12;
+		return 42;
+	}
+
+	// MG1085 menu-specialist admission proof. The 52-byte sidecar remains a
+	// complete named record; malformed cookies stay structurally readable but
+	// fail strict admission before menu consumers.
+	public static uint MenuAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x37A00);
+		var value = new MuiMenuSpecialistState
+		{
+			Magic = MuiMenuSpecialistState.Cookie,
+			Class = (uint)MuiMenuSpecialistClass.Menu,
+			ChangeDepth = 2,
+			TitleOwned = APTR.Null,
+			TitleOwnedSize = 0,
+			ShortcutOwned = APTR.Null,
+			ShortcutOwnedSize = 0,
+			Flags = MuiMenuSpecialistLayout.FlagCaseSensitive,
+			Trigger = 0x80421234,
+			NotifyAttribute = 1,
+			NotifyValue = 2,
+			NotifyCount = 3,
+			Reserved0 = 0,
+		};
+		if (!MuiMenuSpecialistStateCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiMenuSpecialistStateCodec.TryRead(ref platform, address,
+			out var read) || read.Magic != value.Magic ||
+			read.Class != value.Class || read.Flags != value.Flags) return 2;
+		if (!MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiMenuRecordField.Magic, 0)) return 3;
+		if (!MuiMenuSpecialistStateCodec.TryReadStructural(ref platform, address,
+			out read) || read.Magic != 0) return 4;
+		if (MuiMenuSpecialistStateCodec.TryRead(ref platform, address, out _))
+			return 5;
+		return 42;
+	}
+
+	// MG1086 Pop* specialist admission proof. The 108-byte family state remains
+	// a complete named record; malformed cookies stay structurally readable but
+	// fail strict admission before hooks, ASL, windows, or disposal.
+	public static uint PopAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x37B00);
+		var value = new MuiPopSpecialistState
+		{
+			Magic = MuiPopSpecialistState.Cookie,
+			Class = (uint)MuiPopSpecialistClass.Popstring,
+			Flags = MuiPopSpecialistLayout.FlagToggle,
+			AslType = 3,
+			Selected = 7,
+			NotifyAttribute = 1,
+			NotifyValue = 2,
+			NotifyCount = 3,
+		};
+		if (!MuiPopSpecialistStateCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiPopSpecialistStateCodec.TryRead(ref platform, address,
+			out var read) || read.Magic != value.Magic ||
+			read.Class != value.Class || read.Flags != value.Flags ||
+			read.AslType != value.AslType) return 2;
+		if (!MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiPopSpecialistRecordField.Magic, 0)) return 3;
+		if (!MuiPopSpecialistStateCodec.TryReadStructural(ref platform, address,
+			out read) || read.Magic != 0) return 4;
+		if (MuiPopSpecialistStateCodec.TryRead(ref platform, address, out _))
+			return 5;
+		return 42;
+	}
+
+	// MG1087 Misc specialist admission proof. The shared 24-byte header remains
+	// a complete named record; malformed cookies stay structurally readable but
+	// fail strict admission before class-owned specialist regions are consumed.
+	public static uint MiscAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x37C00);
+		var value = new MuiMiscSpecialistHeader
+		{
+			Magic = MuiMiscSpecialistHeader.Cookie,
+			Class = (uint)MuiMiscSpecialistClass.Keyadjust,
+			Flags = MuiMiscSpecialistLayout.FlagKaMultipleKeys,
+			NotifyAttribute = 1,
+			NotifyValue = 2,
+			NotifyCount = 3,
+		};
+		if (!MuiMiscSpecialistHeaderCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiMiscSpecialistHeaderCodec.TryRead(ref platform, address,
+			out var read) || read.Magic != value.Magic ||
+			read.Class != value.Class || read.Flags != value.Flags ||
+			read.NotifyCount != value.NotifyCount) return 2;
+		if (!MuiMiscRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiMiscRecordKind.Header, MuiMiscRecordField.Magic, 0)) return 3;
+		if (!MuiMiscSpecialistHeaderCodec.TryReadStructural(ref platform, address,
+			out read) || read.Magic != 0) return 4;
+		if (MuiMiscSpecialistHeaderCodec.TryRead(ref platform, address, out _))
+			return 5;
+		return 42;
+	}
+
+	// MG1088 Stringscroll admission proof. Content, policy, scrollbar, and
+	// composition state remain complete named records; malformed cookies stay
+	// structurally readable but fail strict admission.
+	public static uint StringscrollAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var stateAddress = APTR.FromPointer(0x37D00);
+		var policyAddress = APTR.FromPointer(0x37D40);
+		var scrollbarAddress = APTR.FromPointer(0x37D80);
+		var compositionAddress = APTR.FromPointer(0x37DA0);
+		var state = new MuiStringscrollStateRecord
+		{
+			Magic = MuiStringscrollStateRecord.Cookie,
+			String = APTR.FromPointer(0x37E00),
+			ContentWidth = 640,
+			ContentHeight = 24,
+			ScrollX = 17,
+			ScrollY = 3,
+		};
+		var policy = new MuiStringscrollPolicyRecord
+		{
+			Magic = MuiStringscrollPolicyRecord.Cookie,
+			HorizBar = 1,
+			SetMin = 1,
+			UseWinBorder = 1,
+			VertBar = 1,
+		};
+		var scrollbar = new MuiStringscrollScrollbarRecord
+		{
+			Magic = MuiStringscrollScrollbarRecord.Cookie,
+			HorizBar = APTR.FromPointer(0x37E40),
+			VertBar = APTR.FromPointer(0x37E80),
+		};
+		var composition = new MuiStringscrollCompositionRecord
+		{
+			Magic = MuiStringscrollCompositionRecord.Cookie,
+			Horizontal = scrollbar.HorizBar,
+			Vertical = scrollbar.VertBar,
+			OwnedMask = MuiStringscrollCompositionState.HorizontalOwned |
+				MuiStringscrollCompositionState.VerticalOwned,
+			LastHorizontalFirst = 5,
+			LastVerticalFirst = 2,
+		};
+		if (!MuiStringscrollStateRecordCodec.Write(ref platform, stateAddress,
+			state) || !MuiStringscrollPolicyRecordCodec.Write(ref platform,
+			policyAddress, policy) ||
+			!MuiStringscrollScrollbarRecordCodec.Write(ref platform,
+				scrollbarAddress, scrollbar) ||
+			!MuiStringscrollCompositionRecordCodec.Write(ref platform,
+				compositionAddress, composition)) return 1;
+		if (!MuiStringscrollStateRecordCodec.TryRead(ref platform, stateAddress,
+			out var readState) || readState.String != state.String ||
+			readState.ScrollX != state.ScrollX) return 2;
+		if (!MuiStringscrollPolicyRecordCodec.TryRead(ref platform, policyAddress,
+			out var readPolicy) || readPolicy.SetMin != policy.SetMin ||
+			readPolicy.VertBar != policy.VertBar) return 3;
+		if (!MuiStringscrollScrollbarRecordCodec.TryRead(ref platform,
+			scrollbarAddress, out var readScrollbar) ||
+			readScrollbar.VertBar != scrollbar.VertBar) return 4;
+		if (!MuiStringscrollCompositionRecordCodec.TryRead(ref platform,
+			compositionAddress, out var readComposition) ||
+			readComposition.OwnedMask != composition.OwnedMask ||
+			readComposition.LastVerticalFirst != composition.LastVerticalFirst) return 5;
+		if (!MuiStringscrollStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			stateAddress, MuiStringscrollStateField.Magic, 0) ||
+			!MuiStringscrollPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
+				policyAddress, MuiStringscrollPolicyField.Magic, 0) ||
+			!MuiStringscrollScrollbarFieldCursorCodec.TryWriteUInt32(ref platform,
+				scrollbarAddress, MuiStringscrollScrollbarField.Magic, 0) ||
+			!MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(ref platform,
+				compositionAddress, MuiStringscrollCompositionField.Magic, 0)) return 6;
+		if (!MuiStringscrollStateRecordCodec.TryReadStructural(ref platform,
+			stateAddress, out readState) || readState.Magic != 0 ||
+			MuiStringscrollStateRecordCodec.TryRead(ref platform, stateAddress,
+				out _)) return 7;
+		if (!MuiStringscrollPolicyRecordCodec.TryReadStructural(ref platform,
+			policyAddress, out readPolicy) || readPolicy.Magic != 0 ||
+			MuiStringscrollPolicyRecordCodec.TryRead(ref platform, policyAddress,
+				out _)) return 8;
+		if (!MuiStringscrollScrollbarRecordCodec.TryReadStructural(ref platform,
+			scrollbarAddress, out readScrollbar) || readScrollbar.Magic != 0 ||
+			MuiStringscrollScrollbarRecordCodec.TryRead(ref platform,
+				scrollbarAddress, out _)) return 9;
+		if (!MuiStringscrollCompositionRecordCodec.TryReadStructural(ref platform,
+			compositionAddress, out readComposition) || readComposition.Magic != 0 ||
+			MuiStringscrollCompositionRecordCodec.TryRead(ref platform,
+				compositionAddress, out _)) return 10;
+		return 42;
+	}
+
+	// MG1089 Stringscroll layout/render/viewport admission proof. Signed geometry,
+	// render pointers, and bounded viewport state remain complete named records;
+	// malformed cookies stay structurally readable but fail strict admission.
+	public static uint StringscrollLayoutAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var layoutAddress = APTR.FromPointer(0x37EA0);
+		var renderAddress = APTR.FromPointer(0x37EE0);
+		var viewportAddress = APTR.FromPointer(0x37F00);
+		var layout = new MuiStringscrollLayoutStateRecord
+		{
+			Magic = MuiStringscrollLayoutStateRecord.Cookie,
+			Left = 12,
+			Top = 7,
+			Width = 320,
+			Height = 180,
+		};
+		var render = new MuiStringscrollRenderStateRecord
+		{
+			Magic = MuiStringscrollRenderStateRecord.Cookie,
+			RenderInfo = APTR.FromPointer(0x37F40),
+			RastPort = APTR.FromPointer(0x37F80),
+			Font = APTR.FromPointer(0x37FC0),
+		};
+		var viewport = new MuiStringscrollViewportStateRecord
+		{
+			Magic = MuiStringscrollViewportStateRecord.Cookie,
+			ViewportWidth = 100,
+			ViewportHeight = 80,
+			HorizontalVisible = 1,
+			VerticalVisible = 0,
+			MaxScrollX = 220,
+			MaxScrollY = 100,
+		};
+		if (!MuiStringscrollLayoutStateRecordCodec.Write(ref platform, layoutAddress,
+			layout) || !MuiStringscrollRenderStateRecordCodec.Write(ref platform,
+			renderAddress, render) ||
+			!MuiStringscrollViewportStateRecordCodec.Write(ref platform,
+				viewportAddress, viewport)) return 1;
+		if (!MuiStringscrollLayoutStateRecordCodec.TryRead(ref platform,
+			layoutAddress, out var readLayout) || readLayout.Left != layout.Left ||
+			readLayout.Height != layout.Height) return 2;
+		if (!MuiStringscrollRenderStateRecordCodec.TryRead(ref platform,
+			renderAddress, out var readRender) ||
+			readRender.RenderInfo != render.RenderInfo ||
+			readRender.Font != render.Font) return 3;
+		if (!MuiStringscrollViewportStateRecordCodec.TryRead(ref platform,
+			viewportAddress, out var readViewport) ||
+			readViewport.ViewportWidth != viewport.ViewportWidth ||
+			readViewport.MaxScrollY != viewport.MaxScrollY) return 4;
+		if (!MuiStringscrollLayoutStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			layoutAddress, MuiStringscrollLayoutStateField.Magic, 0) ||
+			!MuiStringscrollRenderStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				renderAddress, MuiStringscrollRenderStateField.Magic, 0) ||
+			!MuiStringscrollViewportStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				viewportAddress, MuiStringscrollViewportStateField.Magic, 0)) return 5;
+		if (!MuiStringscrollLayoutStateRecordCodec.TryReadStructural(ref platform,
+			layoutAddress, out readLayout) || readLayout.Magic != 0 ||
+			MuiStringscrollLayoutStateRecordCodec.TryRead(ref platform, layoutAddress,
+				out _)) return 6;
+		if (!MuiStringscrollRenderStateRecordCodec.TryReadStructural(ref platform,
+			renderAddress, out readRender) || readRender.Magic != 0 ||
+			MuiStringscrollRenderStateRecordCodec.TryRead(ref platform, renderAddress,
+				out _)) return 7;
+		if (!MuiStringscrollViewportStateRecordCodec.TryReadStructural(ref platform,
+			viewportAddress, out readViewport) || readViewport.Magic != 0 ||
+			MuiStringscrollViewportStateRecordCodec.TryRead(ref platform,
+				viewportAddress, out _)) return 8;
+		return 42;
+	}
+
+	// MG1090 Listtree policy, hook-pool, and click state admission proof. Each
+	// private state block is a complete named struct; malformed cookies remain
+	// structurally readable but fail the strict consumer path.
+	public static uint ListtreePolicyHookPoolClickAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var policyAddress = APTR.FromPointer(0x38000);
+		var poolAddress = APTR.FromPointer(0x38040);
+		var clickAddress = APTR.FromPointer(0x38080);
+		var policy = new MuiListtreeCore.MuiListtreePolicyStateRecord
+		{
+			Magic = MuiListtreeCore.MuiListtreePolicyStateRecord.Cookie,
+			Active = APTR.FromPointer(0x38100),
+			DuplicateNodeName = 1,
+			DragDropSort = 1,
+			DoubleClick = 0xFFFFFFFF,
+			CloseHook = APTR.FromPointer(0x38140),
+			ConstructHook = APTR.FromPointer(0x38180),
+			DestructHook = APTR.FromPointer(0x381C0),
+			DisplayHook = APTR.FromPointer(0x38200),
+			OpenHook = APTR.FromPointer(0x38240),
+			SortHook = APTR.FromPointer(0x38280),
+		};
+		var pool = new MuiListtreeCore.MuiListtreeHookPoolStateRecord
+		{
+			Magic = MuiListtreeCore.MuiListtreeHookPoolStateRecord.Cookie,
+			Pool = APTR.FromPointer(0x38300),
+			Requirements = 8,
+			PuddleSize = 1024,
+			ThresholdSize = 4096,
+			Owned = 1,
+		};
+		var click = new MuiListtreeCore.MuiListtreeClickState
+		{
+			Magic = MuiListtreeCore.MuiListtreeClickState.Cookie,
+			LastNode = APTR.FromPointer(0x38340),
+			LastSeconds = 10,
+			LastMicros = 20,
+			Clicks = 2,
+			TimestampValid = 2,
+			DoubleClick = 7,
+		};
+		if (!MuiListtreeCore.MuiListtreePolicyStateRecordCodec.Write(ref platform,
+			policyAddress, policy) ||
+			!MuiListtreeCore.MuiListtreeHookPoolStateRecordCodec.Write(ref platform,
+				poolAddress, pool) ||
+			!MuiListtreeCore.MuiListtreeClickStateCodec.Write(ref platform,
+				clickAddress, click)) return 1;
+		if (!MuiListtreeCore.MuiListtreePolicyStateRecordCodec.TryRead(ref platform,
+			policyAddress, out var readPolicy) ||
+			readPolicy.SortHook != policy.SortHook) return 2;
+		if (!MuiListtreeCore.MuiListtreeHookPoolStateRecordCodec.TryRead(ref platform,
+			poolAddress, out var readPool) || readPool.Pool != pool.Pool ||
+			readPool.Owned != pool.Owned) return 3;
+		if (!MuiListtreeCore.MuiListtreeClickStateCodec.TryRead(ref platform,
+			clickAddress, out var readClick) || readClick.LastNode != click.LastNode ||
+			readClick.TimestampValid != 1 || readClick.DoubleClick != 1) return 4;
+		if (!MuiListtreeCore.MuiListtreePolicyFieldCursorCodec.TryWriteUInt32(
+			ref platform, policyAddress, MuiListtreeCore.MuiListtreePolicyField.Magic,
+			0) || !MuiListtreeCore.MuiListtreeHookPoolFieldCursorCodec.TryWriteUInt32(
+			ref platform, poolAddress, MuiListtreeCore.MuiListtreeHookPoolField.Magic,
+			0) || !MuiListtreeCore.MuiListtreeClickStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, clickAddress, MuiListtreeCore.MuiListtreeClickStateField.Magic,
+			0)) return 5;
+		if (!MuiListtreeCore.MuiListtreePolicyStateRecordCodec.TryReadStructural(
+			ref platform, policyAddress, out readPolicy) || readPolicy.Magic != 0 ||
+			MuiListtreeCore.MuiListtreePolicyStateRecordCodec.TryRead(ref platform,
+				policyAddress, out _)) return 6;
+		if (!MuiListtreeCore.MuiListtreeHookPoolStateRecordCodec.TryReadStructural(
+			ref platform, poolAddress, out readPool) || readPool.Magic != 0 ||
+			MuiListtreeCore.MuiListtreeHookPoolStateRecordCodec.TryRead(ref platform,
+				poolAddress, out _)) return 7;
+		if (!MuiListtreeCore.MuiListtreeClickStateCodec.TryReadStructural(ref platform,
+			clickAddress, out readClick) || readClick.Magic != 0 ||
+			MuiListtreeCore.MuiListtreeClickStateCodec.TryRead(ref platform,
+				clickAddress, out _)) return 8;
+		return 42;
+	}
+
+	// MG1091 Listtree click-column, surface, and lifecycle admission proof.
+	// Signed geometry, lifecycle flags, and column validity remain complete
+	// named records with a strict cookie gate.
+	public static uint ListtreeClickColumnSurfaceLifecycleAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var columnAddress = APTR.FromPointer(0x38400);
+		var surfaceAddress = APTR.FromPointer(0x38440);
+		var lifecycleAddress = APTR.FromPointer(0x38480);
+		var column = new MuiListtreeCore.MuiListtreeClickColumnState
+		{
+			Magic = MuiListtreeCore.MuiListtreeClickColumnState.Cookie,
+			LastColumn = 3,
+			Valid = 2,
+		};
+		var surface = new MuiListtreeCore.MuiListtreeSurfaceStateRecord
+		{
+			Magic = MuiListtreeCore.MuiListtreeSurfaceStateRecord.Cookie,
+			Left = -4,
+			Top = 8,
+			Width = 320,
+			Height = 180,
+			RowHeight = 12,
+			FirstVisible = 5,
+		};
+		var lifecycle = new MuiListtreeCore.MuiListtreeLifecycleStateRecord
+		{
+			Magic = MuiListtreeCore.MuiListtreeLifecycleStateRecord.Cookie,
+			RenderInfo = APTR.FromPointer(0x38500),
+			Setup = 1,
+			Shown = 1,
+		};
+		if (!MuiListtreeCore.MuiListtreeClickColumnStateCodec.Write(ref platform,
+			columnAddress, column) ||
+			!MuiListtreeCore.MuiListtreeSurfaceStateRecordCodec.Write(ref platform,
+				surfaceAddress, surface) ||
+			!MuiListtreeCore.MuiListtreeLifecycleStateRecordCodec.Write(ref platform,
+				lifecycleAddress, lifecycle)) return 1;
+		if (!MuiListtreeCore.MuiListtreeClickColumnStateCodec.TryRead(ref platform,
+			columnAddress, out var readColumn) || readColumn.LastColumn != 3 ||
+			readColumn.Valid != 1) return 2;
+		if (!MuiListtreeCore.MuiListtreeSurfaceStateRecordCodec.TryRead(ref platform,
+			surfaceAddress, out var readSurface) || readSurface.Left != -4 ||
+			readSurface.Height != 180) return 3;
+		if (!MuiListtreeCore.MuiListtreeLifecycleStateRecordCodec.TryRead(ref platform,
+			lifecycleAddress, out var readLifecycle) ||
+			readLifecycle.RenderInfo != lifecycle.RenderInfo ||
+			readLifecycle.Shown != 1) return 4;
+		if (!MuiListtreeCore.MuiListtreeClickColumnFieldCursorCodec.TryWriteUInt32(
+			ref platform, columnAddress,
+			MuiListtreeCore.MuiListtreeClickColumnField.Magic, 0) ||
+			!MuiListtreeCore.MuiListtreeSurfaceFieldCursorCodec.TryWriteUInt32(
+				ref platform, surfaceAddress,
+				MuiListtreeCore.MuiListtreeSurfaceField.Magic, 0) ||
+			!MuiListtreeCore.MuiListtreeLifecycleFieldCursorCodec.TryWriteUInt32(
+				ref platform, lifecycleAddress,
+				MuiListtreeCore.MuiListtreeLifecycleField.Magic, 0)) return 5;
+		if (!MuiListtreeCore.MuiListtreeClickColumnStateCodec.TryReadStructural(
+			ref platform, columnAddress, out readColumn) || readColumn.Magic != 0 ||
+			MuiListtreeCore.MuiListtreeClickColumnStateCodec.TryRead(ref platform,
+				columnAddress, out _)) return 6;
+		if (!MuiListtreeCore.MuiListtreeSurfaceStateRecordCodec.TryReadStructural(
+			ref platform, surfaceAddress, out readSurface) || readSurface.Magic != 0 ||
+			MuiListtreeCore.MuiListtreeSurfaceStateRecordCodec.TryRead(ref platform,
+				surfaceAddress, out _)) return 7;
+		if (!MuiListtreeCore.MuiListtreeLifecycleStateRecordCodec.TryReadStructural(
+			ref platform, lifecycleAddress, out readLifecycle) ||
+			readLifecycle.Magic != 0 ||
+			MuiListtreeCore.MuiListtreeLifecycleStateRecordCodec.TryRead(ref platform,
+				lifecycleAddress, out _)) return 8;
+		return 42;
+	}
+
+	// MG1092 Listtree header and presentation admission proof. Root topology,
+	// counters, drop-mark state, and presentation attributes remain complete
+	// named records with structural diagnostics and strict cookie admission.
+	public static uint ListtreeHeaderPresentationAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var headerAddress = APTR.FromPointer(0x38600);
+		var presentationAddress = APTR.FromPointer(0x38640);
+		var header = new MuiListtreeCore.MuiListtreeHeaderState
+		{
+			Magic = MuiListtreeCore.MuiListtreeHeaderState.Cookie,
+			RootFirst = APTR.FromPointer(0x38700),
+			RootLast = APTR.FromPointer(0x38740),
+			RootCount = 2,
+			Total = 5,
+			Redraw = 1,
+			Dirty = 1,
+			DropEntry = -3,
+			DropValue = 4,
+			Reserved0 = 0x10,
+			Reserved1 = 0x20,
+			Reserved2 = 0x30,
+		};
+		var presentation = new MuiListtreePresentationStateRecord
+		{
+			Magic = MuiListtreePresentationStateRecord.Cookie,
+			EmptyNodes = 1,
+			Format = APTR.FromPointer(0x38780),
+			MultiSelect = 1,
+			NList = 0,
+			Title = 3,
+			TreeColumn = 2,
+		};
+		if (!MuiListtreeCore.MuiListtreeHeaderCodec.Write(ref platform, headerAddress,
+			header) || !MuiListtreePresentationStateRecordCodec.Write(ref platform,
+				presentationAddress, presentation)) return 1;
+		if (!MuiListtreeCore.MuiListtreeHeaderCodec.TryRead(ref platform,
+			headerAddress, out var readHeader) || readHeader.RootFirst != header.RootFirst ||
+			readHeader.DropEntry != header.DropEntry ||
+			readHeader.Reserved2 != header.Reserved2) return 2;
+		if (!MuiListtreePresentationStateRecordCodec.TryRead(ref platform,
+			presentationAddress, out var readPresentation) ||
+			readPresentation.Format != presentation.Format ||
+			readPresentation.Title != 1) return 3;
+		if (!MuiListtreeCore.MuiListtreeHeaderFieldCursorCodec.TryWriteUInt32(
+			ref platform, headerAddress, MuiListtreeCore.MuiListtreeHeaderField.Magic,
+			0) || !MuiListtreePresentationFieldCursorCodec.TryWriteUInt32(ref platform,
+				presentationAddress, MuiListtreePresentationField.Magic, 0)) return 4;
+		if (!MuiListtreeCore.MuiListtreeHeaderCodec.TryReadStructural(ref platform,
+			headerAddress, out readHeader) || readHeader.Magic != 0 ||
+			readHeader.RootCount != header.RootCount ||
+			MuiListtreeCore.MuiListtreeHeaderCodec.TryRead(ref platform, headerAddress,
+				out _)) return 5;
+		if (!MuiListtreePresentationStateRecordCodec.TryReadStructural(ref platform,
+			presentationAddress, out readPresentation) || readPresentation.Magic != 0 ||
+			readPresentation.Title != presentation.Title ||
+			MuiListtreePresentationStateRecordCodec.TryRead(ref platform,
+				presentationAddress, out _)) return 6;
+		return 42;
+	}
+
+	// MG1093 Listtree node and display-snapshot admission proof. The complete
+	// topology/ownership record and draw snapshot are structurally readable with
+	// strict cookie admission kept at the consumer boundary.
+	public static uint ListtreeNodeSnapshotAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var nodeAddress = APTR.FromPointer(0x38800);
+		var snapshotAddress = APTR.FromPointer(0x38880);
+		var node = new MuiListtreeCore.MuiListtreeNodeState
+		{
+			Private1 = MuiListtreeCore.MuiListtreeNodeState.Cookie,
+			Private2 = APTR.FromPointer(0x38900),
+			Name = APTR.FromPointer(0x38940),
+			Flags = 0,
+			User = APTR.FromPointer(0x38980),
+			PublicReserved = 0x34,
+			Parent = APTR.FromPointer(0x389C0),
+			FirstChild = APTR.FromPointer(0x38A00),
+			LastChild = APTR.FromPointer(0x38A40),
+			Next = APTR.FromPointer(0x38A80),
+			Previous = APTR.FromPointer(0x38AC0),
+			ChildCount = 3,
+			NameOwned = 1,
+			NameSize = 8,
+			UserOwned = 1,
+			Reserved0 = 1,
+			Reserved1 = 2,
+		};
+		var snapshot = new MuiListtreeCore.MuiListtreeDisplaySnapshotState
+		{
+			Magic = MuiListtreeCore.MuiListtreeDisplaySnapshotState.Cookie,
+			Node = nodeAddress,
+			Columns = 2,
+			Values = APTR.FromPointer(0x38B00),
+			DisplayFlags = MuiListtreeCore.MuiListtreeDisplaySnapshotState.DisplayOpen,
+		};
+		if (!MuiListtreeCore.MuiListtreeNodeCodec.Write(ref platform, nodeAddress,
+			node) || !MuiListtreeCore.MuiListtreeDisplaySnapshotStateCodec.Write(
+				ref platform, snapshotAddress, snapshot)) return 1;
+		if (!MuiListtreeCore.MuiListtreeNodeCodec.TryRead(ref platform, nodeAddress,
+			out var readNode) || readNode.Name != node.Name ||
+			readNode.Flags != node.Flags || readNode.ChildCount != node.ChildCount ||
+			readNode.Reserved1 != node.Reserved1) return 2;
+		if (!MuiListtreeCore.MuiListtreeDisplaySnapshotStateCodec.TryRead(ref platform,
+			snapshotAddress, out var readSnapshot) || readSnapshot.Node != snapshot.Node ||
+			readSnapshot.Values != snapshot.Values ||
+			readSnapshot.DisplayFlags != snapshot.DisplayFlags) return 3;
+		if (!MuiListtreeCore.MuiListtreeNodeFieldCursorCodec.TryWriteUInt32(
+			ref platform, nodeAddress, MuiListtreeCore.MuiListtreeNodeField.Private1,
+			0) || !MuiListtreeCore.MuiListtreeDisplaySnapshotFieldCursorCodec
+			.TryWriteUInt32(ref platform, snapshotAddress,
+				MuiListtreeCore.MuiListtreeDisplaySnapshotField.Magic, 0)) return 4;
+		if (!MuiListtreeCore.MuiListtreeNodeCodec.TryReadStructural(ref platform,
+			nodeAddress, out readNode) || readNode.Private1 != 0 ||
+			readNode.ChildCount != node.ChildCount ||
+			MuiListtreeCore.MuiListtreeNodeCodec.TryRead(ref platform, nodeAddress,
+				out _)) return 5;
+		if (!MuiListtreeCore.MuiListtreeDisplaySnapshotStateCodec.TryReadStructural(
+			ref platform, snapshotAddress, out readSnapshot) ||
+			readSnapshot.Magic != 0 || readSnapshot.Columns != snapshot.Columns ||
+			MuiListtreeCore.MuiListtreeDisplaySnapshotStateCodec.TryRead(ref platform,
+				snapshotAddress, out _)) return 6;
+		return 42;
+	}
+
+	// MG1094 Listview child, click, interaction-policy, selection-signal, and
+	// layout admission proof. Composite ownership and signed geometry stay in
+	// named guest records; strict readers retain MorphOS cookie admission.
+	public static uint ListviewCoreAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var childAddress = APTR.FromPointer(0x38C00);
+		var clickAddress = APTR.FromPointer(0x38C20);
+		var policyAddress = APTR.FromPointer(0x38C40);
+		var selectionAddress = APTR.FromPointer(0x38C60);
+		var layoutAddress = APTR.FromPointer(0x38C80);
+		var child = new MuiListviewCore.MuiListviewChildState
+		{
+			Magic = MuiListviewCore.MuiListviewChildState.Cookie,
+			Child = APTR.FromPointer(0x38D00),
+		};
+		var click = new MuiListviewCore.MuiListviewClickState
+		{
+			Magic = MuiListviewCore.MuiListviewClickState.Cookie,
+			ClickColumn = 3,
+			DoubleClick = 4,
+			AgainClick = 2,
+			Clicks = 5,
+			DefClickColumn = 1,
+		};
+		var policy = new MuiListviewCore.MuiListviewInteractionPolicyState
+		{
+			Magic = MuiListviewCore.MuiListviewInteractionPolicyState.Cookie,
+			Input = 1,
+			MultiSelect = 2,
+			ScrollerPos = 3,
+			DragType = 4,
+		};
+		var selection = new MuiListviewCore.MuiListviewSelectionSignalState
+		{
+			Magic = MuiListviewCore.MuiListviewSelectionSignalState.Cookie,
+			Value = 9,
+		};
+		var layout = new MuiListviewCore.MuiListviewLayoutState
+		{
+			Magic = MuiListviewCore.MuiListviewLayoutState.Cookie,
+			Left = -4,
+			Top = 8,
+			Width = 320,
+			Height = 180,
+			ChildLeft = 2,
+			ChildTop = 3,
+			ChildWidth = 300,
+			ChildHeight = 160,
+		};
+		if (!MuiListviewCore.MuiListviewChildStateCodec.Write(ref platform,
+			childAddress, child) || !MuiListviewCore.MuiListviewClickStateCodec.Write(
+				ref platform, clickAddress, click) ||
+			!MuiListviewCore.MuiListviewInteractionPolicyStateCodec.Write(ref platform,
+				policyAddress, policy) ||
+			!MuiListviewCore.MuiListviewSelectionSignalStateCodec.Write(ref platform,
+				selectionAddress, selection) ||
+			!MuiListviewCore.MuiListviewLayoutStateCodec.Write(ref platform,
+				layoutAddress, layout)) return 1;
+		if (!MuiListviewCore.MuiListviewChildStateCodec.TryRead(ref platform,
+			childAddress, out var readChild) || readChild.Child != child.Child) return 2;
+		if (!MuiListviewCore.MuiListviewClickStateCodec.TryRead(ref platform,
+			clickAddress, out var readClick) || readClick.ClickColumn != 3 ||
+			readClick.DoubleClick != 1 || readClick.AgainClick != 1) return 3;
+		if (!MuiListviewCore.MuiListviewInteractionPolicyStateCodec.TryRead(ref platform,
+			policyAddress, out var readPolicy) || readPolicy.DragType != 4) return 4;
+		if (!MuiListviewCore.MuiListviewSelectionSignalStateCodec.TryRead(ref platform,
+			selectionAddress, out var readSelection) || readSelection.Value != 9) return 5;
+		if (!MuiListviewCore.MuiListviewLayoutStateCodec.TryRead(ref platform,
+			layoutAddress, out var readLayout) || readLayout.Left != -4 ||
+			readLayout.ChildHeight != 160) return 6;
+		if (!MuiListviewCore.MuiListviewChildStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, childAddress, MuiListviewCore.MuiListviewChildStateField.Magic,
+			0) || !MuiListviewCore.MuiListviewClickStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, clickAddress, MuiListviewCore.MuiListviewClickStateField.Magic,
+			0) || !MuiListviewCore.MuiListviewInteractionPolicyFieldCursorCodec
+			.TryWriteUInt32(ref platform, policyAddress,
+				MuiListviewCore.MuiListviewInteractionPolicyField.Magic, 0) ||
+			!MuiListviewCore.MuiListviewSelectionSignalFieldCursorCodec.TryWriteUInt32(
+				ref platform, selectionAddress,
+				MuiListviewCore.MuiListviewSelectionSignalField.Magic, 0) ||
+			!MuiListviewCore.MuiListviewLayoutFieldCursorCodec.TryWriteUInt32(
+				ref platform, layoutAddress, MuiListviewCore.MuiListviewLayoutField.Magic,
+				0)) return 7;
+		if (!MuiListviewCore.MuiListviewChildStateCodec.TryReadStructural(ref platform,
+			childAddress, out readChild) || readChild.Magic != 0 ||
+			MuiListviewCore.MuiListviewChildStateCodec.TryRead(ref platform, childAddress,
+				out _)) return 8;
+		if (!MuiListviewCore.MuiListviewClickStateCodec.TryReadStructural(ref platform,
+			clickAddress, out readClick) || readClick.Magic != 0 ||
+			MuiListviewCore.MuiListviewClickStateCodec.TryRead(ref platform, clickAddress,
+				out _)) return 9;
+		if (!MuiListviewCore.MuiListviewInteractionPolicyStateCodec.TryReadStructural(
+			ref platform, policyAddress, out readPolicy) || readPolicy.Magic != 0 ||
+			MuiListviewCore.MuiListviewInteractionPolicyStateCodec.TryRead(ref platform,
+				policyAddress, out _)) return 10;
+		if (!MuiListviewCore.MuiListviewSelectionSignalStateCodec.TryReadStructural(
+			ref platform, selectionAddress, out readSelection) ||
+			readSelection.Magic != 0 ||
+			MuiListviewCore.MuiListviewSelectionSignalStateCodec.TryRead(ref platform,
+				selectionAddress, out _)) return 11;
+		if (!MuiListviewCore.MuiListviewLayoutStateCodec.TryReadStructural(ref platform,
+			layoutAddress, out readLayout) || readLayout.Magic != 0 ||
+			MuiListviewCore.MuiListviewLayoutStateCodec.TryRead(ref platform,
+				layoutAddress, out _)) return 12;
+		return 42;
+	}
+
+	// MG1095 Listview render, external-scroller connection, and vertical-scroller
+	// admission proof. Render pointers and bounded row ranges remain complete
+	// named records; malformed cookies fail only at strict admission.
+	public static uint ListviewRenderScrollerAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var renderAddress = APTR.FromPointer(0x39000);
+		var connectionAddress = APTR.FromPointer(0x39020);
+		var scrollerAddress = APTR.FromPointer(0x39040);
+		var render = new MuiListviewCore.MuiListviewRenderState
+		{
+			Magic = MuiListviewCore.MuiListviewRenderState.Cookie,
+			RenderInfo = APTR.FromPointer(0x39100),
+			RastPort = APTR.FromPointer(0x39140),
+		};
+		var connection = new MuiListviewCore.MuiListviewExternalScrollerConnectionState
+		{
+			Magic = MuiListviewCore.MuiListviewExternalScrollerConnectionState.Cookie,
+			Prop = APTR.FromPointer(0x39180),
+		};
+		var scroller = new MuiListviewCore.MuiListviewScrollerState
+		{
+			Magic = MuiListviewCore.MuiListviewScrollerState.Cookie,
+			Entries = 100,
+			Visible = 10,
+			First = 4,
+			MaxFirst = 90,
+		};
+		if (!MuiListviewCore.MuiListviewRenderStateCodec.Write(ref platform,
+			renderAddress, render) ||
+			!MuiListviewCore.MuiListviewExternalScrollerConnectionStateCodec.Write(
+				ref platform, connectionAddress, connection) ||
+			!MuiListviewCore.MuiListviewScrollerStateCodec.Write(ref platform,
+				scrollerAddress, scroller)) return 1;
+		if (!MuiListviewCore.MuiListviewRenderStateCodec.TryRead(ref platform,
+			renderAddress, out var readRender) || readRender.RastPort != render.RastPort)
+			return 2;
+		if (!MuiListviewCore.MuiListviewExternalScrollerConnectionStateCodec
+			.TryRead(ref platform, connectionAddress, out var readConnection) ||
+			readConnection.Prop != connection.Prop) return 3;
+		if (!MuiListviewCore.MuiListviewScrollerStateCodec.TryRead(ref platform,
+			scrollerAddress, out var readScroller) ||
+			readScroller.MaxFirst != scroller.MaxFirst) return 4;
+		if (!MuiListviewCore.MuiListviewRenderFieldCursorCodec.TryWriteUInt32(
+			ref platform, renderAddress, MuiListviewCore.MuiListviewRenderField.Magic,
+			0) || !MuiListviewCore.MuiListviewExternalScrollerConnectionFieldCursorCodec
+			.TryWriteUInt32(ref platform, connectionAddress,
+				MuiListviewCore.MuiListviewExternalScrollerConnectionField.Magic, 0) ||
+			!MuiListviewCore.MuiListviewScrollerFieldCursorCodec.TryWriteUInt32(
+				ref platform, scrollerAddress,
+				MuiListviewCore.MuiListviewScrollerField.Magic, 0)) return 5;
+		if (!MuiListviewCore.MuiListviewRenderStateCodec.TryReadStructural(ref platform,
+			renderAddress, out readRender) || readRender.Magic != 0 ||
+			MuiListviewCore.MuiListviewRenderStateCodec.TryRead(ref platform,
+				renderAddress, out _)) return 6;
+		if (!MuiListviewCore.MuiListviewExternalScrollerConnectionStateCodec
+			.TryReadStructural(ref platform, connectionAddress, out readConnection) ||
+			readConnection.Magic != 0 ||
+			MuiListviewCore.MuiListviewExternalScrollerConnectionStateCodec.TryRead(
+				ref platform, connectionAddress, out _)) return 7;
+		if (!MuiListviewCore.MuiListviewScrollerStateCodec.TryReadStructural(ref platform,
+			scrollerAddress, out readScroller) || readScroller.Magic != 0 ||
+			MuiListviewCore.MuiListviewScrollerStateCodec.TryRead(ref platform,
+				scrollerAddress, out _)) return 8;
+		return 42;
+	}
+
+	// MG1096 Listview horizontal-scroller and drag admission proof.  Track,
+	// thumb, and signed pointer fields stay in named records; strict readers
+	// reject only the malformed cookie while structural readers retain it.
+	public static uint ListviewHorizontalScrollerAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var horizontalAddress = APTR.FromPointer(0x39200);
+		var horizontalDragAddress = APTR.FromPointer(0x39240);
+		var verticalDragAddress = APTR.FromPointer(0x39280);
+		var horizontal = new MuiListviewHorizontalScrollerState
+		{
+			Magic = MuiListviewHorizontalScrollerState.Cookie,
+			TrackLeft = 0,
+			TrackTop = 1,
+			TrackRight = 240,
+			TrackBottom = 18,
+			ThumbLeft = 20,
+			ThumbTop = 1,
+			ThumbRight = 80,
+			ThumbBottom = 18,
+			ContentWidth = 1200,
+			ViewWidth = 240,
+			ScrollX = 60,
+			MaxScrollX = 960,
+		};
+		var horizontalDrag = new MuiListviewHorizontalScrollerDragState
+		{
+			Magic = MuiListviewHorizontalScrollerDragState.Cookie,
+			GrabOffset = -4,
+			StartScroll = 60,
+			LastPointer = 23,
+			Flags = MuiListviewHorizontalScrollerDragState.ActiveFlag,
+		};
+		var verticalDrag = new MuiListviewScrollerDragState
+		{
+			Magic = MuiListviewScrollerDragState.Cookie,
+			GrabOffset = 3,
+			StartFirst = 5,
+			LastPointer = 11,
+			Flags = MuiListviewScrollerDragState.CapturedFlag,
+		};
+		if (!MuiListviewHorizontalScrollerStateCodec.Write(ref platform,
+			horizontalAddress, horizontal) ||
+			!MuiListviewHorizontalScrollerDragStateCodec.Write(ref platform,
+				horizontalDragAddress, horizontalDrag) ||
+			!MuiListviewScrollerDragStateCodec.Write(ref platform,
+				verticalDragAddress, verticalDrag)) return 1;
+		if (!MuiListviewHorizontalScrollerStateCodec.TryRead(ref platform,
+			horizontalAddress, out var readHorizontal) ||
+			readHorizontal.ContentWidth != horizontal.ContentWidth ||
+			readHorizontal.ScrollX != horizontal.ScrollX) return 2;
+		if (!MuiListviewHorizontalScrollerDragStateCodec.TryRead(ref platform,
+			horizontalDragAddress, out var readHorizontalDrag) ||
+			readHorizontalDrag.GrabOffset != horizontalDrag.GrabOffset ||
+			readHorizontalDrag.Flags != horizontalDrag.Flags) return 3;
+		if (!MuiListviewScrollerDragStateCodec.TryRead(ref platform,
+			verticalDragAddress, out var readVerticalDrag) ||
+			readVerticalDrag.StartFirst != verticalDrag.StartFirst ||
+			readVerticalDrag.Flags != verticalDrag.Flags) return 4;
+		if (!MuiListviewHorizontalScrollerFieldCursorCodec.TryWriteUInt32(
+			ref platform, horizontalAddress,
+			MuiListviewHorizontalScrollerField.Magic, 0) ||
+			!MuiListviewHorizontalScrollerDragStateCodec.TryWrite(ref platform,
+				horizontalDragAddress,
+				MuiListviewHorizontalScrollerDragStateField.Magic, 0) ||
+			!MuiListviewScrollerDragStateFieldCursorCodec.TryWrite(ref platform,
+				verticalDragAddress, MuiListviewScrollerDragStateField.Magic, 0))
+			return 5;
+		if (!MuiListviewHorizontalScrollerStateCodec.TryReadStructural(ref platform,
+			horizontalAddress, out readHorizontal) || readHorizontal.Magic != 0 ||
+			readHorizontal.MaxScrollX != horizontal.MaxScrollX ||
+			MuiListviewHorizontalScrollerStateCodec.TryRead(ref platform,
+				horizontalAddress, out _)) return 6;
+		if (!MuiListviewHorizontalScrollerDragStateCodec.TryReadStructural(ref platform,
+			horizontalDragAddress, out readHorizontalDrag) ||
+			readHorizontalDrag.Magic != 0 ||
+			MuiListviewHorizontalScrollerDragStateCodec.TryRead(ref platform,
+				horizontalDragAddress, out _)) return 7;
+		if (!MuiListviewScrollerDragStateCodec.TryReadStructural(ref platform,
+			verticalDragAddress, out readVerticalDrag) ||
+			readVerticalDrag.Magic != 0 ||
+			MuiListviewScrollerDragStateCodec.TryRead(ref platform,
+				verticalDragAddress, out _)) return 8;
+		return 42;
+	}
+
+	// MG1097 Listview drag-sort admission proof.  The complete pointer and row
+	// transition record is decoded through named fields; strict consumers reject
+	// only the malformed cookie while structural diagnostics retain the record.
+	public static uint ListviewDragStateAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x39300);
+		var value = new MuiListviewDragState
+		{
+			Magic = MuiListviewDragStateCodec.Cookie,
+			Source = 6,
+			Target = 8,
+			StartX = -5,
+			StartY = 14,
+			LastX = 22,
+			LastY = 28,
+			Flags = MuiListviewDragState.ActiveFlag |
+				MuiListviewDragState.MovedFlag,
+		};
+		if (!MuiListviewDragStateCodec.TryWrite(ref platform, address, value))
+			return 1;
+		if (!MuiListviewDragStateCodec.TryRead(ref platform, address,
+			out var read) || read.Source != value.Source ||
+			read.Target != value.Target || read.LastY != value.LastY ||
+			read.Flags != value.Flags) return 2;
+		if (!MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiListviewDragStateField.Magic, 0)) return 3;
+		if (!MuiListviewDragStateCodec.TryReadStructural(ref platform, address,
+			out read) || read.Magic != 0 || read.Source != value.Source ||
+			MuiListviewDragStateCodec.TryRead(ref platform, address, out _)) return 4;
+		return 42;
+	}
+
+	// MG1098 Floattext policy admission proof.  Owned text pointers and scalar
+	// wrapping policy remain a complete named guest record; strict admission
+	// rejects only the malformed cookie while structural diagnostics preserve it.
+	public static uint FloattextPolicyAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x39400);
+		var value = new MuiFloattextPolicyState
+		{
+			Magic = MuiFloattextPolicyState.Cookie,
+			Text = APTR.FromPointer(0x39480),
+			SkipChars = APTR.FromPointer(0x394C0),
+			TabSize = 6,
+			Justify = 1,
+			Width = 512,
+		};
+		if (!MuiFloattextPolicyStateCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiFloattextPolicyStateCodec.TryRead(ref platform, address,
+			out var read) || read.Text != value.Text ||
+			read.SkipChars != value.SkipChars || read.Width != value.Width ||
+			!MuiFloattextPolicyValidation.IsValid(read)) return 2;
+		if (!MuiFloattextPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiFloattextPolicyField.Magic, 0)) return 3;
+		if (!MuiFloattextPolicyStateCodec.TryReadStructural(ref platform, address,
+			out read) || read.Magic != 0 || read.TabSize != value.TabSize ||
+			MuiFloattextPolicyStateCodec.TryRead(ref platform, address, out _))
+			return 4;
+		return 42;
+	}
+
+	// MG1099 List backbone admission proof.  Owner linkage, horizontal policy,
+	// and image-chain state remain named fixed-width records; structural reads
+	// retain malformed cookies while strict consumers fail closed.
+	public static uint ListCoreAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var ownerAddress = APTR.FromPointer(0x39500);
+		var scrollerAddress = APTR.FromPointer(0x39520);
+		var imageAddress = APTR.FromPointer(0x39550);
+		var owner = new MuiListviewOwnerState
+		{
+			Magic = MuiListviewOwnerState.Cookie,
+			Owner = APTR.FromPointer(0x39600),
+		};
+		var scroller = new MuiListHScrollerState
+		{
+			Magic = MuiListHScrollerState.Cookie,
+			Policy = 1,
+			ContentWidth = 1400,
+			ViewWidth = 350,
+			Visible = 1,
+			ScrollX = 55,
+			MaxScrollX = 1050,
+		};
+		var image = new MuiListImageState
+		{
+			Magic = MuiListImageState.Cookie,
+			ImageObject = APTR.FromPointer(0x39640),
+			Flags = 5,
+			Next = APTR.FromPointer(0x39680),
+		};
+		if (!MuiListviewOwnerStateCodec.Write(ref platform, ownerAddress, owner) ||
+			!MuiListHScrollerStateCodec.Write(ref platform, scrollerAddress,
+				scroller) || !MuiListImageCodec.Write(ref platform, imageAddress, image))
+			return 1;
+		if (!MuiListviewOwnerStateCodec.TryRead(ref platform, ownerAddress,
+			out var readOwner) || readOwner.Owner != owner.Owner) return 2;
+		if (!MuiListHScrollerStateCodec.TryRead(ref platform, scrollerAddress,
+			out var readScroller) || readScroller.ContentWidth !=
+			scroller.ContentWidth || readScroller.MaxScrollX != scroller.MaxScrollX)
+			return 3;
+		if (!MuiListImageCodec.TryRead(ref platform, imageAddress,
+			out var readImage) || readImage.ImageObject != image.ImageObject ||
+			readImage.Next != image.Next || readImage.Flags != image.Flags) return 4;
+		if (!MuiListviewOwnerStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			ownerAddress, MuiListviewOwnerStateField.Magic, 0) ||
+			!MuiListHScrollerStateFieldCursorCodec.TryWriteUInt32(ref platform,
+				scrollerAddress, MuiListHScrollerStateField.Magic, 0) ||
+			!MuiListImageFieldCursorCodec.TryWriteUInt32(ref platform, imageAddress,
+				MuiListImageField.Magic, 0)) return 5;
+		if (!MuiListviewOwnerStateCodec.TryReadStructural(ref platform,
+			ownerAddress, out readOwner) || readOwner.Magic != 0 ||
+			MuiListviewOwnerStateCodec.TryRead(ref platform, ownerAddress, out _))
+			return 6;
+		if (!MuiListHScrollerStateCodec.TryReadStructural(ref platform,
+			scrollerAddress, out readScroller) || readScroller.Magic != 0 ||
+			readScroller.MaxScrollX != scroller.MaxScrollX ||
+			MuiListHScrollerStateCodec.TryRead(ref platform, scrollerAddress, out _))
+			return 7;
+		if (!MuiListImageCodec.TryReadStructural(ref platform, imageAddress,
+			out readImage) || readImage.Magic != 0 ||
+			readImage.Next != image.Next ||
+			MuiListImageCodec.TryRead(ref platform, imageAddress, out _)) return 8;
+		return 42;
+	}
+
+	// MG1100 List header and edit-state admission proof.  Capacity/count,
+	// ownership pointers, and signed edit coordinates stay in named records;
+	// malformed cookies remain structurally readable and strict reads fail closed.
+	public static uint ListHeaderEditAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var headerAddress = APTR.FromPointer(0x39700);
+		var editAddress = APTR.FromPointer(0x39740);
+		var header = new MuiListHeaderState
+		{
+			Magic = MuiListHeaderState.Cookie,
+			Index = APTR.FromPointer(0x39800),
+			Capacity = 24,
+			Count = 5,
+			Images = APTR.FromPointer(0x39840),
+		};
+		var edit = new MuiListCore.MuiListEditState
+		{
+			Magic = 0x4C454449u,
+			Row = -3,
+			Column = 2,
+			Entry = APTR.FromPointer(0x39880),
+			EditObject = APTR.FromPointer(0x398C0),
+			Flags = 1,
+		};
+		if (!MuiListHeaderCodec.Write(ref platform, headerAddress, header) ||
+			!MuiListCore.MuiListEditStateCodec.Write(ref platform, editAddress, edit))
+			return 1;
+		if (!MuiListHeaderCodec.TryRead(ref platform, headerAddress,
+			out var readHeader) || readHeader.Index != header.Index ||
+			readHeader.Count != header.Count) return 2;
+		if (!MuiListCore.MuiListEditStateCodec.TryRead(ref platform, editAddress,
+			out var readEdit) || readEdit.Row != edit.Row ||
+			readEdit.EditObject != edit.EditObject) return 3;
+		if (!MuiListHeaderFieldCursorCodec.TryWriteUInt32(ref platform,
+			headerAddress, MuiListHeaderField.Magic, 0) ||
+			!MuiListCore.MuiListEditFieldCursorCodec.TryWriteUInt32(ref platform,
+				editAddress, MuiListCore.MuiListEditField.Magic, 0)) return 4;
+		if (!MuiListHeaderCodec.TryReadStructural(ref platform, headerAddress,
+			out readHeader) || readHeader.Magic != 0 ||
+			readHeader.Count != header.Count ||
+			MuiListHeaderCodec.TryRead(ref platform, headerAddress, out _)) return 5;
+		if (!MuiListCore.MuiListEditStateCodec.TryReadStructural(ref platform,
+			editAddress, out readEdit) || readEdit.Magic != 0 ||
+			readEdit.Row != edit.Row ||
+			MuiListCore.MuiListEditStateCodec.TryRead(ref platform, editAddress,
+				out _)) return 6;
+		return 42;
+	}
+
+	// MG1101 List column-layout admission proof.  The layout owner and its
+	// bounded {offset,width} entries remain named records; strict admission
+	// retains cookie, range, and mapped-vector checks.
+	public static uint ListColumnLayoutAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var layoutAddress = APTR.FromPointer(0x39A00);
+		var valuesAddress = APTR.FromPointer(0x39B00);
+		var layout = new MuiListCore.MuiListColumnLayoutState
+		{
+			Magic = MuiListCore.MuiListColumnLayoutState.Cookie,
+			Width = 640,
+			Columns = 2,
+			Values = valuesAddress,
+		};
+		if (!MuiListCore.MuiListColumnGeometryCodec.Write(ref platform,
+			valuesAddress, new MuiListCore.MuiListColumnGeometry
+			{
+				Offset = 8,
+				Width = 160,
+			}) || !MuiListCore.MuiListColumnGeometryCodec.Write(ref platform,
+			APTR.FromPointer(valuesAddress.Raw + 8),
+			new MuiListCore.MuiListColumnGeometry
+			{
+				Offset = 168,
+				Width = 472,
+			}) || !MuiListCore.MuiListColumnLayoutStateCodec.Write(ref platform,
+				layoutAddress, layout)) return 1;
+		if (!MuiListCore.MuiListColumnLayoutStateCodec.TryRead(ref platform,
+			layoutAddress, out var readLayout) || readLayout.Width != layout.Width ||
+			readLayout.Columns != layout.Columns || readLayout.Values != layout.Values)
+			return 2;
+		if (!MuiListCore.MuiListColumnGeometryCodec.TryRead(ref platform,
+			APTR.FromPointer(valuesAddress.Raw + 8), out var readGeometry) ||
+			readGeometry.Width != 472) return 3;
+		if (!MuiListCore.MuiListColumnLayoutFieldCursorCodec.TryWriteUInt32(
+			ref platform, layoutAddress,
+			MuiListCore.MuiListColumnLayoutField.Magic, 0)) return 4;
+		if (!MuiListCore.MuiListColumnLayoutStateCodec.TryReadStructural(
+			ref platform, layoutAddress, out readLayout) || readLayout.Magic != 0 ||
+			readLayout.Columns != layout.Columns ||
+			MuiListCore.MuiListColumnLayoutStateCodec.TryRead(ref platform,
+				layoutAddress, out _)) return 5;
+		return 42;
+	}
+
+	// MG1102 List FORMAT descriptor and measured-column admission proof.  The
+	// state records and their bounded value vectors stay struct-based; the
+	// strict readers retain cookie, range, and mapped-vector checks.
+	public static uint ListFormatMetricsAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var formatAddress = APTR.FromPointer(0x39C00);
+		var formatValues = APTR.FromPointer(0x39D00);
+		var metricsAddress = APTR.FromPointer(0x39F00);
+		var metricsValues = APTR.FromPointer(0x3A000);
+		var format = new MuiListCore.MuiListFormatDescriptorState
+		{
+			Magic = MuiListCore.MuiListFormatDescriptorState.Cookie,
+			Columns = 2,
+			Values = formatValues,
+		};
+		var descriptor = new MuiListCore.MuiListFormatDescriptor
+		{
+			Delta = 2,
+			Weight = 3,
+			MinWidth = 20,
+			MaxWidth = 500,
+			Column = 0,
+			Flags = 1,
+		};
+		var formatCursor = default(MuiListCore.MuiListFormatDescriptorCursor);
+		formatCursor.Base = formatValues;
+		formatCursor.Index = 0;
+		if (!MuiListCore.MuiListFormatDescriptorCursorCodec.TryGetEntry(
+			ref platform, formatCursor, out var descriptorAddress)) return 1;
+		MuiListCore.WriteFormatDescriptor(ref platform, descriptorAddress,
+			ref descriptor);
+		formatCursor.Index = 1;
+		if (!MuiListCore.MuiListFormatDescriptorCursorCodec.TryGetEntry(
+			ref platform, formatCursor, out descriptorAddress)) return 2;
+		MuiListCore.WriteFormatDescriptor(ref platform, descriptorAddress,
+			ref descriptor);
+		var metrics = new MuiListCore.MuiListColumnMetricsState
+		{
+			Magic = 0x434D4554u,
+			Width = 720,
+			Columns = 2,
+			Values = metricsValues,
+		};
+		var metricCursor = default(MuiListCore.MuiListColumnMetricCursor);
+		metricCursor.Base = metricsValues;
+		metricCursor.Index = 0;
+		if (!MuiListCore.MuiListColumnMetricCursorCodec.TryGetEntry(ref platform,
+			metricCursor, out var metricAddress) ||
+			!MuiListCore.MuiListColumnMetricCodec.Write(ref platform, metricAddress,
+				new MuiListCore.MuiListColumnMetricValue { Value = 280 })) return 3;
+		metricCursor.Index = 1;
+		if (!MuiListCore.MuiListColumnMetricCursorCodec.TryGetEntry(ref platform,
+			metricCursor, out metricAddress) ||
+			!MuiListCore.MuiListColumnMetricCodec.Write(ref platform, metricAddress,
+				new MuiListCore.MuiListColumnMetricValue { Value = 440 })) return 4;
+		if (!MuiListCore.MuiListFormatDescriptorStateCodec.Write(ref platform,
+			formatAddress, format) || !MuiListCore.MuiListColumnMetricsStateCodec.Write(
+				ref platform, metricsAddress, metrics)) return 5;
+		if (!MuiListCore.MuiListFormatDescriptorStateCodec.TryRead(ref platform,
+			formatAddress, out var readFormat) || readFormat.Columns != 2 ||
+			readFormat.Values != formatValues) return 6;
+		if (!MuiListCore.MuiListColumnMetricsStateCodec.TryRead(ref platform,
+			metricsAddress, out var readMetrics) || readMetrics.Width != 720 ||
+			readMetrics.Values != metricsValues) return 7;
+		if (!MuiListCore.MuiListFormatDescriptorStateFieldCursorCodec
+			.TryWriteUInt32(ref platform, formatAddress,
+				MuiListCore.MuiListFormatDescriptorStateField.Magic, 0) ||
+			!MuiListCore.MuiListColumnMetricsFieldCursorCodec.TryWriteUInt32(
+				ref platform, metricsAddress,
+				MuiListCore.MuiListColumnMetricsField.Magic, 0)) return 8;
+		if (!MuiListCore.MuiListFormatDescriptorStateCodec.TryReadStructural(
+			ref platform, formatAddress, out readFormat) || readFormat.Magic != 0 ||
+			readFormat.Columns != format.Columns ||
+			MuiListCore.MuiListFormatDescriptorStateCodec.TryRead(ref platform,
+				formatAddress, out _)) return 9;
+		if (!MuiListCore.MuiListColumnMetricsStateCodec.TryReadStructural(
+			ref platform, metricsAddress, out readMetrics) || readMetrics.Magic != 0 ||
+			readMetrics.Columns != metrics.Columns ||
+			MuiListCore.MuiListColumnMetricsStateCodec.TryRead(ref platform,
+				metricsAddress, out _)) return 10;
+		return 42;
+	}
+
+	// MG1103 List title, selection-signal, FORMAT-policy, and font-policy
+	// admission proof. Each projection is carried by a named fixed-width
+	// record; malformed cookies remain structurally readable but fail strict
+	// admission without rebuilding state from an anonymous scalar.
+	public static uint ListTitlePolicyAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var titleAddress = APTR.FromPointer(0x3A200);
+		var selectionAddress = APTR.FromPointer(0x3A220);
+		var formatAddress = APTR.FromPointer(0x3A240);
+		var fontAddress = APTR.FromPointer(0x3A260);
+		var title = new MuiListCore.MuiListTitleState
+		{
+			Magic = MuiListCore.MuiListTitleState.Cookie,
+			Value = 1,
+		};
+		var selection = new MuiListCore.MuiListSelectionSignalState
+		{
+			Magic = MuiListCore.MuiListSelectionSignalState.Cookie,
+			Value = 1,
+		};
+		var format = new MuiListCore.MuiListFormatPolicyState
+		{
+			Magic = MuiListCore.MuiListFormatPolicyState.Cookie,
+			Format = APTR.Null,
+			MaxColumns = 8,
+			Columns = 3,
+		};
+		var font = new MuiListCore.MuiListFontState
+		{
+			Magic = MuiListCore.MuiListFontState.Cookie,
+			Font = APTR.Null,
+		};
+		if (!MuiListCore.MuiListTitleStateCodec.Write(ref platform, titleAddress,
+			title) || !MuiListCore.MuiListSelectionSignalStateCodec.Write(
+			ref platform, selectionAddress, selection) ||
+			!MuiListCore.MuiListFormatPolicyStateCodec.Write(ref platform,
+				formatAddress, format) || !MuiListCore.MuiListFontStateCodec.Write(
+				ref platform, fontAddress, font)) return 1;
+		if (!MuiListCore.MuiListTitleStateCodec.TryRead(ref platform,
+			titleAddress, out var readTitle) || readTitle.Value != title.Value ||
+			!MuiListCore.MuiListSelectionSignalStateCodec.TryRead(ref platform,
+				selectionAddress, out var readSelection) ||
+				readSelection.Value != selection.Value ||
+			!MuiListCore.MuiListFormatPolicyStateCodec.TryRead(ref platform,
+				formatAddress, out var readFormat) ||
+				readFormat.Columns != format.Columns ||
+			!MuiListCore.MuiListFontStateCodec.TryRead(ref platform, fontAddress,
+				out var readFont) || readFont.Font != font.Font) return 2;
+		if (!MuiListCore.MuiListTitleStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, titleAddress, MuiListCore.MuiListTitleStateField.Magic, 0) ||
+			!MuiListCore.MuiListSelectionSignalStateFieldCursorCodec.TryWriteUInt32(
+				ref platform, selectionAddress,
+				MuiListCore.MuiListSelectionSignalStateField.Magic, 0) ||
+			!MuiListCore.MuiListFormatPolicyStateFieldCursorCodec.TryWriteUInt32(
+				ref platform, formatAddress,
+				MuiListCore.MuiListFormatPolicyStateField.Magic, 0) ||
+			!MuiListCore.MuiListFontStateFieldCursorCodec.TryWriteUInt32(
+				ref platform, fontAddress, MuiListCore.MuiListFontStateField.Magic, 0))
+			return 3;
+		if (!MuiListCore.MuiListTitleStateCodec.TryReadStructural(ref platform,
+			titleAddress, out readTitle) || readTitle.Magic != 0 ||
+			MuiListCore.MuiListTitleStateCodec.TryRead(ref platform,
+				titleAddress, out _) ||
+			!MuiListCore.MuiListSelectionSignalStateCodec.TryReadStructural(
+				ref platform, selectionAddress, out readSelection) ||
+				readSelection.Magic != 0 ||
+			MuiListCore.MuiListSelectionSignalStateCodec.TryRead(ref platform,
+				selectionAddress, out _) ||
+			!MuiListCore.MuiListFormatPolicyStateCodec.TryReadStructural(ref platform,
+				formatAddress, out readFormat) || readFormat.Magic != 0 ||
+			MuiListCore.MuiListFormatPolicyStateCodec.TryRead(ref platform,
+				formatAddress, out _) ||
+			!MuiListCore.MuiListFontStateCodec.TryReadStructural(ref platform,
+				fontAddress, out readFont) || readFont.Magic != 0 ||
+			MuiListCore.MuiListFontStateCodec.TryRead(ref platform, fontAddress,
+				out _)) return 4;
+		return 42;
+	}
+
+	// MG1104 List active-cursor admission proof. The presence bit and row stay
+	// together in a named record; malformed cookies remain structurally readable
+	// but fail strict admission before consumers can repair the raw attribute.
+	public static uint ListActiveAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x3A280);
+		var value = new MuiListCore.MuiListActiveState
+		{
+			Magic = MuiListCore.MuiListActiveState.Cookie,
+			HasActive = 1,
+			Active = 7,
+		};
+		if (!MuiListCore.MuiListActiveStateCodec.Write(ref platform, address,
+			value) || !MuiListCore.MuiListActiveStateCodec.TryRead(ref platform,
+				address, out var read) || read.HasActive != value.HasActive ||
+				read.Active != value.Active) return 1;
+		if (!MuiListCore.MuiListActiveStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListActiveStateField.Magic, 0))
+			return 2;
+		if (!MuiListCore.MuiListActiveStateCodec.TryReadStructural(ref platform,
+			address, out read) || read.Magic != 0 || read.HasActive != 1 ||
+			read.Active != value.Active ||
+			MuiListCore.MuiListActiveStateCodec.TryRead(ref platform, address,
+				out _) || !MuiListCore.MuiListActiveStateCodec.TryReadStorage(
+				ref platform, address, out _)) return 3;
+		return 42;
+	}
+
+	// MG1105 List insertion-result admission proof. The last successful
+	// insertion position is carried by a named record; malformed cookies remain
+	// structurally readable while strict admission fails closed.
+	public static uint ListInsertPositionAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x3A2A0);
+		var value = new MuiListCore.MuiListInsertPositionState
+		{
+			Magic = MuiListCore.MuiListInsertPositionState.Cookie,
+			Position = 23,
+		};
+		if (!MuiListCore.MuiListInsertPositionStateCodec.Write(ref platform,
+			address, value) || !MuiListCore.MuiListInsertPositionStateCodec
+			.TryRead(ref platform, address, out var read) ||
+			read.Position != value.Position) return 1;
+		if (!MuiListCore.MuiListInsertPositionStateFieldCursorCodec
+			.TryWriteUInt32(ref platform, address,
+				MuiListCore.MuiListInsertPositionStateField.Magic, 0)) return 2;
+		if (!MuiListCore.MuiListInsertPositionStateCodec.TryReadStructural(
+			ref platform, address, out read) || read.Magic != 0 ||
+			read.Position != value.Position ||
+			MuiListCore.MuiListInsertPositionStateCodec.TryRead(ref platform,
+				address, out _) ||
+			!MuiListCore.MuiListInsertPositionStateCodec.TryReadStorage(
+				ref platform, address, out _)) return 3;
+		return 42;
+	}
+
+	// MG1106 List viewport admission proof. Pixel metrics remain in one named
+	// fixed-width record; malformed cookies are structurally observable while
+	// strict readers fail closed before viewport consumers use the record.
+	public static uint ListViewportAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x3A2C0);
+		var value = new MuiListCore.MuiListViewportState
+		{
+			Magic = MuiListCore.MuiListViewportState.Cookie,
+			TopPixel = 64,
+			VisiblePixel = 320,
+			TotalPixel = 1024,
+			First = 4,
+			LineHeight = 16,
+			Visible = 20,
+			DropMark = 3,
+		};
+		if (!MuiListCore.MuiListViewportStateCodec.Write(ref platform, address,
+			value) || !MuiListCore.MuiListViewportStateCodec.TryRead(ref platform,
+				address, out var read) || read.TopPixel != value.TopPixel ||
+				read.VisiblePixel != value.VisiblePixel ||
+				read.TotalPixel != value.TotalPixel || read.LineHeight !=
+				value.LineHeight) return 1;
+		if (!MuiListCore.MuiListViewportStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListViewportStateField.Magic, 0))
+			return 2;
+		if (!MuiListCore.MuiListViewportStateCodec.TryReadStructural(ref platform,
+			address, out read) || read.Magic != 0 || read.First != value.First ||
+			read.Visible != value.Visible ||
+			MuiListCore.MuiListViewportStateCodec.TryRead(ref platform, address,
+				out _) || !MuiListCore.MuiListViewportStateCodec.TryReadStorage(
+				ref platform, address, out _)) return 3;
+		return 42;
+	}
+
+	// MG1107 List redraw coalescing admission proof. Dirty/request counters
+	// remain together in a named record; malformed cookies stay structurally
+	// visible while strict readers fail closed before redraw consumers act.
+	public static uint ListRedrawAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x3A300);
+		var value = new MuiListCore.MuiListRedrawState
+		{
+			Magic = MuiListCore.MuiListRedrawState.Cookie,
+			Dirty = 1,
+			Requests = 9,
+		};
+		if (!MuiListCore.MuiListRedrawStateCodec.Write(ref platform, address,
+			value) || !MuiListCore.MuiListRedrawStateCodec.TryRead(ref platform,
+				address, out var read) || read.Dirty != value.Dirty ||
+				read.Requests != value.Requests) return 1;
+		if (!MuiListCore.MuiListRedrawStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiListCore.MuiListRedrawStateField.Magic, 0))
+			return 2;
+		if (!MuiListCore.MuiListRedrawStateCodec.TryReadStructural(ref platform,
+			address, out read) || read.Magic != 0 || read.Requests != value.Requests ||
+			MuiListCore.MuiListRedrawStateCodec.TryRead(ref platform, address,
+				out _) || !MuiListCore.MuiListRedrawStateCodec.TryReadStorage(
+				ref platform, address, out _)) return 3;
+		return 42;
+	}
+
+	// MG1108 List interaction-policy and click-state admission proof. BOOL,
+	// enum, column, and click counters stay in named records; malformed cookies
+	// remain structurally readable but fail strict admission.
+	public static uint ListInteractionClickAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var interactionAddress = APTR.FromPointer(0x3A340);
+		var clickAddress = APTR.FromPointer(0x3A370);
+		var interaction = new MuiListCore.MuiListInteractionPolicyState
+		{
+			Magic = MuiListCore.MuiListInteractionPolicyState.Cookie,
+			Input = 1,
+			MultiSelect = 2,
+			ScrollerPos = 1,
+		};
+		var click = new MuiListCore.MuiListClickState
+		{
+			Magic = MuiListCore.MuiListClickState.Cookie,
+			ClickColumn = 3,
+			DoubleClick = 1,
+			AgainClick = 1,
+			Clicks = 2,
+			DefClickColumn = 4,
+		};
+		if (!MuiListCore.MuiListInteractionPolicyStateCodec.Write(ref platform,
+			interactionAddress, interaction) || !MuiListCore.MuiListClickStateCodec
+			.Write(ref platform, clickAddress, click) ||
+			!MuiListCore.MuiListInteractionPolicyStateCodec.TryRead(ref platform,
+				interactionAddress, out var readInteraction) ||
+			readInteraction.MultiSelect != interaction.MultiSelect ||
+			!MuiListCore.MuiListClickStateCodec.TryRead(ref platform, clickAddress,
+				out var readClick) || readClick.Clicks != click.Clicks) return 1;
+		if (!MuiListCore.MuiListInteractionPolicyStateFieldCursorCodec
+			.TryWriteUInt32(ref platform, interactionAddress,
+				MuiListCore.MuiListInteractionPolicyStateField.Magic, 0) ||
+			!MuiListCore.MuiListClickStateFieldCursorCodec.TryWriteUInt32(
+				ref platform, clickAddress, MuiListCore.MuiListClickStateField.Magic, 0))
+			return 2;
+		if (!MuiListCore.MuiListInteractionPolicyStateCodec.TryReadStructural(
+			ref platform, interactionAddress, out readInteraction) ||
+			readInteraction.Magic != 0 ||
+			MuiListCore.MuiListInteractionPolicyStateCodec.TryRead(ref platform,
+				interactionAddress, out _) ||
+			!MuiListCore.MuiListInteractionPolicyStateCodec.TryReadStorage(
+				ref platform, interactionAddress, out _) ||
+			!MuiListCore.MuiListClickStateCodec.TryReadStructural(ref platform,
+				clickAddress, out readClick) || readClick.Magic != 0 ||
+			MuiListCore.MuiListClickStateCodec.TryRead(ref platform, clickAddress,
+				out _) || !MuiListCore.MuiListClickStateCodec.TryReadStorage(
+				ref platform, clickAddress, out _)) return 3;
+		return 42;
+	}
+
+	// MG1109 List hook-policy and sort-state admission proof. Hook pointers,
+	// selected column, and title-click state stay in named records; malformed
+	// cookies remain structurally readable but fail strict admission.
+	public static uint ListHookSortAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var hookAddress = APTR.FromPointer(0x3A3A0);
+		var sortAddress = APTR.FromPointer(0x3A3D0);
+		var hooks = new MuiListCore.MuiListHookPolicyState
+		{
+			Magic = MuiListCore.MuiListHookPolicyState.Cookie,
+			ConstructHook = 0x1001,
+			DestructHook = 0x1002,
+			DisplayHook = 0x1003,
+			CompareHook = 0x1004,
+			MultiTestHook = 0x1005,
+		};
+		var sort = new MuiListCore.MuiListSortState
+		{
+			Magic = MuiListCore.MuiListSortState.Cookie,
+			SortColumn = 3,
+			TitleClick = 7,
+		};
+		if (!MuiListCore.MuiListHookPolicyStateCodec.Write(ref platform,
+			hookAddress, hooks) || !MuiListCore.MuiListSortStateCodec.Write(
+			ref platform, sortAddress, sort) ||
+			!MuiListCore.MuiListHookPolicyStateCodec.TryRead(ref platform,
+				hookAddress, out var readHooks) ||
+			readHooks.DisplayHook != hooks.DisplayHook ||
+			!MuiListCore.MuiListSortStateCodec.TryRead(ref platform, sortAddress,
+				out var readSort) || readSort.SortColumn != sort.SortColumn) return 1;
+		if (!MuiListCore.MuiListHookPolicyStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, hookAddress,
+				MuiListCore.MuiListHookPolicyStateField.Magic, 0) ||
+			!MuiListCore.MuiListSortStateFieldCursorCodec.TryWriteUInt32(
+				ref platform, sortAddress,
+				MuiListCore.MuiListSortStateField.Magic, 0)) return 2;
+		if (!MuiListCore.MuiListHookPolicyStateCodec.TryReadStructural(ref platform,
+			hookAddress, out readHooks) || readHooks.Magic != 0 ||
+			readHooks.MultiTestHook != hooks.MultiTestHook ||
+			MuiListCore.MuiListHookPolicyStateCodec.TryRead(ref platform,
+				hookAddress, out _) ||
+			!MuiListCore.MuiListHookPolicyStateCodec.TryReadStorage(ref platform,
+				hookAddress, out _) ||
+			!MuiListCore.MuiListSortStateCodec.TryReadStructural(ref platform,
+				sortAddress, out readSort) || readSort.Magic != 0 ||
+			readSort.TitleClick != sort.TitleClick ||
+			MuiListCore.MuiListSortStateCodec.TryRead(ref platform, sortAddress,
+				out _) || !MuiListCore.MuiListSortStateCodec.TryReadStorage(
+				ref platform, sortAddress, out _)) return 3;
+		return 42;
+	}
+
+	// MG1110 List presentation-policy admission proof. BOOL/enum policy fields
+	// remain in one named record; malformed cookies stay structurally visible
+	// while strict admission fails closed.
+	public static uint ListPresentationAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x3A400);
+		var value = new MuiListCore.MuiListPresentationPolicyState
+		{
+			Magic = MuiListCore.MuiListPresentationPolicyState.Cookie,
+			Editable = 1,
+			Quiet = 1,
+			AdjustHeight = 1,
+			AdjustWidth = 0,
+			Stripes = 1,
+			ShowDropMarks = 1,
+			DragSortable = 1,
+			DragType = 1,
+			AutoVisible = 1,
+			AutoLineHeight = 1,
+			MinLineHeight = 8,
+		};
+		if (!MuiListCore.MuiListPresentationPolicyStateCodec.Write(ref platform,
+			address, value) || !MuiListCore.MuiListPresentationPolicyStateCodec
+			.TryRead(ref platform, address, out var read) ||
+			read.Stripes != value.Stripes || read.DragType != value.DragType ||
+			read.MinLineHeight != value.MinLineHeight) return 1;
+		if (!MuiListCore.MuiListPresentationPolicyStateFieldCursorCodec
+			.TryWriteUInt32(ref platform, address,
+				MuiListCore.MuiListPresentationPolicyStateField.Magic, 0)) return 2;
+		if (!MuiListCore.MuiListPresentationPolicyStateCodec.TryReadStructural(
+			ref platform, address, out read) || read.Magic != 0 ||
+			read.Stripes != value.Stripes ||
+			MuiListCore.MuiListPresentationPolicyStateCodec.TryRead(ref platform,
+				address, out _) ||
+			!MuiListCore.MuiListPresentationPolicyStateCodec.TryReadStorage(
+				ref platform, address, out _)) return 3;
+		return 42;
+	}
+
+	// MG1111 List column-visibility admission proof. The bounded eight-word
+	// visibility mask stays in a named record; malformed cookies remain
+	// structurally readable but fail strict admission.
+	public static uint ListColumnVisibilityAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x3A480);
+		var value = new MuiListCore.MuiListColumnVisibilityState
+		{
+			Magic = MuiListCore.MuiListColumnVisibilityState.Cookie,
+			Low = 5,
+			High = 0x80000000,
+			Word2 = 0x12,
+			Word7 = 0x80000001,
+		};
+		if (!MuiListCore.MuiListColumnVisibilityStateCodec.Write(ref platform,
+			address, value) || !MuiListCore.MuiListColumnVisibilityStateCodec
+			.TryRead(ref platform, address, out var read) || read.Low != value.Low ||
+			read.High != value.High || read.Word7 != value.Word7) return 1;
+		if (!MuiListCore.MuiListColumnVisibilityStateFieldCursorCodec
+			.TryWriteUInt32(ref platform, address,
+				MuiListCore.MuiListColumnVisibilityStateField.Magic, 0)) return 2;
+		if (!MuiListCore.MuiListColumnVisibilityStateCodec.TryReadStructural(
+			ref platform, address, out read) || read.Magic != 0 ||
+			read.Word2 != value.Word2 ||
+			MuiListCore.MuiListColumnVisibilityStateCodec.TryRead(ref platform,
+				address, out _) ||
+			!MuiListCore.MuiListColumnVisibilityStateCodec.TryReadStorage(
+				ref platform, address, out _)) return 3;
+		return 42;
+	}
+
+	// MG1112 List column-order admission proof. The bounded BYTE permutation
+	// metadata stays in a named record; malformed cookies remain structurally
+	// readable while strict admission fails closed.
+	public static uint ListColumnOrderAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x3A500);
+		var values = APTR.FromPointer(0x3A540);
+		platform.WriteUInt8(values, 0, 1);
+		platform.WriteUInt8(values, 1, 0);
+		var value = new MuiListCore.MuiListColumnOrderState
+		{
+			Magic = MuiListCore.MuiListColumnOrderState.Cookie,
+			Count = 2,
+			Values = values,
+			Reserved = 4,
+		};
+		if (!MuiListCore.MuiListColumnOrderStateCodec.Write(ref platform, address,
+			value) || !MuiListCore.MuiListColumnOrderStateCodec.TryRead(ref platform,
+				address, out var read) || read.Count != value.Count ||
+			read.Values != value.Values || read.Reserved != value.Reserved) return 1;
+		if (!MuiListCore.MuiListColumnOrderStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address,
+				MuiListCore.MuiListColumnOrderStateField.Magic, 0)) return 2;
+		if (!MuiListCore.MuiListColumnOrderStateCodec.TryReadStructural(ref platform,
+			address, out read) || read.Magic != 0 || read.Count != value.Count ||
+			read.Values != value.Values ||
+			MuiListCore.MuiListColumnOrderStateCodec.TryRead(ref platform, address,
+				out _) || !MuiListCore.MuiListColumnOrderStateCodec.TryReadStorage(
+				ref platform, address, out _)) return 3;
+		return 42;
+	}
+
+	// MG1113 List title-array admission proof. The owned pointer table metadata
+	// stays in a named record; malformed cookies remain structurally readable
+	// while strict admission retains bounded table validation.
+	public static uint ListTitleArrayAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x3A580);
+		var pointers = APTR.FromPointer(0x3A5C0);
+		if (!MuiListCore.MuiListPointerSlotCodec.Write(ref platform, pointers,
+			new MuiListCore.MuiListPointerSlotRecord
+			{
+				Value = APTR.FromPointer(0x3A680),
+			}) || !MuiListCore.MuiListTitleArrayStateCodec.Write(ref platform,
+				address, new MuiListCore.MuiListTitleArrayState
+				{
+					Magic = MuiListCore.MuiListTitleArrayState.Cookie,
+					Pointers = pointers,
+					Count = 1,
+				}) || !MuiListCore.MuiListTitleArrayStateCodec.TryRead(ref platform,
+				address, out var read) || read.Pointers != pointers ||
+			read.Count != 1) return 1;
+		if (!MuiListCore.MuiListTitleArrayStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address,
+				MuiListCore.MuiListTitleArrayStateField.Magic, 0)) return 2;
+		if (!MuiListCore.MuiListTitleArrayStateCodec.TryReadStructural(ref platform,
+			address, out read) || read.Magic != 0 || read.Pointers != pointers ||
+			MuiListCore.MuiListTitleArrayStateCodec.TryRead(ref platform, address,
+				out _) || !MuiListCore.MuiListTitleArrayStateCodec.TryReadStorage(
+				ref platform, address, out _)) return 3;
+		return 42;
+	}
+
+	// MG954 shared Area Weight admission proof. Weight remains a full ULONG;
+	// malformed cookies are rejected without managed storage.
+	public static uint AreaWeightAdmissionRoot()
+	{
+		var value = default(MuiAreaWeightStateRecord);
+		value.Magic = MuiAreaWeightStateRecord.Cookie;
+		value.Weight = uint.MaxValue;
+		if (!MuiAreaWeightStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiAreaWeightStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG955 BitmapRemapped admission proof. NULL or a mapped guest pointer is
+	// accepted; an unmapped renderer pointer is rejected without managed state.
+	public static uint BitmapRemappedAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiBitmapRemappedStateRecord);
+		value.Magic = MuiBitmapRemappedStateRecord.Cookie;
+		if (!MuiBitmapRemappedStateAdmission.Validate(ref platform, value)) return 1;
+		value.Remapped = APTR.FromPointer(0x0004D000);
+		if (!MuiBitmapRemappedStateAdmission.Validate(ref platform, value)) return 2;
+		value.Remapped = APTR.FromPointer(0xFFFFFF00u);
+		if (MuiBitmapRemappedStateAdmission.Validate(ref platform, value)) return 3;
+		return 42;
+	}
+
+	// MG956 Bitmap policy admission proof. MappingTable and SourceColors retain
+	// guest pointers, UseFriend is a canonical BOOL, and scalar values remain
+	// full-width without managed storage.
+	public static uint BitmapPolicyAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiBitmapPolicyStateRecord);
+		value.Magic = MuiBitmapPolicyStateRecord.Cookie;
+		value.MappingTable = 0x0004D000;
+		value.SourceColors = 0x0004D004;
+		value.UseFriend = 1;
+		if (!MuiBitmapPolicyStateAdmission.Validate(ref platform, value)) return 1;
+		value.MappingTable = 0xFFFFFF00u;
+		if (MuiBitmapPolicyStateAdmission.Validate(ref platform, value)) return 2;
+		value.MappingTable = 0x0004D000;
+		value.UseFriend = 2;
+		if (MuiBitmapPolicyStateAdmission.Validate(ref platform, value)) return 3;
+		return 42;
+	}
+
+	// MG957 GadgetGadget admission proof. The getter-only Intuition gadget
+	// relationship accepts NULL or a mapped guest pointer, while an unmapped
+	// pointer is rejected without a managed gadget wrapper.
+	public static uint GadgetGadgetAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiGadgetGadgetStateRecord);
+		value.Magic = MuiGadgetGadgetStateRecord.Cookie;
+		if (!MuiGadgetGadgetStateAdmission.Validate(ref platform, value)) return 1;
+		value.Gadget = APTR.FromPointer(0x0004D000);
+		if (!MuiGadgetGadgetStateAdmission.Validate(ref platform, value)) return 2;
+		value.Gadget = APTR.FromPointer(0xFFFFFF00u);
+		if (MuiGadgetGadgetStateAdmission.Validate(ref platform, value)) return 3;
+		return 42;
+	}
+
+	// MG958 Gadget interaction admission proof. InputMode is the bounded
+	// MorphOS enum and Selected/Pressed/ShowSelState are canonical BOOL fields
+	// in the named guest record.
+	public static uint GadgetInteractionAdmissionRoot()
+	{
+		var value = default(MuiGadgetInteractionStateRecord);
+		value.Magic = MuiGadgetInteractionStateRecord.Cookie;
+		value.InputMode = 3;
+		value.Selected = 1;
+		value.ShowSelState = 1;
+		if (!MuiGadgetInteractionStateAdmission.Validate(value)) return 1;
+		value.InputMode = 4;
+		if (MuiGadgetInteractionStateAdmission.Validate(value)) return 2;
+		value.InputMode = 3;
+		value.Pressed = 2;
+		if (MuiGadgetInteractionStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG959 Gauge admission proof. Maximum, Current, and Divide retain full
+	// ULONG values while Horizontal is admitted as a canonical MorphOS BOOL.
+	public static uint GaugeAdmissionRoot()
+	{
+		var value = default(MuiGaugeStateRecord);
+		value.Magic = MuiGaugeStateRecord.Cookie;
+		value.Maximum = uint.MaxValue;
+		value.Current = 1;
+		value.Divide = 3;
+		value.Horizontal = 1;
+		if (!MuiGaugeStateAdmission.Validate(value)) return 1;
+		value.Horizontal = 2;
+		if (MuiGaugeStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG960 Numeric-family admission proof. Numeric values retain the complete
+	// signed 32-bit guest range and Reverse is admitted as a canonical BOOL.
+	public static uint NumericAdmissionRoot()
+	{
+		var value = default(MuiNumericStateRecord);
+		value.Magic = MuiNumericStateRecord.Cookie;
+		value.Minimum = unchecked((uint)int.MinValue);
+		value.Maximum = unchecked((uint)int.MaxValue);
+		value.Value = 0;
+		value.Default = unchecked((uint)int.MinValue);
+		value.Reverse = 1;
+		if (!MuiNumericStateAdmission.Validate(value)) return 1;
+		value.Reverse = 2;
+		if (MuiNumericStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG961 Prop/Scrollbar policy admission proof. DeltaFactor retains the
+	// complete signed LONG bit pattern while Horizontal/Slider are BOOLs and
+	// UseWinBorder accepts only the four MorphOS policy selectors.
+	public static uint PropPolicyAdmissionRoot()
+	{
+		var value = default(MuiPropPolicyStateRecord);
+		value.Magic = MuiPropPolicyStateRecord.Cookie;
+		value.Horizontal = 1;
+		value.DeltaFactor = unchecked((uint)int.MinValue);
+		value.Slider = 0;
+		value.UseWinBorder = 3;
+		if (!MuiPropPolicyStateAdmission.Validate(value)) return 1;
+		value.Horizontal = 2;
+		if (MuiPropPolicyStateAdmission.Validate(value)) return 2;
+		value.Horizontal = 1;
+		value.Slider = 2;
+		if (MuiPropPolicyStateAdmission.Validate(value)) return 3;
+		value.Slider = 0;
+		value.UseWinBorder = 4;
+		if (MuiPropPolicyStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG962 Prop/Scrollbar range admission proof. Entries, Visible, and First
+	// retain the guest LONG wire range while First remains reachable from the
+	// bounded Entries/Visible interval.
+	public static uint PropRangeAdmissionRoot()
+	{
+		var value = default(MuiPropRangeStateRecord);
+		value.Magic = MuiPropRangeStateRecord.Cookie;
+		value.Entries = 0x7fffffffu;
+		value.Visible = 1;
+		value.First = 0x7ffffffeu;
+		if (!MuiPropRangeStateAdmission.Validate(value)) return 1;
+		value.First = 0x7fffffffu;
+		if (MuiPropRangeStateAdmission.Validate(value)) return 2;
+		value.First = 0;
+		value.Visible = 0x80000000u;
+		if (MuiPropRangeStateAdmission.Validate(value)) return 3;
+		value.Visible = 1;
+		value.Entries = 0xffffffffu;
+		if (MuiPropRangeStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG963 Scrollbar layout admission proof. Group_Horiz remains a canonical
+	// BOOL and Scrollbar_Type accepts the documented default/bottom/top/
+	// symmetric/none values only.
+	public static uint ScrollbarLayoutAdmissionRoot()
+	{
+		var value = default(MuiScrollbarLayoutStateRecord);
+		value.Magic = MuiScrollbarLayoutStateRecord.Cookie;
+		value.Horizontal = 1;
+		value.Type = 4;
+		if (!MuiScrollbarLayoutStateAdmission.Validate(value)) return 1;
+		value.Horizontal = 2;
+		if (MuiScrollbarLayoutStateAdmission.Validate(value)) return 2;
+		value.Horizontal = 1;
+		value.Type = 5;
+		if (MuiScrollbarLayoutStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG964 Balance policy admission proof. MUIA_Balance_Quiet is documented as
+	// a LONG, so the complete guest bit pattern is retained; only the record
+	// cookie is structural admission data.
+	public static uint BalancePolicyAdmissionRoot()
+	{
+		var value = default(MuiBalancePolicyStateRecord);
+		value.Magic = MuiBalancePolicyStateRecord.Cookie;
+		value.Quiet = uint.MaxValue;
+		if (!MuiBalancePolicyStateAdmission.Validate(value)) return 1;
+		value.Magic = 0;
+		if (MuiBalancePolicyStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG965 Slider presentation admission proof. Horizontal and Quiet retain
+	// MorphOS BOOL semantics and reject noncanonical values.
+	public static uint SliderPresentationAdmissionRoot()
+	{
+		var value = default(MuiSliderPresentationStateRecord);
+		value.Magic = MuiSliderPresentationStateRecord.Cookie;
+		value.Horizontal = 1;
+		value.Quiet = 1;
+		if (!MuiSliderPresentationStateAdmission.Validate(value)) return 1;
+		value.Horizontal = 2;
+		if (MuiSliderPresentationStateAdmission.Validate(value)) return 2;
+		value.Horizontal = 1;
+		value.Quiet = 2;
+		if (MuiSliderPresentationStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG966 Scale presentation admission proof. Horizontal retains MorphOS
+	// BOOL semantics and rejects noncanonical values.
+	public static uint ScalePresentationAdmissionRoot()
+	{
+		var value = default(MuiScalePresentationStateRecord);
+		value.Magic = MuiScalePresentationStateRecord.Cookie;
+		value.Horizontal = 1;
+		if (!MuiScalePresentationStateAdmission.Validate(value)) return 1;
+		value.Horizontal = 2;
+		if (MuiScalePresentationStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG967 Levelmeter presentation admission proof. Gauge_Horiz retains
+	// MorphOS BOOL semantics and rejects noncanonical values.
+	public static uint LevelmeterPresentationAdmissionRoot()
+	{
+		var value = default(MuiLevelmeterPresentationStateRecord);
+		value.Magic = MuiLevelmeterPresentationStateRecord.Cookie;
+		value.Horizontal = 1;
+		if (!MuiLevelmeterPresentationStateAdmission.Validate(value)) return 1;
+		value.Horizontal = 2;
+		if (MuiLevelmeterPresentationStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG968 shared Area presentation admission proof. BOOL-like policy fields
+	// reject noncanonical values while unrestricted selectors remain lossless.
+	public static uint AreaPresentationAdmissionRoot()
+	{
+		var value = default(MuiAreaPresentationStateRecord);
+		value.Magic = MuiAreaPresentationStateRecord.Cookie;
+		value.Disabled = 1;
+		value.ShowMe = 1;
+		value.Background = uint.MaxValue;
+		value.Frame = uint.MaxValue;
+		value.CustomBackfill = 1;
+		if (!MuiAreaPresentationStateAdmission.Validate(value)) return 1;
+		value.Disabled = 2;
+		if (MuiAreaPresentationStateAdmission.Validate(value)) return 2;
+		value.Disabled = 1;
+		value.ShowMe = 2;
+		if (MuiAreaPresentationStateAdmission.Validate(value)) return 3;
+		value.ShowMe = 1;
+		value.CustomBackfill = 2;
+		if (MuiAreaPresentationStateAdmission.Validate(value)) return 4;
+		return 42;
+	}
+
+	// MG969 Rectangle presentation admission proof. HBar and VBar are
+	// MorphOS BOOLs and reject noncanonical values.
+	public static uint RectanglePresentationAdmissionRoot()
+	{
+		var value = default(MuiRectanglePresentationStateRecord);
+		value.Magic = MuiRectanglePresentationStateRecord.Cookie;
+		value.HorizontalBar = 1;
+		value.VerticalBar = 1;
+		if (!MuiRectanglePresentationStateAdmission.Validate(value)) return 1;
+		value.HorizontalBar = 2;
+		if (MuiRectanglePresentationStateAdmission.Validate(value)) return 2;
+		value.HorizontalBar = 1;
+		value.VerticalBar = 2;
+		if (MuiRectanglePresentationStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG972 Group grid admission proof. The fixed policy record rejects
+	// noncanonical center values while retaining the named struct boundary.
+	public static uint GroupGridAdmissionRoot()
+	{
+		var value = default(MuiGroupGridStateRecord);
+		value.Magic = MuiGroupGridStateRecord.Cookie;
+		value.Columns = 2;
+		value.Rows = 2;
+		value.HorizontalSpacing = 4;
+		value.VerticalSpacing = 4;
+		value.SameWidth = 1;
+		value.SameHeight = 1;
+		value.HorizontalCenter = 2;
+		value.VerticalCenter = 1;
+		if (!MuiGroupGridStateAdmission.Validate(value)) return 1;
+		value.HorizontalCenter = 3;
+		if (MuiGroupGridStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG978 Group layout-policy admission proof. Horizontal, SameWidth,
+	// SameHeight, and PageMode are canonical BOOLs; spacing retains MorphOS's
+	// signed default/percentage LONG representation.
+	public static uint GroupLayoutPolicyAdmissionRoot()
+	{
+		var value = default(MuiGroupLayoutPolicyStateRecord);
+		value.Magic = MuiGroupLayoutPolicyStateRecord.Cookie;
+		value.Horizontal = 1;
+		value.HorizontalSpacing = 4;
+		value.VerticalSpacing = unchecked((uint)-25);
+		value.SameWidth = 1;
+		value.SameHeight = 0;
+		value.PageMode = 1;
+		if (!MuiGroupLayoutPolicyStateAdmission.Validate(value)) return 1;
+		value.PageMode = 2;
+		if (MuiGroupLayoutPolicyStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG974 Group layout-hook admission proof. The hook is an opaque guest
+	// callback pointer, so the fixed record admits both installed and null
+	// hooks while rejecting a missing structural cookie.
+	public static uint GroupLayoutHookAdmissionRoot()
+	{
+		var value = default(MuiGroupLayoutHookStateRecord);
+		value.Magic = MuiGroupLayoutHookStateRecord.Cookie;
+		value.Hook = APTR.FromPointer(0x2800);
+		if (!MuiGroupLayoutHookStateAdmission.Validate(value)) return 1;
+		value.Hook = APTR.Null;
+		if (!MuiGroupLayoutHookStateAdmission.Validate(value)) return 2;
+		value.Magic = 0;
+		if (MuiGroupLayoutHookStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG975 Help state admission proof. HelpLine retains the complete signed
+	// LONG bit pattern, Node is an opaque caller-owned string pointer, and the
+	// generation counter rejects an uninitialized named record.
+	public static uint HelpStateAdmissionRoot()
+	{
+		var value = default(MuiHelpStateRecord);
+		value.Magic = MuiHelpStateRecord.Cookie;
+		value.Node = APTR.FromPointer(0x1B00);
+		value.Line = unchecked((uint)-7);
+		value.Generation = 1;
+		if (!MuiHelpStateAdmission.Validate(value)) return 1;
+		value.Generation = 0;
+		if (MuiHelpStateAdmission.Validate(value)) return 2;
+		value.Generation = 1;
+		value.Magic = 0;
+		if (MuiHelpStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG976 Image font-match admission proof. Match remains a scalar policy
+	// value while Height and Width retain their complete ULONG bit patterns;
+	// only the fixed record cookie is structural admission data.
+	public static uint ImageFontMatchAdmissionRoot()
+	{
+		var value = default(MuiImageFontMatchStateRecord);
+		value.Magic = MuiImageFontMatchStateRecord.Cookie;
+		value.Match = 1;
+		value.Height = 12;
+		value.Width = 24;
+		if (!MuiImageFontMatchStateAdmission.Validate(value)) return 1;
+		value.Match = uint.MaxValue;
+		if (!MuiImageFontMatchStateAdmission.Validate(value)) return 2;
+		value.Magic = 0;
+		if (MuiImageFontMatchStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
+	// MG977 Scrollgroup border-scroller admission proof. The window pointer may
+	// be null when no parent Window owns the policy; BOOL fields are canonical
+	// and Reserved must remain zero.
+	public static uint ScrollgroupBorderScrollerAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiScrollgroupBorderScrollerStateRecord);
+		value.Magic = MuiScrollgroupBorderScrollerStateRecord.Cookie;
+		value.Window = APTR.Null;
+		value.UseWindowBorder = 0;
+		value.HorizontalRequested = 0;
+		value.VerticalRequested = 0;
+		value.Applied = 0;
+		value.Reserved = 0;
+		if (!MuiScrollgroupBorderScrollerStateAdmission.Validate(ref platform,
+			value)) return 1;
+		value.Reserved = 1;
+		if (MuiScrollgroupBorderScrollerStateAdmission.Validate(ref platform,
+			value)) return 2;
+		return 42;
+	}
+
+	// MG979 Scrollgroup policy admission proof.  The policy is carried by one
+	// named guest struct: pointers remain opaque and all public BOOL values are
+	// canonical, while malformed policy cannot enter the typed consumer path.
+	public static uint ScrollgroupPolicyAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiScrollgroupPolicyStateRecord);
+		value.Magic = MuiScrollgroupPolicyStateRecord.Cookie;
+		value.Contents = APTR.Null;
+		value.FreeHorizontal = 1;
+		value.FreeVertical = 0;
+		value.HorizontalBar = APTR.Null;
+		value.VerticalBar = APTR.Null;
+		value.NoHorizontalBar = 0;
+		value.NoVerticalBar = 1;
+		value.AutoBars = 1;
+		value.UseWindowBorder = 0;
+		if (!MuiScrollgroupPolicyStateAdmission.Validate(ref platform, value))
+			return 1;
+		value.AutoBars = 2;
+		if (MuiScrollgroupPolicyStateAdmission.Validate(ref platform, value))
+			return 2;
+		return 42;
+	}
+
+	// MG980 Scrollgroup viewport admission proof.  Geometry and scroll ranges
+	// stay in a named fixed-width guest struct; only the validity predicate sees
+	// the packed wire representation.
+	public static uint ScrollgroupViewportAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiScrollgroupViewportStateRecord);
+		value.Magic = MuiScrollgroupViewportStateRecord.Cookie;
+		value.ViewportWidth = 100;
+		value.ViewportHeight = 80;
+		value.ContentWidth = 200;
+		value.ContentHeight = 120;
+		value.MaximumScrollX = 100;
+		value.MaximumScrollY = 40;
+		value.ScrollLeft = 25;
+		value.ScrollTop = 10;
+		value.HorizontalBarVisible = 1;
+		value.VerticalBarVisible = 0;
+		if (!MuiScrollgroupViewportStateAdmission.Validate(value)) return 1;
+		value.HorizontalBarVisible = 2;
+		if (MuiScrollgroupViewportStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG981 Scrollgroup normalized-layout admission proof.  The projection is
+	// carried by one named guest struct with opaque child pointers and canonical
+	// policy BOOLs; malformed policy never reaches layout consumers.
+	public static uint ScrollgroupLayoutAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiScrollgroupLayoutStateRecord);
+		value.Magic = MuiScrollgroupLayoutStateRecord.Cookie;
+		value.Contents = APTR.Null;
+		value.FreeHorizontal = 1;
+		value.FreeVertical = 0;
+		value.HorizontalBar = APTR.Null;
+		value.VerticalBar = APTR.Null;
+		value.NoHorizontalBar = 0;
+		value.NoVerticalBar = 1;
+		if (!MuiScrollgroupLayoutStateAdmission.Validate(ref platform, value))
+			return 1;
+		value.NoVerticalBar = 2;
+		if (MuiScrollgroupLayoutStateAdmission.Validate(ref platform, value))
+			return 2;
+		return 42;
+	}
+
+	// MG982 Virtgroup policy admission proof. Signed virtual geometry remains
+	// lossless in the named fixed-width struct, while Input/TryFit retain
+	// canonical BOOL admission and the owner is checked by the live consumer.
+	public static uint VirtgroupPolicyAdmissionRoot()
+	{
+		var value = default(MuiVirtgroupPolicyStateRecord);
+		value.Magic = MuiVirtgroupPolicyStateRecord.Cookie;
+		value.Input = 1;
+		value.Width = 320;
+		value.Height = 180;
+		value.Left = -12;
+		value.Top = 7;
+		value.TryFit = 0;
+		if (!MuiVirtgroupPolicyStateAdmission.Validate(value)) return 1;
+		value.TryFit = 2;
+		if (MuiVirtgroupPolicyStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG983 Virtgroup normalized-layout admission proof. The fixed struct keeps
+	// layout geometry named and width-safe; only canonical TryFit and the live
+	// owner gate the consumer path.
+	public static uint VirtgroupLayoutAdmissionRoot()
+	{
+		var value = default(MuiVirtgroupLayoutStateRecord);
+		value.Magic = MuiVirtgroupLayoutStateRecord.Cookie;
+		value.Width = 320;
+		value.Height = 180;
+		value.Left = 12;
+		value.Top = 7;
+		value.TryFit = 0;
+		if (!MuiVirtgroupLayoutStateAdmission.Validate(value)) return 1;
+		value.Left = -1;
+		if (MuiVirtgroupLayoutStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG984 Virtgroup display projection admission proof. Signed display
+	// origin remains lossless while width/height are nonnegative in the named
+	// fixed-width record and the live consumer requires an existing owner.
+	public static uint VirtgroupDisplayAdmissionRoot()
+	{
+		var value = default(MuiVirtgroupDisplayStateRecord);
+		value.Magic = MuiVirtgroupDisplayStateRecord.Cookie;
+		value.Left = -12;
+		value.Top = 7;
+		value.Width = 320;
+		value.Height = 180;
+		if (!MuiVirtgroupDisplayStateAdmission.Validate(value)) return 1;
+		value.Height = -1;
+		if (MuiVirtgroupDisplayStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG985 Virtgroup drag-state admission proof. The transient capture state
+	// remains one named guest struct; Captured is valid only with Active and no
+	// host object or managed callback is involved.
+	public static uint VirtgroupPointerAdmissionRoot()
+	{
+		var value = default(MuiVirtgroupPointerStateRecord);
+		value.Magic = MuiVirtgroupPointerStateRecord.Cookie;
+		value.Flags = MuiVirtgroupPointerStateRecord.ActiveFlag |
+			MuiVirtgroupPointerStateRecord.CapturedFlag;
+		value.StartX = 50;
+		value.StartY = 40;
+		value.StartLeft = 12;
+		value.StartTop = 7;
+		value.LastX = 52;
+		value.LastY = 41;
+		if (!MuiVirtgroupPointerStateAdmission.Validate(value)) return 1;
+		value.Flags = MuiVirtgroupPointerStateRecord.CapturedFlag;
+		if (MuiVirtgroupPointerStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG973 Selectgroup active admission proof. The persisted selector is a
+	// canonical child index bounded by the fixed traversal limit; -1/-2 remain
+	// interpreted by the public setter before storage.
+	public static uint SelectgroupActiveAdmissionRoot()
+	{
+		var value = default(MuiSelectgroupActiveStateRecord);
+		value.Magic = MuiSelectgroupActiveStateRecord.Cookie;
+		value.Active = 1;
+		if (!MuiSelectgroupActiveStateAdmission.Validate(value)) return 1;
+		value.Active = MuiHeadlessLayout.MaximumTraversal + 1u;
+		if (MuiSelectgroupActiveStateAdmission.Validate(value)) return 2;
+		return 42;
+	}
+
+	// MG970 Choice entries admission proof. The caller-owned STRPTR vector is
+	// bounded and NUL-terminated; invalid guest pointers are rejected.
+	public static uint ChoiceEntriesAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x4D100);
+		APTR.WriteUInt8(text, 0, (byte)'M');
+		APTR.WriteUInt8(text, 1, (byte)'U');
+		APTR.WriteUInt8(text, 2, (byte)'I');
+		APTR.WriteUInt8(text, 3, 0);
+		var entries = APTR.FromPointer(0x4D000);
+		APTR.WriteUInt32(entries, 0, text.Raw);
+		APTR.WriteUInt32(entries, 4, 0);
+		var value = default(MuiChoiceEntriesStateRecord);
+		value.Magic = MuiChoiceEntriesStateRecord.Cookie;
+		value.Entries = entries;
+		if (!MuiChoiceEntriesStateAdmission.Validate(ref platform, value)) return 1;
+		value.Entries = APTR.Null;
+		if (!MuiChoiceEntriesStateAdmission.Validate(ref platform, value)) return 2;
+		value.Magic = 0;
+		if (MuiChoiceEntriesStateAdmission.Validate(ref platform, value)) return 3;
+		return 42;
+	}
+
+	// MG971 Choice active admission proof. Persisted active values are
+	// nonnegative LONGs; Cycle's -1/-2 selectors are interpreted before storage.
+	public static uint ChoiceActiveAdmissionRoot()
+	{
+		if (!MuiChoiceActiveStateAdmission.ValidateActive(1)) return 1;
+		if (MuiChoiceActiveStateAdmission.ValidateActive(uint.MaxValue)) return 2;
+		return 42;
+	}
 
 		// MG09 MUIA_Application identity strings. These [I.G] attributes retain
 		// bounded caller-owned guest C-string pointers and reject live writes.
@@ -9450,6 +16294,27 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	public static int ApplicationDefaultConfigStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationDefaultConfigStateRecord);
+		value.Magic = MuiApplicationDefaultConfigStateRecord.Cookie;
+		value.ConfigId = 0x44;
+		value.Value = 0x12345678;
+		value.Requests = 7;
+		var address = APTR.FromPointer(0x4D480);
+		if (!MuiApplicationDefaultConfigStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.ConfigId != value.ConfigId || decoded.Value != value.Value ||
+			decoded.Requests != value.Requests) return 2;
+		if (MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 3;
+		return 42;
+	}
+
 	// MG09 MUIM_Application_DefaultConfigItem packet closure. The application
 	// override seam supplies a value for a guest configuration identifier and
 	// the accepted request is retained in guest-resident telemetry.
@@ -9891,6 +16756,40 @@ public static class MuiNativeRoots
 			decoded.Storage.Raw != storage) return 1;
 		if (MuiGetConfigItemMessageCodec.TryRead(ref platform,
 			APTR.FromPointer(0x00050FF5), out _)) return 2;
+		return 42;
+	}
+
+	// Focused MG1310 proof that the MUIM_GetConfigItem envelope uses its named
+	// records at the guest boundary. ConfigId, storage, method admission, and a
+	// truncated 12-byte packet are checked without importing Notify dispatch.
+	public static uint GetConfigItemMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050E00);
+		if (!MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiGetConfigItemPacketField.ConfigId, 0x24) ||
+			!MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiGetConfigItemPacketField.ConfigId, out var configId) ||
+			configId != 0x24) return 1;
+		if (!MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiGetConfigItemPacketField.Storage, 0x00050F00) ||
+			!MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiGetConfigItemPacketField.Storage, out var storage) ||
+			storage != 0x00050F00) return 2;
+		if (!MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiGetConfigItemPacketField.MethodId,
+			MuiGetConfigItemMessageCodec.Method) ||
+			!MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiGetConfigItemPacketField.MethodId, out var method) ||
+			method != MuiGetConfigItemMessageCodec.Method) return 3;
+		if (MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x00050FF5), MuiGetConfigItemPacketField.Storage,
+			out _) ||
+			MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				(MuiGetConfigItemPacketField)255, out _) ||
+			MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
+				APTR.Null, MuiGetConfigItemPacketField.ConfigId, out _)) return 4;
 		return 42;
 	}
 
@@ -15458,50 +22357,27 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// Focused MG09 ABI proof for the fixed Dirlist/Volumelist packet records.
-	// Set, rename/comment, protection, GetEntry, and method-only messages all
-	// round-trip through named structs; packed guest offsets stay in the codec.
+	// Focused MG1114 ABI proof for the fixed Dirlist/Volumelist packet records.
+	// The Set record exercises the dedicated struct codec and malformed-packet
+	// rejection here; the host suite covers rename/comment, protection, GetEntry,
+	// and method-only records through the same packet-specific boundary.
 	public static uint DirlistMessageCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
-		const uint packetAddress = 0x00050F20;
-		const uint storage = 0x00050F80;
-		var packet = APTR.FromPointer(packetAddress);
-		if (!MuiDirlistMessageCodec.WriteSet(ref platform, packet,
-			MuiDirlistMessageCodec.Set, 0x8042EA41u, 0x00050D00) ||
-			!MuiDirlistMessageCodec.TryReadSet(ref platform, packet,
-				MuiDirlistMessageCodec.Set, out var set) ||
-			set.Attribute != 0x8042EA41u || set.Value != 0x00050D00) return 1;
-		if (!MuiDirlistMessageCodec.WriteRename(ref platform, packet,
-			MuiDirlistMessageCodec.SetComment, 3, 0x00050D20) ||
-			!MuiDirlistMessageCodec.TryReadRename(ref platform, packet,
-				MuiDirlistMessageCodec.SetComment, out var comment) ||
-			comment.Entry != 3 || comment.Name != 0x00050D20) return 2;
-		if (!MuiDirlistMessageCodec.WriteProtection(ref platform, packet,
-			7, 0x12345678u) ||
-			!MuiDirlistMessageCodec.TryReadProtection(ref platform, packet,
-				out var protection) || protection.Entry != 7 ||
-			protection.Protection != 0x12345678u) return 3;
-		if (!MuiDirlistMessageCodec.WriteGetEntry(ref platform, packet,
-			unchecked((uint)-2), storage) ||
-			!MuiDirlistMessageCodec.TryReadGetEntry(ref platform, packet,
-				out var getEntry) || getEntry.Position != unchecked((uint)-2) ||
-			getEntry.Storage != storage) return 4;
-		if (!MuiDirlistMessageCodec.WriteMethod(ref platform, packet,
-			MuiDirlistMessageCodec.ReRead) ||
-			!MuiDirlistMessageCodec.IsValidMethod(ref platform, packet,
-				MuiDirlistMessageCodec.ReRead)) return 5;
-		if (!MuiDirlistMessageCodec.WriteMethod(ref platform, packet,
-			MuiDirlistMessageCodec.ListClear) ||
-			!MuiDirlistMessageCodec.IsValidMethod(ref platform, packet,
-				MuiDirlistMessageCodec.ListClear)) return 6;
-		if (MuiDirlistMessageCodec.TryReadGetEntry(ref platform,
-			APTR.FromPointer(0x00050FFF), out _)) return 7;
-		if (MuiDirlistMessageCodec.WriteSet(ref platform, packet,
-			0x80420000u, 1, 2)) return 8;
-		if (MuiDirlistMessageCodec.IsValidMethod(ref platform, packet,
-			0x80420000u)) return 9;
+		var packet = APTR.FromPointer(0x00050F20);
+		var set = default(MuiDirlistSetMessage);
+		set.MethodId = MuiDirlistMessageCodec.Set;
+		set.Attribute = 0x8042EA41u;
+		set.Value = 0x00050D00;
+		if (!MuiDirlistSetMessageCodec.TryWrite(ref platform, packet, set))
+			return 1;
+		if (!MuiDirlistSetMessageCodec.TryRead(ref platform, packet,
+			out var setRead)) return 2;
+		if (setRead.Attribute != 0x8042EA41u ||
+			setRead.Value != 0x00050D00) return 3;
+		if (MuiDirlistSetMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 4;
 		return 42;
 	}
 
@@ -15527,76 +22403,170 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// Focused MG09 ABI proof for the fixed external Listtree.mcc packet records.
-	// Every documented fixed envelope round-trips through named structs; packed
-	// guest offsets remain confined to MuiListtreeMessageCodec.
+	// MG922 focused Dirlist/Volumelist state-admission proof. Named sort,
+	// filter, and scan records accept canonical MorphOS values and reject
+	// malformed selectors, BOOLs, and status before live consumers use them.
+	public static uint DirlistStateAdmissionRoot()
+	{
+		var sort = default(MuiDirlistSortStateRecord);
+		sort.Magic = MuiDirlistSortStateRecord.Cookie;
+		sort.SortType = 5;
+		sort.SortDirs = 2;
+		sort.SortHighLow = 1;
+		if (!MuiDirlistStateAdmission.ValidateSort(sort)) return 1;
+		sort.SortType = 6;
+		if (MuiDirlistStateAdmission.ValidateSort(sort)) return 2;
+
+		var filter = default(MuiDirlistFilterStateRecord);
+		filter.Magic = MuiDirlistFilterStateRecord.Cookie;
+		filter.DrawersOnly = 1;
+		filter.FilesOnly = 1;
+		filter.FilterDrawers = 1;
+		filter.MultiSelDirs = 1;
+		filter.RejectIcons = 1;
+		if (!MuiDirlistStateAdmission.ValidateFilter(filter)) return 3;
+		filter.DrawersOnly = 2;
+		if (MuiDirlistStateAdmission.ValidateFilter(filter)) return 4;
+
+		var scan = default(MuiDirlistScanStateRecord);
+		scan.Magic = MuiDirlistScanStateRecord.Cookie;
+		scan.Status = MuiDirlistCore.StatusValid;
+		scan.NumFiles = 7;
+		scan.NumDrawers = 4;
+		if (!MuiDirlistStateAdmission.ValidateScan(scan)) return 5;
+		scan.Status = MuiDirlistCore.StatusValid + 1;
+		if (MuiDirlistStateAdmission.ValidateScan(scan)) return 6;
+		return 42;
+	}
+
+	// MG923 focused Volumelist ExampleMode admission proof. The named
+	// MorphOS BOOL accepts canonical values and rejects malformed state before
+	// a live consumer can select synthetic-volume population.
+	public static uint VolumelistModeAdmissionRoot()
+	{
+		var mode = default(MuiVolumelistCore.MuiVolumelistModeStateRecord);
+		mode.Magic = MuiVolumelistCore.MuiVolumelistModeStateRecord.Cookie;
+		mode.ExampleMode = 1;
+		if (!MuiVolumelistCore.MuiVolumelistModeStateAdmission.Validate(mode))
+			return 1;
+		mode.ExampleMode = 2;
+		if (MuiVolumelistCore.MuiVolumelistModeStateAdmission.Validate(mode))
+			return 2;
+		return 42;
+	}
+
+	// Focused MG1115 ABI proof for the fixed external Listtree.mcc packet
+	// records. The Set record exercises its dedicated struct codec here; the
+	// host packet suite covers the Get/GetEntry records and remaining envelopes.
 	public static uint ListtreeMessageCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
-		const uint packetAddress = 0x00050F20;
-		var packet = APTR.FromPointer(packetAddress);
-		if (!MuiListtreeMessageCodec.WriteSet(ref platform, packet,
-			MuiListtreeMessageCodec.Set, 0x80420001u, 7) ||
-			!MuiListtreeMessageCodec.TryReadSet(ref platform, packet,
-				MuiListtreeMessageCodec.Set, out var set) ||
-			set.Attribute != 0x80420001u || set.Value != 7) return 1;
-		if (!MuiListtreeMessageCodec.WriteGet(ref platform, packet, 9,
-			0x00050D00) || !MuiListtreeMessageCodec.TryReadGet(ref platform,
-			packet, out var get) || get.Attribute != 9 ||
-			get.Storage != 0x00050D00) return 2;
-		if (!MuiListtreeMessageCodec.WriteInsert(ref platform, packet,
-			0x00050D20, 0x00050D40, 0x00050D60, 0x00050D80, 4) ||
-			!MuiListtreeMessageCodec.TryReadInsert(ref platform, packet,
-				out var insert) || insert.Name != 0x00050D20 ||
-			insert.User != 0x00050D40 || insert.Flags != 4) return 3;
-		if (!MuiListtreeMessageCodec.WriteRemove(ref platform, packet,
-			0x00050D60, 0x00050DA0, 5) ||
-			!MuiListtreeMessageCodec.TryReadRemove(ref platform, packet,
-				out var remove) || remove.ListNode != 0x00050D60 ||
-			remove.TreeNode != 0x00050DA0) return 4;
-		if (!MuiListtreeMessageCodec.WriteGetEntry(ref platform, packet,
-			0x00050D60, unchecked((uint)-2), 6) ||
-			!MuiListtreeMessageCodec.TryReadGetEntry(ref platform, packet,
-				out var entry) || entry.Position != unchecked((uint)-2) ||
-			entry.Flags != 6) return 5;
-		if (!MuiListtreeMessageCodec.WriteOpenClose(ref platform, packet,
-			MuiListtreeMessageCodec.Open, 0x00050D60, 0x00050DA0, 1) ||
-			!MuiListtreeMessageCodec.TryReadOpenClose(ref platform, packet,
-				MuiListtreeMessageCodec.Open, out var open) ||
-			open.TreeNode != 0x00050DA0) return 6;
-		if (!MuiListtreeMessageCodec.WriteGetNr(ref platform, packet,
-			0x00050D60, 2) ||
-			!MuiListtreeMessageCodec.TryReadGetNr(ref platform, packet,
-				MuiListtreeMessageCodec.GetNr, out var getNr) ||
-			getNr.Flags != 2) return 7;
-		if (!MuiListtreeMessageCodec.WriteMoveExchange(ref platform, packet,
-			MuiListtreeMessageCodec.Move, 0x00050D60, 0x00050DA0,
-			0x00050DC0, 0x00050DE0, 3) ||
-			!MuiListtreeMessageCodec.TryReadMoveExchange(ref platform, packet,
-				MuiListtreeMessageCodec.Move, out var move) ||
-			move.NewListNode != 0x00050DC0 || move.Flags != 3) return 8;
-		if (!MuiListtreeMessageCodec.WriteRename(ref platform, packet,
-			0x00050DA0, 0x00050E00, 8) ||
-			!MuiListtreeMessageCodec.TryReadRename(ref platform, packet,
-				out var rename) || rename.NewName != 0x00050E00) return 9;
-		if (!MuiListtreeMessageCodec.WriteFindName(ref platform, packet,
-			0x00050D60, 0x00050E00, 9) ||
-			!MuiListtreeMessageCodec.TryReadFindName(ref platform, packet,
-				out var find) || find.ListNode != 0x00050D60) return 10;
-		if (!MuiListtreeMessageCodec.WriteDropMark(ref platform, packet, 10,
-			11) || !MuiListtreeMessageCodec.TryReadDropMark(ref platform, packet,
-			out var drop) || drop.Entry != 10 || drop.Values != 11) return 11;
-		if (!MuiListtreeMessageCodec.WriteTestPos(ref platform, packet, 12, 13,
-			0x00050DA0) || !MuiListtreeMessageCodec.TryReadTestPos(ref platform,
-			packet, out var testPos) || testPos.X != 12 ||
-			testPos.Result != 0x00050DA0) return 12;
-		if (MuiListtreeMessageCodec.WriteSet(ref platform, packet,
-			0x80420000u, 1, 2)) return 13;
-		if (MuiListtreeMessageCodec.TryReadInsert(ref platform,
-			APTR.FromPointer(0x00050FFF), out _)) return 14;
-		if (MuiListtreeMessageCodec.TryReadGet(ref platform, packet, out _))
-			return 15;
+		var packet = APTR.FromPointer(0x00050F20);
+		var set = default(MuiListtreeSetMessage);
+		set.MethodId = MuiListtreeMessageCodec.Set;
+		set.Attribute = 7;
+		set.Value = 9;
+		if (!MuiListtreeSetMessageCodec.TryWrite(ref platform, packet, set))
+			return 1;
+		if (!MuiListtreeSetMessageCodec.TryRead(ref platform, packet,
+			out var setRead) || setRead.Attribute != 7 ||
+			setRead.Value != 9) return 2;
+		if (MuiListtreeGetEntryMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 3;
+		return 42;
+	}
+
+	// Focused MG1116 ABI proof for the Listtree insert mutation record. The
+	// host packet suite covers remove and open/close through the same adapter.
+	public static uint ListtreeMutationPacketCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050F20);
+		var insert = default(MuiListtreeInsertMessage);
+		insert.MethodId = MuiListtreeMessageCodec.Insert;
+		insert.Name = 0x00050D20;
+		insert.User = 0x00050D24;
+		insert.ListNode = 0x00050D28;
+		insert.PrevNode = 0x00050D2C;
+		insert.Flags = 5;
+		if (!MuiListtreeInsertMessageCodec.TryWrite(ref platform, packet,
+			insert)) return 1;
+		if (!MuiListtreeInsertMessageCodec.TryRead(ref platform, packet,
+			out var read) || read.Name != insert.Name ||
+			read.PrevNode != insert.PrevNode || read.Flags != insert.Flags)
+			return 2;
+		if (MuiListtreeInsertMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 3;
+		return 42;
+	}
+
+	// Focused MG1117 ABI proof for the Listtree ordering/query records. The
+	// host packet suite also exercises GetNr through the same struct adapter.
+	public static uint ListtreeOrderingPacketCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050F20);
+		var sort = default(MuiListtreeSortMessage);
+		sort.MethodId = MuiListtreeMessageCodec.Sort;
+		sort.ListNode = 0x00050D50;
+		sort.Flags = 8;
+		if (!MuiListtreeSortMessageCodec.TryWrite(ref platform, packet, sort))
+			return 1;
+		if (!MuiListtreeSortMessageCodec.TryRead(ref platform, packet,
+			out var read) || read.ListNode != sort.ListNode ||
+			read.Flags != sort.Flags) return 2;
+		if (MuiListtreeSortMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 3;
+		return 42;
+	}
+
+	// Focused MG1118 ABI proof for the Listtree Move/Exchange record. The host
+	// packet suite also exercises Rename and FindName through the adapter.
+	public static uint ListtreeLookupMutationPacketCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050F20);
+		var move = default(MuiListtreeMoveExchangeMessage);
+		move.MethodId = MuiListtreeMessageCodec.Move;
+		move.OldListNode = 0x00050D60;
+		move.OldTreeNode = 0x00050D64;
+		move.NewListNode = 0x00050D68;
+		move.NewTreeNode = 0x00050D6C;
+		move.Flags = 10;
+		if (!MuiListtreeMoveExchangeMessageCodec.TryWrite(ref platform, packet,
+			move)) return 1;
+		if (!MuiListtreeMoveExchangeMessageCodec.TryRead(ref platform, packet,
+			out var read) || read.OldTreeNode != move.OldTreeNode ||
+			read.NewTreeNode != move.NewTreeNode || read.Flags != move.Flags)
+			return 2;
+		if (MuiListtreeMoveExchangeMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 3;
+		return 42;
+	}
+
+	// Focused MG1119 ABI proof for the mixed TestPos packet. The host packet
+	// suite also exercises SetDropMark through the same dedicated adapter.
+	public static uint ListtreeDropMarkTestPosPacketCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050F20);
+		var testPos = default(MuiListtreeTestPosMessage);
+		testPos.MethodId = MuiListtreeMessageCodec.TestPos;
+		testPos.X = 14;
+		testPos.Y = 15;
+		testPos.Result = 0x00050DA0;
+		if (!MuiListtreeTestPosMessageCodec.TryWrite(ref platform, packet,
+			testPos)) return 1;
+		if (!MuiListtreeTestPosMessageCodec.TryRead(ref platform, packet,
+			out var read) || read.X != testPos.X || read.Y != testPos.Y ||
+			read.Result != testPos.Result) return 2;
+		if (MuiListtreeTestPosMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FFF), out _)) return 3;
 		return 42;
 	}
 
@@ -18130,6 +25100,26 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG1037 headless-state admission proof. The common MUI state header keeps
+	// its fixed-width struct valid before any object or notification consumer.
+	public static uint HeadlessStateAdmissionRoot()
+	{
+		var value = new MuiHeadlessStateRecord
+		{
+			Magic = MuiHeadlessLayout.Magic,
+			Version = MuiHeadlessLayout.Version,
+			NextSequence = 1,
+			NotifyDepth = MuiHeadlessLayout.MaximumNotificationDepth,
+		};
+		if (!MuiHeadlessStateAdmission.Validate(value)) return 1;
+		value.NotifyDepth = MuiHeadlessLayout.MaximumNotificationDepth + 1;
+		if (MuiHeadlessStateAdmission.Validate(value)) return 2;
+		value.NotifyDepth = 0;
+		value.Magic = 0;
+		if (MuiHeadlessStateAdmission.Validate(value)) return 3;
+		return 42;
+	}
+
 	// MG09 typed class-service record closure. Service state, class lease, and
 	// MUI_CustomClass fields round-trip through their named codecs without
 	// entering the loader or custom-class lifecycle.
@@ -18808,6 +25798,22 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG919 focused Pop* live-admission proof. The named 108-byte state remains
+	// structurally writable, while the live Valid path rejects a Popstring state
+	// carrying an object-only flag. Returns 42 on the MC68000 closure.
+	public static uint PopSpecialistAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var state = default(MuiPopSpecialistState);
+		state.Magic = MuiPopSpecialistState.Cookie;
+		state.Class = (uint)MuiPopSpecialistClass.Popstring;
+		if (!MuiPopSpecialistAdmission.Validate(ref platform, state)) return 1;
+		state.Flags = MuiPopSpecialistLayout.FlagFollow;
+		if (MuiPopSpecialistAdmission.Validate(ref platform, state)) return 2;
+		return 42;
+	}
+
 	// Focused MG09 ABI proof for the fixed Pop* specialist packet records.
 	// OM_GET, Set/NoNotifySet, Popstring_Close, and method-only frames round-trip
 	// through named structs; malformed and unsupported packets are rejected
@@ -18847,6 +25853,57 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Focused MG1306 proof that each fixed Pop* packet field crosses the guest
+	// boundary through the named packet structs and their bounded memory
+	// adapter. The state machine is intentionally outside this record closure.
+	public static uint PopSpecialistMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050E00);
+		if (!MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiPopSpecialistPacketKind.Method,
+			MuiPopSpecialistField.MethodId, MuiPopSpecialistMessageCodec.OmDispose) ||
+			!MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiPopSpecialistPacketKind.Method, MuiPopSpecialistField.MethodId,
+				out var method) || method != MuiPopSpecialistMessageCodec.OmDispose)
+			return 1;
+		if (!MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiPopSpecialistPacketKind.Get,
+			MuiPopSpecialistField.Attribute, 0x120) ||
+			!MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+				packet, MuiPopSpecialistPacketKind.Get,
+				MuiPopSpecialistField.Storage, 0x00050F00) ||
+			!MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiPopSpecialistPacketKind.Get, MuiPopSpecialistField.Storage,
+				out var storage) || storage != 0x00050F00)
+			return 2;
+		if (!MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiPopSpecialistPacketKind.Set,
+			MuiPopSpecialistField.Value, 0x456) ||
+			!MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiPopSpecialistPacketKind.Set, MuiPopSpecialistField.Value,
+				out var value) || value != 0x456)
+			return 3;
+		if (!MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiPopSpecialistPacketKind.Close,
+			MuiPopSpecialistField.Result, 1) ||
+			!MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiPopSpecialistPacketKind.Close, MuiPopSpecialistField.Result,
+				out var result) || result != 1)
+			return 4;
+		if (MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x00050FFD), MuiPopSpecialistPacketKind.Close,
+			MuiPopSpecialistField.Result, out _) ||
+			MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiPopSpecialistPacketKind.Method,
+				MuiPopSpecialistField.Attribute, out _) ||
+			MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+				APTR.Null, MuiPopSpecialistPacketKind.Set,
+				MuiPopSpecialistField.Value, out _)) return 5;
+		return 42;
+	}
+
 	// MG610 Poplist pointer-vector closure. The caller-owned string vector is
 	// authored and materialized through named pointer-slot records; the live
 	// SetArray/SelectEntry path then consumes the same bounded cursor. No raw
@@ -18883,7 +25940,7 @@ public static class MuiNativeRoots
 			MuiPopSpecialistClass.Poplist, stringChild, buttonChild)) return 4;
 		if (!MuiPopSpecialistCore.SetArray(ref platform, instance, source) ||
 			MuiPopSpecialistCore.ArrayCount(ref platform, instance) != 2) return 5;
-		if (!MuiPopSpecialistStateCodec.TryRead(ref platform, instance,
+		if (!MuiPopSpecialistStateCodec.TryReadStructural(ref platform, instance,
 			out var state) || state.MaterializedArray.IsNull) return 6;
 
 		var materializedCursor = default(MuiPoplistArrayCursor);
@@ -19040,6 +26097,104 @@ public static class MuiNativeRoots
 			APTR.FromPointer(0x00050FFF), out _)) return 6;
 		if (MuiMiscSpecialistMessageCodec.TryReadSet(ref platform, packet,
 			0xDEADBEEFu, out _)) return 7;
+		return 42;
+	}
+
+	// Focused MG1307 proof that every fixed Misc specialist packet field crosses
+	// the guest boundary through named packet structs and one bounded memory
+	// adapter. The lifecycle, get/set, pointer/pair, HandleInput, and Mccprefs
+	// RegisterGadget records are exercised without importing the state machine.
+	public static uint MiscSpecialistMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050E00);
+		if (!MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiMiscSpecialistPacketKind.Lifecycle,
+			MuiMiscSpecialistField.MethodId, MuiMiscAttributes.Setup) ||
+			!MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMiscSpecialistPacketKind.Lifecycle,
+				MuiMiscSpecialistField.MethodId, out var lifecycle) ||
+			lifecycle != MuiMiscAttributes.Setup) return 1;
+		if (!MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiMiscSpecialistPacketKind.Get,
+			MuiMiscSpecialistField.Storage, 0x00050F00) ||
+			!MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMiscSpecialistPacketKind.Get, MuiMiscSpecialistField.Storage,
+				out var storage) || storage != 0x00050F00) return 2;
+		if (!MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiMiscSpecialistPacketKind.Set,
+			MuiMiscSpecialistField.Value, 0x456) ||
+			!MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMiscSpecialistPacketKind.Set, MuiMiscSpecialistField.Value,
+				out var value) || value != 0x456) return 3;
+		if (!MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiMiscSpecialistPacketKind.Pointer,
+			MuiMiscSpecialistField.Pointer, 0x00050F20) ||
+			!MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMiscSpecialistPacketKind.Pointer, MuiMiscSpecialistField.Pointer,
+				out var pointer) || pointer != 0x00050F20) return 4;
+		if (!MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiMiscSpecialistPacketKind.Pair,
+			MuiMiscSpecialistField.Second, 0x00050F30) ||
+			!MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMiscSpecialistPacketKind.Pair, MuiMiscSpecialistField.Second,
+				out var second) || second != 0x00050F30) return 5;
+		if (!MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiMiscSpecialistPacketKind.HandleInput,
+			MuiMiscSpecialistField.MuiKey, unchecked((uint)-2)) ||
+			!MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMiscSpecialistPacketKind.HandleInput,
+				MuiMiscSpecialistField.MuiKey, out var muiKey) ||
+			muiKey != unchecked((uint)-2)) return 6;
+		if (!MuiMiscSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiMiscSpecialistPacketKind.RegisterGadget,
+			MuiMiscSpecialistField.Label, 10) ||
+			!MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMiscSpecialistPacketKind.RegisterGadget,
+				MuiMiscSpecialistField.Label, out var label) || label != 10) return 7;
+		if (MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x00050FE9),
+			MuiMiscSpecialistPacketKind.RegisterGadget,
+			MuiMiscSpecialistField.Label, out _) ||
+			MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiMiscSpecialistPacketKind.Method,
+				MuiMiscSpecialistField.Attribute, out _) ||
+			MuiMiscSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+				APTR.Null, MuiMiscSpecialistPacketKind.Set,
+				MuiMiscSpecialistField.Value, out _)) return 8;
+		return 42;
+	}
+
+	// MG920 focused Misc live-admission proof. The named header accepts its own
+	// Keyadjust policy flags and rejects a Title-only flag before any class method
+	// can observe the sidecar. Returns 42 on the MC68000 closure.
+	public static uint MiscSpecialistAdmissionRoot()
+	{
+		var header = default(MuiMiscSpecialistHeader);
+		header.Magic = MuiMiscSpecialistHeader.Cookie;
+		header.Class = (uint)MuiMiscSpecialistClass.Keyadjust;
+		if (!MuiMiscSpecialistAdmission.ValidateHeader(header)) return 1;
+		header.Flags = MuiMiscSpecialistLayout.FlagTiClosable;
+		if (MuiMiscSpecialistAdmission.ValidateHeader(header)) return 2;
+		return 42;
+	}
+
+	// MG921 focused external-wrapper admission proof. The named header policy is
+	// exercised directly on MC68000 so the native closure stays freestanding and
+	// relocation-free; host coverage additionally drives the full sidecar state
+	// topology through MuiExternalWrapperCore.Valid.
+	public static uint ExternalWrapperAdmissionRoot()
+	{
+		var header = default(MuiExternalWrapperHeader);
+		header.Magic = MuiExternalWrapperHeader.Cookie;
+		header.Class = MuiExternalWrapperClass.Dtpic;
+		if (!MuiExternalWrapperAdmission.ValidateHeader(header)) return 1;
+		header.Flags = MuiExternalWrapperLayout.FlagSmart;
+		if (MuiExternalWrapperAdmission.ValidateHeader(header)) return 2;
+		header.Class = MuiExternalWrapperClass.Boopsi;
+		header.Flags = MuiExternalWrapperLayout.FlagFreeHoriz;
+		if (MuiExternalWrapperAdmission.ValidateHeader(header)) return 3;
 		return 42;
 	}
 
@@ -19679,6 +26834,61 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Focused MG1308 proof that each fixed Process/Slave packet field crosses
+	// the guest boundary through named packet structs and one bounded memory
+	// adapter. Get/set, signal, error, and Slave dispatch records are covered
+	// without importing the process state machine.
+	public static uint ProcessSpecialistMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050E00);
+		if (!MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiProcessSpecialistPacketKind.Get,
+			MuiProcessSpecialistField.Storage, 0x00050F00) ||
+			!MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiProcessSpecialistPacketKind.Get,
+				MuiProcessSpecialistField.Storage, out var storage) ||
+			storage != 0x00050F00) return 1;
+		if (!MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiProcessSpecialistPacketKind.Set,
+			MuiProcessSpecialistField.Value, 0x456) ||
+			!MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiProcessSpecialistPacketKind.Set, MuiProcessSpecialistField.Value,
+				out var value) || value != 0x456) return 2;
+		if (!MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiProcessSpecialistPacketKind.Signal,
+			MuiProcessSpecialistField.Signals, 0x40) ||
+			!MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiProcessSpecialistPacketKind.Signal,
+				MuiProcessSpecialistField.Signals, out var signals) || signals != 0x40)
+			return 3;
+		if (!MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiProcessSpecialistPacketKind.Error,
+			MuiProcessSpecialistField.ErrorCode, 205) ||
+			!MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiProcessSpecialistPacketKind.Error,
+				MuiProcessSpecialistField.ErrorCode, out var error) || error != 205)
+			return 4;
+		if (!MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiProcessSpecialistPacketKind.Dispatch,
+			MuiProcessSpecialistField.Packet, 0x00050F20) ||
+			!MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiProcessSpecialistPacketKind.Dispatch,
+				MuiProcessSpecialistField.Packet, out var dispatch) ||
+			dispatch != 0x00050F20) return 5;
+		if (MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x00050FFD), MuiProcessSpecialistPacketKind.Signal,
+			MuiProcessSpecialistField.Signals, out _) ||
+			MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, packet,
+				MuiProcessSpecialistPacketKind.Method,
+				MuiProcessSpecialistField.Attribute, out _) ||
+			MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+				APTR.Null, MuiProcessSpecialistPacketKind.Set,
+				MuiProcessSpecialistField.Value, out _)) return 6;
+		return 42;
+	}
+
 	private static void WriteProcessClassName(APTR address)
 	{
 		APTR.WriteUInt8(address, 0, (byte)'P');
@@ -19893,6 +27103,6374 @@ public static class MuiNativeRoots
 		if (MuiExternalWrapperCore.Valid(ref platform, instance)) return 34;
 
 		return 42;
+	}
+
+	// MG1049 extends the scheduler closure through the named guest codec:
+	// malformed cookies remain structurally readable but are rejected by the
+	// strict reader before queue consumers can act on them.
+	public static uint ApplicationSchedulerAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationSchedulerStateRecord);
+		value.Magic = MuiApplicationSchedulerStateRecord.Cookie;
+		if (!MuiApplicationSchedulerStateAdmission.Validate(ref platform, value))
+			return 1;
+		var address = APTR.FromPointer(0x4D200);
+		if (!MuiApplicationSchedulerStateRecordCodec.Write(ref platform, address,
+			value)) return 2;
+		if (!MuiApplicationSchedulerStateRecordCodec.TryRead(ref platform, address,
+			out var decoded) || decoded.SignalMask != value.SignalMask) return 3;
+		if (!MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationSchedulerStateField.Magic, 0)) return 4;
+		if (!MuiApplicationSchedulerStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural) || structural.Magic != 0) return 5;
+		if (MuiApplicationSchedulerStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 6;
+		value.Magic = MuiApplicationSchedulerStateRecord.Cookie;
+
+		// Head/tail pairing and reachable-tail identity are structural
+		// invariants, independent of any live Application object.
+		value.ReturnHead = APTR.FromPointer(0x4D000);
+		if (MuiApplicationSchedulerStateAdmission.Validate(ref platform, value))
+			return 7;
+		value.ReturnTail = APTR.FromPointer(0x4D020);
+		if (MuiApplicationSchedulerStateAdmission.Validate(ref platform, value))
+			return 8;
+
+		// Input-handler nodes must carry the same packet identity as their
+		// caller-owned named handler records.
+		value.ReturnHead = APTR.Null;
+		value.ReturnTail = APTR.Null;
+		value.InputHandlers = APTR.FromPointer(0x4D040);
+		var handler = APTR.FromPointer(0x4D080);
+		var inputNode = default(MuiApplicationWindowNodeRecord);
+		inputNode.Value = handler;
+		inputNode.Packet = 1;
+		if (!MuiApplicationWindowNodeCodec.Write(ref platform,
+			value.InputHandlers, inputNode) ||
+			!MuiInputHandlerFieldCursorCodec.TryWriteUInt32(ref platform, handler,
+				MuiInputHandlerField.Packet, 2)) return 4;
+		if (MuiApplicationSchedulerStateAdmission.Validate(ref platform, value))
+			return 10;
+		inputNode.Packet = 2;
+		if (!MuiApplicationWindowNodeCodec.Write(ref platform,
+			value.InputHandlers, inputNode) ||
+			!MuiApplicationSchedulerStateAdmission.Validate(ref platform, value))
+			return 11;
+
+		// Pushed methods accept at most seven 32-bit arguments.
+		value.InputHandlers = APTR.Null;
+		value.PushHead = APTR.FromPointer(0x4D0C0);
+		value.PushTail = value.PushHead;
+		var pushNode = default(MuiApplicationWindowNodeRecord);
+		pushNode.Value = APTR.FromPointer(0x4D100);
+		pushNode.Auxiliary = 8;
+		if (!MuiApplicationWindowNodeCodec.Write(ref platform, value.PushHead,
+			pushNode) || MuiApplicationSchedulerStateAdmission.Validate(ref platform,
+			value)) return 12;
+		return 42;
+	}
+
+	public static uint ApplicationMessageRoutingAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationMessageRoutingStateRecord);
+		value.Magic = MuiApplicationMessageRoutingStateRecord.Cookie;
+		if (!MuiApplicationMessageRoutingStateAdmission.Validate(ref platform, value))
+			return 1;
+		var address = APTR.FromPointer(0x4D180);
+		if (!MuiApplicationMessageRoutingStateRecordCodec.Write(ref platform,
+			address, value)) return 2;
+		if (!MuiApplicationMessageRoutingStateRecordCodec.TryRead(ref platform,
+			address, out var decoded) || decoded.WindowAppWindow != 0 ||
+			decoded.AppMessage.IsNotNull) return 3;
+		if (!MuiApplicationMessageRoutingStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationMessageRoutingStateField.Magic, 0))
+			return 4;
+		if (!MuiApplicationMessageRoutingStateRecordCodec.TryReadStructural(
+			ref platform, address, out var structural) || structural.Magic != 0)
+			return 5;
+		if (MuiApplicationMessageRoutingStateRecordCodec.TryRead(ref platform,
+			address, out _)) return 6;
+		value.Magic = MuiApplicationMessageRoutingStateRecord.Cookie;
+
+		value.WindowAppWindow = 2;
+		if (MuiApplicationMessageRoutingStateAdmission.Validate(ref platform, value))
+			return 7;
+		value.WindowAppWindow = 0;
+		value.AppMessage = APTR.FromPointer(0x4D000);
+		if (!MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform,
+			value.AppMessage, MuiAppMessageField.NumberOfArguments,
+			unchecked((uint)-1))) return 8;
+		if (MuiApplicationMessageRoutingStateAdmission.Validate(ref platform, value))
+			return 9;
+		if (!MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform,
+			value.AppMessage, MuiAppMessageField.NumberOfArguments, 0) ||
+			!MuiApplicationMessageRoutingStateAdmission.Validate(ref platform, value))
+			return 10;
+		return 42;
+	}
+
+	public static int ApplicationMessageRoutingStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationMessageRoutingStateRecord);
+		value.Magic = MuiApplicationMessageRoutingStateRecord.Cookie;
+		value.WindowAppWindow = 1;
+		var address = APTR.FromPointer(0x4D200);
+		if (!MuiApplicationMessageRoutingStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationMessageRoutingStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.AppMessage != value.AppMessage ||
+			decoded.WindowAppWindow != value.WindowAppWindow) return 2;
+		if (MuiApplicationMessageRoutingStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 3;
+		return 42;
+	}
+
+	public static uint ApplicationIdentityTextAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+
+		var identity = default(MuiApplicationIdentityStateRecord);
+		identity.Magic = MuiApplicationIdentityStateRecord.Cookie;
+		if (!MuiApplicationIdentityStateAdmission.Validate(ref platform, identity))
+			return 1;
+		identity.Title = APTR.FromPointer(0x4D000);
+		WriteCString(identity.Title, (byte)'C', (byte)'o', (byte)'p', (byte)'p',
+			(byte)'e', (byte)'r', (byte)'O', (byte)'S');
+		var identityAddress = APTR.FromPointer(0x4D200);
+		if (!MuiApplicationIdentityStateRecordCodec.Write(ref platform,
+			identityAddress, identity)) return 2;
+		if (!MuiApplicationIdentityStateRecordCodec.TryRead(ref platform,
+			identityAddress, out var decoded) || decoded.Title != identity.Title)
+			return 3;
+		if (!MuiApplicationIdentityStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			identityAddress, MuiApplicationIdentityStateField.Magic, 0)) return 4;
+		if (!MuiApplicationIdentityStateRecordCodec.TryReadStructural(ref platform,
+			identityAddress, out var structural) || structural.Magic != 0) return 5;
+		if (MuiApplicationIdentityStateRecordCodec.TryRead(ref platform,
+			identityAddress, out _)) return 6;
+		identity.Magic = MuiApplicationIdentityStateRecord.Cookie;
+		if (!MuiApplicationIdentityStateAdmission.Validate(ref platform, identity))
+			return 7;
+		identity.Title = APTR.FromPointer(0xFFFFFF00);
+		if (MuiApplicationIdentityStateAdmission.Validate(ref platform, identity))
+			return 8;
+
+		var text = default(MuiApplicationTextStateRecord);
+		text.Magic = MuiApplicationTextStateRecord.Cookie;
+		if (!MuiApplicationTextStateAdmission.Validate(ref platform, text))
+			return 9;
+		text.HelpFile = APTR.FromPointer(0x4D040);
+		WriteCString(text.HelpFile, (byte)'S', (byte)'Y', (byte)'S', (byte)':',
+			(byte)'H', (byte)'e', (byte)'l', (byte)'p');
+		if (!MuiApplicationTextStateAdmission.Validate(ref platform, text))
+			return 10;
+		var textAddress = APTR.FromPointer(0x4D240);
+		if (!MuiApplicationTextStateRecordCodec.Write(ref platform, textAddress,
+			text)) return 11;
+		if (!MuiApplicationTextStateRecordCodec.TryRead(ref platform, textAddress,
+			out var textDecoded) || textDecoded.HelpFile != text.HelpFile)
+			return 12;
+		if (!MuiApplicationTextStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			textAddress, MuiApplicationTextStateField.Magic, 0)) return 13;
+		if (!MuiApplicationTextStateRecordCodec.TryReadStructural(ref platform,
+			textAddress, out var textStructural) || textStructural.Magic != 0)
+			return 14;
+		if (MuiApplicationTextStateRecordCodec.TryRead(ref platform, textAddress,
+			out _)) return 15;
+		text.Magic = MuiApplicationTextStateRecord.Cookie;
+		text.IconifyTitle = APTR.FromPointer(0xFFFFFF00);
+		if (MuiApplicationTextStateAdmission.Validate(ref platform, text))
+			return 16;
+		return 42;
+	}
+
+	public static int ApplicationTextStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationTextStateRecord);
+		value.Magic = MuiApplicationTextStateRecord.Cookie;
+		value.HelpFile = APTR.FromPointer(0x4D000);
+		value.IconifyTitle = APTR.FromPointer(0x4D040);
+		WriteCString(value.HelpFile, (byte)'S', (byte)'Y', (byte)'S', (byte)':',
+			(byte)'H', (byte)'e', (byte)'l', (byte)'p');
+		WriteCString(value.IconifyTitle, (byte)'C', (byte)'o', (byte)'p', (byte)'p',
+			(byte)'e', (byte)'r', (byte)'O', (byte)'S');
+		var address = APTR.FromPointer(0x4D740);
+		if (!MuiApplicationTextStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationTextStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.HelpFile != value.HelpFile ||
+			decoded.IconifyTitle != value.IconifyTitle) return 2;
+		if (MuiApplicationTextStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 3;
+		return 42;
+	}
+
+	public static uint ApplicationObjectAdmissionRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationObjectStateRecord);
+		value.Magic = MuiApplicationObjectStateRecord.Cookie;
+		var address = APTR.FromPointer(0x4D4C0);
+		if (!MuiApplicationObjectStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationObjectStateRecordCodec.TryReadStructural(ref platform,
+			address, out var structural)) return 2;
+		if (!MuiApplicationObjectStateAdmission.Validate(ref platform,
+			structural)) return 3;
+		if (!MuiApplicationObjectStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 4;
+		value.DiskObject = APTR.FromPointer(0x4D000);
+		if (!MuiApplicationObjectStateAdmission.Validate(ref platform, value))
+			return 5;
+		value.DiskObject = APTR.FromPointer(0xFFFFFF00);
+		if (MuiApplicationObjectStateAdmission.Validate(ref platform, value))
+			return 6;
+		value.DiskObject = APTR.Null;
+		value.DropObject = APTR.FromPointer(0x4D100);
+		if (!MuiApplicationObjectStateAdmission.Validate(ref platform, value))
+			return 7;
+		value.DropObject = APTR.FromPointer(0xFFFFFF00);
+		if (MuiApplicationObjectStateAdmission.Validate(ref platform, value))
+			return 8;
+		if (!MuiApplicationObjectStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationObjectStateField.Magic, 0))
+			return 9;
+		if (!MuiApplicationObjectStateRecordCodec.TryReadStructural(ref platform,
+			address, out structural) || structural.Magic != 0) return 10;
+		if (MuiApplicationObjectStateRecordCodec.TryRead(ref platform, address,
+			out _)) return 11;
+		return 42;
+	}
+
+	public static int ApplicationObjectStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationObjectStateRecord);
+		value.Magic = MuiApplicationObjectStateRecord.Cookie;
+		value.DiskObject = APTR.FromPointer(0x4D000);
+		value.DropObject = APTR.FromPointer(0x4D100);
+		value.Menustrip = APTR.FromPointer(0x4D200);
+		var address = APTR.FromPointer(0x4D780);
+		if (!MuiApplicationObjectStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationObjectStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.DiskObject != value.DiskObject ||
+			decoded.DropObject != value.DropObject ||
+			decoded.Menustrip != value.Menustrip) return 2;
+		if (MuiApplicationObjectStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 3;
+		return 42;
+	}
+
+	public static int CommonControlPacketMemoryRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+
+		var packet = APTR.FromPointer(0x50F20);
+		if (!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, packet,
+			MuiCommonPacketKind.Method, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.NumericIncrease)) return 1;
+		if (!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, packet,
+			MuiCommonPacketKind.Method, MuiCommonField.MethodId, out var method) ||
+			method != MuiCommonControlPacketCore.NumericIncrease) return 2;
+		if (!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, packet,
+			MuiCommonPacketKind.Signed, MuiCommonField.Value,
+			unchecked((uint)-7))) return 3;
+		if (!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, packet,
+			MuiCommonPacketKind.Signed, MuiCommonField.Value, out var value) ||
+			unchecked((int)value) != -7) return 4;
+		return 42;
+	}
+
+	public static int ApplicationCommandRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationCommandRecord);
+		value.Name = APTR.FromPointer(0x4C100);
+		value.Template = APTR.FromPointer(0x4C120);
+		value.Parameters = -3;
+		value.Hook = APTR.FromPointer(0x4C140);
+		value.Reserved0 = 1;
+		value.Reserved1 = -2;
+		value.Reserved2 = 3;
+		value.Reserved3 = -4;
+		value.Reserved4 = 5;
+		var address = APTR.FromPointer(0x4C000);
+		if (!MuiApplicationCommandRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiApplicationCommandRecordCodec.TryRead(ref platform, address,
+			out var decoded) || decoded.Name != value.Name ||
+			decoded.Template != value.Template ||
+			decoded.Parameters != value.Parameters || decoded.Hook != value.Hook ||
+			decoded.Reserved0 != value.Reserved0 ||
+			decoded.Reserved1 != value.Reserved1 ||
+			decoded.Reserved2 != value.Reserved2 ||
+			decoded.Reserved3 != value.Reserved3 ||
+			decoded.Reserved4 != value.Reserved4) return 2;
+		if (MuiApplicationCommandRecordCodec.TryRead(ref platform, APTR.Null,
+			out _)) return 3;
+		return 42;
+	}
+
+	public static int ApplicationHelpStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = default(MuiApplicationHelpStateRecord);
+		value.Magic = MuiApplicationHelpStateRecord.Cookie;
+		value.AboutRequests = uint.MaxValue;
+		value.HelpLine = unchecked((uint)-9);
+		value.HelpRequests = 7;
+		var address = APTR.FromPointer(0x4D000);
+		if (!MuiApplicationHelpStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiApplicationHelpStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.AboutRequests != value.AboutRequests ||
+			decoded.HelpLine != value.HelpLine ||
+			decoded.HelpRequests != value.HelpRequests) return 2;
+		if (MuiApplicationHelpStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 3;
+		return 42;
+	}
+
+	// MG1182 Scale presentation struct-codec proof. The named record remains
+	// the semantic boundary; the bounded adapter is the only guest-layout
+	// translation used by the strict and structural codecs.
+	public static uint ScalePresentationStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x4FD00);
+		var value = new MuiScalePresentationStateRecord
+		{
+			Magic = MuiScalePresentationStateRecord.Cookie,
+			Horizontal = 1,
+		};
+		if (!MuiScalePresentationStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiScalePresentationStateField.Horizontal,
+			out var horizontalAddress) || horizontalAddress.Raw !=
+			0x4FD04u) return 2;
+		if (!MuiScalePresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiScalePresentationStateField.Horizontal,
+			out var horizontal) || horizontal != 1) return 3;
+		if (!MuiScalePresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiScalePresentationStateField.Horizontal, 0) ||
+			!MuiScalePresentationStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded) || decoded.Horizontal != 0)
+			return 4;
+		if (MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiScalePresentationStateField)255, out _) ||
+			MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiScalePresentationStateField.Magic, out _) ||
+			MuiScalePresentationStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1183 Selectgroup active-index struct-codec proof. The named record
+	// remains the semantic boundary; the bounded adapter is the only
+	// guest-layout translation used by the strict and structural codecs.
+	public static uint SelectgroupActiveStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x4FD20);
+		var value = new MuiSelectgroupActiveStateRecord
+		{
+			Magic = MuiSelectgroupActiveStateRecord.Cookie,
+			Active = 7,
+		};
+		if (!MuiSelectgroupActiveStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiSelectgroupActiveStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiSelectgroupActiveStateField.Active,
+			out var activeAddress) || activeAddress.Raw != 0x4FD24u)
+			return 2;
+		if (!MuiSelectgroupActiveStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiSelectgroupActiveStateField.Active, out var active) ||
+			active != 7) return 3;
+		if (!MuiSelectgroupActiveStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiSelectgroupActiveStateField.Active, 2) ||
+			!MuiSelectgroupActiveStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded) || decoded.Active != 2)
+			return 4;
+		if (MuiSelectgroupActiveStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiSelectgroupActiveStateField)255, out _) ||
+			MuiSelectgroupActiveStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiSelectgroupActiveStateField.Magic, out _) ||
+			MuiSelectgroupActiveStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1184 String integer struct-codec proof. The signed value remains a
+	// full-width LONG in the named record; raw ULONG transport is confined to
+	// the bounded guest-memory adapter.
+	public static uint StringIntegerStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x4FD40);
+		var value = new MuiStringIntegerStateRecord
+		{
+			Magic = MuiStringIntegerStateRecord.Cookie,
+			Value = -123,
+		};
+		if (!MuiStringIntegerStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiStringIntegerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiStringIntegerStateField.Value,
+			out var valueAddress) || valueAddress.Raw != 0x4FD44u)
+			return 2;
+		if (!MuiStringIntegerStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiStringIntegerStateField.Value,
+			out var raw) || raw != unchecked((uint)-123)) return 3;
+		if (!MuiStringIntegerStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiStringIntegerStateField.Value, unchecked((uint)456)) ||
+			!MuiStringIntegerStateRecordCodec.TryReadStructural(ref platform, address,
+			out var decoded) || decoded.Value != 456) return 4;
+		if (MuiStringIntegerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiStringIntegerStateField)255, out _) ||
+			MuiStringIntegerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiStringIntegerStateField.Magic, out _) ||
+			MuiStringIntegerStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1185 Numeric range/value struct-codec proof. The complete fixed-width
+	// range record remains the semantic boundary; the bounded adapter is the
+	// only guest-layout translation used by the codecs.
+	public static uint NumericStateRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x4FD60);
+		var value = new MuiNumericStateRecord
+		{
+			Magic = MuiNumericStateRecord.Cookie,
+			Minimum = unchecked((uint)-10),
+			Maximum = 100,
+			Value = 35,
+			Default = 50,
+			Reverse = 1,
+		};
+		if (!MuiNumericStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiNumericStateRecordMemoryCodec.TryGetAddress(ref platform, address,
+			MuiNumericStateField.Value, out var valueAddress) || valueAddress.Raw !=
+			0x4FD6Cu) return 2;
+		if (!MuiNumericStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
+			MuiNumericStateField.Minimum, out var minimum) || minimum != unchecked((uint)-10))
+			return 3;
+		if (!MuiNumericStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			MuiNumericStateField.Value, 42) || !MuiNumericStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Value != 42) return 4;
+		if (MuiNumericStateRecordMemoryCodec.TryGetAddress(ref platform, address,
+			(MuiNumericStateField)255, out _) ||
+			MuiNumericStateRecordMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+			MuiNumericStateField.Magic, out _) || MuiNumericStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1186 Text Unicode/Shortened struct-codec proof. Both fixed BOOL
+	// records use named semantic structs; bounded adapters own guest-layout
+	// translation and reject null or out-of-record accesses.
+	public static uint TextPolicyRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var unicodeAddress = APTR.FromPointer(0x4FD80);
+		var shortenedAddress = APTR.FromPointer(0x4FDA0);
+		var unicode = new MuiTextUnicodeStateRecord
+		{
+			Magic = MuiTextUnicodeStateRecord.Cookie,
+			Unicode = 1,
+		};
+		var shortened = new MuiTextShortenedStateRecord
+		{
+			Magic = MuiTextShortenedStateRecord.Cookie,
+			Shortened = 1,
+		};
+		if (!MuiTextUnicodeStateRecordCodec.Write(ref platform, unicodeAddress,
+			unicode) || !MuiTextShortenedStateRecordCodec.Write(ref platform,
+			shortenedAddress, shortened)) return 1;
+		if (!MuiTextUnicodeStateRecordMemoryCodec.TryGetAddress(ref platform,
+			unicodeAddress, 4, out var unicodeField) || unicodeField.Raw !=
+			0x4FD84u || !MuiTextShortenedStateRecordMemoryCodec.TryGetAddress(
+			ref platform, shortenedAddress, 4, out var shortenedField) ||
+			shortenedField.Raw != 0x4FDA4u) return 2;
+		if (!MuiTextUnicodeStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			unicodeAddress, 4, out var unicodeValue) || unicodeValue != 1 ||
+			!MuiTextShortenedStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			shortenedAddress, 4, out var shortenedValue) || shortenedValue != 1)
+			return 3;
+		if (!MuiTextUnicodeStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			unicodeAddress, 4, 0) ||
+			!MuiTextShortenedStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			shortenedAddress, 4, 0) ||
+			!MuiTextUnicodeStateRecordCodec.TryReadStructural(ref platform,
+			unicodeAddress, out var unicodeDecoded) || unicodeDecoded.Unicode != 0 ||
+			!MuiTextShortenedStateRecordCodec.TryReadStructural(ref platform,
+			shortenedAddress, out var shortenedDecoded) ||
+			shortenedDecoded.Shortened != 0) return 4;
+		if (MuiTextUnicodeStateRecordMemoryCodec.TryGetAddress(ref platform,
+			unicodeAddress, MuiTextUnicodeStateRecord.Size, out _) ||
+			MuiTextShortenedStateRecordMemoryCodec.TryGetAddress(ref platform,
+			shortenedAddress, MuiTextShortenedStateRecord.Size, out _) ||
+			MuiTextUnicodeStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, out _) ||
+			MuiTextShortenedStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1187 Text contents/copy struct-codec proof. The contents pointer and
+	// Copy BOOL remain named semantic fields; bounded adapters own guest-layout
+	// translation and reject null or out-of-record accesses.
+	public static uint TextContentsCopyRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var contentsAddress = APTR.FromPointer(0x4FDC0);
+		var copyAddress = APTR.FromPointer(0x4FDE0);
+		var contents = new MuiTextContentsStateRecord
+		{
+			Magic = MuiTextContentsStateRecord.Cookie,
+			Contents = APTR.FromPointer(0x4FE00),
+		};
+		var copy = new MuiTextCopyStateRecord
+		{
+			Magic = MuiTextCopyStateRecord.Cookie,
+			Copy = 1,
+		};
+		if (!MuiTextContentsStateRecordCodec.Write(ref platform, contentsAddress,
+			contents) || !MuiTextCopyStateRecordCodec.Write(ref platform, copyAddress,
+			copy)) return 1;
+		if (!MuiTextContentsStateRecordMemoryCodec.TryGetAddress(ref platform,
+			contentsAddress, 4, out var contentsField) || contentsField.Raw !=
+			0x4FDC4u || !MuiTextCopyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			copyAddress, 4, out var copyField) || copyField.Raw != 0x4FDE4u)
+			return 2;
+		if (!MuiTextContentsStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			contentsAddress, 4, out var contentsValue) || contentsValue != 0x4FE00u ||
+			!MuiTextCopyStateRecordMemoryCodec.TryReadUInt32(ref platform, copyAddress,
+			4, out var copyValue) || copyValue != 1) return 3;
+		if (!MuiTextContentsStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			contentsAddress, 4, 0) || !MuiTextCopyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, copyAddress, 4, 0) ||
+			!MuiTextContentsStateRecordCodec.TryReadStructural(ref platform,
+			contentsAddress, out var contentsDecoded) ||
+			!contentsDecoded.Contents.IsNull ||
+			!MuiTextCopyStateRecordCodec.TryReadStructural(ref platform, copyAddress,
+			out var copyDecoded) || copyDecoded.Copy != 0) return 4;
+		if (MuiTextContentsStateRecordMemoryCodec.TryGetAddress(ref platform,
+			contentsAddress, MuiTextContentsStateRecord.Size, out _) ||
+			MuiTextCopyStateRecordMemoryCodec.TryGetAddress(ref platform, copyAddress,
+			MuiTextCopyStateRecord.Size, out _) ||
+			MuiTextContentsStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, out _) ||
+			MuiTextCopyStateRecordCodec.TryReadStructural(ref platform, APTR.Null,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG1188 String acknowledgement/contents/placeholder struct-codec proof.
+	// All three pointer records retain named semantic fields; bounded adapters
+	// own guest-layout translation and reject null or out-of-record accesses.
+	public static uint StringPointerRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var acknowledgeAddress = APTR.FromPointer(0x4FE20);
+		var contentsAddress = APTR.FromPointer(0x4FE40);
+		var placeholderAddress = APTR.FromPointer(0x4FE60);
+		var acknowledge = new MuiStringAcknowledgeStateRecord
+		{
+			Magic = MuiStringAcknowledgeStateRecord.Cookie,
+			Contents = APTR.FromPointer(0x4FEA0),
+		};
+		var contents = new MuiStringContentsStateRecord
+		{
+			Magic = MuiStringContentsStateRecord.Cookie,
+			Contents = APTR.FromPointer(0x4FEC0),
+		};
+		var placeholder = new MuiStringPlaceholderStateRecord
+		{
+			Magic = MuiStringPlaceholderStateRecord.Cookie,
+			Contents = APTR.FromPointer(0x4FEE0),
+		};
+		if (!MuiStringAcknowledgeStateRecordCodec.Write(ref platform,
+			acknowledgeAddress, acknowledge) ||
+			!MuiStringContentsStateRecordCodec.Write(ref platform, contentsAddress,
+			contents) || !MuiStringPlaceholderStateRecordCodec.Write(ref platform,
+			placeholderAddress, placeholder)) return 1;
+		if (!MuiStringAcknowledgeStateRecordMemoryCodec.TryGetAddress(
+			ref platform, acknowledgeAddress, 4, out var acknowledgeField) ||
+			acknowledgeField.Raw != 0x4FE24u ||
+			!MuiStringContentsStateRecordMemoryCodec.TryGetAddress(ref platform,
+			contentsAddress, 4, out var contentsField) || contentsField.Raw !=
+			0x4FE44u || !MuiStringPlaceholderStateRecordMemoryCodec.TryGetAddress(
+			ref platform, placeholderAddress, 4, out var placeholderField) ||
+			placeholderField.Raw != 0x4FE64u) return 2;
+		if (!MuiStringAcknowledgeStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, acknowledgeAddress, 4, out var acknowledgeValue) ||
+			acknowledgeValue != 0x4FEA0u ||
+			!MuiStringContentsStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			contentsAddress, 4, out var contentsValue) || contentsValue != 0x4FEC0u ||
+			!MuiStringPlaceholderStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			placeholderAddress, 4, out var placeholderValue) ||
+			placeholderValue != 0x4FEE0u) return 3;
+		if (!MuiStringAcknowledgeStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, acknowledgeAddress, 4, 0) ||
+			!MuiStringContentsStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			contentsAddress, 4, 0) ||
+			!MuiStringPlaceholderStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			placeholderAddress, 4, 0) ||
+			!MuiStringAcknowledgeStateRecordCodec.TryReadStructural(ref platform,
+			acknowledgeAddress, out var acknowledgeDecoded) ||
+			!acknowledgeDecoded.Contents.IsNull ||
+			!MuiStringContentsStateRecordCodec.TryReadStructural(ref platform,
+			contentsAddress, out var contentsDecoded) || !contentsDecoded.Contents.IsNull ||
+			!MuiStringPlaceholderStateRecordCodec.TryReadStructural(ref platform,
+			placeholderAddress, out var placeholderDecoded) ||
+			!placeholderDecoded.Contents.IsNull) return 4;
+		if (MuiStringAcknowledgeStateRecordMemoryCodec.TryGetAddress(ref platform,
+			acknowledgeAddress, MuiStringAcknowledgeStateRecord.Size, out _) ||
+			MuiStringContentsStateRecordMemoryCodec.TryGetAddress(ref platform,
+			contentsAddress, MuiStringContentsStateRecord.Size, out _) ||
+			MuiStringPlaceholderStateRecordMemoryCodec.TryGetAddress(ref platform,
+			placeholderAddress, MuiStringPlaceholderStateRecord.Size, out _) ||
+			MuiStringAcknowledgeStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, out _) ||
+			MuiStringPlaceholderStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1189 compact String/Text struct-codec proof. The Listview relationship,
+	// spell-checking BOOL, and Text PreParse pointer retain named semantic
+	// fields; bounded adapters own guest-layout translation and reject null or
+	// out-of-record accesses.
+	public static uint CompactStringTextRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var attachedAddress = APTR.FromPointer(0x4FF00);
+		var spellAddress = APTR.FromPointer(0x4FF20);
+		var preParseAddress = APTR.FromPointer(0x4FF40);
+		var attached = new MuiStringAttachedListStateRecord
+		{
+			Magic = MuiStringAttachedListStateRecord.Cookie,
+			Listview = APTR.FromPointer(0x4FF80),
+		};
+		var spell = new MuiStringSpellCheckingStateRecord
+		{
+			Magic = MuiStringSpellCheckingStateRecord.Cookie,
+			Enabled = 1,
+		};
+		var preParse = new MuiTextPreParseStateRecord
+		{
+			Magic = MuiTextPreParseStateRecord.Cookie,
+			PreParse = APTR.FromPointer(0x4FFA0),
+		};
+		if (!MuiStringAttachedListStateRecordCodec.Write(ref platform,
+			attachedAddress, attached) || !MuiStringSpellCheckingStateRecordCodec.Write(
+			ref platform, spellAddress, spell) || !MuiTextPreParseStateRecordCodec.Write(
+			ref platform, preParseAddress, preParse)) return 1;
+		if (!MuiStringAttachedListStateRecordMemoryCodec.TryGetAddress(
+			ref platform, attachedAddress, 4, out var attachedField) ||
+			attachedField.Raw != 0x4FF04u ||
+			!MuiStringSpellCheckingStateRecordMemoryCodec.TryGetAddress(ref platform,
+			spellAddress, 4, out var spellField) || spellField.Raw != 0x4FF24u ||
+			!MuiTextPreParseStateRecordMemoryCodec.TryGetAddress(ref platform,
+			preParseAddress, 4, out var preParseField) || preParseField.Raw !=
+			0x4FF44u) return 2;
+		if (!MuiStringAttachedListStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, attachedAddress, 4, out var attachedValue) ||
+			attachedValue != 0x4FF80u ||
+			!MuiStringSpellCheckingStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			spellAddress, 4, out var spellValue) || spellValue != 1 ||
+			!MuiTextPreParseStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			preParseAddress, 4, out var preParseValue) || preParseValue != 0x4FFA0u)
+			return 3;
+		if (!MuiStringAttachedListStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, attachedAddress, 4, 0) ||
+			!MuiStringSpellCheckingStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			spellAddress, 4, 0) || !MuiTextPreParseStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, preParseAddress, 4, 0) ||
+			!MuiStringAttachedListStateRecordCodec.TryReadStructural(ref platform,
+			attachedAddress, out var attachedDecoded) || !attachedDecoded.Listview.IsNull ||
+			!MuiStringSpellCheckingStateRecordCodec.TryReadStructural(ref platform,
+			spellAddress, out var spellDecoded) || spellDecoded.Enabled != 0 ||
+			!MuiTextPreParseStateRecordCodec.TryReadStructural(ref platform,
+			preParseAddress, out var preParseDecoded) || !preParseDecoded.PreParse.IsNull)
+			return 4;
+		if (MuiStringAttachedListStateRecordMemoryCodec.TryGetAddress(ref platform,
+			attachedAddress, MuiStringAttachedListStateRecord.Size, out _) ||
+			MuiStringSpellCheckingStateRecordMemoryCodec.TryGetAddress(ref platform,
+			spellAddress, MuiStringSpellCheckingStateRecord.Size, out _) ||
+			MuiTextPreParseStateRecordMemoryCodec.TryGetAddress(ref platform,
+			preParseAddress, MuiTextPreParseStateRecord.Size, out _) ||
+			MuiStringAttachedListStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, out _) ||
+			MuiTextPreParseStateRecordCodec.TryReadStructural(ref platform, APTR.Null,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG1190 String cursor/edit-hook/filter struct-codec proof. Cursor
+	// positions, Hook/BOOL policy, and character-set pointers retain named
+	// semantic fields; bounded adapters own guest-layout translation.
+	public static uint StringCursorHookFilterRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var cursorAddress = APTR.FromPointer(0x4FFC0);
+		var hookAddress = APTR.FromPointer(0x4FFE0);
+		var filterAddress = APTR.FromPointer(0x50000);
+		var cursor = new MuiStringCursorStateRecord
+		{
+			Magic = MuiStringCursorStateRecord.Cookie,
+			BufferPos = 12,
+			DisplayPos = 5,
+		};
+		var hook = new MuiStringEditHookStateRecord
+		{
+			Magic = MuiStringEditHookStateRecord.Cookie,
+			EditHook = APTR.FromPointer(0x50040),
+			LonelyEditHook = 1,
+		};
+		var filter = new MuiStringFilterStateRecord
+		{
+			Magic = MuiStringFilterStateRecord.Cookie,
+			Accept = APTR.FromPointer(0x50060),
+			Reject = APTR.FromPointer(0x50080),
+		};
+		if (!MuiStringCursorStateRecordCodec.Write(ref platform, cursorAddress,
+			cursor) || !MuiStringEditHookStateRecordCodec.Write(ref platform,
+			hookAddress, hook) || !MuiStringFilterStateRecordCodec.Write(ref platform,
+			filterAddress, filter)) return 1;
+		if (!MuiStringCursorStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursorAddress, 8, out var displayField) || displayField.Raw != 0x4FFC8u ||
+			!MuiStringEditHookStateRecordMemoryCodec.TryGetAddress(ref platform,
+			hookAddress, 4, out var hookField) || hookField.Raw != 0x4FFE4u ||
+			!MuiStringFilterStateRecordMemoryCodec.TryGetAddress(ref platform,
+			filterAddress, 8, out var rejectField) || rejectField.Raw != 0x50008u)
+			return 2;
+		if (!MuiStringCursorStateRecordMemoryCodec.TryReadInt32(ref platform,
+			cursorAddress, 4, out var buffer) || buffer != 12 ||
+			!MuiStringEditHookStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			hookAddress, 8, out var lonely) || lonely != 1 ||
+			!MuiStringFilterStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			filterAddress, 4, out var accept) || accept != 0x50060u) return 3;
+		if (!MuiStringCursorStateRecordMemoryCodec.TryWriteInt32(ref platform,
+			cursorAddress, 8, 0) || !MuiStringEditHookStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, hookAddress, 8, 0) || !MuiStringFilterStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, filterAddress, 8, 0) ||
+			!MuiStringCursorStateRecordCodec.TryReadStructural(ref platform,
+			cursorAddress, out var cursorDecoded) || cursorDecoded.DisplayPos != 0 ||
+			!MuiStringEditHookStateRecordCodec.TryReadStructural(ref platform,
+			hookAddress, out var hookDecoded) || hookDecoded.LonelyEditHook != 0 ||
+			!MuiStringFilterStateRecordCodec.TryReadStructural(ref platform,
+			filterAddress, out var filterDecoded) || !filterDecoded.Reject.IsNull)
+			return 4;
+		if (MuiStringCursorStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursorAddress, MuiStringCursorStateRecord.Size, out _) ||
+			MuiStringEditHookStateRecordMemoryCodec.TryGetAddress(ref platform,
+			hookAddress, MuiStringEditHookStateRecord.Size, out _) ||
+			MuiStringFilterStateRecordMemoryCodec.TryGetAddress(ref platform,
+			filterAddress, MuiStringFilterStateRecord.Size, out _) ||
+			MuiStringCursorStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, out _) ||
+			MuiStringFilterStateRecordCodec.TryReadStructural(ref platform, APTR.Null,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG1191 String interaction/presentation/scroll-metrics struct-codec proof.
+	// Scalar policies and metrics remain named semantic fields; bounded adapters
+	// own guest-layout translation and reject null or out-of-record accesses.
+	public static uint StringInteractionPresentationMetricsRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var interactionAddress = APTR.FromPointer(0x500A0);
+		var presentationAddress = APTR.FromPointer(0x500C0);
+		var metricsAddress = APTR.FromPointer(0x500E0);
+		var interaction = new MuiStringInteractionStateRecord
+		{
+			Magic = MuiStringInteractionStateRecord.Cookie,
+			Editable = 1,
+			AdvanceOnCR = 0,
+			Multiline = 1,
+		};
+		var presentation = new MuiStringPresentationStateRecord
+		{
+			Magic = MuiStringPresentationStateRecord.Cookie,
+			MaxLen = 32,
+			Secret = 1,
+			Format = 2,
+			Unicode = 1,
+		};
+		var metrics = new MuiStringScrollMetricsStateRecord
+		{
+			Magic = MuiStringScrollMetricsStateRecord.Cookie,
+			Width = 640,
+			Height = 240,
+			VisibleWidth = 320,
+			VisibleHeight = 120,
+			Left = 24,
+			Top = 8,
+		};
+		if (!MuiStringInteractionStateRecordCodec.Write(ref platform,
+			interactionAddress, interaction) ||
+			!MuiStringPresentationStateRecordCodec.Write(ref platform,
+			presentationAddress, presentation) ||
+			!MuiStringScrollMetricsStateRecordCodec.Write(ref platform, metricsAddress,
+			metrics)) return 1;
+		if (!MuiStringInteractionStateRecordMemoryCodec.TryGetAddress(
+			ref platform, interactionAddress, 12, out var multilineField) ||
+			multilineField.Raw != 0x500ACu ||
+			!MuiStringPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			presentationAddress, 16, out var unicodeField) || unicodeField.Raw !=
+			0x500D0u || !MuiStringScrollMetricsStateRecordMemoryCodec.TryGetAddress(
+			ref platform, metricsAddress, 20, out var leftField) ||
+			leftField.Raw != 0x500F4u) return 2;
+		if (!MuiStringInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			interactionAddress, 4, out var editable) || editable != 1 ||
+			!MuiStringPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			presentationAddress, 12, out var format) || format != 2 ||
+			!MuiStringScrollMetricsStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			metricsAddress, 8, out var height) || height != 240) return 3;
+		if (!MuiStringInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			interactionAddress, 12, 0) ||
+			!MuiStringPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			presentationAddress, 16, 0) ||
+			!MuiStringScrollMetricsStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			metricsAddress, 24, 0) ||
+			!MuiStringInteractionStateRecordCodec.TryReadStructural(ref platform,
+			interactionAddress, out var interactionDecoded) ||
+			interactionDecoded.Multiline != 0 ||
+			!MuiStringPresentationStateRecordCodec.TryReadStructural(ref platform,
+			presentationAddress, out var presentationDecoded) ||
+			presentationDecoded.Unicode != 0 ||
+			!MuiStringScrollMetricsStateRecordCodec.TryReadStructural(ref platform,
+			metricsAddress, out var metricsDecoded) || metricsDecoded.Top != 0) return 4;
+		if (MuiStringInteractionStateRecordMemoryCodec.TryGetAddress(ref platform,
+			interactionAddress, MuiStringInteractionStateRecord.Size, out _) ||
+			MuiStringPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			presentationAddress, MuiStringPresentationStateRecord.Size, out _) ||
+			MuiStringScrollMetricsStateRecordMemoryCodec.TryGetAddress(ref platform,
+			metricsAddress, MuiStringScrollMetricsStateRecord.Size, out _) ||
+			MuiStringInteractionStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, out _) ||
+			MuiStringScrollMetricsStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1192 Stringscroll pointer-drag struct-codec proof. Signed drag
+	// positions and capture flags remain named semantic fields; the bounded
+	// adapter owns guest-layout translation and rejects invalid addresses.
+	public static uint StringscrollPointerRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50120);
+		var value = new MuiStringscrollPointerState
+		{
+			Magic = MuiStringscrollPointerState.Cookie,
+			Axis = MuiStringscrollPointerState.HorizontalAxis,
+			GrabOffset = -3,
+			StartScroll = 17,
+			StartX = 10,
+			StartY = 20,
+			LastPointer = 30,
+			Flags = MuiStringscrollPointerState.ActiveFlag |
+				MuiStringscrollPointerState.CapturedFlag,
+		};
+		if (!MuiStringscrollPointerStateCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiStringscrollPointerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, 24, out var pointerField) || pointerField.Raw != 0x50138u)
+			return 2;
+		if (!MuiStringscrollPointerStateRecordMemoryCodec.TryReadInt32(ref platform,
+			address, 8, out var grabOffset) || grabOffset != -3 ||
+			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 28, out var flags) || flags != 3) return 3;
+		if (!MuiStringscrollPointerStateRecordMemoryCodec.TryWriteInt32(ref platform,
+			address, 24, 0) ||
+			!MuiStringscrollPointerStateCodec.TryReadStructural(ref platform, address,
+			out var decoded) || decoded.LastPointer != 0) return 4;
+		if (MuiStringscrollPointerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiStringscrollPointerState.Size, out _) ||
+			MuiStringscrollPointerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, out _) ||
+			MuiStringscrollPointerStateCodec.TryReadStructural(ref platform, APTR.Null,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG1193 Text presentation struct-codec proof. Mixed BOOL, character, and
+	// shortening-selector fields remain named semantic state; the bounded
+	// adapter owns guest-layout translation and rejects invalid addresses.
+	public static uint TextPresentationRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50180);
+		var value = new MuiTextPresentationStateRecord
+		{
+			Magic = MuiTextPresentationStateRecord.Cookie,
+			SetMin = 1,
+			SetMax = 0,
+			SetVMax = 1,
+			ControlChar = 13,
+			Marking = 1,
+			Shorten = 2,
+			HiChar = 10,
+			HiCharPresent = 1,
+		};
+		if (!MuiTextPresentationStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiTextPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, 24, out var shortenField) || shortenField.Raw != 0x50198u ||
+			!MuiTextPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, 32, out var hiCharPresentField) || hiCharPresentField.Raw !=
+			0x501A0u) return 2;
+		if (!MuiTextPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 16, out var controlChar) || controlChar != 13 ||
+			!MuiTextPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 24, out var shorten) || shorten != 2) return 3;
+		if (!MuiTextPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 24, 0) ||
+			!MuiTextPresentationStateRecordCodec.TryReadStructural(ref platform, address,
+			out var decoded) || decoded.Shorten != 0) return 4;
+		if (MuiTextPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiTextPresentationStateRecord.Size, out _) ||
+			MuiTextPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, out _) ||
+			MuiTextPresentationStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1194 Group layout struct-codec proof. Hook, policy, and grid records
+	// retain named semantic fields; bounded adapters own guest-layout
+	// translation and reject invalid addresses.
+	public static uint GroupLayoutStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var hookAddress = APTR.FromPointer(0x501C0);
+		var policyAddress = APTR.FromPointer(0x501E0);
+		var gridAddress = APTR.FromPointer(0x50220);
+		var hook = new MuiGroupLayoutHookStateRecord
+		{
+			Magic = MuiGroupLayoutHookStateRecord.Cookie,
+			Hook = APTR.FromPointer(0x50280),
+		};
+		var policy = new MuiGroupLayoutPolicyStateRecord
+		{
+			Magic = MuiGroupLayoutPolicyStateRecord.Cookie,
+			Horizontal = 1,
+			HorizontalSpacing = unchecked((uint)-25),
+			VerticalSpacing = 6,
+			SameWidth = 1,
+			SameHeight = 0,
+			PageMode = 1,
+		};
+		var grid = new MuiGroupGridStateRecord
+		{
+			Magic = MuiGroupGridStateRecord.Cookie,
+			Columns = 3,
+			Rows = 2,
+			HorizontalSpacing = unchecked((uint)-4),
+			VerticalSpacing = 6,
+			SameWidth = 1,
+			SameHeight = 0,
+			HorizontalCenter = 1,
+			VerticalCenter = 2,
+		};
+		if (!MuiGroupLayoutHookStateRecordCodec.Write(ref platform, hookAddress, hook) ||
+			!MuiGroupLayoutPolicyStateRecordCodec.Write(ref platform, policyAddress,
+			policy) || !MuiGroupGridStateRecordCodec.Write(ref platform, gridAddress,
+			grid)) return 1;
+		if (!MuiGroupLayoutHookStateRecordMemoryCodec.TryGetAddress(ref platform,
+			hookAddress, MuiGroupLayoutHookStateField.Hook, out var hookField) ||
+			hookField.Raw != 0x501C4u ||
+			!MuiGroupLayoutPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			policyAddress, MuiGroupLayoutPolicyField.PageMode, out var pageModeField) || pageModeField.Raw !=
+			0x501F8u || !MuiGroupGridStateRecordMemoryCodec.TryGetAddress(ref platform,
+			gridAddress, MuiGroupGridStateField.VerticalCenter, out var centerField) || centerField.Raw != 0x50240u)
+			return 2;
+		if (!MuiGroupLayoutHookStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			hookAddress, MuiGroupLayoutHookStateField.Hook, out var hookValue) ||
+			hookValue != 0x50280u ||
+			!MuiGroupLayoutPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			policyAddress, MuiGroupLayoutPolicyField.HorizontalSpacing, out var horizontalSpacing) ||
+			horizontalSpacing != unchecked((uint)-25) ||
+			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform, gridAddress,
+			MuiGroupGridStateField.Rows, out var rows) || rows != 2) return 3;
+		if (!MuiGroupLayoutHookStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			hookAddress, MuiGroupLayoutHookStateField.Hook, 0) ||
+			!MuiGroupLayoutPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			policyAddress, MuiGroupLayoutPolicyField.PageMode, 0) || !MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, gridAddress, MuiGroupGridStateField.VerticalCenter, 0) ||
+			!MuiGroupLayoutHookStateRecordCodec.TryReadStructural(ref platform,
+			hookAddress, out var hookDecoded) || !hookDecoded.Hook.IsNull ||
+			!MuiGroupLayoutPolicyStateRecordCodec.TryReadStructural(ref platform,
+			policyAddress, out var policyDecoded) || policyDecoded.PageMode != 0 ||
+			!MuiGroupGridStateRecordCodec.TryReadStructural(ref platform, gridAddress,
+			out var gridDecoded) || gridDecoded.VerticalCenter != 0) return 4;
+		if (MuiGroupLayoutHookStateRecordMemoryCodec.TryGetAddress(ref platform,
+			hookAddress, (MuiGroupLayoutHookStateField)255, out _) ||
+			MuiGroupLayoutPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			policyAddress, (MuiGroupLayoutPolicyField)255, out _) ||
+			MuiGroupGridStateRecordMemoryCodec.TryGetAddress(ref platform, gridAddress,
+			(MuiGroupGridStateField)255, out _) ||
+			MuiGroupLayoutHookStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiGroupLayoutHookStateField.Magic, out _) ||
+			MuiGroupGridStateRecordCodec.TryReadStructural(ref platform, APTR.Null,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG1270 native struct-first Group layout-policy closure. Boolean policy
+	// inputs and signed spacing values remain lossless named fields while the
+	// bounded enum adapter owns the fixed MorphOS guest layout.
+	public static uint GroupLayoutPolicyStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = new MuiGroupLayoutPolicyStateRecord
+		{
+			Magic = MuiGroupLayoutPolicyStateRecord.Cookie,
+			Horizontal = 1,
+			HorizontalSpacing = unchecked((uint)-25),
+			VerticalSpacing = 6,
+			SameWidth = 1,
+			SameHeight = 0,
+			PageMode = 1,
+		};
+		var address = APTR.FromPointer(0x000503E0);
+		if (!MuiGroupLayoutPolicyStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiGroupLayoutPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiGroupLayoutPolicyField.PageMode, out var pageModeAddress) ||
+			pageModeAddress.Raw != address.Raw + MuiGroupLayoutPolicyStateRecord.PageModeOffset)
+			return 2;
+		if (!MuiGroupLayoutPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGroupLayoutPolicyField.HorizontalSpacing, unchecked((uint)-4)))
+			return 3;
+		if (!MuiGroupLayoutPolicyStateRecordCodec.TryRead(ref platform, address,
+			out var decoded)) return 4;
+		if (decoded.Magic != value.Magic || decoded.Horizontal != value.Horizontal ||
+			decoded.HorizontalSpacing != unchecked((uint)-4) ||
+			decoded.VerticalSpacing != value.VerticalSpacing ||
+			decoded.SameWidth != value.SameWidth ||
+			decoded.SameHeight != value.SameHeight || decoded.PageMode != value.PageMode)
+			return 5;
+		if (MuiGroupLayoutPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiGroupLayoutPolicyField)255, out _)) return 6;
+		return 42;
+	}
+
+	// MG1271 native struct-first Group grid closure. Axis limits, signed spacing,
+	// same-size flags, and centering modes remain typed fields; only the bounded
+	// enum adapter translates the nine MorphOS guest ULONG slots.
+	public static uint GroupGridStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = new MuiGroupGridStateRecord
+		{
+			Magic = MuiGroupGridStateRecord.Cookie,
+			Columns = 3,
+			Rows = 2,
+			HorizontalSpacing = unchecked((uint)-4),
+			VerticalSpacing = 6,
+			SameWidth = 1,
+			SameHeight = 0,
+			HorizontalCenter = 1,
+			VerticalCenter = 2,
+		};
+		var address = APTR.FromPointer(0x00050440);
+		if (!MuiGroupGridStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiGroupGridStateRecordMemoryCodec.TryGetAddress(ref platform, address,
+			MuiGroupGridStateField.VerticalCenter, out var centerAddress) ||
+			centerAddress.Raw != address.Raw + MuiGroupGridStateRecord.VerticalCenterOffset)
+			return 2;
+		if (!MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			MuiGroupGridStateField.HorizontalSpacing, unchecked((uint)-8))) return 3;
+		if (!MuiGroupGridStateRecordCodec.TryRead(ref platform, address,
+			out var decoded)) return 4;
+		if (decoded.Magic != value.Magic || decoded.Columns != value.Columns ||
+			decoded.Rows != value.Rows ||
+			decoded.HorizontalSpacing != unchecked((uint)-8) ||
+			decoded.VerticalSpacing != value.VerticalSpacing ||
+			decoded.SameWidth != value.SameWidth ||
+			decoded.SameHeight != value.SameHeight ||
+			decoded.HorizontalCenter != value.HorizontalCenter ||
+			decoded.VerticalCenter != value.VerticalCenter) return 5;
+		if (MuiGroupGridStateRecordMemoryCodec.TryGetAddress(ref platform, address,
+			(MuiGroupGridStateField)255, out _)) return 6;
+		return 42;
+	}
+
+	// MG1195 Numeric/Rectangle/Register struct-codec proof. The four fixed
+	// records retain named semantic fields; bounded adapters own guest-layout
+	// translation and reject invalid addresses.
+	public static uint NumericRectangleRegisterStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var numericAddress = APTR.FromPointer(0x50300);
+		var barAddress = APTR.FromPointer(0x50320);
+		var rectangleAddress = APTR.FromPointer(0x50340);
+		var registerAddress = APTR.FromPointer(0x50360);
+		var titleAddress = APTR.FromPointer(0x503A0);
+		var numeric = new MuiNumericFormatStateRecord
+		{
+			Magic = MuiNumericFormatStateRecord.Cookie,
+			Format = APTR.FromPointer(0x503C0),
+		};
+		var bar = new MuiRectangleBarTitleStateRecord
+		{
+			Magic = MuiRectangleBarTitleStateRecord.Cookie,
+			Present = 1,
+			Title = titleAddress,
+		};
+		var rectangle = new MuiRectanglePresentationStateRecord
+		{
+			Magic = MuiRectanglePresentationStateRecord.Cookie,
+			HorizontalBar = 1,
+			VerticalBar = 0,
+		};
+		var register = new MuiRegisterPolicyStateRecord
+		{
+			Magic = MuiRegisterPolicyStateRecord.Cookie,
+			Frame = 1,
+			Titles = titleAddress,
+		};
+		if (!MuiNumericFormatStateRecordCodec.Write(ref platform, numericAddress,
+			numeric) || !MuiRectangleBarTitleStateRecordCodec.Write(ref platform,
+			barAddress, bar) || !MuiRectanglePresentationStateRecordCodec.Write(
+			ref platform, rectangleAddress, rectangle) ||
+			!MuiRegisterPolicyStateRecordCodec.Write(ref platform, registerAddress,
+			register)) return 1;
+		if (!MuiNumericFormatStateRecordMemoryCodec.TryGetAddress(ref platform,
+			numericAddress, 4, out var formatField) || formatField.Raw != 0x50304u ||
+			!MuiRectangleBarTitleStateRecordMemoryCodec.TryGetAddress(ref platform,
+			barAddress, 8, out var titleField) || titleField.Raw != 0x50328u ||
+			!MuiRectanglePresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			rectangleAddress, 8, out var verticalField) || verticalField.Raw !=
+			0x50348u || !MuiRegisterPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, registerAddress, 8, out var titlesField) || titlesField.Raw !=
+			0x50368u) return 2;
+		if (!MuiNumericFormatStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			numericAddress, 4, out var format) || format != 0x503C0u ||
+			!MuiRectangleBarTitleStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			barAddress, 4, out var present) || present != 1 ||
+			!MuiRectanglePresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			rectangleAddress, 4, out var horizontal) || horizontal != 1 ||
+			!MuiRegisterPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			registerAddress, 4, out var frame) || frame != 1) return 3;
+		if (!MuiNumericFormatStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			numericAddress, 4, 0) ||
+			!MuiRectangleBarTitleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			barAddress, 4, 0) ||
+			!MuiRectanglePresentationStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, rectangleAddress, 4, 0) ||
+			!MuiRegisterPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			registerAddress, 4, 0) ||
+			!MuiNumericFormatStateRecordCodec.TryReadStructural(ref platform,
+			numericAddress, out var numericDecoded) || !numericDecoded.Format.IsNull ||
+			!MuiRectangleBarTitleStateRecordCodec.TryReadStructural(ref platform,
+			barAddress, out var barDecoded) || barDecoded.Present != 0 ||
+			!MuiRectanglePresentationStateRecordCodec.TryReadStructural(ref platform,
+			rectangleAddress, out var rectangleDecoded) ||
+			rectangleDecoded.HorizontalBar != 0 ||
+			!MuiRegisterPolicyStateRecordCodec.TryReadStructural(ref platform,
+			registerAddress, out var registerDecoded) || registerDecoded.Frame != 0)
+			return 4;
+		if (MuiNumericFormatStateRecordMemoryCodec.TryGetAddress(ref platform,
+			numericAddress, MuiNumericFormatStateRecord.Size, out _) ||
+			MuiRectangleBarTitleStateRecordMemoryCodec.TryGetAddress(ref platform,
+			barAddress, MuiRectangleBarTitleStateRecord.Size, out _) ||
+			MuiRectanglePresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			rectangleAddress, MuiRectanglePresentationStateRecord.Size, out _) ||
+			MuiRegisterPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			registerAddress, MuiRegisterPolicyStateRecord.Size, out _) ||
+			MuiRectanglePresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, out _) ||
+			MuiRegisterPolicyStateRecordCodec.TryReadStructural(ref platform, APTR.Null,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG1196 Prop/Scrollbar/Slider struct-codec proof. Range, policy,
+	// orientation, and presentation values remain named semantic fields;
+	// bounded adapters own guest-layout translation and reject invalid addresses.
+	public static uint PropScrollbarSliderStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var policyAddress = APTR.FromPointer(0x50400);
+		var rangeAddress = APTR.FromPointer(0x50430);
+		var scrollbarAddress = APTR.FromPointer(0x50450);
+		var sliderAddress = APTR.FromPointer(0x50470);
+		var policy = new MuiPropPolicyStateRecord
+		{
+			Magic = MuiPropPolicyStateRecord.Cookie,
+			Horizontal = 1,
+			DeltaFactor = unchecked((uint)-2),
+			Slider = 1,
+			UseWinBorder = 2,
+		};
+		var range = new MuiPropRangeStateRecord
+		{
+			Magic = MuiPropRangeStateRecord.Cookie,
+			Entries = 100,
+			Visible = 10,
+			First = 5,
+		};
+		var scrollbar = new MuiScrollbarLayoutStateRecord
+		{
+			Magic = MuiScrollbarLayoutStateRecord.Cookie,
+			Horizontal = 1,
+			Type = 4,
+		};
+		var slider = new MuiSliderPresentationStateRecord
+		{
+			Magic = MuiSliderPresentationStateRecord.Cookie,
+			Horizontal = 0,
+			Quiet = 1,
+		};
+		if (!MuiPropPolicyStateRecordCodec.Write(ref platform, policyAddress, policy) ||
+			!MuiPropRangeStateRecordCodec.Write(ref platform, rangeAddress, range) ||
+			!MuiScrollbarLayoutStateRecordCodec.Write(ref platform, scrollbarAddress,
+			scrollbar) || !MuiSliderPresentationStateRecordCodec.Write(ref platform,
+			sliderAddress, slider)) return 1;
+		if (!MuiPropPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			policyAddress, 16, out var borderField) || borderField.Raw != 0x50410u ||
+			!MuiPropRangeStateRecordMemoryCodec.TryGetAddress(ref platform,
+			rangeAddress, 12, out var firstField) || firstField.Raw != 0x5043Cu ||
+			!MuiScrollbarLayoutStateRecordMemoryCodec.TryGetAddress(ref platform,
+			scrollbarAddress, 8, out var typeField) || typeField.Raw != 0x50458u ||
+			!MuiSliderPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			sliderAddress, MuiSliderPresentationStateField.Quiet,
+			out var quietField) || quietField.Raw != 0x50478u)
+			return 2;
+		if (!MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			policyAddress, 8, out var deltaFactor) ||
+			deltaFactor != unchecked((uint)-2) ||
+			!MuiPropRangeStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			rangeAddress, 4, out var entries) || entries != 100 ||
+			!MuiScrollbarLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			scrollbarAddress, 4, out var horizontal) || horizontal != 1 ||
+			!MuiSliderPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			sliderAddress, MuiSliderPresentationStateField.Horizontal,
+			out var sliderHorizontal) || sliderHorizontal != 0)
+			return 3;
+		if (!MuiPropPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			policyAddress, 12, 0) ||
+			!MuiPropRangeStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			rangeAddress, 12, 7) ||
+			!MuiScrollbarLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			scrollbarAddress, 8, 0) ||
+			!MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			sliderAddress, MuiSliderPresentationStateField.Quiet, 0) ||
+			!MuiPropPolicyStateRecordCodec.TryReadStructural(ref platform,
+			policyAddress, out var policyDecoded) || policyDecoded.Slider != 0 ||
+			!MuiPropRangeStateRecordCodec.TryReadStructural(ref platform, rangeAddress,
+			out var rangeDecoded) || rangeDecoded.First != 7 ||
+			!MuiScrollbarLayoutStateRecordCodec.TryReadStructural(ref platform,
+			scrollbarAddress, out var scrollbarDecoded) || scrollbarDecoded.Type != 0 ||
+			!MuiSliderPresentationStateRecordCodec.TryReadStructural(ref platform,
+			sliderAddress, out var sliderDecoded) || sliderDecoded.Quiet != 0) return 4;
+		if (MuiPropPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			policyAddress, MuiPropPolicyStateRecord.Size, out _) ||
+			MuiPropRangeStateRecordMemoryCodec.TryGetAddress(ref platform, rangeAddress,
+			MuiPropRangeStateRecord.Size, out _) ||
+			MuiScrollbarLayoutStateRecordMemoryCodec.TryGetAddress(ref platform,
+			scrollbarAddress, MuiScrollbarLayoutStateRecord.Size, out _) ||
+			MuiSliderPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			sliderAddress, (MuiSliderPresentationStateField)255, out _) ||
+			MuiPropRangeStateRecordMemoryCodec.TryGetAddress(ref platform, APTR.Null, 0,
+			out _) || MuiSliderPresentationStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1197 Virtgroup input struct-codec proof. Display geometry, pointer
+	// drag state, and policy geometry retain named semantic structs; bounded
+	// adapters own the shared fixed guest-layout translation.
+	public static uint VirtgroupInputPolicyStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var displayAddress = APTR.FromPointer(0x50500);
+		var pointerAddress = APTR.FromPointer(0x50530);
+		var policyAddress = APTR.FromPointer(0x50560);
+		var display = new MuiVirtgroupDisplayStateRecord
+		{
+			Magic = MuiVirtgroupDisplayStateRecord.Cookie,
+			Left = -12,
+			Top = 8,
+			Width = 100,
+			Height = 60,
+		};
+		var pointer = new MuiVirtgroupPointerStateRecord
+		{
+			Magic = MuiVirtgroupPointerStateRecord.Cookie,
+			Flags = MuiVirtgroupPointerStateRecord.ActiveFlag,
+			StartX = 20,
+			StartY = 10,
+			StartLeft = -12,
+			StartTop = 8,
+			LastX = 24,
+			LastY = 14,
+		};
+		var policy = new MuiVirtgroupPolicyStateRecord
+		{
+			Magic = MuiVirtgroupPolicyStateRecord.Cookie,
+			Input = 1,
+			Width = 100,
+			Height = 60,
+			Left = -12,
+			Top = 8,
+			TryFit = 0,
+		};
+		if (!MuiVirtgroupDisplayStateRecordCodec.Write(ref platform, displayAddress,
+			display) || !MuiVirtgroupPointerStateRecordCodec.Write(ref platform,
+			pointerAddress, pointer) || !MuiVirtgroupPolicyStateRecordCodec.Write(
+			ref platform, policyAddress, policy)) return 1;
+		if (!MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform,
+			displayAddress, MuiVirtgroupInputRecordKind.Display,
+			MuiVirtgroupInputField.Height,
+			out var heightField) || heightField.Raw != 0x50510u ||
+			!MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform,
+			pointerAddress, MuiVirtgroupInputRecordKind.Pointer,
+			MuiVirtgroupInputField.LastY,
+			out var lastYField) || lastYField.Raw != 0x5054Cu ||
+			!MuiVirtgroupPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			policyAddress, MuiVirtgroupPolicyStateField.TryFit, out var tryFitField) ||
+			tryFitField.Raw != 0x50578u)
+			return 2;
+		if (!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform,
+			displayAddress, MuiVirtgroupInputRecordKind.Display,
+			MuiVirtgroupInputField.Left,
+			out var left) || left != unchecked((uint)-12) ||
+			!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform,
+			pointerAddress, MuiVirtgroupInputRecordKind.Pointer,
+			MuiVirtgroupInputField.LastX,
+			out var lastX) || lastX != 24 ||
+			!MuiVirtgroupPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			policyAddress, MuiVirtgroupPolicyStateField.Top, out var top) || top != 8)
+			return 3;
+		if (!MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform,
+			pointerAddress, MuiVirtgroupInputRecordKind.Pointer,
+			MuiVirtgroupInputField.Flags, 0) ||
+			!MuiVirtgroupPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			policyAddress, MuiVirtgroupPolicyStateField.TryFit, 1) ||
+			!MuiVirtgroupPointerStateRecordCodec.TryReadStructural(ref platform,
+			pointerAddress, out var pointerDecoded) || pointerDecoded.Flags != 0 ||
+			!MuiVirtgroupPolicyStateRecordCodec.TryReadStructural(ref platform,
+			policyAddress, out var policyDecoded) || policyDecoded.TryFit != 1) return 4;
+		if (MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform,
+			displayAddress, MuiVirtgroupInputRecordKind.Display,
+			(MuiVirtgroupInputField)255, out _) ||
+			MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform,
+			pointerAddress, MuiVirtgroupInputRecordKind.Pointer,
+			(MuiVirtgroupInputField)255, out _) ||
+			MuiVirtgroupPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			policyAddress, (MuiVirtgroupPolicyStateField)255, out _) ||
+			MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+			MuiVirtgroupInputRecordKind.Display, MuiVirtgroupInputField.Magic,
+			out _) ||
+			MuiVirtgroupPolicyStateRecordCodec.TryReadStructural(ref platform, APTR.Null,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG1198 Scrollgroup struct-codec proof. Border-scroller routing, policy
+	// pointers/BOOLs, and viewport geometry remain named semantic structs;
+	// bounded adapters own fixed guest-layout translation.
+	public static uint ScrollgroupStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var borderAddress = APTR.FromPointer(0x50600);
+		var policyAddress = APTR.FromPointer(0x50630);
+		var viewportAddress = APTR.FromPointer(0x50660);
+		var border = new MuiScrollgroupBorderScrollerStateRecord
+		{
+			Magic = MuiScrollgroupBorderScrollerStateRecord.Cookie,
+			Window = APTR.FromPointer(0x506A0),
+			UseWindowBorder = 1,
+			HorizontalRequested = 1,
+			VerticalRequested = 0,
+			Applied = 1,
+			Reserved = 0,
+		};
+		var policy = new MuiScrollgroupPolicyStateRecord
+		{
+			Magic = MuiScrollgroupPolicyStateRecord.Cookie,
+			Contents = APTR.FromPointer(0x506C0),
+			FreeHorizontal = 1,
+			FreeVertical = 0,
+			HorizontalBar = APTR.FromPointer(0x506E0),
+			VerticalBar = APTR.Null,
+			NoHorizontalBar = 0,
+			NoVerticalBar = 1,
+			AutoBars = 1,
+			UseWindowBorder = 0,
+		};
+		var viewport = new MuiScrollgroupViewportStateRecord
+		{
+			Magic = MuiScrollgroupViewportStateRecord.Cookie,
+			ViewportWidth = 100,
+			ViewportHeight = 80,
+			ContentWidth = 200,
+			ContentHeight = 120,
+			MaximumScrollX = 100,
+			MaximumScrollY = 40,
+			ScrollLeft = 25,
+			ScrollTop = 10,
+			HorizontalBarVisible = 1,
+			VerticalBarVisible = 0,
+		};
+		if (!MuiScrollgroupBorderScrollerStateRecordCodec.Write(ref platform,
+			borderAddress, border) || !MuiScrollgroupPolicyStateRecordCodec.Write(
+			ref platform, policyAddress, policy) ||
+			!MuiScrollgroupViewportStateRecordCodec.Write(ref platform, viewportAddress,
+			viewport)) return 1;
+		if (!MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryGetAddress(
+			ref platform, borderAddress, MuiScrollgroupBorderScrollerStateField.Applied,
+			out var appliedField) ||
+			appliedField.Raw != 0x50614u ||
+			!MuiScrollgroupPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			policyAddress, MuiScrollgroupPolicyStateField.VerticalBar, out var verticalBarField) || verticalBarField.Raw !=
+			0x50644u ||
+			!MuiScrollgroupViewportStateRecordMemoryCodec.TryGetAddress(ref platform,
+			viewportAddress, MuiScrollgroupViewportField.ScrollTop, out var scrollTopField) || scrollTopField.Raw !=
+			0x50680u) return 2;
+		if (!MuiScrollgroupPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			policyAddress, MuiScrollgroupPolicyStateField.FreeHorizontal, out var freeHorizontal) || freeHorizontal != 1 ||
+			!MuiScrollgroupViewportStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			viewportAddress, MuiScrollgroupViewportField.ScrollLeft, out var scrollLeft) || scrollLeft != 25 ||
+			!MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, borderAddress, MuiScrollgroupBorderScrollerStateField.Window,
+			out var window) || window != 0x506A0u)
+			return 3;
+		if (!MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, borderAddress, MuiScrollgroupBorderScrollerStateField.Applied,
+			0) ||
+			!MuiScrollgroupViewportStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			viewportAddress, MuiScrollgroupViewportField.VerticalBarVisible, 1) ||
+			!MuiScrollgroupBorderScrollerStateRecordCodec.TryReadStructural(ref platform,
+			borderAddress, out var borderDecoded) || borderDecoded.Applied != 0 ||
+			!MuiScrollgroupViewportStateRecordCodec.TryReadStructural(ref platform,
+			viewportAddress, out var viewportDecoded) ||
+			viewportDecoded.VerticalBarVisible != 1 ||
+			!MuiScrollgroupPolicyStateRecordCodec.TryReadStructural(ref platform,
+			policyAddress, out var policyDecoded) || policyDecoded.AutoBars != 1) return 4;
+		if (MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryGetAddress(
+			ref platform, borderAddress, (MuiScrollgroupBorderScrollerStateField)255,
+			out _) || MuiScrollgroupPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, policyAddress, (MuiScrollgroupPolicyStateField)255,
+			out _) || MuiScrollgroupViewportStateRecordMemoryCodec.TryGetAddress(
+			ref platform, viewportAddress, (MuiScrollgroupViewportField)255,
+			out _) || MuiScrollgroupPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiScrollgroupPolicyStateField.Magic, out _) ||
+			MuiScrollgroupViewportStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1272 native struct-first Scrollgroup viewport closure. Geometry,
+	// signed scroll coordinates, and visibility flags remain typed fields while
+	// the bounded enum adapter owns the eleven-slot MorphOS guest layout.
+	public static uint ScrollgroupViewportStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = new MuiScrollgroupViewportStateRecord
+		{
+			Magic = MuiScrollgroupViewportStateRecord.Cookie,
+			ViewportWidth = 100,
+			ViewportHeight = 80,
+			ContentWidth = 200,
+			ContentHeight = 120,
+			MaximumScrollX = 100,
+			MaximumScrollY = 40,
+			ScrollLeft = 25,
+			ScrollTop = 10,
+			HorizontalBarVisible = 1,
+			VerticalBarVisible = 0,
+		};
+		var address = APTR.FromPointer(0x00050780);
+		if (!MuiScrollgroupViewportStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiScrollgroupViewportStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiScrollgroupViewportField.ScrollTop, out var scrollTopAddress) ||
+			scrollTopAddress.Raw != address.Raw + MuiScrollgroupViewportStateRecord.ScrollTopOffset)
+			return 2;
+		if (!MuiScrollgroupViewportStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiScrollgroupViewportField.ScrollLeft, 50)) return 3;
+		if (!MuiScrollgroupViewportStateRecordCodec.TryRead(ref platform, address,
+			out var decoded)) return 4;
+		if (decoded.Magic != value.Magic || decoded.ViewportWidth != value.ViewportWidth ||
+			decoded.ViewportHeight != value.ViewportHeight || decoded.ContentWidth != value.ContentWidth ||
+			decoded.ContentHeight != value.ContentHeight || decoded.MaximumScrollX != value.MaximumScrollX ||
+			decoded.MaximumScrollY != value.MaximumScrollY || decoded.ScrollLeft != 50 ||
+			decoded.ScrollTop != value.ScrollTop ||
+			decoded.HorizontalBarVisible != value.HorizontalBarVisible ||
+			decoded.VerticalBarVisible != value.VerticalBarVisible) return 5;
+		if (MuiScrollgroupViewportStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiScrollgroupViewportField)255, out _)) return 6;
+		return 42;
+	}
+
+	// MG1273 native struct-first Scrollgroup policy closure. Contents/bar
+	// handles and canonical BOOL policy values remain typed fields; the bounded
+	// enum adapter translates the ten MorphOS guest ULONG slots.
+	public static uint ScrollgroupPolicyStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = new MuiScrollgroupPolicyStateRecord
+		{
+			Magic = MuiScrollgroupPolicyStateRecord.Cookie,
+			Contents = APTR.FromPointer(0x00050840),
+			FreeHorizontal = 1,
+			FreeVertical = 0,
+			HorizontalBar = APTR.FromPointer(0x00050860),
+			VerticalBar = APTR.Null,
+			NoHorizontalBar = 0,
+			NoVerticalBar = 1,
+			AutoBars = 1,
+			UseWindowBorder = 0,
+		};
+		var address = APTR.FromPointer(0x00050800);
+		if (!MuiScrollgroupPolicyStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiScrollgroupPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiScrollgroupPolicyStateField.HorizontalBar,
+			out var barAddress) ||
+			barAddress.Raw != address.Raw + MuiScrollgroupPolicyStateRecord.HorizontalBarOffset)
+			return 2;
+		if (!MuiScrollgroupPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiScrollgroupPolicyStateField.AutoBars, 0)) return 3;
+		if (!MuiScrollgroupPolicyStateRecordCodec.TryRead(ref platform, address,
+			out var decoded)) return 4;
+		if (decoded.Magic != value.Magic || decoded.Contents != value.Contents ||
+			decoded.FreeHorizontal != value.FreeHorizontal ||
+			decoded.FreeVertical != value.FreeVertical ||
+			decoded.HorizontalBar != value.HorizontalBar ||
+			decoded.VerticalBar != value.VerticalBar ||
+			decoded.NoHorizontalBar != value.NoHorizontalBar ||
+			decoded.NoVerticalBar != value.NoVerticalBar || decoded.AutoBars != 0 ||
+			decoded.UseWindowBorder != value.UseWindowBorder) return 5;
+		if (MuiScrollgroupPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiScrollgroupPolicyStateField)255, out _)) return 6;
+		return 42;
+	}
+
+	// MG1274 native struct-first border-scroller closure. Window ownership,
+	// requested/applied policy flags, and the reserved ABI slot remain named
+	// fields; the bounded enum adapter owns fixed guest-layout translation.
+	public static uint ScrollgroupBorderScrollerStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = new MuiScrollgroupBorderScrollerStateRecord
+		{
+			Magic = MuiScrollgroupBorderScrollerStateRecord.Cookie,
+			Window = APTR.FromPointer(0x00050940),
+			UseWindowBorder = 1,
+			HorizontalRequested = 1,
+			VerticalRequested = 0,
+			Applied = 1,
+			Reserved = 0,
+		};
+		var address = APTR.FromPointer(0x00050900);
+		if (!MuiScrollgroupBorderScrollerStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address,
+			MuiScrollgroupBorderScrollerStateField.Applied, out var appliedAddress) ||
+			appliedAddress.Raw != address.Raw + MuiScrollgroupBorderScrollerStateRecord.AppliedOffset)
+			return 2;
+		if (!MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiScrollgroupBorderScrollerStateField.Applied, 0))
+			return 3;
+		if (!MuiScrollgroupBorderScrollerStateRecordCodec.TryRead(ref platform, address,
+			out var decoded)) return 4;
+		if (decoded.Magic != value.Magic || decoded.Window != value.Window ||
+			decoded.UseWindowBorder != value.UseWindowBorder ||
+			decoded.HorizontalRequested != value.HorizontalRequested ||
+			decoded.VerticalRequested != value.VerticalRequested || decoded.Applied != 0 ||
+			decoded.Reserved != value.Reserved) return 5;
+		if (MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, (MuiScrollgroupBorderScrollerStateField)255,
+			out _)) return 6;
+		return 42;
+	}
+
+	// MG1275 native struct-first Virtgroup policy closure. Input/TryFit BOOLs
+	// and signed virtual geometry remain named fields; the bounded enum adapter
+	// owns the seven-slot MorphOS guest layout and rejects unknown selectors.
+	public static uint VirtgroupPolicyStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var value = new MuiVirtgroupPolicyStateRecord
+		{
+			Magic = MuiVirtgroupPolicyStateRecord.Cookie,
+			Input = 1,
+			Width = 320,
+			Height = 180,
+			Left = -12,
+			Top = 7,
+			TryFit = 1,
+		};
+		var address = APTR.FromPointer(0x00050A00);
+		if (!MuiVirtgroupPolicyStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiVirtgroupPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiVirtgroupPolicyStateField.Left, out var leftAddress) ||
+			leftAddress.Raw != address.Raw + MuiVirtgroupPolicyStateRecord.LeftOffset)
+			return 2;
+		if (!MuiVirtgroupPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiVirtgroupPolicyStateField.Input, 0)) return 3;
+		if (!MuiVirtgroupPolicyStateRecordCodec.TryRead(ref platform, address,
+			out var decoded)) return 4;
+		if (decoded.Magic != value.Magic || decoded.Input != 0 ||
+			decoded.Width != value.Width || decoded.Height != value.Height ||
+			decoded.Left != value.Left || decoded.Top != value.Top ||
+			decoded.TryFit != value.TryFit) return 5;
+		if (MuiVirtgroupPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiVirtgroupPolicyStateField)255, out _)) return 6;
+		return 42;
+	}
+
+	// MG1276 native struct-first Virtgroup input closure. Display geometry and
+	// pointer drag state remain separate named records; the shared bounded enum
+	// adapter owns their MorphOS guest layouts and rejects unknown fields.
+	public static uint VirtgroupInputStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var display = new MuiVirtgroupDisplayStateRecord
+		{
+			Magic = MuiVirtgroupDisplayStateRecord.Cookie,
+			Left = -8,
+			Top = 4,
+			Width = 200,
+			Height = 100,
+		};
+		var pointer = new MuiVirtgroupPointerStateRecord
+		{
+			Magic = MuiVirtgroupPointerStateRecord.Cookie,
+			Flags = MuiVirtgroupPointerStateRecord.ActiveFlag,
+			StartX = 20,
+			StartY = 10,
+			StartLeft = -8,
+			StartTop = 4,
+			LastX = 24,
+			LastY = 14,
+		};
+		var displayAddress = APTR.FromPointer(0x00050B00);
+		var pointerAddress = APTR.FromPointer(0x00050B30);
+		if (!MuiVirtgroupDisplayStateRecordCodec.Write(ref platform, displayAddress,
+			display) || !MuiVirtgroupPointerStateRecordCodec.Write(ref platform,
+			pointerAddress, pointer)) return 1;
+		if (!MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform,
+			displayAddress, MuiVirtgroupInputRecordKind.Display,
+			MuiVirtgroupInputField.Height, out var heightAddress) ||
+			heightAddress.Raw != displayAddress.Raw +
+			MuiVirtgroupDisplayStateRecord.HeightOffset ||
+			!MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform,
+			pointerAddress, MuiVirtgroupInputRecordKind.Pointer,
+			MuiVirtgroupInputField.LastY, out var lastYAddress) ||
+			lastYAddress.Raw != pointerAddress.Raw +
+			MuiVirtgroupPointerStateRecord.LastYOffset) return 2;
+		if (!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform,
+			displayAddress, MuiVirtgroupInputRecordKind.Display,
+			MuiVirtgroupInputField.Left, out var left) ||
+			left != unchecked((uint)-8)) return 3;
+		if (!MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform,
+			pointerAddress, MuiVirtgroupInputRecordKind.Pointer,
+			MuiVirtgroupInputField.Flags, 0) ||
+			!MuiVirtgroupDisplayStateRecordCodec.TryRead(ref platform,
+			displayAddress, out var displayDecoded) ||
+			!MuiVirtgroupPointerStateRecordCodec.TryReadStructural(ref platform,
+			pointerAddress, out var pointerDecoded) || displayDecoded.Width != 200 ||
+			displayDecoded.Height != 100 || pointerDecoded.Flags != 0 ||
+			pointerDecoded.StartLeft != -8) return 4;
+		if (MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform,
+			displayAddress, MuiVirtgroupInputRecordKind.Display,
+			(MuiVirtgroupInputField)255, out _) ||
+			MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform,
+			pointerAddress, MuiVirtgroupInputRecordKind.Pointer,
+			(MuiVirtgroupInputField)255, out _) ||
+			MuiVirtgroupInputRecordMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+			MuiVirtgroupInputRecordKind.Display, MuiVirtgroupInputField.Magic,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG1277 native struct-first normalized-layout closure. Virtgroup geometry
+	// and Scrollgroup content/bar policy remain typed records; named enum fields
+	// are translated only by their bounded guest-memory adapters.
+	public static uint SpecializedLayoutStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var virtgroup = new MuiVirtgroupLayoutStateRecord
+		{
+			Magic = MuiVirtgroupLayoutStateRecord.Cookie,
+			Width = 320,
+			Height = 180,
+			Left = 12,
+			Top = 7,
+			TryFit = 1,
+		};
+		var scrollgroup = new MuiScrollgroupLayoutStateRecord
+		{
+			Magic = MuiScrollgroupLayoutStateRecord.Cookie,
+			Contents = APTR.FromPointer(0x00050C00),
+			FreeHorizontal = 1,
+			FreeVertical = 0,
+			HorizontalBar = APTR.FromPointer(0x00050C20),
+			VerticalBar = APTR.Null,
+			NoHorizontalBar = 0,
+			NoVerticalBar = 1,
+		};
+		var virtgroupAddress = APTR.FromPointer(0x00050B80);
+		var scrollgroupAddress = APTR.FromPointer(0x00050BB0);
+		if (!MuiVirtgroupLayoutStateRecordCodec.Write(ref platform,
+			virtgroupAddress, virtgroup) ||
+			!MuiScrollgroupLayoutStateRecordCodec.Write(ref platform,
+			scrollgroupAddress, scrollgroup)) return 1;
+		if (!MuiVirtgroupLayoutStateRecordMemoryCodec.TryGetAddress(ref platform,
+			virtgroupAddress, MuiVirtgroupLayoutField.Left, out var leftAddress) ||
+			leftAddress.Raw != virtgroupAddress.Raw +
+			MuiVirtgroupLayoutStateRecord.LeftOffset ||
+			!MuiScrollgroupLayoutStateRecordMemoryCodec.TryGetAddress(ref platform,
+			scrollgroupAddress, MuiScrollgroupLayoutField.VerticalBar,
+			out var verticalBarAddress) || verticalBarAddress.Raw !=
+			scrollgroupAddress.Raw + MuiScrollgroupLayoutStateRecord.VerticalBarOffset)
+			return 2;
+		if (!MuiVirtgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			virtgroupAddress, MuiVirtgroupLayoutField.TryFit, out var tryFit) ||
+			tryFit != 1 ||
+			!MuiScrollgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			scrollgroupAddress, MuiScrollgroupLayoutField.Contents,
+			out var contents) || contents != 0x50C00u) return 3;
+		if (!MuiVirtgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			virtgroupAddress, MuiVirtgroupLayoutField.TryFit, 0) ||
+			!MuiScrollgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			scrollgroupAddress, MuiScrollgroupLayoutField.NoVerticalBar, 0) ||
+			!MuiVirtgroupLayoutStateRecordCodec.TryRead(ref platform,
+			virtgroupAddress, out var virtgroupDecoded) ||
+			!MuiScrollgroupLayoutStateRecordCodec.TryRead(ref platform,
+			scrollgroupAddress, out var scrollgroupDecoded) ||
+			virtgroupDecoded.TryFit != 0 || virtgroupDecoded.Left != 12 ||
+			scrollgroupDecoded.NoVerticalBar != 0 ||
+			scrollgroupDecoded.Contents != scrollgroup.Contents) return 4;
+		if (MuiVirtgroupLayoutStateRecordMemoryCodec.TryGetAddress(ref platform,
+			virtgroupAddress, (MuiVirtgroupLayoutField)255, out _) ||
+			MuiScrollgroupLayoutStateRecordMemoryCodec.TryGetAddress(ref platform,
+			scrollgroupAddress, (MuiScrollgroupLayoutField)255, out _) ||
+			MuiVirtgroupLayoutStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiVirtgroupLayoutField.Magic, out _)) return 5;
+		return 42;
+	}
+
+	// MG1278 native struct-first application-queue closure. PushMethod and
+	// UnpushMethod packets are written through their named record members and
+	// decoded by the existing typed packet readers; the bounded adapter rejects
+	// cross-packet fields and unmapped tails.
+	public static uint ApplicationQueuePacketStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint pushMethod = 0x80429EF8u;
+		const uint unpushMethod = 0x804211DDu;
+		var pushAddress = APTR.FromPointer(0x00050C40);
+		if (!MuiApplicationQueuePacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			pushAddress, MuiApplicationQueuePacketKind.PushMethod,
+			MuiApplicationQueuePacketField.MethodId, pushMethod) ||
+			!MuiApplicationQueuePacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			pushAddress, MuiApplicationQueuePacketKind.PushMethod,
+			MuiApplicationQueuePacketField.Destination, 0x00050D00) ||
+			!MuiApplicationQueuePacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			pushAddress, MuiApplicationQueuePacketKind.PushMethod,
+			MuiApplicationQueuePacketField.Count, 2)) return 1;
+		var pushRequest = new MuiApplicationQueuePacketCodec.QueuePacketAddress
+		{
+			Address = pushAddress,
+			Method = pushMethod,
+		};
+		if (!MuiApplicationQueuePacketCodec.TryReadPush(ref platform,
+			ref pushRequest, out var push) || push.MethodId != pushMethod ||
+			push.Destination != 0x00050D00 || push.Count != 2) return 2;
+		if (!MuiApplicationQueuePacketRecordMemoryCodec.TryGetAddress(ref platform,
+			pushAddress, MuiApplicationQueuePacketKind.PushMethod,
+			MuiApplicationQueuePacketField.Count, out var countAddress) ||
+			countAddress.Raw != pushAddress.Raw +
+			MuiApplicationPushMethodMessage.CountOffset) return 3;
+
+		var unpushAddress = APTR.FromPointer(0x00050C60);
+		if (!MuiApplicationQueuePacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			unpushAddress, MuiApplicationQueuePacketKind.UnpushMethod,
+			MuiApplicationQueuePacketField.MethodId, unpushMethod) ||
+			!MuiApplicationQueuePacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			unpushAddress, MuiApplicationQueuePacketKind.UnpushMethod,
+			MuiApplicationQueuePacketField.TargetObject, 0x00050D40) ||
+			!MuiApplicationQueuePacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			unpushAddress, MuiApplicationQueuePacketKind.UnpushMethod,
+			MuiApplicationQueuePacketField.MethodIdSelector, 0x90000001) ||
+			!MuiApplicationQueuePacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			unpushAddress, MuiApplicationQueuePacketKind.UnpushMethod,
+			MuiApplicationQueuePacketField.Method, 77)) return 4;
+		var unpushRequest = new MuiApplicationQueuePacketCodec.QueuePacketAddress
+		{
+			Address = unpushAddress,
+			Method = unpushMethod,
+		};
+		if (!MuiApplicationQueuePacketCodec.TryReadUnpush(ref platform,
+			ref unpushRequest, out var unpush) || unpush.MethodId != unpushMethod ||
+			unpush.TargetObject != 0x00050D40 ||
+			unpush.MethodIdSelector != 0x90000001 || unpush.Method != 77) return 5;
+		if (!MuiApplicationQueuePacketRecordMemoryCodec.TryGetAddress(ref platform,
+			unpushAddress, MuiApplicationQueuePacketKind.UnpushMethod,
+			MuiApplicationQueuePacketField.Method, out var methodAddress) ||
+			methodAddress.Raw != unpushAddress.Raw +
+			MuiApplicationUnpushMethodMessage.MethodOffset) return 6;
+		if (MuiApplicationQueuePacketRecordMemoryCodec.TryGetAddress(ref platform,
+			pushAddress, MuiApplicationQueuePacketKind.PushMethod,
+			MuiApplicationQueuePacketField.Method, out _) ||
+			MuiApplicationQueuePacketRecordMemoryCodec.TryGetAddress(ref platform,
+			unpushAddress, MuiApplicationQueuePacketKind.UnpushMethod,
+			(MuiApplicationQueuePacketField)255, out _) ||
+			MuiApplicationQueuePacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFE),
+			MuiApplicationQueuePacketKind.PushMethod,
+			MuiApplicationQueuePacketField.Count, out _) ||
+			MuiApplicationQueuePacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiApplicationQueuePacketKind.UnpushMethod,
+			MuiApplicationQueuePacketField.Method, out _)) return 7;
+		return 42;
+	}
+
+	// MG1279 native struct-first application-presentation closure. ShowHelp and
+	// AboutMUI packets are written through named record members and decoded by
+	// their typed readers; cross-packet fields and unmapped records are rejected.
+	public static uint ApplicationPresentationPacketStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint showHelpMethod = 0x80426479u;
+		const uint aboutMethod = 0x8042D21Du;
+		var showHelpAddress = APTR.FromPointer(0x00050CA0);
+		if (!MuiApplicationPresentationPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, showHelpAddress,
+			MuiApplicationPresentationPacketKind.ShowHelp,
+			MuiApplicationPresentationPacketField.MethodId, showHelpMethod) ||
+			!MuiApplicationPresentationPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, showHelpAddress,
+			MuiApplicationPresentationPacketKind.ShowHelp,
+			MuiApplicationPresentationPacketField.ReferenceWindow, 0x00050D40) ||
+			!MuiApplicationPresentationPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, showHelpAddress,
+			MuiApplicationPresentationPacketKind.ShowHelp,
+			MuiApplicationPresentationPacketField.HelpFile, 0x00050D80) ||
+			!MuiApplicationPresentationPacketRecordMemoryCodec.TryWriteUInt32(
+				ref platform, showHelpAddress,
+				MuiApplicationPresentationPacketKind.ShowHelp,
+				MuiApplicationPresentationPacketField.Node, 0x00050DC0) ||
+			!MuiApplicationPresentationPacketRecordMemoryCodec.TryWriteUInt32(
+				ref platform, showHelpAddress,
+				MuiApplicationPresentationPacketKind.ShowHelp,
+				MuiApplicationPresentationPacketField.Line, unchecked((uint)-3)))
+			return 1;
+		var showHelpRequest = new MuiApplicationPresentationPacketCodec.PresentationPacketAddress
+		{
+			Address = showHelpAddress,
+			Method = showHelpMethod,
+		};
+		if (!MuiApplicationPresentationPacketCodec.TryReadShowHelp(ref platform,
+			ref showHelpRequest, out var showHelp) ||
+			showHelp.MethodId != showHelpMethod ||
+			showHelp.ReferenceWindow != 0x00050D40 ||
+			showHelp.HelpFile != 0x00050D80 || showHelp.Node != 0x00050DC0 ||
+			showHelp.Line != unchecked((uint)-3)) return 2;
+		if (!MuiApplicationPresentationPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, showHelpAddress,
+			MuiApplicationPresentationPacketKind.ShowHelp,
+			MuiApplicationPresentationPacketField.Line, out var lineAddress) ||
+			lineAddress.Raw != showHelpAddress.Raw +
+			MuiApplicationShowHelpMessage.LineOffset) return 3;
+
+		var aboutAddress = APTR.FromPointer(0x00050CC0);
+		if (!MuiApplicationPresentationPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, aboutAddress,
+			MuiApplicationPresentationPacketKind.AboutMui,
+			MuiApplicationPresentationPacketField.MethodId, aboutMethod) ||
+			!MuiApplicationPresentationPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, aboutAddress,
+			MuiApplicationPresentationPacketKind.AboutMui,
+			MuiApplicationPresentationPacketField.ReferenceWindow, 0x00050D40))
+			return 4;
+		var aboutRequest = new MuiApplicationPresentationPacketCodec.PresentationPacketAddress
+		{
+			Address = aboutAddress,
+			Method = aboutMethod,
+		};
+		if (!MuiApplicationPresentationPacketCodec.TryReadAboutMui(ref platform,
+			ref aboutRequest, out var about) || about.MethodId != aboutMethod ||
+			about.ReferenceWindow != 0x00050D40) return 5;
+		if (MuiApplicationPresentationPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, showHelpAddress,
+			MuiApplicationPresentationPacketKind.ShowHelp,
+			(MuiApplicationPresentationPacketField)255, out _) ||
+			MuiApplicationPresentationPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, aboutAddress,
+			MuiApplicationPresentationPacketKind.AboutMui,
+			(MuiApplicationPresentationPacketField)255, out _) ||
+			MuiApplicationPresentationPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0x00050FFE),
+			MuiApplicationPresentationPacketKind.ShowHelp,
+			MuiApplicationPresentationPacketField.Line, out _) ||
+			MuiApplicationPresentationPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null,
+			MuiApplicationPresentationPacketKind.AboutMui,
+			MuiApplicationPresentationPacketField.ReferenceWindow, out _)) return 6;
+		return 42;
+	}
+
+	// MG1280 native struct-first application-input closure. ReturnId, Input,
+	// InputBuffered, and InputHandler packets are written through named record
+	// members and decoded by typed readers; cross-packet fields and boundaries
+	// outside the complete records are rejected.
+	public static uint ApplicationInputPacketStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var returnIdAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			returnIdAddress, MuiApplicationInputPacketKind.ReturnId,
+			MuiApplicationInputPacketField.MethodId,
+			MuiApplicationDispatcher.ApplicationReturnIdMethod)) return 10;
+		if (!MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			returnIdAddress, MuiApplicationInputPacketKind.ReturnId,
+			MuiApplicationInputPacketField.ReturnId, 77)) return 11;
+		if (!MuiApplicationInputPacketCodec.TryReadReturnId(ref platform,
+			returnIdAddress, MuiApplicationDispatcher.ApplicationReturnIdMethod,
+			out var returnId) || returnId.ReturnId != 77) return 2;
+		if (!MuiApplicationInputPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			returnIdAddress, MuiApplicationInputPacketKind.ReturnId,
+			MuiApplicationInputPacketField.ReturnId, out var returnAddress) ||
+			returnAddress.Raw != returnIdAddress.Raw +
+			MuiApplicationReturnIdMessage.ReturnIdOffset) return 3;
+
+		var inputAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			inputAddress, MuiApplicationInputPacketKind.Input,
+			MuiApplicationInputPacketField.MethodId,
+			MuiApplicationDispatcher.ApplicationInputMethod) ||
+			!MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			inputAddress, MuiApplicationInputPacketKind.Input,
+			MuiApplicationInputPacketField.SignalStorage, 0x00050D40)) return 4;
+		if (!MuiApplicationInputPacketCodec.TryReadInput(ref platform, inputAddress,
+			MuiApplicationDispatcher.ApplicationInputMethod,
+			out var input) || input.SignalStorage != 0x00050D40) return 5;
+		if (!MuiApplicationInputPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			inputAddress, MuiApplicationInputPacketKind.Input,
+			MuiApplicationInputPacketField.SignalStorage, out var signalAddress) ||
+			signalAddress.Raw != inputAddress.Raw +
+			MuiApplicationInputMessage.SignalStorageOffset) return 6;
+
+		var bufferedAddress = APTR.FromPointer(0x00050E40);
+		if (!MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			bufferedAddress, MuiApplicationInputPacketKind.InputBuffered,
+			MuiApplicationInputPacketField.MethodId,
+			MuiApplicationDispatcher.ApplicationInputBufferedMethod) ||
+			!MuiApplicationInputPacketCodec.TryReadInputBufferedValue(ref platform,
+				bufferedAddress, MuiApplicationDispatcher.ApplicationInputBufferedMethod,
+				out var bufferedMethodId) || bufferedMethodId !=
+				MuiApplicationDispatcher.ApplicationInputBufferedMethod) return 7;
+		var buffered = new MuiApplicationInputBufferedMessage
+		{
+			MethodId = bufferedMethodId,
+		};
+
+		var handlerAddress = APTR.FromPointer(0x00050E50);
+		if (!MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			handlerAddress, MuiApplicationInputPacketKind.InputHandler,
+			MuiApplicationInputPacketField.MethodId,
+			MuiApplicationDispatcher.AddInputHandlerMethod) ||
+			!MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			handlerAddress, MuiApplicationInputPacketKind.InputHandler,
+			MuiApplicationInputPacketField.Handler, 0x00050D80) ||
+			!MuiApplicationInputPacketCodec.TryReadInputHandler(ref platform,
+				handlerAddress, MuiApplicationDispatcher.AddInputHandlerMethod,
+				out var handler) || handler.Handler != 0x00050D80) return 8;
+		if (MuiApplicationInputPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			returnIdAddress, MuiApplicationInputPacketKind.ReturnId,
+			MuiApplicationInputPacketField.Handler, out _)) return 10;
+		if (MuiApplicationInputPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			inputAddress, MuiApplicationInputPacketKind.Input,
+			MuiApplicationInputPacketField.ReturnId, out _)) return 11;
+		if (MuiApplicationInputPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			bufferedAddress, MuiApplicationInputPacketKind.InputBuffered,
+			(MuiApplicationInputPacketField)255, out _)) return 12;
+		if (MuiApplicationInputPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFE),
+			MuiApplicationInputPacketKind.InputHandler,
+			MuiApplicationInputPacketField.Handler, out _)) return 13;
+		if (MuiApplicationInputPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiApplicationInputPacketKind.Input,
+			MuiApplicationInputPacketField.SignalStorage, out _)) return 14;
+		return 42;
+	}
+
+	// MG1281 native struct-first application-settings closure. The four fixed
+	// MorphOS packet records are written and decoded through named members; the
+	// bounded adapter rejects cross-packet fields, invalid selectors, and tails.
+	public static uint ApplicationSettingsPacketStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint setConfigItemMethod = 0x80424A80;
+		const uint openConfigWindowMethod = 0x804299BA;
+		const uint buildSettingsPanelMethod = 0x8042B58F;
+		const uint saveMethod = 0x804227EF;
+		const uint setAddress = 0x00050F00;
+		const uint openAddress = 0x00050F20;
+		const uint panelAddress = 0x00050F40;
+		const uint ioAddress = 0x00050F60;
+
+		if (!MuiApplicationSettingsPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(setAddress), MuiApplicationSettingsPacketKind.SetConfigItem,
+			MuiApplicationSettingsPacketField.MethodId, setConfigItemMethod) ||
+			!MuiApplicationSettingsPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(setAddress), MuiApplicationSettingsPacketKind.SetConfigItem,
+			MuiApplicationSettingsPacketField.Item, 0x00001234) ||
+			!MuiApplicationSettingsPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(setAddress), MuiApplicationSettingsPacketKind.SetConfigItem,
+			MuiApplicationSettingsPacketField.Data, 0x00050D00)) return 1;
+		var setRequest = new MuiApplicationSettingsPacketCodec.SettingsPacketAddress
+		{
+			Address = APTR.FromPointer(setAddress), Method = setConfigItemMethod,
+		};
+		if (!MuiApplicationSettingsPacketCodec.TryReadSetConfigItem(ref platform,
+			ref setRequest, out var setValue) || setValue.Item != 0x00001234 ||
+			setValue.Data != 0x00050D00) return 2;
+
+		if (!MuiApplicationSettingsPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(openAddress), MuiApplicationSettingsPacketKind.OpenConfigWindow,
+			MuiApplicationSettingsPacketField.MethodId, openConfigWindowMethod) ||
+			!MuiApplicationSettingsPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(openAddress), MuiApplicationSettingsPacketKind.OpenConfigWindow,
+			MuiApplicationSettingsPacketField.Flags, 3) ||
+			!MuiApplicationSettingsPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(openAddress), MuiApplicationSettingsPacketKind.OpenConfigWindow,
+			MuiApplicationSettingsPacketField.ClassId, 0x00050D20)) return 3;
+		var openRequest = new MuiApplicationSettingsPacketCodec.SettingsPacketAddress
+		{
+			Address = APTR.FromPointer(openAddress), Method = openConfigWindowMethod,
+		};
+		if (!MuiApplicationSettingsPacketCodec.TryReadOpenConfigWindow(ref platform,
+			ref openRequest, out var openValue) || openValue.Flags != 3 ||
+			openValue.ClassId != 0x00050D20) return 4;
+
+		if (!MuiApplicationSettingsPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(panelAddress), MuiApplicationSettingsPacketKind.BuildSettingsPanel,
+			MuiApplicationSettingsPacketField.MethodId, buildSettingsPanelMethod) ||
+			!MuiApplicationSettingsPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(panelAddress), MuiApplicationSettingsPacketKind.BuildSettingsPanel,
+			MuiApplicationSettingsPacketField.Number, 5)) return 5;
+		var panelRequest = new MuiApplicationSettingsPacketCodec.SettingsPacketAddress
+		{
+			Address = APTR.FromPointer(panelAddress), Method = buildSettingsPanelMethod,
+		};
+		if (!MuiApplicationSettingsPacketCodec.TryReadBuildSettingsPanel(ref platform,
+			ref panelRequest, out var panelValue) || panelValue.Number != 5) return 6;
+
+		if (!MuiApplicationSettingsPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(ioAddress), MuiApplicationSettingsPacketKind.SettingsIo,
+			MuiApplicationSettingsPacketField.MethodId, saveMethod) ||
+			!MuiApplicationSettingsPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(ioAddress), MuiApplicationSettingsPacketKind.SettingsIo,
+			MuiApplicationSettingsPacketField.Name, 0x00050D40)) return 7;
+		var ioRequest = new MuiApplicationSettingsPacketCodec.SettingsPacketAddress
+		{
+			Address = APTR.FromPointer(ioAddress), Method = saveMethod,
+		};
+		if (!MuiApplicationSettingsPacketCodec.TryReadSettingsIo(ref platform,
+			ref ioRequest, out var ioValue) || ioValue.Name != 0x00050D40) return 8;
+
+		if (MuiApplicationSettingsPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(setAddress), MuiApplicationSettingsPacketKind.SetConfigItem,
+			MuiApplicationSettingsPacketField.ClassId, out _) ||
+			MuiApplicationSettingsPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(openAddress), MuiApplicationSettingsPacketKind.OpenConfigWindow,
+			MuiApplicationSettingsPacketField.Data, out _) ||
+			MuiApplicationSettingsPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFE), MuiApplicationSettingsPacketKind.SettingsIo,
+			MuiApplicationSettingsPacketField.Name, out _) ||
+			MuiApplicationSettingsPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiApplicationSettingsPacketKind.BuildSettingsPanel,
+			MuiApplicationSettingsPacketField.Number, out _)) return 9;
+		return 42;
+	}
+
+	// MG1282 native struct-first application/window method closure. ConfigId,
+	// CheckRefresh, Loop, WindowMethod, and Snapshot records share one bounded
+	// named-field adapter; invalid fields and incomplete records are rejected.
+	public static uint ApplicationMethodPacketStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint configMethod = 0x8042D934;
+		const uint checkRefreshMethod = 0x80424D68;
+		const uint executeMethod = 0x804253F3;
+		const uint windowSetupMethod = 0x8042C34C;
+		const uint snapshotMethod = 0x8042945E;
+		var configAddress = APTR.FromPointer(0x00050F00);
+		if (!MuiApplicationMethodPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			configAddress, MuiApplicationMethodPacketKind.ConfigId,
+			MuiApplicationMethodPacketField.MethodId, configMethod) ||
+			!MuiApplicationMethodPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			configAddress, MuiApplicationMethodPacketKind.ConfigId,
+			MuiApplicationMethodPacketField.ConfigId, 9)) return 1;
+		var configRequest = new MuiApplicationMethodPacketCodec.MethodPacketAddress
+		{
+			Address = configAddress, Method = configMethod,
+		};
+		if (!MuiApplicationMethodPacketCodec.TryReadConfigId(ref platform,
+			ref configRequest, out var config) || config.ConfigId != 9) return 2;
+
+		var checkAddress = APTR.FromPointer(0x00050F20);
+		if (!MuiApplicationMethodPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			checkAddress, MuiApplicationMethodPacketKind.CheckRefresh,
+			MuiApplicationMethodPacketField.MethodId, checkRefreshMethod) ||
+			!MuiApplicationMethodPacketCodec.TryReadMethodIdValue(ref platform,
+			checkAddress, MuiApplicationMethodPacketKind.CheckRefresh,
+			out var checkMethodId) || checkMethodId != checkRefreshMethod) return 3;
+		var loopAddress = APTR.FromPointer(0x00050F40);
+		if (!MuiApplicationMethodPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			loopAddress, MuiApplicationMethodPacketKind.Loop,
+			MuiApplicationMethodPacketField.MethodId, executeMethod) ||
+			!MuiApplicationMethodPacketCodec.TryReadMethodIdValue(ref platform,
+			loopAddress, MuiApplicationMethodPacketKind.Loop,
+			out var loopMethodId) || loopMethodId != executeMethod) return 4;
+		var windowAddress = APTR.FromPointer(0x00050F60);
+		if (!MuiApplicationMethodPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			windowAddress, MuiApplicationMethodPacketKind.WindowMethod,
+			MuiApplicationMethodPacketField.MethodId, windowSetupMethod) ||
+			!MuiApplicationMethodPacketCodec.TryReadMethodIdValue(ref platform,
+			windowAddress, MuiApplicationMethodPacketKind.WindowMethod,
+			out var windowMethodId) || windowMethodId != windowSetupMethod) return 5;
+		var snapshotAddress = APTR.FromPointer(0x00050F80);
+		if (!MuiApplicationMethodPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			snapshotAddress, MuiApplicationMethodPacketKind.Snapshot,
+			MuiApplicationMethodPacketField.MethodId, snapshotMethod) ||
+			!MuiApplicationMethodPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			snapshotAddress, MuiApplicationMethodPacketKind.Snapshot,
+			MuiApplicationMethodPacketField.Flags, 1)) return 6;
+		if (!MuiApplicationMethodPacketCodec.TryReadMethodIdValue(ref platform,
+			snapshotAddress, MuiApplicationMethodPacketKind.Snapshot,
+			out var snapshotMethodId) || snapshotMethodId != snapshotMethod ||
+			!MuiApplicationMethodPacketRecordMemoryCodec.TryReadUInt32(ref platform,
+				snapshotAddress, MuiApplicationMethodPacketKind.Snapshot,
+				MuiApplicationMethodPacketField.Flags, out var snapshotFlags) ||
+			snapshotFlags != 1) return 7;
+		if (snapshotMethodId != snapshotMethod || snapshotFlags != 1 ||
+			checkMethodId != checkRefreshMethod || loopMethodId != executeMethod ||
+			windowMethodId != windowSetupMethod) return 8;
+
+		if (MuiApplicationMethodPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			configAddress, MuiApplicationMethodPacketKind.ConfigId,
+			MuiApplicationMethodPacketField.Flags, out _) ||
+			MuiApplicationMethodPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			snapshotAddress, MuiApplicationMethodPacketKind.Snapshot,
+			MuiApplicationMethodPacketField.ConfigId, out _) ||
+			MuiApplicationMethodPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFE), MuiApplicationMethodPacketKind.Snapshot,
+			MuiApplicationMethodPacketField.Flags, out _) ||
+			MuiApplicationMethodPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiApplicationMethodPacketKind.Loop,
+			MuiApplicationMethodPacketField.MethodId, out _)) return 9;
+		return 42;
+	}
+
+	// MG1283 native struct-first application/window menu closure. Query and set
+	// records for both Application and Window use one named-field adapter with
+	// bounded rejection of invalid fields and incomplete records.
+	public static uint ApplicationMenuPacketStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint applicationGetCheck = 0x8042C0A7;
+		const uint applicationSetState = 0x80428BEF;
+		const uint windowGetState = 0x80420D2F;
+		const uint windowSetCheck = 0x80422243;
+		var applicationQueryAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiApplicationMenuPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			applicationQueryAddress, MuiApplicationMenuPacketKind.ApplicationQuery,
+			MuiApplicationMenuPacketField.MethodId, applicationGetCheck) ||
+			!MuiApplicationMenuPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			applicationQueryAddress, MuiApplicationMenuPacketKind.ApplicationQuery,
+			MuiApplicationMenuPacketField.MenuId, 0x11)) return 1;
+		var applicationQueryRequest = new MuiApplicationMenuPacketCodec.MenuPacketAddress
+		{
+			Address = applicationQueryAddress, Method = applicationGetCheck,
+		};
+		if (!MuiApplicationMenuPacketCodec.TryReadApplicationQuery(ref platform,
+			ref applicationQueryRequest, out var applicationQuery) ||
+			applicationQuery.MenuId != 0x11) return 2;
+
+		var applicationSetAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiApplicationMenuPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			applicationSetAddress, MuiApplicationMenuPacketKind.ApplicationSet,
+			MuiApplicationMenuPacketField.MethodId, applicationSetState) ||
+			!MuiApplicationMenuPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			applicationSetAddress, MuiApplicationMenuPacketKind.ApplicationSet,
+			MuiApplicationMenuPacketField.MenuId, 0x22) ||
+			!MuiApplicationMenuPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			applicationSetAddress, MuiApplicationMenuPacketKind.ApplicationSet,
+			MuiApplicationMenuPacketField.State, 1)) return 3;
+		var applicationSetRequest = new MuiApplicationMenuPacketCodec.MenuPacketAddress
+		{
+			Address = applicationSetAddress, Method = applicationSetState,
+		};
+		if (!MuiApplicationMenuPacketCodec.TryReadApplicationSet(ref platform,
+			ref applicationSetRequest, out var applicationSet) ||
+			applicationSet.MenuId != 0x22 || applicationSet.State != 1) return 4;
+
+		var windowQueryAddress = APTR.FromPointer(0x00050E40);
+		if (!MuiApplicationMenuPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			windowQueryAddress, MuiApplicationMenuPacketKind.WindowQuery,
+			MuiApplicationMenuPacketField.MethodId, windowGetState) ||
+			!MuiApplicationMenuPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			windowQueryAddress, MuiApplicationMenuPacketKind.WindowQuery,
+			MuiApplicationMenuPacketField.MenuId, 0x33)) return 5;
+		var windowQueryRequest = new MuiApplicationMenuPacketCodec.MenuPacketAddress
+		{
+			Address = windowQueryAddress, Method = windowGetState,
+		};
+		if (!MuiApplicationMenuPacketCodec.TryReadWindowQuery(ref platform,
+			ref windowQueryRequest, out var windowQuery) ||
+			windowQuery.MenuId != 0x33) return 6;
+
+		var windowSetAddress = APTR.FromPointer(0x00050E60);
+		if (!MuiApplicationMenuPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			windowSetAddress, MuiApplicationMenuPacketKind.WindowSet,
+			MuiApplicationMenuPacketField.MethodId, windowSetCheck) ||
+			!MuiApplicationMenuPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			windowSetAddress, MuiApplicationMenuPacketKind.WindowSet,
+			MuiApplicationMenuPacketField.MenuId, 0x44) ||
+			!MuiApplicationMenuPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			windowSetAddress, MuiApplicationMenuPacketKind.WindowSet,
+			MuiApplicationMenuPacketField.State, 0)) return 7;
+		var windowSetRequest = new MuiApplicationMenuPacketCodec.MenuPacketAddress
+		{
+			Address = windowSetAddress, Method = windowSetCheck,
+		};
+		if (!MuiApplicationMenuPacketCodec.TryReadWindowSet(ref platform,
+			ref windowSetRequest, out var windowSet) || windowSet.MenuId != 0x44 ||
+			windowSet.State != 0) return 8;
+
+		if (MuiApplicationMenuPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			applicationQueryAddress, MuiApplicationMenuPacketKind.ApplicationQuery,
+			MuiApplicationMenuPacketField.State, out _) ||
+			MuiApplicationMenuPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			windowSetAddress, MuiApplicationMenuPacketKind.WindowSet,
+			(MuiApplicationMenuPacketField)255, out _) ||
+			MuiApplicationMenuPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFE), MuiApplicationMenuPacketKind.WindowQuery,
+			MuiApplicationMenuPacketField.MenuId, out _) ||
+			MuiApplicationMenuPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiApplicationMenuPacketKind.ApplicationSet,
+			MuiApplicationMenuPacketField.State, out _)) return 9;
+		return 42;
+	}
+
+	// MG1284 native struct-first Window event-handler closure. Add and Remove
+	// packets share a named record adapter while retaining selector-specific
+	// admission and bounded rejection of invalid fields/tails.
+	public static uint WindowEventHandlerPacketStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var addAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiWindowEventHandlerPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			addAddress, MuiWindowEventHandlerPacketKind.Add,
+			MuiWindowEventHandlerPacketField.MethodId,
+			MuiApplicationDispatcher.WindowAddEventHandlerMethod) ||
+			!MuiWindowEventHandlerPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			addAddress, MuiWindowEventHandlerPacketKind.Add,
+			MuiWindowEventHandlerPacketField.Handler, 0x00050D00)) return 1;
+		var addRequest = new MuiApplicationMenuPacketCodec.MenuPacketAddress
+		{
+			Address = addAddress,
+			Method = MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+		};
+		if (!MuiApplicationMenuPacketCodec.TryReadWindowEventHandler(ref platform,
+			ref addRequest, out var addValue) || addValue.Handler != 0x00050D00) return 2;
+
+		var removeAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiWindowEventHandlerPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			removeAddress, MuiWindowEventHandlerPacketKind.Remove,
+			MuiWindowEventHandlerPacketField.MethodId,
+			MuiApplicationDispatcher.WindowRemoveEventHandlerMethod) ||
+			!MuiWindowEventHandlerPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			removeAddress, MuiWindowEventHandlerPacketKind.Remove,
+			MuiWindowEventHandlerPacketField.Handler, 0x00050D20)) return 3;
+		var removeRequest = new MuiApplicationMenuPacketCodec.MenuPacketAddress
+		{
+			Address = removeAddress,
+			Method = MuiApplicationDispatcher.WindowRemoveEventHandlerMethod,
+		};
+		if (!MuiApplicationMenuPacketCodec.TryReadWindowEventHandler(ref platform,
+			ref removeRequest, out var removeValue) || removeValue.Handler != 0x00050D20) return 4;
+
+		if (MuiWindowEventHandlerPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			addAddress, MuiWindowEventHandlerPacketKind.Add,
+			(MuiWindowEventHandlerPacketField)255, out _) ||
+			MuiWindowEventHandlerPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			removeAddress, MuiWindowEventHandlerPacketKind.Remove,
+			(MuiWindowEventHandlerPacketField)255, out _) ||
+			MuiWindowEventHandlerPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFE), MuiWindowEventHandlerPacketKind.Add,
+			MuiWindowEventHandlerPacketField.Handler, out _) ||
+			MuiWindowEventHandlerPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiWindowEventHandlerPacketKind.Remove,
+			MuiWindowEventHandlerPacketField.MethodId, out _)) return 5;
+		return 42;
+	}
+
+	// MG1285 native struct-first SetCycleChain closure. The fixed header uses a
+	// named record adapter; its inline object-vector tail remains a bounded
+	// cursor rather than an unmanaged array or object graph.
+	public static uint WindowCycleChainPacketStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint method = 0x80426510;
+		var address = APTR.FromPointer(0x00050E00);
+		if (!MuiWindowCycleChainPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiWindowCycleChainPacketField.MethodId, method) ||
+			!MuiWindowCycleChainPacketRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiWindowCycleChainPacketField.FirstObject, 0x00050D00)) return 1;
+		var request = new MuiWindowCycleChainPacketCodec.CycleChainPacketAddress
+		{
+			Address = address, Method = method,
+		};
+		if (!MuiWindowCycleChainPacketCodec.TryRead(ref platform, ref request,
+			out var value) || value.MethodId != method ||
+			value.FirstObject != 0x00050D00) return 2;
+		if (!MuiWindowCycleChainPacketCodec.TryGetVector(ref platform, address,
+			out var vector) || vector.Raw != address.Raw +
+			MuiWindowCycleChainMessage.VectorOffset) return 3;
+		if (MuiWindowCycleChainPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiWindowCycleChainPacketField)255, out _) ||
+			MuiWindowCycleChainPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFC),
+			MuiWindowCycleChainPacketField.FirstObject, out _) ||
+			MuiWindowCycleChainPacketRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiWindowCycleChainPacketField.MethodId, out _)) return 4;
+		return 42;
+	}
+
+	// MG1286 native struct-first event-handler node closure. The mixed-width
+	// MorphOS record is written and read through its named semantic struct;
+	// the bounded adapter exposes field addresses without leaking offsets.
+	public static uint EventHandlerNodeStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x00050E00);
+		var value = default(MuiEventHandlerNodeRecord);
+		value.NodeSuccessor = APTR.FromPointer(0x00050D00);
+		value.NodePredecessor = APTR.FromPointer(0x00050D20);
+		value.Reserved = 0xA5;
+		value.Priority = -3;
+		value.Flags = (ushort)(MuiEventHandlerNodeInput.MUI_EHF_GUIMODE |
+			MuiEventHandlerNodeInput.MUI_EHF_PRIORITY);
+		value.Object = APTR.FromPointer(0x00050D40);
+		value.Class = APTR.FromPointer(0x00050D60);
+		value.Events = 0x01020304;
+		if (!MuiEventHandlerNodeCodec.Write(ref platform, address, value)) return 1;
+		if (!MuiEventHandlerNodeRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiEventHandlerNodeField.Priority, out var priority,
+			out var prioritySize) || priority.Raw != address.Raw +
+			MuiEventHandlerNodeRecord.PriorityOffset || prioritySize !=
+			MuiEventHandlerNodeRecord.ByteFieldSize) return 2;
+		if (!MuiEventHandlerNodeCodec.TryRead(ref platform, address,
+			out var decoded) || decoded.NodeSuccessor != value.NodeSuccessor ||
+			decoded.Priority != value.Priority || decoded.Flags != value.Flags ||
+			decoded.Events != value.Events) return 3;
+		if (!MuiEventHandlerNodeRecordMemoryCodec.TryReadUInt16(ref platform,
+			address, MuiEventHandlerNodeField.Flags, out var flags) ||
+			flags != value.Flags) return 4;
+		if (MuiEventHandlerNodeRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFE), MuiEventHandlerNodeField.Events,
+			out _, out _) || MuiEventHandlerNodeRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiEventHandlerNodeField.Class, out _, out _))
+			return 5;
+		return 42;
+	}
+
+	// MG1287 native struct-first input-handler node closure. Pointer members
+	// stay APTR fields in the semantic record while the adapter validates the
+	// complete fixed guest record and its named LONG fields.
+	public static uint InputHandlerStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x00050E40);
+		var value = default(MuiInputHandlerRecord);
+		value.NodeSuccessor = APTR.FromPointer(0x00050D00);
+		value.NodePredecessor = APTR.FromPointer(0x00050D20);
+		value.Object = APTR.FromPointer(0x00050D40);
+		value.Events = 0x01020304;
+		value.Reserved = 0x05060708;
+		value.Packet = 0x80420001;
+		if (!MuiInputHandlerCodec.Write(ref platform, address, value)) return 1;
+		if (!MuiInputHandlerRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiInputHandlerField.Packet, out var packet) || packet.Raw !=
+			address.Raw + MuiInputHandlerRecord.PacketOffset) return 2;
+		if (!MuiInputHandlerCodec.TryRead(ref platform, address,
+			out var decoded) || decoded.NodeSuccessor != value.NodeSuccessor ||
+			decoded.NodePredecessor != value.NodePredecessor ||
+			decoded.Object != value.Object || decoded.Packet != value.Packet) return 3;
+		if (!MuiInputHandlerRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiInputHandlerField.Events, out var events) ||
+			events != value.Events) return 4;
+		if (MuiInputHandlerRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFE), MuiInputHandlerField.Object, out _) ||
+			MuiInputHandlerRecordMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+			MuiInputHandlerField.Packet, out _)) return 5;
+		return 42;
+	}
+
+	// MG1288 native struct-first WindowList projection closure. The persistent
+	// state and each Exec-style list entry use named semantic structs; bounded
+	// adapters retain complete-record validation for the guest projection.
+	public static uint ApplicationWindowListStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var stateAddress = APTR.FromPointer(0x00050E80);
+		var state = default(MuiApplicationWindowListState);
+		state.Application = APTR.FromPointer(0x00050D00);
+		state.List = APTR.FromPointer(0x00050D20);
+		state.Entries = APTR.FromPointer(0x00050D40);
+		state.Count = 2;
+		state.Capacity = 4;
+		state.Mutation = 7;
+		state.Generation = 9;
+		if (!MuiApplicationWindowListStateCodec.Write(ref platform,
+			stateAddress, state)) return 1;
+		if (!MuiApplicationWindowListStateRecordMemoryCodec.TryGetAddress(
+			ref platform, stateAddress,
+			MuiApplicationWindowListStateField.Entries, out var entries) ||
+			entries.Raw != stateAddress.Raw +
+			MuiApplicationWindowListState.EntriesOffset) return 2;
+		if (!MuiApplicationWindowListStateCodec.TryRead(ref platform, stateAddress,
+			out var decodedState) || decodedState.Entries != state.Entries ||
+			decodedState.Generation != state.Generation) return 3;
+
+		var entryAddress = APTR.FromPointer(0x00050EA0);
+		var entry = default(MuiApplicationWindowListEntry);
+		entry.Next = APTR.FromPointer(0x00050D60);
+		entry.Previous = APTR.FromPointer(0x00050D80);
+		entry.Object = APTR.FromPointer(0x00050DA0);
+		entry.Reserved = APTR.FromPointer(MuiApplicationWindowListEntry.ProjectionMagic);
+		if (!MuiApplicationWindowListEntryCodec.Write(ref platform, entryAddress,
+			entry)) return 4;
+		if (!MuiApplicationWindowListEntryRecordMemoryCodec.TryGetAddress(
+			ref platform, entryAddress, MuiApplicationWindowListEntryField.Object,
+			out var objectAddress) || objectAddress.Raw != entryAddress.Raw +
+			MuiApplicationWindowListEntry.ObjectOffset) return 5;
+		if (!MuiApplicationWindowListEntryCodec.TryRead(ref platform, entryAddress,
+			out var decodedEntry) || decodedEntry.Object != entry.Object) return 6;
+		if (MuiApplicationWindowListStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFE), MuiApplicationWindowListStateField.Generation,
+			out _) || MuiApplicationWindowListEntryRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiApplicationWindowListEntryField.Next, out _))
+			return 7;
+		return 42;
+	}
+
+	// MG1289 native struct-first application/window queue-node closure. The
+	// fixed five-LONG record is carried as a named semantic struct; the Packet
+	// payload remains a separate bounded cursor owned by the queue consumer.
+	public static uint ApplicationWindowNodeStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x00050EC0);
+		var value = default(MuiApplicationWindowNodeRecord);
+		value.Next = APTR.FromPointer(0x00050D00);
+		value.Value = APTR.FromPointer(0x00050D20);
+		value.Sequence = 2;
+		value.Auxiliary = 3;
+		value.Packet = 0x80420001;
+		if (!MuiApplicationWindowNodeCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiApplicationWindowNodeRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationWindowNodeField.Packet, out var packet) ||
+			packet.Raw != address.Raw + MuiApplicationWindowNodeRecord.PacketOffset)
+			return 2;
+		if (!MuiApplicationWindowNodeCodec.TryRead(ref platform, address,
+			out var decoded) || decoded.Next != value.Next ||
+			decoded.Value != value.Value || decoded.Sequence != value.Sequence ||
+			decoded.Auxiliary != value.Auxiliary || decoded.Packet != value.Packet)
+			return 3;
+		if (!MuiApplicationWindowNodeRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationWindowNodeField.Sequence, out var sequence) ||
+			sequence != value.Sequence) return 4;
+		if (MuiApplicationWindowNodeRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFE), MuiApplicationWindowNodeField.Value,
+			out _) || MuiApplicationWindowNodeRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiApplicationWindowNodeField.Next, out _))
+			return 5;
+		return 42;
+	}
+
+	// MG1290 native struct-first Area activation packet closure. Method-only
+	// and {MethodID, Flags} records share a bounded named-field adapter while
+	// retaining their MorphOS selector-specific record sizes.
+	public static uint AreaActivationMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var activation = APTR.FromPointer(0x00050EE0);
+		if (!MuiAreaActivationRecordMemoryCodec.TryWriteUInt32(ref platform,
+			activation, MuiAreaActivationPacketKind.Activation,
+			MuiAreaActivationField.MethodId, MuiAreaActivationMessageCodec.GoActive) ||
+			!MuiAreaActivationRecordMemoryCodec.TryWriteUInt32(ref platform,
+				activation, MuiAreaActivationPacketKind.Activation,
+				MuiAreaActivationField.Flags, 0xA5A5)) return 1;
+		if (!MuiAreaActivationMessageCodec.TryRead(ref platform, activation,
+			out var decoded) || decoded.MethodId != MuiAreaActivationMessageCodec.GoActive ||
+			decoded.Flags != 0xA5A5) return 2;
+		if (!MuiAreaActivationRecordMemoryCodec.TryGetAddress(ref platform,
+			activation, MuiAreaActivationPacketKind.Activation,
+			MuiAreaActivationField.Flags, out var flags) || flags.Raw != activation.Raw +
+			MuiAreaActivationMessage.FlagsOffset) return 3;
+
+		var method = APTR.FromPointer(0x00050F00);
+		if (!MuiAreaActivationRecordMemoryCodec.TryWriteUInt32(ref platform, method,
+			MuiAreaActivationPacketKind.Method, MuiAreaActivationField.MethodId,
+			MuiAreaActivationMessageCodec.GoInactive)) return 4;
+		if (!MuiAreaActivationMessageCodec.TryReadMethodIdValue(ref platform, method,
+			out var methodId) || methodId != MuiAreaActivationMessageCodec.GoInactive)
+			return 5;
+		if (MuiAreaActivationRecordMemoryCodec.TryGetAddress(ref platform,
+			method, MuiAreaActivationPacketKind.Method, MuiAreaActivationField.Flags,
+			out _) || MuiAreaActivationRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFE), MuiAreaActivationPacketKind.Activation,
+			MuiAreaActivationField.Flags, out _) ||
+			MuiAreaActivationRecordMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+			MuiAreaActivationPacketKind.Method, MuiAreaActivationField.MethodId,
+			out _)) return 6;
+		return 42;
+	}
+
+	// MG1291 native struct-first common-control message closure. Numeric,
+	// signed, scaling, event, attribute, and MinMax packets all cross the guest
+	// boundary through their named semantic records and packet-kind cursor.
+	public static uint CommonControlMessagesStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		// Exercise the native boundary with scalar fields. The typed records and
+		// their struct codecs are host-qualified; this closure keeps lowering
+		// predictable while still selecting every field through named packet and
+		// field enums (no ad-hoc ABI offsets at the call site).
+		var methodAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, methodAddress,
+			MuiCommonPacketKind.Method, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.Cleanup)) return 1;
+		if (!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, methodAddress,
+			MuiCommonPacketKind.Method, MuiCommonField.MethodId, out var methodId) ||
+			methodId != MuiCommonControlPacketCore.Cleanup) return 2;
+
+		var signedAddress = APTR.FromPointer(0x00050E10);
+		if (!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, signedAddress,
+			MuiCommonPacketKind.Signed, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.NumericIncrease) ||
+			!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, signedAddress,
+				MuiCommonPacketKind.Signed, MuiCommonField.Value,
+				unchecked((uint)-7)) ||
+			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, signedAddress,
+				MuiCommonPacketKind.Signed, MuiCommonField.Value, out var signedValue) ||
+			unchecked((int)signedValue) != -7) return 3;
+
+		var scaleAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, scaleAddress,
+			MuiCommonPacketKind.ScaleToValue, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.NumericScaleToValue) ||
+			!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, scaleAddress,
+				MuiCommonPacketKind.ScaleToValue, MuiCommonField.Min,
+				unchecked((uint)-100)) ||
+			!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, scaleAddress,
+				MuiCommonPacketKind.ScaleToValue, MuiCommonField.Max, 100) ||
+			!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, scaleAddress,
+				MuiCommonPacketKind.ScaleToValue, MuiCommonField.Value, 25) ||
+			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, scaleAddress,
+				MuiCommonPacketKind.ScaleToValue, MuiCommonField.Min, out var scaleMin) ||
+			unchecked((int)scaleMin) != -100) return 4;
+
+		var eventAddress = APTR.FromPointer(0x00050E40);
+		if (!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, eventAddress,
+			MuiCommonPacketKind.HandleEvent, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.HandleEvent) ||
+			!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, eventAddress,
+				MuiCommonPacketKind.HandleEvent, MuiCommonField.InputMessage,
+				0x00050D00) ||
+			!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, eventAddress,
+				MuiCommonPacketKind.HandleEvent, MuiCommonField.MuiKey,
+				unchecked((uint)-1)) ||
+			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, eventAddress,
+				MuiCommonPacketKind.HandleEvent, MuiCommonField.MuiKey, out var muiKey) ||
+			unchecked((int)muiKey) != -1) return 5;
+
+		var getAddress = APTR.FromPointer(0x00050E60);
+		if (!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, getAddress,
+			MuiCommonPacketKind.Get, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.OmGet) ||
+			!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, getAddress,
+				MuiCommonPacketKind.Get, MuiCommonField.Attribute, 0x80420001) ||
+			!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, getAddress,
+				MuiCommonPacketKind.Get, MuiCommonField.Storage, 0x00050D40) ||
+			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, getAddress,
+				MuiCommonPacketKind.Get, MuiCommonField.Storage, out var storage) ||
+			storage != 0x00050D40) return 6;
+
+		var attributeAddress = APTR.FromPointer(0x00050E70);
+		if (!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, attributeAddress,
+			MuiCommonPacketKind.Attribute, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.Set) ||
+			!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, attributeAddress,
+				MuiCommonPacketKind.Attribute, MuiCommonField.Attribute, 0x80420002) ||
+			!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, attributeAddress,
+				MuiCommonPacketKind.Attribute, MuiCommonField.Value, 1) ||
+			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, attributeAddress,
+				MuiCommonPacketKind.Attribute, MuiCommonField.Value, out var attributeValue) ||
+			attributeValue != 1) return 7;
+
+		var minMaxAddress = APTR.FromPointer(0x00050E80);
+		if (!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, minMaxAddress,
+			MuiCommonPacketKind.AskMinMax, MuiCommonField.MethodId,
+			MuiCommonControlPacketCore.AskMinMax) ||
+			!MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, minMaxAddress,
+				MuiCommonPacketKind.AskMinMax, MuiCommonField.Storage, 0x00050D60) ||
+			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, minMaxAddress,
+				MuiCommonPacketKind.AskMinMax, MuiCommonField.Storage, out var minMaxStorage) ||
+			minMaxStorage != 0x00050D60) return 8;
+
+		if (!MuiCommonFieldCursorCodec.TryGetAddress(ref platform, scaleAddress,
+			MuiCommonPacketKind.ScaleToValue, MuiCommonField.Value,
+			out var valueAddress) || valueAddress.Raw != scaleAddress.Raw +
+			MuiCommonScaleToValueMessage.ValueOffset) return 9;
+		if (MuiCommonFieldCursorCodec.TryGetAddress(ref platform, methodAddress,
+			MuiCommonPacketKind.Method, MuiCommonField.Value, out _) ||
+			MuiCommonFieldCursorCodec.TryGetAddress(ref platform,
+				APTR.FromPointer(0x00050FFE), MuiCommonPacketKind.Get,
+				MuiCommonField.Storage, out _) ||
+			MuiCommonFieldCursorCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiCommonPacketKind.Attribute, MuiCommonField.Value, out _)) return 10;
+		return 42;
+	}
+
+	// MG1292 native struct-first ShortHelp message closure. Check, Create, and
+	// Delete retain their selector-specific MorphOS record sizes while every
+	// field crosses the guest boundary through the named adapter.
+	public static uint AreaShortHelpMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var checkAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiAreaShortHelpMessageMemoryCodec.TryWriteUInt32(ref platform,
+			checkAddress, MuiAreaShortHelpPacketKind.Check,
+			MuiAreaShortHelpMessageField.MethodId,
+			MuiAreaShortHelpMessageCodec.CheckShortHelp) ||
+			!MuiAreaShortHelpMessageMemoryCodec.TryWriteUInt32(ref platform,
+				checkAddress, MuiAreaShortHelpPacketKind.Check,
+				MuiAreaShortHelpMessageField.Help, 0x00050D00) ||
+			!MuiAreaShortHelpMessageMemoryCodec.TryWriteUInt32(ref platform,
+				checkAddress, MuiAreaShortHelpPacketKind.Check,
+				MuiAreaShortHelpMessageField.MouseX, unchecked((uint)-12)) ||
+			!MuiAreaShortHelpMessageMemoryCodec.TryWriteUInt32(ref platform,
+				checkAddress, MuiAreaShortHelpPacketKind.Check,
+				MuiAreaShortHelpMessageField.MouseY, 34)) return 1;
+		if (!MuiAreaShortHelpMessageMemoryCodec.TryReadUInt32(ref platform,
+			checkAddress, MuiAreaShortHelpPacketKind.Check,
+			MuiAreaShortHelpMessageField.MouseX, out var mouseX) ||
+			unchecked((int)mouseX) != -12 ||
+			!MuiAreaShortHelpMessageMemoryCodec.TryReadUInt32(ref platform,
+				checkAddress, MuiAreaShortHelpPacketKind.Check,
+				MuiAreaShortHelpMessageField.MouseY, out var mouseY) ||
+			mouseY != 34) return 2;
+		if (!MuiAreaShortHelpMessageMemoryCodec.TryGetAddress(ref platform,
+			checkAddress, MuiAreaShortHelpPacketKind.Check,
+			MuiAreaShortHelpMessageField.Help, out var helpAddress) ||
+			helpAddress.Raw != checkAddress.Raw +
+			MuiAreaCheckShortHelpMessage.HelpOffset) return 3;
+
+		var createAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiAreaShortHelpMessageMemoryCodec.TryWriteUInt32(ref platform,
+			createAddress, MuiAreaShortHelpPacketKind.Create,
+			MuiAreaShortHelpMessageField.MethodId,
+			MuiAreaShortHelpMessageCodec.CreateShortHelp) ||
+			!MuiAreaShortHelpMessageCodec.TryReadMethodIdValue(ref platform,
+				createAddress, MuiAreaShortHelpPacketKind.Create, out var createMethod))
+			return 4;
+		if (createMethod != MuiAreaShortHelpMessageCodec.CreateShortHelp) return 5;
+
+		var deleteAddress = APTR.FromPointer(0x00050E30);
+		if (!MuiAreaShortHelpMessageMemoryCodec.TryWriteUInt32(ref platform,
+			deleteAddress, MuiAreaShortHelpPacketKind.Delete,
+			MuiAreaShortHelpMessageField.MethodId,
+			MuiAreaShortHelpMessageCodec.DeleteShortHelp) ||
+			!MuiAreaShortHelpMessageMemoryCodec.TryWriteUInt32(ref platform,
+				deleteAddress, MuiAreaShortHelpPacketKind.Delete,
+				MuiAreaShortHelpMessageField.Help, 0x00050D40) ||
+			!MuiAreaShortHelpMessageCodec.TryReadMethodIdValue(ref platform,
+				deleteAddress, MuiAreaShortHelpPacketKind.Delete, out var deleteMethod) ||
+			deleteMethod != MuiAreaShortHelpMessageCodec.DeleteShortHelp) return 6;
+
+		if (MuiAreaShortHelpMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FF8), MuiAreaShortHelpPacketKind.Check,
+			MuiAreaShortHelpMessageField.MouseY, out _) ||
+			MuiAreaShortHelpMessageMemoryCodec.TryGetAddress(ref platform,
+				checkAddress, MuiAreaShortHelpPacketKind.Check,
+				(MuiAreaShortHelpMessageField)255, out _) ||
+			MuiAreaShortHelpMessageMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiAreaShortHelpPacketKind.Delete,
+				MuiAreaShortHelpMessageField.Help, out _)) return 7;
+		return 42;
+	}
+
+	// MG1293 native struct-first custom-font message closure. Open and Close
+	// retain their two-LONG MorphOS records and typed APTR payloads while the
+	// bounded adapter owns all guest-memory translation.
+	public static uint AreaCustomFontMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var openAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiAreaCustomFontMessageMemoryCodec.TryWriteUInt32(ref platform,
+			openAddress, MuiAreaCustomFontMessageKind.Open,
+			MuiAreaCustomFontMessageField.MethodId,
+			MuiAreaCustomFontMessageCodec.OpenCustomFont) ||
+			!MuiAreaCustomFontMessageMemoryCodec.TryWriteUInt32(ref platform,
+				openAddress, MuiAreaCustomFontMessageKind.Open,
+				MuiAreaCustomFontMessageField.Pointer, 0x00050D00) ||
+			!MuiAreaCustomFontMessageMemoryCodec.TryReadUInt32(ref platform,
+				openAddress, MuiAreaCustomFontMessageKind.Open,
+				MuiAreaCustomFontMessageField.MethodId, out var openMethod) ||
+			openMethod != MuiAreaCustomFontMessageCodec.OpenCustomFont ||
+			!MuiAreaCustomFontMessageMemoryCodec.TryReadUInt32(ref platform,
+				openAddress, MuiAreaCustomFontMessageKind.Open,
+				MuiAreaCustomFontMessageField.Pointer, out var spec) ||
+			spec != 0x00050D00) return 1;
+		if (!MuiAreaCustomFontMessageMemoryCodec.TryGetAddress(ref platform,
+			openAddress, MuiAreaCustomFontMessageKind.Open,
+			MuiAreaCustomFontMessageField.Pointer, out var specAddress) ||
+			specAddress.Raw != openAddress.Raw +
+			MuiAreaOpenCustomFontMessage.SpecOffset) return 2;
+
+		var closeAddress = APTR.FromPointer(0x00050E10);
+		if (!MuiAreaCustomFontMessageMemoryCodec.TryWriteUInt32(ref platform,
+			closeAddress, MuiAreaCustomFontMessageKind.Close,
+			MuiAreaCustomFontMessageField.MethodId,
+			MuiAreaCustomFontMessageCodec.CloseCustomFont) ||
+			!MuiAreaCustomFontMessageMemoryCodec.TryWriteUInt32(ref platform,
+				closeAddress, MuiAreaCustomFontMessageKind.Close,
+				MuiAreaCustomFontMessageField.Pointer, 0x00050D40) ||
+			!MuiAreaCustomFontMessageMemoryCodec.TryReadUInt32(ref platform,
+				closeAddress, MuiAreaCustomFontMessageKind.Close,
+				MuiAreaCustomFontMessageField.Pointer, out var font) ||
+			font != 0x00050D40) return 3;
+		if (MuiAreaCustomFontMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FFC), MuiAreaCustomFontMessageKind.Open,
+			MuiAreaCustomFontMessageField.Pointer, out _) ||
+			MuiAreaCustomFontMessageMemoryCodec.TryGetAddress(ref platform,
+				openAddress, MuiAreaCustomFontMessageKind.Open,
+				(MuiAreaCustomFontMessageField)255, out _) ||
+			MuiAreaCustomFontMessageMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiAreaCustomFontMessageKind.Close,
+				MuiAreaCustomFontMessageField.Pointer, out _)) return 4;
+		return 42;
+	}
+
+	// MG1294 native struct-first Area drag message closure. All selector
+	// variants use their named records and bounded packet adapter, including
+	// the larger event and report packets.
+	public static uint AreaDragMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var doDragAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			doDragAddress, MuiAreaDragPacketKind.DoDrag,
+			MuiAreaDragField.MethodId, MuiAreaDragMessageCodec.DoDrag) ||
+			!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+				doDragAddress, MuiAreaDragPacketKind.DoDrag,
+				MuiAreaDragField.TouchX, unchecked((uint)-5)) ||
+			!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+				doDragAddress, MuiAreaDragPacketKind.DoDrag,
+				MuiAreaDragField.TouchY, 7) ||
+			!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+				doDragAddress, MuiAreaDragPacketKind.DoDrag,
+				MuiAreaDragField.Flags, 2) ||
+			!MuiAreaDragMessageMemoryCodec.TryReadUInt32(ref platform,
+				doDragAddress, MuiAreaDragPacketKind.DoDrag,
+				MuiAreaDragField.TouchX, out var touchX) ||
+			unchecked((int)touchX) != -5) return 1;
+		if (!MuiAreaDragMessageMemoryCodec.TryGetAddress(ref platform,
+			doDragAddress, MuiAreaDragPacketKind.DoDrag,
+			MuiAreaDragField.Flags, out var doDragFlags) ||
+			doDragFlags.Raw != doDragAddress.Raw +
+			MuiAreaDoDragMessage.FlagsOffset) return 2;
+
+		var dropAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			dropAddress, MuiAreaDragPacketKind.Drop, MuiAreaDragField.MethodId,
+			MuiAreaDragMessageCodec.DragDrop) ||
+			!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+				dropAddress, MuiAreaDragPacketKind.Drop, MuiAreaDragField.Object,
+				0x00050D00) ||
+			!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+				dropAddress, MuiAreaDragPacketKind.Drop, MuiAreaDragField.X,
+				unchecked((uint)-12)) ||
+			!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+				dropAddress, MuiAreaDragPacketKind.Drop, MuiAreaDragField.Y, 24) ||
+			!MuiAreaDragMessageMemoryCodec.TryReadUInt32(ref platform,
+				dropAddress, MuiAreaDragPacketKind.Drop,
+				MuiAreaDragField.X, out var dropX) ||
+			unchecked((int)dropX) != -12) return 3;
+
+		var eventAddress = APTR.FromPointer(0x00050E40);
+		if (!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			eventAddress, MuiAreaDragPacketKind.Event,
+			MuiAreaDragField.MethodId, MuiAreaDragMessageCodec.DragEvent) ||
+			!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+				eventAddress, MuiAreaDragPacketKind.Event,
+				MuiAreaDragField.Window, 0x00050D20) ||
+			!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+				eventAddress, MuiAreaDragPacketKind.Event,
+				MuiAreaDragField.MuiKey, unchecked((uint)-1)) ||
+			!MuiAreaDragMessageMemoryCodec.TryReadUInt32(ref platform,
+				eventAddress, MuiAreaDragPacketKind.Event,
+				MuiAreaDragField.MuiKey, out var muiKey) ||
+			unchecked((int)muiKey) != -1) return 4;
+
+		var finishAddress = APTR.FromPointer(0x00050E70);
+		if (!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			finishAddress, MuiAreaDragPacketKind.Finish,
+			MuiAreaDragField.MethodId, MuiAreaDragMessageCodec.DragFinish) ||
+			!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+				finishAddress, MuiAreaDragPacketKind.Finish,
+				MuiAreaDragField.DropFollows, unchecked((uint)-1)) ||
+			!MuiAreaDragMessageMemoryCodec.TryReadUInt32(ref platform,
+				finishAddress, MuiAreaDragPacketKind.Finish,
+				MuiAreaDragField.DropFollows, out var dropFollows) ||
+			unchecked((int)dropFollows) != -1) return 5;
+
+		var queryAddress = APTR.FromPointer(0x00050E80);
+		if (!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			queryAddress, MuiAreaDragPacketKind.Query,
+			MuiAreaDragField.MethodId, MuiAreaDragMessageCodec.DragQuery) ||
+			!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+				queryAddress, MuiAreaDragPacketKind.Query,
+				MuiAreaDragField.Object, 0x00050D40)) return 6;
+
+		var reportAddress = APTR.FromPointer(0x00050E90);
+		if (!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			reportAddress, MuiAreaDragPacketKind.Report,
+			MuiAreaDragField.MethodId, MuiAreaDragMessageCodec.DragReport) ||
+			!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+				reportAddress, MuiAreaDragPacketKind.Report,
+				MuiAreaDragField.Update, unchecked((uint)-3)) ||
+			!MuiAreaDragMessageMemoryCodec.TryReadUInt32(ref platform,
+				reportAddress, MuiAreaDragPacketKind.Report,
+				MuiAreaDragField.Update, out var update) ||
+			unchecked((int)update) != -3) return 7;
+
+		var imageAddress = APTR.FromPointer(0x00050EB0);
+		if (!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			imageAddress, MuiAreaDragPacketKind.CreateImage,
+			MuiAreaDragField.MethodId, MuiAreaDragMessageCodec.CreateDragImage) ||
+			!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+				imageAddress, MuiAreaDragPacketKind.CreateImage,
+				MuiAreaDragField.TouchY, unchecked((uint)-9))) return 8;
+		var deleteAddress = APTR.FromPointer(0x00050EC0);
+		if (!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			deleteAddress, MuiAreaDragPacketKind.DeleteImage,
+			MuiAreaDragField.MethodId, MuiAreaDragMessageCodec.DeleteDragImage) ||
+			!MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+				deleteAddress, MuiAreaDragPacketKind.DeleteImage,
+				MuiAreaDragField.DragImage, 0x00050D60)) return 9;
+
+		if (MuiAreaDragMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FF0), MuiAreaDragPacketKind.Event,
+			MuiAreaDragField.Flags, out _) ||
+			MuiAreaDragMessageMemoryCodec.TryGetAddress(ref platform,
+				doDragAddress, MuiAreaDragPacketKind.Method,
+				MuiAreaDragField.Object, out _) ||
+			MuiAreaDragMessageMemoryCodec.TryGetAddress(ref platform,
+				doDragAddress, MuiAreaDragPacketKind.DoDrag,
+				(MuiAreaDragField)255, out _) ||
+			MuiAreaDragMessageMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiAreaDragPacketKind.Begin, MuiAreaDragField.Object, out _)) return 10;
+		return 42;
+	}
+
+	// MG1295 native struct-first Collection basic message closure. GetEntry,
+	// Select, and method-only packets keep their distinct MorphOS sizes while
+	// all fields use the named bounded adapter.
+	public static uint CollectionBasicMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var getEntryAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiCollectionBasicMessageMemoryCodec.TryWriteUInt32(ref platform,
+			getEntryAddress, MuiCollectionBasicPacketKind.GetEntry,
+			MuiCollectionBasicField.MethodId,
+			MuiCollectionBasicMessageCodec.GetEntry) ||
+			!MuiCollectionBasicMessageMemoryCodec.TryWriteUInt32(ref platform,
+				getEntryAddress, MuiCollectionBasicPacketKind.GetEntry,
+				MuiCollectionBasicField.Position, 7) ||
+			!MuiCollectionBasicMessageMemoryCodec.TryWriteUInt32(ref platform,
+				getEntryAddress, MuiCollectionBasicPacketKind.GetEntry,
+				MuiCollectionBasicField.Storage, 0x00050D00) ||
+			!MuiCollectionBasicMessageMemoryCodec.TryReadUInt32(ref platform,
+				getEntryAddress, MuiCollectionBasicPacketKind.GetEntry,
+				MuiCollectionBasicField.Position, out var position) ||
+			position != 7) return 1;
+
+		var selectAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiCollectionBasicMessageMemoryCodec.TryWriteUInt32(ref platform,
+			selectAddress, MuiCollectionBasicPacketKind.Select,
+			MuiCollectionBasicField.MethodId,
+			MuiCollectionBasicMessageCodec.Select) ||
+			!MuiCollectionBasicMessageMemoryCodec.TryWriteUInt32(ref platform,
+				selectAddress, MuiCollectionBasicPacketKind.Select,
+				MuiCollectionBasicField.Position, 3) ||
+			!MuiCollectionBasicMessageMemoryCodec.TryWriteUInt32(ref platform,
+				selectAddress, MuiCollectionBasicPacketKind.Select,
+				MuiCollectionBasicField.Select, 1) ||
+			!MuiCollectionBasicMessageMemoryCodec.TryWriteUInt32(ref platform,
+				selectAddress, MuiCollectionBasicPacketKind.Select,
+				MuiCollectionBasicField.Storage, 0x00050D20) ||
+			!MuiCollectionBasicMessageMemoryCodec.TryReadUInt32(ref platform,
+				selectAddress, MuiCollectionBasicPacketKind.Select,
+				MuiCollectionBasicField.Storage, out var storage) ||
+			storage != 0x00050D20) return 2;
+		if (!MuiCollectionBasicMessageMemoryCodec.TryGetAddress(ref platform,
+			selectAddress, MuiCollectionBasicPacketKind.Select,
+			MuiCollectionBasicField.Storage, out var storageAddress) ||
+			storageAddress.Raw != selectAddress.Raw +
+			MuiCollectionSelectMessage.StorageOffset) return 3;
+
+		var methodAddress = APTR.FromPointer(0x00050E40);
+		if (!MuiCollectionBasicMessageMemoryCodec.TryWriteUInt32(ref platform,
+			methodAddress, MuiCollectionBasicPacketKind.Method,
+			MuiCollectionBasicField.MethodId, MuiCollectionBasicMessageCodec.Clear) ||
+			!MuiCollectionBasicMessageMemoryCodec.TryReadUInt32(ref platform,
+				methodAddress, MuiCollectionBasicPacketKind.Method,
+				MuiCollectionBasicField.MethodId, out var method) ||
+			method != MuiCollectionBasicMessageCodec.Clear) return 4;
+
+		if (MuiCollectionBasicMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FF8), MuiCollectionBasicPacketKind.Select,
+			MuiCollectionBasicField.Storage, out _) ||
+			MuiCollectionBasicMessageMemoryCodec.TryGetAddress(ref platform,
+				methodAddress, MuiCollectionBasicPacketKind.Method,
+				MuiCollectionBasicField.Storage, out _) ||
+			MuiCollectionBasicMessageMemoryCodec.TryGetAddress(ref platform,
+				selectAddress, MuiCollectionBasicPacketKind.Select,
+				(MuiCollectionBasicField)255, out _) ||
+			MuiCollectionBasicMessageMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiCollectionBasicPacketKind.GetEntry,
+				MuiCollectionBasicField.Position, out _)) return 5;
+		return 42;
+	}
+
+	// MG1296 native struct-first Collection advanced message closure. Insert,
+	// pair, position, redraw, pointer, and image records retain their named
+	// MorphOS shapes while the bounded adapter owns guest-memory translation.
+	public static uint CollectionAdvancedMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var insertAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+			insertAddress, MuiCollectionAdvancedPacketKind.Insert,
+			MuiCollectionAdvancedField.MethodId, MuiCollectionAdvancedMessageCodec.Insert) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+				insertAddress, MuiCollectionAdvancedPacketKind.Insert,
+				MuiCollectionAdvancedField.Entries, 0x00050D00) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+				insertAddress, MuiCollectionAdvancedPacketKind.Insert,
+				MuiCollectionAdvancedField.Count, 4) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+				insertAddress, MuiCollectionAdvancedPacketKind.Insert,
+				MuiCollectionAdvancedField.Position, 2) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryReadUInt32(ref platform,
+				insertAddress, MuiCollectionAdvancedPacketKind.Insert,
+				MuiCollectionAdvancedField.Position, out var insertPosition) ||
+			insertPosition != 2) return 1;
+		if (!MuiCollectionAdvancedMessageMemoryCodec.TryGetAddress(ref platform,
+			insertAddress, MuiCollectionAdvancedPacketKind.Insert,
+			MuiCollectionAdvancedField.Position, out var insertPositionAddress) ||
+			insertPositionAddress.Raw != insertAddress.Raw +
+			MuiCollectionInsertMessage.PositionOffset) return 2;
+
+		var pairAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+			pairAddress, MuiCollectionAdvancedPacketKind.Pair,
+			MuiCollectionAdvancedField.MethodId, MuiCollectionAdvancedMessageCodec.Move) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+				pairAddress, MuiCollectionAdvancedPacketKind.Pair,
+				MuiCollectionAdvancedField.First, 1) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+				pairAddress, MuiCollectionAdvancedPacketKind.Pair,
+				MuiCollectionAdvancedField.Second, 3) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryReadUInt32(ref platform,
+				pairAddress, MuiCollectionAdvancedPacketKind.Pair,
+				MuiCollectionAdvancedField.Second, out var second) ||
+			second != 3) return 3;
+
+		var positionAddress = APTR.FromPointer(0x00050E40);
+		if (!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+			positionAddress, MuiCollectionAdvancedPacketKind.Position,
+			MuiCollectionAdvancedField.MethodId, MuiCollectionAdvancedMessageCodec.Jump) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+				positionAddress, MuiCollectionAdvancedPacketKind.Position,
+				MuiCollectionAdvancedField.Position, 9) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryReadUInt32(ref platform,
+				positionAddress, MuiCollectionAdvancedPacketKind.Position,
+				MuiCollectionAdvancedField.Position, out var position) ||
+			position != 9) return 4;
+
+		var redrawAddress = APTR.FromPointer(0x00050E50);
+		if (!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+			redrawAddress, MuiCollectionAdvancedPacketKind.Redraw,
+			MuiCollectionAdvancedField.MethodId, MuiCollectionAdvancedMessageCodec.Redraw) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+				redrawAddress, MuiCollectionAdvancedPacketKind.Redraw,
+				MuiCollectionAdvancedField.Position, 2) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+				redrawAddress, MuiCollectionAdvancedPacketKind.Redraw,
+				MuiCollectionAdvancedField.Entry, 0x00050D20) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryReadUInt32(ref platform,
+				redrawAddress, MuiCollectionAdvancedPacketKind.Redraw,
+				MuiCollectionAdvancedField.Entry, out var redrawEntry) ||
+			redrawEntry != 0x00050D20) return 5;
+
+		var pointerAddress = APTR.FromPointer(0x00050E60);
+		if (!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+			pointerAddress, MuiCollectionAdvancedPacketKind.Pointer,
+			MuiCollectionAdvancedField.MethodId, MuiCollectionAdvancedMessageCodec.DeleteImage) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+				pointerAddress, MuiCollectionAdvancedPacketKind.Pointer,
+				MuiCollectionAdvancedField.Pointer, 0x00050D40) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryReadUInt32(ref platform,
+				pointerAddress, MuiCollectionAdvancedPacketKind.Pointer,
+				MuiCollectionAdvancedField.Pointer, out var pointer) ||
+			pointer != 0x00050D40) return 6;
+
+		var imageAddress = APTR.FromPointer(0x00050E70);
+		if (!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+			imageAddress, MuiCollectionAdvancedPacketKind.CreateImage,
+			MuiCollectionAdvancedField.MethodId, MuiCollectionAdvancedMessageCodec.CreateImage) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+				imageAddress, MuiCollectionAdvancedPacketKind.CreateImage,
+				MuiCollectionAdvancedField.Image, 0x00050D60) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryWriteUInt32(ref platform,
+				imageAddress, MuiCollectionAdvancedPacketKind.CreateImage,
+				MuiCollectionAdvancedField.Flags, 5) ||
+			!MuiCollectionAdvancedMessageMemoryCodec.TryReadUInt32(ref platform,
+				imageAddress, MuiCollectionAdvancedPacketKind.CreateImage,
+				MuiCollectionAdvancedField.Flags, out var flags) ||
+			flags != 5) return 7;
+
+		if (MuiCollectionAdvancedMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FF4), MuiCollectionAdvancedPacketKind.Insert,
+			MuiCollectionAdvancedField.Position, out _) ||
+			MuiCollectionAdvancedMessageMemoryCodec.TryGetAddress(ref platform,
+				insertAddress, MuiCollectionAdvancedPacketKind.Method,
+				MuiCollectionAdvancedField.Entry, out _) ||
+			MuiCollectionAdvancedMessageMemoryCodec.TryGetAddress(ref platform,
+				pairAddress, MuiCollectionAdvancedPacketKind.Pair,
+				(MuiCollectionAdvancedField)255, out _) ||
+			MuiCollectionAdvancedMessageMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiCollectionAdvancedPacketKind.CreateImage,
+				MuiCollectionAdvancedField.Image, out _)) return 8;
+		return 42;
+	}
+
+	// MG1297 native struct-first Collection record closure. Construct/Destruct,
+	// Display, Compare, and TestPos retain their named MorphOS packet records;
+	// the bounded adapter is the only guest-memory translation layer.
+	public static uint CollectionRecordMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var entryPoolAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+			entryPoolAddress, MuiCollectionRecordPacketKind.EntryPool,
+			MuiCollectionRecordField.MethodId, MuiCollectionRecordMessageCodec.Construct) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+				entryPoolAddress, MuiCollectionRecordPacketKind.EntryPool,
+				MuiCollectionRecordField.Entry, 0x00050D00) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+				entryPoolAddress, MuiCollectionRecordPacketKind.EntryPool,
+				MuiCollectionRecordField.Pool, 0x00050D20) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryReadUInt32(ref platform,
+				entryPoolAddress, MuiCollectionRecordPacketKind.EntryPool,
+				MuiCollectionRecordField.Pool, out var pool) ||
+			pool != 0x00050D20) return 1;
+		if (!MuiCollectionRecordMessageMemoryCodec.TryGetAddress(ref platform,
+			entryPoolAddress, MuiCollectionRecordPacketKind.EntryPool,
+			MuiCollectionRecordField.Entry, out var entryAddress) ||
+			entryAddress.Raw != entryPoolAddress.Raw +
+			MuiCollectionEntryPoolMessage.EntryOffset) return 2;
+
+		var displayAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+			displayAddress, MuiCollectionRecordPacketKind.Display,
+			MuiCollectionRecordField.MethodId, MuiCollectionRecordMessageCodec.Display) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+				displayAddress, MuiCollectionRecordPacketKind.Display,
+				MuiCollectionRecordField.Entry, 0x00050D40) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+				displayAddress, MuiCollectionRecordPacketKind.Display,
+				MuiCollectionRecordField.Array, 0x00050D60) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+				displayAddress, MuiCollectionRecordPacketKind.Display,
+				MuiCollectionRecordField.Row, 3) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryReadUInt32(ref platform,
+				displayAddress, MuiCollectionRecordPacketKind.Display,
+				MuiCollectionRecordField.Row, out var row) || row != 3) return 3;
+
+		var compareAddress = APTR.FromPointer(0x00050E40);
+		if (!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+			compareAddress, MuiCollectionRecordPacketKind.Compare,
+			MuiCollectionRecordField.MethodId, MuiCollectionRecordMessageCodec.Compare) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+				compareAddress, MuiCollectionRecordPacketKind.Compare,
+				MuiCollectionRecordField.Entry1, 0x00050D40) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+				compareAddress, MuiCollectionRecordPacketKind.Compare,
+				MuiCollectionRecordField.Entry2, 0x00050D80) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+				compareAddress, MuiCollectionRecordPacketKind.Compare,
+				MuiCollectionRecordField.Column, 2) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryReadUInt32(ref platform,
+				compareAddress, MuiCollectionRecordPacketKind.Compare,
+				MuiCollectionRecordField.Column, out var column) || column != 2) return 4;
+
+		var testPosAddress = APTR.FromPointer(0x00050E60);
+		if (!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+			testPosAddress, MuiCollectionRecordPacketKind.TestPos,
+			MuiCollectionRecordField.MethodId, MuiCollectionRecordMessageCodec.TestPos) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+				testPosAddress, MuiCollectionRecordPacketKind.TestPos,
+				MuiCollectionRecordField.X, 8) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+				testPosAddress, MuiCollectionRecordPacketKind.TestPos,
+				MuiCollectionRecordField.Y, 9) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(ref platform,
+				testPosAddress, MuiCollectionRecordPacketKind.TestPos,
+				MuiCollectionRecordField.Result, 0x00050DA0) ||
+			!MuiCollectionRecordMessageMemoryCodec.TryReadUInt32(ref platform,
+				testPosAddress, MuiCollectionRecordPacketKind.TestPos,
+				MuiCollectionRecordField.Result, out var result) ||
+			result != 0x00050DA0) return 5;
+
+		if (MuiCollectionRecordMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FF4), MuiCollectionRecordPacketKind.Display,
+			MuiCollectionRecordField.Row, out _) ||
+			MuiCollectionRecordMessageMemoryCodec.TryGetAddress(ref platform,
+				displayAddress, MuiCollectionRecordPacketKind.Compare,
+				MuiCollectionRecordField.Array, out _) ||
+			MuiCollectionRecordMessageMemoryCodec.TryGetAddress(ref platform,
+				displayAddress, MuiCollectionRecordPacketKind.Display,
+				(MuiCollectionRecordField)255, out _) ||
+			MuiCollectionRecordMessageMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiCollectionRecordPacketKind.TestPos,
+				MuiCollectionRecordField.Result, out _)) return 6;
+		return 42;
+	}
+
+	// MG1298 native struct-first Collection surface closure. Layout, AskMinMax,
+	// Draw, HandleInput, and attribute records retain named MorphOS fields;
+	// only the bounded adapter translates their guest representation.
+	public static uint CollectionSurfaceMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var layoutAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+			layoutAddress, MuiCollectionSurfacePacketKind.Layout,
+			MuiCollectionSurfaceField.MethodId, MuiCollectionSurfaceMessageCodec.Layout) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+				layoutAddress, MuiCollectionSurfacePacketKind.Layout,
+				MuiCollectionSurfaceField.Left, 1) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+				layoutAddress, MuiCollectionSurfacePacketKind.Layout,
+				MuiCollectionSurfaceField.Top, 2) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+				layoutAddress, MuiCollectionSurfacePacketKind.Layout,
+				MuiCollectionSurfaceField.Width, 3) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+				layoutAddress, MuiCollectionSurfacePacketKind.Layout,
+				MuiCollectionSurfaceField.Height, 4) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryReadUInt32(ref platform,
+				layoutAddress, MuiCollectionSurfacePacketKind.Layout,
+				MuiCollectionSurfaceField.Height, out var height) || height != 4) return 1;
+		if (!MuiCollectionSurfaceMessageMemoryCodec.TryGetAddress(ref platform,
+			layoutAddress, MuiCollectionSurfacePacketKind.Layout,
+			MuiCollectionSurfaceField.Height, out var heightAddress) ||
+			heightAddress.Raw != layoutAddress.Raw +
+			MuiCollectionLayoutMessage.HeightOffset) return 2;
+
+		var minMaxAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+			minMaxAddress, MuiCollectionSurfacePacketKind.AskMinMax,
+			MuiCollectionSurfaceField.MethodId, MuiCollectionSurfaceMessageCodec.AskMinMax) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+				minMaxAddress, MuiCollectionSurfacePacketKind.AskMinMax,
+				MuiCollectionSurfaceField.Storage, 0x00050D00) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryReadUInt32(ref platform,
+				minMaxAddress, MuiCollectionSurfacePacketKind.AskMinMax,
+				MuiCollectionSurfaceField.Storage, out var storage) ||
+			storage != 0x00050D00) return 3;
+
+		var drawAddress = APTR.FromPointer(0x00050E30);
+		if (!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+			drawAddress, MuiCollectionSurfacePacketKind.Draw,
+			MuiCollectionSurfaceField.MethodId, MuiCollectionSurfaceMessageCodec.Draw) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+				drawAddress, MuiCollectionSurfacePacketKind.Draw,
+				MuiCollectionSurfaceField.Flags, 7) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryReadUInt32(ref platform,
+				drawAddress, MuiCollectionSurfacePacketKind.Draw,
+				MuiCollectionSurfaceField.Flags, out var flags) || flags != 7) return 4;
+
+		var inputAddress = APTR.FromPointer(0x00050E40);
+		if (!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+			inputAddress, MuiCollectionSurfacePacketKind.HandleInput,
+			MuiCollectionSurfaceField.MethodId, MuiCollectionSurfaceMessageCodec.HandleInput) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+				inputAddress, MuiCollectionSurfacePacketKind.HandleInput,
+				MuiCollectionSurfaceField.IntuiMessage, 0x00050D20) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+				inputAddress, MuiCollectionSurfacePacketKind.HandleInput,
+				MuiCollectionSurfaceField.MuiKey, unchecked((uint)-9)) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryReadUInt32(ref platform,
+				inputAddress, MuiCollectionSurfacePacketKind.HandleInput,
+				MuiCollectionSurfaceField.MuiKey, out var muiKey) ||
+			muiKey != unchecked((uint)-9)) return 5;
+
+		var attributeAddress = APTR.FromPointer(0x00050E50);
+		if (!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+			attributeAddress, MuiCollectionSurfacePacketKind.Attribute,
+			MuiCollectionSurfaceField.MethodId, MuiCollectionSurfaceMessageCodec.Set) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+				attributeAddress, MuiCollectionSurfacePacketKind.Attribute,
+				MuiCollectionSurfaceField.Attribute, 0x120) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+				attributeAddress, MuiCollectionSurfacePacketKind.Attribute,
+				MuiCollectionSurfaceField.Value, 0x456) ||
+			!MuiCollectionSurfaceMessageMemoryCodec.TryReadUInt32(ref platform,
+				attributeAddress, MuiCollectionSurfacePacketKind.Attribute,
+				MuiCollectionSurfaceField.Value, out var value) || value != 0x456) return 6;
+
+		if (MuiCollectionSurfaceMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FED), MuiCollectionSurfacePacketKind.Layout,
+			MuiCollectionSurfaceField.Height, out _) ||
+			MuiCollectionSurfaceMessageMemoryCodec.TryGetAddress(ref platform,
+				layoutAddress, MuiCollectionSurfacePacketKind.Layout,
+				MuiCollectionSurfaceField.Storage, out _) ||
+			MuiCollectionSurfaceMessageMemoryCodec.TryGetAddress(ref platform,
+				layoutAddress, (MuiCollectionSurfacePacketKind)255,
+				MuiCollectionSurfaceField.MethodId, out _) ||
+			MuiCollectionSurfaceMessageMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiCollectionSurfacePacketKind.Attribute,
+				MuiCollectionSurfaceField.Value, out _)) return 7;
+		return 42;
+	}
+
+	// MG1299 native struct-first Collection edit closure. CreateEditObject,
+	// Edit, EditDone, and EndEdit keep signed row/column values as named
+	// semantic fields while the bounded adapter translates guest words.
+	public static uint CollectionEditMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var createAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+			createAddress, MuiCollectionEditPacketKind.CreateEditObject,
+			MuiCollectionEditField.MethodId, MuiCollectionEditMessageCodec.CreateEditObject) ||
+			!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+				createAddress, MuiCollectionEditPacketKind.CreateEditObject,
+				MuiCollectionEditField.Row, unchecked((uint)-2)) ||
+			!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+				createAddress, MuiCollectionEditPacketKind.CreateEditObject,
+				MuiCollectionEditField.Column, 3) ||
+			!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+				createAddress, MuiCollectionEditPacketKind.CreateEditObject,
+				MuiCollectionEditField.Entry, 0x00050D00) ||
+			!MuiCollectionEditMessageMemoryCodec.TryReadUInt32(ref platform,
+				createAddress, MuiCollectionEditPacketKind.CreateEditObject,
+				MuiCollectionEditField.Row, out var row) ||
+			row != unchecked((uint)-2)) return 1;
+		if (!MuiCollectionEditMessageMemoryCodec.TryGetAddress(ref platform,
+			createAddress, MuiCollectionEditPacketKind.CreateEditObject,
+			MuiCollectionEditField.Entry, out var entryAddress) ||
+			entryAddress.Raw != createAddress.Raw +
+			MuiCollectionCreateEditObjectMessage.EntryOffset) return 2;
+
+		var editAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+			editAddress, MuiCollectionEditPacketKind.Edit,
+			MuiCollectionEditField.MethodId, MuiCollectionEditMessageCodec.Edit) ||
+			!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+				editAddress, MuiCollectionEditPacketKind.Edit,
+				MuiCollectionEditField.Row, 4) ||
+			!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+				editAddress, MuiCollectionEditPacketKind.Edit,
+				MuiCollectionEditField.Column, 5) ||
+			!MuiCollectionEditMessageMemoryCodec.TryReadUInt32(ref platform,
+				editAddress, MuiCollectionEditPacketKind.Edit,
+				MuiCollectionEditField.Column, out var column) || column != 5) return 3;
+
+		var doneAddress = APTR.FromPointer(0x00050E30);
+		if (!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+			doneAddress, MuiCollectionEditPacketKind.EditDone,
+			MuiCollectionEditField.MethodId, MuiCollectionEditMessageCodec.EditDone) ||
+			!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+				doneAddress, MuiCollectionEditPacketKind.EditDone,
+				MuiCollectionEditField.Row, 6) ||
+			!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+				doneAddress, MuiCollectionEditPacketKind.EditDone,
+				MuiCollectionEditField.Column, unchecked((uint)-7)) ||
+			!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+				doneAddress, MuiCollectionEditPacketKind.EditDone,
+				MuiCollectionEditField.Entry, 0x00050D20) ||
+			!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+				doneAddress, MuiCollectionEditPacketKind.EditDone,
+				MuiCollectionEditField.EditObject, 0x00050D40) ||
+			!MuiCollectionEditMessageMemoryCodec.TryReadUInt32(ref platform,
+				doneAddress, MuiCollectionEditPacketKind.EditDone,
+				MuiCollectionEditField.EditObject, out var editObject) ||
+			editObject != 0x00050D40) return 4;
+
+		var endAddress = APTR.FromPointer(0x00050E50);
+		if (!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+			endAddress, MuiCollectionEditPacketKind.EndEdit,
+			MuiCollectionEditField.MethodId, MuiCollectionEditMessageCodec.EndEdit) ||
+			!MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
+				endAddress, MuiCollectionEditPacketKind.EndEdit,
+				MuiCollectionEditField.Mode, 2) ||
+			!MuiCollectionEditMessageMemoryCodec.TryReadUInt32(ref platform,
+				endAddress, MuiCollectionEditPacketKind.EndEdit,
+				MuiCollectionEditField.Mode, out var mode) || mode != 2) return 5;
+
+		if (MuiCollectionEditMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FED), MuiCollectionEditPacketKind.EditDone,
+			MuiCollectionEditField.EditObject, out _) ||
+			MuiCollectionEditMessageMemoryCodec.TryGetAddress(ref platform,
+				createAddress, MuiCollectionEditPacketKind.Edit,
+				MuiCollectionEditField.Entry, out _) ||
+			MuiCollectionEditMessageMemoryCodec.TryGetAddress(ref platform,
+				createAddress, (MuiCollectionEditPacketKind)255,
+				MuiCollectionEditField.MethodId, out _) ||
+			MuiCollectionEditMessageMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiCollectionEditPacketKind.EndEdit,
+				MuiCollectionEditField.Mode, out _)) return 6;
+		return 42;
+	}
+
+	// MG1300 native struct-first Listtree closure. The common Method, Set,
+	// Get, and GetEntry packets use named records; the bounded adapter verifies
+	// complete guest packet spans before translating individual fields.
+	public static uint ListtreeBasicMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var methodAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			methodAddress, MuiListtreePacketKind.Method,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.Get) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				methodAddress, MuiListtreePacketKind.Method,
+				MuiListtreeField.MethodId, out var method) ||
+			method != MuiListtreeMessageCodec.Get) return 1;
+		if (!MuiListtreeMessageMemoryCodec.TryGetAddress(ref platform,
+			methodAddress, MuiListtreePacketKind.Method,
+			MuiListtreeField.MethodId, out var methodField) ||
+			methodField.Raw != methodAddress.Raw +
+			MuiListtreeMethodMessage.MethodIdOffset) return 2;
+
+		var setAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			setAddress, MuiListtreePacketKind.Set,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.Set) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				setAddress, MuiListtreePacketKind.Set,
+				MuiListtreeField.Attribute, 0x120) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				setAddress, MuiListtreePacketKind.Set,
+				MuiListtreeField.Value, 0x456) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				setAddress, MuiListtreePacketKind.Set,
+				MuiListtreeField.Value, out var value) || value != 0x456) return 3;
+
+		var getAddress = APTR.FromPointer(0x00050E40);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			getAddress, MuiListtreePacketKind.Get,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.Get) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				getAddress, MuiListtreePacketKind.Get,
+				MuiListtreeField.Attribute, 0x220) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				getAddress, MuiListtreePacketKind.Get,
+				MuiListtreeField.Storage, 0x00050D00) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				getAddress, MuiListtreePacketKind.Get,
+				MuiListtreeField.Storage, out var storage) ||
+			storage != 0x00050D00) return 4;
+		if (!MuiListtreeMessageMemoryCodec.TryGetAddress(ref platform,
+			getAddress, MuiListtreePacketKind.Get,
+			MuiListtreeField.Storage, out var storageField) ||
+			storageField.Raw != getAddress.Raw +
+			MuiListtreeGetMessage.StorageOffset) return 5;
+
+		var entryAddress = APTR.FromPointer(0x00050E60);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			entryAddress, MuiListtreePacketKind.GetEntry,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.GetEntry) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				entryAddress, MuiListtreePacketKind.GetEntry,
+				MuiListtreeField.Node, 0x00050D20) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				entryAddress, MuiListtreePacketKind.GetEntry,
+				MuiListtreeField.Position, 7) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				entryAddress, MuiListtreePacketKind.GetEntry,
+				MuiListtreeField.Flags, 3) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				entryAddress, MuiListtreePacketKind.GetEntry,
+				MuiListtreeField.Flags, out var flags) || flags != 3) return 6;
+
+		if (MuiListtreeMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FF4), MuiListtreePacketKind.GetEntry,
+			MuiListtreeField.Flags, out _) ||
+			MuiListtreeMessageMemoryCodec.TryGetAddress(ref platform,
+				setAddress, MuiListtreePacketKind.Method,
+				MuiListtreeField.Attribute, out _) ||
+			MuiListtreeMessageMemoryCodec.TryGetAddress(ref platform,
+				getAddress, (MuiListtreePacketKind)255,
+				MuiListtreeField.MethodId, out _) ||
+			MuiListtreeMessageMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiListtreePacketKind.GetEntry,
+				MuiListtreeField.Node, out _)) return 7;
+		return 42;
+	}
+
+	// MG1301 native struct-first Listtree mutation/query closure. Every fixed
+	// Listtree packet family now routes through the named record adapter rather
+	// than a literal field-offset cursor.
+	public static uint ListtreeRemainingMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var insertAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			insertAddress, MuiListtreePacketKind.Insert,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.Insert) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				insertAddress, MuiListtreePacketKind.Insert,
+				MuiListtreeField.Name, 0x00050F00) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				insertAddress, MuiListtreePacketKind.Insert,
+				MuiListtreeField.User, 0x00050F20) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				insertAddress, MuiListtreePacketKind.Insert,
+				MuiListtreeField.ListNode, 0x00050F40) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				insertAddress, MuiListtreePacketKind.Insert,
+				MuiListtreeField.PrevNode, 0x00050F60) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				insertAddress, MuiListtreePacketKind.Insert,
+				MuiListtreeField.Flags, 9) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				insertAddress, MuiListtreePacketKind.Insert,
+				MuiListtreeField.Flags, out var insertFlags) || insertFlags != 9)
+			return 1;
+
+		var removeAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			removeAddress, MuiListtreePacketKind.Remove,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.Remove) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				removeAddress, MuiListtreePacketKind.Remove,
+				MuiListtreeField.ListNode, 0x00050F80) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				removeAddress, MuiListtreePacketKind.Remove,
+				MuiListtreeField.TreeNode, 0x00050FA0) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				removeAddress, MuiListtreePacketKind.Remove,
+				MuiListtreeField.Flags, 10) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				removeAddress, MuiListtreePacketKind.Remove,
+				MuiListtreeField.TreeNode, out var removeTree) ||
+			removeTree != 0x00050FA0) return 2;
+
+		var openAddress = APTR.FromPointer(0x00050E40);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			openAddress, MuiListtreePacketKind.OpenClose,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.Open) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				openAddress, MuiListtreePacketKind.OpenClose,
+				MuiListtreeField.ListNode, 0x00050FC0) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				openAddress, MuiListtreePacketKind.OpenClose,
+				MuiListtreeField.TreeNode, 0x00050FE0) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				openAddress, MuiListtreePacketKind.OpenClose,
+				MuiListtreeField.Flags, 11) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				openAddress, MuiListtreePacketKind.OpenClose,
+				MuiListtreeField.ListNode, out var openList) ||
+			openList != 0x00050FC0) return 3;
+
+		var sortAddress = APTR.FromPointer(0x00050E60);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			sortAddress, MuiListtreePacketKind.Sort,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.Sort) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				sortAddress, MuiListtreePacketKind.Sort,
+				MuiListtreeField.ListNode, 0x00050F00) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				sortAddress, MuiListtreePacketKind.Sort,
+				MuiListtreeField.Flags, 12) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				sortAddress, MuiListtreePacketKind.Sort,
+				MuiListtreeField.Flags, out var sortFlags) || sortFlags != 12)
+			return 4;
+
+		var getNrAddress = APTR.FromPointer(0x00050E80);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			getNrAddress, MuiListtreePacketKind.GetNr,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.GetNr) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				getNrAddress, MuiListtreePacketKind.GetNr,
+				MuiListtreeField.TreeNode, 0x00050F20) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				getNrAddress, MuiListtreePacketKind.GetNr,
+				MuiListtreeField.Flags, 13) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				getNrAddress, MuiListtreePacketKind.GetNr,
+				MuiListtreeField.TreeNode, out var getNrTree) ||
+			getNrTree != 0x00050F20) return 5;
+
+		var moveAddress = APTR.FromPointer(0x00050EA0);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			moveAddress, MuiListtreePacketKind.MoveExchange,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.Move) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				moveAddress, MuiListtreePacketKind.MoveExchange,
+				MuiListtreeField.OldListNode, 0x00050F40) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				moveAddress, MuiListtreePacketKind.MoveExchange,
+				MuiListtreeField.OldTreeNode, 0x00050F60) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				moveAddress, MuiListtreePacketKind.MoveExchange,
+				MuiListtreeField.NewListNode, 0x00050F80) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				moveAddress, MuiListtreePacketKind.MoveExchange,
+				MuiListtreeField.NewTreeNode, 0x00050FA0) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				moveAddress, MuiListtreePacketKind.MoveExchange,
+				MuiListtreeField.Flags, 14) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				moveAddress, MuiListtreePacketKind.MoveExchange,
+				MuiListtreeField.NewTreeNode, out var newTree) ||
+			newTree != 0x00050FA0) return 6;
+
+		var renameAddress = APTR.FromPointer(0x00050EC0);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			renameAddress, MuiListtreePacketKind.Rename,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.Rename) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				renameAddress, MuiListtreePacketKind.Rename,
+			MuiListtreeField.TreeNode, 0x00050FC0) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				renameAddress, MuiListtreePacketKind.Rename,
+				MuiListtreeField.NewName, 0x00050FE0) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				renameAddress, MuiListtreePacketKind.Rename,
+				MuiListtreeField.Flags, 15) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				renameAddress, MuiListtreePacketKind.Rename,
+				MuiListtreeField.NewName, out var newName) ||
+			newName != 0x00050FE0) return 7;
+
+		var findAddress = APTR.FromPointer(0x00050EE0);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			findAddress, MuiListtreePacketKind.FindName,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.FindName) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				findAddress, MuiListtreePacketKind.FindName,
+				MuiListtreeField.ListNode, 0x00050F00) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				findAddress, MuiListtreePacketKind.FindName,
+				MuiListtreeField.Name, 0x00050F20) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				findAddress, MuiListtreePacketKind.FindName,
+				MuiListtreeField.Flags, 16) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				findAddress, MuiListtreePacketKind.FindName,
+				MuiListtreeField.Name, out var findName) ||
+			findName != 0x00050F20) return 8;
+
+		var dropAddress = APTR.FromPointer(0x00050F00);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			dropAddress, MuiListtreePacketKind.DropMark,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.SetDropMark) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				dropAddress, MuiListtreePacketKind.DropMark,
+				MuiListtreeField.Entry, 0x00050F40) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				dropAddress, MuiListtreePacketKind.DropMark,
+				MuiListtreeField.Values, 17) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				dropAddress, MuiListtreePacketKind.DropMark,
+				MuiListtreeField.Values, out var dropValues) || dropValues != 17)
+			return 9;
+
+		var testPosAddress = APTR.FromPointer(0x00050F20);
+		if (!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			testPosAddress, MuiListtreePacketKind.TestPos,
+			MuiListtreeField.MethodId, MuiListtreeMessageCodec.TestPos) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				testPosAddress, MuiListtreePacketKind.TestPos,
+				MuiListtreeField.X, 18) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				testPosAddress, MuiListtreePacketKind.TestPos,
+				MuiListtreeField.Y, 19) ||
+			!MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform,
+				testPosAddress, MuiListtreePacketKind.TestPos,
+				MuiListtreeField.Result, 20) ||
+			!MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform,
+				testPosAddress, MuiListtreePacketKind.TestPos,
+				MuiListtreeField.Result, out var testResult) || testResult != 20)
+			return 10;
+
+		if (MuiListtreeMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FF0), MuiListtreePacketKind.MoveExchange,
+			MuiListtreeField.Flags, out _) ||
+			MuiListtreeMessageMemoryCodec.TryGetAddress(ref platform,
+				insertAddress, MuiListtreePacketKind.Remove,
+				MuiListtreeField.Name, out _) ||
+			MuiListtreeMessageMemoryCodec.TryGetAddress(ref platform,
+				insertAddress, (MuiListtreePacketKind)255,
+				MuiListtreeField.MethodId, out _) ||
+			MuiListtreeMessageMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiListtreePacketKind.TestPos, MuiListtreeField.Result, out _))
+			return 11;
+		return 42;
+	}
+
+	// MG1302 native struct-first Area bubble packet closure. CreateBubble and
+	// DeleteBubble use named records while the adapter rejects incomplete or
+	// cross-kind packet accesses before touching guest memory.
+	public static uint AreaBubbleMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var createAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+			createAddress, MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.MethodId,
+			MuiAreaBubbleMessageCodec.CreateBubble) ||
+			!MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+				createAddress, MuiAreaBubblePacketKind.Create,
+				MuiAreaBubbleMessageField.X, unchecked((uint)-5)) ||
+			!MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+				createAddress, MuiAreaBubblePacketKind.Create,
+				MuiAreaBubbleMessageField.Y, 17) ||
+			!MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+				createAddress, MuiAreaBubblePacketKind.Create,
+				MuiAreaBubbleMessageField.Text, 0x00050F00) ||
+			!MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+				createAddress, MuiAreaBubblePacketKind.Create,
+				MuiAreaBubbleMessageField.Flags, 3) ||
+			!MuiAreaBubbleMessageMemoryCodec.TryReadUInt32(ref platform,
+				createAddress, MuiAreaBubblePacketKind.Create,
+				MuiAreaBubbleMessageField.X, out var x) ||
+			x != unchecked((uint)-5)) return 1;
+		if (!MuiAreaBubbleMessageMemoryCodec.TryGetAddress(ref platform,
+			createAddress, MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.Text, out var textAddress) ||
+			textAddress.Raw != createAddress.Raw +
+			MuiAreaCreateBubbleMessage.TextOffset) return 2;
+
+		var deleteAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+			deleteAddress, MuiAreaBubblePacketKind.Delete,
+			MuiAreaBubbleMessageField.MethodId,
+			MuiAreaBubbleMessageCodec.DeleteBubble) ||
+			!MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+				deleteAddress, MuiAreaBubblePacketKind.Delete,
+				MuiAreaBubbleMessageField.Bubble, 0x00050F20) ||
+			!MuiAreaBubbleMessageMemoryCodec.TryReadUInt32(ref platform,
+				deleteAddress, MuiAreaBubblePacketKind.Delete,
+				MuiAreaBubbleMessageField.Bubble, out var bubble) ||
+			bubble != 0x00050F20) return 3;
+
+		if (MuiAreaBubbleMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FF0), MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.Flags, out _) ||
+			MuiAreaBubbleMessageMemoryCodec.TryGetAddress(ref platform,
+				createAddress, MuiAreaBubblePacketKind.Delete,
+				MuiAreaBubbleMessageField.Flags, out _) ||
+			MuiAreaBubbleMessageMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiAreaBubblePacketKind.Delete,
+				MuiAreaBubbleMessageField.Bubble, out _)) return 4;
+		return 42;
+	}
+
+	// MG1303 native struct-first Area context-menu packet closure. Add,
+	// Build, and Choice records retain signed coordinates and pointer fields as
+	// named members while the bounded adapter enforces packet-specific spans.
+	public static uint AreaContextMenuMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var addAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+			addAddress, MuiAreaContextMenuPacketKind.Add,
+			MuiAreaContextMenuMessageField.MethodId,
+			MuiAreaContextMenuMessageCodec.Add) ||
+			!MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+				addAddress, MuiAreaContextMenuPacketKind.Add,
+				MuiAreaContextMenuMessageField.MenuStrip, 0x00050F00) ||
+			!MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+				addAddress, MuiAreaContextMenuPacketKind.Add,
+				MuiAreaContextMenuMessageField.MouseX, unchecked((uint)-6)) ||
+			!MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+				addAddress, MuiAreaContextMenuPacketKind.Add,
+				MuiAreaContextMenuMessageField.MouseY, 13) ||
+			!MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+				addAddress, MuiAreaContextMenuPacketKind.Add,
+				MuiAreaContextMenuMessageField.MouseXPointer, 0x00050F20) ||
+			!MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+				addAddress, MuiAreaContextMenuPacketKind.Add,
+				MuiAreaContextMenuMessageField.MouseYPointer, 0x00050F40) ||
+			!MuiAreaContextMenuMessageMemoryCodec.TryReadUInt32(ref platform,
+				addAddress, MuiAreaContextMenuPacketKind.Add,
+				MuiAreaContextMenuMessageField.MouseX, out var mouseX) ||
+			mouseX != unchecked((uint)-6)) return 1;
+		if (!MuiAreaContextMenuMessageMemoryCodec.TryGetAddress(ref platform,
+			addAddress, MuiAreaContextMenuPacketKind.Add,
+			MuiAreaContextMenuMessageField.MouseYPointer, out var pointer) ||
+			pointer.Raw != addAddress.Raw +
+			MuiAreaContextMenuAddMessage.MouseYPointerOffset) return 2;
+
+		var buildAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+			buildAddress, MuiAreaContextMenuPacketKind.Build,
+			MuiAreaContextMenuMessageField.MethodId,
+			MuiAreaContextMenuMessageCodec.Build) ||
+			!MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+				buildAddress, MuiAreaContextMenuPacketKind.Build,
+				MuiAreaContextMenuMessageField.MouseX, 7) ||
+			!MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+				buildAddress, MuiAreaContextMenuPacketKind.Build,
+				MuiAreaContextMenuMessageField.MouseY, unchecked((uint)-8)) ||
+			!MuiAreaContextMenuMessageMemoryCodec.TryReadUInt32(ref platform,
+				buildAddress, MuiAreaContextMenuPacketKind.Build,
+				MuiAreaContextMenuMessageField.MouseY, out var mouseY) ||
+			mouseY != unchecked((uint)-8)) return 3;
+
+		var choiceAddress = APTR.FromPointer(0x00050E40);
+		if (!MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+			choiceAddress, MuiAreaContextMenuPacketKind.Choice,
+			MuiAreaContextMenuMessageField.MethodId,
+			MuiAreaContextMenuMessageCodec.Choice) ||
+			!MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+				choiceAddress, MuiAreaContextMenuPacketKind.Choice,
+				MuiAreaContextMenuMessageField.Item, 0x00050F60) ||
+			!MuiAreaContextMenuMessageMemoryCodec.TryReadUInt32(ref platform,
+				choiceAddress, MuiAreaContextMenuPacketKind.Choice,
+				MuiAreaContextMenuMessageField.Item, out var item) ||
+			item != 0x00050F60) return 4;
+
+		if (MuiAreaContextMenuMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FF0), MuiAreaContextMenuPacketKind.Add,
+			MuiAreaContextMenuMessageField.MouseYPointer, out _) ||
+			MuiAreaContextMenuMessageMemoryCodec.TryGetAddress(ref platform,
+				addAddress, MuiAreaContextMenuPacketKind.Choice,
+				MuiAreaContextMenuMessageField.MouseX, out _) ||
+			MuiAreaContextMenuMessageMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaContextMenuPacketKind.Build,
+				MuiAreaContextMenuMessageField.MouseX, out _)) return 5;
+		return 42;
+	}
+
+	// MG1304 native struct-first pen/color specialist packet closure. Method,
+	// OM_GET, Set, pointer, and RGB frames use named records and complete
+	// packet-span validation without entering the specialist state machine.
+	public static uint ColorSpecialistMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var methodAddress = APTR.FromPointer(0x00050E00);
+		if (!MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			methodAddress, MuiColorSpecialistPacketKind.Method,
+			MuiColorSpecialistField.MethodId, MuiColorSpecialistMessageCodec.OmDispose) ||
+			!MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+				methodAddress, MuiColorSpecialistPacketKind.Method,
+				MuiColorSpecialistField.MethodId, out var method) ||
+			method != MuiColorSpecialistMessageCodec.OmDispose) return 1;
+
+		var getAddress = APTR.FromPointer(0x00050E20);
+		if (!MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			getAddress, MuiColorSpecialistPacketKind.Get,
+			MuiColorSpecialistField.MethodId, MuiColorSpecialistMessageCodec.OmGet) ||
+			!MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+				getAddress, MuiColorSpecialistPacketKind.Get,
+				MuiColorSpecialistField.Attribute, 0x120) ||
+			!MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+				getAddress, MuiColorSpecialistPacketKind.Get,
+				MuiColorSpecialistField.Storage, 0x00050F00) ||
+			!MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+				getAddress, MuiColorSpecialistPacketKind.Get,
+				MuiColorSpecialistField.Storage, out var storage) ||
+			storage != 0x00050F00) return 2;
+		if (!MuiColorSpecialistMessageMemoryCodec.TryGetAddress(ref platform,
+			getAddress, MuiColorSpecialistPacketKind.Get,
+			MuiColorSpecialistField.Storage, out var storageField) ||
+			storageField.Raw != getAddress.Raw +
+			MuiColorSpecialistGetMessage.StorageOffset) return 3;
+
+		var setAddress = APTR.FromPointer(0x00050E40);
+		if (!MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			setAddress, MuiColorSpecialistPacketKind.Set,
+			MuiColorSpecialistField.MethodId, MuiColorSpecialistMessageCodec.MethodSet) ||
+			!MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+				setAddress, MuiColorSpecialistPacketKind.Set,
+				MuiColorSpecialistField.Attribute, 0x220) ||
+			!MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+				setAddress, MuiColorSpecialistPacketKind.Set,
+				MuiColorSpecialistField.Value, 0x456) ||
+			!MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+				setAddress, MuiColorSpecialistPacketKind.Set,
+				MuiColorSpecialistField.Value, out var value) || value != 0x456)
+			return 4;
+
+		var pointerAddress = APTR.FromPointer(0x00050E60);
+		if (!MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			pointerAddress, MuiColorSpecialistPacketKind.Pointer,
+			MuiColorSpecialistField.MethodId,
+			MuiColorSpecialistMessageCodec.SetColormap) ||
+			!MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+				pointerAddress, MuiColorSpecialistPacketKind.Pointer,
+				MuiColorSpecialistField.Pointer, 0x00050F20) ||
+			!MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+				pointerAddress, MuiColorSpecialistPacketKind.Pointer,
+				MuiColorSpecialistField.Pointer, out var pointer) ||
+			pointer != 0x00050F20) return 5;
+
+		var rgbAddress = APTR.FromPointer(0x00050E70);
+		if (!MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			rgbAddress, MuiColorSpecialistPacketKind.Rgb,
+			MuiColorSpecialistField.MethodId, MuiColorSpecialistMessageCodec.SetRGB) ||
+			!MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+				rgbAddress, MuiColorSpecialistPacketKind.Rgb,
+				MuiColorSpecialistField.Red, 1) ||
+			!MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+				rgbAddress, MuiColorSpecialistPacketKind.Rgb,
+				MuiColorSpecialistField.Green, 2) ||
+			!MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+				rgbAddress, MuiColorSpecialistPacketKind.Rgb,
+				MuiColorSpecialistField.Blue, 3) ||
+			!MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+				rgbAddress, MuiColorSpecialistPacketKind.Rgb,
+				MuiColorSpecialistField.Blue, out var blue) || blue != 3)
+			return 6;
+
+		if (MuiColorSpecialistMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x00050FF1), MuiColorSpecialistPacketKind.Rgb,
+			MuiColorSpecialistField.Blue, out _) ||
+			MuiColorSpecialistMessageMemoryCodec.TryGetAddress(ref platform,
+				methodAddress, MuiColorSpecialistPacketKind.Method,
+				MuiColorSpecialistField.Attribute, out _) ||
+			MuiColorSpecialistMessageMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiColorSpecialistPacketKind.Set,
+				MuiColorSpecialistField.Value, out _)) return 7;
+		return 42;
+	}
+
+	// MG1199 Help state struct-codec proof. Node, signed line, and generation
+	// remain named semantic fields; the bounded adapter owns guest translation.
+	public static uint HelpStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50700);
+		var value = new MuiHelpStateRecord
+		{
+			Magic = MuiHelpStateRecord.Cookie,
+			Node = APTR.FromPointer(0x50740),
+			Line = unchecked((uint)-7),
+			Generation = 3,
+		};
+		if (!MuiHelpStateRecordCodec.Write(ref platform, address, value)) return 1;
+		if (!MuiHelpStateRecordMemoryCodec.TryGetAddress(ref platform, address, 4,
+			out var nodeField) || nodeField.Raw != 0x50704u ||
+			!MuiHelpStateRecordMemoryCodec.TryGetAddress(ref platform, address, 12,
+			out var generationField) || generationField.Raw != 0x5070Cu) return 2;
+		if (!MuiHelpStateRecordMemoryCodec.TryReadUInt32(ref platform, address, 8,
+			out var line) || line != unchecked((uint)-7) ||
+			!MuiHelpStateRecordMemoryCodec.TryReadUInt32(ref platform, address, 4,
+			out var node) || node != 0x50740u) return 3;
+		if (!MuiHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform, address, 12,
+			4) || !MuiHelpStateRecordCodec.TryReadStructural(ref platform, address,
+			out var decoded) || decoded.Generation != 4) return 4;
+		if (MuiHelpStateRecordMemoryCodec.TryGetAddress(ref platform, address,
+			MuiHelpStateRecord.Size, out _) ||
+			MuiHelpStateRecordMemoryCodec.TryGetAddress(ref platform, APTR.Null, 0,
+			out _) || MuiHelpStateRecordCodec.TryReadStructural(ref platform, APTR.Null,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG1200 Application scheduler struct-codec proof. Queue heads/tails and
+	// signal selection remain named semantic fields; the bounded adapter owns
+	// fixed guest-layout translation while admission retains queue invariants.
+	public static uint ApplicationSchedulerStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50780);
+		var value = new MuiApplicationSchedulerStateRecord
+		{
+			Magic = MuiApplicationSchedulerStateRecord.Cookie,
+			ReturnHead = APTR.Null,
+			ReturnTail = APTR.Null,
+			InputHandlers = APTR.Null,
+			SignalMask = 0x20,
+			PushHead = APTR.Null,
+			PushTail = APTR.Null,
+		};
+		if (!MuiApplicationSchedulerStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationSchedulerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationSchedulerStateField.SignalMask,
+			out var signalField) || signalField.Raw != 0x50790u ||
+			!MuiApplicationSchedulerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationSchedulerStateField.PushTail,
+			out var pushTailField) || pushTailField.Raw != 0x50798u)
+			return 2;
+		if (!MuiApplicationSchedulerStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationSchedulerStateField.SignalMask,
+			out var signalMask) || signalMask != 0x20u ||
+			!MuiApplicationSchedulerStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationSchedulerStateField.Magic,
+			out var magic) || magic != MuiApplicationSchedulerStateRecord.Cookie)
+			return 3;
+		if (!MuiApplicationSchedulerStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationSchedulerStateField.SignalMask, 0x40) ||
+			!MuiApplicationSchedulerStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.SignalMask != 0x40u) return 4;
+		if (MuiApplicationSchedulerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiApplicationSchedulerStateField)255, out _) ||
+			MuiApplicationSchedulerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiApplicationSchedulerStateField.Magic, out _) ||
+			MuiApplicationSchedulerStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1221 application-lifecycle struct-codec proof. The seven BOOL
+	// projections remain named semantic fields; only the bounded adapter owns
+	// their fixed MorphOS ULONG guest representation.
+	public static uint ApplicationLifecycleStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiApplicationLifecycleStateRecord
+		{
+			Magic = MuiApplicationLifecycleStateRecord.Cookie,
+			Initialized = 1,
+			Iconified = 0,
+			Active = 1,
+			SingleTask = 0,
+			DoubleStart = 1,
+			ForceQuit = 0,
+		};
+		if (!MuiApplicationLifecycleStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationLifecycleStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationLifecycleStateField.Active, out var activeField) ||
+			activeField.Raw != 0x50FCCu) return 2;
+		if (!MuiApplicationLifecycleStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationLifecycleStateField.ForceQuit,
+			out var forceQuitField) || forceQuitField.Raw != 0x50FD8u) return 3;
+		if (!MuiApplicationLifecycleStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationLifecycleStateField.Initialized,
+			out var initialized) || initialized != 1u ||
+			!MuiApplicationLifecycleStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiApplicationLifecycleStateField.DoubleStart,
+				out var doubleStart) || doubleStart != 1u) return 4;
+		if (!MuiApplicationLifecycleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationLifecycleStateField.ForceQuit, 1) ||
+			!MuiApplicationLifecycleStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Active != 1u ||
+			decoded.ForceQuit != 1u) return 5;
+		if (MuiApplicationLifecycleStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiApplicationLifecycleStateField.Magic,
+			out _) || MuiApplicationLifecycleStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiApplicationLifecycleStateField.ForceQuit,
+			out _) || MuiApplicationLifecycleStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 6;
+		return 42;
+	}
+
+	// MG1222 DefaultConfigItem state proof. The requested identifier, returned
+	// value, and request count remain named semantic fields; only the bounded
+	// adapter translates their fixed MorphOS ULONG guest representation.
+	public static uint ApplicationDefaultConfigStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FE0);
+		var value = new MuiApplicationDefaultConfigStateRecord
+		{
+			Magic = MuiApplicationDefaultConfigStateRecord.Cookie,
+			ConfigId = 0x44,
+			Value = 0x12345678,
+			Requests = 7,
+		};
+		if (!MuiApplicationDefaultConfigStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationDefaultConfigStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiApplicationDefaultConfigStateField.Value,
+			out var valueField) || valueField.Raw != 0x50FE8u) return 2;
+		if (!MuiApplicationDefaultConfigStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiApplicationDefaultConfigStateField.Requests,
+			out var requestsField) || requestsField.Raw != 0x50FECu) return 3;
+		if (!MuiApplicationDefaultConfigStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationDefaultConfigStateField.ConfigId,
+			out var configId) || configId != 0x44u ||
+			!MuiApplicationDefaultConfigStateRecordMemoryCodec.TryReadUInt32(
+				ref platform, address, MuiApplicationDefaultConfigStateField.Value,
+				out var returnedValue) || returnedValue != 0x12345678u) return 4;
+		if (!MuiApplicationDefaultConfigStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationDefaultConfigStateField.Requests,
+			8) || !MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded) || decoded.ConfigId != 0x44u ||
+			decoded.Value != 0x12345678u || decoded.Requests != 8u) return 5;
+		if (MuiApplicationDefaultConfigStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiApplicationDefaultConfigStateField.Magic,
+			out _) || MuiApplicationDefaultConfigStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiApplicationDefaultConfigStateField.Requests,
+			out _) || MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 6;
+		return 42;
+	}
+
+	// MG1227 UsedClasses struct-codec proof. The caller-owned class-name vector
+	// remains a typed APTR capability; only the bounded adapter translates the
+	// two fixed MorphOS LONG slots.
+	public static uint ApplicationIdentityStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FA0);
+		var value = new MuiApplicationIdentityStateRecord
+		{
+			Magic = MuiApplicationIdentityStateRecord.Cookie,
+			Author = APTR.Null,
+			Base = APTR.Null,
+			Copyright = APTR.Null,
+			Description = APTR.Null,
+			Title = APTR.Null,
+			Version = APTR.Null,
+		};
+		if (!MuiApplicationIdentityStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationIdentityStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationIdentityStateField.Title, out var titleField) ||
+			titleField.Raw != 0x50FB4u) return 2;
+		if (!MuiApplicationIdentityStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationIdentityStateField.Version,
+			out var versionField) || versionField.Raw != 0x50FB8u) return 3;
+		if (!MuiApplicationIdentityStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationIdentityStateField.Magic, out var magic) ||
+			magic != MuiApplicationIdentityStateRecord.Cookie) return 4;
+		if (!MuiApplicationIdentityStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationIdentityStateField.Title, 0x3600) ||
+			!MuiApplicationIdentityStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationIdentityStateField.Version, 0x3610) ||
+			!MuiApplicationIdentityStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Title.Raw != 0x3600u ||
+			decoded.Version.Raw != 0x3610u) return 5;
+		if (MuiApplicationIdentityStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiApplicationIdentityStateField.Magic,
+			out _) || MuiApplicationIdentityStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiApplicationIdentityStateField.Author,
+			out _) || MuiApplicationIdentityStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 6;
+		return 42;
+	}
+
+	// MG1224 application-policy struct-codec proof. The three initializer BOOL
+	// projections remain named semantic fields; only the bounded adapter
+	// translates their fixed MorphOS ULONG guest representation.
+	public static uint ApplicationPolicyStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FE0);
+		var value = new MuiApplicationPolicyStateRecord
+		{
+			Magic = MuiApplicationPolicyStateRecord.Cookie,
+			UseRexx = 1,
+			UseCommodities = 0,
+			UseScreenNotify = 1,
+		};
+		if (!MuiApplicationPolicyStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationPolicyStateField.UseCommodities,
+			out var commoditiesField) || commoditiesField.Raw != 0x50FE8u) return 2;
+		if (!MuiApplicationPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationPolicyStateField.UseScreenNotify,
+			out var notifyField) || notifyField.Raw != 0x50FECu) return 3;
+		if (!MuiApplicationPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationPolicyStateField.UseRexx, out var useRexx) ||
+			useRexx != 1u) return 4;
+		if (!MuiApplicationPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationPolicyStateField.UseCommodities, 1) ||
+			!MuiApplicationPolicyStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.UseRexx != 1u ||
+			decoded.UseCommodities != 1u || decoded.UseScreenNotify != 1u) return 5;
+		if (MuiApplicationPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiApplicationPolicyStateField.Magic,
+			out _) || MuiApplicationPolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiApplicationPolicyStateField.UseRexx,
+			out _) || MuiApplicationPolicyStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 6;
+		return 42;
+	}
+
+	// MG1225 application-menu struct-codec proof. MenuAction and MenuHelp stay
+	// opaque named UserData fields; only the bounded adapter translates the
+	// three fixed MorphOS ULONG guest slots.
+	public static uint ApplicationMenuStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FF0);
+		var value = new MuiApplicationMenuStateRecord
+		{
+			Magic = MuiApplicationMenuStateRecord.Cookie,
+			MenuAction = 0x80420001,
+			MenuHelp = 0x12345678,
+		};
+		if (!MuiApplicationMenuStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiApplicationMenuStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationMenuStateField.MenuAction, out var actionField) ||
+			actionField.Raw != 0x50FF4u) return 2;
+		if (!MuiApplicationMenuStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationMenuStateField.MenuHelp, out var helpField) ||
+			helpField.Raw != 0x50FF8u) return 3;
+		if (!MuiApplicationMenuStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationMenuStateField.MenuAction, out var action) ||
+			action != 0x80420001u) return 4;
+		if (!MuiApplicationMenuStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationMenuStateField.MenuHelp, 0xCAFEBABE) ||
+			!MuiApplicationMenuStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.MenuAction != 0x80420001u ||
+			decoded.MenuHelp != 0xCAFEBABEu) return 5;
+		if (MuiApplicationMenuStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiApplicationMenuStateField.Magic, out _) ||
+			MuiApplicationMenuStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiApplicationMenuStateField.MenuHelp, out _) ||
+			MuiApplicationMenuStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 6;
+		return 42;
+	}
+
+	// MG1226 CheckRefresh state proof. Refresh counters remain named semantic
+	// fields; only the bounded adapter translates the three fixed MorphOS ULONG
+	// guest slots.
+	public static uint ApplicationRefreshStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FF0);
+		var value = new MuiApplicationRefreshStateRecord
+		{
+			Magic = MuiApplicationRefreshStateRecord.Cookie,
+			Checks = 3,
+			RefreshedWindows = 5,
+		};
+		if (!MuiApplicationRefreshStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationRefreshStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationRefreshStateField.Checks, out var checksField) ||
+			checksField.Raw != 0x50FF4u) return 2;
+		if (!MuiApplicationRefreshStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationRefreshStateField.RefreshedWindows,
+			out var windowsField) || windowsField.Raw != 0x50FF8u) return 3;
+		if (!MuiApplicationRefreshStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationRefreshStateField.RefreshedWindows,
+			out var windows) || windows != 5u) return 4;
+		if (!MuiApplicationRefreshStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationRefreshStateField.Checks, 4) ||
+			!MuiApplicationRefreshStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Checks != 4u ||
+			decoded.RefreshedWindows != 5u) return 5;
+		if (MuiApplicationRefreshStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiApplicationRefreshStateField.Magic, out _) ||
+			MuiApplicationRefreshStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiApplicationRefreshStateField.Checks, out _) ||
+			MuiApplicationRefreshStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 6;
+		return 42;
+	}
+
+	// MG1227 UsedClasses state proof. The caller-owned class-name vector stays
+	// a typed APTR capability; only the bounded adapter translates the two
+	// fixed MorphOS ULONG record slots.
+	public static uint ApplicationUsedClassesStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FF0);
+		var value = new MuiApplicationUsedClassesStateRecord
+		{
+			Magic = MuiApplicationUsedClassesStateRecord.Cookie,
+			Vector = APTR.Null,
+		};
+		if (!MuiApplicationUsedClassesStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationUsedClassesStateField.Magic,
+			value.Magic) || !MuiApplicationUsedClassesStateRecordMemoryCodec
+			.TryWriteUInt32(ref platform, address,
+				MuiApplicationUsedClassesStateField.Vector, value.Vector.Raw)) return 1;
+		if (!MuiApplicationUsedClassesStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiApplicationUsedClassesStateField.Vector,
+			out var vectorField) || vectorField.Raw != 0x50FF4u) return 2;
+		if (!MuiApplicationUsedClassesStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationUsedClassesStateField.Magic, out var magic) ||
+			magic != MuiApplicationUsedClassesStateRecord.Cookie) return 3;
+		if (!MuiApplicationUsedClassesStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationUsedClassesStateField.Vector,
+			0x3600) || !MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded) || decoded.Vector.Raw != 0x3600u)
+			return 4;
+		if (MuiApplicationUsedClassesStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0x51000),
+			MuiApplicationUsedClassesStateField.Magic, out _) ||
+			MuiApplicationUsedClassesStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiApplicationUsedClassesStateField.Vector, out _) ||
+			MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1228 application-help struct-codec proof. Reference windows, help
+	// strings, line numbers, and request counters remain named semantic fields;
+	// only the bounded adapter translates the eight fixed MorphOS ULONG slots.
+	public static uint ApplicationHelpStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiApplicationHelpStateRecord
+		{
+			Magic = MuiApplicationHelpStateRecord.Cookie,
+			AboutReferenceWindow = APTR.Null,
+			AboutRequests = 2,
+			HelpWindow = APTR.Null,
+			HelpName = APTR.Null,
+			HelpNode = APTR.Null,
+			HelpLine = unchecked((uint)-3),
+			HelpRequests = 4,
+		};
+		if (!MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationHelpStateField.Magic, value.Magic) ||
+			!MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationHelpStateField.AboutRequests,
+				value.AboutRequests) ||
+			!MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationHelpStateField.HelpLine, value.HelpLine) ||
+			!MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationHelpStateField.HelpRequests,
+				value.HelpRequests)) return 1;
+		if (!MuiApplicationHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationHelpStateField.HelpName, out var helpNameField) ||
+			helpNameField.Raw != 0x50FD0u) return 2;
+		if (!MuiApplicationHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationHelpStateField.HelpRequests,
+			out var helpRequestsField) || helpRequestsField.Raw != 0x50FDCu) return 3;
+		if (!MuiApplicationHelpStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiApplicationHelpStateField.HelpLine, out var helpLine) ||
+			helpLine != unchecked((uint)-3)) return 4;
+		if (!MuiApplicationHelpStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.AboutRequests != 2u || decoded.HelpRequests != 4u ||
+			decoded.HelpLine != unchecked((uint)-3)) return 5;
+		if (MuiApplicationHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiApplicationHelpStateField.Magic, out _) ||
+			MuiApplicationHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiApplicationHelpStateField.HelpNode, out _) ||
+			MuiApplicationHelpStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 6;
+		return 42;
+	}
+
+	// MG1229 application settings-persistence struct-codec proof. Operation,
+	// environment selector, and saturating counters remain named semantic
+	// fields; only the bounded adapter translates the six fixed MorphOS ULONG
+	// slots. The ENVARC sentinel avoids caller-string traversal in this root.
+	public static uint ApplicationSettingsPersistenceStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FE0);
+		var value = new MuiApplicationSettingsPersistenceStateRecord
+		{
+			Magic = MuiApplicationSettingsPersistenceStateRecord.Cookie,
+			Operation = 1,
+			Name = APTR.FromPointer(uint.MaxValue),
+			Requests = 9,
+			Saves = 5,
+			Loads = 4,
+		};
+		if (!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiApplicationSettingsPersistenceStateField.Magic, value.Magic) ||
+			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address,
+				MuiApplicationSettingsPersistenceStateField.Operation,
+				value.Operation) ||
+			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address,
+				MuiApplicationSettingsPersistenceStateField.Name, value.Name.Raw) ||
+			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address,
+				MuiApplicationSettingsPersistenceStateField.Requests,
+				value.Requests) ||
+			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address,
+				MuiApplicationSettingsPersistenceStateField.Saves, value.Saves) ||
+			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address,
+				MuiApplicationSettingsPersistenceStateField.Loads, value.Loads)) return 1;
+		if (!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address,
+			MuiApplicationSettingsPersistenceStateField.Name,
+			out var nameField) || nameField.Raw != 0x50FE8u) return 2;
+		if (!MuiApplicationSettingsPersistenceStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.Operation != value.Operation || decoded.Name != value.Name ||
+			decoded.Requests != value.Requests || decoded.Saves != value.Saves ||
+			decoded.Loads != value.Loads) return 3;
+		if (MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0x51000),
+			MuiApplicationSettingsPersistenceStateField.Magic, out _) ||
+			MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryGetAddress(
+				ref platform, APTR.Null,
+				MuiApplicationSettingsPersistenceStateField.Loads, out _) ||
+			MuiApplicationSettingsPersistenceStateRecordCodec.TryReadStructural(
+				ref platform, APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1230 application text struct-codec proof. HelpFile and IconifyTitle
+	// remain typed caller-owned APTR fields; bounded C-string validation stays
+	// in admission while this root exercises the null-pointer fast path.
+	public static uint ApplicationTextStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FF0);
+		var value = new MuiApplicationTextStateRecord
+		{
+			Magic = MuiApplicationTextStateRecord.Cookie,
+			HelpFile = APTR.Null,
+			IconifyTitle = APTR.Null,
+		};
+		if (!MuiApplicationTextStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationTextStateField.Magic, value.Magic) ||
+			!MuiApplicationTextStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationTextStateField.HelpFile,
+				value.HelpFile.Raw) ||
+			!MuiApplicationTextStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiApplicationTextStateField.IconifyTitle,
+				value.IconifyTitle.Raw)) return 1;
+		if (!MuiApplicationTextStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationTextStateField.IconifyTitle,
+			out var titleField) || titleField.Raw != 0x50FF8u) return 2;
+		if (!MuiApplicationTextStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.HelpFile != value.HelpFile ||
+			decoded.IconifyTitle != value.IconifyTitle) return 3;
+		if (MuiApplicationTextStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiApplicationTextStateField.Magic, out _) ||
+			MuiApplicationTextStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiApplicationTextStateField.HelpFile, out _) ||
+			MuiApplicationTextStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1231 application-window relationship struct-codec proof. LastWindow
+	// remains an opaque caller-owned APTR capability and AddedCount retains
+	// saturating ULONG semantics; this root exercises named fields only.
+	public static uint ApplicationWindowRelationshipStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FF0);
+		var value = new MuiApplicationWindowRelationshipStateRecord
+		{
+			Magic = MuiApplicationWindowRelationshipStateRecord.Cookie,
+			LastWindow = APTR.Null,
+			AddedCount = uint.MaxValue,
+		};
+		if (!MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiApplicationWindowRelationshipStateField.Magic, value.Magic) ||
+			!MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address,
+				MuiApplicationWindowRelationshipStateField.LastWindow,
+				value.LastWindow.Raw) ||
+			!MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address,
+				MuiApplicationWindowRelationshipStateField.AddedCount,
+				value.AddedCount)) return 1;
+		if (!MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address,
+			MuiApplicationWindowRelationshipStateField.AddedCount,
+			out var countField) || countField.Raw != 0x50FF8u) return 2;
+		if (!MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.LastWindow != value.LastWindow ||
+			decoded.AddedCount != value.AddedCount) return 3;
+		if (MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0x51000),
+			MuiApplicationWindowRelationshipStateField.Magic, out _) ||
+			MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryGetAddress(
+				ref platform, APTR.Null,
+				MuiApplicationWindowRelationshipStateField.LastWindow, out _) ||
+			MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+				ref platform, APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1232 sleep-state struct-codec proof. Nesting depth, saved-disabled
+	// state, and request depth remain named scalar fields; the bounded adapter
+	// owns the four fixed MorphOS ULONG positions.
+	public static uint SleepStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiSleepStateRecord
+		{
+			Magic = MuiSleepStateRecord.Cookie,
+			Depth = 3,
+			SavedDisabled = 1,
+			Request = 3,
+		};
+		if (!MuiSleepStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			MuiSleepStateField.Magic, value.Magic) ||
+			!MuiSleepStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+				MuiSleepStateField.Depth, value.Depth) ||
+			!MuiSleepStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+				MuiSleepStateField.SavedDisabled, value.SavedDisabled) ||
+			!MuiSleepStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+				MuiSleepStateField.Request, value.Request)) return 1;
+		if (!MuiSleepStateRecordMemoryCodec.TryGetAddress(ref platform, address,
+			MuiSleepStateField.Request, out var requestField) ||
+			requestField.Raw != 0x50FCCu) return 2;
+		if (!MuiSleepStateRecordCodec.TryReadStructural(ref platform, address,
+			out var decoded) || decoded.Magic != value.Magic ||
+			decoded.Depth != value.Depth || decoded.SavedDisabled != value.SavedDisabled ||
+			decoded.Request != value.Request) return 3;
+		if (MuiSleepStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiSleepStateField.Magic, out _) ||
+			MuiSleepStateRecordMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiSleepStateField.Depth, out _) ||
+			MuiSleepStateRecordCodec.TryReadStructural(ref platform, APTR.Null,
+				out _)) return 4;
+		return 42;
+	}
+
+	// MG1233 Area weight struct-codec proof. The full MorphOS ULONG weight
+	// range remains representable as a named field; this bounded adapter owns
+	// the two fixed guest slots.
+	public static uint AreaWeightStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaWeightStateRecord
+		{
+			Magic = MuiAreaWeightStateRecord.Cookie,
+			Weight = uint.MaxValue,
+		};
+		if (!MuiAreaWeightStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaWeightStateField.Magic, value.Magic) ||
+			!MuiAreaWeightStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiAreaWeightStateField.Weight, value.Weight)) return 1;
+		if (!MuiAreaWeightStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaWeightStateField.Weight, out var weightField) ||
+			weightField.Raw != 0x50FC4u) return 2;
+		if (!MuiAreaWeightStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Magic != value.Magic ||
+			decoded.Weight != value.Weight) return 3;
+		if (MuiAreaWeightStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiAreaWeightStateField.Magic, out _) ||
+			MuiAreaWeightStateRecordMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiAreaWeightStateField.Weight, out _) ||
+			MuiAreaWeightStateRecordCodec.TryReadStructural(ref platform, APTR.Null,
+				out _)) return 4;
+		return 42;
+	}
+
+	// MG1234 Area activation struct-codec proof. Active, flags, generation,
+	// and the signature remain named semantic fields; the bounded adapter owns
+	// the four fixed MorphOS ULONG positions.
+	public static uint AreaActivationStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaActivationStateRecord
+		{
+			Signature = MuiAreaActivationStateRecord.Cookie,
+			Active = 1,
+			Flags = uint.MaxValue,
+			Generation = 7,
+		};
+		if (!MuiAreaActivationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaActivationStateField.Signature, value.Signature) ||
+			!MuiAreaActivationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiAreaActivationStateField.Active, value.Active) ||
+			!MuiAreaActivationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiAreaActivationStateField.Flags, value.Flags) ||
+			!MuiAreaActivationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiAreaActivationStateField.Generation, value.Generation)) return 1;
+		if (!MuiAreaActivationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaActivationStateField.Generation,
+			out var generationField) || generationField.Raw != 0x50FCCu) return 2;
+		if (!MuiAreaActivationStateCodec.TryReadStructural(ref platform, address,
+			out var decoded) || decoded.Signature != value.Signature ||
+			decoded.Active != value.Active || decoded.Flags != value.Flags ||
+			decoded.Generation != value.Generation) return 3;
+		if (MuiAreaActivationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiAreaActivationStateField.Signature, out _) ||
+			MuiAreaActivationStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaActivationStateField.Active, out _) ||
+			MuiAreaActivationStateCodec.TryReadStructural(ref platform, APTR.Null,
+				out _)) return 4;
+		return 42;
+	}
+
+	// MG1235 Gauge state struct-codec proof. Progress, divide, orientation,
+	// and the validation cookie remain named scalar fields; the bounded adapter
+	// owns the five fixed MorphOS ULONG positions.
+	public static uint GaugeStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiGaugeStateRecord
+		{
+			Magic = MuiGaugeStateRecord.Cookie,
+			Maximum = uint.MaxValue,
+			Current = 17,
+			Divide = 3,
+			Horizontal = 1,
+		};
+		if (!MuiGaugeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			MuiGaugeStateField.Magic, value.Magic) ||
+			!MuiGaugeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+				MuiGaugeStateField.Maximum, value.Maximum) ||
+			!MuiGaugeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+				MuiGaugeStateField.Current, value.Current) ||
+			!MuiGaugeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+				MuiGaugeStateField.Divide, value.Divide) ||
+			!MuiGaugeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+				MuiGaugeStateField.Horizontal, value.Horizontal)) return 1;
+		if (!MuiGaugeStateRecordMemoryCodec.TryGetAddress(ref platform, address,
+			MuiGaugeStateField.Horizontal, out var horizontalField) ||
+			horizontalField.Raw != 0x50FD0u) return 2;
+		if (!MuiGaugeStateRecordCodec.TryReadStructural(ref platform, address,
+			out var decoded) || decoded.Magic != value.Magic ||
+			decoded.Maximum != value.Maximum || decoded.Current != value.Current ||
+			decoded.Divide != value.Divide || decoded.Horizontal != value.Horizontal)
+			return 3;
+		if (MuiGaugeStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiGaugeStateField.Magic, out _) ||
+			MuiGaugeStateRecordMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+				MuiGaugeStateField.Current, out _) ||
+			MuiGaugeStateRecordCodec.TryReadStructural(ref platform, APTR.Null,
+				out _)) return 4;
+		return 42;
+	}
+
+	// MG1236 Selectgroup active-index struct-codec proof. The canonical child
+	// index and validation cookie remain named semantic fields; signed public
+	// selectors are interpreted before this bounded two-slot adapter.
+	public static uint SelectgroupActiveStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiSelectgroupActiveStateRecord
+		{
+			Magic = MuiSelectgroupActiveStateRecord.Cookie,
+			Active = 7,
+		};
+		if (!MuiSelectgroupActiveStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiSelectgroupActiveStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiSelectgroupActiveStateField.Active,
+			out var activeField) || activeField.Raw != 0x50FC4u) return 2;
+		if (!MuiSelectgroupActiveStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiSelectgroupActiveStateField.Active, 2) ||
+			!MuiSelectgroupActiveStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Active != 2) return 3;
+		if (MuiSelectgroupActiveStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiSelectgroupActiveStateField.Magic, out _) ||
+			MuiSelectgroupActiveStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiSelectgroupActiveStateField.Active, out _) ||
+			MuiSelectgroupActiveStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1237 application object-relationship struct-codec proof. DiskObject,
+	// DropObject, Menustrip, and the validation cookie remain typed APTR fields;
+	// this bounded adapter owns the four fixed MorphOS ULONG positions.
+	public static uint ApplicationObjectStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiApplicationObjectStateRecord
+		{
+			Magic = MuiApplicationObjectStateRecord.Cookie,
+			DiskObject = APTR.Null,
+			DropObject = APTR.Null,
+			Menustrip = APTR.Null,
+		};
+		if (!MuiApplicationObjectStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiApplicationObjectStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiApplicationObjectStateField.Menustrip,
+			out var menustripField) || menustripField.Raw != 0x50FCCu) return 2;
+		if (!MuiApplicationObjectStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiApplicationObjectStateField.DropObject, 0x12345678) ||
+			!MuiApplicationObjectStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.DropObject.Raw != 0x12345678u)
+			return 3;
+		if (MuiApplicationObjectStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiApplicationObjectStateField.Magic, out _) ||
+			MuiApplicationObjectStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiApplicationObjectStateField.DiskObject, out _) ||
+			MuiApplicationObjectStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1241 Group_LayoutHook struct-codec proof. The hook capability and
+	// validation cookie remain named semantic fields; this bounded adapter owns
+	// the two fixed MorphOS ULONG positions.
+	public static uint GroupLayoutHookStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiGroupLayoutHookStateRecord
+		{
+			Magic = MuiGroupLayoutHookStateRecord.Cookie,
+			Hook = APTR.Null,
+		};
+		if (!MuiGroupLayoutHookStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiGroupLayoutHookStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiGroupLayoutHookStateField.Hook,
+			out var hookField) || hookField.Raw != 0x50FC4u) return 2;
+		if (!MuiGroupLayoutHookStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGroupLayoutHookStateField.Hook, 0x12345678) ||
+			!MuiGroupLayoutHookStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Hook.Raw != 0x12345678u)
+			return 3;
+		if (MuiGroupLayoutHookStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiGroupLayoutHookStateField.Magic, out _) ||
+			MuiGroupLayoutHookStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiGroupLayoutHookStateField.Hook, out _) ||
+			MuiGroupLayoutHookStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1242 Window event-reuse state struct-codec proof. Context flags,
+	// event capabilities, and the signed MUI key remain named semantic fields;
+	// this bounded adapter owns their fixed MorphOS ULONG representation.
+	public static uint WindowEventReuseStateStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiWindowEventReuseStateRecord
+		{
+			Magic = MuiWindowEventReuseStateRecord.Cookie,
+			ContextActive = 0,
+			Pending = 0,
+			EventMessage = APTR.Null,
+			InputEvent = APTR.Null,
+			EventClass = 0,
+			MuiKey = -7,
+		};
+		if (!MuiWindowEventReuseStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiWindowEventReuseStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiWindowEventReuseStateField.MuiKey,
+			out var keyField) || keyField.Raw != 0x50FD8u) return 2;
+		if (!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiWindowEventReuseStateField.MuiKey,
+			out var key) || key != unchecked((uint)-7)) return 3;
+		if (!MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiWindowEventReuseStateField.MuiKey, unchecked((uint)-8)) ||
+			!MuiWindowEventReuseStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.MuiKey != -8) return 4;
+		if (MuiWindowEventReuseStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiWindowEventReuseStateField.Magic, out _) ||
+			MuiWindowEventReuseStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiWindowEventReuseStateField.Magic, out _) ||
+			MuiWindowEventReuseStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1243 Choice/Radio entries struct-codec proof. The caller-owned
+	// STRPTR-vector capability and validation cookie remain named semantic
+	// fields; this bounded adapter owns the two fixed MorphOS ULONG positions.
+	public static uint ChoiceEntriesStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiChoiceEntriesStateRecord
+		{
+			Magic = MuiChoiceEntriesStateRecord.Cookie,
+			Entries = APTR.Null,
+		};
+		if (!MuiChoiceEntriesStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiChoiceEntriesStateField.Magic, value.Magic) ||
+			!MuiChoiceEntriesStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiChoiceEntriesStateField.Entries, value.Entries.Raw))
+			return 1;
+		if (!MuiChoiceEntriesStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiChoiceEntriesStateField.Entries,
+			out var entriesField) || entriesField.Raw != 0x50FC4u) return 2;
+		if (!MuiChoiceEntriesStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiChoiceEntriesStateField.Entries, 0x12345678u) ||
+			!MuiChoiceEntriesStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Entries.Raw != 0x12345678u)
+			return 3;
+		if (MuiChoiceEntriesStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiChoiceEntriesStateField.Magic, out _) ||
+			MuiChoiceEntriesStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiChoiceEntriesStateField.Entries, out _) ||
+			MuiChoiceEntriesStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1244 Choice/Radio active-index struct-codec proof. The normalized
+	// active index and validation cookie remain named semantic fields; this
+	// bounded adapter owns the two fixed MorphOS ULONG positions.
+	public static uint ChoiceActiveStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiChoiceActiveStateRecord
+		{
+			Magic = MuiChoiceActiveStateRecord.Cookie,
+			Active = 7,
+		};
+		if (!MuiChoiceActiveStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiChoiceActiveStateField.Magic, value.Magic) ||
+			!MuiChoiceActiveStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiChoiceActiveStateField.Active, value.Active)) return 1;
+		if (!MuiChoiceActiveStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiChoiceActiveStateField.Active,
+			out var activeField) || activeField.Raw != 0x50FC4u) return 2;
+		if (!MuiChoiceActiveStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiChoiceActiveStateField.Active, 8) ||
+			!MuiChoiceActiveStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Active != 8) return 3;
+		if (MuiChoiceActiveStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiChoiceActiveStateField.Magic, out _) ||
+			MuiChoiceActiveStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiChoiceActiveStateField.Active, out _) ||
+			MuiChoiceActiveStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1245 Scale presentation struct-codec proof. The BOOL orientation and
+	// validation cookie remain named semantic fields; this bounded adapter owns
+	// the two fixed MorphOS ULONG positions.
+	public static uint ScalePresentationStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiScalePresentationStateRecord
+		{
+			Magic = MuiScalePresentationStateRecord.Cookie,
+			Horizontal = 1,
+		};
+		if (!MuiScalePresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiScalePresentationStateField.Magic, value.Magic) ||
+			!MuiScalePresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiScalePresentationStateField.Horizontal, value.Horizontal))
+			return 1;
+		if (!MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiScalePresentationStateField.Horizontal,
+			out var horizontalField) || horizontalField.Raw != 0x50FC4u) return 2;
+		if (!MuiScalePresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiScalePresentationStateField.Horizontal, 0) ||
+			!MuiScalePresentationStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Horizontal != 0) return 3;
+		if (MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiScalePresentationStateField.Magic, out _) ||
+			MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiScalePresentationStateField.Horizontal, out _) ||
+			MuiScalePresentationStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1246 Slider presentation struct-codec proof. The BOOL orientation,
+	// quiet-display policy, and validation cookie remain named semantic fields;
+	// this bounded adapter owns the three fixed MorphOS ULONG positions.
+	public static uint SliderPresentationStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiSliderPresentationStateRecord
+		{
+			Magic = MuiSliderPresentationStateRecord.Cookie,
+			Horizontal = 1,
+			Quiet = 1,
+		};
+		if (!MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiSliderPresentationStateField.Magic, value.Magic) ||
+			!MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiSliderPresentationStateField.Horizontal, value.Horizontal) ||
+			!MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiSliderPresentationStateField.Quiet, value.Quiet)) return 1;
+		if (!MuiSliderPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiSliderPresentationStateField.Quiet,
+			out var quietField) || quietField.Raw != 0x50FC8u) return 2;
+		if (!MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiSliderPresentationStateField.Horizontal, 0) ||
+			!MuiSliderPresentationStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Horizontal != 0 ||
+			decoded.Quiet != 1) return 3;
+		if (MuiSliderPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiSliderPresentationStateField.Magic, out _) ||
+			MuiSliderPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiSliderPresentationStateField.Quiet, out _) ||
+			MuiSliderPresentationStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1247 String Integer struct-codec proof. The signed parsed value and
+	// validation cookie remain named semantic fields; this bounded adapter owns
+	// the two fixed MorphOS ULONG positions.
+	public static uint StringIntegerStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiStringIntegerStateRecord
+		{
+			Magic = MuiStringIntegerStateRecord.Cookie,
+			Value = -123,
+		};
+		if (!MuiStringIntegerStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiStringIntegerStateField.Magic, value.Magic) ||
+			!MuiStringIntegerStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiStringIntegerStateField.Value,
+				unchecked((uint)value.Value))) return 1;
+		if (!MuiStringIntegerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiStringIntegerStateField.Value,
+			out var valueField) || valueField.Raw != 0x50FC4u) return 2;
+		if (!MuiStringIntegerStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiStringIntegerStateField.Value, unchecked((uint)456)) ||
+			!MuiStringIntegerStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Value != 456) return 3;
+		if (MuiStringIntegerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiStringIntegerStateField.Magic, out _) ||
+			MuiStringIntegerStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiStringIntegerStateField.Value, out _) ||
+			MuiStringIntegerStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1248 Numeric range/value struct-codec proof. The complete named
+	// range/value record is the semantic boundary; this bounded adapter owns
+	// the six fixed MorphOS ULONG positions.
+	public static uint NumericStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiNumericStateRecord
+		{
+			Magic = MuiNumericStateRecord.Cookie,
+			Minimum = unchecked((uint)-10),
+			Maximum = 100,
+			Value = 35,
+			Default = 50,
+			Reverse = 1,
+		};
+		if (!MuiNumericStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiNumericStateRecordMemoryCodec.TryGetAddress(ref platform, address,
+			MuiNumericStateField.Value, out var valueAddress) || valueAddress.Raw !=
+			0x50FCCu) return 2;
+		if (!MuiNumericStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
+			MuiNumericStateField.Minimum, out var minimum) || minimum != unchecked((uint)-10))
+			return 3;
+		if (!MuiNumericStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			MuiNumericStateField.Value, 42) || !MuiNumericStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded) || decoded.Value != 42) return 4;
+		if (MuiNumericStateRecordMemoryCodec.TryGetAddress(ref platform, address,
+			(MuiNumericStateField)255, out _) ||
+			MuiNumericStateRecordMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+			MuiNumericStateField.Magic, out _) ||
+			MuiNumericStateRecordCodec.TryReadStructural(ref platform, APTR.Null,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG1249 BuildSettingsPanel state struct-codec proof. The requested number,
+	// returned panel capability, request count, and validation cookie remain
+	// named semantic fields; this bounded adapter owns four fixed ULONG slots.
+	public static uint ApplicationSettingsPanelStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiApplicationSettingsPanelStateRecord
+		{
+			Magic = MuiApplicationSettingsPanelStateRecord.Cookie,
+			Number = 9,
+			Panel = APTR.Null,
+			Requests = 4,
+		};
+		if (!MuiApplicationSettingsPanelStateRecordCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationSettingsPanelStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiApplicationSettingsPanelStateField.Panel,
+			out var panelAddress) || panelAddress.Raw != 0x50FC8u) return 2;
+		if (!MuiApplicationSettingsPanelStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSettingsPanelStateField.Panel,
+			0x12345678) || !MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded) || decoded.Panel.Raw != 0x12345678u)
+			return 3;
+		if (MuiApplicationSettingsPanelStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiApplicationSettingsPanelStateField)255, out _) ||
+			MuiApplicationSettingsPanelStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiApplicationSettingsPanelStateField.Magic, out _) ||
+			MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1250 Area ControlChar struct-codec proof. The normalized character and
+	// publication generation remain named semantic fields; this bounded adapter
+	// owns the three fixed MorphOS ULONG positions.
+	public static uint AreaControlCharStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaControlCharStateRecord
+		{
+			Magic = MuiAreaControlCharStateRecord.Cookie,
+			Character = 0x41,
+			Generation = 7,
+		};
+		if (!MuiAreaControlCharStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaControlCharStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaControlCharStateField.Character,
+			out var characterAddress) || characterAddress.Raw != 0x50FC4u) return 2;
+		if (!MuiAreaControlCharStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaControlCharStateField.Character, 0x42) ||
+			!MuiAreaControlCharStateRecordCodec.TryReadStructural(ref platform, address,
+				out var decoded) || decoded.Character != 0x42) return 3;
+		if (MuiAreaControlCharStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaControlCharStateField)255, out _) ||
+			MuiAreaControlCharStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaControlCharStateField.Magic, out _) ||
+			MuiAreaControlCharStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1251 Area TextColor struct-codec proof. The packed RGB value, setup
+	// active flag, publication generation, and cookie remain named semantic
+	// fields; this bounded adapter owns four fixed MorphOS ULONG positions.
+	public static uint AreaTextColorStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaTextColorStateRecord
+		{
+			Magic = MuiAreaTextColorStateRecord.Cookie,
+			Color = 0x00C0FFEE,
+			Active = 1,
+			Generation = 7,
+		};
+		if (!MuiAreaTextColorStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaTextColorStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaTextColorStateField.Color,
+			out var colorAddress) || colorAddress.Raw != 0x50FC4u) return 2;
+		if (!MuiAreaTextColorStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaTextColorStateField.Color, 0x00112233) ||
+			!MuiAreaTextColorStateRecordCodec.TryReadStructural(ref platform, address,
+				out var decoded) || decoded.Color != 0x00112233u) return 3;
+		if (MuiAreaTextColorStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaTextColorStateField)255, out _) ||
+			MuiAreaTextColorStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaTextColorStateField.Magic, out _) ||
+			MuiAreaTextColorStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1252 Area BuiltinFont struct-codec proof. The signed-compatible
+	// selector bit pattern, presence flag, generation, and cookie remain named
+	// semantic fields; this bounded adapter owns four fixed ULONG positions.
+	public static uint AreaBuiltinFontStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaBuiltinFontStateRecord
+		{
+			Magic = MuiAreaBuiltinFontStateRecord.Cookie,
+			Selector = unchecked((uint)-1),
+			Present = 1,
+			Generation = 7,
+		};
+		if (!MuiAreaBuiltinFontStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaBuiltinFontStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaBuiltinFontStateField.Selector,
+			out var selectorAddress) || selectorAddress.Raw != 0x50FC4u) return 2;
+		if (!MuiAreaBuiltinFontStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaBuiltinFontStateField.Selector, 2) ||
+			!MuiAreaBuiltinFontStateRecordCodec.TryReadStructural(ref platform, address,
+				out var decoded) || decoded.Selector != 2) return 3;
+		if (MuiAreaBuiltinFontStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaBuiltinFontStateField)255, out _) ||
+			MuiAreaBuiltinFontStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaBuiltinFontStateField.Magic, out _) ||
+			MuiAreaBuiltinFontStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1253 Area presentation struct-codec proof. BOOL policies, unrestricted
+	// background/frame selectors, and validation cookie remain named semantic
+	// fields; this bounded adapter owns six fixed MorphOS ULONG positions.
+	public static uint AreaPresentationStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaPresentationStateRecord
+		{
+			Magic = MuiAreaPresentationStateRecord.Cookie,
+			Disabled = 1,
+			ShowMe = 0,
+			Background = 0x12345678,
+			Frame = 0xCAFEBABE,
+			CustomBackfill = 1,
+		};
+		if (!MuiAreaPresentationStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaPresentationStateField.Frame,
+			out var frameAddress) || frameAddress.Raw != 0x50FD0u) return 2;
+		if (!MuiAreaPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaPresentationStateField.Background, 0x00112233) ||
+			!MuiAreaPresentationStateRecordCodec.TryReadStructural(ref platform, address,
+				out var decoded) || decoded.Background != 0x00112233u) return 3;
+		if (MuiAreaPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaPresentationStateField)255, out _) ||
+			MuiAreaPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaPresentationStateField.Magic, out _) ||
+			MuiAreaPresentationStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1254 Area ContextMenu struct-codec proof. Menu-strip and trigger
+	// capabilities, publication generation, and cookie remain named semantic
+	// fields; this bounded adapter owns four fixed MorphOS ULONG positions.
+	public static uint AreaContextMenuStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaContextMenuStateRecord
+		{
+			Magic = MuiAreaContextMenuStateRecord.Cookie,
+			MenuStrip = APTR.FromPointer(0x1234),
+			Trigger = APTR.FromPointer(0x5678),
+			Generation = 7,
+		};
+		if (!MuiAreaContextMenuStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaContextMenuStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaContextMenuStateField.Trigger,
+			out var triggerAddress) || triggerAddress.Raw != 0x50FC8u) return 2;
+		if (!MuiAreaContextMenuStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaContextMenuStateField.Trigger, 0xABCDEF01) ||
+			!MuiAreaContextMenuStateRecordCodec.TryReadStructural(ref platform, address,
+				out var decoded) || decoded.Trigger.Raw != 0xABCDEF01u) return 3;
+		if (MuiAreaContextMenuStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaContextMenuStateField)255, out _) ||
+			MuiAreaContextMenuStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaContextMenuStateField.Magic, out _) ||
+			MuiAreaContextMenuStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1255 Area drag-policy struct-codec proof. Draggable/dropable BOOLs and
+	// the validation cookie remain named semantic fields; this bounded adapter
+	// owns the three fixed MorphOS ULONG positions.
+	public static uint AreaDragPolicyStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaDragPolicyStateRecord
+		{
+			Magic = MuiAreaDragPolicyStateRecord.Cookie,
+			Draggable = 1,
+			Dropable = 0,
+		};
+		if (!MuiAreaDragPolicyStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaDragPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaDragPolicyStateField.Dropable,
+			out var dropableAddress) || dropableAddress.Raw != 0x50FC8u) return 2;
+		if (!MuiAreaDragPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaDragPolicyStateField.Draggable, 0) ||
+			!MuiAreaDragPolicyStateRecordCodec.TryReadStructural(ref platform, address,
+				out var decoded) || decoded.Draggable != 0) return 3;
+		if (MuiAreaDragPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaDragPolicyStateField)255, out _) ||
+			MuiAreaDragPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaDragPolicyStateField.Magic, out _) ||
+			MuiAreaDragPolicyStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1256 Area disappearance-policy struct-codec proof. Signed horizontal
+	// and vertical priorities plus the validation cookie remain named semantic
+	// fields; this bounded adapter owns the three fixed MorphOS ULONG positions.
+	public static uint AreaDisappearPolicyStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaDisappearPolicyStateRecord
+		{
+			Magic = MuiAreaDisappearPolicyStateRecord.Cookie,
+			HorizDisappear = -3,
+			VertDisappear = 5,
+		};
+		if (!MuiAreaDisappearPolicyStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaDisappearPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaDisappearPolicyStateField.HorizDisappear,
+			out var horizontalAddress) || horizontalAddress.Raw != 0x50FC4u) return 2;
+		if (!MuiAreaDisappearPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaDisappearPolicyStateField.VertDisappear,
+			unchecked((uint)-7)) ||
+			!MuiAreaDisappearPolicyStateRecordCodec.TryReadStructural(ref platform, address,
+				out var decoded) || decoded.VertDisappear != -7) return 3;
+		if (MuiAreaDisappearPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaDisappearPolicyStateField)255, out _) ||
+			MuiAreaDisappearPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaDisappearPolicyStateField.Magic, out _) ||
+			MuiAreaDisappearPolicyStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1257 Area DoubleClick struct-codec proof. The signed signal value,
+	// generation, and validation cookie remain named semantic fields; this
+	// bounded adapter owns the three fixed MorphOS ULONG positions.
+	public static uint AreaDoubleClickStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaDoubleClickStateRecord
+		{
+			Magic = MuiAreaDoubleClickStateRecord.Cookie,
+			Value = -123,
+			Generation = 7,
+		};
+		if (!MuiAreaDoubleClickStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaDoubleClickStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaDoubleClickStateField.Value,
+			out var valueAddress) || valueAddress.Raw != 0x50FC4u) return 2;
+		if (!MuiAreaDoubleClickStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaDoubleClickStateField.Value, unchecked((uint)456)) ||
+			!MuiAreaDoubleClickStateRecordCodec.TryReadStructural(ref platform, address,
+				out var decoded) || decoded.Value != 456) return 3;
+		if (MuiAreaDoubleClickStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaDoubleClickStateField)255, out _) ||
+			MuiAreaDoubleClickStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaDoubleClickStateField.Magic, out _) ||
+			MuiAreaDoubleClickStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1258 Area ShortHelp struct-codec proof. The caller-owned OBString
+	// pointer, publication generation, and validation cookie remain named
+	// semantic fields; the bounded adapter owns the three fixed ULONG slots.
+	public static uint AreaShortHelpStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaShortHelpStateRecord
+		{
+			Magic = MuiAreaShortHelpStateRecord.Cookie,
+			Text = APTR.FromPointer(0x1A00),
+			Generation = 7,
+		};
+		if (!MuiAreaShortHelpStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaShortHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaShortHelpStateField.Text,
+			out var textAddress) || textAddress.Raw != 0x50FC4u) return 2;
+		if (!MuiAreaShortHelpStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Text.Raw != 0x1A00u) return 3;
+		if (MuiAreaShortHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaShortHelpStateField)255, out _) ||
+			MuiAreaShortHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaShortHelpStateField.Magic, out _) ||
+			MuiAreaShortHelpStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1259 Area CycleChain struct-codec proof. The signed policy value,
+	// generation, and validation cookie remain named semantic fields; this
+	// bounded adapter owns the three fixed MorphOS ULONG positions.
+	public static uint AreaCycleChainStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaCycleChainStateRecord
+		{
+			Magic = MuiAreaCycleChainStateRecord.Cookie,
+			Value = -123,
+			Generation = 7,
+		};
+		if (!MuiAreaCycleChainStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaCycleChainStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaCycleChainStateField.Value,
+			out var valueAddress) || valueAddress.Raw != 0x50FC4u) return 2;
+		if (!MuiAreaCycleChainStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaCycleChainStateField.Value, unchecked((uint)456)) ||
+			!MuiAreaCycleChainStateRecordCodec.TryReadStructural(ref platform, address,
+				out var decoded) || decoded.Value != 456) return 3;
+		if (MuiAreaCycleChainStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaCycleChainStateField)255, out _) ||
+			MuiAreaCycleChainStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaCycleChainStateField.Magic, out _) ||
+			MuiAreaCycleChainStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1260 Area DoubleBuffer struct-codec proof. The canonical BOOL,
+	// generation, and validation cookie remain named semantic fields; this
+	// bounded adapter owns the three fixed MorphOS ULONG positions.
+	public static uint AreaDoubleBufferStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaDoubleBufferStateRecord
+		{
+			Magic = MuiAreaDoubleBufferStateRecord.Cookie,
+			Enabled = 1,
+			Generation = 7,
+		};
+		if (!MuiAreaDoubleBufferStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaDoubleBufferStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaDoubleBufferStateField.Enabled,
+			out var enabledAddress) || enabledAddress.Raw != 0x50FC4u) return 2;
+		if (!MuiAreaDoubleBufferStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaDoubleBufferStateField.Enabled, 0) ||
+			!MuiAreaDoubleBufferStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Enabled != 0) return 3;
+		if (MuiAreaDoubleBufferStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaDoubleBufferStateField)255, out _) ||
+			MuiAreaDoubleBufferStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaDoubleBufferStateField.Magic, out _) ||
+			MuiAreaDoubleBufferStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1261 Area Floating struct-codec proof. The canonical BOOL, generation,
+	// and validation cookie remain named semantic fields; this bounded adapter
+	// owns the three fixed MorphOS ULONG positions.
+	public static uint AreaFloatingStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaFloatingStateRecord
+		{
+			Magic = MuiAreaFloatingStateRecord.Cookie,
+			Enabled = 1,
+			Generation = 7,
+		};
+		if (!MuiAreaFloatingStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaFloatingStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaFloatingStateField.Enabled,
+			out var enabledAddress) || enabledAddress.Raw != 0x50FC4u) return 2;
+		if (!MuiAreaFloatingStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaFloatingStateField.Enabled, 0) ||
+			!MuiAreaFloatingStateRecordCodec.TryReadStructural(ref platform, address,
+				out var decoded) || decoded.Enabled != 0) return 3;
+		if (MuiAreaFloatingStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaFloatingStateField)255, out _) ||
+			MuiAreaFloatingStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaFloatingStateField.Magic, out _) ||
+			MuiAreaFloatingStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1262 Area CustomFont struct-codec proof. The caller-owned font-spec
+	// pointer, presence flag, generation, and validation cookie remain named
+	// semantic fields; this bounded adapter owns the four fixed ULONG slots.
+	public static uint AreaCustomFontStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaCustomFontStateRecord
+		{
+			Magic = MuiAreaCustomFontStateRecord.Cookie,
+			Spec = APTR.FromPointer(0x1A00),
+			Present = 1,
+			Generation = 7,
+		};
+		if (!MuiAreaCustomFontStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaCustomFontStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaCustomFontStateField.Spec,
+			out var specAddress) || specAddress.Raw != 0x50FC4u) return 2;
+		if (!MuiAreaCustomFontStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Spec.Raw != 0x1A00u ||
+			decoded.Present != 1) return 3;
+		if (MuiAreaCustomFontStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaCustomFontStateField)255, out _) ||
+			MuiAreaCustomFontStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaCustomFontStateField.Magic, out _) ||
+			MuiAreaCustomFontStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1263 CustomFont runtime struct-codec proof. Provider font and source
+	// spec handles, active state, generation, and validation cookie remain
+	// named semantic fields; this adapter owns the five fixed ULONG slots.
+	public static uint AreaCustomFontRuntimeStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaCustomFontRuntimeRecord
+		{
+			Magic = MuiAreaCustomFontRuntimeRecord.Cookie,
+			Font = APTR.FromPointer(0x2A00),
+			Spec = APTR.FromPointer(0x1A00),
+			Generation = 7,
+			Active = 1,
+		};
+		if (!MuiAreaCustomFontRuntimeRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaCustomFontRuntimeRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaCustomFontRuntimeField.Spec,
+			out var specAddress) || specAddress.Raw != 0x50FC8u) return 2;
+		if (!MuiAreaCustomFontRuntimeRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaCustomFontRuntimeField.Active, 0) ||
+			!MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Font.Raw != 0x2A00u ||
+			decoded.Spec.Raw != 0x1A00u || decoded.Active != 0) return 3;
+		if (MuiAreaCustomFontRuntimeRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaCustomFontRuntimeField)255, out _) ||
+			MuiAreaCustomFontRuntimeRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaCustomFontRuntimeField.Magic, out _) ||
+			MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1264 Area FontSelection struct-codec proof. The closed active choice,
+	// caller-owned source pointer, generation, and validation cookie remain
+	// named semantic fields; this bounded adapter owns the four fixed ULONG
+	// positions.
+	public static uint AreaFontSelectionStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaFontSelectionStateRecord
+		{
+			Magic = MuiAreaFontSelectionStateRecord.Cookie,
+			Active = (uint)MuiAreaFontSelectionKind.CustomFont,
+			Source = APTR.FromPointer(0x1A00),
+			Generation = 7,
+		};
+		if (!MuiAreaFontSelectionStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiAreaFontSelectionStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaFontSelectionStateField.Source,
+			out var sourceAddress) || sourceAddress.Raw != 0x50FC8u) return 2;
+		if (!MuiAreaFontSelectionStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Active !=
+			(uint)MuiAreaFontSelectionKind.CustomFont ||
+			decoded.Source.Raw != 0x1A00u) return 3;
+		if (MuiAreaFontSelectionStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaFontSelectionStateField)255, out _) ||
+			MuiAreaFontSelectionStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaFontSelectionStateField.Magic, out _) ||
+			MuiAreaFontSelectionStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1265 Area Timer struct-codec proof. The signed event counter,
+	// generation, and validation cookie remain named semantic fields; this
+	// bounded adapter owns the three fixed MorphOS ULONG positions.
+	public static uint AreaTimerStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaTimerStateRecord
+		{
+			Magic = MuiAreaTimerStateRecord.Cookie,
+			Value = -123,
+			Generation = 7,
+		};
+		if (!MuiAreaTimerStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaTimerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaTimerStateField.Value,
+			out var valueAddress) || valueAddress.Raw != 0x50FC4u) return 2;
+		if (!MuiAreaTimerStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaTimerStateField.Value, unchecked((uint)456)) ||
+			!MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform, address,
+				out var decoded) || decoded.Value != 456) return 3;
+		if (MuiAreaTimerStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaTimerStateField)255, out _) ||
+			MuiAreaTimerStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaTimerStateField.Magic, out _) ||
+			MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1266 Area Timer event-state struct-codec proof. Canonical event flags,
+	// IntuiTick identity, generation, and validation cookie remain named
+	// semantic fields; this bounded adapter owns the six fixed ULONG slots.
+	public static uint AreaTimerEventStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiAreaTimerEventStateRecord
+		{
+			Magic = MuiAreaTimerEventStateRecord.Cookie,
+			Armed = 1,
+			MouseOver = 1,
+			DelayElapsed = 0,
+			LastTick = 0xFEDCBA98,
+			Generation = 7,
+		};
+		if (!MuiAreaTimerEventStateCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiAreaTimerEventStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaTimerEventStateField.LastTick,
+			out var tickAddress) || tickAddress.Raw != 0x50FD0u) return 2;
+		if (!MuiAreaTimerEventStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaTimerEventStateField.LastTick, 0x12345678) ||
+			!MuiAreaTimerEventStateCodec.TryReadStructural(ref platform, address,
+				out var decoded) || decoded.LastTick != 0x12345678u ||
+			decoded.Armed != 1 || decoded.MouseOver != 1) return 3;
+		if (MuiAreaTimerEventStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, (MuiAreaTimerEventStateField)255, out _) ||
+			MuiAreaTimerEventStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiAreaTimerEventStateField.Magic, out _) ||
+			MuiAreaTimerEventStateCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1240 Gadget_Gadget struct-codec proof. The getter-only gadget pointer
+	// and validation cookie remain named semantic fields; this bounded adapter
+	// owns the two fixed MorphOS ULONG positions.
+	public static uint GadgetGadgetStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiGadgetGadgetStateRecord
+		{
+			Magic = MuiGadgetGadgetStateRecord.Cookie,
+			Gadget = APTR.Null,
+		};
+		if (!MuiGadgetGadgetStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiGadgetGadgetStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiGadgetGadgetStateField.Gadget,
+			out var gadgetField) || gadgetField.Raw != 0x50FC4u) return 2;
+		if (!MuiGadgetGadgetStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGadgetGadgetStateField.Gadget, 0x12345678) ||
+			!MuiGadgetGadgetStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Gadget.Raw != 0x12345678u)
+			return 3;
+		if (MuiGadgetGadgetStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiGadgetGadgetStateField.Magic, out _) ||
+			MuiGadgetGadgetStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiGadgetGadgetStateField.Gadget, out _) ||
+			MuiGadgetGadgetStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1239 bitmap-policy struct-codec proof. Alpha, precision, pointer
+	// capabilities, BOOL projections, and the validation cookie remain named
+	// fields; this bounded adapter owns the seven fixed MorphOS ULONG slots.
+	public static uint BitmapPolicyStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiBitmapPolicyStateRecord
+		{
+			Magic = MuiBitmapPolicyStateRecord.Cookie,
+			Alpha = uint.MaxValue,
+			MappingTable = 0,
+			Precision = 7,
+			SourceColors = 0,
+			Transparent = 1,
+			UseFriend = 1,
+		};
+		if (!MuiBitmapPolicyStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiBitmapPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiBitmapPolicyStateField.UseFriend,
+			out var friendField) || friendField.Raw != 0x50FD8u) return 2;
+		if (!MuiBitmapPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiBitmapPolicyStateField.Transparent, 0) ||
+			!MuiBitmapPolicyStateRecordCodec.TryReadStructural(ref platform, address,
+				out var decoded) || decoded.Transparent != 0) return 3;
+		if (MuiBitmapPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiBitmapPolicyStateField.Magic, out _) ||
+			MuiBitmapPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiBitmapPolicyStateField.Alpha, out _) ||
+			MuiBitmapPolicyStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1238 remapped-bitmap struct-codec proof. The renderer-produced APTR
+	// capability and validation cookie remain named fields; this bounded adapter
+	// owns the two fixed MorphOS ULONG positions.
+	public static uint BitmapRemappedStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50FC0);
+		var value = new MuiBitmapRemappedStateRecord
+		{
+			Magic = MuiBitmapRemappedStateRecord.Cookie,
+			Remapped = APTR.Null,
+		};
+		if (!MuiBitmapRemappedStateRecordCodec.Write(ref platform, address, value))
+			return 1;
+		if (!MuiBitmapRemappedStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiBitmapRemappedStateField.Remapped,
+			out var remappedField) || remappedField.Raw != 0x50FC4u) return 2;
+		if (!MuiBitmapRemappedStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiBitmapRemappedStateField.Remapped, 0x12345678) ||
+			!MuiBitmapRemappedStateRecordCodec.TryReadStructural(ref platform,
+				address, out var decoded) || decoded.Remapped.Raw != 0x12345678u)
+			return 3;
+		if (MuiBitmapRemappedStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiBitmapRemappedStateField.Magic, out _) ||
+			MuiBitmapRemappedStateRecordMemoryCodec.TryGetAddress(ref platform,
+				APTR.Null, MuiBitmapRemappedStateField.Remapped, out _) ||
+			MuiBitmapRemappedStateRecordCodec.TryReadStructural(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
+	// MG1201 Window control/focus/lifecycle struct-codec proof. Window public
+	// projections remain named records; bounded adapters own fixed guest layout
+	// translation for scalar fields and opaque APTR capabilities.
+	public static uint WindowControlFocusLifecycleStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var controlAddress = APTR.FromPointer(0x50800);
+		var focusAddress = APTR.FromPointer(0x50830);
+		var lifecycleAddress = APTR.FromPointer(0x50860);
+		var control = new MuiWindowControlStateRecord
+		{
+			Magic = MuiWindowControlStateRecord.Cookie,
+			Id = 7,
+			DisableKeys = 1,
+			VisibleOnMaximize = 1,
+			IsSubWindow = 0,
+			NeedsMouseObject = 1,
+		};
+		var focus = new MuiWindowFocusStateRecord
+		{
+			Magic = MuiWindowFocusStateRecord.Cookie,
+			ActiveObject = APTR.Null,
+			DefaultObject = APTR.Null,
+		};
+		var lifecycle = new MuiWindowLifecycleStateRecord
+		{
+			Magic = MuiWindowLifecycleStateRecord.Cookie,
+			NativeWindow = APTR.Null,
+			Open = 0,
+			EventMask = 0x40,
+			IconifiedOpen = 1,
+		};
+		if (!MuiWindowControlStateRecordCodec.Write(ref platform, controlAddress,
+			control) || !MuiWindowFocusStateRecordCodec.Write(ref platform,
+			focusAddress, focus) || !MuiWindowLifecycleStateRecordCodec.Write(
+			ref platform, lifecycleAddress, lifecycle)) return 1;
+		if (!MuiWindowControlStateRecordMemoryCodec.TryGetAddress(ref platform,
+			controlAddress, 20, out var controlField) || controlField.Raw != 0x50814u ||
+			!MuiWindowFocusStateRecordMemoryCodec.TryGetAddress(ref platform,
+			focusAddress, 8, out var focusField) || focusField.Raw != 0x50838u ||
+			!MuiWindowLifecycleStateRecordMemoryCodec.TryGetAddress(ref platform,
+			lifecycleAddress, 16, out var lifecycleField) || lifecycleField.Raw !=
+			0x50870u) return 2;
+		if (!MuiWindowControlStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			controlAddress, 12, out var visible) || visible != 1 ||
+			!MuiWindowFocusStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			focusAddress, 4, out var active) || active != 0 ||
+			!MuiWindowLifecycleStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			lifecycleAddress, 12, out var eventMask) || eventMask != 0x40u) return 3;
+		if (!MuiWindowControlStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			controlAddress, 12, 0) ||
+			!MuiWindowLifecycleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			lifecycleAddress, 16, 0) ||
+			!MuiWindowControlStateRecordCodec.TryReadStructural(ref platform,
+			controlAddress, out var controlDecoded) || controlDecoded.VisibleOnMaximize != 0 ||
+			!MuiWindowLifecycleStateRecordCodec.TryReadStructural(ref platform,
+			lifecycleAddress, out var lifecycleDecoded) || lifecycleDecoded.IconifiedOpen != 0 ||
+			!MuiWindowFocusStateRecordCodec.TryReadStructural(ref platform,
+			focusAddress, out var focusDecoded) || !focusDecoded.DefaultObject.IsNull) return 4;
+		if (MuiWindowControlStateRecordMemoryCodec.TryGetAddress(ref platform,
+			controlAddress, MuiWindowControlStateRecord.Size, out _) ||
+			MuiWindowFocusStateRecordMemoryCodec.TryGetAddress(ref platform,
+			focusAddress, MuiWindowFocusStateRecord.Size, out _) ||
+			MuiWindowLifecycleStateRecordMemoryCodec.TryGetAddress(ref platform,
+			lifecycleAddress, MuiWindowLifecycleStateRecord.Size, out _) ||
+			MuiWindowFocusStateRecordMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+			0, out _) || MuiWindowLifecycleStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1202 Window event and event-reuse struct-codec proof. Close requests,
+	// dispatch flags, event capabilities, and signed keys remain named semantic
+	// fields; bounded adapters own their fixed guest representation.
+	public static uint WindowEventReuseStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var eventAddress = APTR.FromPointer(0x50900);
+		var reuseAddress = APTR.FromPointer(0x50930);
+		var eventValue = new MuiWindowEventStateRecord
+		{
+			Magic = MuiWindowEventStateRecord.Cookie,
+			CloseRequest = 1,
+			InputEvent = APTR.Null,
+			MouseObject = APTR.Null,
+		};
+		var reuseValue = new MuiWindowEventReuseStateRecord
+		{
+			Magic = MuiWindowEventReuseStateRecord.Cookie,
+			ContextActive = 0,
+			Pending = 0,
+			EventMessage = APTR.Null,
+			InputEvent = APTR.Null,
+			EventClass = 0,
+			MuiKey = -7,
+		};
+		if (!MuiWindowEventStateRecordCodec.Write(ref platform, eventAddress,
+			eventValue) || !MuiWindowEventReuseStateRecordCodec.Write(ref platform,
+			reuseAddress, reuseValue)) return 1;
+		if (!MuiWindowEventStateRecordMemoryCodec.TryGetAddress(ref platform,
+			eventAddress, 12, out var mouseField) || mouseField.Raw != 0x5090Cu ||
+			!MuiWindowEventReuseStateRecordMemoryCodec.TryGetAddress(ref platform,
+			 reuseAddress, MuiWindowEventReuseStateField.MuiKey,
+			 out var keyField) || keyField.Raw != 0x50948u) return 2;
+		if (!MuiWindowEventStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			eventAddress, 4, out var closeRequest) || closeRequest != 1 ||
+			!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			 reuseAddress, MuiWindowEventReuseStateField.MuiKey,
+			 out var key) || key != unchecked((uint)-7)) return 3;
+		if (!MuiWindowEventStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			eventAddress, 4, 0) ||
+			!MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			 reuseAddress, MuiWindowEventReuseStateField.MuiKey,
+			 unchecked((uint)-8)) ||
+			!MuiWindowEventStateRecordCodec.TryReadStructural(ref platform,
+			eventAddress, out var eventDecoded) || eventDecoded.CloseRequest != 0 ||
+			!MuiWindowEventReuseStateRecordCodec.TryReadStructural(ref platform,
+			reuseAddress, out var reuseDecoded) || reuseDecoded.MuiKey != -8) return 4;
+		if (MuiWindowEventStateRecordMemoryCodec.TryGetAddress(ref platform,
+			eventAddress, MuiWindowEventStateRecord.Size, out _) ||
+			MuiWindowEventReuseStateRecordMemoryCodec.TryGetAddress(ref platform,
+			 reuseAddress, (MuiWindowEventReuseStateField)255, out _) ||
+			MuiWindowEventReuseStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiWindowEventReuseStateField.Magic, out _) ||
+			MuiWindowEventStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1203 Window interaction/presentation struct-codec proof. Snapshot and
+	// cycle-chain state plus caller-owned presentation capabilities remain
+	// named semantic fields; bounded adapters own fixed guest translation.
+	public static uint WindowInteractionPresentationStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var interactionAddress = APTR.FromPointer(0x50980);
+		var presentationAddress = APTR.FromPointer(0x509B0);
+		var interaction = new MuiWindowInteractionStateRecord
+		{
+			Magic = MuiWindowInteractionStateRecord.Cookie,
+			SnapshotFlags = 1,
+			SnapshotRequests = 2,
+			CycleChainHead = APTR.Null,
+			CycleChainCount = 0,
+			CycleChainRequests = 3,
+		};
+		var presentation = new MuiWindowPresentationStateRecord
+		{
+			Magic = MuiWindowPresentationStateRecord.Cookie,
+			Title = APTR.Null,
+			Screen = APTR.Null,
+			ScreenTitle = APTR.Null,
+			PublicScreen = APTR.Null,
+		};
+		if (!MuiWindowInteractionStateRecordCodec.Write(ref platform,
+			interactionAddress, interaction) ||
+			!MuiWindowPresentationStateRecordCodec.Write(ref platform,
+			presentationAddress, presentation)) return 1;
+		if (!MuiWindowInteractionStateRecordMemoryCodec.TryGetAddress(ref platform,
+			interactionAddress, 20, out var requestsField) || requestsField.Raw !=
+			0x50994u || !MuiWindowPresentationStateRecordMemoryCodec.TryGetAddress(
+			ref platform, presentationAddress, 16, out var publicScreenField) ||
+			publicScreenField.Raw != 0x509C0u) return 2;
+		if (!MuiWindowInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			interactionAddress, 4, out var flags) || flags != 1 ||
+			!MuiWindowPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			presentationAddress, 8, out var screen) || screen != 0) return 3;
+		if (!MuiWindowInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			interactionAddress, 4, 0) ||
+			!MuiWindowPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			presentationAddress, 0, MuiWindowPresentationStateRecord.Cookie) ||
+			!MuiWindowInteractionStateRecordCodec.TryReadStructural(ref platform,
+			interactionAddress, out var interactionDecoded) ||
+			interactionDecoded.SnapshotFlags != 0 ||
+			!MuiWindowPresentationStateRecordCodec.TryReadStructural(ref platform,
+			presentationAddress, out var presentationDecoded) ||
+			!presentationDecoded.Title.IsNull) return 4;
+		if (MuiWindowInteractionStateRecordMemoryCodec.TryGetAddress(ref platform,
+			interactionAddress, MuiWindowInteractionStateRecord.Size, out _) ||
+			MuiWindowPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			presentationAddress, MuiWindowPresentationStateRecord.Size, out _) ||
+			MuiWindowInteractionStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, out _) || MuiWindowPresentationStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1204 Window relationship/visual struct-codec proof. Relationship
+	// capabilities and visual policy remain named semantic fields; bounded
+	// adapters own fixed guest translation.
+	public static uint WindowRelationshipVisualStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var relationshipAddress = APTR.FromPointer(0x50A00);
+		var visualAddress = APTR.FromPointer(0x50A30);
+		var relationship = new MuiWindowRelationshipStateRecord
+		{
+			Magic = MuiWindowRelationshipStateRecord.Cookie,
+			RootObject = APTR.Null,
+			Menustrip = APTR.Null,
+			RefWindow = APTR.Null,
+		};
+		var visual = new MuiWindowVisualStateRecord
+		{
+			Magic = MuiWindowVisualStateRecord.Cookie,
+			NoMenus = 1,
+			HasAlpha = 1,
+			Opacity = 128,
+			FancyDrawing = 1,
+			MenuAction = 7,
+		};
+		if (!MuiWindowRelationshipStateRecordCodec.Write(ref platform,
+			relationshipAddress, relationship) ||
+			!MuiWindowVisualStateRecordCodec.Write(ref platform, visualAddress,
+			visual)) return 1;
+		if (!MuiWindowRelationshipStateRecordMemoryCodec.TryGetAddress(ref platform,
+			relationshipAddress, 12, out var refField) || refField.Raw != 0x50A0Cu ||
+			!MuiWindowVisualStateRecordMemoryCodec.TryGetAddress(ref platform,
+			visualAddress, 12, out var opacityField) || opacityField.Raw != 0x50A3Cu)
+			return 2;
+		if (!MuiWindowRelationshipStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			relationshipAddress, 4, out var root) || root != 0 ||
+			!MuiWindowVisualStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			visualAddress, 20, out var action) || action != 7) return 3;
+		if (!MuiWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			relationshipAddress, 0, MuiWindowRelationshipStateRecord.Cookie) ||
+			!MuiWindowVisualStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			visualAddress, 12, 64) ||
+			!MuiWindowRelationshipStateRecordCodec.TryReadStructural(ref platform,
+			relationshipAddress, out var relationshipDecoded) ||
+			!relationshipDecoded.Menustrip.IsNull ||
+			!MuiWindowVisualStateRecordCodec.TryReadStructural(ref platform,
+			visualAddress, out var visualDecoded) || visualDecoded.Opacity != 64)
+			return 4;
+		if (MuiWindowRelationshipStateRecordMemoryCodec.TryGetAddress(ref platform,
+			relationshipAddress, MuiWindowRelationshipStateRecord.Size, out _) ||
+			MuiWindowVisualStateRecordMemoryCodec.TryGetAddress(ref platform,
+			visualAddress, MuiWindowVisualStateRecord.Size, out _) ||
+			MuiWindowRelationshipStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, out _) || MuiWindowVisualStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1205 Window OpenWindow-policy struct-codec proof. Signed geometry and
+	// MorphOS BOOL projections remain named semantic fields; the bounded adapter
+	// owns the 22-word guest record translation.
+	public static uint WindowOpenPolicyStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50A80);
+		var value = new MuiWindowOpenPolicyStateRecord
+		{
+			Magic = MuiWindowOpenPolicyStateRecord.Cookie,
+			AlternateHeight = -2,
+			AlternateWidth = 640,
+			AlternateLeftEdge = 10,
+			AlternateTopEdge = 20,
+			Height = 480,
+			Width = 640,
+			LeftEdge = 4,
+			TopEdge = 8,
+			CloseGadget = 1,
+			DepthGadget = 1,
+			DragBar = 1,
+			SizeGadget = 1,
+			SizeRight = 0,
+			AppWindow = 1,
+			Backdrop = 0,
+			Borderless = 1,
+			PanelWindow = 0,
+			TabletMessages = 1,
+			UseBottomBorderScroller = 1,
+			UseLeftBorderScroller = 0,
+			UseRightBorderScroller = 1,
+		};
+		if (!MuiWindowOpenPolicyStateRecordCodec.Write(ref platform, address,
+			value)) return 1;
+		if (!MuiWindowOpenPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, 84, out var rightScroller) || rightScroller.Raw != 0x50AD4u ||
+			!MuiWindowOpenPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, 24, out var heightField) || heightField.Raw != 0x50A98u) return 2;
+		if (!MuiWindowOpenPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out var alternateHeight) || alternateHeight != unchecked((uint)-2) ||
+			!MuiWindowOpenPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 36, out var closeGadget) || closeGadget != 1) return 3;
+		if (!MuiWindowOpenPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 20, unchecked((uint)-240)) ||
+			!MuiWindowOpenPolicyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded) || decoded.Height != -240 ||
+			decoded.Borderless != 1 || decoded.UseRightBorderScroller != 1) return 4;
+		if (MuiWindowOpenPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiWindowOpenPolicyStateRecord.Size, out _) ||
+			MuiWindowOpenPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, out _) || MuiWindowOpenPolicyStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1206 InputEvent struct-codec proof. The public Amiga.InputEvent remains
+	// a named semantic struct while the bounded field adapter owns its mixed
+	// byte/word/long guest representation.
+	public static uint WindowInputEventStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50B20);
+		var value = new InputEvent
+		{
+			NextEvent = APTR.FromPointer(0x50B60),
+			Class = InputEventClass.RawKey,
+			SubClass = InputEventSubClass.Compatible,
+			Code = 0x44,
+			Qualifier = InputEventQualifier.LeftShift,
+			Position = -12,
+			TimeStamp = new TimeVal { Seconds = 2, Microseconds = 3 },
+		};
+		if (!MuiWindowInputEventCodec.Write(ref platform, address, value)) return 1;
+		if (!MuiWindowInputEventMemoryCodec.TryGetAddress(ref platform, address,
+			MuiWindowInputEventField.Code, out var codeField) || codeField.Raw !=
+			0x50B26u || !MuiWindowInputEventMemoryCodec.TryGetAddress(ref platform,
+			address, MuiWindowInputEventField.Microseconds, out var microsField) ||
+			microsField.Raw != 0x50B32u) return 2;
+		if (!MuiWindowInputEventMemoryCodec.TryReadUInt32(ref platform, address,
+			MuiWindowInputEventField.Position, out var position) ||
+			position != unchecked((uint)-12) ||
+			!MuiWindowInputEventMemoryCodec.TryReadUInt16(ref platform, address,
+			MuiWindowInputEventField.Code, out var code) || code != 0x44) return 3;
+		if (!MuiWindowInputEventMemoryCodec.TryWriteUInt32(ref platform, address,
+			MuiWindowInputEventField.Position, 24) ||
+			!MuiWindowInputEventCodec.TryRead(ref platform, address, out var decoded) ||
+			decoded.Position != 24 || decoded.Class != InputEventClass.RawKey) return 4;
+		if (MuiWindowInputEventMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(uint.MaxValue - 8),
+			MuiWindowInputEventField.Microseconds, out _) ||
+			MuiWindowInputEventMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+			MuiWindowInputEventField.Class, out _) ||
+			MuiWindowInputEventCodec.TryRead(ref platform, APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1207 List scalar/result struct-codec proof. Mixed-width TestPos output,
+	// scalar storage, and display-row values remain named semantic structs;
+	// dedicated bounded adapters own their guest representations.
+	public static uint ListResultStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var testPosAddress = APTR.FromPointer(0x50B80);
+		var scalarAddress = APTR.FromPointer(0x50BA0);
+		var rowAddress = APTR.FromPointer(0x50BB0);
+		// The native closure proves the bounded address boundary. Host tests
+		// exercise the same adapters' typed read/write paths with the semantic
+		// structs, avoiding a synthetic guest-memory seed in freestanding code.
+		if (!MuiListTestPosResultMemoryCodec.TryGetAddress(ref platform,
+			testPosAddress, MuiListTestPosResultField.XOffset, out var xOffset) ||
+			xOffset.Raw != 0x50B88u ||
+			!MuiListScalarStorageRecordMemoryCodec.TryGetAddress(ref platform,
+			scalarAddress, out var scalarField) || scalarField.Raw != 0x50BA0u ||
+			!MuiListDisplayRowRecordMemoryCodec.TryGetAddress(ref platform, rowAddress,
+				out var rowField) || rowField.Raw != 0x50BB0u) return 2;
+		if (MuiListTestPosResultMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiListTestPosResultField.XOffset,
+			out _) || MuiListScalarStorageRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, out _) || MuiListDisplayRowRecordCodec.TryRead(ref platform,
+			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG1208 IntuiMessage/raw-key struct-codec proof. Pointer-envelope and
+	// shorter raw-key fields use separate named adapters; only those bounded
+	// boundaries know the MorphOS byte/word/long guest slots.
+	public static uint IntuiMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var pointerAddress = APTR.FromPointer(0x50C00);
+		var rawKeyAddress = APTR.FromPointer(0x50C40);
+		if (!MuiIntuiPointerMessageMemoryCodec.TryGetAddress(ref platform,
+			pointerAddress, MuiIntuiPointerMessageField.MouseY, out var mouseY,
+			out var mouseYSize) || mouseY.Raw != 0x50C22u || mouseYSize != 2u)
+			return 1;
+		if (!MuiIntuiPointerMessageMemoryCodec.TryGetAddress(ref platform,
+			pointerAddress, MuiIntuiPointerMessageField.Seconds, out var seconds,
+			out var secondsSize) || seconds.Raw != 0x50C24u || secondsSize != 4u)
+			return 2;
+		if (!MuiIntuiRawKeyMessageMemoryCodec.TryGetAddress(ref platform,
+			rawKeyAddress, MuiIntuiRawKeyMessageField.Qualifier, out var qualifier,
+			out var qualifierSize) || qualifier.Raw != 0x50C5Au || qualifierSize != 2u)
+			return 3;
+		if (MuiIntuiPointerMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiIntuiPointerMessageField.Seconds,
+			out _, out _) || MuiIntuiRawKeyMessageMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiIntuiRawKeyMessageField.Class, out _, out _))
+			return 4;
+		return 42;
+	}
+
+	// MG1209 Listview drag-state struct-codec proof. The full drag lifecycle
+	// uses the named semantic record; this closure checks its bounded field
+	// adapter and rejection of null/overrun guest records.
+	public static uint ListviewDragStateStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var record = APTR.FromPointer(0x50C80);
+		if (!MuiListviewDragStateMemoryCodec.TryGetAddress(ref platform, record,
+			MuiListviewDragStateField.Flags, out var flags) || flags.Raw != 0x50C9Cu)
+			return 1;
+		if (!MuiListviewDragStateMemoryCodec.TryGetAddress(ref platform, record,
+			MuiListviewDragStateField.LastY, out var lastY) || lastY.Raw != 0x50C98u)
+			return 2;
+		if (MuiListviewDragStateMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiListviewDragStateField.Flags, out _) ||
+			MuiListviewDragStateMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+			MuiListviewDragStateField.Magic, out _)) return 3;
+		return 42;
+	}
+
+	// MG1210 effective-font projection proof. The semantic font-resolution
+	// record remains a named value; this closure checks its bounded five-LONG
+	// guest adapter and malformed-record rejection.
+	public static uint ControlFontResolutionStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var record = APTR.FromPointer(0x50D00);
+		if (!MuiControlFontResolutionRecordMemoryCodec.TryGetAddress(ref platform,
+			record, MuiControlFontResolutionRecordField.Font, out var font) ||
+			font.Raw != 0x50D10u) return 1;
+		if (!MuiControlFontResolutionRecordMemoryCodec.TryGetAddress(ref platform,
+			record, MuiControlFontResolutionRecordField.Inherited,
+			out var inherited) || inherited.Raw != 0x50D08u) return 2;
+		if (MuiControlFontResolutionRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiControlFontResolutionRecordField.Font,
+			out _) || MuiControlFontResolutionRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiControlFontResolutionRecordField.Magic,
+			out _)) return 3;
+		return 42;
+	}
+
+	// MG1211 layout-message struct-codec proof. Mixed-width min/max fields,
+	// nested layout dimensions, and child pointers are exposed as named
+	// semantic fields; only the bounded adapter knows guest field positions.
+	public static uint LayoutMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var record = APTR.FromPointer(0x50E00);
+		if (!MUI_LayoutMsgMemoryCodec.TryGetAddress(ref platform, record,
+			MUI_LayoutMsgField.Height, out var height, out var heightSize) ||
+			height.Raw != 0x50E18u || heightSize != 4u) return 1;
+		if (!MUI_LayoutMsgMemoryCodec.TryGetAddress(ref platform, record,
+			MUI_LayoutMsgField.MaxHeight, out var maxHeight,
+			out var maxHeightSize) || maxHeight.Raw != 0x50E0Eu ||
+			maxHeightSize != 2u) return 2;
+		if (!MUI_LayoutMsgMemoryCodec.TryGetAddress(ref platform, record,
+			MUI_LayoutMsgField.Children, out var children,
+			out var childrenSize) || children.Raw != 0x50E04u ||
+			childrenSize != 4u) return 3;
+		if (MUI_LayoutMsgMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MUI_LayoutMsgField.Height,
+			out _, out _) || MUI_LayoutMsgMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MUI_LayoutMsgField.Type, out _, out _)) return 4;
+		return 42;
+	}
+
+	// MG1212 application-command record proof. Command names, templates,
+	// parameters, hooks, and reserved values remain a named semantic struct;
+	// only its bounded adapter translates the fixed MorphOS LONG fields.
+	public static uint ApplicationCommandStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var record = APTR.FromPointer(0x50F00);
+		if (!MuiApplicationCommandRecordMemoryCodec.TryGetAddress(ref platform,
+			record, MuiApplicationCommandField.Hook, out var hook) ||
+			hook.Raw != 0x50F0Cu) return 1;
+		if (!MuiApplicationCommandRecordMemoryCodec.TryGetAddress(ref platform,
+			record, MuiApplicationCommandField.Parameters, out var parameters) ||
+			parameters.Raw != 0x50F08u) return 2;
+		if (!MuiApplicationCommandRecordMemoryCodec.TryGetAddress(ref platform,
+			record, MuiApplicationCommandField.Reserved4, out var reserved4) ||
+			reserved4.Raw != 0x50F20u) return 3;
+		if (MuiApplicationCommandRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiApplicationCommandField.Name, out _) ||
+			MuiApplicationCommandRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiApplicationCommandField.Template, out _)) return 4;
+		return 42;
+	}
+
+	// MG1213 application command-state proof. The stored cookie and table
+	// capability remain a named semantic record; its two bounded LONG fields
+	// are translated only by the dedicated adapter.
+	public static uint ApplicationCommandsStateStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var record = APTR.FromPointer(0x50F40);
+		if (!MuiApplicationCommandsStateRecordMemoryCodec.TryGetAddress(ref platform,
+			record, MuiApplicationCommandsStateField.Magic, out var magic) ||
+			magic.Raw != 0x50F40u) return 1;
+		if (!MuiApplicationCommandsStateRecordMemoryCodec.TryGetAddress(ref platform,
+			record, MuiApplicationCommandsStateField.Table, out var table) ||
+			table.Raw != 0x50F44u) return 2;
+		if (MuiApplicationCommandsStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiApplicationCommandsStateField.Magic,
+			out _) || MuiApplicationCommandsStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiApplicationCommandsStateField.Table, out _))
+			return 3;
+		return 42;
+	}
+
+	// MG1214 configuration-window state proof. The cookie, flags, class-id
+	// capability, and request count stay in a named semantic record; only the
+	// bounded adapter translates its fixed MorphOS LONG fields.
+	public static uint ApplicationConfigWindowStateStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var record = APTR.FromPointer(0x50F60);
+		if (!MuiApplicationConfigWindowStateRecordMemoryCodec.TryGetAddress(
+			ref platform, record, MuiApplicationConfigWindowStateField.Magic,
+			out var magic) || magic.Raw != 0x50F60u) return 1;
+		if (!MuiApplicationConfigWindowStateRecordMemoryCodec.TryGetAddress(
+			ref platform, record, MuiApplicationConfigWindowStateField.ClassId,
+			out var classId) || classId.Raw != 0x50F68u) return 2;
+		if (!MuiApplicationConfigWindowStateRecordMemoryCodec.TryGetAddress(
+			ref platform, record, MuiApplicationConfigWindowStateField.Requests,
+			out var requests) || requests.Raw != 0x50F6Cu) return 3;
+		if (MuiApplicationConfigWindowStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0x51000),
+			MuiApplicationConfigWindowStateField.Flags, out _) ||
+			MuiApplicationConfigWindowStateRecordMemoryCodec.TryGetAddress(
+				ref platform, APTR.Null,
+				MuiApplicationConfigWindowStateField.ClassId, out _)) return 4;
+		return 42;
+	}
+
+	// MG1215 SetConfigItem state proof. The cookie, item identifier, opaque
+	// data capability, and request count remain a named semantic record; only
+	// the bounded adapter translates its fixed MorphOS LONG fields.
+	public static uint ApplicationSetConfigItemStateStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var record = APTR.FromPointer(0x50F80);
+		if (!MuiApplicationSetConfigItemStateRecordMemoryCodec.TryGetAddress(
+			ref platform, record, MuiApplicationSetConfigItemStateField.Magic,
+			out var magic) || magic.Raw != 0x50F80u) return 1;
+		if (!MuiApplicationSetConfigItemStateRecordMemoryCodec.TryGetAddress(
+			ref platform, record, MuiApplicationSetConfigItemStateField.Data,
+			out var data) || data.Raw != 0x50F88u) return 2;
+		if (!MuiApplicationSetConfigItemStateRecordMemoryCodec.TryGetAddress(
+			ref platform, record, MuiApplicationSetConfigItemStateField.Requests,
+			out var requests) || requests.Raw != 0x50F8Cu) return 3;
+		if (MuiApplicationSetConfigItemStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0x51000),
+			MuiApplicationSetConfigItemStateField.Item, out _) ||
+			MuiApplicationSetConfigItemStateRecordMemoryCodec.TryGetAddress(
+				ref platform, APTR.Null,
+				MuiApplicationSetConfigItemStateField.Data, out _)) return 4;
+		return 42;
+	}
+
+	// MG1216 AppMessage node proof. Exec list links, byte-sized type/priority,
+	// name/reply-port pointers, and the word length remain a named semantic
+	// struct; only the bounded adapter translates the mixed-width guest fields.
+	public static uint AppMessageNodeStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var record = APTR.FromPointer(0x50FA0);
+		if (!MuiAppMessageNodeMemoryCodec.TryGetAddress(ref platform, record,
+			MuiAppMessageNodeField.Name, out var name, out var nameSize) ||
+			name.Raw != 0x50FAAu || nameSize != 4u) return 1;
+		if (!MuiAppMessageNodeMemoryCodec.TryGetAddress(ref platform, record,
+			MuiAppMessageNodeField.Priority, out var priority,
+			out var prioritySize) || priority.Raw != 0x50FA9u ||
+			prioritySize != 1u) return 2;
+		if (!MuiAppMessageNodeMemoryCodec.TryGetAddress(ref platform, record,
+			MuiAppMessageNodeField.Length, out var length, out var lengthSize) ||
+			length.Raw != 0x50FB2u || lengthSize != 2u) return 3;
+		if (MuiAppMessageNodeMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiAppMessageNodeField.Type, out _, out _) ||
+			MuiAppMessageNodeMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+			MuiAppMessageNodeField.Successor, out _, out _)) return 4;
+		return 42;
+	}
+
+	// MG1217 full AppMessage proof. The Exec node prefix and message payload
+	// remain named semantic structs; this bounded adapter owns their mixed
+	// 16/32-bit guest translation and rejects truncated records.
+	public static uint AppMessageStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var record = APTR.FromPointer(0x50EC0);
+		if (!MuiAppMessageRecordMemoryCodec.TryGetAddress(ref platform, record,
+			MuiAppMessageField.MouseX, out var mouseX, out var mouseXSize) ||
+			mouseX.Raw != 0x50EEAu || mouseXSize != 2u) return 1;
+		if (!MuiAppMessageRecordMemoryCodec.TryGetAddress(ref platform, record,
+			MuiAppMessageField.Seconds, out var seconds, out var secondsSize) ||
+			seconds.Raw != 0x50EEEu || secondsSize != 4u) return 2;
+		if (!MuiAppMessageRecordMemoryCodec.TryGetAddress(ref platform, record,
+			MuiAppMessageField.Reserved7, out var reserved7,
+			out var reserved7Size) || reserved7.Raw != 0x50F12u ||
+			reserved7Size != 4u) return 3;
+		if (MuiAppMessageRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiAppMessageField.Type, out _, out _) ||
+			MuiAppMessageRecordMemoryCodec.TryGetAddress(ref platform, APTR.Null,
+			MuiAppMessageField.UserData, out _, out _)) return 4;
+		return 42;
+	}
+
+	// MG1218 Workbench argument proof. Lock and name remain typed BPTR/STRPTR
+	// fields in the argument record; only its bounded adapter translates the
+	// two guest LONG slots used by the vector consumer.
+	public static uint WorkbenchArgumentStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var record = APTR.FromPointer(0x50E40);
+		if (!MuiWorkbenchArgumentRecordMemoryCodec.TryGetAddress(ref platform,
+			record, MuiWorkbenchArgumentField.Lock, out var lockField) ||
+			lockField.Raw != 0x50E40u) return 1;
+		if (!MuiWorkbenchArgumentRecordMemoryCodec.TryGetAddress(ref platform,
+			record, MuiWorkbenchArgumentField.Name, out var nameField) ||
+			nameField.Raw != 0x50E44u) return 2;
+		if (MuiWorkbenchArgumentRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x51000), MuiWorkbenchArgumentField.Lock, out _) ||
+			MuiWorkbenchArgumentRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiWorkbenchArgumentField.Name, out _)) return 3;
+		return 42;
+	}
+
+	// MG1219 application-message routing-state proof. The transient message
+	// capability and WindowAppWindow BOOL remain named semantic fields; only
+	// the bounded adapter translates the three fixed MorphOS LONG slots.
+	public static uint ApplicationMessageRoutingStateStructRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var record = APTR.FromPointer(0x50E60);
+		if (!MuiApplicationMessageRoutingStateRecordMemoryCodec.TryGetAddress(
+			ref platform, record,
+			MuiApplicationMessageRoutingStateField.AppMessage, out var message) ||
+			message.Raw != 0x50E64u) return 1;
+		if (!MuiApplicationMessageRoutingStateRecordMemoryCodec.TryGetAddress(
+			ref platform, record,
+			MuiApplicationMessageRoutingStateField.WindowAppWindow,
+			out var window) || window.Raw != 0x50E68u) return 2;
+		if (MuiApplicationMessageRoutingStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0x51000),
+			MuiApplicationMessageRoutingStateField.Magic, out _) ||
+			MuiApplicationMessageRoutingStateRecordMemoryCodec.TryGetAddress(
+				ref platform, APTR.Null,
+				MuiApplicationMessageRoutingStateField.AppMessage, out _)) return 3;
+		return 42;
+	}
+
+	private static void WriteCString(APTR address, byte c0, byte c1, byte c2,
+		byte c3, byte c4, byte c5, byte c6, byte c7)
+	{
+		APTR.WriteUInt8(address, 0, c0);
+		APTR.WriteUInt8(address, 1, c1);
+		APTR.WriteUInt8(address, 2, c2);
+		APTR.WriteUInt8(address, 3, c3);
+		APTR.WriteUInt8(address, 4, c4);
+		APTR.WriteUInt8(address, 5, c5);
+		APTR.WriteUInt8(address, 6, c6);
+		APTR.WriteUInt8(address, 7, c7);
+		APTR.WriteUInt8(address, 8, 0);
 	}
 
 	// Write "colorwheel.gadget" (NUL terminated) for the -1 workaround path.

@@ -25,6 +25,22 @@ internal struct MuiWindowVisualStateRecord
 	internal uint MenuAction;
 }
 
+// Structural decoding is separate from live admission so ABI fixtures can
+// inspect malformed records without making them consumable by Window.mui.
+internal static class MuiWindowVisualStateAdmission
+{
+	internal static bool Validate(MuiWindowVisualStateRecord value) =>
+		value.Magic == MuiWindowVisualStateRecord.Cookie &&
+		value.NoMenus <= 1 && value.HasAlpha <= 1 &&
+		value.Opacity <= 255 && value.FancyDrawing <= 1;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR window, MuiWindowVisualStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) && !window.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, window).IsNull;
+}
+
 internal enum MuiWindowVisualStateField : byte
 {
 	Magic,
@@ -101,9 +117,46 @@ internal static class MuiWindowVisualStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Visual policy values remain named
+// semantic fields; this bounded adapter owns their fixed guest slots.
+internal static class MuiWindowVisualStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiWindowVisualStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiWindowVisualStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiWindowVisualStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiWindowVisualStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -113,23 +166,18 @@ internal static class MuiWindowVisualStateRecordCodec
 		uint opacity;
 		uint fancyDrawing;
 		uint menuAction;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiWindowVisualStateRecord.Size) ||
-			!MuiWindowVisualStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowVisualStateField.Magic, out var magic) ||
-			magic != MuiWindowVisualStateRecord.Cookie ||
-			!MuiWindowVisualStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowVisualStateField.NoMenus, out noMenus) ||
-			!MuiWindowVisualStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowVisualStateField.HasAlpha, out hasAlpha) ||
-			!MuiWindowVisualStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowVisualStateField.Opacity, out opacity) ||
-			!MuiWindowVisualStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowVisualStateField.FancyDrawing,
-				out fancyDrawing) ||
-			!MuiWindowVisualStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowVisualStateField.MenuAction,
-				out menuAction)) return false;
+		if (!MuiWindowVisualStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out var magic) ||
+			!MuiWindowVisualStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 4, out noMenus) ||
+			!MuiWindowVisualStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 8, out hasAlpha) ||
+			!MuiWindowVisualStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 12, out opacity) ||
+			!MuiWindowVisualStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 16, out fancyDrawing) ||
+			!MuiWindowVisualStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 20, out menuAction)) return false;
 		value.Magic = magic;
 		value.NoMenus = noMenus;
 		value.HasAlpha = hasAlpha;
@@ -139,25 +187,28 @@ internal static class MuiWindowVisualStateRecordCodec
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiWindowVisualStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiWindowVisualStateAdmission.Validate(value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiWindowVisualStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiWindowVisualStateRecord.Size) || value.Magic !=
-			MuiWindowVisualStateRecord.Cookie) return false;
-		return MuiWindowVisualStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiWindowVisualStateField.Magic, value.Magic) &&
-			MuiWindowVisualStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowVisualStateField.NoMenus, value.NoMenus) &&
-			MuiWindowVisualStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowVisualStateField.HasAlpha, value.HasAlpha) &&
-			MuiWindowVisualStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowVisualStateField.Opacity, value.Opacity) &&
-			MuiWindowVisualStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowVisualStateField.FancyDrawing,
-				value.FancyDrawing) &&
-			MuiWindowVisualStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowVisualStateField.MenuAction, value.MenuAction);
+		if (!MuiWindowVisualStateAdmission.Validate(value)) return false;
+		return MuiWindowVisualStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiWindowVisualStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 4, value.NoMenus) &&
+			MuiWindowVisualStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 8, value.HasAlpha) &&
+			MuiWindowVisualStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 12, value.Opacity) &&
+			MuiWindowVisualStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 16, value.FancyDrawing) &&
+			MuiWindowVisualStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 20, value.MenuAction);
 	}
 }

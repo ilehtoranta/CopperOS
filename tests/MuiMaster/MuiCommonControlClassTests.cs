@@ -102,18 +102,22 @@ public sealed class MuiCommonControlClassTests
 	private const uint GadgetInteractionStateKey = 0x7F070030;
 	private const uint NumericStateKey = 0x7F07002A;
 	private const uint PropRangeStateKey = 0x7F07002B;
+	private const uint ChoiceEntriesStateKey = 0x7F07001B;
+	private const uint ChoiceActiveStateKey = 0x7F070036;
 	private const uint GaugeStateKey = 0x7F07002C;
 	private const uint ScrollbarLayoutStateKey = 0x7F07002D;
 	private const uint SliderPresentationStateKey = 0x7F07002E;
 	private const uint ScalePresentationStateKey = 0x7F07002F;
 	private const uint LevelmeterPresentationStateKey = 0x7F070031;
 	private const uint TextPresentationStateKey = 0x7F070032;
+	private const uint RectanglePresentationStateKey = 0x7F070033;
 	private const uint TextCopyStateKey = 0x7F07003F;
 	private const uint TextUnicodeStateKey = 0x7F070071;
 	private const uint TextShortenedStateKey = 0x7F070072;
 	private const uint AreaPresentationStateKey = 0x7F070034;
 	private const uint PropPolicyStateKey = 0x7F07003C;
 	private const uint BalancePolicyStateKey = 0x7F07003E;
+	private const uint ImageFontMatchStateKey = 0x7F070038;
 	private const uint NumericFormatKey = 0x7F070007;
 	private const uint GaugeInfoTextKey = 0x7F070008;
 	private const uint LevelmeterLabelKey = 0x7F07000E;
@@ -398,6 +402,113 @@ public sealed class MuiCommonControlClassTests
 			MuiCommonPacketKind.Signed, MuiCommonField.MethodId, 0xDEADBEEFu));
 		Assert.False(MuiCommonControlPacketCore.TryReadSigned(ref platform,
 			address, MuiCommonControlPacketCore.NumericIncrease, out _));
+	}
+
+	[Fact]
+	public void CommonControlDedicatedRecordCodecsRoundTrip()
+	{
+		var platform = NewPlatform();
+		var methodAddress = APTR.FromPointer(0x3500);
+		Assert.True(MuiCommonMethodMessageCodec.TryWrite(ref platform,
+			methodAddress, NumericIncrease));
+		Assert.True(MuiCommonMethodMessageCodec.TryRead(ref platform,
+			methodAddress, out var method));
+		Assert.Equal(NumericIncrease, method.MethodId);
+
+		var signedAddress = APTR.FromPointer(0x3520);
+		var signed = default(MuiCommonSignedValueMessage);
+		signed.MethodId = NumericDecrease;
+		signed.Value = -7;
+		Assert.True(MuiCommonSignedValueMessageCodec.TryWrite(ref platform,
+			signedAddress, signed));
+		Assert.True(MuiCommonSignedValueMessageCodec.TryRead(ref platform,
+			signedAddress, out var signedRoundTrip));
+		Assert.Equal(signed.MethodId, signedRoundTrip.MethodId);
+		Assert.Equal(signed.Value, signedRoundTrip.Value);
+
+		var scaleAddress = APTR.FromPointer(0x3540);
+		var scale = default(MuiCommonScaleToValueMessage);
+		scale.MethodId = NumericScaleToValue;
+		scale.Min = -10;
+		scale.Max = 100;
+		scale.Value = 25;
+		Assert.True(MuiCommonScaleToValueMessageCodec.TryWrite(ref platform,
+			scaleAddress, scale));
+		Assert.True(MuiCommonScaleToValueMessageCodec.TryRead(ref platform,
+			scaleAddress, out var scaleRoundTrip));
+		Assert.Equal(scale.Min, scaleRoundTrip.Min);
+		Assert.Equal(scale.Max, scaleRoundTrip.Max);
+		Assert.Equal(scale.Value, scaleRoundTrip.Value);
+
+		var reverseAddress = APTR.FromPointer(0x3560);
+		var reverse = default(MuiCommonValueToScaleMessage);
+		reverse.MethodId = NumericValueToScale;
+		reverse.Min = -4;
+		reverse.Max = 80;
+		Assert.True(MuiCommonValueToScaleMessageCodec.TryWrite(ref platform,
+			reverseAddress, reverse));
+		Assert.True(MuiCommonValueToScaleMessageCodec.TryRead(ref platform,
+			reverseAddress, out var reverseRoundTrip));
+		Assert.Equal(reverse.Min, reverseRoundTrip.Min);
+		Assert.Equal(reverse.Max, reverseRoundTrip.Max);
+
+		var stringifyAddress = APTR.FromPointer(0x3580);
+		var stringify = default(MuiCommonStringifyMessage);
+		stringify.MethodId = NumericStringify;
+		stringify.Value = -42;
+		Assert.True(MuiCommonStringifyMessageCodec.TryWrite(ref platform,
+			stringifyAddress, stringify));
+		Assert.True(MuiCommonStringifyMessageCodec.TryRead(ref platform,
+			stringifyAddress, out var stringifyRoundTrip));
+		Assert.Equal(stringify.Value, stringifyRoundTrip.Value);
+
+		var eventAddress = APTR.FromPointer(0x35A0);
+		var eventPacket = default(MuiCommonHandleEventMessage);
+		eventPacket.MethodId = HandleEvent;
+		eventPacket.InputMessage = 0x4100;
+		eventPacket.MuiKey = -3;
+		eventPacket.EventHandlerNode = 0x4200;
+		Assert.True(MuiCommonHandleEventMessageCodec.TryWrite(ref platform,
+			eventAddress, eventPacket));
+		Assert.True(MuiCommonHandleEventMessageCodec.TryRead(ref platform,
+			eventAddress, out var eventRoundTrip));
+		Assert.Equal(eventPacket.MuiKey, eventRoundTrip.MuiKey);
+		Assert.Equal(eventPacket.EventHandlerNode, eventRoundTrip.EventHandlerNode);
+
+		var getAddress = APTR.FromPointer(0x35C0);
+		var get = default(MuiCommonGetMessage);
+		get.MethodId = MuiCommonControlPacketCore.OmGet;
+		get.Attribute = NumericValue;
+		get.Storage = 0x4300;
+		Assert.True(MuiCommonGetMessageCodec.TryWrite(ref platform, getAddress,
+			get));
+		Assert.True(MuiCommonGetMessageCodec.TryRead(ref platform, getAddress,
+			out var getRoundTrip));
+		Assert.Equal(get.Attribute, getRoundTrip.Attribute);
+		Assert.Equal(get.Storage, getRoundTrip.Storage);
+
+		var attributeAddress = APTR.FromPointer(0x35E0);
+		var attribute = default(MuiCommonAttributeMessage);
+		attribute.MethodId = MethodSet;
+		attribute.Attribute = NumericValue;
+		attribute.Value = 55;
+		Assert.True(MuiCommonAttributeMessageCodec.TryWrite(ref platform,
+			attributeAddress, attribute));
+		Assert.True(MuiCommonAttributeMessageCodec.TryRead(ref platform,
+			attributeAddress, out var attributeRoundTrip));
+		Assert.Equal(attribute.Value, attributeRoundTrip.Value);
+
+		var minMaxAddress = APTR.FromPointer(0x3600);
+		var minMax = default(MuiCommonAskMinMaxMessage);
+		minMax.MethodId = AskMinMax;
+		minMax.Storage = 0x4400;
+		Assert.True(MuiCommonAskMinMaxMessageCodec.TryWrite(ref platform,
+			minMaxAddress, minMax));
+		Assert.True(MuiCommonAskMinMaxMessageCodec.TryRead(ref platform,
+			minMaxAddress, out var minMaxRoundTrip));
+		Assert.Equal(minMax.Storage, minMaxRoundTrip.Storage);
+		Assert.False(MuiCommonScaleToValueMessageCodec.TryRead(ref platform,
+			APTR.Null, out _));
 	}
 
 	[Fact]
@@ -1020,20 +1131,86 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(block.IsNotNull);
 		Assert.True(MuiNumericStateFieldCursorCodec.TryWriteUInt32(ref platform,
 			block, MuiNumericStateField.Reverse, 2));
-		Assert.Equal(2u, platform.ReadUInt32(block, 20));
+		Assert.True(MuiNumericStateRecordCodec.TryReadStructural(ref platform,
+			block, out var malformed));
+		Assert.Equal(2u, malformed.Reverse);
+		Assert.False(MuiNumericStateRecordCodec.TryRead(ref platform, block,
+			out _));
 
 		Assert.False(MuiCommonControlCore.TryGetNumericStateRecord(
 			ref platform, State, numeric, out _));
+		Assert.False(MuiCommonControlCore.NumericStateAvailable(ref platform,
+			State, numeric));
 		Assert.False(MuiCommonControlCore.TryReadNumericState(ref platform, State,
 			numeric, out _));
 		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, numeric,
 			NumericReverse, out _, out _));
 		Assert.False(MuiCommonControlCore.SetNumericValue(ref platform, State,
 			numeric, 60, false));
+		Assert.False(MuiCommonControlCore.ChangeNumeric(ref platform, State,
+			numeric, 1));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			numeric, NumericMin, 0));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			numeric, NumericMax, 100));
 		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
 			numeric, NumericValue, out var rawValue));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			numeric, NumericMin, out var rawMinimum));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			numeric, NumericMax, out var rawMaximum));
 		Assert.Equal(50u, rawValue);
-		Assert.Equal(2u, platform.ReadUInt32(block, 20));
+		Assert.Equal(10u, rawMinimum);
+		Assert.Equal(90u, rawMaximum);
+		Assert.True(MuiNumericStateRecordCodec.TryReadStructural(ref platform,
+			block, out malformed));
+		Assert.Equal(2u, malformed.Reverse);
+
+		// Numeric drawing also consumes the same record. The generic background
+		// remains valid, but malformed state must suppress value text generation.
+		var renderInfo = APTR.FromPointer(0x1300);
+		var renderRecord = default(MuiDrawingRenderInfoRecord);
+		renderRecord.RastPort = APTR.FromPointer(0x2000);
+		Assert.True(MuiDrawingRenderInfoCodec.Write(ref platform, renderInfo,
+			renderRecord));
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, numeric, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, numeric, 0, 0,
+			80, 14));
+		var drawPacket = APTR.FromPointer(0x1340);
+		Assert.True(MuiCommonControlPacketCore.WriteMethod(ref platform,
+			drawPacket, Draw));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			drawPacket, MuiCommonPacketKind.Flags, MuiCommonField.Flags, 0));
+		var textBefore = platform.TextCount;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			numeric, drawPacket));
+		Assert.Equal(textBefore, platform.TextCount);
+	}
+
+	[Fact]
+	public void NumericAdmissionValidatesReverseAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var numericClass = Register(ref platform, 0x1380, "Numeric.mui");
+		var numeric = MuiCommonControlCore.CreateControl(ref platform, State,
+			numericClass, APTR.Null);
+		var value = default(MuiNumericStateRecord);
+		value.Magic = MuiNumericStateRecord.Cookie;
+		value.Minimum = unchecked((uint)int.MinValue);
+		value.Maximum = unchecked((uint)int.MaxValue);
+		value.Value = 0;
+		value.Default = unchecked((uint)int.MinValue);
+		value.Reverse = 1;
+		Assert.True(MuiNumericStateAdmission.Validate(value));
+		Assert.True(MuiNumericStateAdmission.ValidateLive(ref platform, State,
+			numeric, value));
+		value.Reverse = 2;
+		Assert.False(MuiNumericStateAdmission.Validate(value));
+		value.Reverse = 1;
+		Assert.False(MuiNumericStateAdmission.ValidateLive(ref platform, State,
+			APTR.FromPointer(0x32000), value));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			numeric));
 	}
 
 	[Fact]
@@ -1300,6 +1477,103 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void ChoiceActiveMalformedRecordFailsClosedBeforeMutationAndDrawing()
+	{
+		var platform = NewPlatform();
+		var cycleClass = Register(ref platform, 0x1D80, "Cycle.mui");
+		var entries = APTR.FromPointer(0x1DC0);
+		var first = APTR.FromPointer(0x1E00);
+		platform.WriteCString(first, "First");
+		platform.WriteUInt32(entries, 0, first.Raw);
+		platform.WriteUInt32(entries, 4, 0);
+		var cycle = MuiCommonControlCore.CreateControl(ref platform, State,
+			cycleClass, BuildTags(ref platform, 0x1E40, new[] {
+				(CycleEntries, entries.Raw) }));
+		Assert.True(cycle.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, cycle,
+			ChoiceActiveStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiChoiceActiveStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiChoiceActiveStateField.Active, uint.MaxValue));
+		Assert.True(MuiChoiceActiveStateRecordCodec.TryReadStructural(ref platform,
+			block, out var malformed));
+		Assert.Equal(uint.MaxValue, malformed.Active);
+		Assert.False(MuiChoiceActiveStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		Assert.False(MuiCommonControlCore.TryGetChoiceActiveStateRecord(
+			ref platform, State, cycle, out _));
+		Assert.False(MuiCommonControlCore.ChoiceActiveStateAvailable(ref platform,
+			State, cycle));
+		Assert.False(MuiCommonControlCore.TryReadChoiceActiveState(ref platform,
+			State, cycle, CycleActive, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, cycle,
+			CycleActive, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			cycle, CycleActive, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, cycle,
+			CycleActive, out var rawActive));
+		Assert.Equal(0u, rawActive);
+
+		var renderInfo = APTR.FromPointer(0x1E80);
+		platform.WriteUInt32(renderInfo, 20, 0x2000);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, cycle,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, cycle, 0, 0,
+			80, 16));
+		var textBefore = platform.TextCount;
+		Assert.True(MuiCommonControlCore.DrawControl(ref platform, State, cycle,
+			0));
+		Assert.Equal(textBefore, platform.TextCount);
+
+		// A nonnegative active value is structurally valid but still malformed
+		// when it lies outside the one-entry vector; range admission remains
+		// separate from the raw diagnostic read.
+		Assert.True(MuiChoiceActiveStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiChoiceActiveStateField.Active, 1));
+		Assert.True(MuiChoiceActiveStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		Assert.False(MuiCommonControlCore.ChoiceActiveStateAvailable(ref platform,
+			State, cycle, CycleActive));
+		Assert.False(MuiCommonControlCore.TryReadChoiceActiveState(ref platform,
+			State, cycle, CycleActive, out _));
+		Assert.True(MuiChoiceActiveStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiChoiceActiveStateField.Active, uint.MaxValue));
+
+		Assert.True(MuiChoiceActiveStateRecordCodec.TryReadStructural(ref platform,
+			block, out malformed));
+		Assert.Equal(uint.MaxValue, malformed.Active);
+	}
+
+	[Fact]
+	public void ChoiceActiveAdmissionValidatesNonnegativeLongAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var cycleClass = Register(ref platform, 0x1EC0, "Cycle.mui");
+		var cycle = MuiCommonControlCore.CreateControl(ref platform, State,
+			cycleClass, APTR.Null);
+		Assert.True(cycle.IsNotNull);
+
+		var value = default(MuiChoiceActiveStateRecord);
+		value.Magic = MuiChoiceActiveStateRecord.Cookie;
+		value.Active = 1;
+		Assert.True(MuiChoiceActiveStateAdmission.Validate(value));
+		Assert.True(MuiChoiceActiveStateAdmission.ValidateLive(ref platform, State,
+			cycle, value));
+		value.Active = uint.MaxValue;
+		Assert.False(MuiChoiceActiveStateAdmission.Validate(value));
+		value.Active = 1;
+		Assert.False(MuiChoiceActiveStateAdmission.ValidateLive(ref platform, State,
+			APTR.FromPointer(0x90000000), value));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, cycle));
+		Assert.False(MuiChoiceActiveStateAdmission.ValidateLive(ref platform, State,
+			cycle, value));
+		Assert.False(MuiCommonControlCore.ChoiceActiveStateAvailable(ref platform,
+			State, cycle));
+	}
+
+	[Fact]
 	public void ChoiceEntriesUsesNamedGuestRecordAndSharedConsumers()
 	{
 		var platform = NewPlatform();
@@ -1359,6 +1633,96 @@ public sealed class MuiCommonControlClassTests
 
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, cycle));
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, radio));
+	}
+
+	[Fact]
+	public void ChoiceEntriesMalformedRecordFailsClosedBeforeMutationSizingAndDrawing()
+	{
+		var platform = NewPlatform();
+		var cycleClass = Register(ref platform, 0x2040, "Cycle.mui");
+		var entries = APTR.FromPointer(0x2080);
+		var first = APTR.FromPointer(0x20C0);
+		platform.WriteCString(first, "First");
+		platform.WriteUInt32(entries, 0, first.Raw);
+		platform.WriteUInt32(entries, 4, 0);
+		var cycle = MuiCommonControlCore.CreateControl(ref platform, State,
+			cycleClass, BuildTags(ref platform, 0x2100, new[] {
+				(CycleEntries, entries.Raw) }));
+		Assert.True(cycle.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, cycle,
+			ChoiceEntriesStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiChoiceEntriesStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiChoiceEntriesStateField.Entries,
+			0x90000000));
+		Assert.True(MuiChoiceEntriesStateRecordCodec.TryReadStructural(
+			ref platform, block, out var malformed));
+		Assert.Equal(0x90000000u, malformed.Entries.Raw);
+		Assert.False(MuiChoiceEntriesStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		Assert.False(MuiCommonControlCore.TryGetChoiceEntriesStateRecord(
+			ref platform, State, cycle, out _));
+		Assert.False(MuiCommonControlCore.ChoiceEntriesStateAvailable(
+			ref platform, State, cycle));
+		Assert.False(MuiCommonControlCore.TryReadChoiceEntriesState(ref platform,
+			State, cycle, CycleEntries, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, cycle,
+			CycleEntries, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			cycle, CycleEntries, entries.Raw, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, cycle,
+			CycleEntries, out var rawEntries));
+		Assert.Equal(entries.Raw, rawEntries);
+
+		var renderInfo = APTR.FromPointer(0x2140);
+		platform.WriteUInt32(renderInfo, 20, 0x2000);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, cycle,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, cycle, 0, 0,
+			80, 16));
+		var textBefore = platform.TextCount;
+		Assert.True(MuiCommonControlCore.DrawControl(ref platform, State, cycle,
+			0));
+		Assert.Equal(textBefore, platform.TextCount);
+
+		Assert.True(MuiChoiceEntriesStateRecordCodec.TryReadStructural(
+			ref platform, block, out malformed));
+		Assert.Equal(0x90000000u, malformed.Entries.Raw);
+	}
+
+	[Fact]
+	public void ChoiceEntriesAdmissionValidatesBoundedVectorAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var cycleClass = Register(ref platform, 0x2180, "Cycle.mui");
+		var entries = APTR.FromPointer(0x21C0);
+		var first = APTR.FromPointer(0x2200);
+		platform.WriteCString(first, "First");
+		platform.WriteUInt32(entries, 0, first.Raw);
+		platform.WriteUInt32(entries, 4, 0);
+		var cycle = MuiCommonControlCore.CreateControl(ref platform, State,
+			cycleClass, BuildTags(ref platform, 0x2240, new[] {
+				(CycleEntries, entries.Raw) }));
+		Assert.True(cycle.IsNotNull);
+
+		var value = default(MuiChoiceEntriesStateRecord);
+		value.Magic = MuiChoiceEntriesStateRecord.Cookie;
+		value.Entries = entries;
+		Assert.True(MuiChoiceEntriesStateAdmission.Validate(ref platform, value));
+		Assert.True(MuiChoiceEntriesStateAdmission.ValidateLive(ref platform, State,
+			cycle, value));
+		value.Entries = APTR.Null;
+		Assert.True(MuiChoiceEntriesStateAdmission.Validate(ref platform, value));
+		value.Entries = APTR.FromPointer(0x90000000);
+		Assert.False(MuiChoiceEntriesStateAdmission.Validate(ref platform, value));
+		value.Entries = entries;
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, cycle));
+		Assert.False(MuiChoiceEntriesStateAdmission.ValidateLive(ref platform, State,
+			cycle, value));
+		Assert.False(MuiCommonControlCore.ChoiceEntriesStateAvailable(
+			ref platform, State, cycle));
 	}
 
 	[Fact]
@@ -2152,6 +2516,73 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void GadgetGadgetAdmissionValidatesPointerAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var gadgetClass = Register(ref platform, 0x3BC0, "Gadget.mui");
+		var gadget = MuiCommonControlCore.CreateControl(ref platform, State,
+			gadgetClass, APTR.Null);
+		var value = default(MuiGadgetGadgetStateRecord);
+		value.Magic = MuiGadgetGadgetStateRecord.Cookie;
+		Assert.True(MuiGadgetGadgetStateAdmission.Validate(ref platform, value));
+		Assert.True(MuiGadgetGadgetStateAdmission.ValidateLive(ref platform, State,
+			gadget, value));
+
+		value.Gadget = APTR.FromPointer(0x3C00);
+		Assert.True(MuiGadgetGadgetStateAdmission.Validate(ref platform, value));
+		Assert.True(MuiGadgetGadgetStateAdmission.ValidateLive(ref platform, State,
+			gadget, value));
+		value.Gadget = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiGadgetGadgetStateAdmission.Validate(ref platform, value));
+		value.Gadget = APTR.FromPointer(0x3C00);
+		Assert.True(MuiGadgetGadgetStateAdmission.Validate(ref platform, value));
+
+		Assert.False(MuiGadgetGadgetStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x32000), value));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			gadget));
+	}
+
+	[Fact]
+	public void MalformedGadgetGadgetStateFailsClosedBeforeGetterProjection()
+	{
+		var platform = NewPlatform();
+		var gadgetClass = Register(ref platform, 0x3C40, "Gadget.mui");
+		var gadget = MuiCommonControlCore.CreateControl(ref platform, State,
+			gadgetClass, APTR.Null);
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, gadget,
+			MuiCommonControlCore.GadgetGadgetStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiGadgetGadgetStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiGadgetGadgetStateField.Gadget,
+			0xFFFFFF00u));
+
+		Assert.False(MuiCommonControlCore.GadgetGadgetStateAvailable(ref platform,
+			State, gadget));
+		Assert.False(MuiCommonControlCore.TryGetGadgetGadgetStateRecord(
+			ref platform, State, gadget, out _));
+		Assert.False(MuiCommonControlCore.TryReadGadgetGadgetState(ref platform,
+			State, gadget, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, gadget,
+			GadgetGadget, out _, out _));
+		Assert.True(MuiGadgetGadgetStateRecordCodec.TryReadStructural(ref platform,
+			block, out var structural));
+		Assert.Equal(0xFFFFFF00u, structural.Gadget.Raw);
+
+		// The malformed block remains caller-owned; repairing its named field
+		// restores the getter without replacing the Dataspace allocation.
+		Assert.True(MuiGadgetGadgetStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiGadgetGadgetStateField.Gadget, 0));
+		Assert.True(MuiCommonControlCore.TryReadGadgetGadgetState(ref platform,
+			State, gadget, out var repaired));
+		Assert.Equal(0u, repaired.Gadget.Raw);
+		Assert.True(MuiCommonControlCore.GadgetGadgetStateAvailable(ref platform,
+			State, gadget));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			gadget));
+	}
+
+	[Fact]
 	public void ImageSpecsParseWithoutTreatingSpecStringsAsBitmaps()
 	{
 		var platform = NewPlatform();
@@ -2481,21 +2912,21 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(balance.IsNotNull);
 		Assert.Equal(MuiControlClass.Balance,
 			MuiCommonControlCore.Classify(ref platform, State, balance));
-		Assert.Equal(1u, Get(ref platform, balance, BalanceQuiet));
+		Assert.Equal(7u, Get(ref platform, balance, BalanceQuiet));
 		Assert.True(MuiCommonControlCore.TryGetBalancePolicyStateRecord(
 			ref platform, State, balance, out var record));
 		Assert.Equal(MuiBalancePolicyStateRecord.Cookie, record.Magic);
-		Assert.Equal(1u, record.Quiet);
+		Assert.Equal(7u, record.Quiet);
 		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
 			balance, BalanceQuiet, 0));
 
-		// A raw compatibility write is normalized back into the typed BOOL state.
+		// A raw compatibility write retains the complete MorphOS LONG bit pattern.
 		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, balance,
 			BalanceQuiet, 9, false));
 		Assert.True(MuiCommonControlCore.TryGet(ref platform, State, balance,
 			BalanceQuiet, out var projected, out var handled));
 		Assert.True(handled);
-		Assert.Equal(1u, projected);
+		Assert.Equal(9u, projected);
 
 		var renderInfo = APTR.FromPointer(0x1300);
 		platform.WriteUInt32(renderInfo, 20, 0x2000);
@@ -2528,11 +2959,17 @@ public sealed class MuiCommonControlClassTests
 			BalancePolicyStateKey);
 		Assert.True(block.IsNotNull);
 		Assert.True(MuiBalancePolicyStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, block, MuiBalancePolicyStateField.Quiet, 2));
-		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+			ref platform, block, MuiBalancePolicyStateField.Magic, 0));
+		Assert.True(MuiBalancePolicyStateRecordCodec.TryReadStructural(ref platform,
+			block, out var structural));
+		Assert.Equal(0u, structural.Magic);
+		Assert.False(MuiBalancePolicyStateRecordCodec.TryRead(ref platform, block,
+			out _));
 
 		Assert.False(MuiCommonControlCore.TryGetBalancePolicyStateRecord(
 			ref platform, State, balance, out _));
+		Assert.False(MuiCommonControlCore.BalancePolicyStateAvailable(ref platform,
+			State, balance));
 		Assert.False(MuiCommonControlCore.TryReadBalancePolicyState(
 			ref platform, State, balance, out _));
 		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, balance,
@@ -2542,7 +2979,40 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
 			balance, BalanceQuiet, out var rawQuiet));
 		Assert.Equal(1u, rawQuiet);
-		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+		Assert.True(MuiBalancePolicyStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiBalancePolicyStateField.Magic,
+			out var malformedMagic));
+		Assert.Equal(0u, malformedMagic);
+	}
+
+	[Fact]
+	public void BalancePolicyAdmissionValidatesLongAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var balanceClass = Register(ref platform, 0x1400, "Balance.mui");
+		var balance = MuiCommonControlCore.CreateControl(ref platform, State,
+			balanceClass, APTR.Null);
+		Assert.True(balance.IsNotNull);
+
+		var value = default(MuiBalancePolicyStateRecord);
+		value.Magic = MuiBalancePolicyStateRecord.Cookie;
+		value.Quiet = uint.MaxValue;
+		Assert.True(MuiBalancePolicyStateAdmission.Validate(value));
+		Assert.True(MuiBalancePolicyStateAdmission.ValidateLive(ref platform,
+			State, balance, value));
+
+		value.Magic = 0;
+		Assert.False(MuiBalancePolicyStateAdmission.Validate(value));
+		value.Magic = MuiBalancePolicyStateRecord.Cookie;
+		Assert.False(MuiBalancePolicyStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x32300), value));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			balance));
+		Assert.False(MuiBalancePolicyStateAdmission.ValidateLive(ref platform,
+			State, balance, value));
+		Assert.False(MuiCommonControlCore.BalancePolicyStateAvailable(ref platform,
+			State, balance));
 	}
 
 	[Fact]
@@ -2606,6 +3076,68 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(0u, Get(ref platform, bitmap, BitmapRemapped));
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
 			bitmap));
+	}
+
+	[Fact]
+	public void BitmapRemappedAdmissionValidatesPointerAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var bitmapClass = Register(ref platform, 0x3620, "Bitmap.mui");
+		var bitmap = MuiCommonControlCore.CreateControl(ref platform, State,
+			bitmapClass, APTR.Null);
+		var value = default(MuiBitmapRemappedStateRecord);
+		value.Magic = MuiBitmapRemappedStateRecord.Cookie;
+		Assert.True(MuiBitmapRemappedStateAdmission.Validate(ref platform, value));
+		Assert.True(MuiBitmapRemappedStateAdmission.ValidateLive(ref platform,
+			State, bitmap, value));
+		value.Remapped = APTR.FromPointer(0x3700);
+		Assert.True(MuiBitmapRemappedStateAdmission.Validate(ref platform, value));
+		Assert.True(MuiBitmapRemappedStateAdmission.ValidateLive(ref platform,
+			State, bitmap, value));
+		value.Remapped = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiBitmapRemappedStateAdmission.Validate(ref platform, value));
+		value.Remapped = APTR.FromPointer(0x3700);
+		Assert.False(MuiBitmapRemappedStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x32000), value));
+	}
+
+	[Fact]
+	public void MalformedBitmapRemappedStateFailsClosedBeforeConsumerMutation()
+	{
+		var platform = NewPlatform();
+		var bitmapClass = Register(ref platform, 0x3640, "Bitmap.mui");
+		var bitmap = MuiCommonControlCore.CreateControl(ref platform, State,
+			bitmapClass, APTR.Null);
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, bitmap,
+			MuiCommonControlCore.BitmapRemappedStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiBitmapRemappedStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiBitmapRemappedStateField.Remapped,
+			0xFFFFFF00u));
+		Assert.False(MuiCommonControlCore.TryGetBitmapRemappedStateRecord(
+			ref platform, State, bitmap, out _));
+		Assert.False(MuiCommonControlCore.TryReadBitmapRemappedState(ref platform,
+			State, bitmap, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, bitmap,
+			BitmapRemapped, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			bitmap, BitmapWidth, 32));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			bitmap, BitmapWidth, out var unchangedWidth));
+		Assert.Equal(0u, unchangedWidth);
+		Assert.True(MuiBitmapRemappedStateRecordCodec.TryReadStructural(ref platform,
+			block, out var structural));
+		Assert.Equal(0xFFFFFF00u, structural.Remapped.Raw);
+
+		// Repair the caller-owned sidecar before retrying; renderer state remains
+		// fail-closed while the retained pointer is unmapped.
+		Assert.True(MuiBitmapRemappedStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiBitmapRemappedStateField.Remapped, 0));
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			bitmap, BitmapWidth, 32));
+		Assert.True(MuiCommonControlCore.TryGetBitmapRemappedStateRecord(
+			ref platform, State, bitmap, out var repaired));
+		Assert.Equal(0u, repaired.Remapped.Raw);
 	}
 
 	[Fact]
@@ -2727,7 +3259,7 @@ public sealed class MuiCommonControlClassTests
 			bitmapClass, BuildTags(ref platform, 0x3440, new[] {
 				(BitmapAlpha, 1u), (BitmapMappingTable, mappingTable.Raw),
 				(BitmapPrecision, 2u), (BitmapSourceColors, sourceColors.Raw),
-				(BitmapTransparent, 7u), (BitmapUseFriend, 0x3540u) }));
+				(BitmapTransparent, 7u), (BitmapUseFriend, 1u) }));
 
 		Assert.True(MuiCommonControlCore.TryGetBitmapPolicyStateRecord(
 			ref platform, State, bitmap, out var record));
@@ -2737,7 +3269,7 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(2u, record.Precision);
 		Assert.Equal(sourceColors.Raw, record.SourceColors);
 		Assert.Equal(7u, record.Transparent);
-		Assert.Equal(0x3540u, record.UseFriend);
+		Assert.Equal(1u, record.UseFriend);
 
 		Assert.True(MuiCommonControlCore.TryGet(ref platform, State, bitmap,
 			BitmapMappingTable, out var projected, out var handled));
@@ -2748,7 +3280,7 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(sourceColors.Raw, Get(ref platform, bitmap,
 			BitmapSourceColors));
 		Assert.Equal(7u, Get(ref platform, bitmap, BitmapTransparent));
-		Assert.Equal(0x3540u, Get(ref platform, bitmap, BitmapUseFriend));
+		Assert.Equal(1u, Get(ref platform, bitmap, BitmapUseFriend));
 
 		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
 			bitmap, BitmapAlpha, 3));
@@ -2786,6 +3318,73 @@ public sealed class MuiCommonControlClassTests
 
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
 			bitmap));
+	}
+
+	[Fact]
+	public void BitmapPolicyAdmissionValidatesPointersBooleanAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var bitmapClass = Register(ref platform, 0x3660, "Bitmap.mui");
+		var bitmap = MuiCommonControlCore.CreateControl(ref platform, State,
+			bitmapClass, APTR.Null);
+		var value = default(MuiBitmapPolicyStateRecord);
+		value.Magic = MuiBitmapPolicyStateRecord.Cookie;
+		value.MappingTable = 0x3500;
+		value.SourceColors = 0x3520;
+		value.UseFriend = 1;
+		Assert.True(MuiBitmapPolicyStateAdmission.Validate(ref platform, value));
+		Assert.True(MuiBitmapPolicyStateAdmission.ValidateLive(ref platform, State,
+			bitmap, value));
+		value.MappingTable = 0xFFFFFF00u;
+		Assert.False(MuiBitmapPolicyStateAdmission.Validate(ref platform, value));
+		value.MappingTable = 0x3500;
+		value.SourceColors = 0xFFFFFF00u;
+		Assert.False(MuiBitmapPolicyStateAdmission.Validate(ref platform, value));
+		value.SourceColors = 0x3520;
+		value.UseFriend = 2;
+		Assert.False(MuiBitmapPolicyStateAdmission.Validate(ref platform, value));
+		value.UseFriend = 1;
+		Assert.False(MuiBitmapPolicyStateAdmission.ValidateLive(ref platform, State,
+			APTR.FromPointer(0x32000), value));
+	}
+
+	[Fact]
+	public void MalformedBitmapPolicyStateFailsClosedBeforeConsumerMutation()
+	{
+		var platform = NewPlatform();
+		var bitmapClass = Register(ref platform, 0x3680, "Bitmap.mui");
+		var bitmap = MuiCommonControlCore.CreateControl(ref platform, State,
+			bitmapClass, APTR.Null);
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, bitmap,
+			MuiCommonControlCore.BitmapPolicyStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiBitmapPolicyStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiBitmapPolicyStateField.MappingTable,
+			0xFFFFFF00u));
+		Assert.False(MuiCommonControlCore.TryGetBitmapPolicyStateRecord(
+			ref platform, State, bitmap, out _));
+		Assert.False(MuiCommonControlCore.TryReadBitmapPolicyState(ref platform,
+			State, bitmap, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, bitmap,
+			BitmapAlpha, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			bitmap, BitmapAlpha, 3));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			bitmap, BitmapAlpha, out var unchangedAlpha));
+		Assert.Equal(0u, unchangedAlpha);
+		Assert.True(MuiBitmapPolicyStateRecordCodec.TryReadStructural(ref platform,
+			block, out var structural));
+		Assert.Equal(0xFFFFFF00u, structural.MappingTable);
+
+		// Repair the caller-owned pointer before retrying the policy setter.
+		Assert.True(MuiBitmapPolicyStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiBitmapPolicyStateField.MappingTable, 0));
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			bitmap, BitmapAlpha, 3));
+		Assert.True(MuiCommonControlCore.TryGetBitmapPolicyStateRecord(
+			ref platform, State, bitmap, out var repaired));
+		Assert.Equal(3u, repaired.Alpha);
+		Assert.Equal(0u, repaired.MappingTable);
 	}
 
 	[Fact]
@@ -3009,6 +3608,97 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiCommonControlCore.TryGetGadgetInteractionStateRecord(
 			ref platform, State, gadget, out var record));
 		Assert.Equal(1u, record.Pressed);
+	}
+
+	[Fact]
+	public void GadgetInteractionAdmissionValidatesEnumBooleansAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var gadgetClass = Register(ref platform, 0x3D00, "Gadget.mui");
+		var gadget = MuiCommonControlCore.CreateControl(ref platform, State,
+			gadgetClass, BuildTags(ref platform, 0x3D40, new[] {
+				(InputMode, InputModeToggle), (Selected, 1u) }));
+		var value = default(MuiGadgetInteractionStateRecord);
+		value.Magic = MuiGadgetInteractionStateRecord.Cookie;
+		value.InputMode = InputModeToggle;
+		value.Selected = 1;
+		value.ShowSelState = 1;
+		Assert.True(MuiGadgetInteractionStateAdmission.Validate(value));
+		Assert.True(MuiGadgetInteractionStateAdmission.ValidateLive(ref platform,
+			State, gadget, value));
+
+		value.InputMode = 4;
+		Assert.False(MuiGadgetInteractionStateAdmission.Validate(value));
+		value.InputMode = InputModeToggle;
+		value.Selected = 2;
+		Assert.False(MuiGadgetInteractionStateAdmission.Validate(value));
+		value.Selected = 1;
+		Assert.False(MuiGadgetInteractionStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x32000), value));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			gadget));
+	}
+
+	[Fact]
+	public void MalformedGadgetInteractionStateFailsClosedBeforeEventMutation()
+	{
+		var platform = NewPlatform();
+		var gadgetClass = Register(ref platform, 0x3E00, "Gadget.mui");
+		var gadget = MuiCommonControlCore.CreateControl(ref platform, State,
+			gadgetClass, BuildTags(ref platform, 0x3E40, new[] {
+				(InputMode, InputModeToggle), (Selected, 1u) }));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, gadget,
+			MuiCommonControlCore.GadgetInteractionStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiGadgetInteractionStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiGadgetInteractionStateField.Pressed, 2));
+
+		Assert.False(MuiCommonControlCore.GadgetInteractionStateAvailable(
+			ref platform, State, gadget));
+		Assert.False(MuiCommonControlCore.TryGetGadgetInteractionStateRecord(
+			ref platform, State, gadget, out _));
+		Assert.False(MuiCommonControlCore.TryReadGadgetInteractionState(ref platform,
+			State, gadget, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, gadget,
+			InputMode, out _, out _));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			gadget, Selected, out var selectedBefore));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			gadget, Pressed, out var pressedBefore));
+		Assert.Equal(1u, selectedBefore);
+		Assert.Equal(0u, pressedBefore);
+
+		// Event-driven transitions must reject the malformed sidecar before their
+		// raw Selected/Pressed compatibility writes occur.
+		var packet = APTR.FromPointer(0x3E80);
+		platform.WriteUInt32(packet, 0, HandleEvent);
+		platform.WriteUInt32(packet, 8, unchecked((uint)KeyToggle));
+		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			gadget, packet));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			gadget, Selected, out var selectedAfter));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			gadget, Pressed, out var pressedAfter));
+		Assert.Equal(1u, selectedAfter);
+		Assert.Equal(0u, pressedAfter);
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			gadget, Selected, 0));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			gadget, Selected, out selectedAfter));
+		Assert.Equal(1u, selectedAfter);
+
+		Assert.True(MuiGadgetInteractionStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(2u, structural.Pressed);
+		Assert.True(MuiGadgetInteractionStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiGadgetInteractionStateField.Pressed, 0));
+		Assert.True(MuiCommonControlCore.TryReadGadgetInteractionState(ref platform,
+			State, gadget, out var repaired));
+		Assert.Equal(0u, repaired.Pressed);
+		Assert.True(MuiCommonControlCore.GadgetInteractionStateAvailable(
+			ref platform, State, gadget));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			gadget));
 	}
 
 	[Fact]
@@ -3832,10 +4522,16 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(block.IsNotNull);
 		Assert.True(MuiLevelmeterPresentationStateFieldCursorCodec.TryWriteUInt32(
 			ref platform, block, MuiLevelmeterPresentationStateField.Horizontal, 2));
-		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+		Assert.True(MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(
+			ref platform, block, out var malformed));
+		Assert.Equal(2u, malformed.Horizontal);
+		Assert.False(MuiLevelmeterPresentationStateRecordCodec.TryRead(ref platform,
+			block, out _));
 
 		Assert.False(MuiCommonControlCore.TryGetLevelmeterPresentationStateRecord(
 			ref platform, State, levelmeter, out _));
+		Assert.False(MuiCommonControlCore.LevelmeterPresentationStateAvailable(
+			ref platform, State, levelmeter));
 		Assert.False(MuiCommonControlCore.TryReadLevelmeterPresentationState(
 			ref platform, State, levelmeter, out _));
 		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, levelmeter,
@@ -3845,7 +4541,66 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
 			levelmeter, GaugeHoriz, out var rawHorizontal));
 		Assert.Equal(1u, rawHorizontal);
-		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+
+		Assert.True(MuiCommonControlCore.TryComputeMinMax(ref platform, State,
+			levelmeter, out var minMax));
+		Assert.Equal((short)0, minMax.MinWidth);
+		Assert.Equal((short)0, minMax.MinHeight);
+
+		var renderInfo = APTR.FromPointer(0x2D00);
+		var renderRecord = default(MuiDrawingRenderInfoRecord);
+		renderRecord.RastPort = APTR.FromPointer(0x2E00);
+		Assert.True(MuiDrawingRenderInfoCodec.Write(ref platform, renderInfo,
+			renderRecord));
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, levelmeter,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, levelmeter, 0,
+			0, 80, 16));
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			levelmeter, FillArea, 0, false));
+		var drawPacket = APTR.FromPointer(0x2D40);
+		Assert.True(MuiCommonControlPacketCore.WriteMethod(ref platform,
+			drawPacket, Draw));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			drawPacket, MuiCommonPacketKind.Flags, MuiCommonField.Flags, 0));
+		var fillsBefore = platform.FillCount;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			levelmeter, drawPacket));
+		Assert.Equal(fillsBefore, platform.FillCount);
+
+		Assert.True(MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(
+			ref platform, block, out malformed));
+		Assert.Equal(2u, malformed.Horizontal);
+	}
+
+	[Fact]
+	public void LevelmeterPresentationAdmissionValidatesBooleanAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var levelmeterClass = Register(ref platform, 0x2500, "Levelmeter.mui");
+		var levelmeter = MuiCommonControlCore.CreateControl(ref platform, State,
+			levelmeterClass, APTR.Null);
+		Assert.True(levelmeter.IsNotNull);
+
+		var value = default(MuiLevelmeterPresentationStateRecord);
+		value.Magic = MuiLevelmeterPresentationStateRecord.Cookie;
+		value.Horizontal = 1;
+		Assert.True(MuiLevelmeterPresentationStateAdmission.Validate(value));
+		Assert.True(MuiLevelmeterPresentationStateAdmission.ValidateLive(
+			ref platform, State, levelmeter, value));
+
+		value.Horizontal = 2;
+		Assert.False(MuiLevelmeterPresentationStateAdmission.Validate(value));
+		value.Horizontal = 1;
+		Assert.False(MuiLevelmeterPresentationStateAdmission.ValidateLive(
+			ref platform, State, APTR.FromPointer(0x32600), value));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			levelmeter));
+		Assert.False(MuiLevelmeterPresentationStateAdmission.ValidateLive(
+			ref platform, State, levelmeter, value));
+		Assert.False(MuiCommonControlCore.LevelmeterPresentationStateAvailable(
+			ref platform, State, levelmeter));
 	}
 
 	[Fact]
@@ -4001,10 +4756,16 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(block.IsNotNull);
 		Assert.True(MuiPropRangeStateFieldCursorCodec.TryWriteUInt32(ref platform,
 			block, MuiPropRangeStateField.First, 99));
-		Assert.Equal(99u, platform.ReadUInt32(block, 12));
+		Assert.True(MuiPropRangeStateRecordCodec.TryReadStructural(ref platform,
+			block, out var malformed));
+		Assert.Equal(99u, malformed.First);
+		Assert.False(MuiPropRangeStateRecordCodec.TryRead(ref platform, block,
+			out _));
 
 		Assert.False(MuiCommonControlCore.TryGetPropRangeStateRecord(
 			ref platform, State, prop, out _));
+		Assert.False(MuiCommonControlCore.PropRangeStateAvailable(ref platform,
+			State, prop));
 		Assert.False(MuiCommonControlCore.TryReadPropRangeState(ref platform, State,
 			prop, out _));
 		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, prop,
@@ -4017,7 +4778,65 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, prop,
 			PropFirst, out var rawFirst));
 		Assert.Equal(20u, rawFirst);
-		Assert.Equal(99u, platform.ReadUInt32(block, 12));
+		Assert.True(MuiPropRangeStateRecordCodec.TryReadStructural(ref platform,
+			block, out malformed));
+		Assert.Equal(99u, malformed.First);
+
+		// Drawing completes the Area transaction but must not consume a malformed
+		// range record to produce a thumb.
+		var renderInfo = APTR.FromPointer(0x1580);
+		var renderRecord = default(MuiDrawingRenderInfoRecord);
+		renderRecord.RastPort = APTR.FromPointer(0x1600);
+		Assert.True(MuiDrawingRenderInfoCodec.Write(ref platform, renderInfo,
+			renderRecord));
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, prop, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, prop, 0, 0,
+			80, 16));
+		var drawPacket = APTR.FromPointer(0x15C0);
+		Assert.True(MuiCommonControlPacketCore.WriteMethod(ref platform,
+			drawPacket, Draw));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			drawPacket, MuiCommonPacketKind.Flags, MuiCommonField.Flags, 0));
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			prop, FillArea, 0, false));
+		var fillsBefore = platform.FillCount;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			prop, drawPacket));
+		Assert.Equal(fillsBefore, platform.FillCount);
+	}
+
+	[Fact]
+	public void PropRangeAdmissionValidatesBoundsAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var propClass = Register(ref platform, 0x1680, "Prop.mui");
+		var prop = MuiCommonControlCore.CreateControl(ref platform, State,
+			propClass, APTR.Null);
+		Assert.True(prop.IsNotNull);
+
+		var value = default(MuiPropRangeStateRecord);
+		value.Magic = MuiPropRangeStateRecord.Cookie;
+		value.Entries = 0x7fffffffu;
+		value.Visible = 1;
+		value.First = 0x7ffffffeu;
+		Assert.True(MuiPropRangeStateAdmission.Validate(value));
+		Assert.True(MuiPropRangeStateAdmission.ValidateLive(ref platform, State,
+			prop, value));
+
+		value.First = 0x7fffffffu;
+		Assert.False(MuiPropRangeStateAdmission.Validate(value));
+		value.First = 0;
+		value.Visible = 0x80000000u;
+		Assert.False(MuiPropRangeStateAdmission.Validate(value));
+		value.Visible = 1;
+		value.Entries = 0xffffffffu;
+		Assert.False(MuiPropRangeStateAdmission.Validate(value));
+
+		value.Entries = 0x7fffffffu;
+		value.First = 0x7ffffffeu;
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, prop));
+		Assert.False(MuiPropRangeStateAdmission.ValidateLive(ref platform, State,
+			prop, value));
 	}
 
 	[Fact]
@@ -4122,20 +4941,85 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(block.IsNotNull);
 		Assert.True(MuiGaugeStateFieldCursorCodec.TryWriteUInt32(ref platform,
 			block, MuiGaugeStateField.Horizontal, 2));
-		Assert.Equal(2u, platform.ReadUInt32(block, 16));
+		Assert.True(MuiGaugeStateRecordCodec.TryReadStructural(ref platform, block,
+			out var malformed));
+		Assert.Equal(2u, malformed.Horizontal);
+		Assert.False(MuiGaugeStateRecordCodec.TryRead(ref platform, block,
+			out _));
 
 		Assert.False(MuiCommonControlCore.TryGetGaugeStateRecord(
 			ref platform, State, gauge, out _));
+		Assert.False(MuiCommonControlCore.GaugeStateAvailable(ref platform,
+			State, gauge));
 		Assert.False(MuiCommonControlCore.TryReadGaugeState(ref platform, State,
 			gauge, out _));
 		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, gauge,
 			GaugeHoriz, out _, out _));
 		Assert.False(MuiCommonControlCore.SetGauge(ref platform, State, gauge,
 			50));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			gauge, GaugeMax, 200));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			gauge, GaugeDivide, 2));
 		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
 			gauge, GaugeCurrent, out var rawCurrent));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			gauge, GaugeMax, out var rawMaximum));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			gauge, GaugeDivide, out var rawDivide));
 		Assert.Equal(25u, rawCurrent);
-		Assert.Equal(2u, platform.ReadUInt32(block, 16));
+		Assert.Equal(100u, rawMaximum);
+		Assert.Equal(0u, rawDivide);
+		Assert.True(MuiGaugeStateRecordCodec.TryReadStructural(ref platform, block,
+			out malformed));
+		Assert.Equal(2u, malformed.Horizontal);
+
+		// Draw is another consumer of the same admission boundary. A malformed
+		// record must suppress rendering rather than falling back to raw fields.
+		var renderInfo = APTR.FromPointer(0x1F80);
+		var renderRecord = default(MuiDrawingRenderInfoRecord);
+		renderRecord.RastPort = APTR.FromPointer(0x2000);
+		Assert.True(MuiDrawingRenderInfoCodec.Write(ref platform, renderInfo,
+			renderRecord));
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, gauge, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, gauge, 0, 0,
+			80, 10));
+		var drawPacket = APTR.FromPointer(0x1FC0);
+		Assert.True(MuiCommonControlPacketCore.WriteMethod(ref platform,
+			drawPacket, Draw));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			drawPacket, MuiCommonPacketKind.Flags, MuiCommonField.Flags, 0));
+		var fillsBefore = platform.FillCount;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			gauge, drawPacket));
+		// DrawControl still paints the generic background; the Gauge-specific
+		// fill is suppressed because its named state is not admitted.
+		Assert.Equal(fillsBefore + 1, platform.FillCount);
+	}
+
+	[Fact]
+	public void GaugeAdmissionValidatesBoolAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var gaugeClass = Register(ref platform, 0x1F00, "Gauge.mui");
+		var gauge = MuiCommonControlCore.CreateControl(ref platform, State,
+			gaugeClass, APTR.Null);
+		var value = default(MuiGaugeStateRecord);
+		value.Magic = MuiGaugeStateRecord.Cookie;
+		value.Maximum = uint.MaxValue;
+		value.Current = 12;
+		value.Divide = 3;
+		value.Horizontal = 1;
+		Assert.True(MuiGaugeStateAdmission.Validate(value));
+		Assert.True(MuiGaugeStateAdmission.ValidateLive(ref platform, State,
+			gauge, value));
+		value.Horizontal = 2;
+		Assert.False(MuiGaugeStateAdmission.Validate(value));
+		value.Horizontal = 1;
+		Assert.False(MuiGaugeStateAdmission.ValidateLive(ref platform, State,
+			APTR.FromPointer(0x32000), value));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			gauge));
 	}
 
 	// Gap 13: Draw produces class-specific content for the numeric readout
@@ -4591,6 +5475,86 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void RectangleMalformedPresentationRecordFailsClosedBeforeDrawingAndMutation()
+	{
+		var platform = NewPlatform();
+		var rectangleClass = Register(ref platform, 0x2380, "Rectangle.mui");
+		var rectangle = MuiCommonControlCore.CreateControl(ref platform, State,
+			rectangleClass, APTR.Null);
+		Assert.True(rectangle.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, rectangle,
+			RectanglePresentationStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiRectanglePresentationStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiRectanglePresentationStateField.HorizontalBar, 2));
+		Assert.True(MuiRectanglePresentationStateRecordCodec.TryReadStructural(
+			ref platform, block, out var malformed));
+		Assert.Equal(2u, malformed.HorizontalBar);
+		Assert.False(MuiRectanglePresentationStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		Assert.False(MuiCommonControlCore.TryGetRectanglePresentationStateRecord(
+			ref platform, State, rectangle, out _));
+		Assert.False(MuiCommonControlCore.RectanglePresentationStateAvailable(
+			ref platform, State, rectangle));
+		Assert.False(MuiCommonControlCore.TryReadRectanglePresentationState(
+			ref platform, State, rectangle, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, rectangle,
+			RectangleHBar, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			rectangle, RectangleHBar, 0, false));
+
+		var renderInfo = APTR.FromPointer(0x1F00);
+		platform.WriteUInt32(renderInfo, 20, 0x2000);
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, rectangle,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, rectangle, 0, 0,
+			40, 20));
+		var linesBefore = platform.LineCount;
+		Assert.True(MuiCommonControlCore.DrawControl(ref platform, State, rectangle,
+			0));
+		Assert.Equal(linesBefore, platform.LineCount);
+
+		Assert.True(MuiRectanglePresentationStateRecordCodec.TryReadStructural(
+			ref platform, block, out malformed));
+		Assert.Equal(2u, malformed.HorizontalBar);
+	}
+
+	[Fact]
+	public void RectanglePresentationAdmissionValidatesBooleansAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var rectangleClass = Register(ref platform, 0x2580, "Rectangle.mui");
+		var rectangle = MuiCommonControlCore.CreateControl(ref platform, State,
+			rectangleClass, APTR.Null);
+		Assert.True(rectangle.IsNotNull);
+
+		var value = default(MuiRectanglePresentationStateRecord);
+		value.Magic = MuiRectanglePresentationStateRecord.Cookie;
+		value.HorizontalBar = 1;
+		value.VerticalBar = 1;
+		Assert.True(MuiRectanglePresentationStateAdmission.Validate(value));
+		Assert.True(MuiRectanglePresentationStateAdmission.ValidateLive(ref platform,
+			State, rectangle, value));
+
+		value.HorizontalBar = 2;
+		Assert.False(MuiRectanglePresentationStateAdmission.Validate(value));
+		value.HorizontalBar = 1;
+		value.VerticalBar = 2;
+		Assert.False(MuiRectanglePresentationStateAdmission.Validate(value));
+		value.VerticalBar = 1;
+		Assert.False(MuiRectanglePresentationStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x32900), value));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			rectangle));
+		Assert.False(MuiRectanglePresentationStateAdmission.ValidateLive(ref platform,
+			State, rectangle, value));
+		Assert.False(MuiCommonControlCore.RectanglePresentationStateAvailable(
+			ref platform, State, rectangle));
+	}
+
+	[Fact]
 	public void AreaPresentationUsesNamedGuestRecordForVisibilityAndDrawingPolicy()
 	{
 		var platform = NewPlatform();
@@ -4693,9 +5657,16 @@ public sealed class MuiCommonControlClassTests
 			ref platform, block, MuiAreaPresentationStateField.Disabled,
 			out var malformedDisabled));
 		Assert.Equal(2u, malformedDisabled);
+		Assert.True(MuiAreaPresentationStateRecordCodec.TryReadStructural(
+			ref platform, block, out var malformed));
+		Assert.Equal(2u, malformed.Disabled);
+		Assert.False(MuiAreaPresentationStateRecordCodec.TryRead(ref platform,
+			block, out _));
 
 		Assert.False(MuiCommonControlCore.TryGetAreaPresentationStateRecord(
 			ref platform, State, rectangle, out _));
+		Assert.False(MuiCommonControlCore.AreaPresentationStateAvailable(
+			ref platform, State, rectangle));
 		Assert.False(MuiCommonControlCore.TryReadAreaPresentationState(
 			ref platform, State, rectangle, out _));
 		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, rectangle,
@@ -4719,6 +5690,49 @@ public sealed class MuiCommonControlClassTests
 			ref platform, block, MuiAreaPresentationStateField.Disabled,
 			out malformedDisabled));
 		Assert.Equal(2u, malformedDisabled);
+		Assert.True(MuiAreaPresentationStateRecordCodec.TryReadStructural(
+			ref platform, block, out malformed));
+		Assert.Equal(2u, malformed.Disabled);
+	}
+
+	[Fact]
+	public void AreaPresentationAdmissionValidatesBooleansAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var rectangleClass = Register(ref platform, 0x2500, "Rectangle.mui");
+		var rectangle = MuiCommonControlCore.CreateControl(ref platform, State,
+			rectangleClass, APTR.Null);
+		Assert.True(rectangle.IsNotNull);
+
+		var value = default(MuiAreaPresentationStateRecord);
+		value.Magic = MuiAreaPresentationStateRecord.Cookie;
+		value.Disabled = 1;
+		value.ShowMe = 1;
+		value.Background = uint.MaxValue;
+		value.Frame = uint.MaxValue;
+		value.CustomBackfill = 1;
+		Assert.True(MuiAreaPresentationStateAdmission.Validate(value));
+		Assert.True(MuiAreaPresentationStateAdmission.ValidateLive(ref platform,
+			State, rectangle, value));
+
+		value.Disabled = 2;
+		Assert.False(MuiAreaPresentationStateAdmission.Validate(value));
+		value.Disabled = 1;
+		value.ShowMe = 2;
+		Assert.False(MuiAreaPresentationStateAdmission.Validate(value));
+		value.ShowMe = 1;
+		value.CustomBackfill = 2;
+		Assert.False(MuiAreaPresentationStateAdmission.Validate(value));
+		value.CustomBackfill = 1;
+		Assert.False(MuiAreaPresentationStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x32700), value));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			rectangle));
+		Assert.False(MuiAreaPresentationStateAdmission.ValidateLive(ref platform,
+			State, rectangle, value));
+		Assert.False(MuiCommonControlCore.AreaPresentationStateAvailable(
+			ref platform, State, rectangle));
 	}
 
 	[Fact]
@@ -4907,6 +5921,62 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void AreaWeightAdmissionValidatesCookieAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var textClass = Register(ref platform, 0x1300, "Text.mui");
+		var text = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, APTR.Null);
+		var value = default(MuiAreaWeightStateRecord);
+		value.Magic = MuiAreaWeightStateRecord.Cookie;
+		value.Weight = uint.MaxValue;
+		Assert.True(MuiAreaWeightStateAdmission.Validate(value));
+		Assert.True(MuiAreaWeightStateAdmission.ValidateLive(ref platform, State,
+			text, value));
+		value.Magic = 0;
+		Assert.False(MuiAreaWeightStateAdmission.Validate(value));
+		value.Magic = MuiAreaWeightStateRecord.Cookie;
+		Assert.False(MuiAreaWeightStateAdmission.ValidateLive(ref platform, State,
+			APTR.FromPointer(0x32000), value));
+	}
+
+	[Fact]
+	public void MalformedAreaWeightStateFailsClosedBeforeSynchronization()
+	{
+		var platform = NewPlatform();
+		var textClass = Register(ref platform, 0x1320, "Text.mui");
+		var text = MuiCommonControlCore.CreateControl(ref platform, State,
+			textClass, APTR.Null);
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, text,
+			MuiCommonControlCore.AreaWeightStateKey);
+		Assert.True(block.IsNotNull);
+		platform.WriteUInt32(block, 0, 0);
+		Assert.False(MuiCommonControlCore.TryGetAreaWeightStateRecord(
+			ref platform, State, text, out _));
+		Assert.False(MuiCommonControlCore.TryReadAreaWeightState(ref platform,
+			State, text, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, text,
+			Weight, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			text, Weight, 55, false));
+		Assert.True(MuiAreaWeightStateFieldCursorCodec.TryReadUInt32(ref platform,
+			block, MuiAreaWeightStateField.Magic, out var preservedMagic));
+		Assert.Equal(0u, preservedMagic);
+		Assert.True(MuiAreaWeightStateFieldCursorCodec.TryReadUInt32(ref platform,
+			block, MuiAreaWeightStateField.Weight, out var preservedWeight));
+		Assert.Equal(100u, preservedWeight);
+
+		// Repair the caller-owned sidecar before retrying; strict synchronization
+		// remains fail-closed while the cookie is malformed.
+		platform.WriteUInt32(block, 0, MuiAreaWeightStateRecord.Cookie);
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			text, Weight, 55, false));
+		Assert.True(MuiCommonControlCore.TryGetAreaWeightStateRecord(
+			ref platform, State, text, out var repaired));
+		Assert.Equal(55u, repaired.Weight);
+	}
+
+	[Fact]
 	public void AreaFillUsesNamedRenderPolicyForGetAndOmGet()
 	{
 		var platform = NewPlatform();
@@ -5005,6 +6075,106 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
 			scale, getMessage));
 		Assert.Equal(0u, platform.ReadUInt32(getStorage, 0));
+	}
+
+	[Fact]
+	public void SliderMalformedPresentationRecordFailsClosedBeforeSizingAndDrawing()
+	{
+		var platform = NewPlatform();
+		var sliderClass = Register(ref platform, 0x2400, "Slider.mui");
+		var slider = MuiCommonControlCore.CreateControl(ref platform, State,
+			sliderClass, BuildTags(ref platform, 0x2440,
+			[(SliderHoriz, 1u), (SliderQuiet, 1u)]));
+		Assert.True(slider.IsNotNull);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, slider,
+			SliderPresentationStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiSliderPresentationStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiSliderPresentationStateField.Horizontal, 2));
+		Assert.True(MuiSliderPresentationStateRecordCodec.TryReadStructural(
+			ref platform, block, out var malformed));
+		Assert.Equal(2u, malformed.Horizontal);
+		Assert.False(MuiSliderPresentationStateRecordCodec.TryRead(ref platform,
+			block, out _));
+
+		Assert.False(MuiCommonControlCore.TryGetSliderPresentationStateRecord(
+			ref platform, State, slider, out _));
+		Assert.False(MuiCommonControlCore.SliderPresentationStateAvailable(
+			ref platform, State, slider));
+		Assert.False(MuiCommonControlCore.TryReadSliderPresentationState(
+			ref platform, State, slider, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, slider,
+			SliderHoriz, out _, out _));
+		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			slider, SliderHoriz, 0, false));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			slider, SliderHoriz, out var rawHorizontal));
+		Assert.Equal(1u, rawHorizontal);
+
+		Assert.True(MuiCommonControlCore.TryComputeMinMax(ref platform, State,
+			slider, out var minMax));
+		Assert.Equal((short)0, minMax.MinWidth);
+		Assert.Equal((short)0, minMax.MinHeight);
+
+		var renderInfo = APTR.FromPointer(0x2D00);
+		var renderRecord = default(MuiDrawingRenderInfoRecord);
+		renderRecord.RastPort = APTR.FromPointer(0x2E00);
+		Assert.True(MuiDrawingRenderInfoCodec.Write(ref platform, renderInfo,
+			renderRecord));
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, slider,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, slider, 0, 0,
+			80, 16));
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			slider, FillArea, 0, false));
+		var drawPacket = APTR.FromPointer(0x2D40);
+		Assert.True(MuiCommonControlPacketCore.WriteMethod(ref platform,
+			drawPacket, Draw));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			drawPacket, MuiCommonPacketKind.Flags, MuiCommonField.Flags, 0));
+		var fillsBefore = platform.FillCount;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			slider, drawPacket));
+		Assert.Equal(fillsBefore, platform.FillCount);
+
+		Assert.True(MuiSliderPresentationStateRecordCodec.TryReadStructural(
+			ref platform, block, out malformed));
+		Assert.Equal(2u, malformed.Horizontal);
+	}
+
+	[Fact]
+	public void SliderPresentationAdmissionValidatesBooleansAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var sliderClass = Register(ref platform, 0x2480, "Slider.mui");
+		var slider = MuiCommonControlCore.CreateControl(ref platform, State,
+			sliderClass, APTR.Null);
+		Assert.True(slider.IsNotNull);
+
+		var value = default(MuiSliderPresentationStateRecord);
+		value.Magic = MuiSliderPresentationStateRecord.Cookie;
+		value.Horizontal = 1;
+		value.Quiet = 1;
+		Assert.True(MuiSliderPresentationStateAdmission.Validate(value));
+		Assert.True(MuiSliderPresentationStateAdmission.ValidateLive(ref platform,
+			State, slider, value));
+
+		value.Horizontal = 2;
+		Assert.False(MuiSliderPresentationStateAdmission.Validate(value));
+		value.Horizontal = 1;
+		value.Quiet = 2;
+		Assert.False(MuiSliderPresentationStateAdmission.Validate(value));
+		value.Quiet = 1;
+		Assert.False(MuiSliderPresentationStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x32400), value));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			slider));
+		Assert.False(MuiSliderPresentationStateAdmission.ValidateLive(ref platform,
+			State, slider, value));
+		Assert.False(MuiCommonControlCore.SliderPresentationStateAvailable(
+			ref platform, State, slider));
 	}
 
 	[Fact]
@@ -5160,10 +6330,16 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(block.IsNotNull);
 		Assert.True(MuiScrollbarLayoutStateFieldCursorCodec.TryWriteUInt32(
 			ref platform, block, MuiScrollbarLayoutStateField.Type, 5));
-		Assert.Equal(5u, platform.ReadUInt32(block, 8));
+		Assert.True(MuiScrollbarLayoutStateRecordCodec.TryReadStructural(
+			ref platform, block, out var malformed));
+		Assert.Equal(5u, malformed.Type);
+		Assert.False(MuiScrollbarLayoutStateRecordCodec.TryRead(ref platform,
+			block, out _));
 
 		Assert.False(MuiCommonControlCore.TryGetScrollbarLayoutStateRecord(
 			ref platform, State, scrollbar, out _));
+		Assert.False(MuiCommonControlCore.ScrollbarLayoutStateAvailable(ref platform,
+			State, scrollbar));
 		Assert.False(MuiCommonControlCore.TryReadScrollbarLayoutState(
 			ref platform, State, scrollbar, out _));
 		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, scrollbar,
@@ -5173,7 +6349,30 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
 			scrollbar, ScrollbarType, out var rawType));
 		Assert.Equal(ScrollbarTypeSym, rawType);
-		Assert.Equal(5u, platform.ReadUInt32(block, 8));
+		Assert.True(MuiScrollbarLayoutStateRecordCodec.TryReadStructural(
+			ref platform, block, out malformed));
+		Assert.Equal(5u, malformed.Type);
+
+		// DrawControl still completes the Area transaction, but malformed layout
+		// state must suppress the Scrollbar-specific consumer.
+		var renderInfo = APTR.FromPointer(0x2A80);
+		var renderRecord = default(MuiDrawingRenderInfoRecord);
+		renderRecord.RastPort = APTR.FromPointer(0x2B80);
+		Assert.True(MuiDrawingRenderInfoCodec.Write(ref platform, renderInfo,
+			renderRecord));
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, scrollbar,
+			renderInfo));
+		var drawPacket = APTR.FromPointer(0x2AC0);
+		Assert.True(MuiCommonControlPacketCore.WriteMethod(ref platform,
+			drawPacket, Draw));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			drawPacket, MuiCommonPacketKind.Flags, MuiCommonField.Flags, 0));
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			scrollbar, FillArea, 0, false));
+		var fillsBefore = platform.FillCount;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			scrollbar, drawPacket));
+		Assert.Equal(fillsBefore, platform.FillCount);
 
 		Assert.True(MuiScrollbarLayoutStateFieldCursorCodec.TryWriteUInt32(
 			ref platform, block, MuiScrollbarLayoutStateField.Type,
@@ -5189,7 +6388,43 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
 			scrollbar, GroupHoriz, out var rawHorizontal));
 		Assert.Equal(1u, rawHorizontal);
-		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+		Assert.True(MuiScrollbarLayoutStateRecordCodec.TryReadStructural(
+			ref platform, block, out malformed));
+		Assert.Equal(2u, malformed.Horizontal);
+	}
+
+	[Fact]
+	public void ScrollbarLayoutAdmissionValidatesBoolTypeAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var scrollbarClass = Register(ref platform, 0x2940, "Scrollbar.mui");
+		var scrollbar = MuiCommonControlCore.CreateControl(ref platform, State,
+			scrollbarClass, APTR.Null);
+		Assert.True(scrollbar.IsNotNull);
+
+		var value = default(MuiScrollbarLayoutStateRecord);
+		value.Magic = MuiScrollbarLayoutStateRecord.Cookie;
+		value.Horizontal = 1;
+		value.Type = 4;
+		Assert.True(MuiScrollbarLayoutStateAdmission.Validate(value));
+		Assert.True(MuiScrollbarLayoutStateAdmission.ValidateLive(ref platform,
+			State, scrollbar, value));
+
+		value.Horizontal = 2;
+		Assert.False(MuiScrollbarLayoutStateAdmission.Validate(value));
+		value.Horizontal = 1;
+		value.Type = 5;
+		Assert.False(MuiScrollbarLayoutStateAdmission.Validate(value));
+		value.Type = 4;
+		Assert.False(MuiScrollbarLayoutStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x32200), value));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			scrollbar));
+		Assert.False(MuiScrollbarLayoutStateAdmission.ValidateLive(ref platform,
+			State, scrollbar, value));
+		Assert.False(MuiCommonControlCore.ScrollbarLayoutStateAvailable(ref platform,
+			State, scrollbar));
 	}
 
 	[Fact]
@@ -5283,20 +6518,88 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(block.IsNotNull);
 		Assert.True(MuiPropPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
 			block, MuiPropPolicyStateField.Slider, 2));
-		Assert.Equal(2u, platform.ReadUInt32(block, 12));
+		Assert.True(MuiPropPolicyStateRecordCodec.TryReadStructural(ref platform,
+			block, out var malformed));
+		Assert.Equal(2u, malformed.Slider);
+		Assert.False(MuiPropPolicyStateRecordCodec.TryRead(ref platform, block,
+			out _));
 
 		Assert.False(MuiCommonControlCore.TryGetPropPolicyStateRecord(
 			ref platform, State, prop, out _));
+		Assert.False(MuiCommonControlCore.PropPolicyStateAvailable(ref platform,
+			State, prop));
 		Assert.False(MuiCommonControlCore.TryReadPropPolicyState(ref platform, State,
 			prop, out _));
 		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, prop,
 			PropSlider, out _, out _));
 		Assert.False(MuiCommonControlCore.SetControlAttribute(ref platform, State,
 			prop, PropSlider, 0, false));
+		Assert.False(MuiCommonControlCore.TrySetHeadlessPropAttribute(ref platform,
+			State, prop, PropUseWinBorder, 3, false, out var handled));
+		Assert.True(handled);
 		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, prop,
 			PropSlider, out var rawSlider));
 		Assert.Equal(1u, rawSlider);
-		Assert.Equal(2u, platform.ReadUInt32(block, 12));
+		Assert.True(MuiPropPolicyStateRecordCodec.TryReadStructural(ref platform,
+			block, out malformed));
+		Assert.Equal(2u, malformed.Slider);
+
+		// DrawControl still completes the Area transaction, but the malformed
+		// policy must suppress the Prop-specific thumb consumer.
+		var renderInfo = APTR.FromPointer(0x2A00);
+		var renderRecord = default(MuiDrawingRenderInfoRecord);
+		renderRecord.RastPort = APTR.FromPointer(0x2B00);
+		Assert.True(MuiDrawingRenderInfoCodec.Write(ref platform, renderInfo,
+			renderRecord));
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, prop, renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, prop, 0, 0,
+			80, 16));
+		var drawPacket = APTR.FromPointer(0x2A40);
+		Assert.True(MuiCommonControlPacketCore.WriteMethod(ref platform,
+			drawPacket, Draw));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			drawPacket, MuiCommonPacketKind.Flags, MuiCommonField.Flags, 0));
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			prop, FillArea, 0, false));
+		var fillsBefore = platform.FillCount;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			prop, drawPacket));
+		Assert.Equal(fillsBefore, platform.FillCount);
+	}
+
+	[Fact]
+	public void PropPolicyAdmissionValidatesBooleansAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var propClass = Register(ref platform, 0x2980, "Prop.mui");
+		var prop = MuiCommonControlCore.CreateControl(ref platform, State,
+			propClass, APTR.Null);
+		Assert.True(prop.IsNotNull);
+
+		var value = default(MuiPropPolicyStateRecord);
+		value.Magic = MuiPropPolicyStateRecord.Cookie;
+		value.Horizontal = 1;
+		value.DeltaFactor = unchecked((uint)int.MinValue);
+		value.Slider = 0;
+		value.UseWinBorder = 3;
+		Assert.True(MuiPropPolicyStateAdmission.Validate(value));
+		Assert.True(MuiPropPolicyStateAdmission.ValidateLive(ref platform, State,
+			prop, value));
+
+		value.Horizontal = 2;
+		Assert.False(MuiPropPolicyStateAdmission.Validate(value));
+		value.Horizontal = 1;
+		value.Slider = 2;
+		Assert.False(MuiPropPolicyStateAdmission.Validate(value));
+		value.Slider = 0;
+		value.UseWinBorder = 4;
+		Assert.False(MuiPropPolicyStateAdmission.Validate(value));
+		value.UseWinBorder = 3;
+		Assert.True(MuiPropPolicyStateAdmission.Validate(value));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, prop));
+		Assert.False(MuiPropPolicyStateAdmission.ValidateLive(ref platform, State,
+			prop, value));
 	}
 
 	// Gap 8: Bitmap source/geometry attributes the autodocs mark [ISG]
@@ -5658,8 +6961,15 @@ public sealed class MuiCommonControlClassTests
 			ref platform, block, MuiScalePresentationStateField.Horizontal, 2));
 		Assert.Equal(2u, platform.ReadUInt32(block, 4));
 
+		Assert.True(MuiScalePresentationStateRecordCodec.TryReadStructural(
+			ref platform, block, out var malformed));
+		Assert.Equal(2u, malformed.Horizontal);
+		Assert.False(MuiScalePresentationStateRecordCodec.TryRead(ref platform,
+			block, out _));
 		Assert.False(MuiCommonControlCore.TryGetScalePresentationStateRecord(
 			ref platform, State, scale, out _));
+		Assert.False(MuiCommonControlCore.ScalePresentationStateAvailable(
+			ref platform, State, scale));
 		Assert.False(MuiCommonControlCore.TryReadScalePresentationState(
 			ref platform, State, scale, out _));
 		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, scale,
@@ -5669,7 +6979,66 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
 			scale, ScaleHoriz, out var rawHorizontal));
 		Assert.Equal(1u, rawHorizontal);
-		Assert.Equal(2u, platform.ReadUInt32(block, 4));
+
+		Assert.True(MuiCommonControlCore.TryComputeMinMax(ref platform, State,
+			scale, out var minMax));
+		Assert.Equal((short)0, minMax.MinWidth);
+		Assert.Equal((short)0, minMax.MinHeight);
+
+		var renderInfo = APTR.FromPointer(0x2D00);
+		var renderRecord = default(MuiDrawingRenderInfoRecord);
+		renderRecord.RastPort = APTR.FromPointer(0x2E00);
+		Assert.True(MuiDrawingRenderInfoCodec.Write(ref platform, renderInfo,
+			renderRecord));
+		Assert.True(MuiAreaLayoutCore.Setup(ref platform, State, scale,
+			renderInfo));
+		Assert.True(MuiAreaLayoutCore.Layout(ref platform, State, scale, 0, 0,
+			80, 16));
+		Assert.True(MuiCommonControlCore.SetControlAttribute(ref platform, State,
+			scale, FillArea, 0, false));
+		var drawPacket = APTR.FromPointer(0x2D40);
+		Assert.True(MuiCommonControlPacketCore.WriteMethod(ref platform,
+			drawPacket, Draw));
+		Assert.True(MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform,
+			drawPacket, MuiCommonPacketKind.Flags, MuiCommonField.Flags, 0));
+		var linesBefore = platform.LineCount;
+		Assert.Equal(1u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			scale, drawPacket));
+		Assert.Equal(linesBefore, platform.LineCount);
+
+		Assert.True(MuiScalePresentationStateRecordCodec.TryReadStructural(
+			ref platform, block, out malformed));
+		Assert.Equal(2u, malformed.Horizontal);
+	}
+
+	[Fact]
+	public void ScalePresentationAdmissionValidatesBooleanAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var scaleClass = Register(ref platform, 0x2500, "Scale.mui");
+		var scale = MuiCommonControlCore.CreateControl(ref platform, State,
+			scaleClass, APTR.Null);
+		Assert.True(scale.IsNotNull);
+
+		var value = default(MuiScalePresentationStateRecord);
+		value.Magic = MuiScalePresentationStateRecord.Cookie;
+		value.Horizontal = 1;
+		Assert.True(MuiScalePresentationStateAdmission.Validate(value));
+		Assert.True(MuiScalePresentationStateAdmission.ValidateLive(ref platform,
+			State, scale, value));
+
+		value.Horizontal = 2;
+		Assert.False(MuiScalePresentationStateAdmission.Validate(value));
+		value.Horizontal = 1;
+		Assert.False(MuiScalePresentationStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x32500), value));
+
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
+			scale));
+		Assert.False(MuiScalePresentationStateAdmission.ValidateLive(ref platform,
+			State, scale, value));
+		Assert.False(MuiCommonControlCore.ScalePresentationStateAvailable(
+			ref platform, State, scale));
 	}
 
 	[Fact]
@@ -5780,6 +7149,66 @@ public sealed class MuiCommonControlClassTests
 			image, getMessage));
 		Assert.Equal(24u, platform.ReadUInt32(getStorage, 0));
 
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, image));
+	}
+
+	[Fact]
+	public void ImageFontMatchAdmissionRequiresCookieAndLiveOwner()
+	{
+		var platform = NewPlatform();
+		var imageClass = Register(ref platform, 0x3200, "Image.mui");
+		var image = MuiCommonControlCore.CreateControl(ref platform, State,
+			imageClass, APTR.Null);
+		var valid = default(MuiImageFontMatchStateRecord);
+		valid.Magic = MuiImageFontMatchStateRecord.Cookie;
+		valid.Match = 1;
+		valid.Height = 12;
+		valid.Width = 24;
+		Assert.True(MuiImageFontMatchStateAdmission.Validate(valid));
+		Assert.True(MuiImageFontMatchStateAdmission.ValidateLive(ref platform,
+			State, image, valid));
+		var malformed = valid;
+		malformed.Magic = 0;
+		Assert.False(MuiImageFontMatchStateAdmission.Validate(malformed));
+		Assert.False(MuiImageFontMatchStateAdmission.ValidateLive(ref platform,
+			State, image, malformed));
+		Assert.False(MuiImageFontMatchStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, image));
+	}
+
+	[Fact]
+	public void MalformedImageFontMatchStateFailsClosedBeforeProjection()
+	{
+		var platform = NewPlatform();
+		var imageClass = Register(ref platform, 0x3300, "Image.mui");
+		var image = MuiCommonControlCore.CreateControl(ref platform, State,
+			imageClass, BuildTags(ref platform, 0x3340, new[] {
+				(ImageFontMatch, 1u), (ImageFontMatchHeight, 12u),
+				(ImageFontMatchWidth, 24u) }));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, image,
+			ImageFontMatchStateKey);
+		Assert.True(MuiImageFontMatchStateRecordCodec.TryReadStructural(ref platform,
+			block, out var before));
+		Assert.Equal(MuiImageFontMatchStateRecord.Cookie, before.Magic);
+		var cursor = default(MuiImageFontMatchStateFieldCursor);
+		cursor.Record = block;
+		cursor.Field = MuiImageFontMatchStateField.Magic;
+		Assert.True(MuiImageFontMatchStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, cursor.Field, 0));
+		Assert.True(MuiImageFontMatchStateRecordCodec.TryReadStructural(ref platform,
+			block, out var malformed));
+		Assert.Equal(0u, malformed.Magic);
+		Assert.False(MuiImageFontMatchStateAdmission.Validate(malformed));
+		Assert.False(MuiCommonControlCore.TryReadImageFontMatchState(
+			ref platform, State, image, out _));
+		Assert.False(MuiCommonControlCore.TryGetImageFontMatchStateRecord(
+			ref platform, State, image, out _));
+		Assert.False(MuiCommonControlCore.TryGet(ref platform, State, image,
+			ImageFontMatch, out _, out _));
+		Assert.True(MuiImageFontMatchStateRecordCodec.TryReadStructural(ref platform,
+			block, out var after));
+		Assert.Equal(0u, after.Magic);
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, image));
 	}
 

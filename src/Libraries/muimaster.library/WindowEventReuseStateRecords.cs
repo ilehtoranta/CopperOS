@@ -17,6 +17,14 @@ namespace CopperOS.MuiMaster;
 internal struct MuiWindowEventReuseStateRecord
 {
 	internal const uint Size = 28;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint ContextActiveOffset = 4;
+	internal const uint PendingOffset = 8;
+	internal const uint EventMessageOffset = 12;
+	internal const uint InputEventOffset = 16;
+	internal const uint EventClassOffset = 20;
+	internal const uint MuiKeyOffset = 24;
 	internal const uint Cookie = 0x57525355u; // 'WRSU'
 
 	internal uint Magic;
@@ -26,6 +34,36 @@ internal struct MuiWindowEventReuseStateRecord
 	internal APTR InputEvent;
 	internal uint EventClass;
 	internal int MuiKey;
+}
+
+// Reuse state is a guest-resident dispatch context, not a managed queue. The
+// structural predicate admits canonical context flags and a mapped HandleEvent
+// packet. InputEvent is retained as an opaque caller/native message capability
+// because MorphOS's HandleEvent packet may carry an address outside the MUI
+// guest-memory window; the live predicate additionally ties the state to a
+// live Window.
+internal static class MuiWindowEventReuseStateAdmission
+{
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		MuiWindowEventReuseStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		value.Magic == MuiWindowEventReuseStateRecord.Cookie &&
+		value.ContextActive <= 1 && value.Pending <= 1 &&
+		IsMapped(ref platform, value.EventMessage,
+			MuiCommonHandleEventMessage.Size) &&
+		(value.ContextActive == 0 || value.EventClass != 0) &&
+		(value.Pending == 0 ||
+			(value.EventMessage.IsNotNull && value.EventClass != 0));
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR owner, MuiWindowEventReuseStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(ref platform, value) && !owner.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, owner).IsNull;
+
+	private static bool IsMapped<TPlatform>(ref TPlatform platform, APTR value,
+		uint size) where TPlatform : struct, IMuiGuestMemory =>
+		value.IsNull || platform.IsMapped(value, size);
 }
 
 internal enum MuiWindowEventReuseStateField : byte
@@ -48,19 +86,61 @@ internal struct MuiWindowEventReuseStateFieldCursor
 
 internal static class MuiWindowEventReuseStateFieldCursorCodec
 {
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiWindowEventReuseStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiWindowEventReuseStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowEventReuseStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowEventReuseStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+	}
+}
+
+// Struct-first guest-memory adapter. Dispatch context and reuse state stay
+// named fields; the bounded adapter is the sole fixed-layout translation for
+// event-message/input capabilities and the signed key value.
+internal static class MuiWindowEventReuseStateRecordMemoryCodec
+{
 	private static bool TryResolve(MuiWindowEventReuseStateField field,
 		out uint offset)
 	{
 		switch (field)
 		{
 			case MuiWindowEventReuseStateField.Magic:
+				offset = MuiWindowEventReuseStateRecord.MagicOffset;
+				return true;
 			case MuiWindowEventReuseStateField.ContextActive:
+				offset = MuiWindowEventReuseStateRecord.ContextActiveOffset;
+				return true;
 			case MuiWindowEventReuseStateField.Pending:
+				offset = MuiWindowEventReuseStateRecord.PendingOffset;
+				return true;
 			case MuiWindowEventReuseStateField.EventMessage:
+				offset = MuiWindowEventReuseStateRecord.EventMessageOffset;
+				return true;
 			case MuiWindowEventReuseStateField.InputEvent:
+				offset = MuiWindowEventReuseStateRecord.InputEventOffset;
+				return true;
 			case MuiWindowEventReuseStateField.EventClass:
+				offset = MuiWindowEventReuseStateRecord.EventClassOffset;
+				return true;
 			case MuiWindowEventReuseStateField.MuiKey:
-				offset = (uint)field * 4;
+				offset = MuiWindowEventReuseStateRecord.MuiKeyOffset;
 				return true;
 		}
 		offset = 0;
@@ -68,16 +148,15 @@ internal static class MuiWindowEventReuseStateFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiWindowEventReuseStateFieldCursor cursor, out APTR address)
+		APTR record, MuiWindowEventReuseStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiWindowEventReuseStateRecord.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiWindowEventReuseStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiWindowEventReuseStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -85,10 +164,7 @@ internal static class MuiWindowEventReuseStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiWindowEventReuseStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -97,10 +173,7 @@ internal static class MuiWindowEventReuseStateFieldCursorCodec
 		APTR record, MuiWindowEventReuseStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiWindowEventReuseStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -108,34 +181,30 @@ internal static class MuiWindowEventReuseStateFieldCursorCodec
 
 internal static class MuiWindowEventReuseStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiWindowEventReuseStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiWindowEventReuseStateRecord.Size) ||
-			!MuiWindowEventReuseStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowEventReuseStateField.Magic, out var magic) ||
-			magic != MuiWindowEventReuseStateRecord.Cookie ||
-			!MuiWindowEventReuseStateFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiWindowEventReuseStateField.Magic, out var magic) ||
+			!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiWindowEventReuseStateField.ContextActive,
 				out value.ContextActive) ||
-			!MuiWindowEventReuseStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowEventReuseStateField.Pending,
-				out value.Pending) ||
-			!MuiWindowEventReuseStateFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiWindowEventReuseStateField.Pending, out value.Pending) ||
+			!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiWindowEventReuseStateField.EventMessage,
 				out var eventMessage) ||
-			!MuiWindowEventReuseStateFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiWindowEventReuseStateField.InputEvent,
 				out var inputEvent) ||
-			!MuiWindowEventReuseStateFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiWindowEventReuseStateField.EventClass,
 				out value.EventClass) ||
-			!MuiWindowEventReuseStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowEventReuseStateField.MuiKey,
-				out var muiKey)) return false;
+			!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiWindowEventReuseStateField.MuiKey, out var muiKey)) return false;
 		value.Magic = magic;
 		value.EventMessage = APTR.FromPointer(eventMessage);
 		value.InputEvent = APTR.FromPointer(inputEvent);
@@ -143,38 +212,37 @@ internal static class MuiWindowEventReuseStateRecordCodec
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiWindowEventReuseStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiWindowEventReuseStateAdmission.Validate(ref platform, value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiWindowEventReuseStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiWindowEventReuseStateRecord.Size) || value.Magic !=
-			MuiWindowEventReuseStateRecord.Cookie) return false;
-		return MuiWindowEventReuseStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address, MuiWindowEventReuseStateField.Magic,
-			value.Magic) &&
-			MuiWindowEventReuseStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiWindowEventReuseStateField.ContextActive,
+		if (!MuiWindowEventReuseStateAdmission.Validate(ref platform, value))
+			return false;
+		return MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiWindowEventReuseStateField.Magic, value.Magic) &&
+			MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, MuiWindowEventReuseStateField.ContextActive,
 				value.ContextActive) &&
-			MuiWindowEventReuseStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiWindowEventReuseStateField.Pending, value.Pending) &&
-			MuiWindowEventReuseStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiWindowEventReuseStateField.EventMessage,
+			MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, MuiWindowEventReuseStateField.Pending,
+				value.Pending) &&
+			MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, MuiWindowEventReuseStateField.EventMessage,
 				value.EventMessage.Raw) &&
-			MuiWindowEventReuseStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiWindowEventReuseStateField.InputEvent,
+			MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, MuiWindowEventReuseStateField.InputEvent,
 				value.InputEvent.Raw) &&
-			MuiWindowEventReuseStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiWindowEventReuseStateField.EventClass,
+			MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, MuiWindowEventReuseStateField.EventClass,
 				value.EventClass) &&
-			MuiWindowEventReuseStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiWindowEventReuseStateField.MuiKey,
+			MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, MuiWindowEventReuseStateField.MuiKey,
 				unchecked((uint)value.MuiKey));
 	}
 }

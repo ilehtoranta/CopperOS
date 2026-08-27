@@ -43,12 +43,9 @@ internal static class MuiGroupLayoutHookCore
 		if (!IsPublicGetterAttribute(attribute) ||
 			!MuiGroupChangeCore.IsGroupObject(ref platform, state, group))
 			return false;
-		if (TryReadEffectiveState(ref platform, state, group,
-			out var hookState))
-		{
-			value = hookState.Hook.Raw;
-			return true;
-		}
+		if (!TryReadEffectiveState(ref platform, state, group,
+			out var hookState)) return false;
+		value = hookState.Hook.Raw;
 		return true;
 	}
 
@@ -185,7 +182,7 @@ internal static class MuiGroupLayoutHookCore
 		return true;
 	}
 
-	private static bool TryReadEffectiveState<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadEffectiveState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR group, out MuiGroupLayoutHookStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
@@ -193,13 +190,14 @@ internal static class MuiGroupLayoutHookCore
 		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, group);
 		if (record.IsNull) return false;
 		if (TryReadState(ref platform, state, record, out value)) return true;
+		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, group,
+			StateAttribute, out var stateBlock) && stateBlock != 0) return false;
+		value.Magic = MuiGroupLayoutHookStateRecord.Cookie;
 		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, group,
 			Attribute, out var hook))
 		{
-			value.Magic = MuiGroupLayoutHookStateRecord.Cookie;
 			return true;
 		}
-		value.Magic = MuiGroupLayoutHookStateRecord.Cookie;
 		value.Hook = APTR.FromPointer(hook);
 		return true;
 	}
@@ -215,6 +213,7 @@ internal static class MuiGroupLayoutHookCore
 			var existingBlock = APTR.FromPointer(existing);
 			if (MuiGroupLayoutHookStateRecordCodec.TryRead(ref platform,
 				existingBlock, out _)) return existingBlock;
+			return APTR.Null;
 		}
 		var block = MuiHeadlessMemory.Allocate(ref platform,
 			MuiGroupLayoutHookStateRecord.Size);
@@ -242,8 +241,11 @@ internal static class MuiGroupLayoutHookCore
 		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
 			objectValue.Boopsi, StateAttribute,
 			out var blockRaw) || blockRaw == 0) return false;
-		return MuiGroupLayoutHookStateRecordCodec.TryRead(ref platform,
-			APTR.FromPointer(blockRaw), out value);
+		return MuiGroupLayoutHookStateRecordCodec.TryReadStructural(ref platform,
+			APTR.FromPointer(blockRaw), out value) &&
+			MuiGroupLayoutHookStateAdmission.ValidateLive(ref platform, state,
+				objectValue.Boopsi, value) &&
+			MuiGroupLayoutHookStateValidation.IsValidState(value);
 	}
 
 	internal static void Cleanup<TPlatform>(ref TPlatform platform, APTR state,

@@ -32,6 +32,12 @@ public struct MuiControlFontResolution
 public struct MuiControlFontResolutionRecord
 {
 	public const uint Size = 20;
+	public const uint FieldSize = 4;
+	public const uint MagicOffset = 0;
+	public const uint PresentOffset = 4;
+	public const uint InheritedOffset = 8;
+	public const uint DepthOffset = 12;
+	public const uint FontOffset = 16;
 	public const uint Cookie = 0x4D434652u; // 'MCFR'
 
 	public uint Magic;
@@ -41,6 +47,74 @@ public struct MuiControlFontResolutionRecord
 	public APTR Font;
 }
 
+internal enum MuiControlFontResolutionRecordField : byte
+{
+	Magic,
+	Present,
+	Inherited,
+	Depth,
+	Font,
+}
+
+// Struct-first adapter for the effective-font projection. The resolver and
+// callers exchange a named record; this bounded layer alone translates its
+// five 68k LONG fields in guest memory.
+internal static class MuiControlFontResolutionRecordMemoryCodec
+{
+	private static bool TryResolve(MuiControlFontResolutionRecordField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiControlFontResolutionRecordField.Magic:
+				offset = MuiControlFontResolutionRecord.MagicOffset; return true;
+			case MuiControlFontResolutionRecordField.Present:
+				offset = MuiControlFontResolutionRecord.PresentOffset; return true;
+			case MuiControlFontResolutionRecordField.Inherited:
+				offset = MuiControlFontResolutionRecord.InheritedOffset; return true;
+			case MuiControlFontResolutionRecordField.Depth:
+				offset = MuiControlFontResolutionRecord.DepthOffset; return true;
+			case MuiControlFontResolutionRecordField.Font:
+				offset = MuiControlFontResolutionRecord.FontOffset; return true;
+		}
+		offset = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiControlFontResolutionRecordField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiControlFontResolutionRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiControlFontResolutionRecord.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiControlFontResolutionRecordField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiControlFontResolutionRecordField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 public static class MuiControlFontResolutionRecordCodec
 {
 	public static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -48,13 +122,17 @@ public static class MuiControlFontResolutionRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiControlFontResolutionRecord.Size)) return false;
-		value.Magic = platform.ReadUInt32(address, 0);
-		value.Present = platform.ReadUInt32(address, 4);
-		value.Inherited = platform.ReadUInt32(address, 8);
-		value.Depth = platform.ReadUInt32(address, 12);
-		value.Font = APTR.FromPointer(platform.ReadUInt32(address, 16));
+		if (!MuiControlFontResolutionRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiControlFontResolutionRecordField.Magic, out value.Magic) ||
+			!MuiControlFontResolutionRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiControlFontResolutionRecordField.Present, out value.Present) ||
+			!MuiControlFontResolutionRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiControlFontResolutionRecordField.Inherited, out value.Inherited) ||
+			!MuiControlFontResolutionRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiControlFontResolutionRecordField.Depth, out value.Depth) ||
+			!MuiControlFontResolutionRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiControlFontResolutionRecordField.Font, out var font)) return false;
+		value.Font = APTR.FromPointer(font);
 		return value.Magic == MuiControlFontResolutionRecord.Cookie &&
 			value.Present <= 1 && value.Inherited <= 1;
 	}
@@ -67,12 +145,16 @@ public static class MuiControlFontResolutionRecordCodec
 			MuiControlFontResolutionRecord.Size) ||
 			value.Magic != MuiControlFontResolutionRecord.Cookie ||
 			value.Present > 1 || value.Inherited > 1) return false;
-		platform.WriteUInt32(address, 0, value.Magic);
-		platform.WriteUInt32(address, 4, value.Present);
-		platform.WriteUInt32(address, 8, value.Inherited);
-		platform.WriteUInt32(address, 12, value.Depth);
-		platform.WriteUInt32(address, 16, value.Font.Raw);
-		return true;
+		return MuiControlFontResolutionRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiControlFontResolutionRecordField.Magic, value.Magic) &&
+			MuiControlFontResolutionRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiControlFontResolutionRecordField.Present, value.Present) &&
+			MuiControlFontResolutionRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiControlFontResolutionRecordField.Inherited, value.Inherited) &&
+			MuiControlFontResolutionRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiControlFontResolutionRecordField.Depth, value.Depth) &&
+			MuiControlFontResolutionRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiControlFontResolutionRecordField.Font, value.Font.Raw);
 	}
 }
 

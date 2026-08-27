@@ -36,6 +36,80 @@ public sealed class MuiAreaCycleChainTests
 	}
 
 	[Fact]
+	public void StateRecordUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1540);
+		var value = default(MuiAreaCycleChainStateRecord);
+		value.Magic = MuiAreaCycleChainStateRecord.Cookie;
+		value.Value = int.MinValue;
+		value.Generation = 7;
+
+		Assert.True(MuiAreaCycleChainStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiAreaCycleChainStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Value, decoded.Value);
+		Assert.Equal(value.Generation, decoded.Generation);
+		Assert.True(MuiAreaCycleChainStateRecordCodec.TryRead(ref platform,
+			address, out decoded));
+		Assert.False(MuiAreaCycleChainStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void CycleChainAdmissionRequiresGenerationAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var valid = new MuiAreaCycleChainStateRecord
+		{
+			Magic = MuiAreaCycleChainStateRecord.Cookie,
+			Value = -2,
+			Generation = 1,
+		};
+		Assert.True(MuiAreaCycleChainStateAdmission.Validate(valid));
+		Assert.True(MuiAreaCycleChainStateAdmission.ValidateLive(ref platform,
+			State, obj, valid));
+		var malformed = valid;
+		malformed.Generation = 0;
+		Assert.False(MuiAreaCycleChainStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaCycleChainStateAdmission.ValidateLive(ref platform,
+			State, obj, malformed));
+		Assert.False(MuiAreaCycleChainStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedCycleChainFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiAreaCycleChainPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaCycleChainCore.StateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaCycleChainStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiAreaCycleChainStateField.Generation, 0));
+		Assert.True(MuiAreaCycleChainStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(0u, structural.Generation);
+		Assert.False(MuiAreaCycleChainStateAdmission.Validate(structural));
+		Assert.False(MuiAreaCycleChainStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		var allocationsBefore = platform.AllocationCount;
+		Assert.False(MuiAreaCycleChainPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaCycleChainCore.StateKey));
+	}
+
+	[Fact]
 	public void TypedCycleChainStateRoundTripsSignedValues()
 	{
 		var platform = CreatePlatform(out var areaClass);

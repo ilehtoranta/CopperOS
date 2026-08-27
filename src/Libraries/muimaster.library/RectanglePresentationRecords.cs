@@ -8,8 +8,9 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
-// Rectangle decorative-bar state. The ULONG flags retain MorphOS semantics
-// while construction and drawing consume one named presentation value.
+// Rectangle decorative-bar state. MorphOS documents HBar and VBar as BOOL;
+// retain their guest-width representation while admitting only canonical
+// values at the named state boundary.
 public struct MuiRectanglePresentationState
 {
 	public uint HorizontalBar;
@@ -94,41 +95,94 @@ internal static class MuiRectanglePresentationStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Bar flags remain named semantic fields;
+// fixed guest-layout translation is bounded to this adapter.
+internal static class MuiRectanglePresentationStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiRectanglePresentationStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiRectanglePresentationStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiRectanglePresentationStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiRectanglePresentationStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiRectanglePresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiRectanglePresentationStateRecord.Size) ||
-			!MuiRectanglePresentationStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiRectanglePresentationStateField.Magic, out var magic) ||
-			magic != MuiRectanglePresentationStateRecord.Cookie) return false;
-		value.Magic = magic;
-		return MuiRectanglePresentationStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiRectanglePresentationStateField.HorizontalBar,
-			out value.HorizontalBar) &&
-			MuiRectanglePresentationStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiRectanglePresentationStateField.VerticalBar,
-			out value.VerticalBar);
+		if (!MuiRectanglePresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic)) return false;
+		return MuiRectanglePresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out value.HorizontalBar) &&
+			MuiRectanglePresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 8, out value.VerticalBar);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiRectanglePresentationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiRectanglePresentationStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiRectanglePresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiRectanglePresentationStateRecord.Size) || value.Magic !=
-			MuiRectanglePresentationStateRecord.Cookie) return false;
-		return MuiRectanglePresentationStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiRectanglePresentationStateField.Magic, value.Magic) &&
-			MuiRectanglePresentationStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiRectanglePresentationStateField.HorizontalBar,
-			value.HorizontalBar) &&
-			MuiRectanglePresentationStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiRectanglePresentationStateField.VerticalBar,
-			value.VerticalBar);
+		if (!MuiRectanglePresentationStateAdmission.Validate(value)) return false;
+		return MuiRectanglePresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiRectanglePresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 4, value.HorizontalBar) &&
+			MuiRectanglePresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 8, value.VerticalBar);
 	}
+}
+
+internal static class MuiRectanglePresentationStateAdmission
+{
+	internal static bool Validate(MuiRectanglePresentationState value) =>
+		value.HorizontalBar <= 1 && value.VerticalBar <= 1;
+
+	internal static bool Validate(MuiRectanglePresentationStateRecord value)
+	{
+		if (value.Magic != MuiRectanglePresentationStateRecord.Cookie) return false;
+		var state = default(MuiRectanglePresentationState);
+		state.HorizontalBar = value.HorizontalBar;
+		state.VerticalBar = value.VerticalBar;
+		return Validate(state);
+	}
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiRectanglePresentationStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 }

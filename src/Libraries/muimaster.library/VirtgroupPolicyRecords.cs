@@ -25,6 +25,14 @@ public struct MuiVirtgroupPolicyState
 internal struct MuiVirtgroupPolicyStateRecord
 {
 	internal const uint Size = 28;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint InputOffset = 4;
+	internal const uint WidthOffset = 8;
+	internal const uint HeightOffset = 12;
+	internal const uint LeftOffset = 16;
+	internal const uint TopOffset = 20;
+	internal const uint TryFitOffset = 24;
 	internal const uint Cookie = 0x56504750u; // 'VPGP'
 
 	internal uint Magic;
@@ -54,39 +62,95 @@ internal struct MuiVirtgroupPolicyStateFieldCursor
 	internal MuiVirtgroupPolicyStateField Field;
 }
 
+internal static class MuiVirtgroupPolicyStateValidation
+{
+	// MorphOS BOOL attributes are canonical guest values.  Signed geometry is
+	// intentionally left as int32: VirtualLeft/Top may be negative at the
+	// public boundary while LayoutCore applies the live viewport constraints.
+	internal static bool IsValid(MuiVirtgroupPolicyStateRecord value) =>
+		value.Magic == MuiVirtgroupPolicyStateRecord.Cookie &&
+		value.Input <= 1 && value.TryFit <= 1;
+}
+
+internal static class MuiVirtgroupPolicyStateAdmission
+{
+	internal static bool Validate(MuiVirtgroupPolicyStateRecord value) =>
+		MuiVirtgroupPolicyStateValidation.IsValid(value);
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiVirtgroupPolicyStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
+}
+
 internal static class MuiVirtgroupPolicyStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiVirtgroupPolicyStateField field,
-		out uint offset)
-	{
-		switch (field)
-		{
-			case MuiVirtgroupPolicyStateField.Magic:
-			case MuiVirtgroupPolicyStateField.Input:
-			case MuiVirtgroupPolicyStateField.Width:
-			case MuiVirtgroupPolicyStateField.Height:
-			case MuiVirtgroupPolicyStateField.Left:
-			case MuiVirtgroupPolicyStateField.Top:
-			case MuiVirtgroupPolicyStateField.TryFit:
-				offset = (uint)field * 4;
-				return true;
-			default:
-				offset = 0;
-				return false;
-		}
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiVirtgroupPolicyStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiVirtgroupPolicyStateRecord.Size))
+		return MuiVirtgroupPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiVirtgroupPolicyStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiVirtgroupPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiVirtgroupPolicyStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiVirtgroupPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+	}
+}
+
+// Struct-first guest-memory adapter. Signed virtual geometry and BOOL policy
+// values remain named semantic fields; bounded fixed-layout translation lives
+// here.
+internal static class MuiVirtgroupPolicyStateRecordMemoryCodec
+{
+	private static bool TryResolve(MuiVirtgroupPolicyStateField field,
+		out uint offset)
+	{
+		if (field == MuiVirtgroupPolicyStateField.Magic)
+			offset = MuiVirtgroupPolicyStateRecord.MagicOffset;
+		else if (field == MuiVirtgroupPolicyStateField.Input)
+			offset = MuiVirtgroupPolicyStateRecord.InputOffset;
+		else if (field == MuiVirtgroupPolicyStateField.Width)
+			offset = MuiVirtgroupPolicyStateRecord.WidthOffset;
+		else if (field == MuiVirtgroupPolicyStateField.Height)
+			offset = MuiVirtgroupPolicyStateRecord.HeightOffset;
+		else if (field == MuiVirtgroupPolicyStateField.Left)
+			offset = MuiVirtgroupPolicyStateRecord.LeftOffset;
+		else if (field == MuiVirtgroupPolicyStateField.Top)
+			offset = MuiVirtgroupPolicyStateRecord.TopOffset;
+		else if (field == MuiVirtgroupPolicyStateField.TryFit)
+			offset = MuiVirtgroupPolicyStateRecord.TryFitOffset;
+		else
+		{
+			offset = 0;
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiVirtgroupPolicyStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiVirtgroupPolicyStateRecord.Size) &&
+			platform.IsMapped(address, MuiVirtgroupPolicyStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -94,10 +158,7 @@ internal static class MuiVirtgroupPolicyStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiVirtgroupPolicyStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -106,10 +167,7 @@ internal static class MuiVirtgroupPolicyStateFieldCursorCodec
 		APTR record, MuiVirtgroupPolicyStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiVirtgroupPolicyStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -117,65 +175,61 @@ internal static class MuiVirtgroupPolicyStateFieldCursorCodec
 
 internal static class MuiVirtgroupPolicyStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiVirtgroupPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiVirtgroupPolicyStateRecord.Size) ||
-			!MuiVirtgroupPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiVirtgroupPolicyStateField.Magic, out var magic) ||
-			magic != MuiVirtgroupPolicyStateRecord.Cookie ||
-			!MuiVirtgroupPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiVirtgroupPolicyStateField.Input, out var input) ||
-			!MuiVirtgroupPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiVirtgroupPolicyStateField.Width, out var width) ||
-			!MuiVirtgroupPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiVirtgroupPolicyStateField.Height, out var height) ||
-			!MuiVirtgroupPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiVirtgroupPolicyStateField.Left, out var left) ||
-			!MuiVirtgroupPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiVirtgroupPolicyStateField.Top, out var top) ||
-			!MuiVirtgroupPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiVirtgroupPolicyStateField.TryFit, out var tryFit))
+		if (!MuiVirtgroupPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiVirtgroupPolicyStateField.Magic, out var magic) ||
+			!MuiVirtgroupPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiVirtgroupPolicyStateField.Input, out var input) ||
+			!MuiVirtgroupPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiVirtgroupPolicyStateField.Width, out var width) ||
+			!MuiVirtgroupPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiVirtgroupPolicyStateField.Height, out var height) ||
+			!MuiVirtgroupPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiVirtgroupPolicyStateField.Left, out var left) ||
+			!MuiVirtgroupPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiVirtgroupPolicyStateField.Top, out var top) ||
+			!MuiVirtgroupPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiVirtgroupPolicyStateField.TryFit, out var tryFit))
 			return false;
 		value.Magic = magic;
-		value.Input = input == 0 ? 0u : 1u;
+		value.Input = input;
 		value.Width = unchecked((int)width);
 		value.Height = unchecked((int)height);
 		value.Left = unchecked((int)left);
 		value.Top = unchecked((int)top);
-		value.TryFit = tryFit == 0 ? 0u : 1u;
+		value.TryFit = tryFit;
 		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiVirtgroupPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiVirtgroupPolicyStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiVirtgroupPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiVirtgroupPolicyStateRecord.Size) || value.Magic !=
-			MuiVirtgroupPolicyStateRecord.Cookie) return false;
-		return MuiVirtgroupPolicyStateFieldCursorCodec.TryWriteUInt32(
+		if (!MuiVirtgroupPolicyStateAdmission.Validate(value)) return false;
+		return MuiVirtgroupPolicyStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiVirtgroupPolicyStateField.Magic, value.Magic) &&
-			MuiVirtgroupPolicyStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address, MuiVirtgroupPolicyStateField.Input,
-				value.Input == 0 ? 0u : 1u) &&
-			MuiVirtgroupPolicyStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address, MuiVirtgroupPolicyStateField.Width,
-				unchecked((uint)value.Width)) &&
-			MuiVirtgroupPolicyStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address, MuiVirtgroupPolicyStateField.Height,
-				unchecked((uint)value.Height)) &&
-			MuiVirtgroupPolicyStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address, MuiVirtgroupPolicyStateField.Left,
-				unchecked((uint)value.Left)) &&
-			MuiVirtgroupPolicyStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address, MuiVirtgroupPolicyStateField.Top,
-				unchecked((uint)value.Top)) &&
-			MuiVirtgroupPolicyStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address, MuiVirtgroupPolicyStateField.TryFit,
-				value.TryFit == 0 ? 0u : 1u);
+			MuiVirtgroupPolicyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiVirtgroupPolicyStateField.Input, value.Input) &&
+			MuiVirtgroupPolicyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiVirtgroupPolicyStateField.Width, unchecked((uint)value.Width)) &&
+			MuiVirtgroupPolicyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiVirtgroupPolicyStateField.Height, unchecked((uint)value.Height)) &&
+			MuiVirtgroupPolicyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiVirtgroupPolicyStateField.Left, unchecked((uint)value.Left)) &&
+			MuiVirtgroupPolicyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiVirtgroupPolicyStateField.Top, unchecked((uint)value.Top)) &&
+			MuiVirtgroupPolicyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiVirtgroupPolicyStateField.TryFit, value.TryFit);
 	}
 }

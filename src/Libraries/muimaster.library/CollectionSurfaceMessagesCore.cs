@@ -43,37 +43,64 @@ internal struct MuiCollectionSurfaceFieldCursor
 	internal MuiCollectionSurfaceField Field;
 }
 
-internal static class MuiCollectionSurfaceFieldCursorCodec
+// Named packet adapters keep collection surface payloads as semantic structs.
+// Only this memory layer translates their fixed guest boundaries.
+internal static class MuiCollectionSurfaceMessageMemoryCodec
 {
+	private static bool TryGetPacketSize(MuiCollectionSurfacePacketKind packet,
+		out uint size)
+	{
+		switch (packet)
+		{
+			case MuiCollectionSurfacePacketKind.Layout:
+				size = MuiCollectionLayoutMessage.Size;
+				return true;
+			case MuiCollectionSurfacePacketKind.AskMinMax:
+				size = MuiCollectionAskMinMaxMessage.Size;
+				return true;
+			case MuiCollectionSurfacePacketKind.Draw:
+				size = MuiCollectionDrawMessage.Size;
+				return true;
+			case MuiCollectionSurfacePacketKind.HandleInput:
+				size = MuiCollectionHandleInputMessage.Size;
+				return true;
+			case MuiCollectionSurfacePacketKind.Attribute:
+				size = MuiCollectionAttributeMessage.Size;
+				return true;
+		}
+		size = 0;
+		return false;
+	}
+
 	private static bool TryResolve(MuiCollectionSurfacePacketKind packet,
 		MuiCollectionSurfaceField field, out uint offset)
 	{
 		switch (packet)
 		{
 			case MuiCollectionSurfacePacketKind.Layout:
-				if (field == MuiCollectionSurfaceField.MethodId) { offset = 0; return true; }
-				if (field == MuiCollectionSurfaceField.Left) { offset = 4; return true; }
-				if (field == MuiCollectionSurfaceField.Top) { offset = 8; return true; }
-				if (field == MuiCollectionSurfaceField.Width) { offset = 12; return true; }
-				if (field == MuiCollectionSurfaceField.Height) { offset = 16; return true; }
+				if (field == MuiCollectionSurfaceField.MethodId) { offset = MuiCollectionLayoutMessage.MethodIdOffset; return true; }
+				if (field == MuiCollectionSurfaceField.Left) { offset = MuiCollectionLayoutMessage.LeftOffset; return true; }
+				if (field == MuiCollectionSurfaceField.Top) { offset = MuiCollectionLayoutMessage.TopOffset; return true; }
+				if (field == MuiCollectionSurfaceField.Width) { offset = MuiCollectionLayoutMessage.WidthOffset; return true; }
+				if (field == MuiCollectionSurfaceField.Height) { offset = MuiCollectionLayoutMessage.HeightOffset; return true; }
 				break;
 			case MuiCollectionSurfacePacketKind.AskMinMax:
-				if (field == MuiCollectionSurfaceField.MethodId) { offset = 0; return true; }
-				if (field == MuiCollectionSurfaceField.Storage) { offset = 4; return true; }
+				if (field == MuiCollectionSurfaceField.MethodId) { offset = MuiCollectionAskMinMaxMessage.MethodIdOffset; return true; }
+				if (field == MuiCollectionSurfaceField.Storage) { offset = MuiCollectionAskMinMaxMessage.StorageOffset; return true; }
 				break;
 			case MuiCollectionSurfacePacketKind.Draw:
-				if (field == MuiCollectionSurfaceField.MethodId) { offset = 0; return true; }
-				if (field == MuiCollectionSurfaceField.Flags) { offset = 4; return true; }
+				if (field == MuiCollectionSurfaceField.MethodId) { offset = MuiCollectionDrawMessage.MethodIdOffset; return true; }
+				if (field == MuiCollectionSurfaceField.Flags) { offset = MuiCollectionDrawMessage.FlagsOffset; return true; }
 				break;
 			case MuiCollectionSurfacePacketKind.HandleInput:
-				if (field == MuiCollectionSurfaceField.MethodId) { offset = 0; return true; }
-				if (field == MuiCollectionSurfaceField.IntuiMessage) { offset = 4; return true; }
-				if (field == MuiCollectionSurfaceField.MuiKey) { offset = 8; return true; }
+				if (field == MuiCollectionSurfaceField.MethodId) { offset = MuiCollectionHandleInputMessage.MethodIdOffset; return true; }
+				if (field == MuiCollectionSurfaceField.IntuiMessage) { offset = MuiCollectionHandleInputMessage.IntuiMessageOffset; return true; }
+				if (field == MuiCollectionSurfaceField.MuiKey) { offset = MuiCollectionHandleInputMessage.MuiKeyOffset; return true; }
 				break;
 			case MuiCollectionSurfacePacketKind.Attribute:
-				if (field == MuiCollectionSurfaceField.MethodId) { offset = 0; return true; }
-				if (field == MuiCollectionSurfaceField.Attribute) { offset = 4; return true; }
-				if (field == MuiCollectionSurfaceField.Value) { offset = 8; return true; }
+				if (field == MuiCollectionSurfaceField.MethodId) { offset = MuiCollectionAttributeMessage.MethodIdOffset; return true; }
+				if (field == MuiCollectionSurfaceField.Attribute) { offset = MuiCollectionAttributeMessage.AttributeOffset; return true; }
+				if (field == MuiCollectionSurfaceField.Value) { offset = MuiCollectionAttributeMessage.ValueOffset; return true; }
 				break;
 		}
 		offset = 0;
@@ -86,10 +113,24 @@ internal static class MuiCollectionSurfaceFieldCursorCodec
 	{
 		address = APTR.Null;
 		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset)
+			!TryGetPacketSize(cursor.Packet, out var packetSize) ||
+			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(cursor.Message, packetSize))
 			return false;
 		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiCollectionMethodMessage.FieldSize);
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionSurfacePacketKind packet,
+		MuiCollectionSurfaceField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiCollectionSurfaceFieldCursor);
+		cursor.Message = message;
+		cursor.Packet = packet;
+		cursor.Field = field;
+		return TryGetAddress(ref platform, cursor, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -120,6 +161,31 @@ internal static class MuiCollectionSurfaceFieldCursorCodec
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper for existing dispatcher and host callers. New code
+// should use the packet-named memory adapter above.
+internal static class MuiCollectionSurfaceFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiCollectionSurfaceFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiCollectionSurfaceMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionSurfacePacketKind packet,
+		MuiCollectionSurfaceField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiCollectionSurfaceMessageMemoryCodec.TryReadUInt32(ref platform,
+			message, packet, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionSurfacePacketKind packet,
+		MuiCollectionSurfaceField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiCollectionSurfaceMessageMemoryCodec.TryWriteUInt32(ref platform,
+			message, packet, field, value);
 }
 
 internal static class MuiCollectionSurfaceMessageCodec

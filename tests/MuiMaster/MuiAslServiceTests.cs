@@ -139,6 +139,52 @@ public sealed class MuiAslServiceTests
 	}
 
 	[Fact]
+	public void MalformedLeaseHeadFailsClosedBeforeCapabilityCalls()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		Assert.True(MuiAslServiceCore.Initialize(ref platform, State));
+		var lease = APTR.FromPointer(0x1300);
+		Assert.True(MuiAslServiceRecordPacketCore.WriteLease(ref platform, lease,
+			APTR.Null, APTR.Null, 4, APTR.Null));
+		Assert.True(MuiAslServiceRecordPacketCore.WriteState(ref platform, State,
+			MuiAslServiceLayout.Magic, lease, MuiAslServiceLayout.Version));
+
+		Assert.Equal(APTR.Null, MuiAslServiceCore.AllocAslRequest(ref platform,
+			State, 4, Tags));
+		Assert.Equal(0u, platform.AslAllocateCount);
+		Assert.Equal(0, MuiAslServiceCore.AslRequest(ref platform, State,
+			APTR.FromPointer(0x1E000), APTR.Null));
+		Assert.Equal(0u, platform.AslRequestCount);
+		Assert.False(MuiAslServiceCore.FreeAslRequest(ref platform, State,
+			APTR.FromPointer(0x1E000)));
+		Assert.Equal(0u, platform.AslFreeCount);
+	}
+
+	[Fact]
+	public void MalformedLiveLeaseFailsClosedBeforeRequestOrRelease()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		Assert.True(MuiAslServiceCore.Initialize(ref platform, State));
+		var requester = MuiAslServiceCore.AllocAslRequest(ref platform, State,
+			4, APTR.Null);
+		Assert.True(requester.IsNotNull);
+		Assert.True(MuiAslServiceStateCodec.TryRead(ref platform, State,
+			out var state));
+		Assert.True(state.Head.IsNotNull);
+		Assert.True(MuiAslServiceRecordPacketCore.WriteLease(ref platform,
+			state.Head, APTR.Null, APTR.Null, 4, APTR.Null));
+
+		Assert.Equal(0, MuiAslServiceCore.AslRequest(ref platform, State,
+			requester, APTR.Null));
+		Assert.Equal(0u, platform.AslRequestCount);
+		Assert.False(MuiAslServiceCore.FreeAslRequest(ref platform, State,
+			requester));
+		Assert.Equal(0u, platform.AslFreeCount);
+	}
+
+	[Fact]
 	public void AslTagItemEntryUsesNamedCursorBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

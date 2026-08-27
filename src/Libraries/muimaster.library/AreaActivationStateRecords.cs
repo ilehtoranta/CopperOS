@@ -15,11 +15,32 @@ namespace CopperOS.MuiMaster;
 internal struct MuiAreaActivationStateRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint SignatureOffset = 0;
+	internal const uint ActiveOffset = 4;
+	internal const uint FlagsOffset = 8;
+	internal const uint GenerationOffset = 12;
 	internal const uint Cookie = 0x41435456u; // "ACTV"
 	internal uint Signature;
 	internal uint Active;
 	internal uint Flags;
 	internal uint Generation;
+}
+
+// Active is a MorphOS BOOL projection and must remain canonical. Flags and
+// Generation retain their complete ULONG ranges; the record is published only
+// for a live Area object so malformed activation state cannot drive consumers.
+internal static class MuiAreaActivationStateAdmission
+{
+	internal static bool Validate(MuiAreaActivationStateRecord value) =>
+		value.Signature == MuiAreaActivationStateRecord.Cookie &&
+		value.Active <= 1;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiAreaActivationStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 }
 
 internal enum MuiAreaActivationStateField : byte
@@ -39,22 +60,52 @@ internal struct MuiAreaActivationStateFieldCursor
 
 internal static class MuiAreaActivationStateFieldCursorCodec
 {
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaActivationStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaActivationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Address, cursor.Field, out address);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaActivationStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaActivationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, field, out value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaActivationStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaActivationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, field, value);
+	}
+}
+
+// Fixed Area activation state is transferred as a named record. Numeric guest
+// positions are confined to this ABI adapter; the compatibility cursor above
+// remains available only to legacy callers and malformed-state diagnostics.
+internal static class MuiAreaActivationStateRecordMemoryCodec
+{
 	private static bool TryResolve(MuiAreaActivationStateField field,
 		out uint offset)
 	{
 		switch (field)
 		{
 			case MuiAreaActivationStateField.Signature:
-				offset = 0;
+				offset = MuiAreaActivationStateRecord.SignatureOffset;
 				return true;
 			case MuiAreaActivationStateField.Active:
-				offset = 4;
+				offset = MuiAreaActivationStateRecord.ActiveOffset;
 				return true;
 			case MuiAreaActivationStateField.Flags:
-				offset = 8;
+				offset = MuiAreaActivationStateRecord.FlagsOffset;
 				return true;
 			case MuiAreaActivationStateField.Generation:
-				offset = 12;
+				offset = MuiAreaActivationStateRecord.GenerationOffset;
 				return true;
 		}
 		offset = 0;
@@ -62,83 +113,85 @@ internal static class MuiAreaActivationStateFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiAreaActivationStateFieldCursor cursor, out APTR address)
+		APTR record, MuiAreaActivationStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, MuiAreaActivationStateRecord.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset)
 			return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiAreaActivationStateRecord.Size) &&
+			platform.IsMapped(address, MuiAreaActivationStateRecord.FieldSize);
 	}
 
-	internal static bool TryRead<TPlatform>(ref TPlatform platform,
-		APTR address, MuiAreaActivationStateField field, out uint value)
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaActivationStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaActivationStateFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, record, field, out var address))
 			return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
+		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
 
-	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
-		APTR address, MuiAreaActivationStateField field, uint value)
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaActivationStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaActivationStateFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, record, field, out var address))
 			return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
+		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
 internal static class MuiAreaActivationStateCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiAreaActivationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaActivationStateRecord.Size) ||
-			!MuiAreaActivationStateFieldCursorCodec.TryRead(ref platform, address,
-				MuiAreaActivationStateField.Signature, out value.Signature) ||
-			!MuiAreaActivationStateFieldCursorCodec.TryRead(ref platform, address,
-				MuiAreaActivationStateField.Active, out value.Active) ||
-			!MuiAreaActivationStateFieldCursorCodec.TryRead(ref platform, address,
-				MuiAreaActivationStateField.Flags, out value.Flags) ||
-			!MuiAreaActivationStateFieldCursorCodec.TryRead(ref platform, address,
-				MuiAreaActivationStateField.Generation, out value.Generation) ||
-			value.Signature != MuiAreaActivationStateRecord.Cookie)
+		if (!MuiAreaActivationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaActivationStateField.Signature,
+			out value.Signature) ||
+			!MuiAreaActivationStateRecordMemoryCodec.TryReadUInt32(
+				ref platform, address, MuiAreaActivationStateField.Active,
+				out value.Active) ||
+			!MuiAreaActivationStateRecordMemoryCodec.TryReadUInt32(
+				ref platform, address, MuiAreaActivationStateField.Flags,
+				out value.Flags) ||
+			!MuiAreaActivationStateRecordMemoryCodec.TryReadUInt32(
+				ref platform, address, MuiAreaActivationStateField.Generation,
+				out value.Generation))
 			return false;
 		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiAreaActivationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiAreaActivationStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaActivationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || value.Signature != MuiAreaActivationStateRecord.Cookie ||
+		if (address.IsNull || !MuiAreaActivationStateAdmission.Validate(value) ||
 			!platform.IsMapped(address, MuiAreaActivationStateRecord.Size))
 			return false;
-		return MuiAreaActivationStateFieldCursorCodec.TryWrite(ref platform,
-			address, MuiAreaActivationStateField.Signature, value.Signature) &&
-			MuiAreaActivationStateFieldCursorCodec.TryWrite(ref platform, address,
-				MuiAreaActivationStateField.Active, value.Active) &&
-			MuiAreaActivationStateFieldCursorCodec.TryWrite(ref platform, address,
-				MuiAreaActivationStateField.Flags, value.Flags) &&
-			MuiAreaActivationStateFieldCursorCodec.TryWrite(ref platform, address,
-				MuiAreaActivationStateField.Generation, value.Generation);
+		return MuiAreaActivationStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaActivationStateField.Signature,
+			value.Signature) &&
+			MuiAreaActivationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiAreaActivationStateField.Active, value.Active) &&
+			MuiAreaActivationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiAreaActivationStateField.Flags, value.Flags) &&
+			MuiAreaActivationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiAreaActivationStateField.Generation, value.Generation);
 	}
 }
-

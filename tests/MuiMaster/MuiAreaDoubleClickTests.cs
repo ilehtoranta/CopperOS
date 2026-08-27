@@ -36,6 +36,80 @@ public sealed class MuiAreaDoubleClickTests
 	}
 
 	[Fact]
+	public void AreaDoubleClickStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1580);
+		var value = default(MuiAreaDoubleClickStateRecord);
+		value.Magic = MuiAreaDoubleClickStateRecord.Cookie;
+		value.Value = int.MinValue;
+		value.Generation = 7;
+
+		Assert.True(MuiAreaDoubleClickStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiAreaDoubleClickStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Value, decoded.Value);
+		Assert.Equal(value.Generation, decoded.Generation);
+		Assert.True(MuiAreaDoubleClickStateRecordCodec.TryRead(ref platform,
+			address, out decoded));
+		Assert.False(MuiAreaDoubleClickStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void DoubleClickAdmissionRequiresGenerationAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var valid = new MuiAreaDoubleClickStateRecord
+		{
+			Magic = MuiAreaDoubleClickStateRecord.Cookie,
+			Value = -2,
+			Generation = 1,
+		};
+		Assert.True(MuiAreaDoubleClickStateAdmission.Validate(valid));
+		Assert.True(MuiAreaDoubleClickStateAdmission.ValidateLive(ref platform,
+			State, obj, valid));
+		var malformed = valid;
+		malformed.Generation = 0;
+		Assert.False(MuiAreaDoubleClickStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaDoubleClickStateAdmission.ValidateLive(ref platform,
+			State, obj, malformed));
+		Assert.False(MuiAreaDoubleClickStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedDoubleClickFailsClosedBeforeRawRepair()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiAreaDoubleClickPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaDoubleClickCore.StateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaDoubleClickStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiAreaDoubleClickStateField.Generation, 0));
+		Assert.True(MuiAreaDoubleClickStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(0u, structural.Generation);
+		Assert.False(MuiAreaDoubleClickStateAdmission.Validate(structural));
+		Assert.False(MuiAreaDoubleClickStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		var allocationsBefore = platform.AllocationCount;
+		Assert.False(MuiAreaDoubleClickPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaDoubleClickCore.StateKey));
+	}
+
+	[Fact]
 	public void TypedDoubleClickStatePublishesAndReadsSignedValues()
 	{
 		var platform = CreatePlatform(out var areaClass);

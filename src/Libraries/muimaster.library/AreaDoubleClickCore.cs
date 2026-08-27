@@ -25,11 +25,18 @@ internal static class MuiAreaDoubleClickCore
 			MuiCommonControlCore.DoubleClick, out var raw);
 		var current = hasRaw ? unchecked((int)raw) : 0;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) ==
-			unchecked((int)MuiAreaDoubleClickStateRecord.Size) &&
-			MuiAreaDoubleClickStateRecordCodec.TryRead(ref platform, block,
-				out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateKey);
+		MuiAreaDoubleClickStateRecord record;
+		if (block.IsNotNull || length != 0)
 		{
+			// A present block is authoritative typed state. Reject malformed
+			// generation state instead of rebuilding the signal from raw storage.
+			if (length != unchecked((int)MuiAreaDoubleClickStateRecord.Size) ||
+				!MuiAreaDoubleClickStateRecordCodec.TryReadStructural(ref platform,
+					block, out record) ||
+				!MuiAreaDoubleClickStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
 			if (hasRaw && record.Value != current)
 			{
 				record.Value = current;
@@ -60,8 +67,9 @@ internal static class MuiAreaDoubleClickCore
 		record.Magic = MuiAreaDoubleClickStateRecord.Cookie;
 		record.Value = value;
 		record.Generation = generation == 0 ? 1u : generation;
-		var written = MuiAreaDoubleClickStateRecordCodec.Write(ref platform, scratch,
-			record);
+		var written = MuiAreaDoubleClickStateAdmission.ValidateLive(ref platform,
+			state, obj, record) && MuiAreaDoubleClickStateRecordCodec.Write(
+			ref platform, scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 			StateKey, scratch, unchecked((int)MuiAreaDoubleClickStateRecord.Size));
 		platform.Clear(scratch, MuiAreaDoubleClickStateRecord.Size);
@@ -77,6 +85,7 @@ internal static class MuiAreaDoubleClickCore
 			MuiCommonControlCore.Classify(ref platform, state, obj) ==
 			MuiControlClass.Unknown)
 			return false;
+		if (!TryReadState(ref platform, state, obj, out _)) return false;
 		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			MuiCommonControlCore.DoubleClick, unchecked((uint)value), notify))
 			return false;

@@ -223,6 +223,49 @@ internal static class MuiAslRequestLeaseCodec
 	}
 }
 
+// Structural codecs deliberately preserve the complete ABI record surface,
+// including values that are useful for packet qualification.  Live ASL
+// operations use this separate admission layer so a guest cannot turn an
+// arbitrary mapped block into a requester lease or a traversal edge.
+internal static class MuiAslServiceAdmission
+{
+	internal static bool TryReadReadyState<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAslServiceStateRecord record)
+		where TPlatform : struct, IMuiServicePlatform
+	{
+		record = default;
+		if ((address.Raw & 1u) != 0 ||
+			!MuiAslServiceStateCodec.TryRead(ref platform, address,
+			out record) || record.Magic != MuiAslServiceLayout.Magic ||
+			record.Generation != MuiAslServiceLayout.Version) return false;
+
+		var current = record.Head;
+		uint visited = 0;
+		while (current.IsNotNull)
+		{
+			if (visited++ >= MuiAslServiceLayout.MaximumTraversal ||
+				!TryReadLease(ref platform, current, out var lease)) return false;
+			current = lease.Next;
+		}
+		return true;
+	}
+
+	internal static bool TryReadLease<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAslRequestLeaseRecord record)
+		where TPlatform : struct, IMuiServicePlatform
+	{
+		record = default;
+		if ((address.Raw & 1u) != 0 ||
+			!MuiAslRequestLeaseCodec.TryRead(ref platform, address,
+			out record) || record.Requester.IsNull ||
+			(record.Next.IsNotNull && ((record.Next.Raw & 1u) != 0 ||
+				!platform.IsMapped(record.Next,
+				MuiAslRequestLeaseRecord.Size)))) return false;
+		return record.Tags.IsNull || MuiAslTagListCore.Validate(ref platform,
+			record.Tags);
+	}
+}
+
 // Scalar qualification surface for the guest-resident ASL state and lease
 // records. The production service remains responsible for capability calls;
 // this seam proves that the fixed layouts round-trip without managed state.
@@ -296,7 +339,8 @@ public static class MuiAslServiceCore
 		APTR serviceState, uint requestType, APTR tags)
 		where TPlatform : struct, IMuiServicePlatform
 	{
-		if (!Ready(ref platform, serviceState) ||
+		if (!MuiAslServiceAdmission.TryReadReadyState(ref platform,
+			serviceState, out _) ||
 			!MuiAslTagListCore.Validate(ref platform, tags)) return APTR.Null;
 		var requester = platform.AllocateRequest(requestType, tags);
 		if (requester.IsNull) return APTR.Null;
@@ -310,8 +354,8 @@ public static class MuiAslServiceCore
 			return APTR.Null;
 		}
 		platform.Clear(record, MuiAslRequestLeaseRecord.Size);
-		if (!MuiAslServiceStateCodec.TryRead(ref platform, serviceState,
-			out var state))
+		if (!MuiAslServiceAdmission.TryReadReadyState(ref platform,
+			serviceState, out var state))
 		{
 			platform.Free(record, MuiAslRequestLeaseRecord.Size);
 			platform.FreeRequest(requester);
@@ -342,7 +386,8 @@ public static class MuiAslServiceCore
 		APTR serviceState, APTR requester, APTR tags)
 		where TPlatform : struct, IMuiServicePlatform
 	{
-		if (!Ready(ref platform, serviceState) || requester.IsNull ||
+		if (!MuiAslServiceAdmission.TryReadReadyState(ref platform,
+			serviceState, out _) || requester.IsNull ||
 			Find(ref platform, serviceState, requester).IsNull ||
 			!MuiAslTagListCore.Validate(ref platform, tags)) return 0;
 		return platform.Request(requester, tags);
@@ -355,17 +400,18 @@ public static class MuiAslServiceCore
 		APTR serviceState, APTR requester)
 		where TPlatform : struct, IMuiServicePlatform
 	{
-		if (!Ready(ref platform, serviceState) || requester.IsNull) return false;
+		if (!MuiAslServiceAdmission.TryReadReadyState(ref platform,
+			serviceState, out _) || requester.IsNull) return false;
 		var record = Find(ref platform, serviceState, requester);
 		if (record.IsNull) return false;
-		if (!MuiAslServiceStateCodec.TryRead(ref platform, serviceState,
-			out var state)) return false;
+		if (!MuiAslServiceAdmission.TryReadReadyState(ref platform,
+			serviceState, out var state)) return false;
 		var current = state.Head;
 		APTR previous = APTR.Null;
 		uint visited = 0;
 		while (current.IsNotNull && visited++ < MuiAslServiceLayout.MaximumTraversal)
 		{
-			if (!MuiAslRequestLeaseCodec.TryRead(ref platform, current,
+			if (!MuiAslServiceAdmission.TryReadLease(ref platform, current,
 				out var currentRecord))
 				return false;
 			if (current.Raw == record.Raw)
@@ -379,7 +425,7 @@ public static class MuiAslServiceCore
 				}
 				else
 				{
-					if (!MuiAslRequestLeaseCodec.TryRead(ref platform, previous,
+					if (!MuiAslServiceAdmission.TryReadLease(ref platform, previous,
 						out var previousRecord)) return false;
 					previousRecord.Next = next;
 					if (!MuiAslRequestLeaseCodec.Write(ref platform, previous,
@@ -395,22 +441,16 @@ public static class MuiAslServiceCore
 		return false;
 	}
 
-	private static bool Ready<TPlatform>(ref TPlatform platform, APTR state)
-		where TPlatform : struct, IMuiServicePlatform =>
-		!state.IsNull && MuiAslServiceStateCodec.TryRead(ref platform, state,
-			out var record) && record.Magic == MuiAslServiceLayout.Magic &&
-		record.Generation == MuiAslServiceLayout.Version;
-
 	private static APTR Find<TPlatform>(ref TPlatform platform, APTR state,
 		APTR requester) where TPlatform : struct, IMuiServicePlatform
 	{
-		if (!MuiAslServiceStateCodec.TryRead(ref platform, state,
+		if (!MuiAslServiceAdmission.TryReadReadyState(ref platform, state,
 			out var service)) return APTR.Null;
 		var current = service.Head;
 		uint visited = 0;
 		while (current.IsNotNull && visited++ < MuiAslServiceLayout.MaximumTraversal)
 		{
-			if (!MuiAslRequestLeaseCodec.TryRead(ref platform, current,
+			if (!MuiAslServiceAdmission.TryReadLease(ref platform, current,
 				out var record))
 				return APTR.Null;
 			if (record.Requester.Raw == requester.Raw) return current;

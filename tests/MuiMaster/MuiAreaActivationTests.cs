@@ -96,8 +96,90 @@ public sealed class MuiAreaActivationTests
 			APTR.FromPointer(0x20FFFu), out _));
 		Assert.True(MuiAreaActivationStateFieldCursorCodec.TryWrite(ref platform,
 			address, MuiAreaActivationStateField.Signature, 0));
+		Assert.True(MuiAreaActivationStateCodec.TryReadStructural(ref platform,
+			address, out var malformed));
+		Assert.Equal(0u, malformed.Signature);
 		Assert.False(MuiAreaActivationStateCodec.TryRead(ref platform, address,
 			out _));
+	}
+
+	[Fact]
+	public void AreaActivationStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1580);
+		var value = default(MuiAreaActivationStateRecord);
+		value.Signature = MuiAreaActivationStateRecord.Cookie;
+		value.Active = 1;
+		value.Flags = 0xA5A5;
+		value.Generation = 9;
+
+		Assert.True(MuiAreaActivationStateCodec.Write(ref platform, address,
+			value));
+		Assert.True(MuiAreaActivationStateCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Signature, decoded.Signature);
+		Assert.Equal(value.Active, decoded.Active);
+		Assert.Equal(value.Flags, decoded.Flags);
+		Assert.Equal(value.Generation, decoded.Generation);
+		Assert.True(MuiAreaActivationStateCodec.TryRead(ref platform, address,
+			out decoded));
+		Assert.False(MuiAreaActivationStateCodec.TryReadStructural(ref platform,
+			APTR.Null, out _));
+	}
+
+	[Fact]
+	public void AreaActivationAdmissionValidatesBooleanAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var value = default(MuiAreaActivationStateRecord);
+		value.Signature = MuiAreaActivationStateRecord.Cookie;
+		Assert.True(MuiAreaActivationStateAdmission.Validate(value));
+		Assert.True(MuiAreaActivationStateAdmission.ValidateLive(ref platform,
+			State, obj, value));
+		value.Active = 1;
+		Assert.True(MuiAreaActivationStateAdmission.Validate(value));
+		value.Active = 2;
+		Assert.False(MuiAreaActivationStateAdmission.Validate(value));
+		value.Active = 1;
+		Assert.False(MuiAreaActivationStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x32000), value));
+	}
+
+	[Fact]
+	public void MalformedAreaActivationStateFailsClosedBeforeTransition()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiAreaActivationCore.GoActive(ref platform, State, obj, 7));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaActivationCore.StateKey);
+		Assert.True(block.IsNotNull);
+		platform.WriteUInt32(block, 4, 2);
+		Assert.False(MuiAreaActivationCore.TryGetState(ref platform, State, obj,
+			out _));
+		Assert.False(MuiAreaActivationCore.IsActive(ref platform, State, obj));
+		Assert.False(MuiAreaActivationCore.GoInactive(ref platform, State, obj,
+			11));
+		Assert.True(MuiAreaActivationStateCodec.TryReadStructural(ref platform,
+			block, out var structural));
+		Assert.Equal(2u, structural.Active);
+		Assert.Equal(7u, structural.Flags);
+		Assert.Equal(1u, structural.Generation);
+
+		// Repair the caller-owned sidecar before retrying; transition admission
+		// remains fail-closed while Active is non-canonical.
+		platform.WriteUInt32(block, 4, 1);
+		Assert.True(MuiAreaActivationCore.GoInactive(ref platform, State, obj,
+			11));
+		Assert.True(MuiAreaActivationCore.TryGetState(ref platform, State, obj,
+			out var repaired));
+		Assert.Equal(0u, repaired.Active);
+		Assert.Equal(11u, repaired.Flags);
+		Assert.Equal(2u, repaired.Generation);
 	}
 
 	[Fact]
@@ -184,6 +266,44 @@ public sealed class MuiAreaActivationTests
 		cursor.Field = MuiAreaActivationField.Flags;
 		Assert.False(MuiAreaActivationFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void AreaActivationRecordAdapterUsesStructMembers()
+	{
+		var platform = CreatePlatform(out _);
+		var packet = APTR.FromPointer(0x1280);
+		Assert.True(MuiAreaActivationRecordMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiAreaActivationPacketKind.Activation,
+			MuiAreaActivationField.MethodId, MuiAreaActivationMessageCodec.GoActive));
+		Assert.True(MuiAreaActivationRecordMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiAreaActivationPacketKind.Activation,
+			MuiAreaActivationField.Flags, 0xA5A5u));
+		Assert.True(MuiAreaActivationRecordMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiAreaActivationPacketKind.Activation,
+			MuiAreaActivationField.Flags, out var flagsAddress));
+		Assert.Equal(packet.Raw + MuiAreaActivationMessage.FlagsOffset,
+			flagsAddress.Raw);
+		Assert.True(MuiAreaActivationMessageCodec.TryRead(ref platform, packet,
+			out var decoded));
+		Assert.Equal(MuiAreaActivationMessageCodec.GoActive, decoded.MethodId);
+		Assert.Equal(0xA5A5u, decoded.Flags);
+
+		var method = APTR.FromPointer(0x12A0);
+		Assert.True(MuiAreaActivationRecordMemoryCodec.TryWriteUInt32(ref platform,
+			method, MuiAreaActivationPacketKind.Method,
+			MuiAreaActivationField.MethodId, MuiAreaActivationMessageCodec.GoInactive));
+		Assert.True(MuiAreaActivationRecordMemoryCodec.TryGetAddress(ref platform,
+			method, MuiAreaActivationPacketKind.Method,
+			MuiAreaActivationField.MethodId, out var methodAddress));
+		Assert.Equal(method.Raw + MuiAreaActivationMethodMessage.MethodIdOffset,
+			methodAddress.Raw);
+		Assert.False(MuiAreaActivationRecordMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiAreaActivationPacketKind.Method,
+			MuiAreaActivationField.Flags, out _));
+		Assert.False(MuiAreaActivationRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiAreaActivationPacketKind.Activation,
+			MuiAreaActivationField.Flags, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR areaClass)

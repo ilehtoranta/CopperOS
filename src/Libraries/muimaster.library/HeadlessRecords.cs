@@ -290,10 +290,19 @@ internal static class MuiHeadlessStateFieldCursorCodec
 	}
 }
 
+internal static class MuiHeadlessStateAdmission
+{
+	internal static bool Validate(MuiHeadlessStateRecord record) =>
+		record.Magic == MuiHeadlessLayout.Magic &&
+		record.Version == MuiHeadlessLayout.Version &&
+		record.NotifyDepth <= MuiHeadlessLayout.MaximumNotificationDepth;
+}
+
 internal static class MuiHeadlessStateCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiHeadlessStateRecord record) where TPlatform : struct, IMuiGuestMemory
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiHeadlessStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
 		if (address.IsNull || !platform.IsMapped(address,
@@ -318,11 +327,17 @@ internal static class MuiHeadlessStateCodec
 				MuiHeadlessStateField.Reserved, out record.Reserved);
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiHeadlessStateRecord record) where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out record) &&
+		MuiHeadlessStateAdmission.Validate(record);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiHeadlessStateRecord record) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !platform.IsMapped(address,
-			MuiHeadlessStateRecord.Size)) return false;
+			MuiHeadlessStateRecord.Size) ||
+			!MuiHeadlessStateAdmission.Validate(record)) return false;
 		return MuiHeadlessStateFieldCursorCodec.TryWrite(ref platform, address,
 			MuiHeadlessStateField.Magic, record.Magic) &&
 			MuiHeadlessStateFieldCursorCodec.TryWrite(ref platform, address,

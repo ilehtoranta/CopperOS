@@ -12,6 +12,8 @@ namespace CopperOS.MuiMaster;
 internal struct MuiCollectionMethodMessage
 {
 	public const uint Size = 4;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -19,6 +21,10 @@ internal struct MuiCollectionMethodMessage
 internal struct MuiCollectionInsertSingleMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint EntryOffset = 4;
+	public const uint PositionOffset = 8;
 	public uint MethodId;
 	public uint Entry;
 	public uint Position;
@@ -28,6 +34,11 @@ internal struct MuiCollectionInsertSingleMessage
 internal struct MuiCollectionInsertMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint EntriesOffset = 4;
+	public const uint CountOffset = 8;
+	public const uint PositionOffset = 12;
 	public uint MethodId;
 	// MorphOS MUIP_List_Insert: APTR *entries, LONG count, LONG pos.
 	// Keep the guest LONGs as raw words at the ABI boundary; the dispatcher
@@ -41,6 +52,10 @@ internal struct MuiCollectionInsertMessage
 internal struct MuiCollectionGetEntryMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint PositionOffset = 4;
+	public const uint StorageOffset = 8;
 	public uint MethodId;
 	public uint Position;
 	public uint Storage;
@@ -50,6 +65,11 @@ internal struct MuiCollectionGetEntryMessage
 internal struct MuiCollectionSelectMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint PositionOffset = 4;
+	public const uint SelectOffset = 8;
+	public const uint StorageOffset = 12;
 	public uint MethodId;
 	public uint Position;
 	public uint Select;
@@ -60,6 +80,9 @@ internal struct MuiCollectionSelectMessage
 internal struct MuiCollectionPositionMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint PositionOffset = 4;
 	public uint MethodId;
 	public uint Position;
 }
@@ -68,6 +91,10 @@ internal struct MuiCollectionPositionMessage
 internal struct MuiCollectionRedrawMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint PositionOffset = 4;
+	public const uint EntryOffset = 8;
 	public uint MethodId;
 	// MorphOS MUIP_List_Redraw: LONG pos, APTR entry.
 	public uint Position;
@@ -78,6 +105,9 @@ internal struct MuiCollectionRedrawMessage
 internal struct MuiCollectionPointerMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint PointerOffset = 4;
 	public uint MethodId;
 	public uint Pointer;
 }
@@ -86,6 +116,10 @@ internal struct MuiCollectionPointerMessage
 internal struct MuiCollectionPairMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint FirstOffset = 4;
+	public const uint SecondOffset = 8;
 	public uint MethodId;
 	public uint First;
 	public uint Second;
@@ -95,6 +129,10 @@ internal struct MuiCollectionPairMessage
 internal struct MuiCollectionCreateImageMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ImageOffset = 4;
+	public const uint FlagsOffset = 8;
 	public uint MethodId;
 	public uint Image;
 	public uint Flags;
@@ -104,6 +142,10 @@ internal struct MuiCollectionCreateImageMessage
 internal struct MuiCollectionEntryPoolMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint EntryOffset = 4;
+	public const uint PoolOffset = 8;
 	public uint MethodId;
 	public uint Entry;
 	public uint Pool;
@@ -113,6 +155,11 @@ internal struct MuiCollectionEntryPoolMessage
 internal struct MuiCollectionDisplayMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint EntryOffset = 4;
+	public const uint ArrayOffset = 8;
+	public const uint RowOffset = 12;
 	public uint MethodId;
 	public uint Entry;
 	public uint Array;
@@ -123,6 +170,11 @@ internal struct MuiCollectionDisplayMessage
 internal struct MuiCollectionCompareMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint Entry1Offset = 4;
+	public const uint Entry2Offset = 8;
+	public const uint ColumnOffset = 12;
 	public uint MethodId;
 	public uint Entry1;
 	public uint Entry2;
@@ -133,6 +185,11 @@ internal struct MuiCollectionCompareMessage
 internal struct MuiCollectionTestPosMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint XOffset = 4;
+	public const uint YOffset = 8;
+	public const uint ResultOffset = 12;
 	public uint MethodId;
 	public uint X;
 	public uint Y;
@@ -143,6 +200,12 @@ internal struct MuiCollectionTestPosMessage
 internal struct MuiCollectionLayoutMessage
 {
 	public const uint Size = 20;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint LeftOffset = 4;
+	public const uint TopOffset = 8;
+	public const uint WidthOffset = 12;
+	public const uint HeightOffset = 16;
 	public uint MethodId;
 	public uint Left;
 	public uint Top;
@@ -154,6 +217,9 @@ internal struct MuiCollectionLayoutMessage
 internal struct MuiCollectionAskMinMaxMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint StorageOffset = 4;
 	public uint MethodId;
 	public uint Storage;
 }
@@ -162,6 +228,9 @@ internal struct MuiCollectionAskMinMaxMessage
 internal struct MuiCollectionDrawMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint FlagsOffset = 4;
 	public uint MethodId;
 	public uint Flags;
 }
@@ -170,6 +239,10 @@ internal struct MuiCollectionDrawMessage
 internal struct MuiCollectionHandleInputMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint IntuiMessageOffset = 4;
+	public const uint MuiKeyOffset = 8;
 	public uint MethodId;
 	public uint IntuiMessage;
 	public int MuiKey;
@@ -179,6 +252,10 @@ internal struct MuiCollectionHandleInputMessage
 internal struct MuiCollectionAttributeMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint AttributeOffset = 4;
+	public const uint ValueOffset = 8;
 	public uint MethodId;
 	public uint Attribute;
 	public uint Value;
@@ -188,6 +265,11 @@ internal struct MuiCollectionAttributeMessage
 internal struct MuiCollectionCreateEditObjectMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint RowOffset = 4;
+	public const uint ColumnOffset = 8;
+	public const uint EntryOffset = 12;
 	public uint MethodId;
 	public int Row;
 	public int Column;
@@ -198,6 +280,10 @@ internal struct MuiCollectionCreateEditObjectMessage
 internal struct MuiCollectionEditMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint RowOffset = 4;
+	public const uint ColumnOffset = 8;
 	public uint MethodId;
 	public int Row;
 	public int Column;
@@ -207,6 +293,12 @@ internal struct MuiCollectionEditMessage
 internal struct MuiCollectionEditDoneMessage
 {
 	public const uint Size = 20;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint RowOffset = 4;
+	public const uint ColumnOffset = 8;
+	public const uint EntryOffset = 12;
+	public const uint EditObjectOffset = 16;
 	public uint MethodId;
 	public int Row;
 	public int Column;
@@ -218,6 +310,9 @@ internal struct MuiCollectionEditDoneMessage
 internal struct MuiCollectionEndEditMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ModeOffset = 4;
 	public uint MethodId;
 	public uint Mode;
 }

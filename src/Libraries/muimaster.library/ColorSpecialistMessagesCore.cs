@@ -37,51 +37,105 @@ internal struct MuiColorSpecialistFieldCursor
 	internal MuiColorSpecialistField Field;
 }
 
-internal static class MuiColorSpecialistFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed pen/color specialist
+// packets. Packet kinds own complete MorphOS record spans; field names select
+// members without exposing numeric positions to dispatch code.
+internal static class MuiColorSpecialistMessageMemoryCodec
 {
 	private static bool TryResolve(MuiColorSpecialistPacketKind packet,
-		MuiColorSpecialistField field, out uint offset)
+		MuiColorSpecialistField field, out uint offset, out uint size)
 	{
 		switch (packet)
 		{
 			case MuiColorSpecialistPacketKind.Method:
-				if (field == MuiColorSpecialistField.MethodId) { offset = 0; return true; }
-				break;
+				size = MuiColorSpecialistMethodMessage.Size;
+				if (field == MuiColorSpecialistField.MethodId)
+					offset = MuiColorSpecialistMethodMessage.MethodIdOffset;
+				else
+				{
+					offset = 0;
+					size = 0;
+					return false;
+				}
+				return true;
 			case MuiColorSpecialistPacketKind.Get:
-				if (field == MuiColorSpecialistField.MethodId) { offset = 0; return true; }
-				if (field == MuiColorSpecialistField.Attribute) { offset = 4; return true; }
-				if (field == MuiColorSpecialistField.Storage) { offset = 8; return true; }
-				break;
+				size = MuiColorSpecialistGetMessage.Size;
+				if (field == MuiColorSpecialistField.MethodId)
+					offset = MuiColorSpecialistGetMessage.MethodIdOffset;
+				else if (field == MuiColorSpecialistField.Attribute)
+					offset = MuiColorSpecialistGetMessage.AttributeOffset;
+				else if (field == MuiColorSpecialistField.Storage)
+					offset = MuiColorSpecialistGetMessage.StorageOffset;
+				else
+				{
+					offset = 0;
+					size = 0;
+					return false;
+				}
+				return true;
 			case MuiColorSpecialistPacketKind.Set:
-				if (field == MuiColorSpecialistField.MethodId) { offset = 0; return true; }
-				if (field == MuiColorSpecialistField.Attribute) { offset = 4; return true; }
-				if (field == MuiColorSpecialistField.Value) { offset = 8; return true; }
-				break;
+				size = MuiColorSpecialistSetMessage.Size;
+				if (field == MuiColorSpecialistField.MethodId)
+					offset = MuiColorSpecialistSetMessage.MethodIdOffset;
+				else if (field == MuiColorSpecialistField.Attribute)
+					offset = MuiColorSpecialistSetMessage.AttributeOffset;
+				else if (field == MuiColorSpecialistField.Value)
+					offset = MuiColorSpecialistSetMessage.ValueOffset;
+				else
+				{
+					offset = 0;
+					size = 0;
+					return false;
+				}
+				return true;
 			case MuiColorSpecialistPacketKind.Pointer:
-				if (field == MuiColorSpecialistField.MethodId) { offset = 0; return true; }
-				if (field == MuiColorSpecialistField.Pointer) { offset = 4; return true; }
-				break;
+				size = MuiColorSpecialistPointerMessage.Size;
+				if (field == MuiColorSpecialistField.MethodId)
+					offset = MuiColorSpecialistPointerMessage.MethodIdOffset;
+				else if (field == MuiColorSpecialistField.Pointer)
+					offset = MuiColorSpecialistPointerMessage.PointerOffset;
+				else
+				{
+					offset = 0;
+					size = 0;
+					return false;
+				}
+				return true;
 			case MuiColorSpecialistPacketKind.Rgb:
-				if (field == MuiColorSpecialistField.MethodId) { offset = 0; return true; }
-				if (field == MuiColorSpecialistField.Red) { offset = 4; return true; }
-				if (field == MuiColorSpecialistField.Green) { offset = 8; return true; }
-				if (field == MuiColorSpecialistField.Blue) { offset = 12; return true; }
-				break;
+				size = MuiColorSpecialistRgbMessage.Size;
+				if (field == MuiColorSpecialistField.MethodId)
+					offset = MuiColorSpecialistRgbMessage.MethodIdOffset;
+				else if (field == MuiColorSpecialistField.Red)
+					offset = MuiColorSpecialistRgbMessage.RedOffset;
+				else if (field == MuiColorSpecialistField.Green)
+					offset = MuiColorSpecialistRgbMessage.GreenOffset;
+				else if (field == MuiColorSpecialistField.Blue)
+					offset = MuiColorSpecialistRgbMessage.BlueOffset;
+				else
+				{
+					offset = 0;
+					size = 0;
+					return false;
+				}
+				return true;
 		}
 		offset = 0;
+		size = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiColorSpecialistFieldCursor cursor, out APTR address)
+		APTR message, MuiColorSpecialistPacketKind packet,
+		MuiColorSpecialistField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(packet, field, out var offset, out var size) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, size)) return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address,
+			MuiColorSpecialistMethodMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -90,11 +144,8 @@ internal static class MuiColorSpecialistFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiColorSpecialistFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -104,14 +155,36 @@ internal static class MuiColorSpecialistFieldCursorCodec
 		MuiColorSpecialistField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiColorSpecialistFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// field cursor. The live message codecs route to the struct adapter above.
+internal static class MuiColorSpecialistFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiColorSpecialistFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiColorSpecialistMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Packet, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiColorSpecialistPacketKind packet,
+		MuiColorSpecialistField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
+			message, packet, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiColorSpecialistPacketKind packet,
+		MuiColorSpecialistField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			message, packet, field, value);
 }
 
 // Central codec for the fixed MorphOS pen/color specialist packet family.

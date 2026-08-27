@@ -21,11 +21,27 @@ public struct MuiAreaDisappearPolicyStateInput
 internal struct MuiAreaDisappearPolicyStateRecord
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint HorizDisappearOffset = 4;
+	internal const uint VertDisappearOffset = 8;
 	internal const uint Cookie = 0x41445052u; // 'ADPR'
 
 	internal uint Magic;
 	internal int HorizDisappear;
 	internal int VertDisappear;
+}
+
+internal static class MuiAreaDisappearPolicyStateAdmission
+{
+	internal static bool Validate(MuiAreaDisappearPolicyStateRecord value) =>
+		value.Magic == MuiAreaDisappearPolicyStateRecord.Cookie;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiAreaDisappearPolicyStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) && !obj.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 }
 
 internal enum MuiAreaDisappearPolicyStateField : byte
@@ -44,37 +60,67 @@ internal struct MuiAreaDisappearPolicyStateFieldCursor
 
 internal static class MuiAreaDisappearPolicyStateFieldCursorCodec
 {
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDisappearPolicyStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaDisappearPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaDisappearPolicyStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaDisappearPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaDisappearPolicyStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaDisappearPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+	}
+}
+
+// Fixed Area disappearance policy is transferred as a named record. Numeric
+// guest positions are confined to this ABI adapter; the compatibility cursor
+// above remains available only to legacy callers and malformed-state
+// diagnostics.
+internal static class MuiAreaDisappearPolicyStateRecordMemoryCodec
+{
 	private static bool TryResolve(MuiAreaDisappearPolicyStateField field,
 		out uint offset)
 	{
 		switch (field)
 		{
 			case MuiAreaDisappearPolicyStateField.Magic:
-				offset = 0;
+				offset = MuiAreaDisappearPolicyStateRecord.MagicOffset;
 				return true;
 			case MuiAreaDisappearPolicyStateField.HorizDisappear:
-				offset = 4;
+				offset = MuiAreaDisappearPolicyStateRecord.HorizDisappearOffset;
 				return true;
 			case MuiAreaDisappearPolicyStateField.VertDisappear:
-				offset = 8;
+				offset = MuiAreaDisappearPolicyStateRecord.VertDisappearOffset;
 				return true;
-			default:
-				offset = 0;
-				return false;
 		}
+		offset = 0;
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiAreaDisappearPolicyStateFieldCursor cursor, out APTR address)
+		APTR record, MuiAreaDisappearPolicyStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record,
-				MuiAreaDisappearPolicyStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset)
+			return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiAreaDisappearPolicyStateRecord.Size) &&
+			platform.IsMapped(address, MuiAreaDisappearPolicyStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -82,10 +128,8 @@ internal static class MuiAreaDisappearPolicyStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaDisappearPolicyStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -94,10 +138,8 @@ internal static class MuiAreaDisappearPolicyStateFieldCursorCodec
 		APTR record, MuiAreaDisappearPolicyStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaDisappearPolicyStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -105,27 +147,32 @@ internal static class MuiAreaDisappearPolicyStateFieldCursorCodec
 
 internal static class MuiAreaDisappearPolicyStateRecordCodec
 {
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaDisappearPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiAreaDisappearPolicyStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaDisappearPolicyStateField.Magic,
+			out value.Magic) ||
+			!MuiAreaDisappearPolicyStateRecordMemoryCodec.TryReadUInt32(
+				ref platform, address,
+				MuiAreaDisappearPolicyStateField.HorizDisappear,
+				out var horizontal) ||
+			!MuiAreaDisappearPolicyStateRecordMemoryCodec.TryReadUInt32(
+				ref platform, address, MuiAreaDisappearPolicyStateField.VertDisappear,
+				out var vertical)) return false;
+		value.HorizDisappear = unchecked((int)horizontal);
+		value.VertDisappear = unchecked((int)vertical);
+		return true;
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAreaDisappearPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaDisappearPolicyStateRecord.Size) ||
-			!MuiAreaDisappearPolicyStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address, MuiAreaDisappearPolicyStateField.Magic,
-				out var magic) || magic != MuiAreaDisappearPolicyStateRecord.Cookie ||
-			!MuiAreaDisappearPolicyStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiAreaDisappearPolicyStateField.HorizDisappear, out var horizontal) ||
-			!MuiAreaDisappearPolicyStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiAreaDisappearPolicyStateField.VertDisappear, out var vertical))
-			return false;
-		value.Magic = magic;
-		value.HorizDisappear = unchecked((int)horizontal);
-		value.VertDisappear = unchecked((int)vertical);
-		return true;
+		return TryReadStructural(ref platform, address, out value) &&
+			MuiAreaDisappearPolicyStateAdmission.Validate(value);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
@@ -133,19 +180,16 @@ internal static class MuiAreaDisappearPolicyStateRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaDisappearPolicyStateRecord.Size) || value.Magic !=
-			MuiAreaDisappearPolicyStateRecord.Cookie) return false;
-		return MuiAreaDisappearPolicyStateFieldCursorCodec.TryWriteUInt32(
+			MuiAreaDisappearPolicyStateRecord.Size) ||
+			!MuiAreaDisappearPolicyStateAdmission.Validate(value)) return false;
+		return MuiAreaDisappearPolicyStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiAreaDisappearPolicyStateField.Magic,
 			value.Magic) &&
-			MuiAreaDisappearPolicyStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiAreaDisappearPolicyStateField.HorizDisappear,
+			MuiAreaDisappearPolicyStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, MuiAreaDisappearPolicyStateField.HorizDisappear,
 				unchecked((uint)value.HorizDisappear)) &&
-			MuiAreaDisappearPolicyStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiAreaDisappearPolicyStateField.VertDisappear,
+			MuiAreaDisappearPolicyStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, MuiAreaDisappearPolicyStateField.VertDisappear,
 				unchecked((uint)value.VertDisappear));
 	}
 }
-

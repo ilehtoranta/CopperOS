@@ -117,71 +117,110 @@ internal static class MuiStringscrollPointerStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. The named drag state remains the
+// semantic record; this bounded adapter owns fixed guest-layout translation.
+internal static class MuiStringscrollPointerStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiStringscrollPointerState.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiStringscrollPointerState.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+
+	internal static bool TryReadInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out int value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryReadUInt32(ref platform, record, offset, out var raw)) return false;
+		value = unchecked((int)raw);
+		return true;
+	}
+
+	internal static bool TryWriteInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, int value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryWriteUInt32(ref platform, record, offset, unchecked((uint)value));
+}
+
 internal static class MuiStringscrollPointerStateCodec
 {
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringscrollPointerState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiStringscrollPointerStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) ||
+			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 4, out value.Axis) ||
+			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadInt32(ref platform,
+				address, 8, out value.GrabOffset) ||
+			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadInt32(ref platform,
+				address, 12, out value.StartScroll) ||
+			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadInt32(ref platform,
+				address, 16, out value.StartX) ||
+			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadInt32(ref platform,
+				address, 20, out value.StartY) ||
+			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadInt32(ref platform,
+				address, 24, out value.LastPointer) ||
+			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 28, out value.Flags)) return false;
+		return true;
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringscrollPointerState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollPointerState.Size) ||
-			!MuiStringscrollPointerStateFieldCursorCodec.TryRead(ref platform,
-				address, MuiStringscrollPointerStateField.Magic, out value.Magic) ||
-			!MuiStringscrollPointerStateFieldCursorCodec.TryRead(ref platform,
-				address, MuiStringscrollPointerStateField.Axis, out value.Axis) ||
-			!MuiStringscrollPointerStateFieldCursorCodec.TryRead(ref platform,
-				address, MuiStringscrollPointerStateField.GrabOffset,
-				out var grabOffset) ||
-			!MuiStringscrollPointerStateFieldCursorCodec.TryRead(ref platform,
-				address, MuiStringscrollPointerStateField.StartScroll,
-				out var startScroll) ||
-			!MuiStringscrollPointerStateFieldCursorCodec.TryRead(ref platform,
-				address, MuiStringscrollPointerStateField.StartX,
-				out var startX) ||
-			!MuiStringscrollPointerStateFieldCursorCodec.TryRead(ref platform,
-				address, MuiStringscrollPointerStateField.StartY,
-				out var startY) ||
-			!MuiStringscrollPointerStateFieldCursorCodec.TryRead(ref platform,
-				address, MuiStringscrollPointerStateField.LastPointer,
-				out var lastPointer) ||
-			!MuiStringscrollPointerStateFieldCursorCodec.TryRead(ref platform,
-				address, MuiStringscrollPointerStateField.Flags, out value.Flags))
-			return false;
-		value.GrabOffset = unchecked((int)grabOffset);
-		value.StartScroll = unchecked((int)startScroll);
-		value.StartX = unchecked((int)startX);
-		value.StartY = unchecked((int)startY);
-		value.LastPointer = unchecked((int)lastPointer);
-		return value.Magic == MuiStringscrollPointerState.Cookie;
+		return TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiStringscrollPointerState.Cookie;
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringscrollPointerState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollPointerState.Size)) return false;
-		return MuiStringscrollPointerStateFieldCursorCodec.TryWrite(ref platform,
-			address, MuiStringscrollPointerStateField.Magic, value.Magic) &&
-			MuiStringscrollPointerStateFieldCursorCodec.TryWrite(ref platform,
-				address, MuiStringscrollPointerStateField.Axis, value.Axis) &&
-			MuiStringscrollPointerStateFieldCursorCodec.TryWrite(ref platform,
-				address, MuiStringscrollPointerStateField.GrabOffset,
-				unchecked((uint)value.GrabOffset)) &&
-			MuiStringscrollPointerStateFieldCursorCodec.TryWrite(ref platform,
-				address, MuiStringscrollPointerStateField.StartScroll,
-				unchecked((uint)value.StartScroll)) &&
-			MuiStringscrollPointerStateFieldCursorCodec.TryWrite(ref platform,
-				address, MuiStringscrollPointerStateField.StartX,
-				unchecked((uint)value.StartX)) &&
-			MuiStringscrollPointerStateFieldCursorCodec.TryWrite(ref platform,
-				address, MuiStringscrollPointerStateField.StartY,
-				unchecked((uint)value.StartY)) &&
-			MuiStringscrollPointerStateFieldCursorCodec.TryWrite(ref platform,
-				address, MuiStringscrollPointerStateField.LastPointer,
-				unchecked((uint)value.LastPointer)) &&
-			MuiStringscrollPointerStateFieldCursorCodec.TryWrite(ref platform,
-				address, MuiStringscrollPointerStateField.Flags, value.Flags);
+		return MuiStringscrollPointerStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 0, value.Magic) &&
+			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, 4, value.Axis) &&
+			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteInt32(
+				ref platform, address, 8, value.GrabOffset) &&
+			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteInt32(
+				ref platform, address, 12, value.StartScroll) &&
+			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteInt32(
+				ref platform, address, 16, value.StartX) &&
+			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteInt32(
+				ref platform, address, 20, value.StartY) &&
+			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteInt32(
+				ref platform, address, 24, value.LastPointer) &&
+			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteUInt32(
+				ref platform, address, 28, value.Flags);
 	}
 }

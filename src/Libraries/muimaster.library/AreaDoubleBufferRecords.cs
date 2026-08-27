@@ -25,11 +25,31 @@ public struct MuiAreaDoubleBufferStateInput
 internal struct MuiAreaDoubleBufferStateRecord
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint EnabledOffset = 4;
+	internal const uint GenerationOffset = 8;
 	internal const uint Cookie = 0x41444252u; // 'ADBR'
 
 	internal uint Magic;
 	internal uint Enabled;
 	internal uint Generation;
+}
+
+// MUIA_DoubleBuffer is a canonical BOOL policy.  The record is admitted only
+// when its identity, normalized BOOL, and publication generation are valid;
+// live consumers additionally require ownership by the current object.
+internal static class MuiAreaDoubleBufferStateAdmission
+{
+	internal static bool Validate(MuiAreaDoubleBufferStateRecord value) =>
+		value.Magic == MuiAreaDoubleBufferStateRecord.Cookie &&
+		value.Enabled <= 1 && value.Generation != 0;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiAreaDoubleBufferStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 }
 
 internal enum MuiAreaDoubleBufferStateField : byte
@@ -48,37 +68,67 @@ internal struct MuiAreaDoubleBufferStateFieldCursor
 
 internal static class MuiAreaDoubleBufferStateFieldCursorCodec
 {
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDoubleBufferStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaDoubleBufferStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaDoubleBufferStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaDoubleBufferStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaDoubleBufferStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaDoubleBufferStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+	}
+}
+
+// Fixed Area double-buffer state is transferred as a named record. Numeric
+// guest positions are confined to this ABI adapter; the compatibility cursor
+// above remains available only to legacy callers and malformed-state
+// diagnostics.
+internal static class MuiAreaDoubleBufferStateRecordMemoryCodec
+{
 	private static bool TryResolve(MuiAreaDoubleBufferStateField field,
 		out uint offset)
 	{
 		switch (field)
 		{
 			case MuiAreaDoubleBufferStateField.Magic:
-				offset = 0;
+				offset = MuiAreaDoubleBufferStateRecord.MagicOffset;
 				return true;
 			case MuiAreaDoubleBufferStateField.Enabled:
-				offset = 4;
+				offset = MuiAreaDoubleBufferStateRecord.EnabledOffset;
 				return true;
 			case MuiAreaDoubleBufferStateField.Generation:
-				offset = 8;
+				offset = MuiAreaDoubleBufferStateRecord.GenerationOffset;
 				return true;
-			default:
-				offset = 0;
-				return false;
 		}
+		offset = 0;
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiAreaDoubleBufferStateFieldCursor cursor, out APTR address)
+		APTR record, MuiAreaDoubleBufferStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiAreaDoubleBufferStateRecord.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset)
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiAreaDoubleBufferStateRecord.Size) &&
+			platform.IsMapped(address, MuiAreaDoubleBufferStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -86,10 +136,8 @@ internal static class MuiAreaDoubleBufferStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaDoubleBufferStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -98,10 +146,8 @@ internal static class MuiAreaDoubleBufferStateFieldCursorCodec
 		APTR record, MuiAreaDoubleBufferStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaDoubleBufferStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -109,24 +155,29 @@ internal static class MuiAreaDoubleBufferStateFieldCursorCodec
 
 internal static class MuiAreaDoubleBufferStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiAreaDoubleBufferStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaDoubleBufferStateRecord.Size) ||
-			!MuiAreaDoubleBufferStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiAreaDoubleBufferStateField.Magic, out var magic) ||
-			magic != MuiAreaDoubleBufferStateRecord.Cookie ||
-			!MuiAreaDoubleBufferStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiAreaDoubleBufferStateField.Enabled, out value.Enabled) ||
-			!MuiAreaDoubleBufferStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiAreaDoubleBufferStateField.Generation,
+		if (!MuiAreaDoubleBufferStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaDoubleBufferStateField.Magic,
+			out value.Magic) ||
+			!MuiAreaDoubleBufferStateRecordMemoryCodec.TryReadUInt32(
+				ref platform, address, MuiAreaDoubleBufferStateField.Enabled,
+				out value.Enabled) ||
+			!MuiAreaDoubleBufferStateRecordMemoryCodec.TryReadUInt32(
+				ref platform, address, MuiAreaDoubleBufferStateField.Generation,
 				out value.Generation)) return false;
-		value.Magic = magic;
 		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiAreaDoubleBufferStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiAreaDoubleBufferStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaDoubleBufferStateRecord value)
@@ -134,12 +185,14 @@ internal static class MuiAreaDoubleBufferStateRecordCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiAreaDoubleBufferStateRecord.Size) || value.Magic !=
-			MuiAreaDoubleBufferStateRecord.Cookie) return false;
-		return MuiAreaDoubleBufferStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaDoubleBufferStateField.Magic, value.Magic) &&
-			MuiAreaDoubleBufferStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiAreaDoubleBufferStateRecord.Cookie ||
+			!MuiAreaDoubleBufferStateAdmission.Validate(value)) return false;
+		return MuiAreaDoubleBufferStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaDoubleBufferStateField.Magic,
+			value.Magic) &&
+			MuiAreaDoubleBufferStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiAreaDoubleBufferStateField.Enabled, value.Enabled) &&
-			MuiAreaDoubleBufferStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiAreaDoubleBufferStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiAreaDoubleBufferStateField.Generation,
 				value.Generation);
 	}

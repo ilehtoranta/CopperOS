@@ -20,10 +20,28 @@ public struct MuiAreaWeightState
 internal struct MuiAreaWeightStateRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint WeightOffset = 4;
 	internal const uint Cookie = 0x41574754u; // 'AWGT'
 
 	internal uint Magic;
 	internal uint Weight;
+}
+
+// Weight is an opaque MorphOS ULONG input. Admission owns the record cookie
+// and live Area capability; the full Weight range remains representable for
+// compatibility and raw synchronization.
+internal static class MuiAreaWeightStateAdmission
+{
+	internal static bool Validate(MuiAreaWeightStateRecord value) =>
+		value.Magic == MuiAreaWeightStateRecord.Cookie;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiAreaWeightStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 }
 
 internal enum MuiAreaWeightStateField : byte
@@ -41,28 +59,63 @@ internal struct MuiAreaWeightStateFieldCursor
 
 internal static class MuiAreaWeightStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiAreaWeightStateField field,
-		out uint offset)
-	{
-		offset = field switch
-		{
-			MuiAreaWeightStateField.Magic => 0,
-			MuiAreaWeightStateField.Weight => 4,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaWeightStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return MuiAreaWeightStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaWeightStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaWeightStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaWeightStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaWeightStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+	}
+}
+
+// Fixed Area weight state is transferred as a named record. Numeric guest
+// positions are confined to this ABI adapter; the compatibility cursor above
+// remains available only to legacy callers and malformed-state diagnostics.
+internal static class MuiAreaWeightStateRecordMemoryCodec
+{
+	private static bool TryResolve(MuiAreaWeightStateField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiAreaWeightStateField.Magic:
+				offset = MuiAreaWeightStateRecord.MagicOffset;
+				return true;
+			case MuiAreaWeightStateField.Weight:
+				offset = MuiAreaWeightStateRecord.WeightOffset;
+				return true;
+		}
+		offset = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaWeightStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-				cursor.Record, MuiAreaWeightStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset)
+			return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiAreaWeightStateRecord.Size) &&
+			platform.IsMapped(address, MuiAreaWeightStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -70,10 +123,8 @@ internal static class MuiAreaWeightStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaWeightStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -82,10 +133,8 @@ internal static class MuiAreaWeightStateFieldCursorCodec
 		APTR record, MuiAreaWeightStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaWeightStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -93,31 +142,35 @@ internal static class MuiAreaWeightStateFieldCursorCodec
 
 internal static class MuiAreaWeightStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiAreaWeightStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaWeightStateRecord.Size) ||
-			!MuiAreaWeightStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiAreaWeightStateField.Magic, out var magic) ||
-			magic != MuiAreaWeightStateRecord.Cookie) return false;
-		value.Magic = magic;
-		return MuiAreaWeightStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiAreaWeightStateField.Weight, out value.Weight);
+		if (!MuiAreaWeightStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiAreaWeightStateField.Magic, out value.Magic) ||
+			!MuiAreaWeightStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, MuiAreaWeightStateField.Weight, out value.Weight)) return false;
+		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiAreaWeightStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiAreaWeightStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaWeightStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaWeightStateRecord.Size) || value.Magic !=
-			MuiAreaWeightStateRecord.Cookie) return false;
-		return MuiAreaWeightStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiAreaWeightStateRecord.Size) ||
+			!MuiAreaWeightStateAdmission.Validate(value)) return false;
+		return MuiAreaWeightStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiAreaWeightStateField.Magic, value.Magic) &&
-			MuiAreaWeightStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAreaWeightStateField.Weight, value.Weight);
+			MuiAreaWeightStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiAreaWeightStateField.Weight, value.Weight);
 	}
 }

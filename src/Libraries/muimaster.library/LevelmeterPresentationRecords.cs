@@ -91,47 +91,102 @@ internal static class MuiLevelmeterPresentationStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Levelmeter consumers use the named
+// record; this bounded adapter is the only layer that translates its fixed
+// guest layout into addresses. The cursor codec remains for compatibility and
+// malformed-state diagnostics.
+internal static class MuiLevelmeterPresentationStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiLevelmeterPresentationStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiLevelmeterPresentationStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiLevelmeterPresentationStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiLevelmeterPresentationStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiLevelmeterPresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiLevelmeterPresentationStateRecord.Size) ||
-			!MuiLevelmeterPresentationStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiLevelmeterPresentationStateField.Magic, out var magic) ||
-			magic != MuiLevelmeterPresentationStateRecord.Cookie) return false;
-		value.Magic = magic;
-		return MuiLevelmeterPresentationStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiLevelmeterPresentationStateField.Horizontal,
-			out value.Horizontal);
+		return MuiLevelmeterPresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, 0, out value.Magic) &&
+			MuiLevelmeterPresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, 4, out value.Horizontal);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiLevelmeterPresentationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiLevelmeterPresentationStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiLevelmeterPresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiLevelmeterPresentationStateRecord.Size) || value.Magic !=
-			MuiLevelmeterPresentationStateRecord.Cookie) return false;
-		return MuiLevelmeterPresentationStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiLevelmeterPresentationStateField.Magic, value.Magic) &&
-			MuiLevelmeterPresentationStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiLevelmeterPresentationStateField.Horizontal,
-			value.Horizontal);
+		if (!MuiLevelmeterPresentationStateAdmission.Validate(value)) return false;
+		return MuiLevelmeterPresentationStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 0, value.Magic) &&
+			MuiLevelmeterPresentationStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 4, value.Horizontal);
 	}
 }
 
 // Keep the wire field lossless for malformed-state diagnostics. Levelmeter's
 // Gauge_Horiz value is a MorphOS BOOL and must be canonical before layout or
 // drawing consumers use the named presentation state.
+internal static class MuiLevelmeterPresentationStateAdmission
+{
+	internal static bool Validate(MuiLevelmeterPresentationStateRecord value) =>
+		value.Magic == MuiLevelmeterPresentationStateRecord.Cookie &&
+		value.Horizontal <= 1;
+
+	internal static bool Validate(MuiLevelmeterPresentationState value) =>
+		value.Horizontal <= 1;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiLevelmeterPresentationStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
+}
+
+// Compatibility alias for existing Levelmeter presentation call sites. New
+// state boundaries use MuiLevelmeterPresentationStateAdmission directly so
+// live ownership is explicit.
 internal static class MuiLevelmeterPresentationStateValidation
 {
 	internal static bool IsValidRecord(MuiLevelmeterPresentationStateRecord value) =>
-		value.Horizontal <= 1;
+		MuiLevelmeterPresentationStateAdmission.Validate(value);
 
 	internal static bool IsValidState(MuiLevelmeterPresentationState value) =>
-		value.Horizontal <= 1;
+		MuiLevelmeterPresentationStateAdmission.Validate(value);
 }

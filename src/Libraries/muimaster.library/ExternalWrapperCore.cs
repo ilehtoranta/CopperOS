@@ -1428,7 +1428,10 @@ internal static class MuiExternalWrapperHeaderFieldCursorCodec
 
 internal static class MuiExternalWrapperHeaderCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+	// Structural ABI reader. This intentionally validates only the packed
+	// header record so codec tests and low-level recovery paths can inspect a
+	// header before the surrounding sidecar has been admitted.
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiExternalWrapperHeader value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -1455,6 +1458,18 @@ internal static class MuiExternalWrapperHeaderCodec
 		value.Class = (MuiExternalWrapperClass)cls;
 		value.Flags = flags;
 		return true;
+	}
+
+	// Live consumers use the strict reader. It keeps the named header codec as
+	// the only ABI boundary, then applies the class-specific state topology
+	// rules before any external resource or method dispatch can observe it.
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiExternalWrapperHeader value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadStructural(ref platform, address, out value)) return false;
+		return MuiExternalWrapperAdmission.Validate(ref platform, address, value);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
@@ -1490,6 +1505,120 @@ public enum MuiExternalWrapperClass : uint
 	None = 0,
 	Boopsi = 1,   // Boopsi.mui : Area
 	Dtpic = 2,    // Dtpic.mui  : Area
+}
+
+// Strict admission for a live external-wrapper sidecar. The structural
+// codecs above own every packed field; this validator only composes their
+// named records into the invariants required by lifecycle and dispatch code.
+// In particular, it rejects cross-class flags, impossible resource ownership,
+// unmapped owned blocks, and picture/name states that would make teardown walk
+// arbitrary guest memory. No managed state or exceptions are involved.
+internal static class MuiExternalWrapperAdmission
+{
+	private const uint AllFlags =
+		MuiExternalWrapperLayout.FlagDisabled |
+		MuiExternalWrapperLayout.FlagSetup |
+		MuiExternalWrapperLayout.FlagShown |
+		MuiExternalWrapperLayout.FlagObjectCreated |
+		MuiExternalWrapperLayout.FlagSmart |
+		MuiExternalWrapperLayout.FlagColorwheel |
+		MuiExternalWrapperLayout.FlagFreeHoriz |
+		MuiExternalWrapperLayout.FlagFreeVert |
+		MuiExternalWrapperLayout.FlagLighten |
+		MuiExternalWrapperLayout.FlagDarken |
+		MuiExternalWrapperLayout.FlagPicture |
+		MuiExternalWrapperLayout.FlagRedraw;
+
+	private const uint BoopsiOnlyFlags =
+		MuiExternalWrapperLayout.FlagObjectCreated |
+		MuiExternalWrapperLayout.FlagSmart |
+		MuiExternalWrapperLayout.FlagColorwheel;
+
+	private const uint DtpicOnlyFlags =
+		MuiExternalWrapperLayout.FlagFreeHoriz |
+		MuiExternalWrapperLayout.FlagFreeVert |
+		MuiExternalWrapperLayout.FlagLighten |
+		MuiExternalWrapperLayout.FlagDarken |
+		MuiExternalWrapperLayout.FlagPicture;
+
+	internal static bool ValidateHeader(MuiExternalWrapperHeader header)
+	{
+		if (header.Magic != MuiExternalWrapperHeader.Cookie ||
+			(header.Class != MuiExternalWrapperClass.Boopsi &&
+				header.Class != MuiExternalWrapperClass.Dtpic)) return false;
+		if ((header.Flags & ~AllFlags) != 0 ||
+			(header.Flags & MuiExternalWrapperLayout.FlagShown) != 0 &&
+			(header.Flags & MuiExternalWrapperLayout.FlagSetup) == 0 ||
+			(header.Flags & MuiExternalWrapperLayout.FlagObjectCreated) != 0 &&
+			(header.Flags & MuiExternalWrapperLayout.FlagSetup) == 0 ||
+			(header.Flags & MuiExternalWrapperLayout.FlagPicture) != 0 &&
+			(header.Flags & MuiExternalWrapperLayout.FlagSetup) == 0) return false;
+		if (header.Class == MuiExternalWrapperClass.Boopsi)
+			return (header.Flags & DtpicOnlyFlags) == 0;
+		return (header.Flags & BoopsiOnlyFlags) == 0;
+	}
+
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		APTR instance, MuiExternalWrapperHeader header)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (instance.IsNull ||
+			!platform.IsMapped(instance, MuiExternalWrapperLayout.InstanceSize) ||
+			!ValidateHeader(header)) return false;
+		if (!MuiExternalScratchStateCodec.TryRead(ref platform, instance,
+			out var scratch) || scratch.RememberCount >
+			MuiExternalWrapperLayout.MaxRemember || scratch.WorkBuffer.IsNull ||
+			!platform.IsMapped(scratch.WorkBuffer,
+				MuiExternalWrapperLayout.WorkSize)) return false;
+
+		if (header.Class == MuiExternalWrapperClass.Boopsi)
+			return ValidateBoopsi(ref platform, instance, scratch, header.Flags);
+		return ValidateDtpic(ref platform, instance, scratch, header.Flags);
+	}
+
+	private static bool ValidateBoopsi<TPlatform>(ref TPlatform platform,
+		APTR instance, MuiExternalScratchState scratch, uint flags)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (scratch.RememberBuffer.IsNull ||
+			!platform.IsMapped(scratch.RememberBuffer,
+				MuiExternalWrapperLayout.RememberSize) ||
+			!MuiExternalDtpicStateCodec.TryRead(ref platform, instance,
+				out var dtpic) || dtpic.CallerName.IsNotNull ||
+			dtpic.OwnedName.IsNotNull || dtpic.OwnedNameSize != 0 ||
+			dtpic.PictureObject.IsNotNull || dtpic.PicWidth != 0 ||
+			dtpic.PicHeight != 0) return false;
+		if (!MuiExternalBoopsiResourceCodec.TryRead(ref platform, instance,
+			out var resources) ||
+			(flags & MuiExternalWrapperLayout.FlagObjectCreated) == 0 &&
+			resources.BoopsiObject.IsNotNull ||
+			(flags & MuiExternalWrapperLayout.FlagObjectCreated) != 0 &&
+			resources.BoopsiObject.IsNull) return false;
+		return true;
+	}
+
+	private static bool ValidateDtpic<TPlatform>(ref TPlatform platform,
+		APTR instance, MuiExternalScratchState scratch, uint flags)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (scratch.RememberBuffer.IsNotNull || scratch.RememberCount != 0 ||
+			!MuiExternalBoopsiResourceCodec.TryRead(ref platform, instance,
+				out var resources) || resources.PrivateClass.IsNotNull ||
+			resources.ClassId.IsNotNull || resources.OpenedClass.IsNotNull ||
+			resources.BoopsiObject.IsNotNull || resources.CreationTags.IsNotNull ||
+			!MuiExternalDtpicStateCodec.TryRead(ref platform, instance,
+				out var dtpic)) return false;
+		if (dtpic.OwnedName.IsNull != (dtpic.OwnedNameSize == 0) ||
+			(dtpic.OwnedName.IsNotNull &&
+				(dtpic.OwnedNameSize > MuiExternalWrapperLayout.MaxNameLength + 1 ||
+					dtpic.OwnedNameSize == 0 ||
+					!platform.IsMapped(dtpic.OwnedName, dtpic.OwnedNameSize))) ||
+			(dtpic.PictureObject.IsNull !=
+				((flags & MuiExternalWrapperLayout.FlagPicture) == 0)) ||
+			(dtpic.PictureObject.IsNull &&
+				(dtpic.PicWidth != 0 || dtpic.PicHeight != 0))) return false;
+		return true;
+	}
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -3513,13 +3642,18 @@ public static class MuiExternalWrapperCore
 	private static bool SetFlag<TPlatform>(ref TPlatform platform, APTR instance,
 		uint bit, bool set) where TPlatform : struct, IMuiGuestMemory
 	{
-		var flags = ReadFlags(ref platform, instance);
+		// Flag transitions may be paired with a resource-pointer write (picture
+		// acquire/release and BOOPSI create/dispose). Read the packed header
+		// structurally here so the two named records can be committed in either
+		// order without exposing a transient state to live callers; all public
+		// entry points still admit the completed sidecar strictly.
+		if (!MuiExternalWrapperHeaderCodec.TryReadStructural(ref platform,
+			instance, out var current)) return false;
+		var flags = current.Flags;
 		var updated = set ? flags | bit : flags & ~bit;
 		if (updated == flags) return false;
-		if (!MuiExternalWrapperHeaderCodec.TryRead(ref platform, instance,
-			out var header)) return false;
-		header.Flags = updated;
-		if (!MuiExternalWrapperHeaderCodec.Write(ref platform, instance, header))
+		current.Flags = updated;
+		if (!MuiExternalWrapperHeaderCodec.Write(ref platform, instance, current))
 			return false;
 		return true;
 	}

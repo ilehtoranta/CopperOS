@@ -26,6 +26,25 @@ internal struct MuiStringPlaceholderStateRecord
 	internal APTR Contents;
 }
 
+internal static class MuiStringPlaceholderStateAdmission
+{
+	internal const int MaximumLength = 128;
+
+	internal static bool Validate(MuiStringPlaceholderStateRecord value) =>
+		value.Magic == MuiStringPlaceholderStateRecord.Cookie;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiStringPlaceholderStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!Validate(value) || obj.IsNull ||
+			MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		return value.Contents.IsNull || CStringCodec.TryReadLength(ref platform,
+			value.Contents, MaximumLength, out _);
+	}
+}
+
 internal enum MuiStringPlaceholderStateField : byte
 {
 	Magic,
@@ -91,40 +110,73 @@ internal static class MuiStringPlaceholderStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Placeholder consumers use the named
+// contents record; this bounded adapter is the only layer that translates its
+// fixed guest layout into addresses. The cursor codec remains available for
+// compatibility and malformed-state diagnostics.
+internal static class MuiStringPlaceholderStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiStringPlaceholderStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiStringPlaceholderStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiStringPlaceholderStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiStringPlaceholderStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringPlaceholderStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringPlaceholderStateRecord.Size) ||
-			!MuiStringPlaceholderStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiStringPlaceholderStateField.Magic, out var magic) ||
-			magic != MuiStringPlaceholderStateRecord.Cookie) return false;
-		value.Magic = magic;
-		if (!MuiStringPlaceholderStateFieldCursorCodec.TryReadUInt32(
-			ref platform, address,
-			MuiStringPlaceholderStateField.Contents, out var contents))
-			return false;
+		if (!MuiStringPlaceholderStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, 0, out value.Magic) ||
+			!MuiStringPlaceholderStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, 4, out var contents)) return false;
 		value.Contents = APTR.FromPointer(contents);
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiStringPlaceholderStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiStringPlaceholderStateAdmission.Validate(value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringPlaceholderStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringPlaceholderStateRecord.Size) || value.Magic !=
-			MuiStringPlaceholderStateRecord.Cookie) return false;
-		return MuiStringPlaceholderStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiStringPlaceholderStateField.Magic, value.Magic) &&
-			MuiStringPlaceholderStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiStringPlaceholderStateField.Contents, value.Contents.Raw);
+		if (!MuiStringPlaceholderStateAdmission.Validate(value)) return false;
+		return MuiStringPlaceholderStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 0, value.Magic) &&
+			MuiStringPlaceholderStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 4, value.Contents.Raw);
 	}
 }

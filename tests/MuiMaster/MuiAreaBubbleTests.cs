@@ -34,6 +34,42 @@ public sealed class MuiAreaBubbleTests
 	}
 
 	[Fact]
+	public void BubbleRecordAdapterOwnsPacketBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var create = APTR.FromPointer(0x2400);
+		Assert.True(MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+			create, MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.MethodId,
+			MuiAreaBubbleMessageCodec.CreateBubble));
+		Assert.True(MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+			create, MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.X, unchecked((uint)-3)));
+		Assert.True(MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+			create, MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.Flags, 9));
+		Assert.True(MuiAreaBubbleMessageMemoryCodec.TryReadUInt32(ref platform,
+			create, MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.X, out var x));
+		Assert.Equal(unchecked((uint)-3), x);
+		Assert.True(MuiAreaBubbleMessageMemoryCodec.TryGetAddress(ref platform,
+			create, MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.Text, out var textAddress));
+		Assert.Equal(create.Raw + MuiAreaCreateBubbleMessage.TextOffset,
+			textAddress.Raw);
+
+		Assert.False(MuiAreaBubbleMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20FF0), MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.Flags, out _));
+		Assert.False(MuiAreaBubbleMessageMemoryCodec.TryGetAddress(ref platform,
+			create, MuiAreaBubblePacketKind.Delete,
+			MuiAreaBubbleMessageField.Flags, out _));
+		Assert.False(MuiAreaBubbleMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiAreaBubblePacketKind.Delete,
+			MuiAreaBubbleMessageField.Bubble, out _));
+	}
+
+	[Fact]
 	public void DispatcherCreatesAndDeletesProviderOwnedBubble()
 	{
 		var platform = CreatePlatform(out var areaClass);

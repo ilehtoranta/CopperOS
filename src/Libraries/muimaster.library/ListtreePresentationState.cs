@@ -105,7 +105,7 @@ internal static class MuiListtreePresentationFieldCursorCodec
 
 internal static class MuiListtreePresentationStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiListtreePresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -114,7 +114,6 @@ internal static class MuiListtreePresentationStateRecordCodec
 			!platform.IsMapped(address, MuiListtreePresentationStateRecord.Size) ||
 			!MuiListtreePresentationFieldCursorCodec.TryReadUInt32(ref platform,
 				address, MuiListtreePresentationField.Magic, out var magic) ||
-			magic != MuiListtreePresentationStateRecord.Cookie ||
 			!MuiListtreePresentationFieldCursorCodec.TryReadUInt32(ref platform,
 				address, MuiListtreePresentationField.EmptyNodes,
 				out value.EmptyNodes) ||
@@ -130,9 +129,19 @@ internal static class MuiListtreePresentationStateRecordCodec
 			!MuiListtreePresentationFieldCursorCodec.TryReadUInt32(ref platform,
 				address, MuiListtreePresentationField.TreeColumn,
 				out value.TreeColumn)) return false;
-		value.Magic = magic;
+			value.Magic = magic;
 		value.Format = APTR.FromPointer(format);
-		value.Title = title == 0 ? 0u : 1u;
+		value.Title = title;
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiListtreePresentationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryReadStructural(ref platform, address, out value) ||
+			value.Magic != MuiListtreePresentationStateRecord.Cookie) return false;
+		value.Title = value.Title == 0 ? 0u : 1u;
 		return true;
 	}
 

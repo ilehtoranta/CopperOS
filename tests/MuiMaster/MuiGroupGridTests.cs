@@ -6,6 +6,7 @@ namespace CopperOS.MuiMaster.Tests;
 public sealed class MuiGroupGridTests
 {
 	private static readonly APTR State = APTR.FromPointer(0x1000);
+	private const uint GridStateKey = 0x0D100014u;
 	private const uint ShowMe = 0x80429BA8;
 	private const uint LeftEdge = 0x8042BEC6;
 	private const uint Width = 0x8042B59C;
@@ -120,6 +121,37 @@ public sealed class MuiGroupGridTests
 	}
 
 	[Fact]
+	public void GroupGridStateAdmissionValidatesShapeAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var group = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
+			APTR.Null);
+		var value = new MuiGroupGridStateRecord
+		{
+			Magic = MuiGroupGridStateRecord.Cookie,
+			Columns = 2,
+			Rows = 3,
+			HorizontalSpacing = 4,
+			VerticalSpacing = 6,
+			SameWidth = 1,
+			SameHeight = 1,
+			HorizontalCenter = 2,
+			VerticalCenter = 1,
+		};
+		Assert.True(MuiGroupGridStateAdmission.Validate(value));
+		Assert.True(MuiGroupGridStateAdmission.ValidateLive(ref platform, State,
+			group, value));
+		value.HorizontalCenter = 3;
+		Assert.False(MuiGroupGridStateAdmission.Validate(value));
+		Assert.False(MuiGroupGridStateAdmission.ValidateLive(ref platform, State,
+			group, value));
+		value.HorizontalCenter = 2;
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, group));
+		Assert.False(MuiGroupGridStateAdmission.ValidateLive(ref platform, State,
+			group, value));
+	}
+
+	[Fact]
 	public void GroupGridPublishesSanitizedStateAtLayoutBoundary()
 	{
 		var platform = CreatePlatform(out var cl);
@@ -211,6 +243,49 @@ public sealed class MuiGroupGridTests
 		Assert.True(MuiGuestUlongStorageCodec.TryRead(ref platform, storage,
 			out var stored));
 		Assert.Equal(1u, stored.Value);
+	}
+
+	[Fact]
+	public void MalformedNamedGridPolicyFailsClosedBeforeGetterAndLayout()
+	{
+		var platform = CreatePlatform(out var cl);
+		var group = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
+			APTR.Null);
+		var child = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
+			APTR.Null);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, group, child));
+		Set(ref platform, group, 0x8042F416, 1);
+		Set(ref platform, group, 0x8042B68F, 1);
+		Assert.True(MuiGroupLayoutCore.Layout(ref platform, State, group, 3, 4,
+			80, 30));
+		var beforeWidth = Get(ref platform, child, Width);
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, group,
+			GridStateKey);
+		Assert.True(MuiGroupGridStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiGroupGridStateField.HorizontalCenter, 3));
+		Assert.True(MuiGroupGridStateRecordCodec.TryReadStructural(ref platform,
+			block, out var malformed));
+		Assert.Equal(3u, malformed.HorizontalCenter);
+		Assert.False(MuiGroupGridStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		Assert.False(MuiGroupGridStateAdmission.Validate(malformed));
+
+		Assert.False(MuiGroupGridCore.TryGetStateRecord(ref platform, State, group,
+			out _));
+		Assert.False(MuiGroupGridCore.TryRead(ref platform, State, group,
+			out _));
+		Assert.False(MuiGroupGridCore.TryGetAttribute(ref platform, State, group,
+			0x8042F416, out _));
+		var storage = APTR.FromPointer(0x1800);
+		Assert.False(MuiGroupLayoutCore.AskMinMax(ref platform, State, group,
+			storage));
+		Assert.False(MuiGroupLayoutCore.Layout(ref platform, State, group, 3, 4,
+			80, 30));
+		Assert.Equal(beforeWidth, Get(ref platform, child, Width));
+		Assert.Equal(1u, GetRaw(ref platform, group, 0x8042F416));
+		Assert.True(MuiGroupGridStateRecordCodec.TryReadStructural(ref platform,
+			block, out malformed));
+		Assert.Equal(3u, malformed.HorizontalCenter);
 	}
 
 	[Fact]
@@ -505,6 +580,14 @@ public sealed class MuiGroupGridTests
 		uint attribute)
 	{
 		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, obj,
+			attribute, out var value));
+		return value;
+	}
+
+	private static uint GetRaw(ref MuiHeadlessTestPlatform platform, APTR obj,
+		uint attribute)
+	{
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, obj,
 			attribute, out var value));
 		return value;
 	}

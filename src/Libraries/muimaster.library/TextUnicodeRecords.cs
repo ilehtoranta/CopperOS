@@ -91,34 +91,72 @@ internal static class MuiTextUnicodeStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Text consumers use the named Unicode
+// policy record; this bounded adapter is the only layer that translates its
+// fixed guest layout into addresses. The cursor codec remains available for
+// compatibility and malformed-state diagnostics.
+internal static class MuiTextUnicodeStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiTextUnicodeStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiTextUnicodeStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiTextUnicodeStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiTextUnicodeStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiTextUnicodeStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiTextUnicodeStateRecord.Size) ||
-			!MuiTextUnicodeStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiTextUnicodeStateField.Magic, out var magic) ||
-			magic != MuiTextUnicodeStateRecord.Cookie) return false;
-		value.Magic = magic;
-		return MuiTextUnicodeStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiTextUnicodeStateField.Unicode, out value.Unicode);
+		return MuiTextUnicodeStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) &&
+			MuiTextUnicodeStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out value.Unicode);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiTextUnicodeStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiTextUnicodeStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiTextUnicodeStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiTextUnicodeStateRecord.Size) || value.Magic !=
-			MuiTextUnicodeStateRecord.Cookie) return false;
-		return MuiTextUnicodeStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiTextUnicodeStateField.Magic, value.Magic) &&
-			MuiTextUnicodeStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiTextUnicodeStateField.Unicode, value.Unicode);
+		if (!MuiTextUnicodeStateAdmission.Validate(value)) return false;
+		return MuiTextUnicodeStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiTextUnicodeStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 4, value.Unicode);
 	}
 }
 
@@ -132,4 +170,17 @@ internal static class MuiTextUnicodeStateValidation
 
 	internal static bool IsValidState(MuiTextUnicodeState value) =>
 		value.Unicode <= 1;
+}
+
+internal static class MuiTextUnicodeStateAdmission
+{
+	internal static bool Validate(MuiTextUnicodeStateRecord value) =>
+		value.Magic == MuiTextUnicodeStateRecord.Cookie &&
+		MuiTextUnicodeStateValidation.IsValidRecord(value);
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiTextUnicodeStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) && !obj.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 }

@@ -80,6 +80,36 @@ public sealed class MuiConfigItemTests
 			APTR.Null, out _));
 	}
 
+	[Fact]
+	public void GetConfigItemMessageAdapterOwnsStructBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var packet = APTR.FromPointer(0x1500);
+		Assert.True(MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiGetConfigItemPacketField.ConfigId, PublicScreen));
+		Assert.True(MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
+			packet, MuiGetConfigItemPacketField.ConfigId, out var configId));
+		Assert.Equal(PublicScreen, configId);
+		Assert.True(MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiGetConfigItemPacketField.Storage, 0x1510));
+		Assert.True(MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
+			packet, MuiGetConfigItemPacketField.Storage, out var storage));
+		Assert.Equal(0x1510u, storage);
+		Assert.True(MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiGetConfigItemPacketField.MethodId,
+			MuiNotifyConfigMessageCore.GetConfigItemMethod));
+		Assert.True(MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
+			packet, MuiGetConfigItemPacketField.MethodId, out var method));
+		Assert.Equal(MuiNotifyConfigMessageCore.GetConfigItemMethod, method);
+		Assert.False(MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x5FF5), MuiGetConfigItemPacketField.Storage,
+			out _));
+		Assert.False(MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
+			packet, (MuiGetConfigItemPacketField)255, out _));
+		Assert.False(MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.Null, MuiGetConfigItemPacketField.ConfigId, out _));
+	}
+
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR obj)
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x5000, 0x2000,

@@ -95,54 +95,109 @@ internal static class MuiScrollbarLayoutStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Horizontal and Type remain named
+// semantic fields; fixed guest-layout translation is bounded to this adapter.
+internal static class MuiScrollbarLayoutStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiScrollbarLayoutStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiScrollbarLayoutStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiScrollbarLayoutStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiScrollbarLayoutStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiScrollbarLayoutStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiScrollbarLayoutStateRecord.Size) ||
-			!MuiScrollbarLayoutStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiScrollbarLayoutStateField.Magic, out var magic) ||
-			magic != MuiScrollbarLayoutStateRecord.Cookie) return false;
-		value.Magic = magic;
-		return MuiScrollbarLayoutStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiScrollbarLayoutStateField.Horizontal, out value.Horizontal) &&
-			MuiScrollbarLayoutStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiScrollbarLayoutStateField.Type, out value.Type);
+		if (!MuiScrollbarLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic)) return false;
+		return MuiScrollbarLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out value.Horizontal) &&
+			MuiScrollbarLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 8, out value.Type);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiScrollbarLayoutStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiScrollbarLayoutStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiScrollbarLayoutStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiScrollbarLayoutStateRecord.Size) || value.Magic !=
-			MuiScrollbarLayoutStateRecord.Cookie) return false;
-		return MuiScrollbarLayoutStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollbarLayoutStateField.Magic, value.Magic) &&
-			MuiScrollbarLayoutStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollbarLayoutStateField.Horizontal, value.Horizontal) &&
-			MuiScrollbarLayoutStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollbarLayoutStateField.Type, value.Type);
+		if (!MuiScrollbarLayoutStateAdmission.Validate(value)) return false;
+		return MuiScrollbarLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiScrollbarLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 4, value.Horizontal) &&
+			MuiScrollbarLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 8, value.Type);
 	}
 }
 
 // Keep the Scrollbar layout wire record lossless for malformed-state
 // diagnostics, but admit only MorphOS's canonical Group_Horiz BOOL and the
 // documented default/bottom/top/symmetric/none type values.
-internal static class MuiScrollbarLayoutStateValidation
+internal static class MuiScrollbarLayoutStateAdmission
 {
-	internal static bool IsValidRecord(MuiScrollbarLayoutStateRecord value)
+	internal static bool Validate(MuiScrollbarLayoutStateRecord value)
 	{
+		if (value.Magic != MuiScrollbarLayoutStateRecord.Cookie) return false;
 		var state = default(MuiScrollbarLayoutState);
 		state.Horizontal = value.Horizontal;
 		state.Type = value.Type;
-		return IsValidState(state);
+		return Validate(state);
 	}
 
-	internal static bool IsValidState(MuiScrollbarLayoutState value) =>
+	internal static bool Validate(MuiScrollbarLayoutState value) =>
 		value.Horizontal <= 1 && value.Type <= 4;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiScrollbarLayoutStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
+}
+
+// Compatibility alias for existing layout-only call sites. New Scrollbar
+// state boundaries use MuiScrollbarLayoutStateAdmission directly so live
+// ownership is explicit.
+internal static class MuiScrollbarLayoutStateValidation
+{
+	internal static bool IsValidRecord(MuiScrollbarLayoutStateRecord value) =>
+		MuiScrollbarLayoutStateAdmission.Validate(value);
+
+	internal static bool IsValidState(MuiScrollbarLayoutState value) =>
+		MuiScrollbarLayoutStateAdmission.Validate(value);
 }

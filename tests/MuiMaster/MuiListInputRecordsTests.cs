@@ -6,58 +6,48 @@ namespace CopperOS.MuiMaster.Tests;
 public sealed class MuiListInputRecordsTests
 {
 	[Fact]
-	public void MixedWidthCursorUsesNamedRecordBoundaries()
+	public void InputStructAdaptersAndDragCursorUseNamedBoundaries()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x4000,
 			APTR.FromPointer(0x1000));
 		var address = APTR.FromPointer(0x3000);
 
-		var cursor = default(MuiListInputRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Record = MuiListInputRecordKind.TestPos;
-		cursor.Field = MuiListInputRecordField.XOffset;
-		Assert.True(MuiListInputRecordFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out var fieldAddress, out var fieldSize));
+		Assert.True(MuiListTestPosResultMemoryCodec.TryGetAddress(ref platform,
+			address, MuiListTestPosResultField.XOffset, out var fieldAddress));
 		Assert.Equal(APTR.FromPointer(0x3008), fieldAddress);
-		Assert.Equal(2u, fieldSize);
-		Assert.True(MuiListInputRecordFieldCursorCodec.TryWriteUInt16(ref platform,
-			address, MuiListInputRecordKind.TestPos,
-			MuiListInputRecordField.XOffset, unchecked((ushort)-9)));
-		Assert.True(MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform,
-			address, MuiListInputRecordKind.TestPos,
-			MuiListInputRecordField.XOffset, out var xOffset));
+		Assert.True(MuiListTestPosResultMemoryCodec.TryWriteUInt16(ref platform,
+			address, MuiListTestPosResultField.XOffset, unchecked((ushort)-9)));
+		Assert.True(MuiListTestPosResultMemoryCodec.TryReadUInt16(ref platform,
+			address, MuiListTestPosResultField.XOffset, out var xOffset));
 		Assert.Equal(-9, unchecked((short)xOffset));
 
-		cursor.Record = MuiListInputRecordKind.IntuiMessage;
-		cursor.Field = MuiListInputRecordField.MouseY;
-		Assert.True(MuiListInputRecordFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out fieldAddress, out fieldSize));
+		Assert.True(MuiIntuiPointerMessageMemoryCodec.TryGetAddress(ref platform,
+			address, MuiIntuiPointerMessageField.MouseY, out fieldAddress,
+			out var fieldSize));
 		Assert.Equal(APTR.FromPointer(0x3022), fieldAddress);
 		Assert.Equal(2u, fieldSize);
-		Assert.True(MuiListInputRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiListInputRecordKind.IntuiMessage,
-			MuiListInputRecordField.IAddress, 0x12345678u));
-		Assert.True(MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiListInputRecordKind.IntuiMessage,
-			MuiListInputRecordField.IAddress, out var iAddress));
+		Assert.True(MuiIntuiPointerMessageMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiIntuiPointerMessageField.IAddress, 0x12345678u));
+		Assert.True(MuiIntuiPointerMessageMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiIntuiPointerMessageField.IAddress, out var iAddress));
 		Assert.Equal(0x12345678u, iAddress);
 
-		cursor.Record = MuiListInputRecordKind.DragState;
-		cursor.Field = MuiListInputRecordField.Flags;
-		Assert.True(MuiListInputRecordFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out fieldAddress, out fieldSize));
+		Assert.True(MuiListviewDragStateMemoryCodec.TryGetAddress(ref platform,
+			address, MuiListviewDragStateField.Flags, out fieldAddress));
 		Assert.Equal(APTR.FromPointer(0x301C), fieldAddress);
-		Assert.Equal(4u, fieldSize);
+		Assert.True(MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiListviewDragStateField.Flags,
+			MuiListviewDragState.ActiveFlag));
+		Assert.True(MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiListviewDragStateField.Flags, out var dragFlags));
+		Assert.Equal(MuiListviewDragState.ActiveFlag, dragFlags);
 
-		Assert.False(MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiListInputRecordKind.TestPos,
-			MuiListInputRecordField.Column, out _));
-		Assert.False(MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform,
-			address, MuiListInputRecordKind.Scalar,
-			MuiListInputRecordField.XOffset, out _));
-		Assert.False(MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-			APTR.FromPointer(0xFFFFFFF0u), MuiListInputRecordKind.DragState,
-			MuiListInputRecordField.Flags, out _));
+		Assert.False(MuiListTestPosResultMemoryCodec.TryReadUInt16(ref platform,
+			address, MuiListTestPosResultField.Entry, out _));
+		Assert.False(MuiListScalarStorageRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, out _));
+		Assert.False(MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0xFFFFFFF0u), MuiListviewDragStateField.Flags, out _));
 	}
 
 	[Fact]
@@ -105,25 +95,15 @@ public sealed class MuiListInputRecordsTests
 		Assert.Equal(1u, message.TimestampValid);
 		Assert.Equal(77u, message.Seconds);
 		Assert.Equal(880000u, message.Micros);
-		var timestampCursor = new MuiListInputRecordFieldCursor
-		{
-			Address = messageAddress,
-			Record = MuiListInputRecordKind.IntuiMessage,
-			Field = MuiListInputRecordField.Seconds,
-		};
-		Assert.True(MuiListInputRecordFieldCursorCodec.TryGetAddress(ref platform,
-			timestampCursor, out var timestampAddress, out var timestampSize));
+		Assert.True(MuiIntuiPointerMessageMemoryCodec.TryGetAddress(ref platform,
+			messageAddress, MuiIntuiPointerMessageField.Seconds,
+			out var timestampAddress, out var timestampSize));
 		Assert.Equal(APTR.FromPointer(0x3224), timestampAddress);
 		Assert.Equal(4u, timestampSize);
 
-		var rawKeyCursor = new MuiListInputRecordFieldCursor
-		{
-			Address = messageAddress,
-			Record = MuiListInputRecordKind.RawKey,
-			Field = MuiListInputRecordField.Code,
-		};
-		Assert.True(MuiListInputRecordFieldCursorCodec.TryGetAddress(ref platform,
-			rawKeyCursor, out var rawKeyFieldAddress, out var rawKeyFieldSize));
+		Assert.True(MuiIntuiRawKeyMessageMemoryCodec.TryGetAddress(ref platform,
+			messageAddress, MuiIntuiRawKeyMessageField.Code,
+			out var rawKeyFieldAddress, out var rawKeyFieldSize));
 		Assert.Equal(APTR.FromPointer(0x3218), rawKeyFieldAddress);
 		Assert.Equal(2u, rawKeyFieldSize);
 

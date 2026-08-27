@@ -176,7 +176,7 @@ public static class MuiListtreeCore
 
 	internal static class MuiListtreeHeaderCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListtreeHeaderState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -185,11 +185,8 @@ public static class MuiListtreeCore
 				MuiListtreeHeaderState.Size) ||
 				!MuiListtreeHeaderFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeHeaderField.Magic, out var magic) ||
-				magic !=
-				MuiListtreeHeaderState.Cookie) return false;
-			value.Magic = MuiListtreeHeaderState.Cookie;
-			if (!MuiListtreeHeaderFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListtreeHeaderField.RootFirst, out var rootFirst) ||
+				!MuiListtreeHeaderFieldCursorCodec.TryReadUInt32(ref platform,
+					address, MuiListtreeHeaderField.RootFirst, out var rootFirst) ||
 				!MuiListtreeHeaderFieldCursorCodec.TryReadUInt32(ref platform, address,
 					MuiListtreeHeaderField.RootLast, out var rootLast) ||
 				!MuiListtreeHeaderFieldCursorCodec.TryReadUInt32(ref platform, address,
@@ -210,11 +207,18 @@ public static class MuiListtreeCore
 					MuiListtreeHeaderField.Reserved1, out value.Reserved1) ||
 				!MuiListtreeHeaderFieldCursorCodec.TryReadUInt32(ref platform, address,
 					MuiListtreeHeaderField.Reserved2, out value.Reserved2)) return false;
+			value.Magic = magic;
 			value.RootFirst = APTR.FromPointer(rootFirst);
 			value.RootLast = APTR.FromPointer(rootLast);
 			value.DropEntry = unchecked((int)dropEntry);
 			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListtreeHeaderState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiListtreeHeaderState.Cookie;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListtreeHeaderState value)
@@ -504,7 +508,7 @@ public static class MuiListtreeCore
 
 	internal static class MuiListtreeDisplaySnapshotStateCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListtreeDisplaySnapshotState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -513,8 +517,7 @@ public static class MuiListtreeCore
 				MuiListtreeDisplaySnapshotState.Size) ||
 				!MuiListtreeDisplaySnapshotFieldCursorCodec.TryReadUInt32(
 					ref platform, address, MuiListtreeDisplaySnapshotField.Magic,
-					out var magic) || magic !=
-				MuiListtreeDisplaySnapshotState.Cookie ||
+					out var magic) ||
 				!MuiListtreeDisplaySnapshotFieldCursorCodec.TryReadUInt32(
 					ref platform, address, MuiListtreeDisplaySnapshotField.Node,
 					out var node) ||
@@ -533,6 +536,12 @@ public static class MuiListtreeCore
 			value.Values = APTR.FromPointer(values);
 			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListtreeDisplaySnapshotState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiListtreeDisplaySnapshotState.Cookie;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListtreeDisplaySnapshotState value)
@@ -675,7 +684,7 @@ public static class MuiListtreeCore
 
 	internal static class MuiListtreePolicyStateRecordCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListtreePolicyStateRecord value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -684,7 +693,6 @@ public static class MuiListtreeCore
 				MuiListtreePolicyStateRecord.Size) ||
 				!MuiListtreePolicyFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreePolicyField.Magic, out var magic) ||
-				magic != MuiListtreePolicyStateRecord.Cookie ||
 				!MuiListtreePolicyFieldCursorCodec.TryReadUInt32(ref platform, address,
 					MuiListtreePolicyField.Active, out var active) ||
 				!MuiListtreePolicyFieldCursorCodec.TryReadUInt32(ref platform, address,
@@ -707,7 +715,7 @@ public static class MuiListtreeCore
 					MuiListtreePolicyField.OpenHook, out var openHook) ||
 				!MuiListtreePolicyFieldCursorCodec.TryReadUInt32(ref platform, address,
 					MuiListtreePolicyField.SortHook, out var sortHook)) return false;
-			value.Magic = MuiListtreePolicyStateRecord.Cookie;
+			value.Magic = magic;
 			value.Active = APTR.FromPointer(active);
 			value.CloseHook = APTR.FromPointer(closeHook);
 			value.ConstructHook = APTR.FromPointer(constructHook);
@@ -717,6 +725,12 @@ public static class MuiListtreeCore
 			value.SortHook = APTR.FromPointer(sortHook);
 			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListtreePolicyStateRecord value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiListtreePolicyStateRecord.Cookie;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListtreePolicyStateRecord value)
@@ -848,7 +862,7 @@ public static class MuiListtreeCore
 
 	internal static class MuiListtreeHookPoolStateRecordCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListtreeHookPoolStateRecord value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -857,7 +871,6 @@ public static class MuiListtreeCore
 				MuiListtreeHookPoolStateRecord.Size) ||
 				!MuiListtreeHookPoolFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeHookPoolField.Magic, out var magic) ||
-				magic != MuiListtreeHookPoolStateRecord.Cookie ||
 				!MuiListtreeHookPoolFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeHookPoolField.Pool, out var pool) ||
 				!MuiListtreeHookPoolFieldCursorCodec.TryReadUInt32(ref platform,
@@ -874,8 +887,15 @@ public static class MuiListtreeCore
 				return false;
 			value.Magic = magic;
 			value.Pool = APTR.FromPointer(pool);
-			return value.Pool.IsNotNull && value.Owned != 0;
+			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListtreeHookPoolStateRecord value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiListtreeHookPoolStateRecord.Cookie &&
+			value.Pool.IsNotNull && value.Owned != 0;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListtreeHookPoolStateRecord value)
@@ -1003,7 +1023,7 @@ public static class MuiListtreeCore
 
 	internal static class MuiListtreeClickStateCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListtreeClickState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -1012,7 +1032,6 @@ public static class MuiListtreeCore
 				MuiListtreeClickState.Size) ||
 				!MuiListtreeClickStateFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeClickStateField.Magic, out var magic) ||
-				magic != MuiListtreeClickState.Cookie ||
 				!MuiListtreeClickStateFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeClickStateField.LastNode, out var lastNode) ||
 				!MuiListtreeClickStateFieldCursorCodec.TryReadUInt32(ref platform,
@@ -1029,8 +1048,17 @@ public static class MuiListtreeCore
 				!MuiListtreeClickStateFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeClickStateField.DoubleClick,
 					out value.DoubleClick)) return false;
-			value.Magic = MuiListtreeClickState.Cookie;
+			value.Magic = magic;
 			value.LastNode = APTR.FromPointer(lastNode);
+			return true;
+		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListtreeClickState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!TryReadStructural(ref platform, address, out value) ||
+				value.Magic != MuiListtreeClickState.Cookie) return false;
 			value.TimestampValid = value.TimestampValid == 0 ? 0u : 1u;
 			value.DoubleClick = value.DoubleClick == 0 ? 0u : 1u;
 			return true;
@@ -1150,7 +1178,7 @@ public static class MuiListtreeCore
 
 	internal static class MuiListtreeClickColumnStateCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListtreeClickColumnState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -1159,14 +1187,22 @@ public static class MuiListtreeCore
 				MuiListtreeClickColumnState.Size) ||
 				!MuiListtreeClickColumnFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeClickColumnField.Magic, out var magic) ||
-				magic != MuiListtreeClickColumnState.Cookie ||
 				!MuiListtreeClickColumnFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeClickColumnField.LastColumn,
 					out value.LastColumn) ||
 				!MuiListtreeClickColumnFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeClickColumnField.Valid, out value.Valid))
 				return false;
-			value.Magic = MuiListtreeClickColumnState.Cookie;
+			value.Magic = magic;
+			return true;
+		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListtreeClickColumnState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!TryReadStructural(ref platform, address, out value) ||
+				value.Magic != MuiListtreeClickColumnState.Cookie) return false;
 			value.Valid = value.Valid == 0 ? 0u : 1u;
 			return true;
 		}
@@ -1289,7 +1325,7 @@ public static class MuiListtreeCore
 
 	internal static class MuiListtreeSurfaceStateRecordCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListtreeSurfaceStateRecord value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -1298,7 +1334,6 @@ public static class MuiListtreeCore
 				MuiListtreeSurfaceStateRecord.Size) ||
 				!MuiListtreeSurfaceFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeSurfaceField.Magic, out var magic) ||
-				magic != MuiListtreeSurfaceStateRecord.Cookie ||
 				!MuiListtreeSurfaceFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeSurfaceField.Left, out var left) ||
 				!MuiListtreeSurfaceFieldCursorCodec.TryReadUInt32(ref platform,
@@ -1313,13 +1348,19 @@ public static class MuiListtreeCore
 					address, MuiListtreeSurfaceField.FirstVisible,
 					out value.FirstVisible))
 				return false;
-			value.Magic = MuiListtreeSurfaceStateRecord.Cookie;
+			value.Magic = magic;
 			value.Left = unchecked((int)left);
 			value.Top = unchecked((int)top);
 			value.Width = unchecked((int)width);
 			value.Height = unchecked((int)height);
 			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListtreeSurfaceStateRecord value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiListtreeSurfaceStateRecord.Cookie;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListtreeSurfaceStateRecord value)
@@ -1434,7 +1475,7 @@ public static class MuiListtreeCore
 
 	internal static class MuiListtreeLifecycleStateRecordCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListtreeLifecycleStateRecord value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -1443,7 +1484,6 @@ public static class MuiListtreeCore
 				MuiListtreeLifecycleStateRecord.Size) ||
 				!MuiListtreeLifecycleFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeLifecycleField.Magic, out var magic) ||
-				magic != MuiListtreeLifecycleStateRecord.Cookie ||
 				!MuiListtreeLifecycleFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeLifecycleField.RenderInfo, out var renderInfo) ||
 				!MuiListtreeLifecycleFieldCursorCodec.TryReadUInt32(ref platform,
@@ -1451,10 +1491,16 @@ public static class MuiListtreeCore
 				!MuiListtreeLifecycleFieldCursorCodec.TryReadUInt32(ref platform,
 					address, MuiListtreeLifecycleField.Shown, out value.Shown))
 				return false;
-			value.Magic = MuiListtreeLifecycleStateRecord.Cookie;
+			value.Magic = magic;
 			value.RenderInfo = APTR.FromPointer(renderInfo);
 			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListtreeLifecycleStateRecord value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Magic == MuiListtreeLifecycleStateRecord.Cookie;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListtreeLifecycleStateRecord value)
@@ -1686,7 +1732,7 @@ public static class MuiListtreeCore
 
 	internal static class MuiListtreeNodeCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListtreeNodeState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -1695,11 +1741,8 @@ public static class MuiListtreeCore
 				MuiListtreeNodeState.Size) ||
 				!MuiListtreeNodeFieldCursorCodec.TryReadUInt32(ref platform, address,
 					MuiListtreeNodeField.Private1, out var private1) ||
-				private1 !=
-				MuiListtreeNodeState.Cookie) return false;
-			value.Private1 = MuiListtreeNodeState.Cookie;
-			if (!MuiListtreeNodeFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiListtreeNodeField.Private2, out var private2) ||
+				!MuiListtreeNodeFieldCursorCodec.TryReadUInt32(ref platform, address,
+					MuiListtreeNodeField.Private2, out var private2) ||
 				!MuiListtreeNodeFieldCursorCodec.TryReadUInt32(ref platform, address,
 					MuiListtreeNodeField.Name, out var name) ||
 				!MuiListtreeNodeFieldCursorCodec.TryReadUInt16(ref platform, address,
@@ -1730,6 +1773,7 @@ public static class MuiListtreeCore
 					MuiListtreeNodeField.Reserved0, out value.Reserved0) ||
 				!MuiListtreeNodeFieldCursorCodec.TryReadUInt32(ref platform, address,
 					MuiListtreeNodeField.Reserved1, out value.Reserved1)) return false;
+			value.Private1 = private1;
 			value.Private2 = APTR.FromPointer(private2);
 			value.Name = APTR.FromPointer(name);
 			value.User = APTR.FromPointer(user);
@@ -1740,6 +1784,12 @@ public static class MuiListtreeCore
 			value.Previous = APTR.FromPointer(previous);
 			return true;
 		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListtreeNodeState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, address, out value) &&
+			value.Private1 == MuiListtreeNodeState.Cookie;
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListtreeNodeState value)

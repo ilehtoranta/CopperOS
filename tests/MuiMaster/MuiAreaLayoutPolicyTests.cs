@@ -79,6 +79,39 @@ public sealed class MuiAreaLayoutPolicyTests
 	}
 
 	[Fact]
+	public void AreaLayoutPolicyAdmissionRequiresCanonicalShowMeAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var area = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
+			APTR.Null);
+		var valid = new MuiAreaLayoutPolicyStateRecord
+		{
+			Magic = MuiAreaLayoutPolicyStateRecord.Cookie,
+			ShowMe = 1,
+			FixWidth = 20,
+			FixHeight = 10,
+			MaxWidth = 100,
+			MaxHeight = 80,
+			InnerLeft = 2,
+			InnerRight = 3,
+			InnerTop = 1,
+			InnerBottom = 1,
+			HorizontalWeight = 7,
+			VerticalWeight = 9,
+		};
+		Assert.True(MuiAreaLayoutPolicyStateAdmission.Validate(valid));
+		Assert.True(MuiAreaLayoutPolicyStateAdmission.ValidateLive(ref platform,
+			State, area, valid));
+		var malformed = valid;
+		malformed.ShowMe = 2;
+		Assert.False(MuiAreaLayoutPolicyStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaLayoutPolicyStateAdmission.ValidateLive(ref platform,
+			State, area, malformed));
+		Assert.False(MuiAreaLayoutPolicyStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
 	public void AreaLayoutPublishesCanonicalMinMaxAndWeightPolicy()
 	{
 		var platform = CreatePlatform(out var cl);

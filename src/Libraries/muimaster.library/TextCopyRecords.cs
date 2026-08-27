@@ -26,6 +26,18 @@ internal struct MuiTextCopyStateRecord
 	internal uint Copy;
 }
 
+internal static class MuiTextCopyStateAdmission
+{
+	internal static bool Validate(MuiTextCopyStateRecord value) =>
+		value.Magic == MuiTextCopyStateRecord.Cookie && value.Copy <= 1;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiTextCopyStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) && !obj.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
+}
+
 internal enum MuiTextCopyStateField : byte
 {
 	Magic,
@@ -91,34 +103,72 @@ internal static class MuiTextCopyStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Text consumers use the named copy-policy
+// record; this bounded adapter is the only layer that translates its fixed
+// guest layout into addresses. The cursor codec remains available for
+// compatibility and malformed-state diagnostics.
+internal static class MuiTextCopyStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiTextCopyStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiTextCopyStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiTextCopyStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiTextCopyStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiTextCopyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiTextCopyStateRecord.Size) ||
-			!MuiTextCopyStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiTextCopyStateField.Magic, out var magic) ||
-			magic != MuiTextCopyStateRecord.Cookie) return false;
-		value.Magic = magic;
-		return MuiTextCopyStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiTextCopyStateField.Copy, out value.Copy);
+		return MuiTextCopyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) &&
+			MuiTextCopyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out value.Copy);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiTextCopyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiTextCopyStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiTextCopyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiTextCopyStateRecord.Size) || value.Magic !=
-			MuiTextCopyStateRecord.Cookie) return false;
-		return MuiTextCopyStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiTextCopyStateField.Magic, value.Magic) &&
-			MuiTextCopyStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiTextCopyStateField.Copy, value.Copy);
+		if (!MuiTextCopyStateAdmission.Validate(value)) return false;
+		return MuiTextCopyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiTextCopyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 4, value.Copy);
 	}
 }
 

@@ -106,6 +106,59 @@ public sealed class MuiDirlistVolumelistTests
 	}
 
 	[Fact]
+	public void DirlistOperationCodecsUseDedicatedStructBoundaries()
+	{
+		var platform = CreatePlatform(out _, out _, out _);
+		var address = APTR.FromPointer(0x2C00);
+
+		var set = default(MuiDirlistSetMessage);
+		set.MethodId = MuiDirlistMessageCodec.Set;
+		set.Attribute = 7;
+		set.Value = 9;
+		Assert.True(MuiDirlistSetMessageCodec.TryWrite(ref platform, address, set));
+		Assert.True(MuiDirlistSetMessageCodec.TryRead(ref platform, address,
+			out var setRead));
+		Assert.Equal(set.MethodId, setRead.MethodId);
+		Assert.Equal(set.Attribute, setRead.Attribute);
+		Assert.Equal(set.Value, setRead.Value);
+
+		var rename = default(MuiDirlistRenameMessage);
+		rename.MethodId = MuiDirlistMessageCodec.Rename;
+		rename.Entry = 3;
+		rename.Name = 0x2800;
+		Assert.True(MuiDirlistRenameMessageCodec.TryWrite(ref platform, address,
+			rename));
+		Assert.True(MuiDirlistRenameMessageCodec.TryRead(ref platform, address,
+			out var renameRead));
+		Assert.Equal(rename.Entry, renameRead.Entry);
+		Assert.Equal(rename.Name, renameRead.Name);
+
+		var protection = default(MuiDirlistProtectionMessage);
+		protection.MethodId = MuiDirlistMessageCodec.SetProtection;
+		protection.Entry = 4;
+		protection.Protection = 0x12345678;
+		Assert.True(MuiDirlistProtectionMessageCodec.TryWrite(ref platform,
+			address, protection));
+		Assert.True(MuiDirlistProtectionMessageCodec.TryRead(ref platform,
+			address, out var protectionRead));
+		Assert.Equal(protection.Protection, protectionRead.Protection);
+
+		var getEntry = default(MuiDirlistGetEntryMessage);
+		getEntry.MethodId = MuiDirlistMessageCodec.ListGetEntry;
+		getEntry.Position = unchecked((uint)-2);
+		getEntry.Storage = 0x2900;
+		Assert.True(MuiDirlistGetEntryMessageCodec.TryWrite(ref platform,
+			address, getEntry));
+		Assert.True(MuiDirlistGetEntryMessageCodec.TryRead(ref platform, address,
+			out var getEntryRead));
+		Assert.Equal(getEntry.Position, getEntryRead.Position);
+		Assert.Equal(getEntry.Storage, getEntryRead.Storage);
+
+		Assert.False(MuiDirlistSetMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x80FFF), out _));
+	}
+
+	[Fact]
 	public void DirlistMethodHeaderUsesNamedField()
 	{
 		var platform = CreatePlatform(out _, out _, out _);
@@ -559,6 +612,56 @@ public sealed class MuiDirlistVolumelistTests
 	}
 
 	[Fact]
+	public void MalformedDirlistPolicyRecordsFailClosedBeforeConsumers()
+	{
+		var platform = CreatePlatform(out var dirlistClass, out _, out _);
+		var dirlist = CreateDirlist(ref platform, dirlistClass, "Data:");
+
+		var sortBlock = MuiStoreCore.DataspaceFind(ref platform, State, dirlist,
+			0x0D100007u);
+		Assert.True(MuiDirlistSortStateRecordCodec.TryReadStructural(ref platform,
+			sortBlock, out var sort));
+		Assert.True(MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			sortBlock, MuiDirlistRecordKind.SortState,
+			MuiDirlistRecordField.SortTypeValue, 99));
+		Assert.False(MuiDirlistCore.TryReadSortState(ref platform, State, dirlist,
+			out _));
+		Assert.False(MuiDirlistCore.GetAttribute(ref platform, State, dirlist,
+			SortType, out _));
+
+		var filterBlock = MuiStoreCore.DataspaceFind(ref platform, State, dirlist,
+			0x0D100008u);
+		Assert.True(MuiDirlistFilterStateRecordCodec.TryReadStructural(
+			ref platform, filterBlock, out var filter));
+		Assert.True(MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			filterBlock, MuiDirlistRecordKind.FilterState,
+			MuiDirlistRecordField.DrawersOnlyValue, 2));
+		Assert.False(MuiDirlistCore.TryReadFilterState(ref platform, State,
+			dirlist, out _));
+		Assert.False(MuiDirlistCore.GetAttribute(ref platform, State, dirlist,
+			DrawersOnly, out _));
+
+		var scanBlock = MuiStoreCore.DataspaceFind(ref platform, State, dirlist,
+			0x0D100009u);
+		Assert.True(MuiDirlistScanStateRecordCodec.TryReadStructural(ref platform,
+			scanBlock, out var scanRecord));
+		Assert.True(MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			scanBlock, MuiDirlistRecordKind.ScanState,
+			MuiDirlistRecordField.StatusValue, 3));
+		Assert.False(MuiDirlistCore.TryReadScanState(ref platform, State, dirlist,
+			out _));
+		Assert.False(MuiDirlistCore.GetAttribute(ref platform, State, dirlist,
+			Status, out _));
+
+		// A normal scan repairs the malformed records through their named
+		// admission boundaries before publishing the next valid result.
+		Assert.True(MuiDirlistCore.ReRead(ref platform, State, dirlist));
+		Assert.True(MuiDirlistCore.TryReadScanState(ref platform, State, dirlist,
+			out var repairedScan));
+		Assert.Equal(MuiDirlistCore.StatusValid, repairedScan.Status);
+	}
+
+	[Fact]
 	public void NamedDirlistEntryStateDecodesOwnedRecordFields()
 	{
 		var platform = CreatePlatform(out var dirlistClass, out _, out _);
@@ -952,6 +1055,42 @@ public sealed class MuiDirlistVolumelistTests
 		Assert.True(MuiVolumelistCore.GetAttribute(ref platform, State, volumes,
 			ExampleMode, out publicValue));
 		Assert.Equal(0u, publicValue);
+	}
+
+	[Fact]
+	public void MalformedVolumelistModeFailsClosedBeforeConsumers()
+	{
+		var platform = CreatePlatform(out _, out var volumelistClass, out _);
+		platform.VolumeCount = 0;
+		var tags = APTR.FromPointer(0x1E00);
+		platform.WriteUInt32(tags, 0, ExampleMode);
+		platform.WriteUInt32(tags, 4, 1);
+		platform.WriteUInt32(tags, 8, 0);
+		var volumes = MuiVolumelistCore.CreateVolumelist(ref platform, State,
+			volumelistClass, tags);
+		Assert.NotEqual(APTR.Null, volumes);
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, volumes,
+			MuiVolumelistCore.ModeStateKey);
+		Assert.True(MuiVolumelistCore.MuiVolumelistModeStateRecordCodec
+			.TryReadStructural(ref platform, block, out var mode));
+		Assert.True(MuiVolumelistCore.MuiVolumelistModeFieldCursorCodec
+			.TryWriteUInt32(ref platform, block,
+				MuiVolumelistCore.MuiVolumelistModeField.ExampleMode, 2));
+
+		Assert.False(MuiVolumelistCore.MuiVolumelistModeStateRecordCodec.TryRead(
+			ref platform, block, out _));
+		Assert.False(MuiVolumelistCore.TryGetModeStateRecord(ref platform, State,
+			volumes, out _));
+		Assert.False(MuiVolumelistCore.GetAttribute(ref platform, State, volumes,
+			ExampleMode, out _));
+		Assert.False(MuiVolumelistCore.SetAttribute(ref platform, State, volumes,
+			ExampleMode, 1));
+
+		// Population rejects the malformed mode before changing the valid listing.
+		Assert.Equal(2u, MuiListCore.EntryCount(ref platform, State, volumes));
+		Assert.False(MuiVolumelistCore.Populate(ref platform, State, volumes));
+		Assert.Equal(2u, MuiListCore.EntryCount(ref platform, State, volumes));
+		Assert.Equal(StatusValid, Get(ref platform, volumes, Status));
 	}
 
 	[Fact]

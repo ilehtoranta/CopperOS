@@ -12,6 +12,10 @@ namespace CopperOS.MuiMaster;
 internal struct MuiGetConfigItemMessage
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint ConfigIdOffset = 4;
+	internal const uint StorageOffset = 8;
 	internal uint MethodId;
 	internal uint ConfigId;
 	internal APTR Storage;
@@ -21,6 +25,8 @@ internal struct MuiGetConfigItemMessage
 internal struct MuiGetConfigItemMethodMessage
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
 
@@ -38,27 +44,47 @@ internal struct MuiGetConfigItemPacketFieldCursor
 	internal MuiGetConfigItemPacketField Field;
 }
 
-internal static class MuiGetConfigItemPacketFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed MUIM_GetConfigItem records.
+// The packet kind is inferred from the field, and the complete record span is
+// validated before a member address is returned.
+internal static class MuiGetConfigItemMessageMemoryCodec
 {
 	private static bool TryResolve(MuiGetConfigItemPacketField field,
-		out uint offset)
+		out uint offset, out uint size)
 	{
-		if (field == MuiGetConfigItemPacketField.MethodId) { offset = 0; return true; }
-		if (field == MuiGetConfigItemPacketField.ConfigId) { offset = 4; return true; }
-		if (field == MuiGetConfigItemPacketField.Storage) { offset = 8; return true; }
+		if (field == MuiGetConfigItemPacketField.MethodId)
+		{
+			offset = MuiGetConfigItemMethodMessage.MethodIdOffset;
+			size = MuiGetConfigItemMethodMessage.Size;
+			return true;
+		}
+		if (field == MuiGetConfigItemPacketField.ConfigId)
+		{
+			offset = MuiGetConfigItemMessage.ConfigIdOffset;
+			size = MuiGetConfigItemMessage.Size;
+			return true;
+		}
+		if (field == MuiGetConfigItemPacketField.Storage)
+		{
+			offset = MuiGetConfigItemMessage.StorageOffset;
+			size = MuiGetConfigItemMessage.Size;
+			return true;
+		}
 		offset = 0;
+		size = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiGetConfigItemPacketFieldCursor cursor, out APTR address)
+		APTR message, MuiGetConfigItemPacketField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset, out var size) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, size)) return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiGetConfigItemMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -66,10 +92,8 @@ internal static class MuiGetConfigItemPacketFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiGetConfigItemPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -78,13 +102,34 @@ internal static class MuiGetConfigItemPacketFieldCursorCodec
 		APTR message, MuiGetConfigItemPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiGetConfigItemPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// field cursor. The live message codec routes to the struct adapter above.
+internal static class MuiGetConfigItemPacketFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGetConfigItemPacketFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGetConfigItemMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiGetConfigItemPacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
+			message, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiGetConfigItemPacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
+			message, field, value);
 }
 
 // Central codec for the fixed MorphOS MUIM_GetConfigItem envelope. The public

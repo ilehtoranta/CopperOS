@@ -28,6 +28,16 @@ internal struct MuiGroupForwardTraversalState
 	public uint Exhausted;
 }
 
+internal static class MuiGroupForwardStateValidation
+{
+	internal static bool IsValidRecord(MuiGroupForwardState value) =>
+		value.Cookie == MuiGroupForwardState.Magic && value.Forward <= 1 &&
+		value.ForwardDepth <= 1;
+
+	internal static bool IsValidState(MuiGroupForwardState value) =>
+		IsValidRecord(value);
+}
+
 internal static class MuiGroupForwardTraversalCore
 {
 	internal static bool TryVisit(ref MuiGroupForwardTraversalState state)
@@ -59,17 +69,39 @@ internal struct MuiGroupChildListState
 	public uint Generation;
 }
 
+internal static class MuiGroupChildListStateValidation
+{
+	internal static bool IsValidRecord(MuiGroupChildListState value) =>
+		value.Cookie == MuiGroupChildListState.Magic && value.Group.IsNotNull &&
+		value.List.IsNotNull && value.Count <= value.Capacity &&
+		value.Count <= MuiHeadlessLayout.MaximumTraversal &&
+		value.Capacity <= MuiHeadlessLayout.MaximumTraversal &&
+		(value.Count == 0 || value.Entries.IsNotNull) &&
+		value.Count <= uint.MaxValue / MuiGroupChildListEntry.Size;
+
+	internal static bool IsValidState<TPlatform>(ref TPlatform platform,
+		MuiGroupChildListState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!IsValidRecord(value) || !platform.IsMapped(value.List,
+			Amiga.List.Size)) return false;
+		if (value.Count == 0) return true;
+		return platform.IsMapped(value.Entries,
+			value.Count * MuiGroupChildListEntry.Size);
+	}
+}
+
 internal static class MuiGroupForwardStateCodec
 {
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiGroupForwardState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGroupForwardState.Size)) return false;
+		if (address.IsNull || !MuiGroupForwardStateValidation.IsValidRecord(value) ||
+			!platform.IsMapped(address, MuiGroupForwardState.Size)) return false;
 		return MuiGroupRecordFieldCursorCodec.TryWriteUInt32(ref platform,
 			address, MuiGroupRecordKind.Forward, MuiGroupRecordField.Cookie,
-			MuiGroupForwardState.Magic) &&
+			value.Cookie) &&
 			MuiGroupRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
 				MuiGroupRecordKind.Forward, MuiGroupRecordField.Forward,
 				value.Forward) &&
@@ -100,11 +132,11 @@ internal static class MuiGroupForwardStateCodec
 			!MuiGroupRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiGroupRecordKind.Forward, MuiGroupRecordField.ForwardCount,
 				out var forwardCount)) return false;
-		value.Cookie = MuiGroupForwardState.Magic;
-		value.Forward = forward == 0 ? 0u : 1u;
-		value.ForwardDepth = forwardDepth == 0 ? 0u : 1u;
+		value.Cookie = cookie;
+		value.Forward = forward;
+		value.ForwardDepth = forwardDepth;
 		value.ForwardCount = forwardCount;
-		return true;
+		return MuiGroupForwardStateValidation.IsValidState(value);
 	}
 }
 
@@ -114,12 +146,13 @@ internal static class MuiGroupChildListStateCodec
 		MuiGroupChildListState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGroupChildListState.Size) || value.Capacity < value.Count)
+		if (address.IsNull || !MuiGroupChildListStateValidation.IsValidState(
+			ref platform, value) || !platform.IsMapped(address,
+			MuiGroupChildListState.Size))
 			return false;
 		return MuiGroupRecordFieldCursorCodec.TryWriteUInt32(ref platform,
 			address, MuiGroupRecordKind.ChildList, MuiGroupRecordField.Cookie,
-			MuiGroupChildListState.Magic) &&
+			value.Cookie) &&
 			MuiGroupRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
 				MuiGroupRecordKind.ChildList, MuiGroupRecordField.Group,
 				value.Group.Raw) &&
@@ -174,11 +207,12 @@ internal static class MuiGroupChildListStateCodec
 			!MuiGroupRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiGroupRecordKind.ChildList, MuiGroupRecordField.Generation,
 				out value.Generation)) return false;
-		value.Cookie = MuiGroupChildListState.Magic;
+		value.Cookie = cookie;
 		value.Group = APTR.FromPointer(group);
 		value.List = APTR.FromPointer(list);
 		value.Entries = APTR.FromPointer(entries);
-		return value.Capacity >= value.Count;
+		return MuiGroupChildListStateValidation.IsValidState(ref platform,
+			value);
 	}
 }
 
@@ -640,8 +674,16 @@ public static class MuiGroupChildrenCore
 				value, notify);
 		}
 
-		if (!TryReadForwardState(ref platform, record, out var forward) ||
-			forward.Forward == 0) return false;
+		if (!TryReadForwardState(ref platform, record, out var forward))
+		{
+			if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+				StateAttribute, out var stateBlock) && stateBlock != 0)
+			{
+				handled = true;
+			}
+			return false;
+		}
+		if (forward.Forward == 0) return false;
 		handled = true;
 		var traversal = default(MuiGroupForwardTraversalState);
 		if (forward.ForwardDepth != 0)
@@ -680,6 +722,8 @@ public static class MuiGroupChildrenCore
 			value = attribute == Forward ? forward.Forward : forward.ForwardDepth;
 			return true;
 		}
+		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+			StateAttribute, out var stateBlock) && stateBlock != 0) return false;
 		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
 			attribute, out var raw)) return false;
 		// Compatibility writes can predate the typed forwarding record. Keep the
@@ -817,13 +861,18 @@ public static class MuiGroupChildrenCore
 		var block = EnsureForwardState(ref platform, state, record);
 		if (block.IsNull || !TryReadState(ref platform, block, out var current))
 			return false;
+		var previous = current;
 		if (attribute == Forward) current.Forward = value == 0 ? 0u : 1u;
 		else current.ForwardDepth = value == 0 ? 0u : 1u;
-		if (!MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state,
-			record, attribute, value == 0 ? 0u : 1u, false)) return false;
 		current.ForwardCount = current.ForwardCount == uint.MaxValue
 			? uint.MaxValue : current.ForwardCount + 1;
-		WriteState(ref platform, block, current);
+		if (!WriteState(ref platform, block, current)) return false;
+		if (!MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state,
+			record, attribute, value == 0 ? 0u : 1u, false))
+		{
+			WriteState(ref platform, block, previous);
+			return false;
+		}
 		MuiHeadlessMemory.Mutated(ref platform, state);
 		if (notify) MuiNotifyCore.DispatchAttributeChange(ref platform, state,
 			record, attribute, value == 0 ? 0u : 1u);
@@ -860,8 +909,8 @@ public static class MuiGroupChildrenCore
 				group);
 			var block = APTR.FromPointer(ReadPrivateAttribute(ref platform,
 				record));
-			if (TryReadState(ref platform, block, out _))
-				WriteState(ref platform, block, current);
+			if (TryReadState(ref platform, block, out _) &&
+				!WriteState(ref platform, block, current)) success = false;
 		}
 		return success;
 	}
@@ -884,12 +933,18 @@ public static class MuiGroupChildrenCore
 		if (!MuiHeadlessStateCodec.TryRead(ref platform, state,
 			out var stateValue)) return APTR.Null;
 		var mutation = stateValue.Mutation;
-		var block = APTR.FromPointer(ReadPrivateAttribute(ref platform, record,
-			ChildListStateAttribute));
-		if (TryReadChildListState(ref platform, block, out var current) &&
-			current.Group.Raw == group.Raw && current.Mutation == mutation &&
-			current.List.IsNotNull && platform.IsMapped(current.List,
-				Amiga.List.Size)) return current.List;
+		var hasExisting = MuiHeadlessObjectCore.GetRawAttribute(ref platform,
+			state, group, ChildListStateAttribute, out var existing) &&
+			existing != 0;
+		var block = APTR.FromPointer(existing);
+		if (hasExisting)
+		{
+			if (!TryReadChildListState(ref platform, block, out var current))
+				return APTR.Null;
+			if (current.Group.Raw == group.Raw && current.Mutation == mutation &&
+				current.List.IsNotNull && platform.IsMapped(current.List,
+					Amiga.List.Size)) return current.List;
+		}
 
 		var count = CountChildren(ref platform, state, group);
 		if (count > uint.MaxValue / MuiGroupChildListEntry.Size) return APTR.Null;
@@ -978,9 +1033,25 @@ public static class MuiGroupChildrenCore
 			return APTR.Null;
 		}
 		if (!MuiHeadlessStateCodec.TryRead(ref platform, state,
-			out stateValue)) return APTR.Null;
+			out stateValue))
+		{
+			MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state, record,
+				ChildListStateAttribute, oldBlock.Raw, false);
+			platform.Clear(block, MuiGroupChildListState.Size);
+			platform.Free(block, MuiGroupChildListState.Size);
+			FreeChildListProjection(ref platform, list, entries, entriesSize);
+			return APTR.Null;
+		}
 		replacement.Mutation = stateValue.Mutation;
-		WriteChildListState(ref platform, block, replacement);
+		if (!WriteChildListState(ref platform, block, replacement))
+		{
+			MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state, record,
+				ChildListStateAttribute, oldBlock.Raw, false);
+			platform.Clear(block, MuiGroupChildListState.Size);
+			platform.Free(block, MuiGroupChildListState.Size);
+			FreeChildListProjection(ref platform, list, entries, entriesSize);
+			return APTR.Null;
+		}
 		FreeChildListStateBlock(ref platform, oldBlock);
 		return list;
 	}
@@ -1055,7 +1126,7 @@ public static class MuiGroupChildrenCore
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiGroupChildListStateCodec.TryRead(ref platform, block, out value);
 
-	private static void WriteChildListState<TPlatform>(ref TPlatform platform,
+	private static bool WriteChildListState<TPlatform>(ref TPlatform platform,
 		APTR block, MuiGroupChildListState value)
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiGroupChildListStateCodec.Write(ref platform, block, value);
@@ -1063,13 +1134,34 @@ public static class MuiGroupChildrenCore
 	private static APTR EnsureForwardState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR record) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var block = APTR.FromPointer(ReadPrivateAttribute(ref platform, record));
-		if (TryReadState(ref platform, block, out _)) return block;
+		if (!MuiHeadlessObjectCodec.TryRead(ref platform, record,
+			out var objectValue)) return APTR.Null;
+		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
+			objectValue.Boopsi, StateAttribute, out var existing) && existing != 0)
+		{
+			var existingBlock = APTR.FromPointer(existing);
+			if (TryReadState(ref platform, existingBlock, out _))
+				return existingBlock;
+			return APTR.Null;
+		}
+		var block = APTR.Null;
 		block = MuiHeadlessMemory.Allocate(ref platform,
 			MuiGroupForwardState.Size);
 		if (block.IsNull) return APTR.Null;
 		var value = default(MuiGroupForwardState);
 		value.Cookie = MuiGroupForwardState.Magic;
+		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
+			objectValue.Boopsi, Forward, out var forward))
+			value.Forward = forward == 0 ? 0u : 1u;
+		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state,
+			objectValue.Boopsi, ForwardDepth, out var forwardDepth))
+			value.ForwardDepth = forwardDepth == 0 ? 0u : 1u;
+		if (!WriteState(ref platform, block, value))
+		{
+			platform.Clear(block, MuiGroupForwardState.Size);
+			platform.Free(block, MuiGroupForwardState.Size);
+			return APTR.Null;
+		}
 		if (!MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state,
 			record, StateAttribute, block.Raw, false))
 		{
@@ -1108,7 +1200,7 @@ public static class MuiGroupChildrenCore
 		return TryReadState(ref platform, block, out value);
 	}
 
-	private static void WriteState<TPlatform>(ref TPlatform platform, APTR block,
+	private static bool WriteState<TPlatform>(ref TPlatform platform, APTR block,
 		MuiGroupForwardState value) where TPlatform : struct, IMuiGuestMemory
 		=> MuiGroupForwardStateCodec.Write(ref platform, block, value);
 

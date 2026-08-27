@@ -22,6 +22,10 @@ internal static class MuiAreaTextColorCore
 		APTR obj, APTR renderInfo) where TPlatform : struct, IMuiLayoutPlatform
 	{
 		if (obj.IsNull || renderInfo.IsNull) return false;
+		// Validate the existing setup-scoped record before asking the provider to
+		// resolve the requested color. A malformed present block must fail closed
+		// first.
+		if (!TryReadState(ref platform, state, obj, out _)) return false;
 		var request = default(MuiTextColorResolutionRequest);
 		request.Object = obj;
 		request.RenderInfo = renderInfo;
@@ -44,6 +48,7 @@ internal static class MuiAreaTextColorCore
 	internal static bool Cleanup<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadState(ref platform, state, obj, out _)) return false;
 		var generation = 1u;
 		if (TryReadRecord(ref platform, state, obj, out var current))
 			generation = current.Generation == uint.MaxValue ? 1u :
@@ -72,7 +77,19 @@ internal static class MuiAreaTextColorCore
 		value = default;
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
 			return false;
-		if (!TryReadRecord(ref platform, state, obj, out var record))
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey);
+		MuiAreaTextColorStateRecord record;
+		if (block.IsNotNull || length != 0)
+		{
+			// A present block is authoritative typed state. Do not rebuild a
+			// malformed RGB/Active/generation record from defaults.
+			if (length != unchecked((int)MuiAreaTextColorStateRecord.Size) ||
+				!MuiAreaTextColorStateRecordCodec.TryReadStructural(ref platform, block,
+					out record) || !MuiAreaTextColorStateAdmission.ValidateLive(ref platform,
+					state, obj, record)) return false;
+		}
+		else
 		{
 			if (!Initialize(ref platform, state, obj) ||
 				!TryReadRecord(ref platform, state, obj, out record)) return false;
@@ -103,8 +120,9 @@ internal static class MuiAreaTextColorCore
 			StateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) !=
 			unchecked((int)MuiAreaTextColorStateRecord.Size)) return false;
-		return MuiAreaTextColorStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiAreaTextColorStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiAreaTextColorStateAdmission.ValidateLive(
+			ref platform, state, obj, value);
 	}
 
 	private static bool WriteState<TPlatform>(ref TPlatform platform, APTR state,
@@ -113,6 +131,18 @@ internal static class MuiAreaTextColorCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
 			return false;
+		var existing = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			StateKey);
+		var existingLength = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateKey);
+		if (existing.IsNotNull || existingLength != 0)
+		{
+			if (existingLength != unchecked((int)MuiAreaTextColorStateRecord.Size) ||
+				!MuiAreaTextColorStateRecordCodec.TryReadStructural(ref platform,
+					existing, out var existingRecord) ||
+				!MuiAreaTextColorStateAdmission.ValidateLive(ref platform, state, obj,
+					existingRecord)) return false;
+		}
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiAreaTextColorStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -122,8 +152,9 @@ internal static class MuiAreaTextColorCore
 		record.Color = color & 0x00FFFFFFu;
 		record.Active = active == 0 ? 0u : 1u;
 		record.Generation = generation == 0 ? 1u : generation;
-		var written = MuiAreaTextColorStateRecordCodec.Write(ref platform, scratch,
-			record);
+		var written = MuiAreaTextColorStateAdmission.ValidateLive(ref platform, state,
+			obj, record) && MuiAreaTextColorStateRecordCodec.Write(ref platform,
+			scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 			StateKey, scratch, unchecked((int)MuiAreaTextColorStateRecord.Size));
 		if (!stored)

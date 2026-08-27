@@ -176,6 +176,100 @@ public sealed class MuiExternalWrapperTests
 	}
 
 	[Fact]
+	public void ExternalWrapperMessageAdapterOwnsStructBounds()
+	{
+		var p = NewPlatform();
+		Assert.True(MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiExternalWrapperPacketKind.Update,
+			MuiExternalWrapperField.Flags, 3));
+		Assert.True(MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiExternalWrapperPacketKind.Update,
+			MuiExternalWrapperField.Flags, out var flags));
+		Assert.Equal(3u, flags);
+		Assert.True(MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiExternalWrapperPacketKind.Get,
+			MuiExternalWrapperField.Storage, Storage.Raw));
+		Assert.True(MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiExternalWrapperPacketKind.Get,
+			MuiExternalWrapperField.Storage, out var storage));
+		Assert.Equal(Storage.Raw, storage);
+		Assert.True(MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiExternalWrapperPacketKind.Set,
+			MuiExternalWrapperField.Value, 0x456));
+		Assert.True(MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiExternalWrapperPacketKind.Set,
+			MuiExternalWrapperField.Value, out var value));
+		Assert.Equal(0x456u, value);
+		Assert.True(MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiExternalWrapperPacketKind.RenderInfo,
+			MuiExternalWrapperField.RenderInfo, RenderInfo.Raw));
+		Assert.True(MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiExternalWrapperPacketKind.RenderInfo,
+			MuiExternalWrapperField.RenderInfo, out var renderInfo));
+		Assert.Equal(RenderInfo.Raw, renderInfo);
+		Assert.True(MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiExternalWrapperPacketKind.AskMinMax,
+			MuiExternalWrapperField.Storage, MinMax.Raw));
+		Assert.True(MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiExternalWrapperPacketKind.AskMinMax,
+			MuiExternalWrapperField.Storage, out var minMax));
+		Assert.Equal(MinMax.Raw, minMax);
+		Assert.True(MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiExternalWrapperPacketKind.Layout,
+			MuiExternalWrapperField.Height, 40));
+		Assert.True(MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiExternalWrapperPacketKind.Layout,
+			MuiExternalWrapperField.Height, out var height));
+		Assert.Equal(40u, height);
+		Assert.False(MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref p,
+			APTR.FromPointer(0x40FED), MuiExternalWrapperPacketKind.Layout,
+			MuiExternalWrapperField.Height, out _));
+		Assert.False(MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiExternalWrapperPacketKind.Method,
+			MuiExternalWrapperField.Value, out _));
+		Assert.False(MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref p,
+			APTR.Null, MuiExternalWrapperPacketKind.Set,
+			MuiExternalWrapperField.Value, out _));
+	}
+
+	[Fact]
+	public void BoopsiQueryMessageAdapterOwnsStructBounds()
+	{
+		var p = NewPlatform();
+		Assert.True(MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiBoopsiQueryPacketField.MethodId,
+			MuiBoopsiQueryMessage.Method));
+		Assert.True(MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiBoopsiQueryPacketField.MethodId, out var method));
+		Assert.Equal(MuiBoopsiQueryMessage.Method, method);
+		Assert.True(MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiBoopsiQueryPacketField.Screen, Screen.Raw));
+		Assert.True(MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiBoopsiQueryPacketField.MinWidth,
+			unchecked((uint)-10)));
+		Assert.True(MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiBoopsiQueryPacketField.MaxHeight, 200));
+		Assert.True(MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiBoopsiQueryPacketField.RenderInfo, RenderInfo.Raw));
+		Assert.True(MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiBoopsiQueryPacketField.MinWidth, out var minWidth));
+		Assert.Equal(unchecked((uint)-10), minWidth);
+		Assert.True(MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiBoopsiQueryPacketField.MaxHeight, out var maxHeight));
+		Assert.Equal(200u, maxHeight);
+		Assert.True(MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, MuiBoopsiQueryPacketField.RenderInfo, out var renderInfo));
+		Assert.Equal(RenderInfo.Raw, renderInfo);
+		Assert.False(MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref p,
+			APTR.FromPointer(0x40FD9), MuiBoopsiQueryPacketField.RenderInfo,
+			out _));
+		Assert.False(MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, (MuiBoopsiQueryPacketField)255, out _));
+		Assert.False(MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref p,
+			APTR.Null, MuiBoopsiQueryPacketField.Flags, out _));
+	}
+
+	[Fact]
 	public void ExternalWrapperHeaderCodecUsesNamedFields()
 	{
 		var p = NewPlatform();
@@ -187,7 +281,7 @@ public sealed class MuiExternalWrapperTests
 			MuiExternalWrapperLayout.FlagPicture;
 		Assert.True(MuiExternalWrapperHeaderCodec.Write(ref p, address,
 			expected));
-		Assert.True(MuiExternalWrapperHeaderCodec.TryRead(ref p, address,
+		Assert.True(MuiExternalWrapperHeaderCodec.TryReadStructural(ref p, address,
 			out var actual));
 		Assert.Equal(expected.Magic, actual.Magic);
 		Assert.Equal(expected.Class, actual.Class);
@@ -197,8 +291,41 @@ public sealed class MuiExternalWrapperTests
 		invalid.Magic = MuiExternalWrapperHeader.Cookie;
 		Assert.False(MuiExternalWrapperHeaderCodec.Write(ref p,
 			APTR.FromPointer(0x50000), invalid));
-		Assert.False(MuiExternalWrapperHeaderCodec.TryRead(ref p,
+		Assert.False(MuiExternalWrapperHeaderCodec.TryReadStructural(ref p,
 			APTR.FromPointer(0x50000), out _));
+	}
+
+	[Fact]
+	public void ExternalWrapperAdmissionRejectsCrossClassFlagsAndBrokenOwnership()
+	{
+		var p = NewPlatform();
+		Assert.Equal(MuiExternalWrapperClass.Dtpic, CreateDtpic(ref p));
+		Assert.True(MuiExternalWrapperCore.Valid(ref p, Instance));
+
+		Assert.True(MuiExternalWrapperHeaderCodec.TryReadStructural(ref p,
+			Instance, out var header));
+		header.Flags = 1u << 31;
+		Assert.True(MuiExternalWrapperHeaderCodec.Write(ref p, Instance, header));
+		Assert.False(MuiExternalWrapperCore.Valid(ref p, Instance));
+		header.Flags = MuiExternalWrapperLayout.FlagSmart;
+		Assert.True(MuiExternalWrapperHeaderCodec.Write(ref p, Instance, header));
+		Assert.False(MuiExternalWrapperCore.Valid(ref p, Instance));
+		Assert.False(MuiExternalWrapperCore.GetAttribute(ref p, Instance,
+			MuiExternalWrapperAttributes.Dtpic_Alpha, out _));
+
+		header.Flags = 0;
+		Assert.True(MuiExternalWrapperHeaderCodec.Write(ref p, Instance, header));
+		Assert.True(MuiExternalWrapperLifecycle.Dispose(ref p, Instance));
+
+		Assert.True(MuiExternalWrapperCore.Create(ref p, Instance,
+			MuiExternalWrapperClass.Boopsi));
+		Assert.True(MuiExternalScratchStateCodec.TryRead(ref p, Instance,
+			out var scratch));
+		scratch.WorkBuffer = APTR.Null;
+		Assert.True(MuiExternalScratchStateCodec.Write(ref p, Instance,
+			scratch));
+		Assert.False(MuiExternalWrapperCore.Valid(ref p, Instance));
+		Assert.False(MuiExternalWrapperLifecycle.Dispose(ref p, Instance));
 	}
 
 	[Fact]

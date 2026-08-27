@@ -166,7 +166,8 @@ internal static class MuiMenuRecordFieldCursorCodec
 
 internal static class MuiMenuSpecialistStateCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiMenuSpecialistState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -174,10 +175,9 @@ internal static class MuiMenuSpecialistStateCodec
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiMenuSpecialistState.Size) ||
 			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiMenuRecordField.Magic, out var magic) ||
-			magic != MuiMenuSpecialistState.Cookie)
+				MuiMenuRecordField.Magic, out var magic))
 			return false;
-		value.Magic = MuiMenuSpecialistState.Cookie;
+		value.Magic = magic;
 		if (!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 			MuiMenuRecordField.Class, out value.Class) ||
 			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
@@ -205,6 +205,14 @@ internal static class MuiMenuSpecialistStateCodec
 		value.TitleOwned = APTR.FromPointer(titleOwned);
 		value.ShortcutOwned = APTR.FromPointer(shortcutOwned);
 		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiMenuSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryReadStructural(ref platform, address, out value)) return false;
+		return MuiMenuSpecialistStateAdmission.Validate(ref platform, value);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
@@ -240,6 +248,44 @@ internal static class MuiMenuSpecialistStateCodec
 				MuiMenuRecordField.NotifyCount, value.NotifyCount) &&
 			MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
 				MuiMenuRecordField.Reserved0, value.Reserved0);
+	}
+}
+
+// The structural codec above preserves the complete 52-byte sidecar ABI for
+// packet qualification. Live menu operations use this semantic boundary so a
+// guest cannot turn arbitrary mapped bytes into an active menu sidecar.
+internal static class MuiMenuSpecialistStateAdmission
+{
+	private const uint AllowedFlags = MuiMenuSpecialistLayout.FlagCopyStrings |
+		MuiMenuSpecialistLayout.FlagCaseSensitive |
+		MuiMenuSpecialistLayout.FlagWillOpen |
+		MuiMenuSpecialistLayout.FlagPublished;
+
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		MuiMenuSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (value.Magic != MuiMenuSpecialistState.Cookie ||
+			value.Class < (uint)MuiMenuSpecialistClass.Menustrip ||
+			value.Class > (uint)MuiMenuSpecialistClass.Menuitem ||
+			(value.Flags & ~AllowedFlags) != 0 ||
+			value.ChangeDepth == uint.MaxValue || value.Reserved0 != 0)
+			return false;
+		return ValidateOwned(ref platform, value.TitleOwned,
+			value.TitleOwnedSize) && ValidateOwned(ref platform,
+			value.ShortcutOwned, value.ShortcutOwnedSize);
+	}
+
+	private static bool ValidateOwned<TPlatform>(ref TPlatform platform,
+		APTR address, uint size) where TPlatform : struct, IMuiGuestMemory
+	{
+		if (address.IsNull) return size == 0;
+		if ((address.Raw & 1u) != 0 || size == 0 ||
+			size > MuiMenuSpecialistLayout.MaximumString + 1 ||
+			!platform.IsMapped(address, size)) return false;
+		return CStringCodec.TryReadLength(ref platform, address,
+			MuiMenuSpecialistLayout.MaximumString, out var length) &&
+			length + 1 == size;
 	}
 }
 

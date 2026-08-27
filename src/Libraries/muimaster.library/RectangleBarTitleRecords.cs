@@ -28,6 +28,24 @@ internal struct MuiRectangleBarTitleStateRecord
 	internal APTR Title;
 }
 
+internal static class MuiRectangleBarTitleStateAdmission
+{
+	internal static bool Validate(MuiRectangleBarTitleStateRecord value) =>
+		value.Magic == MuiRectangleBarTitleStateRecord.Cookie &&
+		value.Present <= 1;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiRectangleBarTitleStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!Validate(value) || obj.IsNull ||
+			MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		return value.Title.IsNull || CStringCodec.TryReadLength(ref platform,
+			value.Title, 4096, out _);
+	}
+}
+
 internal enum MuiRectangleBarTitleStateField : byte
 {
 	Magic,
@@ -95,41 +113,76 @@ internal static class MuiRectangleBarTitleStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Presence and title remain named
+// semantic fields; fixed guest-layout translation is bounded here.
+internal static class MuiRectangleBarTitleStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiRectangleBarTitleStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiRectangleBarTitleStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiRectangleBarTitleStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiRectangleBarTitleStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiRectangleBarTitleStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiRectangleBarTitleStateRecord.Size) ||
-			!MuiRectangleBarTitleStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiRectangleBarTitleStateField.Magic, out var magic) ||
-			magic != MuiRectangleBarTitleStateRecord.Cookie) return false;
-		value.Magic = magic;
-		if (!MuiRectangleBarTitleStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiRectangleBarTitleStateField.Present, out value.Present) ||
-			!MuiRectangleBarTitleStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiRectangleBarTitleStateField.Title, out var title) ||
-			value.Present > 1) return false;
+		if (!MuiRectangleBarTitleStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) ||
+			!MuiRectangleBarTitleStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out value.Present) ||
+			!MuiRectangleBarTitleStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 8, out var title))
+			return false;
 		value.Title = APTR.FromPointer(title);
 		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiRectangleBarTitleStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiRectangleBarTitleStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiRectangleBarTitleStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiRectangleBarTitleStateRecord.Size) || value.Magic !=
-			MuiRectangleBarTitleStateRecord.Cookie || value.Present > 1) return false;
-		return MuiRectangleBarTitleStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address, MuiRectangleBarTitleStateField.Magic,
-			value.Magic) && MuiRectangleBarTitleStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address, MuiRectangleBarTitleStateField.Present,
-			value.Present) && MuiRectangleBarTitleStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address, MuiRectangleBarTitleStateField.Title,
-			value.Title.Raw);
+		if (!MuiRectangleBarTitleStateAdmission.Validate(value)) return false;
+		return MuiRectangleBarTitleStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 0, value.Magic) &&
+			MuiRectangleBarTitleStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 4, value.Present) &&
+			MuiRectangleBarTitleStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 8, value.Title.Raw);
 	}
 }

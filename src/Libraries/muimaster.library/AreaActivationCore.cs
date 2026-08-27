@@ -58,8 +58,15 @@ public static class MuiAreaActivationCore
 		if (data.IsNull || MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			StateKey) != (int)MuiAreaActivationStateRecord.Size)
 			return false;
-		return MuiAreaActivationStateCodec.TryRead(ref platform, data, out value);
+		return MuiAreaActivationStateCodec.TryReadStructural(ref platform, data,
+			out value) && MuiAreaActivationStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
+
+	internal static bool StateAvailable<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj) where TPlatform : struct, IMuiHeadlessPlatform =>
+		MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) == 0 ||
+		TryGetState(ref platform, state, obj, out _);
 
 	private static bool WriteState<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, uint active, uint flags)
@@ -67,8 +74,11 @@ public static class MuiAreaActivationCore
 	{
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
 			return false;
+		if (!StateAvailable(ref platform, state, obj)) return false;
 		var previous = default(MuiAreaActivationStateRecord);
-		if (!TryGetState(ref platform, state, obj, out previous))
+		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) != 0 &&
+			!TryGetState(ref platform, state, obj, out previous)) return false;
+		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) == 0)
 			previous = default;
 		var next = default(MuiAreaActivationStateRecord);
 		next.Signature = MuiAreaActivationStateRecord.Cookie;
@@ -76,6 +86,8 @@ public static class MuiAreaActivationCore
 		next.Flags = flags;
 		next.Generation = previous.Generation == uint.MaxValue ? 1u :
 			previous.Generation + 1u;
+		if (!MuiAreaActivationStateAdmission.ValidateLive(ref platform, state, obj,
+			next)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiAreaActivationStateRecord.Size);
 		if (scratch.IsNull) return false;

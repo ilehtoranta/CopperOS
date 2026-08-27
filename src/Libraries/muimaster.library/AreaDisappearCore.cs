@@ -19,18 +19,22 @@ internal static class MuiAreaDisappearCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
-		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull)
 			return false;
-		var horizontal = ReadRaw(ref platform, state, obj,
-			MuiCommonControlCore.HorizDisappear, 0);
-		var vertical = ReadRaw(ref platform, state, obj,
-			MuiCommonControlCore.VertDisappear, 0);
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) ==
-			unchecked((int)MuiAreaDisappearPolicyStateRecord.Size) &&
-			MuiAreaDisappearPolicyStateRecordCodec.TryRead(ref platform, block,
-				out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey);
+		if (block.IsNotNull || length != 0)
 		{
+			if (length != unchecked((int)MuiAreaDisappearPolicyStateRecord.Size) ||
+				!MuiAreaDisappearPolicyStateRecordCodec.TryReadStructural(ref platform,
+					block, out var record) ||
+				!MuiAreaDisappearPolicyStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
+			var horizontal = ReadRaw(ref platform, state, obj,
+				MuiCommonControlCore.HorizDisappear, 0);
+			var vertical = ReadRaw(ref platform, state, obj,
+				MuiCommonControlCore.VertDisappear, 0);
 			if (record.HorizDisappear != unchecked((int)horizontal) ||
 				record.VertDisappear != unchecked((int)vertical))
 			{
@@ -43,10 +47,14 @@ internal static class MuiAreaDisappearCore
 			value.VertDisappear = record.VertDisappear;
 			return true;
 		}
-		if (!WriteState(ref platform, state, obj, unchecked((int)horizontal),
-			unchecked((int)vertical))) return false;
-		value.HorizDisappear = unchecked((int)horizontal);
-		value.VertDisappear = unchecked((int)vertical);
+		var horizontalValue = ReadRaw(ref platform, state, obj,
+			MuiCommonControlCore.HorizDisappear, 0);
+		var verticalValue = ReadRaw(ref platform, state, obj,
+			MuiCommonControlCore.VertDisappear, 0);
+		if (!WriteState(ref platform, state, obj, unchecked((int)horizontalValue),
+			unchecked((int)verticalValue))) return false;
+		value.HorizDisappear = unchecked((int)horizontalValue);
+		value.VertDisappear = unchecked((int)verticalValue);
 		return true;
 	}
 
@@ -55,11 +63,16 @@ internal static class MuiAreaDisappearCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (obj.IsNull || MuiHeadlessObjectCore.FindObject(ref platform, state,
+			obj).IsNull) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) !=
-			unchecked((int)MuiAreaDisappearPolicyStateRecord.Size)) return false;
-		return MuiAreaDisappearPolicyStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey);
+		if ((block.IsNull && length == 0) || length !=
+			unchecked((int)MuiAreaDisappearPolicyStateRecord.Size) ||
+			!MuiAreaDisappearPolicyStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) || !MuiAreaDisappearPolicyStateAdmission.ValidateLive(
+				ref platform, state, obj, value)) return false;
+		return true;
 	}
 
 	internal static bool WriteState<TPlatform>(ref TPlatform platform,
@@ -76,6 +89,8 @@ internal static class MuiAreaDisappearCore
 		record.Magic = MuiAreaDisappearPolicyStateRecord.Cookie;
 		record.HorizDisappear = horizontal;
 		record.VertDisappear = vertical;
+		if (!MuiAreaDisappearPolicyStateAdmission.ValidateLive(ref platform, state,
+			obj, record)) return false;
 		var written = MuiAreaDisappearPolicyStateRecordCodec.Write(ref platform,
 			scratch, record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
@@ -113,4 +128,3 @@ public static class MuiAreaDisappearPacketCore
 		where TPlatform : struct, IMuiHeadlessPlatform =>
 		MuiAreaDisappearCore.TryReadState(ref platform, state, obj, out value);
 }
-

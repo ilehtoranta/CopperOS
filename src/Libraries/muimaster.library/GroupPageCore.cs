@@ -19,6 +19,30 @@ internal struct MuiGroupPageState
 	public uint LastSelector;
 }
 
+internal static class MuiGroupPageStateValidation
+{
+	private const int MinimumSelector = -4;
+
+	private static bool IsSelector(uint raw)
+	{
+		var value = unchecked((int)raw);
+		return value >= MinimumSelector;
+	}
+
+	internal static bool IsValidRecord(MuiGroupPageState value) =>
+		value.Cookie == MuiGroupPageState.Magic &&
+		value.Active <= int.MaxValue && IsSelector(value.LastSelector);
+
+	internal static bool IsValidState(MuiGroupPageState value) =>
+		IsValidRecord(value);
+
+	internal static bool IsValidActive(MuiGroupPageState value, uint count)
+	{
+		if (!IsValidState(value)) return false;
+		return count == 0 ? value.Active == 0 : value.Active < count;
+	}
+}
+
 // Page layout consumes one active child at a time.  Keep that decision in a
 // named host record so inactive and explicitly hidden pages are represented by
 // zero-area geometry without guest pointers, offsets, or managed collections.
@@ -110,7 +134,8 @@ internal static class MuiGroupPageStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !platform.IsMapped(address,
-			MuiGroupPageState.Size)) return false;
+			MuiGroupPageState.Size) ||
+			!MuiGroupPageStateValidation.IsValidRecord(value)) return false;
 		return MuiGroupPageStateFieldCursorCodec.TryWriteUInt32(ref platform,
 			address, MuiGroupPageStateField.Cookie, value.Cookie) &&
 			MuiGroupPageStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
@@ -138,7 +163,7 @@ internal static class MuiGroupPageStateCodec
 			!MuiGroupPageStateFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiGroupPageStateField.LastSelector, out value.LastSelector)) return false;
 		value.Cookie = MuiGroupPageState.Magic;
-		return true;
+		return MuiGroupPageStateValidation.IsValidRecord(value);
 	}
 }
 
@@ -170,10 +195,13 @@ public static class MuiGroupPageCore
 		var count = CountChildren(ref platform, state, group);
 		if (TryGetState(ref platform, state, group, out var pageState))
 		{
+			if (!MuiGroupPageStateValidation.IsValidActive(pageState, count))
+				return false;
 			value = count == 0 ? pageState.Active :
 				NormalizeActive(pageState.Active, count);
 			return true;
 		}
+		if (HasStateAttribute(ref platform, state, group)) return false;
 		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, group,
 			ActivePage, out var raw))
 		{
@@ -197,6 +225,8 @@ public static class MuiGroupPageCore
 			obj)) return false;
 		handled = true;
 		var count = CountChildren(ref platform, state, obj);
+		if (HasStateAttribute(ref platform, state, obj) &&
+			!TryGetState(ref platform, state, obj, out _)) return false;
 		if (count == 0)
 		{
 			if (!MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state,
@@ -206,7 +236,8 @@ public static class MuiGroupPageCore
 			return true;
 		}
 		var block = EnsureState(ref platform, state, record);
-		if (block.IsNull || !TryReadState(ref platform, block, out var value))
+		if (block.IsNull || !TryReadState(ref platform, block, out var value) ||
+			!MuiGroupPageStateValidation.IsValidActive(value, count))
 			return false;
 		var current = value.Active < count ? value.Active : 0u;
 		if (!Resolve(requested, current, count, out var active)) return false;
@@ -216,7 +247,7 @@ public static class MuiGroupPageCore
 		value.LastSelector = requested;
 		value.Changes = value.Changes == uint.MaxValue ? uint.MaxValue :
 			value.Changes + 1;
-		WriteState(ref platform, block, value);
+		if (!WriteState(ref platform, block, value)) return false;
 		MuiHeadlessMemory.Mutated(ref platform, state);
 		if (notify) MuiNotifyCore.DispatchAttributeChange(ref platform, state,
 			record, ActivePage, active);
@@ -227,21 +258,38 @@ public static class MuiGroupPageCore
 		APTR state, APTR group, uint count) where TPlatform : struct,
 		IMuiHeadlessPlatform
 	{
-		if (TryGetState(ref platform, state, group, out var value))
-			return NormalizeActive(value.Active, count);
-		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, group,
-			ActivePage, out var raw)) return 0;
-		return NormalizeActive(raw, count);
+		return TryReadActivePage(ref platform, state, group, count,
+			out var value) ? value : 0;
 	}
 
-	internal static MuiGroupPageLayoutSelection ResolveLayout<TPlatform>(
-		ref TPlatform platform, APTR state, APTR group, int count, int left,
-		int top, int width, int height)
+	internal static bool TryReadActivePage<TPlatform>(ref TPlatform platform,
+		APTR state, APTR group, uint count, out uint value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var selection = default(MuiGroupPageLayoutSelection);
-		selection.ActiveIndex = (int)ReadActivePage(ref platform, state, group,
-			unchecked((uint)count));
+		value = 0;
+		if (TryGetState(ref platform, state, group, out var pageState))
+		{
+			if (!MuiGroupPageStateValidation.IsValidActive(pageState, count))
+				return false;
+			value = NormalizeActive(pageState.Active, count);
+			return true;
+		}
+		if (HasStateAttribute(ref platform, state, group)) return false;
+		if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, group,
+			ActivePage, out var raw)) return true;
+		value = NormalizeActive(raw, count);
+		return true;
+	}
+
+	internal static bool TryResolveLayout<TPlatform>(ref TPlatform platform,
+		APTR state, APTR group, int count, int left, int top, int width,
+		int height, out MuiGroupPageLayoutSelection selection)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		selection = default;
+		if (count < 0 || !TryReadActivePage(ref platform, state, group,
+			unchecked((uint)count), out var active)) return false;
+		selection.ActiveIndex = unchecked((int)active);
 		selection.Count = count;
 		selection.Left = left;
 		selection.Top = top;
@@ -253,7 +301,7 @@ public static class MuiGroupPageCore
 		if (!child.IsNull && MuiAreaLayoutCore.TryReadLayoutPolicyState(
 			ref platform, state, child, out var policy) && policy.ShowMe == 0)
 			selection.ActiveShown = 0;
-		return selection;
+		return true;
 	}
 
 	internal static void Cleanup<TPlatform>(ref TPlatform platform, APTR state,
@@ -336,10 +384,15 @@ public static class MuiGroupPageCore
 			out var objectValue)) return APTR.Null;
 		var item = FindAttributeValue(ref platform, objectValue.Attributes,
 			StateAttribute);
+		if (item.IsNotNull)
+		{
+			if (!MuiHeadlessAttributeCodec.TryRead(ref platform, item,
+				out var itemValue) || itemValue.Value == 0) return APTR.Null;
+			var existing = APTR.FromPointer(itemValue.Value);
+			return TryReadState(ref platform, existing, out _) ? existing :
+				APTR.Null;
+		}
 		var block = APTR.Null;
-		if (item.IsNotNull && MuiHeadlessAttributeCodec.TryRead(ref platform,
-			item, out var itemValue)) block = APTR.FromPointer(itemValue.Value);
-		if (TryReadState(ref platform, block, out _)) return block;
 		block = MuiHeadlessMemory.Allocate(ref platform, MuiGroupPageState.Size);
 		if (block.IsNull) return APTR.Null;
 		var value = default(MuiGroupPageState);
@@ -351,7 +404,14 @@ public static class MuiGroupPageCore
 			platform.Free(block, MuiGroupPageState.Size);
 			return APTR.Null;
 		}
-		WriteState(ref platform, block, value);
+		if (!WriteState(ref platform, block, value))
+		{
+			MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state, record,
+				StateAttribute, 0, false);
+			platform.Clear(block, MuiGroupPageState.Size);
+			platform.Free(block, MuiGroupPageState.Size);
+			return APTR.Null;
+		}
 		return block;
 	}
 
@@ -389,6 +449,16 @@ public static class MuiGroupPageCore
 			out value);
 	}
 
+	private static bool HasStateAttribute<TPlatform>(ref TPlatform platform,
+		APTR state, APTR group) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, group);
+		if (record.IsNull || !MuiHeadlessObjectCodec.TryRead(ref platform, record,
+			out var objectValue)) return true;
+		return FindAttributeValue(ref platform, objectValue.Attributes,
+			StateAttribute).IsNotNull;
+	}
+
 	private static APTR FindAttributeValue<TPlatform>(ref TPlatform platform,
 		APTR current, uint attribute) where TPlatform : struct, IMuiGuestMemory
 	{
@@ -405,11 +475,13 @@ public static class MuiGroupPageCore
 		return APTR.Null;
 	}
 
-	private static void WriteState<TPlatform>(ref TPlatform platform, APTR block,
+	private static bool WriteState<TPlatform>(ref TPlatform platform, APTR block,
 		MuiGroupPageState value) where TPlatform : struct, IMuiGuestMemory
-		=> MuiGroupPageStateCodec.Write(ref platform, block, value);
+		=> MuiGroupPageStateValidation.IsValidState(value) &&
+		MuiGroupPageStateCodec.Write(ref platform, block, value);
 
 	private static bool TryReadState<TPlatform>(ref TPlatform platform, APTR block,
 		out MuiGroupPageState value) where TPlatform : struct, IMuiGuestMemory
-		=> MuiGroupPageStateCodec.TryRead(ref platform, block, out value);
+		=> MuiGroupPageStateCodec.TryRead(ref platform, block, out value) &&
+		MuiGroupPageStateValidation.IsValidState(value);
 }

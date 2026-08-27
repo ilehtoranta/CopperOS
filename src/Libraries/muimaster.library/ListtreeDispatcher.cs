@@ -16,6 +16,8 @@ namespace CopperOS.MuiMaster;
 internal struct MuiListtreeMethodMessage
 {
 	public const uint Size = 4;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -23,6 +25,10 @@ internal struct MuiListtreeMethodMessage
 internal struct MuiListtreeSetMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint AttributeOffset = 4;
+	public const uint ValueOffset = 8;
 	public uint MethodId;
 	public uint Attribute;
 	public uint Value;
@@ -32,6 +38,10 @@ internal struct MuiListtreeSetMessage
 internal struct MuiListtreeGetMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint AttributeOffset = 4;
+	public const uint StorageOffset = 8;
 	public uint MethodId;
 	public uint Attribute;
 	public uint Storage;
@@ -41,6 +51,13 @@ internal struct MuiListtreeGetMessage
 internal struct MuiListtreeInsertMessage
 {
 	public const uint Size = 24;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint NameOffset = 4;
+	public const uint UserOffset = 8;
+	public const uint ListNodeOffset = 12;
+	public const uint PrevNodeOffset = 16;
+	public const uint FlagsOffset = 20;
 	public uint MethodId;
 	public uint Name;
 	public uint User;
@@ -53,6 +70,11 @@ internal struct MuiListtreeInsertMessage
 internal struct MuiListtreeRemoveMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ListNodeOffset = 4;
+	public const uint TreeNodeOffset = 8;
+	public const uint FlagsOffset = 12;
 	public uint MethodId;
 	public uint ListNode;
 	public uint TreeNode;
@@ -63,6 +85,11 @@ internal struct MuiListtreeRemoveMessage
 internal struct MuiListtreeGetEntryMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint NodeOffset = 4;
+	public const uint PositionOffset = 8;
+	public const uint FlagsOffset = 12;
 	public uint MethodId;
 	public uint Node;
 	public uint Position;
@@ -73,6 +100,11 @@ internal struct MuiListtreeGetEntryMessage
 internal struct MuiListtreeOpenCloseMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ListNodeOffset = 4;
+	public const uint TreeNodeOffset = 8;
+	public const uint FlagsOffset = 12;
 	public uint MethodId;
 	public uint ListNode;
 	public uint TreeNode;
@@ -83,6 +115,10 @@ internal struct MuiListtreeOpenCloseMessage
 internal struct MuiListtreeSortMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ListNodeOffset = 4;
+	public const uint FlagsOffset = 8;
 	public uint MethodId;
 	public uint ListNode;
 	public uint Flags;
@@ -92,6 +128,10 @@ internal struct MuiListtreeSortMessage
 internal struct MuiListtreeGetNrMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint TreeNodeOffset = 4;
+	public const uint FlagsOffset = 8;
 	public uint MethodId;
 	public uint TreeNode;
 	public uint Flags;
@@ -101,6 +141,13 @@ internal struct MuiListtreeGetNrMessage
 internal struct MuiListtreeMoveExchangeMessage
 {
 	public const uint Size = 24;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint OldListNodeOffset = 4;
+	public const uint OldTreeNodeOffset = 8;
+	public const uint NewListNodeOffset = 12;
+	public const uint NewTreeNodeOffset = 16;
+	public const uint FlagsOffset = 20;
 	public uint MethodId;
 	public uint OldListNode;
 	public uint OldTreeNode;
@@ -113,6 +160,11 @@ internal struct MuiListtreeMoveExchangeMessage
 internal struct MuiListtreeRenameMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint TreeNodeOffset = 4;
+	public const uint NewNameOffset = 8;
+	public const uint FlagsOffset = 12;
 	public uint MethodId;
 	public uint TreeNode;
 	public uint NewName;
@@ -123,6 +175,11 @@ internal struct MuiListtreeRenameMessage
 internal struct MuiListtreeFindNameMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ListNodeOffset = 4;
+	public const uint NameOffset = 8;
+	public const uint FlagsOffset = 12;
 	public uint MethodId;
 	public uint ListNode;
 	public uint Name;
@@ -133,6 +190,10 @@ internal struct MuiListtreeFindNameMessage
 internal struct MuiListtreeDropMarkMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint EntryOffset = 4;
+	public const uint ValuesOffset = 8;
 	public uint MethodId;
 	public uint Entry;
 	public uint Values;
@@ -142,6 +203,11 @@ internal struct MuiListtreeDropMarkMessage
 internal struct MuiListtreeTestPosMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint XOffset = 4;
+	public const uint YOffset = 8;
+	public const uint ResultOffset = 12;
 	public uint MethodId;
 	public uint X;
 	public uint Y;
@@ -167,38 +233,8 @@ public static class MuiListtreeDispatcher
 		APTR message, out MuiIntuiPointerMessage value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiIntuiPointerMessage.MinimumSize)) return false;
-		uint messageClass;
-		ushort code;
-		ushort qualifier;
-		uint iAddress;
-		if (!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiListInputRecordKind.IntuiMessage,
-			MuiListInputRecordField.Class, out messageClass) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.Code, out code) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.Qualifier, out qualifier) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.IAddress, out iAddress) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.MouseX, out var mouseX) ||
-			!MuiListInputRecordFieldCursorCodec.TryReadUInt16(ref platform,
-				message, MuiListInputRecordKind.IntuiMessage,
-				MuiListInputRecordField.MouseY, out var mouseY)) return false;
-		value.Class = messageClass;
-		value.Code = code;
-		value.Qualifier = qualifier;
-		value.IAddress = iAddress;
-		value.MouseX = unchecked((short)mouseX);
-		value.MouseY = unchecked((short)mouseY);
-		return true;
+		return MuiIntuiMessageCodec.TryReadPointer(ref platform, message,
+			out value);
 	}
 
 	// Native-safe fixed packet subset. Keep the bounded tree mutations and
@@ -270,30 +306,16 @@ public static class MuiListtreeDispatcher
 		if (method == MuiListtreeMessageCodec.Set ||
 			method == MuiListtreeMessageCodec.NoNotifySet)
 		{
-			if (!platform.IsMapped(message, MuiListtreeSetMessage.Size)) return 0;
-			var packet = default(MuiListtreeSetMessage);
-			packet.MethodId = method;
-			if (!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Set, MuiListtreeField.Attribute,
-				out packet.Attribute) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.Set, MuiListtreeField.Value,
-					out packet.Value)) return 0;
+			if (!MuiListtreeMessageCodec.TryReadSet(ref platform, message, method,
+				out var packet)) return 0;
 			return MuiListtreeCore.SetAttribute(ref platform, state, obj,
 				packet.Attribute, packet.Value,
 				method == MuiListtreeMessageCodec.Set) ? 1u : 0u;
 		}
 		if (method == MuiListtreeMessageCodec.Get)
 		{
-			if (!platform.IsMapped(message, MuiListtreeGetMessage.Size)) return 0;
-			var packet = default(MuiListtreeGetMessage);
-			packet.MethodId = method;
-			if (!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Get, MuiListtreeField.Attribute,
-				out packet.Attribute) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.Get, MuiListtreeField.Storage,
-					out packet.Storage)) return 0;
+			if (!MuiListtreeMessageCodec.TryReadGet(ref platform, message,
+				out var packet)) return 0;
 			uint value;
 			if (!MuiListtreeCore.GetAttribute(ref platform, state, obj,
 				packet.Attribute, out value)) return 0;
@@ -305,24 +327,8 @@ public static class MuiListtreeDispatcher
 		}
 		if (method == MuiListtreeMessageCodec.Insert)
 		{
-			if (!platform.IsMapped(message, MuiListtreeInsertMessage.Size)) return 0;
-			var packet = default(MuiListtreeInsertMessage);
-			packet.MethodId = method;
-			if (!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Insert, MuiListtreeField.Name,
-				out packet.Name) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.Insert, MuiListtreeField.User,
-					out packet.User) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.Insert, MuiListtreeField.ListNode,
-					out packet.ListNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.Insert, MuiListtreeField.PrevNode,
-					out packet.PrevNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.Insert, MuiListtreeField.Flags,
-					out packet.Flags)) return 0;
+			if (!MuiListtreeMessageCodec.TryReadInsert(ref platform, message,
+				out var packet)) return 0;
 			var inserted = MuiListtreeCore.Insert(ref platform, state, obj,
 				APTR.FromPointer(packet.Name), APTR.FromPointer(packet.User),
 				APTR.FromPointer(packet.ListNode), APTR.FromPointer(packet.PrevNode),
@@ -331,18 +337,8 @@ public static class MuiListtreeDispatcher
 		}
 		if (method == MuiListtreeMessageCodec.GetEntry)
 		{
-			if (!platform.IsMapped(message, MuiListtreeGetEntryMessage.Size)) return 0;
-			var packet = default(MuiListtreeGetEntryMessage);
-			packet.MethodId = method;
-			if (!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.GetEntry, MuiListtreeField.Node,
-				out packet.Node) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.GetEntry, MuiListtreeField.Position,
-					out packet.Position) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.GetEntry, MuiListtreeField.Flags,
-					out packet.Flags)) return 0;
+			if (!MuiListtreeMessageCodec.TryReadGetEntry(ref platform, message,
+				out var packet)) return 0;
 			var entry = MuiListtreeCore.GetEntry(ref platform, state, obj,
 				APTR.FromPointer(packet.Node), unchecked((int)packet.Position),
 				packet.Flags);
@@ -351,18 +347,8 @@ public static class MuiListtreeDispatcher
 		if (method == MuiListtreeMessageCodec.Open ||
 			method == MuiListtreeMessageCodec.Close)
 		{
-			if (!platform.IsMapped(message, MuiListtreeOpenCloseMessage.Size)) return 0;
-			var packet = default(MuiListtreeOpenCloseMessage);
-			packet.MethodId = method;
-			if (!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.OpenClose, MuiListtreeField.ListNode,
-				out packet.ListNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.OpenClose, MuiListtreeField.TreeNode,
-					out packet.TreeNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.OpenClose, MuiListtreeField.Flags,
-					out packet.Flags)) return 0;
+			if (!MuiListtreeMessageCodec.TryReadOpenClose(ref platform, message,
+				method, out var packet)) return 0;
 			var listNode = APTR.FromPointer(packet.ListNode);
 			var treeNode = APTR.FromPointer(packet.TreeNode);
 			if (method == MuiListtreeMessageCodec.Open)
@@ -373,50 +359,23 @@ public static class MuiListtreeDispatcher
 		}
 		if (method == MuiListtreeMessageCodec.Sort)
 		{
-			if (!platform.IsMapped(message, MuiListtreeSortMessage.Size)) return 0;
-			var packet = default(MuiListtreeSortMessage);
-			packet.MethodId = method;
-			if (!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Sort, MuiListtreeField.ListNode,
-				out packet.ListNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.Sort, MuiListtreeField.Flags,
-					out packet.Flags)) return 0;
+			if (!MuiListtreeMessageCodec.TryReadSort(ref platform, message, method,
+				out var packet)) return 0;
 			return MuiListtreeCore.Sort(ref platform, state, obj,
 				APTR.FromPointer(packet.ListNode), packet.Flags) ? 1u : 0u;
 		}
 		if (method == MuiListtreeMessageCodec.Rename)
 		{
-			if (!platform.IsMapped(message, MuiListtreeRenameMessage.Size)) return 0;
-			var packet = default(MuiListtreeRenameMessage);
-			packet.MethodId = method;
-			if (!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Rename, MuiListtreeField.TreeNode,
-				out packet.TreeNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.Rename, MuiListtreeField.NewName,
-					out packet.NewName) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.Rename, MuiListtreeField.Flags,
-					out packet.Flags)) return 0;
+			if (!MuiListtreeMessageCodec.TryReadRename(ref platform, message,
+				out var packet)) return 0;
 			return MuiListtreeCore.Rename(ref platform, state, obj,
 				APTR.FromPointer(packet.TreeNode), APTR.FromPointer(packet.NewName),
 				packet.Flags) ? 1u : 0u;
 		}
 		if (method == MuiListtreeMessageCodec.FindName)
 		{
-			if (!platform.IsMapped(message, MuiListtreeFindNameMessage.Size)) return 0;
-			var packet = default(MuiListtreeFindNameMessage);
-			packet.MethodId = method;
-			if (!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.FindName, MuiListtreeField.ListNode,
-				out packet.ListNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.FindName, MuiListtreeField.Name,
-					out packet.Name) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.FindName, MuiListtreeField.Flags,
-					out packet.Flags)) return 0;
+			if (!MuiListtreeMessageCodec.TryReadFindName(ref platform, message,
+				out var packet)) return 0;
 			return MuiListtreeCore.FindName(ref platform, state, obj,
 				APTR.FromPointer(packet.ListNode), APTR.FromPointer(packet.Name),
 				packet.Flags).Raw;
@@ -424,25 +383,8 @@ public static class MuiListtreeDispatcher
 		if (method == MuiListtreeMessageCodec.Move ||
 			method == MuiListtreeMessageCodec.Exchange)
 		{
-			if (!platform.IsMapped(message, MuiListtreeMoveExchangeMessage.Size))
-				return 0;
-			var packet = default(MuiListtreeMoveExchangeMessage);
-			packet.MethodId = method;
-			if (!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.MoveExchange, MuiListtreeField.OldListNode,
-				out packet.OldListNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.MoveExchange, MuiListtreeField.OldTreeNode,
-					out packet.OldTreeNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.MoveExchange, MuiListtreeField.NewListNode,
-					out packet.NewListNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.MoveExchange, MuiListtreeField.NewTreeNode,
-					out packet.NewTreeNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.MoveExchange, MuiListtreeField.Flags,
-					out packet.Flags)) return 0;
+			if (!MuiListtreeMessageCodec.TryReadMoveExchange(ref platform, message,
+				method, out var packet)) return 0;
 			if (method == MuiListtreeMessageCodec.Move)
 				return MuiListtreeCore.Move(ref platform, state, obj,
 					APTR.FromPointer(packet.OldListNode),
@@ -457,66 +399,30 @@ public static class MuiListtreeDispatcher
 		}
 		if (method == MuiListtreeMessageCodec.SetDropMark)
 		{
-			if (!platform.IsMapped(message, MuiListtreeDropMarkMessage.Size))
-				return 0;
-			var packet = default(MuiListtreeDropMarkMessage);
-			packet.MethodId = method;
-			if (!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.DropMark, MuiListtreeField.Entry,
-				out packet.Entry) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.DropMark, MuiListtreeField.Values,
-					out packet.Values)) return 0;
+			if (!MuiListtreeMessageCodec.TryReadDropMark(ref platform, message,
+				out var packet)) return 0;
 			return MuiListtreeCore.SetDropMark(ref platform, state, obj,
 				unchecked((int)packet.Entry), packet.Values) ? 1u : 0u;
 		}
 		if (method == MuiListtreeMessageCodec.TestPos)
 		{
-			if (!platform.IsMapped(message, MuiListtreeTestPosMessage.Size))
-				return 0;
-			var packet = default(MuiListtreeTestPosMessage);
-			packet.MethodId = method;
-			if (!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.TestPos, MuiListtreeField.X,
-				out packet.X) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.TestPos, MuiListtreeField.Y,
-					out packet.Y) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.TestPos, MuiListtreeField.Result,
-					out packet.Result)) return 0;
+			if (!MuiListtreeMessageCodec.TryReadTestPos(ref platform, message,
+				out var packet)) return 0;
 			return MuiListtreeCore.TestPos(ref platform, state, obj,
 				unchecked((int)packet.X), unchecked((int)packet.Y),
 				APTR.FromPointer(packet.Result)) ? 1u : 0u;
 		}
 		if (method == MuiListtreeMessageCodec.GetNr)
 		{
-			if (!platform.IsMapped(message, MuiListtreeGetNrMessage.Size)) return 0;
-			var packet = default(MuiListtreeGetNrMessage);
-			packet.MethodId = method;
-			if (!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.GetNr, MuiListtreeField.TreeNode,
-				out packet.TreeNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.GetNr, MuiListtreeField.Flags,
-					out packet.Flags)) return 0;
+			if (!MuiListtreeMessageCodec.TryReadGetNr(ref platform, message, method,
+				out var packet)) return 0;
 			return MuiListtreeCore.GetNr(ref platform, state, obj,
 				APTR.FromPointer(packet.TreeNode), packet.Flags);
 		}
 		if (method == MuiListtreeMessageCodec.Remove)
 		{
-			if (!platform.IsMapped(message, MuiListtreeRemoveMessage.Size)) return 0;
-			var packet = default(MuiListtreeRemoveMessage);
-			packet.MethodId = method;
-			if (!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Remove, MuiListtreeField.ListNode,
-				out packet.ListNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.Remove, MuiListtreeField.TreeNode,
-					out packet.TreeNode) ||
-				!MuiListtreeFieldCursorCodec.TryReadUInt32(ref platform, message,
-					MuiListtreePacketKind.Remove, MuiListtreeField.Flags,
-					out packet.Flags)) return 0;
+			if (!MuiListtreeMessageCodec.TryReadRemove(ref platform, message,
+				out var packet)) return 0;
 			var removed = MuiListtreeCore.Remove(ref platform, state, obj,
 				APTR.FromPointer(packet.ListNode), APTR.FromPointer(packet.TreeNode),
 				packet.Flags);

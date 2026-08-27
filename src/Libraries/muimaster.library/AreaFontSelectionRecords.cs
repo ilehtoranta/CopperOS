@@ -29,12 +29,47 @@ public struct MuiAreaFontSelectionState
 internal struct MuiAreaFontSelectionStateRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint ActiveOffset = 4;
+	internal const uint SourceOffset = 8;
+	internal const uint GenerationOffset = 12;
 	internal const uint Cookie = 0x4146534Cu; // 'AFSL'
 
 	internal uint Magic;
 	internal uint Active;
 	internal APTR Source;
 	internal uint Generation;
+}
+
+// The record captures the last-writer rule between MUIA_Font and
+// MUIA_CustomFont.  Active is a closed semantic choice; Source remains an
+// opaque caller-owned pointer and is preserved losslessly.  A non-zero
+// generation distinguishes an initialized record from arbitrary guest
+// memory, while live-owner validation keeps stale Dataspace state out of
+// font-resolution consumers.
+internal static class MuiAreaFontSelectionStateAdmission
+{
+	internal static bool Validate(MuiAreaFontSelectionState value) =>
+		value.Active <= MuiAreaFontSelectionKind.CustomFont &&
+		value.Generation != 0 &&
+		(value.Active != MuiAreaFontSelectionKind.None || value.Source.IsNull);
+
+	internal static bool Validate(MuiAreaFontSelectionStateRecord value)
+	{
+		if (value.Magic != MuiAreaFontSelectionStateRecord.Cookie) return false;
+		var state = default(MuiAreaFontSelectionState);
+		state.Active = (MuiAreaFontSelectionKind)value.Active;
+		state.Source = value.Source;
+		state.Generation = value.Generation;
+		return Validate(state);
+	}
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiAreaFontSelectionStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 }
 
 internal enum MuiAreaFontSelectionStateField : byte
@@ -54,30 +89,70 @@ internal struct MuiAreaFontSelectionStateFieldCursor
 
 internal static class MuiAreaFontSelectionStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiAreaFontSelectionStateField field,
-		out uint offset)
-	{
-		offset = field switch
-		{
-			MuiAreaFontSelectionStateField.Magic => 0,
-			MuiAreaFontSelectionStateField.Active => 4,
-			MuiAreaFontSelectionStateField.Source => 8,
-			MuiAreaFontSelectionStateField.Generation => 12,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiAreaFontSelectionStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return MuiAreaFontSelectionStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaFontSelectionStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaFontSelectionStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaFontSelectionStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAreaFontSelectionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+	}
+}
+
+// Fixed Area FontSelection state is transferred as a named record. Numeric
+// guest positions are confined to this ABI adapter; the compatibility cursor
+// above remains available only to legacy callers and malformed-state
+// diagnostics.
+internal static class MuiAreaFontSelectionStateRecordMemoryCodec
+{
+	private static bool TryResolve(MuiAreaFontSelectionStateField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiAreaFontSelectionStateField.Magic:
+				offset = MuiAreaFontSelectionStateRecord.MagicOffset;
+				return true;
+			case MuiAreaFontSelectionStateField.Active:
+				offset = MuiAreaFontSelectionStateRecord.ActiveOffset;
+				return true;
+			case MuiAreaFontSelectionStateField.Source:
+				offset = MuiAreaFontSelectionStateRecord.SourceOffset;
+				return true;
+			case MuiAreaFontSelectionStateField.Generation:
+				offset = MuiAreaFontSelectionStateRecord.GenerationOffset;
+				return true;
+		}
+		offset = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaFontSelectionStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-				cursor.Record, MuiAreaFontSelectionStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset)
+			return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiAreaFontSelectionStateRecord.Size) &&
+			platform.IsMapped(address, MuiAreaFontSelectionStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -85,10 +160,8 @@ internal static class MuiAreaFontSelectionStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaFontSelectionStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -97,10 +170,8 @@ internal static class MuiAreaFontSelectionStateFieldCursorCodec
 		APTR record, MuiAreaFontSelectionStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaFontSelectionStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -108,28 +179,33 @@ internal static class MuiAreaFontSelectionStateFieldCursorCodec
 
 internal static class MuiAreaFontSelectionStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiAreaFontSelectionStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaFontSelectionStateRecord.Size) ||
-			!MuiAreaFontSelectionStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiAreaFontSelectionStateField.Magic, out var magic) ||
-			magic != MuiAreaFontSelectionStateRecord.Cookie ||
-			!MuiAreaFontSelectionStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiAreaFontSelectionStateField.Active, out value.Active) ||
-			value.Active > (uint)MuiAreaFontSelectionKind.CustomFont ||
-			!MuiAreaFontSelectionStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiAreaFontSelectionStateField.Source, out var source) ||
-			!MuiAreaFontSelectionStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiAreaFontSelectionStateField.Generation,
+		if (!MuiAreaFontSelectionStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaFontSelectionStateField.Magic,
+			out value.Magic) ||
+			!MuiAreaFontSelectionStateRecordMemoryCodec.TryReadUInt32(
+				ref platform, address, MuiAreaFontSelectionStateField.Active,
+				out value.Active) ||
+			!MuiAreaFontSelectionStateRecordMemoryCodec.TryReadUInt32(
+				ref platform, address, MuiAreaFontSelectionStateField.Source,
+				out var source) ||
+			!MuiAreaFontSelectionStateRecordMemoryCodec.TryReadUInt32(
+				ref platform, address, MuiAreaFontSelectionStateField.Generation,
 				out value.Generation)) return false;
-		value.Magic = magic;
 		value.Source = APTR.FromPointer(source);
 		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiAreaFontSelectionStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiAreaFontSelectionStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaFontSelectionStateRecord value)
@@ -137,15 +213,16 @@ internal static class MuiAreaFontSelectionStateRecordCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiAreaFontSelectionStateRecord.Size) || value.Magic !=
-			MuiAreaFontSelectionStateRecord.Cookie || value.Active >
-			(uint)MuiAreaFontSelectionKind.CustomFont) return false;
-		return MuiAreaFontSelectionStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaFontSelectionStateField.Magic, value.Magic) &&
-			MuiAreaFontSelectionStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiAreaFontSelectionStateRecord.Cookie ||
+			!MuiAreaFontSelectionStateAdmission.Validate(value)) return false;
+		return MuiAreaFontSelectionStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaFontSelectionStateField.Magic,
+			value.Magic) &&
+			MuiAreaFontSelectionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiAreaFontSelectionStateField.Active, value.Active) &&
-			MuiAreaFontSelectionStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiAreaFontSelectionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiAreaFontSelectionStateField.Source, value.Source.Raw) &&
-			MuiAreaFontSelectionStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiAreaFontSelectionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiAreaFontSelectionStateField.Generation,
 				value.Generation);
 	}

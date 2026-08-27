@@ -21,6 +21,24 @@ internal struct MuiStringAttachedListStateRecord
 	internal APTR Listview;
 }
 
+internal static class MuiStringAttachedListStateAdmission
+{
+	internal static bool Validate(MuiStringAttachedListStateRecord value) =>
+		value.Magic == MuiStringAttachedListStateRecord.Cookie;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiStringAttachedListStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!Validate(value) || obj.IsNull ||
+			MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		return value.Listview.IsNull ||
+			MuiListCore.Classify(ref platform, state, value.Listview) ==
+			MuiCollectionClass.Listview;
+	}
+}
+
 internal enum MuiStringAttachedListStateField : byte
 {
 	Magic,
@@ -86,40 +104,73 @@ internal static class MuiStringAttachedListStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. The named Listview relationship remains
+// the semantic record; this bounded adapter owns the fixed guest translation.
+// The cursor codec remains available for compatibility and malformed-state
+// diagnostics.
+internal static class MuiStringAttachedListStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiStringAttachedListStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiStringAttachedListStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiStringAttachedListStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiStringAttachedListStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringAttachedListStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringAttachedListStateRecord.Size) ||
-			!MuiStringAttachedListStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiStringAttachedListStateField.Magic, out var magic) ||
-			magic != MuiStringAttachedListStateRecord.Cookie) return false;
-		value.Magic = magic;
-		if (!MuiStringAttachedListStateFieldCursorCodec.TryReadUInt32(
-			ref platform, address,
-			MuiStringAttachedListStateField.Listview, out var listview))
-			return false;
+		if (!MuiStringAttachedListStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) ||
+			!MuiStringAttachedListStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out var listview)) return false;
 		value.Listview = APTR.FromPointer(listview);
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiStringAttachedListStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiStringAttachedListStateAdmission.Validate(value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringAttachedListStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringAttachedListStateRecord.Size) || value.Magic !=
-			MuiStringAttachedListStateRecord.Cookie) return false;
-		return MuiStringAttachedListStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiStringAttachedListStateField.Magic, value.Magic) &&
-			MuiStringAttachedListStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiStringAttachedListStateField.Listview, value.Listview.Raw);
+		if (!MuiStringAttachedListStateAdmission.Validate(value)) return false;
+		return MuiStringAttachedListStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 0, value.Magic) &&
+			MuiStringAttachedListStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 4, value.Listview.Raw);
 	}
 }

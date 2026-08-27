@@ -15,11 +15,37 @@ namespace CopperOS.MuiMaster;
 internal struct MuiApplicationMessageRoutingStateRecord
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint AppMessageOffset = 4;
+	internal const uint WindowAppWindowOffset = 8;
 	internal const uint Cookie = 0x414D5254u; // 'AMRT'
 
 	internal uint Magic;
 	internal APTR AppMessage;
 	internal uint WindowAppWindow;
+}
+
+// AppMessage is a transient, caller-owned Exec record.  The routing sidecar
+// may retain it only while the named message remains structurally valid; the
+// WindowAppWindow projection is a MorphOS BOOL rather than an arbitrary ULONG.
+internal static class MuiApplicationMessageRoutingStateAdmission
+{
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		MuiApplicationMessageRoutingStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		value.Magic == MuiApplicationMessageRoutingStateRecord.Cookie &&
+		value.WindowAppWindow <= 1 &&
+		(value.AppMessage.IsNull ||
+			MuiApplicationMessageCore.ValidateMessage(ref platform,
+				value.AppMessage));
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR owner,
+		MuiApplicationMessageRoutingStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(ref platform, value) && owner.IsNotNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, owner).IsNull;
 }
 
 internal enum MuiApplicationMessageRoutingStateField : byte
@@ -38,15 +64,49 @@ internal struct MuiApplicationMessageRoutingStateFieldCursor
 
 internal static class MuiApplicationMessageRoutingStateFieldCursorCodec
 {
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiApplicationMessageRoutingStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiApplicationMessageRoutingStateRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor.Record, cursor.Field, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationMessageRoutingStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiApplicationMessageRoutingStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationMessageRoutingStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiApplicationMessageRoutingStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, record, field, value);
+	}
+}
+
+// Fixed routing state is read and written as a named value. Keep packed guest
+// positions in this bounded ABI adapter; production consumers do not select
+// numeric slots directly.
+internal static class MuiApplicationMessageRoutingStateRecordMemoryCodec
+{
 	private static bool TryResolve(
 		MuiApplicationMessageRoutingStateField field, out uint offset)
 	{
 		switch (field)
 		{
 			case MuiApplicationMessageRoutingStateField.Magic:
+				offset = MuiApplicationMessageRoutingStateRecord.MagicOffset;
+				return true;
 			case MuiApplicationMessageRoutingStateField.AppMessage:
+				offset = MuiApplicationMessageRoutingStateRecord.AppMessageOffset;
+				return true;
 			case MuiApplicationMessageRoutingStateField.WindowAppWindow:
-				offset = (uint)field * 4;
+				offset = MuiApplicationMessageRoutingStateRecord.WindowAppWindowOffset;
 				return true;
 		}
 		offset = 0;
@@ -54,16 +114,18 @@ internal static class MuiApplicationMessageRoutingStateFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiApplicationMessageRoutingStateFieldCursor cursor, out APTR address)
+		APTR record, MuiApplicationMessageRoutingStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record,
-				MuiApplicationMessageRoutingStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset)
+			return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record,
+			MuiApplicationMessageRoutingStateRecord.Size) &&
+			platform.IsMapped(address,
+				MuiApplicationMessageRoutingStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -71,10 +133,8 @@ internal static class MuiApplicationMessageRoutingStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiApplicationMessageRoutingStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -83,10 +143,8 @@ internal static class MuiApplicationMessageRoutingStateFieldCursorCodec
 		APTR record, MuiApplicationMessageRoutingStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationMessageRoutingStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -94,22 +152,20 @@ internal static class MuiApplicationMessageRoutingStateFieldCursorCodec
 
 internal static class MuiApplicationMessageRoutingStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiApplicationMessageRoutingStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationMessageRoutingStateRecord.Size) ||
-			!MuiApplicationMessageRoutingStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationMessageRoutingStateField.Magic, out var magic) ||
-			magic != MuiApplicationMessageRoutingStateRecord.Cookie ||
-			!MuiApplicationMessageRoutingStateFieldCursorCodec.TryReadUInt32(
+		if (!MuiApplicationMessageRoutingStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address,
+			MuiApplicationMessageRoutingStateField.Magic, out var magic) ||
+			!MuiApplicationMessageRoutingStateRecordMemoryCodec.TryReadUInt32(
 				ref platform, address,
 				MuiApplicationMessageRoutingStateField.AppMessage,
 				out var appMessage) ||
-			!MuiApplicationMessageRoutingStateFieldCursorCodec.TryReadUInt32(
+			!MuiApplicationMessageRoutingStateRecordMemoryCodec.TryReadUInt32(
 				ref platform, address,
 				MuiApplicationMessageRoutingStateField.WindowAppWindow,
 				out value.WindowAppWindow)) return false;
@@ -118,21 +174,28 @@ internal static class MuiApplicationMessageRoutingStateRecordCodec
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiApplicationMessageRoutingStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiApplicationMessageRoutingStateAdmission.Validate(ref platform, value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiApplicationMessageRoutingStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationMessageRoutingStateRecord.Size) || value.Magic !=
-			MuiApplicationMessageRoutingStateRecord.Cookie) return false;
-		return MuiApplicationMessageRoutingStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiApplicationMessageRoutingStateField.Magic, value.Magic) &&
-			MuiApplicationMessageRoutingStateFieldCursorCodec.TryWriteUInt32(
+			MuiApplicationMessageRoutingStateRecord.Size) ||
+			!MuiApplicationMessageRoutingStateAdmission.Validate(ref platform, value))
+			return false;
+		return MuiApplicationMessageRoutingStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationMessageRoutingStateField.Magic,
+			value.Magic) &&
+			MuiApplicationMessageRoutingStateRecordMemoryCodec.TryWriteUInt32(
 				ref platform, address,
 				MuiApplicationMessageRoutingStateField.AppMessage,
 				value.AppMessage.Raw) &&
-			MuiApplicationMessageRoutingStateFieldCursorCodec.TryWriteUInt32(
+			MuiApplicationMessageRoutingStateRecordMemoryCodec.TryWriteUInt32(
 				ref platform, address,
 				MuiApplicationMessageRoutingStateField.WindowAppWindow,
 				value.WindowAppWindow);

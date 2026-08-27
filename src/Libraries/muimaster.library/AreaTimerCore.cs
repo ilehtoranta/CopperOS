@@ -13,7 +13,7 @@ namespace CopperOS.MuiMaster;
 internal static class MuiAreaTimerCore
 {
 	internal const uint StateKey = 0x7F070065u;
-	private const uint EventStateKey = 0x7F070066u;
+	internal const uint EventStateKey = 0x7F070066u;
 
 	internal static bool TryReadState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, out MuiAreaTimerStateInput value)
@@ -26,11 +26,17 @@ internal static class MuiAreaTimerCore
 			MuiCommonControlCore.Timer, out var raw);
 		var current = hasRaw ? unchecked((int)raw) : 0;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj, StateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj, StateKey) ==
-			unchecked((int)MuiAreaTimerStateRecord.Size) &&
-			MuiAreaTimerStateRecordCodec.TryRead(ref platform, block,
-				out var record))
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			StateKey);
+		MuiAreaTimerStateRecord record;
+		if (block.IsNotNull || length != 0)
 		{
+			// A present block is authoritative typed state.  Do not repair a
+			// malformed signed counter record from its raw compatibility slot.
+			if (length != unchecked((int)MuiAreaTimerStateRecord.Size) ||
+				!MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform, block,
+					out record) || !MuiAreaTimerStateAdmission.ValidateLive(ref platform,
+					state, obj, record)) return false;
 			if (hasRaw && record.Value != current)
 			{
 				record.Value = current;
@@ -61,7 +67,8 @@ internal static class MuiAreaTimerCore
 		record.Magic = MuiAreaTimerStateRecord.Cookie;
 		record.Value = value;
 		record.Generation = generation == 0 ? 1u : generation;
-		var written = MuiAreaTimerStateRecordCodec.Write(ref platform, scratch,
+		var written = MuiAreaTimerStateAdmission.ValidateLive(ref platform, state,
+			obj, record) && MuiAreaTimerStateRecordCodec.Write(ref platform, scratch,
 			record);
 		var stored = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 			StateKey, scratch, unchecked((int)MuiAreaTimerStateRecord.Size));
@@ -77,6 +84,9 @@ internal static class MuiAreaTimerCore
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
 			MuiCommonControlCore.Classify(ref platform, state, obj) ==
 			MuiControlClass.Unknown) return false;
+		// Validate the existing typed state before publishing the producer's
+		// counter so malformed present state cannot be bypassed by raw mutation.
+		if (!TryReadState(ref platform, state, obj, out _)) return false;
 		if (!MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			MuiCommonControlCore.Timer, unchecked((uint)value), notify))
 			return false;
@@ -192,11 +202,15 @@ internal static class MuiAreaTimerCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			EventStateKey);
 		return MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			EventStateKey) == unchecked((int)MuiAreaTimerEventStateRecord.Size) &&
-			MuiAreaTimerEventStateCodec.TryRead(ref platform, block, out value);
+			MuiAreaTimerEventStateCodec.TryReadStructural(ref platform, block,
+				out value) && MuiAreaTimerEventStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static bool ReadEventState<TPlatform>(ref TPlatform platform,
@@ -205,6 +219,11 @@ internal static class MuiAreaTimerCore
 	{
 		if (!TryReadEventState(ref platform, state, obj, out var eventState))
 		{
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				EventStateKey);
+			var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+				EventStateKey);
+			if (block.IsNotNull || length != 0) return false;
 			value.Armed = 0;
 			value.MouseOver = 0;
 			value.DelayElapsed = 0;
@@ -223,6 +242,8 @@ internal static class MuiAreaTimerCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value.Magic = MuiAreaTimerEventStateRecord.Cookie;
+		if (!MuiAreaTimerEventStateAdmission.ValidateLive(ref platform, state,
+			obj, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiAreaTimerEventStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -241,7 +262,16 @@ internal static class MuiAreaTimerCore
 		APTR state, APTR obj)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (TryReadEventState(ref platform, state, obj, out _)) return true;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			EventStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			EventStateKey);
+		if (block.IsNotNull || length != 0)
+		{
+			// A present event record is authoritative.  Never replace malformed
+			// input state merely because strict decoding rejected it.
+			return TryReadEventState(ref platform, state, obj, out _);
+		}
 		var next = default(MuiAreaTimerEventStateRecord);
 		next.Magic = MuiAreaTimerEventStateRecord.Cookie;
 		next.Generation = 1;

@@ -1284,9 +1284,9 @@ public sealed class MuiListviewFloattextTests
 
 		// The record is a named state machine. An unknown flag must not be
 		// accepted as a capture/reorder transition or replaced by a new gesture.
-		Assert.True(MuiListInputRecordFieldCursorCodec.TryWriteUInt32(
+		Assert.True(MuiListviewDragStateMemoryCodec.TryWriteUInt32(
 			ref platform, APTR.FromPointer(dragRaw),
-			MuiListInputRecordKind.DragState, MuiListInputRecordField.Flags,
+			MuiListviewDragStateField.Flags,
 			MuiListviewDragState.ActiveFlag | 8u));
 		Assert.False(MuiListviewCore.HandlePointer(ref platform, State, listview,
 			child, down));

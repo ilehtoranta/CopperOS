@@ -36,6 +36,89 @@ public sealed class MuiAreaShortHelpTests
 	}
 
 	[Fact]
+	public void StateRecordUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1540);
+		var value = default(MuiAreaShortHelpStateRecord);
+		value.Magic = MuiAreaShortHelpStateRecord.Cookie;
+		value.Text = APTR.FromPointer(0x1A00);
+		value.Generation = 7;
+
+		Assert.True(MuiAreaShortHelpStateRecordCodec.Write(ref platform, address,
+			value));
+		Assert.True(MuiAreaShortHelpStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Text, decoded.Text);
+		Assert.Equal(value.Generation, decoded.Generation);
+		Assert.True(MuiAreaShortHelpStateRecordCodec.TryRead(ref platform, address,
+			out decoded));
+		Assert.False(MuiAreaShortHelpStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void ShortHelpAdmissionRequiresGenerationAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var valid = new MuiAreaShortHelpStateRecord
+		{
+			Magic = MuiAreaShortHelpStateRecord.Cookie,
+			Text = APTR.FromPointer(0x1800),
+			Generation = 1,
+		};
+		Assert.True(MuiAreaShortHelpStateAdmission.Validate(valid));
+		Assert.True(MuiAreaShortHelpStateAdmission.ValidateLive(ref platform,
+			State, obj, valid));
+		var malformed = valid;
+		malformed.Generation = 0;
+		Assert.False(MuiAreaShortHelpStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaShortHelpStateAdmission.ValidateLive(ref platform,
+			State, obj, malformed));
+		Assert.False(MuiAreaShortHelpStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedShortHelpFailsClosedBeforeRawRepairOrProviderCalls()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var help = APTR.FromPointer(0x1800);
+		Assert.True(MuiAreaShortHelpPacketCore.Set(ref platform, State, obj, help));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaShortHelpCore.StateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaShortHelpStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiAreaShortHelpStateField.Generation, 0));
+		Assert.True(MuiAreaShortHelpStateRecordCodec.TryReadStructural(ref platform,
+			block, out var structural));
+		Assert.Equal(0u, structural.Generation);
+		Assert.False(MuiAreaShortHelpStateAdmission.Validate(structural));
+		Assert.False(MuiAreaShortHelpStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		var allocationsBefore = platform.AllocationCount;
+		Assert.False(MuiAreaShortHelpPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		platform.ShortHelpCheckSampleAvailable = true;
+		Assert.Equal(APTR.Null, MuiAreaShortHelpPacketCore.Check(ref platform,
+			State, obj, help, 1, 2));
+		Assert.Equal(APTR.Null, platform.LastShortHelpCheckObject);
+		Assert.False(MuiAreaShortHelpPacketCore.Set(ref platform, State, obj,
+			APTR.Null));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, obj,
+			MuiCommonControlCore.ShortHelp, out var raw));
+		Assert.Equal(help.Raw, raw);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaShortHelpCore.StateKey));
+	}
+
+	[Fact]
 	public void TypedShortHelpPointerRoundTripsAndClears()
 	{
 		var platform = CreatePlatform(out var areaClass);

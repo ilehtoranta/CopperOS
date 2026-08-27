@@ -135,38 +135,14 @@ internal static class MuiPopSpecialistRecordFieldCursorCodec
 	private static bool TryResolve(MuiPopSpecialistRecordField field,
 		out uint offset)
 	{
-		offset = field switch
+		var index = (uint)field;
+		if (index > (uint)MuiPopSpecialistRecordField.NotifyCount)
 		{
-			MuiPopSpecialistRecordField.Magic => 0,
-			MuiPopSpecialistRecordField.Class => 4,
-			MuiPopSpecialistRecordField.Flags => 8,
-			MuiPopSpecialistRecordField.StringChild => 12,
-			MuiPopSpecialistRecordField.ButtonChild => 16,
-			MuiPopSpecialistRecordField.OpenHook => 20,
-			MuiPopSpecialistRecordField.CloseHook => 24,
-			MuiPopSpecialistRecordField.PopObject => 28,
-			MuiPopSpecialistRecordField.ObjStrHook => 32,
-			MuiPopSpecialistRecordField.StrObjHook => 36,
-			MuiPopSpecialistRecordField.WindowHook => 40,
-			MuiPopSpecialistRecordField.Array => 44,
-			MuiPopSpecialistRecordField.MaterializedArray => 48,
-			MuiPopSpecialistRecordField.ArrayCount => 52,
-			MuiPopSpecialistRecordField.StartHook => 56,
-			MuiPopSpecialistRecordField.StopHook => 60,
-			MuiPopSpecialistRecordField.AslType => 64,
-			MuiPopSpecialistRecordField.FontStyles => 68,
-			MuiPopSpecialistRecordField.AslTags => 72,
-			MuiPopSpecialistRecordField.AslRequester => 76,
-			MuiPopSpecialistRecordField.AslState => 80,
-			MuiPopSpecialistRecordField.Window => 84,
-			MuiPopSpecialistRecordField.HookMsg => 88,
-			MuiPopSpecialistRecordField.Selected => 92,
-			MuiPopSpecialistRecordField.NotifyAttribute => 96,
-			MuiPopSpecialistRecordField.NotifyValue => 100,
-			MuiPopSpecialistRecordField.NotifyCount => 104,
-			_ => 0,
-		};
-		return field <= MuiPopSpecialistRecordField.NotifyCount;
+			offset = 0;
+			return false;
+		}
+		offset = index * 4;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -212,7 +188,8 @@ internal static class MuiPopSpecialistRecordFieldCursorCodec
 
 internal static class MuiPopSpecialistStateCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiPopSpecialistState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -220,10 +197,9 @@ internal static class MuiPopSpecialistStateCodec
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiPopSpecialistState.Size) ||
 			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiPopSpecialistRecordField.Magic, out var magic) ||
-			magic != MuiPopSpecialistState.Cookie)
+				address, MuiPopSpecialistRecordField.Magic, out var magic))
 			return false;
-		value.Magic = MuiPopSpecialistState.Cookie;
+		value.Magic = magic;
 		if (!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
 			address, MuiPopSpecialistRecordField.Class, out value.Class) ||
 			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
@@ -298,6 +274,14 @@ internal static class MuiPopSpecialistStateCodec
 		value.Window = APTR.FromPointer(window);
 		value.HookMsg = APTR.FromPointer(hookMsg);
 		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiPopSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryReadStructural(ref platform, address, out value)) return false;
+		return MuiPopSpecialistAdmission.Validate(ref platform, value);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
@@ -375,6 +359,103 @@ internal static class MuiPopSpecialistStateCodec
 			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.NotifyCount,
 				value.NotifyCount);
+	}
+}
+
+// Structural decoding is kept separate from live admission. The scalar codec
+// can round-trip arbitrary field values for ABI qualification; every Pop*
+// operation uses the strict wrapper so malformed flags, class-specific state,
+// and owned guest blocks cannot reach hooks, ASL, windows, or disposal.
+internal static class MuiPopSpecialistAdmission
+{
+	private const uint AllowedFlags = MuiPopSpecialistLayout.FlagOpen |
+		MuiPopSpecialistLayout.FlagDisabled |
+		MuiPopSpecialistLayout.FlagCloseDeferred |
+		MuiPopSpecialistLayout.FlagToggle |
+		MuiPopSpecialistLayout.FlagVolatile |
+		MuiPopSpecialistLayout.FlagFollow |
+		MuiPopSpecialistLayout.FlagLight |
+		MuiPopSpecialistLayout.FlagShowAlpha |
+		MuiPopSpecialistLayout.FlagAslActive |
+		MuiPopSpecialistLayout.FlagAslPending |
+		MuiPopSpecialistLayout.FlagSetupActive;
+
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		MuiPopSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cls = (MuiPopSpecialistClass)value.Class;
+		if (value.Magic != MuiPopSpecialistState.Cookie ||
+			cls < MuiPopSpecialistClass.Popstring ||
+			cls > MuiPopSpecialistClass.Poppen ||
+			(value.Flags & ~AllowedFlags) != 0 ||
+			(value.Flags & MuiPopSpecialistLayout.FlagCloseDeferred) != 0 &&
+			(value.Flags & MuiPopSpecialistLayout.FlagOpen) == 0 ||
+			!ValidateOwnedBlocks(ref platform, value)) return false;
+
+		var objectDerived = cls == MuiPopSpecialistClass.Popobject ||
+			cls == MuiPopSpecialistClass.Poplist ||
+			cls == MuiPopSpecialistClass.Popcolor ||
+			cls == MuiPopSpecialistClass.Poppen;
+		var aslDerived = cls == MuiPopSpecialistClass.Popasl ||
+			cls == MuiPopSpecialistClass.Popscreen;
+
+		if (!objectDerived &&
+			(value.Flags & (MuiPopSpecialistLayout.FlagVolatile |
+				MuiPopSpecialistLayout.FlagFollow |
+				MuiPopSpecialistLayout.FlagLight)) != 0)
+			return false;
+		if (!objectDerived && (value.PopObject.IsNotNull ||
+			value.ObjStrHook.IsNotNull || value.StrObjHook.IsNotNull ||
+			value.WindowHook.IsNotNull || value.Window.IsNotNull)) return false;
+		if (!aslDerived && (value.Flags & (MuiPopSpecialistLayout.FlagAslActive |
+			MuiPopSpecialistLayout.FlagAslPending)) != 0) return false;
+		if (!aslDerived && (value.AslState.IsNotNull ||
+			value.AslRequester.IsNotNull || value.AslTags.IsNotNull)) return false;
+		if (aslDerived && value.AslState.IsNull) return false;
+		if ((value.Flags & MuiPopSpecialistLayout.FlagAslPending) != 0 &&
+			(value.Flags & MuiPopSpecialistLayout.FlagAslActive) == 0) return false;
+		if ((value.Flags & MuiPopSpecialistLayout.FlagAslActive) != 0 &&
+			value.AslRequester.IsNull) return false;
+		if ((value.Flags & MuiPopSpecialistLayout.FlagAslActive) == 0 &&
+			value.AslRequester.IsNotNull) return false;
+		if (cls != MuiPopSpecialistClass.Popcolor &&
+			(value.Flags & MuiPopSpecialistLayout.FlagShowAlpha) != 0) return false;
+		if (cls != MuiPopSpecialistClass.Poplist &&
+			(value.Array.IsNotNull || value.MaterializedArray.IsNotNull ||
+			value.ArrayCount != 0)) return false;
+		if (value.ArrayCount > MuiPopSpecialistLayout.MaximumArray ||
+			value.Array.IsNull && value.MaterializedArray.IsNotNull) return false;
+		if (value.MaterializedArray.IsNotNull &&
+			!platform.IsMapped(value.MaterializedArray,
+				(value.ArrayCount + 1) * MuiPoplistArrayEntry.Size)) return false;
+		return true;
+	}
+
+	private static bool ValidateOwnedBlocks<TPlatform>(ref TPlatform platform,
+		MuiPopSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (value.HookMsg.IsNotNull &&
+			((value.HookMsg.Raw & 1) != 0 ||
+			!platform.IsMapped(value.HookMsg, MuiPopSpecialistLayout.HookMsgSize)))
+			return false;
+		if (value.Window.IsNotNull &&
+			((value.Window.Raw & 1) != 0 ||
+			!platform.IsMapped(value.Window, MuiPopSpecialistLayout.WindowSize)))
+			return false;
+		if (value.AslState.IsNotNull &&
+			((value.AslState.Raw & 1) != 0 ||
+			!platform.IsMapped(value.AslState, MuiPopSpecialistLayout.AslStateSize)))
+			return false;
+		if (value.AslRequester.IsNotNull &&
+			((value.AslRequester.Raw & 1) != 0 ||
+			!platform.IsMapped(value.AslRequester, 16))) return false;
+		// AslTags is caller-owned and is intentionally admitted here without
+		// dereferencing it. MuiAslServiceCore validates the tag list at the
+		// capability boundary, while getters must still expose the stored pointer
+		// when a caller supplied malformed tags.
+		return true;
 	}
 }
 
@@ -1535,7 +1616,11 @@ public static class MuiPopSpecialistCore
 			state.AslState = APTR.Null;
 			MuiPopSpecialistStateCodec.Write(ref platform, instance, state);
 		}
-		MuiPopSpecialistStateCodec.TryRead(ref platform, instance, out state);
+		// The ASL service block is now intentionally retired; use the structural
+		// view for the final teardown read so the hook scratch is still released
+		// without reopening a partially dismantled live sidecar.
+		MuiPopSpecialistStateCodec.TryReadStructural(ref platform, instance,
+			out state);
 		var hookMsg = state.HookMsg;
 		if (hookMsg.IsNotNull)
 		{

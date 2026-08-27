@@ -20,10 +20,32 @@ public struct MuiGadgetGadgetState
 internal struct MuiGadgetGadgetStateRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint GadgetOffset = 4;
 	internal const uint Cookie = 0x4D474744u; // 'MGGD'
 
 	internal uint Magic;
 	internal APTR Gadget;
+}
+
+// MUIA_Gadget_Gadget is a getter-only Intuition-gadget pointer. The pointer
+// remains caller/platform-owned; admission only requires a mapped guest byte
+// and a live owning MUI object, never a managed gadget wrapper or object-table
+// relationship that the core cannot prove for native Intuition state.
+internal static class MuiGadgetGadgetStateAdmission
+{
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		MuiGadgetGadgetStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		value.Magic == MuiGadgetGadgetStateRecord.Cookie &&
+		(value.Gadget.IsNull || platform.IsMapped(value.Gadget, 1));
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiGadgetGadgetStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(ref platform, value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 }
 
 internal enum MuiGadgetGadgetStateField : byte
@@ -41,28 +63,63 @@ internal struct MuiGadgetGadgetStateFieldCursor
 
 internal static class MuiGadgetGadgetStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiGadgetGadgetStateField field,
-		out uint offset)
-	{
-		offset = field switch
-		{
-			MuiGadgetGadgetStateField.Magic => 0,
-			MuiGadgetGadgetStateField.Gadget => 4,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiGadgetGadgetStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return MuiGadgetGadgetStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiGadgetGadgetStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiGadgetGadgetStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiGadgetGadgetStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiGadgetGadgetStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+	}
+}
+
+// Struct-first guest-memory adapter. Gadget consumers use the named record;
+// this bounded adapter is the only layer that translates its fixed guest
+// layout into addresses. The cursor codec remains for compatibility and
+// malformed-state diagnostics.
+internal static class MuiGadgetGadgetStateRecordMemoryCodec
+{
+	private static bool TryResolve(MuiGadgetGadgetStateField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiGadgetGadgetStateField.Magic:
+				offset = MuiGadgetGadgetStateRecord.MagicOffset;
+				return true;
+			case MuiGadgetGadgetStateField.Gadget:
+				offset = MuiGadgetGadgetStateRecord.GadgetOffset;
+				return true;
+		}
+		offset = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiGadgetGadgetStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-			cursor.Record, MuiGadgetGadgetStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiGadgetGadgetStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiGadgetGadgetStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -70,10 +127,7 @@ internal static class MuiGadgetGadgetStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiGadgetGadgetStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -82,10 +136,7 @@ internal static class MuiGadgetGadgetStateFieldCursorCodec
 		APTR record, MuiGadgetGadgetStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiGadgetGadgetStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -93,33 +144,35 @@ internal static class MuiGadgetGadgetStateFieldCursorCodec
 
 internal static class MuiGadgetGadgetStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiGadgetGadgetStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGadgetGadgetStateRecord.Size) ||
-			!MuiGadgetGadgetStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiGadgetGadgetStateField.Magic, out var magic) ||
-			magic != MuiGadgetGadgetStateRecord.Cookie) return false;
-		value.Magic = magic;
-		if (!MuiGadgetGadgetStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiGadgetGadgetStateField.Gadget, out var gadget)) return false;
+		if (!MuiGadgetGadgetStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiGadgetGadgetStateField.Magic, out value.Magic) ||
+			!MuiGadgetGadgetStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiGadgetGadgetStateField.Gadget,
+			out var gadget)) return false;
 		value.Gadget = APTR.FromPointer(gadget);
 		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiGadgetGadgetStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiGadgetGadgetStateAdmission.Validate(ref platform, value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiGadgetGadgetStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGadgetGadgetStateRecord.Size) || value.Magic !=
-			MuiGadgetGadgetStateRecord.Cookie) return false;
-		return MuiGadgetGadgetStateFieldCursorCodec.TryWriteUInt32(ref platform,
+		if (!MuiGadgetGadgetStateAdmission.Validate(ref platform, value)) return false;
+		return MuiGadgetGadgetStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiGadgetGadgetStateField.Magic, value.Magic) &&
-			MuiGadgetGadgetStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiGadgetGadgetStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiGadgetGadgetStateField.Gadget, value.Gadget.Raw);
 	}
 }

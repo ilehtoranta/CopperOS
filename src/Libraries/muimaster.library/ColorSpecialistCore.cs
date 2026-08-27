@@ -316,7 +316,8 @@ internal struct MuiColorSpecialistState
 
 internal static class MuiColorSpecialistStateCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiColorSpecialistState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -325,9 +326,9 @@ internal static class MuiColorSpecialistStateCodec
 			MuiColorSpecialistState.Size) ||
 			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 				MuiColorRecordKind.State, MuiColorRecordField.Magic,
-				out var magic) || magic != MuiColorSpecialistState.Cookie)
+				out var magic))
 			return false;
-		value.Magic = MuiColorSpecialistState.Cookie;
+		value.Magic = magic;
 		if (!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
 			MuiColorRecordKind.State, MuiColorRecordField.Class, out value.Class) ||
 			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
@@ -378,6 +379,14 @@ internal static class MuiColorSpecialistStateCodec
 		value.Entries = APTR.FromPointer(entries);
 		value.Names = APTR.FromPointer(names);
 		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiColorSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryReadStructural(ref platform, address, out value)) return false;
+		return MuiColorSpecialistStateAdmission.Validate(ref platform, value);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
@@ -432,6 +441,88 @@ internal static class MuiColorSpecialistStateCodec
 				MuiColorRecordKind.State, MuiColorRecordField.NotifyCount,
 				value.NotifyCount);
 	}
+}
+
+// The structural codec preserves the complete 64-byte specialist ABI for
+// qualification. Live pen/color operations use this semantic boundary so a
+// guest cannot turn arbitrary mapped data into a pen owner or draw binding.
+internal static class MuiColorSpecialistStateAdmission
+{
+	private const uint AllowedFlags = MuiColorSpecialistLayout.FlagSetupActive |
+		MuiColorSpecialistLayout.FlagPenHeld |
+		MuiColorSpecialistLayout.FlagGroupable |
+		MuiColorSpecialistLayout.FlagShowAlpha |
+		MuiColorSpecialistLayout.FlagPSIMode |
+		MuiColorSpecialistLayout.FlagObsolete;
+
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		MuiColorSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cls = (MuiColorSpecialistClass)value.Class;
+		if (value.Magic != MuiColorSpecialistState.Cookie ||
+			cls < MuiColorSpecialistClass.Pendisplay ||
+			cls > MuiColorSpecialistClass.Penadjust ||
+			(value.Flags & ~AllowedFlags) != 0 ||
+			(value.Flags & MuiColorSpecialistLayout.FlagPenHeld) != 0 &&
+			(value.Flags & MuiColorSpecialistLayout.FlagSetupActive) == 0 ||
+			(cls != MuiColorSpecialistClass.Palette &&
+				(value.Flags & MuiColorSpecialistLayout.FlagObsolete) != 0) ||
+			(cls == MuiColorSpecialistClass.Palette &&
+				(value.Flags & MuiColorSpecialistLayout.FlagObsolete) == 0) ||
+			(cls != MuiColorSpecialistClass.Coloradjust &&
+				(value.Flags & MuiColorSpecialistLayout.FlagShowAlpha) != 0) ||
+			(cls != MuiColorSpecialistClass.Penadjust &&
+				(value.Flags & MuiColorSpecialistLayout.FlagPSIMode) != 0) ||
+			(cls != MuiColorSpecialistClass.Palette &&
+				(value.Flags & MuiColorSpecialistLayout.FlagGroupable) != 0) ||
+			(cls != MuiColorSpecialistClass.Pendisplay &&
+				cls != MuiColorSpecialistClass.Colorfield &&
+				(value.Flags & MuiColorSpecialistLayout.FlagPenHeld) != 0))
+			return false;
+
+		if (!ValidateBinding(ref platform, value)) return false;
+		if (cls == MuiColorSpecialistClass.Pendisplay &&
+			!ValidateBlock(ref platform, value.SpecBlock,
+				MuiColorSpecialistLayout.SpecSize) ||
+			cls == MuiColorSpecialistClass.Colorfield &&
+			value.SpecBlock.IsNotNull && !ValidateBlock(ref platform,
+				value.SpecBlock, MuiColorSpecialistLayout.SpecSize)) return false;
+		if ((cls == MuiColorSpecialistClass.Pendisplay ||
+			cls == MuiColorSpecialistClass.Colorfield ||
+			cls == MuiColorSpecialistClass.Coloradjust) &&
+			!ValidateBlock(ref platform, value.RgbBlock,
+				MuiColorSpecialistLayout.RgbSize)) return false;
+		if (cls == MuiColorSpecialistClass.Palette ||
+			cls == MuiColorSpecialistClass.Penadjust)
+		{
+			if (value.SpecBlock.IsNotNull || value.RgbBlock.IsNotNull) return false;
+		}
+		if (cls != MuiColorSpecialistClass.Pendisplay &&
+			value.Reference.IsNotNull) return false;
+		return value.Reference.IsNull || ValidateBlock(ref platform,
+			value.Reference, MuiColorSpecialistState.Size);
+	}
+
+	private static bool ValidateBinding<TPlatform>(ref TPlatform platform,
+		MuiColorSpecialistState value) where TPlatform : struct, IMuiGuestMemory
+	{
+		var active = (value.Flags & MuiColorSpecialistLayout.FlagSetupActive) != 0;
+		if (!active)
+			return value.RenderInfo.IsNull && value.DrawState.IsNull &&
+				(value.Flags & MuiColorSpecialistLayout.FlagPenHeld) == 0 &&
+				value.Pen == 0;
+		return value.RenderInfo.IsNotNull && value.DrawState.IsNotNull &&
+			ValidateBlock(ref platform, value.RenderInfo,
+				MuiColorSpecialistLayout.RenderInfoSize) &&
+			ValidateBlock(ref platform, value.DrawState,
+				MuiDrawingServiceStateRecord.Size);
+	}
+
+	private static bool ValidateBlock<TPlatform>(ref TPlatform platform,
+		APTR address, uint size) where TPlatform : struct, IMuiGuestMemory =>
+	address.IsNotNull && (address.Raw & 1u) == 0 && platform.IsMapped(address,
+		size);
 }
 
 // Public MUI_RGBColor wire record: three ULONG intensities in guest memory.

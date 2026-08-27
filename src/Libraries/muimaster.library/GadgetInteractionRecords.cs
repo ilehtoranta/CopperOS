@@ -103,62 +103,117 @@ internal static class MuiGadgetInteractionStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Gadget consumers use the named record;
+// this bounded adapter is the only layer that translates its fixed guest
+// layout into addresses. The cursor codec remains for compatibility and
+// malformed-state diagnostics.
+internal static class MuiGadgetInteractionStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiGadgetInteractionStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiGadgetInteractionStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiGadgetInteractionStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiGadgetInteractionStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGadgetInteractionStateRecord.Size) ||
-			!MuiGadgetInteractionStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiGadgetInteractionStateField.Magic, out var magic) ||
-			magic != MuiGadgetInteractionStateRecord.Cookie) return false;
-		value.Magic = magic;
-		return MuiGadgetInteractionStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiGadgetInteractionStateField.InputMode, out value.InputMode) &&
-			MuiGadgetInteractionStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiGadgetInteractionStateField.Selected, out value.Selected) &&
-			MuiGadgetInteractionStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiGadgetInteractionStateField.Pressed, out value.Pressed) &&
-			MuiGadgetInteractionStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiGadgetInteractionStateField.ShowSelState,
-			out value.ShowSelState);
+		return MuiGadgetInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic) &&
+			MuiGadgetInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out value.InputMode) &&
+			MuiGadgetInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 8, out value.Selected) &&
+			MuiGadgetInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 12, out value.Pressed) &&
+			MuiGadgetInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 16, out value.ShowSelState);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiGadgetInteractionStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiGadgetInteractionStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiGadgetInteractionStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGadgetInteractionStateRecord.Size) || value.Magic !=
-			MuiGadgetInteractionStateRecord.Cookie) return false;
-		return MuiGadgetInteractionStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiGadgetInteractionStateField.Magic, value.Magic) &&
-			MuiGadgetInteractionStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiGadgetInteractionStateField.InputMode, value.InputMode) &&
-			MuiGadgetInteractionStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiGadgetInteractionStateField.Selected, value.Selected) &&
-			MuiGadgetInteractionStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiGadgetInteractionStateField.Pressed, value.Pressed) &&
-			MuiGadgetInteractionStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiGadgetInteractionStateField.ShowSelState,
-			value.ShowSelState);
+		if (!MuiGadgetInteractionStateAdmission.Validate(value)) return false;
+		return MuiGadgetInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiGadgetInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 4, value.InputMode) &&
+			MuiGadgetInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 8, value.Selected) &&
+			MuiGadgetInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 12, value.Pressed) &&
+			MuiGadgetInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 16, value.ShowSelState);
 	}
 }
 
-// The codec deliberately preserves guest bytes for corruption inspection.
-// Admission is separate: InputMode is the documented four-value enum and the
-// remaining fields are MorphOS BOOL projections. Consumers must not turn an
-// invalid named record into a usable interaction state by normalizing it.
-internal static class MuiGadgetInteractionStateValidation
+// InputMode is the documented four-value enum and the remaining fields are
+// MorphOS BOOL projections. Consumers must not turn an invalid named record
+// into a usable interaction state by normalizing it.
+internal static class MuiGadgetInteractionStateAdmission
 {
-	internal static bool IsValidRecord(MuiGadgetInteractionStateRecord value) =>
+	internal static bool Validate(MuiGadgetInteractionStateRecord value) =>
+		value.Magic == MuiGadgetInteractionStateRecord.Cookie &&
 		value.InputMode <= 3 && value.Selected <= 1 && value.Pressed <= 1 &&
 		value.ShowSelState <= 1;
 
-	internal static bool IsValidState(MuiGadgetInteractionState value) =>
+	internal static bool Validate(MuiGadgetInteractionState value) =>
 		value.InputMode <= 3 && value.Selected <= 1 && value.Pressed <= 1 &&
 		value.ShowSelState <= 1;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiGadgetInteractionStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
+}
+
+// Kept as a named compatibility alias for existing range-only callers. New
+// state publication and consumption use MuiGadgetInteractionStateAdmission so
+// live ownership is checked at the object-store boundary.
+internal static class MuiGadgetInteractionStateValidation
+{
+	internal static bool IsValidRecord(MuiGadgetInteractionStateRecord value) =>
+		MuiGadgetInteractionStateAdmission.Validate(value);
+
+	internal static bool IsValidState(MuiGadgetInteractionState value) =>
+		MuiGadgetInteractionStateAdmission.Validate(value);
 }

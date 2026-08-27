@@ -99,42 +99,78 @@ internal static class MuiPropRangeStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Range values remain named semantic
+// fields; bounded fixed guest-layout translation is isolated here.
+internal static class MuiPropRangeStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiPropRangeStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiPropRangeStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiPropRangeStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiPropRangeStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiPropRangeStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiPropRangeStateRecord.Size) ||
-			!MuiPropRangeStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiPropRangeStateField.Magic, out var magic) ||
-			magic != MuiPropRangeStateRecord.Cookie) return false;
-		value.Magic = magic;
-		return MuiPropRangeStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiPropRangeStateField.Entries, out value.Entries) &&
-			MuiPropRangeStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-			MuiPropRangeStateField.Visible, out value.Visible) &&
-			MuiPropRangeStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-			MuiPropRangeStateField.First, out value.First);
+		if (!MuiPropRangeStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic)) return false;
+		return MuiPropRangeStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out value.Entries) &&
+			MuiPropRangeStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
+			8, out value.Visible) &&
+			MuiPropRangeStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
+			12, out value.First);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiPropRangeStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiPropRangeStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiPropRangeStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiPropRangeStateRecord.Size) || value.Magic !=
-			MuiPropRangeStateRecord.Cookie) return false;
-		return MuiPropRangeStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiPropRangeStateField.Magic, value.Magic) &&
-			MuiPropRangeStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiPropRangeStateField.Entries, value.Entries) &&
-			MuiPropRangeStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiPropRangeStateField.Visible, value.Visible) &&
-			MuiPropRangeStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiPropRangeStateField.First, value.First);
+		if (!MuiPropRangeStateAdmission.Validate(value)) return false;
+		return MuiPropRangeStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiPropRangeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			4, value.Entries) &&
+			MuiPropRangeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			8, value.Visible) &&
+			MuiPropRangeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			12, value.First);
 	}
 }
 
@@ -142,20 +178,21 @@ internal static class MuiPropRangeStateRecordCodec
 // diagnostics, but admit only non-negative values whose First position is
 // reachable from Entries and Visible. The public record keeps ULONG wire
 // storage so the guest ABI remains lossless.
-internal static class MuiPropRangeStateValidation
+internal static class MuiPropRangeStateAdmission
 {
 	private const uint LongMaximum = 0x7fffffffu;
 
-	internal static bool IsValidRecord(MuiPropRangeStateRecord value)
+	internal static bool Validate(MuiPropRangeStateRecord value)
 	{
+		if (value.Magic != MuiPropRangeStateRecord.Cookie) return false;
 		var state = default(MuiPropRangeState);
 		state.Entries = value.Entries;
 		state.Visible = value.Visible;
 		state.First = value.First;
-		return IsValidState(state);
+		return Validate(state);
 	}
 
-	internal static bool IsValidState(MuiPropRangeState value)
+	internal static bool Validate(MuiPropRangeState value)
 	{
 		if (value.Entries > LongMaximum || value.Visible > LongMaximum ||
 			value.First > LongMaximum) return false;
@@ -163,6 +200,12 @@ internal static class MuiPropRangeStateValidation
 			value.Entries - value.Visible : 0u;
 		return value.First <= last;
 	}
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiPropRangeStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 
 	internal static uint ClampFirst(MuiPropRangeState value)
 	{
@@ -178,4 +221,22 @@ internal static class MuiPropRangeStateValidation
 		range.First = value;
 		return ClampFirst(range);
 	}
+}
+
+// Compatibility alias for existing range-only call sites. New range
+// boundaries use MuiPropRangeStateAdmission directly so live ownership is
+// explicit at the consumer edge.
+internal static class MuiPropRangeStateValidation
+{
+	internal static bool IsValidRecord(MuiPropRangeStateRecord value) =>
+		MuiPropRangeStateAdmission.Validate(value);
+
+	internal static bool IsValidState(MuiPropRangeState value) =>
+		MuiPropRangeStateAdmission.Validate(value);
+
+	internal static uint ClampFirst(MuiPropRangeState value) =>
+		MuiPropRangeStateAdmission.ClampFirst(value);
+
+	internal static uint ClampRequestedFirst(MuiPropRangeState range, uint value) =>
+		MuiPropRangeStateAdmission.ClampRequestedFirst(range, value);
 }

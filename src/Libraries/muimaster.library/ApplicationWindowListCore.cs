@@ -19,6 +19,15 @@ internal struct MuiApplicationWindowListState
 {
 	internal const uint Magic = 0x41574C53; // "AWLS"
 	internal const uint Size = 32;
+	internal const uint CookieOffset = 0;
+	internal const uint ApplicationOffset = 4;
+	internal const uint ListOffset = 8;
+	internal const uint EntriesOffset = 12;
+	internal const uint CountOffset = 16;
+	internal const uint CapacityOffset = 20;
+	internal const uint MutationOffset = 24;
+	internal const uint GenerationOffset = 28;
+	internal const uint FieldSize = 4;
 	internal uint Cookie;
 	internal APTR Application;
 	internal APTR List;
@@ -50,33 +59,12 @@ internal struct MuiApplicationWindowListStateFieldCursor
 
 internal static class MuiApplicationWindowListStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiApplicationWindowListStateField field,
-		out uint offset)
-	{
-		offset = field switch
-		{
-			MuiApplicationWindowListStateField.Cookie => 0,
-			MuiApplicationWindowListStateField.Application => 4,
-			MuiApplicationWindowListStateField.List => 8,
-			MuiApplicationWindowListStateField.Entries => 12,
-			MuiApplicationWindowListStateField.Count => 16,
-			MuiApplicationWindowListStateField.Capacity => 20,
-			MuiApplicationWindowListStateField.Mutation => 24,
-			MuiApplicationWindowListStateField.Generation => 28,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiApplicationWindowListStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiApplicationWindowListStateRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor.Record, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -100,6 +88,77 @@ internal static class MuiApplicationWindowListStateFieldCursorCodec
 		cursor.Record = record;
 		cursor.Field = field;
 		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
+// Struct-first guest-memory adapter for the fixed application window-list
+// state record. The semantic APTR members remain typed; only this bounded
+// adapter translates the eight guest LONG slots.
+internal static class MuiApplicationWindowListStateRecordMemoryCodec
+{
+	private static bool TryResolve(MuiApplicationWindowListStateField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiApplicationWindowListStateField.Cookie:
+				offset = MuiApplicationWindowListState.CookieOffset;
+				return true;
+			case MuiApplicationWindowListStateField.Application:
+				offset = MuiApplicationWindowListState.ApplicationOffset;
+				return true;
+			case MuiApplicationWindowListStateField.List:
+				offset = MuiApplicationWindowListState.ListOffset;
+				return true;
+			case MuiApplicationWindowListStateField.Entries:
+				offset = MuiApplicationWindowListState.EntriesOffset;
+				return true;
+			case MuiApplicationWindowListStateField.Count:
+				offset = MuiApplicationWindowListState.CountOffset;
+				return true;
+			case MuiApplicationWindowListStateField.Capacity:
+				offset = MuiApplicationWindowListState.CapacityOffset;
+				return true;
+			case MuiApplicationWindowListStateField.Mutation:
+				offset = MuiApplicationWindowListState.MutationOffset;
+				return true;
+			case MuiApplicationWindowListStateField.Generation:
+				offset = MuiApplicationWindowListState.GenerationOffset;
+				return true;
+		}
+		offset = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationWindowListStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiApplicationWindowListState.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiApplicationWindowListState.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationWindowListStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationWindowListStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -182,6 +241,11 @@ internal struct MuiApplicationWindowListEntry
 {
 	internal const uint Size = 16;
 	internal const uint ProjectionMagic = 0x4157454E; // "AWEN"
+	internal const uint NextOffset = 0;
+	internal const uint PreviousOffset = 4;
+	internal const uint ObjectOffset = 8;
+	internal const uint ReservedOffset = 12;
+	internal const uint FieldSize = 4;
 	internal APTR Next;
 	internal APTR Previous;
 	internal APTR Object;
@@ -213,29 +277,12 @@ internal struct MuiApplicationWindowListEntryFieldCursor
 
 internal static class MuiApplicationWindowListEntryFieldCursorCodec
 {
-	private static bool TryResolve(MuiApplicationWindowListEntryField field,
-		out uint offset)
-	{
-		offset = field switch
-		{
-			MuiApplicationWindowListEntryField.Next => 0,
-			MuiApplicationWindowListEntryField.Previous => 4,
-			MuiApplicationWindowListEntryField.Object => 8,
-			MuiApplicationWindowListEntryField.Reserved => 12,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiApplicationWindowListEntryFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiApplicationWindowListEntryRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor.Record, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -259,6 +306,65 @@ internal static class MuiApplicationWindowListEntryFieldCursorCodec
 		cursor.Record = record;
 		cursor.Field = field;
 		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
+// Struct-first guest-memory adapter for one Exec-style window-list entry.
+// Pointer members stay APTR in the semantic record; this adapter validates
+// the complete fixed entry before exposing a named member address.
+internal static class MuiApplicationWindowListEntryRecordMemoryCodec
+{
+	private static bool TryResolve(MuiApplicationWindowListEntryField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiApplicationWindowListEntryField.Next:
+				offset = MuiApplicationWindowListEntry.NextOffset;
+				return true;
+			case MuiApplicationWindowListEntryField.Previous:
+				offset = MuiApplicationWindowListEntry.PreviousOffset;
+				return true;
+			case MuiApplicationWindowListEntryField.Object:
+				offset = MuiApplicationWindowListEntry.ObjectOffset;
+				return true;
+			case MuiApplicationWindowListEntryField.Reserved:
+				offset = MuiApplicationWindowListEntry.ReservedOffset;
+				return true;
+		}
+		offset = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationWindowListEntryField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiApplicationWindowListEntry.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiApplicationWindowListEntry.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationWindowListEntryField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationWindowListEntryField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}

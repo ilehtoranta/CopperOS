@@ -36,6 +36,63 @@ public sealed class MuiAreaFloatingTests
 	}
 
 	[Fact]
+	public void FloatingAdmissionRequiresCanonicalBoolGenerationAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var valid = new MuiAreaFloatingStateRecord
+		{
+			Magic = MuiAreaFloatingStateRecord.Cookie,
+			Enabled = 1,
+			Generation = 1,
+		};
+		Assert.True(MuiAreaFloatingStateAdmission.Validate(valid));
+		Assert.True(MuiAreaFloatingStateAdmission.ValidateLive(ref platform,
+			State, obj, valid));
+		var malformed = valid;
+		malformed.Enabled = 2;
+		Assert.False(MuiAreaFloatingStateAdmission.Validate(malformed));
+		malformed = valid;
+		malformed.Generation = 0;
+		Assert.False(MuiAreaFloatingStateAdmission.Validate(malformed));
+		Assert.False(MuiAreaFloatingStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedFloatingFailsClosedBeforeRawRepairOrSet()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		Assert.True(MuiAreaFloatingPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		Assert.True(MuiAreaFloatingPacketCore.Set(ref platform, State, obj, 1));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaFloatingCore.StateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaFloatingStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiAreaFloatingStateField.Enabled, 2));
+		Assert.True(MuiAreaFloatingStateRecordCodec.TryReadStructural(ref platform,
+			block, out var structural));
+		Assert.Equal(2u, structural.Enabled);
+		Assert.False(MuiAreaFloatingStateAdmission.Validate(structural));
+		Assert.False(MuiAreaFloatingStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		var allocationsBefore = platform.AllocationCount;
+		Assert.False(MuiAreaFloatingPacketCore.TryGet(ref platform, State, obj,
+			out _));
+		Assert.Equal(allocationsBefore, platform.AllocationCount);
+		Assert.False(MuiAreaFloatingPacketCore.Set(ref platform, State, obj, 0));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, obj,
+			MuiCommonControlCore.Floating, out var raw));
+		Assert.Equal(1u, raw);
+		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaFloatingCore.StateKey));
+	}
+
+	[Fact]
 	public void TypedFloatingStateNormalizesAndRoundTrips()
 	{
 		var platform = CreatePlatform(out var areaClass);

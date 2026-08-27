@@ -104,58 +104,113 @@ internal static class MuiPropPolicyStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Prop policy scalars remain named
+// semantic fields; bounded fixed guest-layout translation lives here.
+internal static class MuiPropPolicyStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiPropPolicyStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiPropPolicyStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiPropPolicyStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiPropPolicyStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiPropPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiPropPolicyStateRecord.Size) ||
-			!MuiPropPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiPropPolicyStateField.Magic, out var magic) ||
-			magic != MuiPropPolicyStateRecord.Cookie) return false;
-		value.Magic = magic;
-		return MuiPropPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiPropPolicyStateField.Horizontal, out value.Horizontal) &&
-			MuiPropPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiPropPolicyStateField.DeltaFactor, out value.DeltaFactor) &&
-			MuiPropPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiPropPolicyStateField.Slider, out value.Slider) &&
-			MuiPropPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiPropPolicyStateField.UseWinBorder, out value.UseWinBorder);
+		if (!MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out value.Magic)) return false;
+		return MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out value.Horizontal) &&
+			MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
+				8, out value.DeltaFactor) &&
+			MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
+				12, out value.Slider) &&
+			MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
+				16, out value.UseWinBorder);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiPropPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiPropPolicyStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiPropPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiPropPolicyStateRecord.Size) || value.Magic !=
-			MuiPropPolicyStateRecord.Cookie) return false;
-		return MuiPropPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiPropPolicyStateField.Magic, value.Magic) &&
-			MuiPropPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiPropPolicyStateField.Horizontal, value.Horizontal) &&
-			MuiPropPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiPropPolicyStateField.DeltaFactor, value.DeltaFactor) &&
-			MuiPropPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiPropPolicyStateField.Slider, value.Slider) &&
-			MuiPropPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiPropPolicyStateField.UseWinBorder, value.UseWinBorder);
+		if (!MuiPropPolicyStateAdmission.Validate(value)) return false;
+		return MuiPropPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiPropPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			4, value.Horizontal) &&
+			MuiPropPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			8, value.DeltaFactor) &&
+			MuiPropPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			12, value.Slider) &&
+			MuiPropPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			16, value.UseWinBorder);
 	}
 }
 
 // Preserve the policy wire fields losslessly for malformed-state diagnostics.
 // Horizontal and Slider are canonical MorphOS BOOLs; UseWinBorder is the
 // existing four-state policy domain accepted by Prop/Scrollbar construction;
-// DeltaFactor is an unrestricted ULONG multiplier.
+// DeltaFactor is an unrestricted LONG multiplier.
+internal static class MuiPropPolicyStateAdmission
+{
+	internal static bool Validate(MuiPropPolicyStateRecord value) =>
+		value.Magic == MuiPropPolicyStateRecord.Cookie &&
+		value.Horizontal <= 1 && value.Slider <= 1 && value.UseWinBorder <= 3;
+
+	internal static bool Validate(MuiPropPolicyState value) =>
+		value.Horizontal <= 1 && value.Slider <= 1 && value.UseWinBorder <= 3;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiPropPolicyStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
+}
+
+// Compatibility alias for existing range-only call sites. New policy
+// boundaries use MuiPropPolicyStateAdmission directly so live ownership is
+// explicit at the consumer edge.
 internal static class MuiPropPolicyStateValidation
 {
 	internal static bool IsValidRecord(MuiPropPolicyStateRecord value) =>
-		value.Horizontal <= 1 && value.Slider <= 1 && value.UseWinBorder <= 3;
+		MuiPropPolicyStateAdmission.Validate(value);
 
 	internal static bool IsValidState(MuiPropPolicyState value) =>
-		value.Horizontal <= 1 && value.Slider <= 1 && value.UseWinBorder <= 3;
+		MuiPropPolicyStateAdmission.Validate(value);
 }

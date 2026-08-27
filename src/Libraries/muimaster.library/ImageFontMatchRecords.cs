@@ -28,6 +28,26 @@ internal struct MuiImageFontMatchStringStateRecord
 	internal APTR MatchString;
 }
 
+internal static class MuiImageFontMatchStringStateAdmission
+{
+	internal const int MaximumLength = 128;
+
+	internal static bool Validate(MuiImageFontMatchStringStateRecord value) =>
+		value.Magic == MuiImageFontMatchStringStateRecord.Cookie &&
+		value.Present <= 1;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiImageFontMatchStringStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!Validate(value) || obj.IsNull ||
+			MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		return value.MatchString.IsNull || CStringCodec.TryReadLength(ref platform,
+			value.MatchString, MaximumLength, out _);
+	}
+}
+
 internal enum MuiImageFontMatchStringStateField : byte
 {
 	Magic,
@@ -95,46 +115,77 @@ internal static class MuiImageFontMatchStringStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Font-match consumers use the named
+// record; this bounded adapter is the only layer that translates its fixed
+// guest layout into addresses. The cursor codec remains for compatibility and
+// malformed-state diagnostics.
+internal static class MuiImageFontMatchStringStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiImageFontMatchStringStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiImageFontMatchStringStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiImageFontMatchStringStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiImageFontMatchStringStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiImageFontMatchStringStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiImageFontMatchStringStateRecord.Size) ||
-			!MuiImageFontMatchStringStateFieldCursorCodec.TryReadUInt32(
-				ref platform, address, MuiImageFontMatchStringStateField.Magic,
-				out var magic) || magic != MuiImageFontMatchStringStateRecord.Cookie)
-			return false;
-		value.Magic = magic;
-		if (!MuiImageFontMatchStringStateFieldCursorCodec.TryReadUInt32(
-			ref platform, address, MuiImageFontMatchStringStateField.Present,
-			out value.Present) || !MuiImageFontMatchStringStateFieldCursorCodec
-			.TryReadUInt32(ref platform, address,
-				MuiImageFontMatchStringStateField.MatchString, out var matchString) ||
-			value.Present > 1) return false;
+		if (!MuiImageFontMatchStringStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, 0, out value.Magic) ||
+			!MuiImageFontMatchStringStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, 4, out value.Present) ||
+			!MuiImageFontMatchStringStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, 8, out var matchString)) return false;
 		value.MatchString = APTR.FromPointer(matchString);
 		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiImageFontMatchStringStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiImageFontMatchStringStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiImageFontMatchStringStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiImageFontMatchStringStateRecord.Size) || value.Magic !=
-			MuiImageFontMatchStringStateRecord.Cookie || value.Present > 1)
-			return false;
-		return MuiImageFontMatchStringStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address, MuiImageFontMatchStringStateField.Magic,
-			value.Magic) && MuiImageFontMatchStringStateFieldCursorCodec
-			.TryWriteUInt32(ref platform, address,
-				MuiImageFontMatchStringStateField.Present, value.Present) &&
-			MuiImageFontMatchStringStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiImageFontMatchStringStateField.MatchString,
-				value.MatchString.Raw);
+		if (!MuiImageFontMatchStringStateAdmission.Validate(value)) return false;
+		return MuiImageFontMatchStringStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 0, value.Magic) &&
+			MuiImageFontMatchStringStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 4, value.Present) &&
+			MuiImageFontMatchStringStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, 8, value.MatchString.Raw);
 	}
 }

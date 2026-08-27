@@ -21,6 +21,10 @@ public struct MuiSliderPresentationState
 internal struct MuiSliderPresentationStateRecord
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint HorizontalOffset = 4;
+	internal const uint QuietOffset = 8;
 	internal const uint Cookie = 0x4D534C44u; // 'MSLD'
 
 	internal uint Magic;
@@ -44,29 +48,64 @@ internal struct MuiSliderPresentationStateFieldCursor
 
 internal static class MuiSliderPresentationStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiSliderPresentationStateField field,
-		out uint offset)
-	{
-		offset = field switch
-		{
-			MuiSliderPresentationStateField.Magic => 0,
-			MuiSliderPresentationStateField.Horizontal => 4,
-			MuiSliderPresentationStateField.Quiet => 8,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiSliderPresentationStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		return MuiSliderPresentationStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiSliderPresentationStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiSliderPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiSliderPresentationStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
+	}
+}
+
+// Struct-first guest-memory adapter. Orientation and quiet-display policy
+// remain named semantic fields; fixed guest-layout translation is bounded here.
+internal static class MuiSliderPresentationStateRecordMemoryCodec
+{
+	private static bool TryResolve(MuiSliderPresentationStateField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiSliderPresentationStateField.Magic:
+				offset = MuiSliderPresentationStateRecord.MagicOffset;
+				return true;
+			case MuiSliderPresentationStateField.Horizontal:
+				offset = MuiSliderPresentationStateRecord.HorizontalOffset;
+				return true;
+			case MuiSliderPresentationStateField.Quiet:
+				offset = MuiSliderPresentationStateRecord.QuietOffset;
+				return true;
+		}
+		offset = 0;
+		return false;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiSliderPresentationStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-			cursor.Record, MuiSliderPresentationStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiSliderPresentationStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiSliderPresentationStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -74,10 +113,7 @@ internal static class MuiSliderPresentationStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiSliderPresentationStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -86,10 +122,7 @@ internal static class MuiSliderPresentationStateFieldCursorCodec
 		APTR record, MuiSliderPresentationStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiSliderPresentationStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -97,35 +130,36 @@ internal static class MuiSliderPresentationStateFieldCursorCodec
 
 internal static class MuiSliderPresentationStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiSliderPresentationStateRecord value)
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiSliderPresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiSliderPresentationStateRecord.Size) ||
-			!MuiSliderPresentationStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiSliderPresentationStateField.Magic, out var magic) ||
-			magic != MuiSliderPresentationStateRecord.Cookie) return false;
-		value.Magic = magic;
-		return MuiSliderPresentationStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiSliderPresentationStateField.Horizontal, out value.Horizontal) &&
-			MuiSliderPresentationStateFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiSliderPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiSliderPresentationStateField.Magic, out value.Magic)) return false;
+		return MuiSliderPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiSliderPresentationStateField.Horizontal,
+			out value.Horizontal) &&
+			MuiSliderPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiSliderPresentationStateField.Quiet, out value.Quiet);
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiSliderPresentationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiSliderPresentationStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiSliderPresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiSliderPresentationStateRecord.Size) || value.Magic !=
-			MuiSliderPresentationStateRecord.Cookie) return false;
-		return MuiSliderPresentationStateFieldCursorCodec.TryWriteUInt32(ref platform,
+		if (!MuiSliderPresentationStateAdmission.Validate(value)) return false;
+		return MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiSliderPresentationStateField.Magic, value.Magic) &&
-			MuiSliderPresentationStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiSliderPresentationStateField.Horizontal, value.Horizontal) &&
-			MuiSliderPresentationStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiSliderPresentationStateField.Quiet, value.Quiet);
 	}
 }
@@ -133,11 +167,30 @@ internal static class MuiSliderPresentationStateRecordCodec
 // Keep the wire record lossless for malformed-state diagnostics. Both
 // presentation fields are MorphOS BOOL projections and must be canonical
 // before Slider layout, input, or drawing consumers use them.
+internal static class MuiSliderPresentationStateAdmission
+{
+	internal static bool Validate(MuiSliderPresentationStateRecord value) =>
+		value.Magic == MuiSliderPresentationStateRecord.Cookie &&
+		value.Horizontal <= 1 && value.Quiet <= 1;
+
+	internal static bool Validate(MuiSliderPresentationState value) =>
+		value.Horizontal <= 1 && value.Quiet <= 1;
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiSliderPresentationStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
+}
+
+// Compatibility alias for existing Slider presentation call sites. New state
+// boundaries use MuiSliderPresentationStateAdmission directly so live
+// ownership is explicit.
 internal static class MuiSliderPresentationStateValidation
 {
 	internal static bool IsValidRecord(MuiSliderPresentationStateRecord value) =>
-		value.Horizontal <= 1 && value.Quiet <= 1;
+		MuiSliderPresentationStateAdmission.Validate(value);
 
 	internal static bool IsValidState(MuiSliderPresentationState value) =>
-		value.Horizontal <= 1 && value.Quiet <= 1;
+		MuiSliderPresentationStateAdmission.Validate(value);
 }

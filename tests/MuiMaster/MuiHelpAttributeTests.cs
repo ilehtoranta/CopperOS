@@ -37,6 +37,38 @@ public sealed class MuiHelpAttributeTests
 	}
 
 	[Fact]
+	public void HelpStateRecordUsesDedicatedStructMemoryAdapter()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1D00);
+		var record = new MuiHelpStateRecord
+		{
+			Magic = MuiHelpStateRecord.Cookie,
+			Node = APTR.FromPointer(0x1D40),
+			Line = unchecked((uint)-7),
+			Generation = 3,
+		};
+		Assert.True(MuiHelpStateRecordCodec.Write(ref platform, address, record));
+		Assert.True(MuiHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, 8, out var lineAddress));
+		Assert.Equal(0x1D08u, lineAddress.Raw);
+		Assert.True(MuiHelpStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 4, out var node));
+		Assert.Equal(0x1D40u, node);
+		Assert.True(MuiHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 12, 4));
+		Assert.True(MuiHelpStateRecordCodec.TryReadStructural(ref platform,
+			address, out var updated));
+		Assert.Equal(4u, updated.Generation);
+		Assert.False(MuiHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiHelpStateRecord.Size, out _));
+		Assert.False(MuiHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, out _));
+		Assert.False(MuiHelpStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _));
+	}
+
+	[Fact]
 	public void GenericAndDispatcherAccessUseNamedHelpStateForExternalObjects()
 	{
 		var platform = CreatePlatform(out var classRecord);
@@ -101,6 +133,71 @@ public sealed class MuiHelpAttributeTests
 		Assert.True(MuiHelpStateCore.TryReadState(ref platform, State, obj,
 			out var state));
 		Assert.Equal(node, state.Node);
+	}
+
+	[Fact]
+	public void HelpStateAdmissionRequiresCookieGenerationAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var classRecord);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			classRecord, APTR.Null);
+		var valid = default(MuiHelpStateRecord);
+		valid.Magic = MuiHelpStateRecord.Cookie;
+		valid.Node = APTR.FromPointer(0x1B00);
+		valid.Line = unchecked((uint)-7);
+		valid.Generation = 1;
+		Assert.True(MuiHelpStateAdmission.Validate(valid));
+		Assert.True(MuiHelpStateAdmission.ValidateLive(ref platform, State, obj,
+			valid));
+		var malformed = valid;
+		malformed.Generation = 0;
+		Assert.False(MuiHelpStateAdmission.Validate(malformed));
+		Assert.False(MuiHelpStateAdmission.ValidateLive(ref platform, State, obj,
+			malformed));
+		malformed = valid;
+		malformed.Magic = 0;
+		Assert.False(MuiHelpStateAdmission.Validate(malformed));
+		Assert.False(MuiHelpStateAdmission.ValidateLive(ref platform, State, obj,
+			malformed));
+		Assert.False(MuiHelpStateAdmission.ValidateLive(ref platform, State,
+			APTR.FromPointer(0xDEAD), valid));
+	}
+
+	[Fact]
+	public void MalformedHelpStateFailsClosedBeforeResolutionAndMutation()
+	{
+		var platform = CreatePlatform(out var classRecord);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			classRecord, APTR.Null);
+		var node = APTR.FromPointer(0x1C00);
+		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, obj,
+			MuiHelpStateCore.HelpNode, node.Raw, false));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiHelpStateCore.StateKey);
+		Assert.True(MuiHelpStateRecordCodec.TryReadStructural(ref platform, block,
+			out var before));
+		Assert.Equal(MuiHelpStateRecord.Cookie, before.Magic);
+		var cursor = default(MuiHelpStateFieldCursor);
+		cursor.Record = block;
+		cursor.Field = MuiHelpStateField.Generation;
+		Assert.True(MuiHelpStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, cursor.Field, 0));
+		Assert.True(MuiHelpStateRecordCodec.TryReadStructural(ref platform, block,
+			out var malformed));
+		Assert.Equal(0u, malformed.Generation);
+		Assert.False(MuiHelpStateAdmission.Validate(malformed));
+		Assert.False(MuiHelpStateCore.TryReadState(ref platform, State, obj,
+			out _));
+		Assert.False(MuiHelpStateCore.TryResolve(ref platform, State, obj,
+			out _));
+		Assert.False(MuiHeadlessObjectCore.SetAttribute(ref platform, State, obj,
+			MuiHelpStateCore.HelpLine, unchecked((uint)9), false));
+		Assert.True(MuiHelpStateRecordCodec.TryReadStructural(ref platform, block,
+			out var after));
+		Assert.Equal(0u, after.Generation);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, obj,
+			MuiHelpStateCore.HelpNode, out var rawNode));
+		Assert.Equal(node.Raw, rawNode);
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR classRecord)

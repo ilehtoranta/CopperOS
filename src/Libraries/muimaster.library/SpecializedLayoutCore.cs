@@ -12,6 +12,13 @@ namespace CopperOS.MuiMaster;
 internal struct MuiVirtgroupLayoutStateRecord
 {
 	internal const uint Size = 24;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint WidthOffset = 4;
+	internal const uint HeightOffset = 8;
+	internal const uint LeftOffset = 12;
+	internal const uint TopOffset = 16;
+	internal const uint TryFitOffset = 20;
 	internal const uint Cookie = 0x56475250u; // 'VGRP'
 
 	internal uint Magic;
@@ -20,6 +27,30 @@ internal struct MuiVirtgroupLayoutStateRecord
 	internal int Left;
 	internal int Top;
 	internal uint TryFit;
+}
+
+internal static class MuiVirtgroupLayoutStateValidation
+{
+	// Layout state is the normalized projection consumed by LayoutCore.  Unlike
+	// the public policy record, it contains only the non-negative geometry that
+	// can be admitted to child layout; VirtualLeft/Top remain signed at the
+	// public policy boundary and are rejected here when they cannot be laid out.
+	internal static bool IsValid(MuiVirtgroupLayoutStateRecord value) =>
+		value.Magic == MuiVirtgroupLayoutStateRecord.Cookie &&
+		value.Width >= 0 && value.Height >= 0 && value.Left >= 0 &&
+		value.Top >= 0 && value.TryFit <= 1;
+}
+
+internal static class MuiVirtgroupLayoutStateAdmission
+{
+	internal static bool Validate(MuiVirtgroupLayoutStateRecord value) =>
+		MuiVirtgroupLayoutStateValidation.IsValid(value);
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiVirtgroupLayoutStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 }
 
 internal enum MuiVirtgroupLayoutField : byte
@@ -41,86 +72,108 @@ internal struct MuiVirtgroupLayoutFieldCursor
 
 internal static class MuiVirtgroupLayoutFieldCursorCodec
 {
-	private static bool TryResolve(MuiVirtgroupLayoutField field,
-		out uint offset)
-	{
-		switch (field)
-		{
-			case MuiVirtgroupLayoutField.Magic:
-			case MuiVirtgroupLayoutField.Width:
-			case MuiVirtgroupLayoutField.Height:
-			case MuiVirtgroupLayoutField.Left:
-			case MuiVirtgroupLayoutField.Top:
-			case MuiVirtgroupLayoutField.TryFit:
-				offset = (uint)field * 4;
-				return true;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiVirtgroupLayoutFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address,
-				MuiVirtgroupLayoutStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiVirtgroupLayoutStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Address, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiVirtgroupLayoutField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiVirtgroupLayoutFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
-			return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
-		return true;
+		return MuiVirtgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiVirtgroupLayoutField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiVirtgroupLayoutFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		return MuiVirtgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, field, value);
+	}
+}
+
+internal static class MuiVirtgroupLayoutStateRecordMemoryCodec
+{
+	private static bool TryResolve(MuiVirtgroupLayoutField field, out uint offset)
+	{
+		if (field == MuiVirtgroupLayoutField.Magic)
+			offset = MuiVirtgroupLayoutStateRecord.MagicOffset;
+		else if (field == MuiVirtgroupLayoutField.Width)
+			offset = MuiVirtgroupLayoutStateRecord.WidthOffset;
+		else if (field == MuiVirtgroupLayoutField.Height)
+			offset = MuiVirtgroupLayoutStateRecord.HeightOffset;
+		else if (field == MuiVirtgroupLayoutField.Left)
+			offset = MuiVirtgroupLayoutStateRecord.LeftOffset;
+		else if (field == MuiVirtgroupLayoutField.Top)
+			offset = MuiVirtgroupLayoutStateRecord.TopOffset;
+		else if (field == MuiVirtgroupLayoutField.TryFit)
+			offset = MuiVirtgroupLayoutStateRecord.TryFitOffset;
+		else
+		{
+			offset = 0;
 			return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiVirtgroupLayoutField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiVirtgroupLayoutStateRecord.Size) &&
+			platform.IsMapped(address, MuiVirtgroupLayoutStateRecord.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiVirtgroupLayoutField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiVirtgroupLayoutField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
 internal static class MuiVirtgroupLayoutStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiVirtgroupLayoutStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiVirtgroupLayoutStateRecord.Size) ||
-			!MuiVirtgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiVirtgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiVirtgroupLayoutField.Magic, out var magic) ||
-			magic != MuiVirtgroupLayoutStateRecord.Cookie ||
-			!MuiVirtgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiVirtgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiVirtgroupLayoutField.Width, out var width) ||
-			!MuiVirtgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiVirtgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiVirtgroupLayoutField.Height, out var height) ||
-			!MuiVirtgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiVirtgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiVirtgroupLayoutField.Left, out var left) ||
-			!MuiVirtgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiVirtgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiVirtgroupLayoutField.Top, out var top) ||
-			!MuiVirtgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiVirtgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiVirtgroupLayoutField.TryFit, out value.TryFit)) return false;
 		value.Magic = magic;
 		value.Width = unchecked((int)width);
@@ -130,24 +183,30 @@ internal static class MuiVirtgroupLayoutStateRecordCodec
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiVirtgroupLayoutStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiVirtgroupLayoutStateAdmission.Validate(value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiVirtgroupLayoutStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiVirtgroupLayoutStateRecord.Size) ||
-			value.Magic != MuiVirtgroupLayoutStateRecord.Cookie) return false;
-		return MuiVirtgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform,
+			!MuiVirtgroupLayoutStateAdmission.Validate(value)) return false;
+		return MuiVirtgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiVirtgroupLayoutField.Magic, value.Magic) &&
-			MuiVirtgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiVirtgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiVirtgroupLayoutField.Width, unchecked((uint)value.Width)) &&
-			MuiVirtgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiVirtgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiVirtgroupLayoutField.Height, unchecked((uint)value.Height)) &&
-			MuiVirtgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiVirtgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiVirtgroupLayoutField.Left, unchecked((uint)value.Left)) &&
-			MuiVirtgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiVirtgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiVirtgroupLayoutField.Top, unchecked((uint)value.Top)) &&
-			MuiVirtgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiVirtgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiVirtgroupLayoutField.TryFit, value.TryFit);
 	}
 }
@@ -156,6 +215,15 @@ internal static class MuiVirtgroupLayoutStateRecordCodec
 internal struct MuiScrollgroupLayoutStateRecord
 {
 	internal const uint Size = 32;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint ContentsOffset = 4;
+	internal const uint FreeHorizontalOffset = 8;
+	internal const uint FreeVerticalOffset = 12;
+	internal const uint HorizontalBarOffset = 16;
+	internal const uint VerticalBarOffset = 20;
+	internal const uint NoHorizontalBarOffset = 24;
+	internal const uint NoVerticalBarOffset = 28;
 	internal const uint Cookie = 0x53475250u; // 'SGRP'
 
 	internal uint Magic;
@@ -166,6 +234,33 @@ internal struct MuiScrollgroupLayoutStateRecord
 	internal APTR VerticalBar;
 	internal uint NoHorizontalBar;
 	internal uint NoVerticalBar;
+}
+
+internal static class MuiScrollgroupLayoutStateValidation
+{
+	internal static bool IsValid<TPlatform>(ref TPlatform platform,
+		MuiScrollgroupLayoutStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		value.Magic == MuiScrollgroupLayoutStateRecord.Cookie &&
+		(value.Contents.IsNull || platform.IsMapped(value.Contents, 4)) &&
+		(value.HorizontalBar.IsNull || platform.IsMapped(value.HorizontalBar, 4)) &&
+		(value.VerticalBar.IsNull || platform.IsMapped(value.VerticalBar, 4)) &&
+		value.FreeHorizontal <= 1 && value.FreeVertical <= 1 &&
+		value.NoHorizontalBar <= 1 && value.NoVerticalBar <= 1;
+}
+
+internal static class MuiScrollgroupLayoutStateAdmission
+{
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		MuiScrollgroupLayoutStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiScrollgroupLayoutStateValidation.IsValid(ref platform, value);
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, MuiScrollgroupLayoutStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(ref platform, value) &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull;
 }
 
 internal enum MuiScrollgroupLayoutField : byte
@@ -189,92 +284,116 @@ internal struct MuiScrollgroupLayoutFieldCursor
 
 internal static class MuiScrollgroupLayoutFieldCursorCodec
 {
-	private static bool TryResolve(MuiScrollgroupLayoutField field,
-		out uint offset)
-	{
-		switch (field)
-		{
-			case MuiScrollgroupLayoutField.Magic:
-			case MuiScrollgroupLayoutField.Contents:
-			case MuiScrollgroupLayoutField.FreeHorizontal:
-			case MuiScrollgroupLayoutField.FreeVertical:
-			case MuiScrollgroupLayoutField.HorizontalBar:
-			case MuiScrollgroupLayoutField.VerticalBar:
-			case MuiScrollgroupLayoutField.NoHorizontalBar:
-			case MuiScrollgroupLayoutField.NoVerticalBar:
-				offset = (uint)field * 4;
-				return true;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiScrollgroupLayoutFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address,
-				MuiScrollgroupLayoutStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiScrollgroupLayoutStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Address, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiScrollgroupLayoutField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiScrollgroupLayoutFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
-			return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
-		return true;
+		return MuiScrollgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiScrollgroupLayoutField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiScrollgroupLayoutFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		return MuiScrollgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, field, value);
+	}
+}
+
+internal static class MuiScrollgroupLayoutStateRecordMemoryCodec
+{
+	private static bool TryResolve(MuiScrollgroupLayoutField field, out uint offset)
+	{
+		if (field == MuiScrollgroupLayoutField.Magic)
+			offset = MuiScrollgroupLayoutStateRecord.MagicOffset;
+		else if (field == MuiScrollgroupLayoutField.Contents)
+			offset = MuiScrollgroupLayoutStateRecord.ContentsOffset;
+		else if (field == MuiScrollgroupLayoutField.FreeHorizontal)
+			offset = MuiScrollgroupLayoutStateRecord.FreeHorizontalOffset;
+		else if (field == MuiScrollgroupLayoutField.FreeVertical)
+			offset = MuiScrollgroupLayoutStateRecord.FreeVerticalOffset;
+		else if (field == MuiScrollgroupLayoutField.HorizontalBar)
+			offset = MuiScrollgroupLayoutStateRecord.HorizontalBarOffset;
+		else if (field == MuiScrollgroupLayoutField.VerticalBar)
+			offset = MuiScrollgroupLayoutStateRecord.VerticalBarOffset;
+		else if (field == MuiScrollgroupLayoutField.NoHorizontalBar)
+			offset = MuiScrollgroupLayoutStateRecord.NoHorizontalBarOffset;
+		else if (field == MuiScrollgroupLayoutField.NoVerticalBar)
+			offset = MuiScrollgroupLayoutStateRecord.NoVerticalBarOffset;
+		else
+		{
+			offset = 0;
 			return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiScrollgroupLayoutField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiScrollgroupLayoutStateRecord.Size) &&
+			platform.IsMapped(address, MuiScrollgroupLayoutStateRecord.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiScrollgroupLayoutField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiScrollgroupLayoutField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
 internal static class MuiScrollgroupLayoutStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiScrollgroupLayoutStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiScrollgroupLayoutStateRecord.Size) ||
-			!MuiScrollgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiScrollgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiScrollgroupLayoutField.Magic, out var magic) ||
-			magic != MuiScrollgroupLayoutStateRecord.Cookie ||
-			!MuiScrollgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiScrollgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.Contents, out var contents) ||
-			!MuiScrollgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiScrollgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.FreeHorizontal, out value.FreeHorizontal) ||
-			!MuiScrollgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiScrollgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.FreeVertical, out value.FreeVertical) ||
-			!MuiScrollgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiScrollgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.HorizontalBar, out var horizontalBar) ||
-			!MuiScrollgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiScrollgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.VerticalBar, out var verticalBar) ||
-			!MuiScrollgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiScrollgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.NoHorizontalBar, out value.NoHorizontalBar) ||
-			!MuiScrollgroupLayoutFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiScrollgroupLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.NoVerticalBar, out value.NoVerticalBar))
 			return false;
 		value.Magic = magic;
@@ -284,28 +403,35 @@ internal static class MuiScrollgroupLayoutStateRecordCodec
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiScrollgroupLayoutStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadStructural(ref platform, address, out value) &&
+		MuiScrollgroupLayoutStateAdmission.Validate(ref platform, value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiScrollgroupLayoutStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiScrollgroupLayoutStateRecord.Size) ||
-			value.Magic != MuiScrollgroupLayoutStateRecord.Cookie) return false;
-		return MuiScrollgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform,
+			!MuiScrollgroupLayoutStateAdmission.Validate(ref platform, value))
+			return false;
+		return MuiScrollgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiScrollgroupLayoutField.Magic, value.Magic) &&
-			MuiScrollgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiScrollgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.Contents, value.Contents.Raw) &&
-			MuiScrollgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiScrollgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.FreeHorizontal, value.FreeHorizontal) &&
-			MuiScrollgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiScrollgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.FreeVertical, value.FreeVertical) &&
-			MuiScrollgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiScrollgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.HorizontalBar, value.HorizontalBar.Raw) &&
-			MuiScrollgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiScrollgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.VerticalBar, value.VerticalBar.Raw) &&
-			MuiScrollgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiScrollgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.NoHorizontalBar, value.NoHorizontalBar) &&
-			MuiScrollgroupLayoutFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiScrollgroupLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiScrollgroupLayoutField.NoVerticalBar, value.NoVerticalBar);
 	}
 }
@@ -447,6 +573,8 @@ public static class MuiRegisterCore
 		// application path runs before ObjectInitialized; later writes fail.
 		if (MuiHeadlessObjectCore.IsObjectInitialized(ref platform, record))
 			return false;
+		if (!TryReadPolicyAdmission(ref platform, state, objectValue.Boopsi,
+			out _, out _)) return false;
 		if (!MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state,
 			record, attribute, attribute == Frame && value != 0 ? 1u : value,
 			false)) return false;
@@ -457,6 +585,8 @@ public static class MuiRegisterCore
 		APTR register, int page, bool notify = true)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadPolicyAdmission(ref platform, state, register,
+			out _, out _)) return false;
 		var target = page;
 		var count = Count(ref platform, state, register);
 		if (count == 0) return false;
@@ -507,17 +637,16 @@ public static class MuiRegisterCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		policy = default;
+		if (!TryReadPolicyAdmission(ref platform, state, obj,
+			out var existing, out var present)) return false;
 		var frame = ReadRaw(ref platform, state, obj, Frame, 1) == 0 ? 0u : 1u;
 		var titles = APTR.FromPointer(ReadRaw(ref platform, state, obj, Titles, 0));
-		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-			PolicyStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			PolicyStateKey) == unchecked((int)MuiRegisterPolicyStateRecord.Size) &&
-			MuiRegisterPolicyStateRecordCodec.TryRead(ref platform, block,
-				out var existing))
+		if (present)
 		{
 			existing.Frame = frame;
 			existing.Titles = titles;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				PolicyStateKey);
 			if (!MuiRegisterPolicyStateRecordCodec.Write(ref platform, block,
 				existing)) return false;
 		}
@@ -543,6 +672,33 @@ public static class MuiRegisterCore
 		policy.Frame = frame;
 		policy.Titles = titles;
 		return true;
+	}
+
+	// A present Register policy block is authoritative typed state. Reject a
+	// wrong-sized or malformed record before initialization or public getters
+	// can rebuild it from raw compatibility attributes.
+	private static bool TryReadPolicyAdmission<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, out MuiRegisterPolicyStateRecord value,
+		out bool present) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+		{
+			present = false;
+			return false;
+		}
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			PolicyStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			PolicyStateKey);
+		present = block.IsNotNull || length != 0;
+		if (!present) return true;
+		if (block.IsNull || length != unchecked((int)
+			MuiRegisterPolicyStateRecord.Size) ||
+			!MuiRegisterPolicyStateRecordCodec.TryRead(ref platform, block,
+				out value)) return false;
+		return MuiRegisterPolicyStateAdmission.ValidateLive(ref platform, state,
+			obj, value);
 	}
 
 	private static uint ReadRaw<TPlatform>(ref TPlatform platform, APTR state,
@@ -618,7 +774,8 @@ public static class MuiSelectgroupCore
 	{
 		var count = MuiRegisterCore.Count(ref platform, state, group);
 		if (count == 0) return false;
-		var current = ReadCurrent(ref platform, state, group, count);
+		if (!TryReadCurrent(ref platform, state, group, count,
+			out var current)) return false;
 		var target = ResolveSelection(selection, current, count);
 		if (target < 0 || target >= count) return false;
 		var record = MuiHeadlessObjectCore.FindObject(ref platform, state, group);
@@ -669,7 +826,8 @@ public static class MuiSelectgroupCore
 				record, attribute, value, false);
 		var count = MuiRegisterCore.Count(ref platform, state, objectValue.Boopsi);
 		if (count == 0) return false;
-		var current = ReadCurrent(ref platform, state, objectValue.Boopsi, count);
+		if (!TryReadCurrent(ref platform, state, objectValue.Boopsi, count,
+			out var current)) return false;
 		var target = ResolveSelection(unchecked((int)value), current, count);
 		if (target < 0 || target >= count) return false;
 		return ApplySelection(ref platform, state, record, target, notify);
@@ -687,14 +845,24 @@ public static class MuiSelectgroupCore
 			target, notify);
 	}
 
-	private static int ReadCurrent<TPlatform>(ref TPlatform platform, APTR state,
-		APTR obj, int count) where TPlatform : struct, IMuiHeadlessPlatform
+	private static bool TryReadCurrent<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, int count, out int current)
+		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (IsSelectgroupObject(ref platform, state, obj) &&
-			TryGetPolicyState(ref platform, state, obj, out var policy))
-			return NormalizeCurrent(policy.Active, count);
-		return NormalizeCurrent(ReadRaw(ref platform, state, obj, Active, 0),
-			count);
+		current = 0;
+		if (!IsSelectgroupObject(ref platform, state, obj))
+		{
+			current = NormalizeCurrent(ReadRaw(ref platform, state, obj,
+				Active, 0), count);
+			return true;
+		}
+		// Once a typed policy block is present it is authoritative.  Do not
+		// recover a malformed record by reading the raw Active scalar.
+		if (!TryReadActiveStateAdmission(ref platform, state, obj,
+			out _, out _) || !PublishActiveState(ref platform, state, obj,
+			out var policy)) return false;
+		current = NormalizeCurrent(policy.Active, count);
+		return true;
 	}
 
 	private static int NormalizeCurrent(uint raw, int count)
@@ -715,19 +883,19 @@ public static class MuiSelectgroupCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		policy = default;
+		if (!TryReadActiveStateAdmission(ref platform, state, obj,
+			out var existing, out var present)) return false;
 		var count = MuiRegisterCore.Count(ref platform, state, obj);
 		var raw = ReadRaw(ref platform, state, obj, Active, 0);
 		policy.Active = count == 0 ? raw : unchecked((uint)NormalizeCurrent(raw, count));
-		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-			PolicyStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			PolicyStateKey) == unchecked((int)MuiSelectgroupActiveStateRecord.Size) &&
-			MuiSelectgroupActiveStateRecordCodec.TryRead(ref platform, block,
-				out var existing))
+		if (present)
 		{
 			existing.Active = policy.Active;
-			return MuiSelectgroupActiveStateRecordCodec.Write(ref platform, block,
-				existing);
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				PolicyStateKey);
+			return MuiSelectgroupActiveStateAdmission.ValidateLive(ref platform, state,
+				obj, existing) && MuiSelectgroupActiveStateRecordCodec.Write(ref platform,
+				block, existing);
 		}
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiSelectgroupActiveStateRecord.Size);
@@ -736,6 +904,13 @@ public static class MuiSelectgroupCore
 		var value = default(MuiSelectgroupActiveStateRecord);
 		value.Magic = MuiSelectgroupActiveStateRecord.Cookie;
 		value.Active = policy.Active;
+		if (!MuiSelectgroupActiveStateAdmission.ValidateLive(ref platform, state, obj,
+			value))
+		{
+			platform.Clear(scratch, MuiSelectgroupActiveStateRecord.Size);
+			platform.Free(scratch, MuiSelectgroupActiveStateRecord.Size);
+			return false;
+		}
 		var written = MuiSelectgroupActiveStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
@@ -744,6 +919,33 @@ public static class MuiSelectgroupCore
 		platform.Clear(scratch, MuiSelectgroupActiveStateRecord.Size);
 		platform.Free(scratch, MuiSelectgroupActiveStateRecord.Size);
 		return added;
+	}
+
+	// A non-NULL Selectgroup policy block is authoritative typed state.  A
+	// wrong-sized or malformed present block is rejected rather than treated as
+	// permission to rebuild the record from the raw Active attribute.
+	private static bool TryReadActiveStateAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiSelectgroupActiveStateRecord value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+		{
+			present = false;
+			return false;
+		}
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			PolicyStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			PolicyStateKey);
+		present = block.IsNotNull || length != 0;
+		if (!present) return true;
+		return !block.IsNull && length == unchecked((int)
+			MuiSelectgroupActiveStateRecord.Size) &&
+			MuiSelectgroupActiveStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiSelectgroupActiveStateAdmission.ValidateLive(ref platform,
+					state, obj, value);
 	}
 
 	private static uint ReadRaw<TPlatform>(ref TPlatform platform, APTR state,
@@ -888,13 +1090,18 @@ public static class MuiScrollgroupCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			BorderScrollerStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			BorderScrollerStateKey) != unchecked((int)
-			MuiScrollgroupBorderScrollerStateRecord.Size)) return false;
-		return MuiScrollgroupBorderScrollerStateRecordCodec.TryRead(ref platform,
-			block, out value);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			BorderScrollerStateKey);
+		return length == unchecked((int)
+			MuiScrollgroupBorderScrollerStateRecord.Size) &&
+			MuiScrollgroupBorderScrollerStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) &&
+			MuiScrollgroupBorderScrollerStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	internal static bool TrySet<TPlatform>(ref TPlatform platform, APTR state,
@@ -912,6 +1119,8 @@ public static class MuiScrollgroupCore
 			record);
 		if (!initialized && !IsConstructionAttribute(attribute)) return false;
 		if (initialized && !IsRuntimeSetAttribute(attribute)) return false;
+		if (!TryReadPolicyAdmission(ref platform, state, objectValue.Boopsi,
+			out _, out _)) return false;
 		var normalized = NormalizeBoolean(attribute, value);
 		if (!MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state,
 			record, attribute, normalized, initialized && notify)) return false;
@@ -947,6 +1156,8 @@ public static class MuiScrollgroupCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		policy = default;
+		if (!TryReadPolicyAdmission(ref platform, state, obj,
+			out var existing, out var present)) return false;
 		policy.Contents = APTR.FromPointer(ReadRaw(ref platform, state, obj,
 			Contents, 0));
 		policy.FreeHorizontal = ReadRaw(ref platform, state, obj,
@@ -966,12 +1177,7 @@ public static class MuiScrollgroupCore
 		policy.UseWindowBorder = ReadRaw(ref platform, state, obj,
 			UseWindowBorder, 0) == 0 ? 0u : 1u;
 
-		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-			PolicyStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			PolicyStateKey) == unchecked((int)MuiScrollgroupPolicyStateRecord.Size) &&
-			MuiScrollgroupPolicyStateRecordCodec.TryRead(ref platform, block,
-				out var existing))
+		if (present)
 		{
 			existing.Contents = policy.Contents;
 			existing.FreeHorizontal = policy.FreeHorizontal;
@@ -982,14 +1188,14 @@ public static class MuiScrollgroupCore
 			existing.NoVerticalBar = policy.NoVerticalBar;
 			existing.AutoBars = policy.AutoBars;
 			existing.UseWindowBorder = policy.UseWindowBorder;
+			if (!MuiScrollgroupPolicyStateAdmission.ValidateLive(ref platform,
+				state, obj, existing)) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				PolicyStateKey);
 			return MuiScrollgroupPolicyStateRecordCodec.Write(ref platform, block,
 				existing);
 		}
 
-		var scratch = MuiHeadlessMemory.Allocate(ref platform,
-			MuiScrollgroupPolicyStateRecord.Size);
-		if (scratch.IsNull) return false;
-		platform.Clear(scratch, MuiScrollgroupPolicyStateRecord.Size);
 		var value = default(MuiScrollgroupPolicyStateRecord);
 		value.Magic = MuiScrollgroupPolicyStateRecord.Cookie;
 		value.Contents = policy.Contents;
@@ -1001,6 +1207,12 @@ public static class MuiScrollgroupCore
 		value.NoVerticalBar = policy.NoVerticalBar;
 		value.AutoBars = policy.AutoBars;
 		value.UseWindowBorder = policy.UseWindowBorder;
+		if (!MuiScrollgroupPolicyStateAdmission.ValidateLive(ref platform, state,
+			obj, value)) return false;
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiScrollgroupPolicyStateRecord.Size);
+		if (scratch.IsNull) return false;
+		platform.Clear(scratch, MuiScrollgroupPolicyStateRecord.Size);
 		var written = MuiScrollgroupPolicyStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
@@ -1009,6 +1221,30 @@ public static class MuiScrollgroupCore
 		platform.Clear(scratch, MuiScrollgroupPolicyStateRecord.Size);
 		platform.Free(scratch, MuiScrollgroupPolicyStateRecord.Size);
 		return added;
+	}
+
+	// A present Scrollgroup policy block is authoritative typed state. Reject a
+	// wrong-sized or malformed record before layout, event, getter, or setter
+	// consumers can recover through raw compatibility attributes.
+	private static bool TryReadPolicyAdmission<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, out MuiScrollgroupPolicyStateRecord value,
+		out bool present) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			PolicyStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			PolicyStateKey);
+		present = block.IsNotNull || length != 0;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		if (!present) return true;
+		return !block.IsNull && length == unchecked((int)
+			MuiScrollgroupPolicyStateRecord.Size) &&
+			MuiScrollgroupPolicyStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) &&
+			MuiScrollgroupPolicyStateAdmission.ValidateLive(ref platform, state,
+				obj, value);
 	}
 
 	private static uint ReadRaw<TPlatform>(ref TPlatform platform, APTR state,
@@ -1078,6 +1314,11 @@ public static class MuiScrollgroupCore
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
 		if (width < 0 || height < 0) return false;
+		if (IsScrollgroupObject(ref platform, state, scrollgroup) &&
+			!TryReadPolicyAdmission(ref platform, state, scrollgroup,
+				out _, out _)) return false;
+		if (!TryReadViewportAdmission(ref platform, state, scrollgroup,
+			out _, out _)) return false;
 		if (!PublishLayoutState(ref platform, state, scrollgroup,
 			out var layoutState)) return false;
 		var contents = layoutState.Contents;
@@ -1220,6 +1461,8 @@ public static class MuiScrollgroupCore
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
 		if (!IsScrollgroupObject(ref platform, state, scrollgroup) ||
+			!TryReadPolicyAdmission(ref platform, state, scrollgroup,
+				out _, out _) ||
 			!TryGetLayoutState(ref platform, state, scrollgroup,
 				out var layoutState) || !TryGetViewportState(ref platform, state,
 				scrollgroup, out var viewport)) return 0;
@@ -1282,11 +1525,12 @@ public static class MuiScrollgroupCore
 		bool verticalRequested)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
+		if (!TryReadBorderScrollerAdmission(ref platform, state, scrollgroup,
+			out var previous, out var present)) return false;
 		var window = FindParentWindow(ref platform, state, scrollgroup);
 		var desiredHorizontal = useWindowBorder && horizontalRequested ? 1u : 0u;
 		var desiredVertical = useWindowBorder && verticalRequested ? 1u : 0u;
-		if (TryGetBorderScrollerState(ref platform, state, scrollgroup,
-			out var previous) && previous.Applied != 0 &&
+		if (present && previous.Applied != 0 &&
 			(previous.Window.Raw != window.Raw || !useWindowBorder))
 		{
 			// Release only values this Scrollgroup previously installed. This keeps
@@ -1314,6 +1558,15 @@ public static class MuiScrollgroupCore
 		value.HorizontalRequested = desiredHorizontal;
 		value.VerticalRequested = desiredVertical;
 		value.Applied = useWindowBorder && window.IsNotNull ? 1u : 0u;
+		if (!MuiScrollgroupBorderScrollerStateAdmission.ValidateLive(ref platform,
+			state, scrollgroup, value)) return false;
+		if (present)
+		{
+			var existingBlock = MuiStoreCore.DataspaceFind(ref platform, state,
+				scrollgroup, BorderScrollerStateKey);
+			return MuiScrollgroupBorderScrollerStateRecordCodec.Write(ref platform,
+				existingBlock, value);
+		}
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, scrollgroup,
 			BorderScrollerStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, scrollgroup,
@@ -1336,6 +1589,32 @@ public static class MuiScrollgroupCore
 		platform.Clear(scratch, MuiScrollgroupBorderScrollerStateRecord.Size);
 		platform.Free(scratch, MuiScrollgroupBorderScrollerStateRecord.Size);
 		return added;
+	}
+
+	// A present border-scroller projection is authoritative typed state. Reject
+	// malformed state before Window policy ownership or projection publication
+	// can repair it through a raw private attribute.
+	private static bool TryReadBorderScrollerAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiScrollgroupBorderScrollerStateRecord value, out bool present)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		value = default;
+		present = false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			BorderScrollerStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			BorderScrollerStateKey);
+		present = block.IsNotNull || length != 0;
+		if (!present) return true;
+		return !block.IsNull && length == unchecked((int)
+			MuiScrollgroupBorderScrollerStateRecord.Size) &&
+			MuiScrollgroupBorderScrollerStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) &&
+			MuiScrollgroupBorderScrollerStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static APTR FindParentWindow<TPlatform>(ref TPlatform platform,
@@ -1398,13 +1677,16 @@ public static class MuiScrollgroupCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			LayoutStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			LayoutStateKey) != unchecked((int)MuiScrollgroupLayoutStateRecord.Size))
 			return false;
-		return MuiScrollgroupLayoutStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiScrollgroupLayoutStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiScrollgroupLayoutStateAdmission.ValidateLive(
+			ref platform, state, obj, value);
 	}
 
 	internal static bool TryGetViewportState<TPlatform>(ref TPlatform platform,
@@ -1412,13 +1694,16 @@ public static class MuiScrollgroupCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ViewportStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			ViewportStateKey) != unchecked((int)MuiScrollgroupViewportStateRecord.Size))
 			return false;
-		return MuiScrollgroupViewportStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiScrollgroupViewportStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiScrollgroupViewportStateAdmission.ValidateLive(
+			ref platform, state, obj, value);
 	}
 
 	private static bool PublishViewportState<TPlatform>(ref TPlatform platform,
@@ -1428,6 +1713,8 @@ public static class MuiScrollgroupCore
 		bool horizontalBarVisible, bool verticalBarVisible)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
+		if (!TryReadViewportAdmission(ref platform, state, obj,
+			out _, out _)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			ViewportStateKey);
 		var value = default(MuiScrollgroupViewportStateRecord);
@@ -1442,6 +1729,8 @@ public static class MuiScrollgroupCore
 		value.ScrollTop = scrollTop;
 		value.HorizontalBarVisible = horizontalBarVisible ? 1u : 0u;
 		value.VerticalBarVisible = verticalBarVisible ? 1u : 0u;
+		if (!MuiScrollgroupViewportStateAdmission.ValidateLive(ref platform, state,
+			obj, value)) return false;
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			ViewportStateKey) == unchecked((int)MuiScrollgroupViewportStateRecord.Size) &&
 			MuiScrollgroupViewportStateRecordCodec.TryRead(ref platform, block,
@@ -1461,15 +1750,44 @@ public static class MuiScrollgroupCore
 		return added;
 	}
 
+	// A present viewport projection is authoritative typed state. Reject a
+	// wrong-sized or geometrically malformed record before layout can rebuild it
+	// from newly computed scalar values.
+	private static bool TryReadViewportAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiScrollgroupViewportStateRecord value, out bool present)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		value = default;
+		present = false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			ViewportStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			ViewportStateKey);
+		present = block.IsNotNull || length != 0;
+		if (!present) return true;
+		return !block.IsNull && length == unchecked((int)
+			MuiScrollgroupViewportStateRecord.Size) &&
+			MuiScrollgroupViewportStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) &&
+			MuiScrollgroupViewportStateAdmission.ValidateLive(ref platform, state,
+				obj, value);
+	}
+
 	private static bool PublishLayoutState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, out MuiScrollgroupLayoutStateRecord value)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
 		value = default;
+		if (!TryReadLayoutAdmission(ref platform, state, obj,
+			out var existing, out var present)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			LayoutStateKey);
-		if (TryGetLayoutState(ref platform, state, obj, out value))
+		if (present)
 		{
+			value = existing;
 			value.Contents = Pointer(ref platform, state, obj, Contents);
 			value.FreeHorizontal = Read(ref platform, state, obj, FreeHorizontal);
 			value.FreeVertical = Read(ref platform, state, obj, FreeVertical);
@@ -1478,6 +1796,8 @@ public static class MuiScrollgroupCore
 			value.NoHorizontalBar = Read(ref platform, state, obj,
 				NoHorizontalBar);
 			value.NoVerticalBar = Read(ref platform, state, obj, NoVerticalBar);
+			if (!MuiScrollgroupLayoutStateAdmission.ValidateLive(ref platform, state,
+				obj, value)) return false;
 			return MuiScrollgroupLayoutStateRecordCodec.Write(ref platform, block,
 				value);
 		}
@@ -1491,6 +1811,8 @@ public static class MuiScrollgroupCore
 		value.VerticalBar = Pointer(ref platform, state, obj, VerticalBar);
 		value.NoHorizontalBar = Read(ref platform, state, obj, NoHorizontalBar);
 		value.NoVerticalBar = Read(ref platform, state, obj, NoVerticalBar);
+		if (!MuiScrollgroupLayoutStateAdmission.ValidateLive(ref platform, state,
+			obj, value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiScrollgroupLayoutStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -1503,6 +1825,32 @@ public static class MuiScrollgroupCore
 		platform.Clear(scratch, MuiScrollgroupLayoutStateRecord.Size);
 		platform.Free(scratch, MuiScrollgroupLayoutStateRecord.Size);
 		return added;
+	}
+
+	// A present Scrollgroup layout block is authoritative typed state. Reject a
+	// wrong-sized or semantically malformed record before raw compatibility
+	// attributes can rebuild it or layout can publish dependent projections.
+	private static bool TryReadLayoutAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiScrollgroupLayoutStateRecord value, out bool present)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		value = default;
+		present = false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			LayoutStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			LayoutStateKey);
+		present = block.IsNotNull || length != 0;
+		if (!present) return true;
+		return !block.IsNull && length == unchecked((int)
+			MuiScrollgroupLayoutStateRecord.Size) &&
+			MuiScrollgroupLayoutStateRecordCodec.TryReadStructural(ref platform,
+				block, out value) &&
+			MuiScrollgroupLayoutStateAdmission.ValidateLive(ref platform, state,
+				obj, value);
 	}
 
 	private static APTR Pointer<TPlatform>(ref TPlatform platform, APTR state,
@@ -1594,7 +1942,10 @@ public static class MuiVirtgroupCore
 	{
 		if (muiKey != KeyNone || !IsVirtgroupObject(ref platform, state,
 			virtgroup) || !MuiIntuiMessageCodec.TryReadPointer(ref platform,
-			intuiMessage, out var pointer)) return false;
+			intuiMessage, out var pointer) || !TryReadPolicyAdmission(ref platform,
+			state, virtgroup, out _, out _) ||
+			!TryReadPointerAdmission(ref platform, state, virtgroup,
+				out _, out _)) return false;
 
 		if (pointer.Class == IdcmpMouseButtons && pointer.Code == SelectDown)
 		{
@@ -1678,6 +2029,8 @@ public static class MuiVirtgroupCore
 			record);
 		if (!initialized && !IsConstructionAttribute(attribute)) return false;
 		if (initialized && !IsRuntimeSetAttribute(attribute)) return false;
+		if (!TryReadPolicyAdmission(ref platform, state, objectValue.Boopsi,
+			out _, out _)) return false;
 		var normalized = attribute == Input || attribute == TryFit ?
 			(value == 0 ? 0u : 1u) : value;
 		if (!MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, state,
@@ -1704,6 +2057,8 @@ public static class MuiVirtgroupCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		policy = default;
+		if (!TryReadPolicyAdmission(ref platform, state, obj,
+			out var existing, out var present)) return false;
 		policy.Input = ReadRaw(ref platform, state, obj, Input, DefaultInput) == 0 ?
 			0u : 1u;
 		policy.Width = unchecked((int)ReadRaw(ref platform, state, obj,
@@ -1716,12 +2071,7 @@ public static class MuiVirtgroupCore
 			VirtualTop, 0));
 		policy.TryFit = ReadRaw(ref platform, state, obj, TryFit, 0) == 0 ?
 			0u : 1u;
-		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
-			PolicyStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			PolicyStateKey) == unchecked((int)MuiVirtgroupPolicyStateRecord.Size) &&
-			MuiVirtgroupPolicyStateRecordCodec.TryRead(ref platform, block,
-				out var existing))
+		if (present)
 		{
 			existing.Input = policy.Input;
 			existing.Width = policy.Width;
@@ -1729,13 +2079,13 @@ public static class MuiVirtgroupCore
 			existing.Left = policy.Left;
 			existing.Top = policy.Top;
 			existing.TryFit = policy.TryFit;
+			if (!MuiVirtgroupPolicyStateAdmission.ValidateLive(ref platform, state,
+				obj, existing)) return false;
+			var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+				PolicyStateKey);
 			return MuiVirtgroupPolicyStateRecordCodec.Write(ref platform, block,
 				existing);
 		}
-		var scratch = MuiHeadlessMemory.Allocate(ref platform,
-			MuiVirtgroupPolicyStateRecord.Size);
-		if (scratch.IsNull) return false;
-		platform.Clear(scratch, MuiVirtgroupPolicyStateRecord.Size);
 		var value = default(MuiVirtgroupPolicyStateRecord);
 		value.Magic = MuiVirtgroupPolicyStateRecord.Cookie;
 		value.Input = policy.Input;
@@ -1744,6 +2094,12 @@ public static class MuiVirtgroupCore
 		value.Left = policy.Left;
 		value.Top = policy.Top;
 		value.TryFit = policy.TryFit;
+		if (!MuiVirtgroupPolicyStateAdmission.ValidateLive(ref platform, state, obj,
+			value)) return false;
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiVirtgroupPolicyStateRecord.Size);
+		if (scratch.IsNull) return false;
+		platform.Clear(scratch, MuiVirtgroupPolicyStateRecord.Size);
 		var written = MuiVirtgroupPolicyStateRecordCodec.Write(ref platform,
 			scratch, value);
 		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state, obj,
@@ -1754,18 +2110,45 @@ public static class MuiVirtgroupCore
 		return added;
 	}
 
+	// A present Virtgroup policy block is authoritative typed state. Reject a
+	// wrong-sized or malformed record before any getter, setter, input, or
+	// layout consumer can fall back to raw compatibility attributes.
+	private static bool TryReadPolicyAdmission<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, out MuiVirtgroupPolicyStateRecord value,
+		out bool present) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			PolicyStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			PolicyStateKey);
+		present = block.IsNotNull || length != 0;
+		if (!present) return true;
+		return !block.IsNull && length == unchecked((int)
+			MuiVirtgroupPolicyStateRecord.Size) &&
+			MuiVirtgroupPolicyStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiVirtgroupPolicyStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
+	}
+
 	internal static bool TryGetDisplayState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, out MuiVirtgroupDisplayStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			DisplayStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			DisplayStateKey) != unchecked((int)MuiVirtgroupDisplayStateRecord.Size))
 			return false;
-		return MuiVirtgroupDisplayStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiVirtgroupDisplayStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiVirtgroupDisplayStateAdmission.ValidateLive(
+			ref platform, state, obj, value);
 	}
 
 	internal static bool TryGetPointerState<TPlatform>(ref TPlatform platform,
@@ -1783,13 +2166,14 @@ public static class MuiVirtgroupCore
 		value.Top = top;
 		value.Width = width;
 		value.Height = height;
+		if (!TryReadDisplayAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
+		if (!MuiVirtgroupDisplayStateAdmission.ValidateLive(ref platform, state,
+			obj, value)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			DisplayStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			DisplayStateKey) == unchecked((int)MuiVirtgroupDisplayStateRecord.Size) &&
-			MuiVirtgroupDisplayStateRecordCodec.TryRead(ref platform, block,
-				out _)) return MuiVirtgroupDisplayStateRecordCodec.Write(ref platform,
-				block, value);
+		if (present) return MuiVirtgroupDisplayStateRecordCodec.Write(ref platform,
+			block, value);
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiVirtgroupDisplayStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -1804,31 +2188,60 @@ public static class MuiVirtgroupCore
 		return added;
 	}
 
+	// A present Virtgroup display block is authoritative typed state. Reject a
+	// wrong-sized or geometrically malformed record before LayoutCore can
+	// replace it and publish an updated display projection.
+	private static bool TryReadDisplayAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiVirtgroupDisplayStateRecord value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			DisplayStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			DisplayStateKey);
+		present = block.IsNotNull || length != 0;
+		if (!present) return true;
+		return !block.IsNull && length == unchecked((int)
+			MuiVirtgroupDisplayStateRecord.Size) &&
+			MuiVirtgroupDisplayStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiVirtgroupDisplayStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
+	}
+
 	private static bool TryReadPointerState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, out MuiVirtgroupPointerStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			PointerStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			PointerStateKey) != unchecked((int)MuiVirtgroupPointerStateRecord.Size))
 			return false;
-		return MuiVirtgroupPointerStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiVirtgroupPointerStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiVirtgroupPointerStateAdmission.ValidateLive(
+			ref platform, state, obj, value);
 	}
 
 	private static bool WritePointerState<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, MuiVirtgroupPointerStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
+		if (!TryReadPointerAdmission(ref platform, state, obj,
+			out _, out var present)) return false;
+		if (!MuiVirtgroupPointerStateAdmission.ValidateLive(ref platform, state, obj,
+			value)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			PointerStateKey);
-		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
-			PointerStateKey) == unchecked((int)MuiVirtgroupPointerStateRecord.Size) &&
-			MuiVirtgroupPointerStateRecordCodec.TryRead(ref platform, block,
-				out _)) return MuiVirtgroupPointerStateRecordCodec.Write(ref platform,
-				block, value);
+		if (present) return MuiVirtgroupPointerStateRecordCodec.Write(ref platform,
+			block, value);
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiVirtgroupPointerStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -1841,6 +2254,30 @@ public static class MuiVirtgroupCore
 		platform.Clear(scratch, MuiVirtgroupPointerStateRecord.Size);
 		platform.Free(scratch, MuiVirtgroupPointerStateRecord.Size);
 		return added;
+	}
+
+	// A present Virtgroup pointer block is authoritative transient state. Reject
+	// malformed flags or a wrong-sized record before drag handling can replace it.
+	private static bool TryReadPointerAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiVirtgroupPointerStateRecord value, out bool present)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		present = false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			PointerStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			PointerStateKey);
+		present = block.IsNotNull || length != 0;
+		if (!present) return true;
+		return !block.IsNull && length == unchecked((int)
+			MuiVirtgroupPointerStateRecord.Size) &&
+			MuiVirtgroupPointerStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiVirtgroupPointerStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static uint ReadRaw<TPlatform>(ref TPlatform platform, APTR state,
@@ -1920,6 +2357,10 @@ public static class MuiVirtgroupCore
 		int fallbackWidth, int fallbackHeight)
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
+		if (!TryReadPolicyAdmission(ref platform, state, virtgroup,
+			out _, out _) || !TryReadLayoutAdmission(ref platform, state,
+			virtgroup, out _, out _) || !TryReadDisplayAdmission(ref platform,
+			state, virtgroup, out _, out _)) return false;
 		if (!PublishDisplayState(ref platform, state, virtgroup, left, top,
 			viewportWidth, viewportHeight)) return false;
 		if (!PublishLayoutState(ref platform, state, virtgroup,
@@ -1949,13 +2390,16 @@ public static class MuiVirtgroupCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		value = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			LayoutStateKey);
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			LayoutStateKey) != unchecked((int)MuiVirtgroupLayoutStateRecord.Size))
 			return false;
-		return MuiVirtgroupLayoutStateRecordCodec.TryRead(ref platform, block,
-			out value);
+		return MuiVirtgroupLayoutStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiVirtgroupLayoutStateAdmission.ValidateLive(
+			ref platform, state, obj, value);
 	}
 
 	private static bool PublishLayoutState<TPlatform>(ref TPlatform platform,
@@ -1963,10 +2407,13 @@ public static class MuiVirtgroupCore
 		where TPlatform : struct, IMuiLayoutPlatform
 	{
 		value = default;
+		if (!TryReadLayoutAdmission(ref platform, state, obj,
+			out var existing, out var present)) return false;
 		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
 			LayoutStateKey);
-		if (TryGetLayoutState(ref platform, state, obj, out value))
+		if (present)
 		{
+			value = existing;
 			value.Width = unchecked((int)Read(ref platform, state, obj,
 				VirtualWidth));
 			value.Height = unchecked((int)Read(ref platform, state, obj,
@@ -1976,6 +2423,8 @@ public static class MuiVirtgroupCore
 			value.Top = unchecked((int)Read(ref platform, state, obj,
 				VirtualTop));
 			value.TryFit = Read(ref platform, state, obj, TryFit);
+			if (!MuiVirtgroupLayoutStateAdmission.ValidateLive(ref platform, state,
+				obj, value)) return false;
 			return MuiVirtgroupLayoutStateRecordCodec.Write(ref platform, block,
 				value);
 		}
@@ -1988,6 +2437,8 @@ public static class MuiVirtgroupCore
 		value.Left = unchecked((int)Read(ref platform, state, obj, VirtualLeft));
 		value.Top = unchecked((int)Read(ref platform, state, obj, VirtualTop));
 		value.TryFit = Read(ref platform, state, obj, TryFit);
+		if (!MuiVirtgroupLayoutStateAdmission.ValidateLive(ref platform, state, obj,
+			value)) return false;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform,
 			MuiVirtgroupLayoutStateRecord.Size);
 		if (scratch.IsNull) return false;
@@ -2000,6 +2451,31 @@ public static class MuiVirtgroupCore
 		platform.Clear(scratch, MuiVirtgroupLayoutStateRecord.Size);
 		platform.Free(scratch, MuiVirtgroupLayoutStateRecord.Size);
 		return added;
+	}
+
+	// A present Virtgroup layout block is authoritative typed state. Reject a
+	// wrong-sized or semantically malformed record before display/layout
+	// projections can repair it from raw compatibility attributes.
+	private static bool TryReadLayoutAdmission<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiVirtgroupLayoutStateRecord value, out bool present)
+		where TPlatform : struct, IMuiLayoutPlatform
+	{
+		value = default;
+		present = false;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			LayoutStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			LayoutStateKey);
+		present = block.IsNotNull || length != 0;
+		if (!present) return true;
+		return !block.IsNull && length == unchecked((int)
+			MuiVirtgroupLayoutStateRecord.Size) &&
+			MuiVirtgroupLayoutStateRecordCodec.TryReadStructural(ref platform, block,
+				out value) && MuiVirtgroupLayoutStateAdmission.ValidateLive(ref platform,
+				state, obj, value);
 	}
 
 	private static uint Read<TPlatform>(ref TPlatform platform, APTR state,

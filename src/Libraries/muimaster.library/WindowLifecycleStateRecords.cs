@@ -24,6 +24,27 @@ internal struct MuiWindowLifecycleStateRecord
 	internal uint IconifiedOpen;
 }
 
+// The packed codec checks the guest representation; this admission boundary
+// checks the lifecycle contract consumed by native-window operations.  A
+// native capability exists exactly while the public Open projection is true.
+// IconifiedOpen is intentionally independent: MorphOS retains an open request
+// while an application is iconified, both before and after the native window
+// is temporarily closed.
+internal static class MuiWindowLifecycleStateAdmission
+{
+	internal static bool Validate(MuiWindowLifecycleStateRecord value) =>
+		value.Magic == MuiWindowLifecycleStateRecord.Cookie &&
+		value.Open <= 1 && value.IconifiedOpen <= 1 &&
+		(value.Open == 0 ? value.NativeWindow.IsNull :
+			value.NativeWindow.IsNotNull);
+
+	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,
+		APTR state, APTR window, MuiWindowLifecycleStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		Validate(value) && !window.IsNull &&
+		!MuiHeadlessObjectCore.FindObject(ref platform, state, window).IsNull;
+}
+
 internal enum MuiWindowLifecycleStateField : byte
 {
 	Magic,
@@ -98,53 +119,85 @@ internal static class MuiWindowLifecycleStateFieldCursorCodec
 	}
 }
 
+// Struct-first guest-memory adapter. Lifecycle topology remains named state;
+// this bounded boundary owns only the fixed four-byte guest fields.
+internal static class MuiWindowLifecycleStateRecordMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || offset > MuiWindowLifecycleStateRecord.Size - 4 ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiWindowLifecycleStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, 4);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, uint offset, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiWindowLifecycleStateRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiWindowLifecycleStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiWindowLifecycleStateRecord.Size) ||
-			!MuiWindowLifecycleStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowLifecycleStateField.Magic, out var magic) ||
-			magic != MuiWindowLifecycleStateRecord.Cookie ||
-			!MuiWindowLifecycleStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowLifecycleStateField.NativeWindow,
-				out var nativeWindow) ||
-			!MuiWindowLifecycleStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowLifecycleStateField.Open, out value.Open) ||
-			!MuiWindowLifecycleStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowLifecycleStateField.EventMask,
-				out value.EventMask) ||
-			!MuiWindowLifecycleStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiWindowLifecycleStateField.IconifiedOpen,
-				out value.IconifiedOpen)) return false;
+		if (!MuiWindowLifecycleStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, 0, out var magic) ||
+			!MuiWindowLifecycleStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 4, out var nativeWindow) ||
+			!MuiWindowLifecycleStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 8, out value.Open) ||
+			!MuiWindowLifecycleStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 12, out value.EventMask) ||
+			!MuiWindowLifecycleStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, 16, out value.IconifiedOpen)) return false;
 		value.Magic = magic;
 		value.NativeWindow = APTR.FromPointer(nativeWindow);
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiWindowLifecycleStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
+		MuiWindowLifecycleStateAdmission.Validate(value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiWindowLifecycleStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiWindowLifecycleStateRecord.Size) || value.Magic !=
-			MuiWindowLifecycleStateRecord.Cookie) return false;
-		return MuiWindowLifecycleStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiWindowLifecycleStateField.Magic, value.Magic) &&
-			MuiWindowLifecycleStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowLifecycleStateField.NativeWindow,
-				value.NativeWindow.Raw) &&
-			MuiWindowLifecycleStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowLifecycleStateField.Open, value.Open) &&
-			MuiWindowLifecycleStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowLifecycleStateField.EventMask,
-				value.EventMask) &&
-			MuiWindowLifecycleStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiWindowLifecycleStateField.IconifiedOpen,
-				value.IconifiedOpen);
+		if (!MuiWindowLifecycleStateAdmission.Validate(value)) return false;
+		return MuiWindowLifecycleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, 0, value.Magic) &&
+			MuiWindowLifecycleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 4, value.NativeWindow.Raw) &&
+			MuiWindowLifecycleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 8, value.Open) &&
+			MuiWindowLifecycleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 12, value.EventMask) &&
+			MuiWindowLifecycleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, 16, value.IconifiedOpen);
 	}
 }

@@ -245,6 +245,36 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void ApplicationSettingsRecordMemoryAdapterUsesStructMembers()
+	{
+		var platform = CreatePlatform(out _);
+		var setConfig = APTR.FromPointer(0x1400);
+		Assert.True(MuiApplicationSettingsPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, setConfig,
+			MuiApplicationSettingsPacketKind.SetConfigItem,
+			MuiApplicationSettingsPacketField.Data, 0x3300u));
+		Assert.True(MuiApplicationSettingsPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, setConfig,
+			MuiApplicationSettingsPacketKind.SetConfigItem,
+			MuiApplicationSettingsPacketField.Data, out var dataAddress));
+		Assert.Equal(setConfig.Raw + MuiApplicationSetConfigItemMessage.DataOffset,
+			dataAddress.Raw);
+		Assert.True(MuiApplicationSettingsPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, setConfig,
+			MuiApplicationSettingsPacketKind.SetConfigItem,
+			MuiApplicationSettingsPacketField.Data, out var data));
+		Assert.Equal(0x3300u, data);
+		Assert.False(MuiApplicationSettingsPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, setConfig,
+			MuiApplicationSettingsPacketKind.SetConfigItem,
+			MuiApplicationSettingsPacketField.ClassId, out _));
+		Assert.False(MuiApplicationSettingsPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0xFFFFFFF0u),
+			MuiApplicationSettingsPacketKind.SetConfigItem,
+			MuiApplicationSettingsPacketField.Data, out _));
+	}
+
+	[Fact]
 	public void ApplicationSettingsRecordsUseNamedCodecs()
 	{
 		var platform = CreatePlatform(out _);
@@ -892,6 +922,73 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void EventHandlerRecordMemoryAdapterUsesStructMembers()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1D80);
+		var value = new MuiEventHandlerNodeRecord
+		{
+			NodeSuccessor = APTR.FromPointer(0x1E00),
+			NodePredecessor = APTR.FromPointer(0x1F00),
+			Reserved = 0xA5,
+			Priority = -2,
+			Flags = 0xC123,
+			Object = APTR.FromPointer(0x2000),
+			Class = APTR.FromPointer(0x2100),
+			Events = 0x01020304u,
+		};
+		Assert.True(MuiEventHandlerNodeCodec.Write(ref platform, address, value));
+		Assert.True(MuiEventHandlerNodeRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiEventHandlerNodeField.Priority, out var priority,
+			out var prioritySize));
+		Assert.Equal(address.Raw + MuiEventHandlerNodeRecord.PriorityOffset,
+			priority.Raw);
+		Assert.Equal(MuiEventHandlerNodeRecord.ByteFieldSize, prioritySize);
+		Assert.True(MuiEventHandlerNodeCodec.TryRead(ref platform, address,
+			out var decoded));
+		Assert.Equal(value.NodeSuccessor, decoded.NodeSuccessor);
+		Assert.Equal(value.Priority, decoded.Priority);
+		Assert.Equal(value.Flags, decoded.Flags);
+		Assert.Equal(value.Events, decoded.Events);
+		Assert.False(MuiEventHandlerNodeRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0xFFFFFFF0u),
+			MuiEventHandlerNodeField.Events, out _, out _));
+		Assert.False(MuiEventHandlerNodeRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiEventHandlerNodeField.Class, out _, out _));
+	}
+
+	[Fact]
+	public void InputHandlerRecordMemoryAdapterUsesStructMembers()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1E80);
+		var value = new MuiInputHandlerRecord
+		{
+			NodeSuccessor = APTR.FromPointer(0x1F00),
+			NodePredecessor = APTR.FromPointer(0x2000),
+			Object = APTR.FromPointer(0x2100),
+			Events = 0x01020304u,
+			Reserved = 0x05060708u,
+			Packet = 0x80420001u,
+		};
+		Assert.True(MuiInputHandlerCodec.Write(ref platform, address, value));
+		Assert.True(MuiInputHandlerRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiInputHandlerField.Packet, out var packet));
+		Assert.Equal(address.Raw + MuiInputHandlerRecord.PacketOffset, packet.Raw);
+		Assert.True(MuiInputHandlerCodec.TryRead(ref platform, address,
+			out var decoded));
+		Assert.Equal(value.NodeSuccessor, decoded.NodeSuccessor);
+		Assert.Equal(value.NodePredecessor, decoded.NodePredecessor);
+		Assert.Equal(value.Object, decoded.Object);
+		Assert.Equal(value.Packet, decoded.Packet);
+		Assert.False(MuiInputHandlerRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0xFFFFFFF0u),
+			MuiInputHandlerField.Object, out _));
+		Assert.False(MuiInputHandlerRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiInputHandlerField.Packet, out _));
+	}
+
+	[Fact]
 	public void ApplicationSetConfigItemFieldCursorUsesNamedRecordBoundary()
 	{
 		var platform = CreatePlatform(out _);
@@ -940,6 +1037,28 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void ApplicationSetConfigItemStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1E80);
+		var value = default(MuiApplicationSetConfigItemStateRecord);
+		value.Magic = MuiApplicationSetConfigItemStateRecord.Cookie;
+		value.Item = 0x22;
+		value.Data = APTR.FromPointer(0x1300);
+		value.Requests = 3;
+		Assert.True(MuiApplicationSetConfigItemStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiApplicationSetConfigItemStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Item, decoded.Item);
+		Assert.Equal(value.Data, decoded.Data);
+		Assert.Equal(value.Requests, decoded.Requests);
+		Assert.False(MuiApplicationSetConfigItemStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
 	public void SetConfigItemRecordUsesNamedOpaqueApointer()
 	{
 		var platform = CreatePlatform(out _);
@@ -955,6 +1074,73 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void ApplicationSetConfigItemAdmissionValidatesOpaquePointerAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var value = default(MuiApplicationSetConfigItemStateRecord);
+		value.Magic = MuiApplicationSetConfigItemStateRecord.Cookie;
+		Assert.True(MuiApplicationSetConfigItemStateAdmission.Validate(
+			ref platform, value));
+		value.Data = APTR.FromPointer(0x1700);
+		Assert.True(MuiApplicationSetConfigItemStateAdmission.Validate(
+			ref platform, value));
+		Assert.True(MuiApplicationSetConfigItemStateAdmission.ValidateLive(
+			ref platform, State, application, value));
+		value.Data = APTR.FromPointer(0x21000);
+		Assert.False(MuiApplicationSetConfigItemStateAdmission.Validate(
+			ref platform, value));
+		value.Data = APTR.FromPointer(0x1700);
+		Assert.False(MuiApplicationSetConfigItemStateAdmission.ValidateLive(
+			ref platform, State, APTR.FromPointer(0x32000), value));
+	}
+
+	[Fact]
+	public void MalformedApplicationSetConfigItemStateFailsClosedBeforeMutation()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		Assert.True(MuiApplicationWindowCore.InitializeApplication(ref platform,
+			State, application, 0));
+		var data = APTR.FromPointer(0x1700);
+		platform.WriteUInt8(data, 0, 0xA5);
+		Assert.True(MuiApplicationWindowCore.SetConfigItem(ref platform, State,
+			application, 0x34, data));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, MuiApplicationWindowCore.ApplicationSetConfigItemState,
+			out var raw));
+		var block = APTR.FromPointer(raw);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiApplicationSetConfigItemStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationSetConfigItemStateField.Data,
+			0x21000));
+
+		Assert.False(MuiApplicationWindowCore.SetConfigItem(ref platform, State,
+			application, 0x35, APTR.Null));
+		Assert.True(MuiApplicationSetConfigItemStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(0x34u, structural.Item);
+		Assert.Equal(0x21000u, structural.Data.Raw);
+		Assert.Equal(1u, structural.Requests);
+		Assert.False(MuiApplicationWindowCore.ReadSetConfigItemState(ref platform,
+			State, application, out _, out _, out _));
+
+		// Repair the caller-owned sidecar before retrying; strict admission stays
+		// fail-closed until the opaque data pointer is mapped again.
+		Assert.True(MuiApplicationSetConfigItemStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationSetConfigItemStateField.Data,
+			data.Raw));
+		Assert.True(MuiApplicationWindowCore.SetConfigItem(ref platform, State,
+			application, 0x35, APTR.Null));
+		Assert.True(MuiApplicationWindowCore.ReadSetConfigItemState(ref platform,
+			State, application, out var item, out var storedData,
+			out var requests));
+		Assert.Equal(0x35u, item);
+		Assert.Equal(0u, storedData);
+		Assert.Equal(2u, requests);
+	}
+
+	[Fact]
 	public void ApplicationLifecycleStateCodecUsesNamedFields()
 	{
 		var platform = CreatePlatform(out _);
@@ -965,8 +1151,8 @@ public sealed class MuiApplicationWindowTests
 		value.Iconified = 1;
 		value.Active = 1;
 		value.SingleTask = 1;
-		value.DoubleStart = 2;
-		value.ForceQuit = 3;
+		value.DoubleStart = 1;
+		value.ForceQuit = 1;
 		Assert.True(MuiApplicationLifecycleStateRecordCodec.Write(ref platform,
 			address, value));
 		Assert.True(MuiApplicationLifecycleStateRecordCodec.TryRead(ref platform,
@@ -987,6 +1173,71 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiApplicationLifecycleStateField)255;
 		Assert.False(MuiApplicationLifecycleStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+		Assert.True(MuiApplicationLifecycleStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationLifecycleStateField.DoubleStart, 2));
+		Assert.True(MuiApplicationLifecycleStateRecordCodec.TryReadStructural(
+			ref platform, address, out _));
+		Assert.False(MuiApplicationLifecycleStateRecordCodec.TryRead(ref platform,
+			address, out _));
+	}
+
+	[Fact]
+	public void ApplicationLifecycleStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1F40);
+		var value = default(MuiApplicationLifecycleStateRecord);
+		value.Magic = MuiApplicationLifecycleStateRecord.Cookie;
+		value.Initialized = 1;
+		value.Iconified = 0;
+		value.Active = 1;
+		value.SingleTask = 1;
+		value.DoubleStart = 0;
+		value.ForceQuit = 1;
+
+		Assert.True(MuiApplicationLifecycleStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiApplicationLifecycleStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Initialized, decoded.Initialized);
+		Assert.Equal(value.Iconified, decoded.Iconified);
+		Assert.Equal(value.Active, decoded.Active);
+		Assert.Equal(value.SingleTask, decoded.SingleTask);
+		Assert.Equal(value.DoubleStart, decoded.DoubleStart);
+		Assert.Equal(value.ForceQuit, decoded.ForceQuit);
+		Assert.True(MuiApplicationLifecycleStateRecordCodec.TryRead(ref platform,
+			address, out decoded));
+		Assert.Equal(value.Active, decoded.Active);
+		Assert.False(MuiApplicationLifecycleStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void MalformedApplicationLifecycleStateFailsClosedBeforeConsumers()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		Assert.True(MuiApplicationWindowCore.InitializeApplication(ref platform,
+			State, application, 0));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationLifecycleStateKey);
+		Assert.True(MuiApplicationLifecycleStateRecordCodec.TryReadStructural(
+			ref platform, block, out _));
+		Assert.True(MuiApplicationLifecycleStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationLifecycleStateField.Active, 2));
+		Assert.False(MuiApplicationLifecycleStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationLifecycleState(
+			ref platform, State, application, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			application, 0x804260AB, out _));
+		Assert.False(MuiApplicationWindowCore.SetIconified(ref platform, State,
+			application, true));
+		Assert.True(MuiApplicationLifecycleStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiApplicationLifecycleStateField.Active,
+			out var active));
+		Assert.Equal(2u, active);
 	}
 
 	[Fact]
@@ -1083,6 +1334,25 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void WindowLifecycleAdmissionRejectsNoncanonicalTopology()
+	{
+		var platform = CreatePlatform(out _);
+		var value = default(MuiWindowLifecycleStateRecord);
+		value.Magic = MuiWindowLifecycleStateRecord.Cookie;
+		value.NativeWindow = APTR.FromPointer(0x2200);
+		value.Open = 1;
+		Assert.True(MuiWindowLifecycleStateAdmission.Validate(value));
+		value.Open = 2;
+		Assert.False(MuiWindowLifecycleStateAdmission.Validate(value));
+		value.Open = 1;
+		value.NativeWindow = APTR.Null;
+		Assert.False(MuiWindowLifecycleStateAdmission.Validate(value));
+		value.Open = 0;
+		value.NativeWindow = APTR.FromPointer(0x2200);
+		Assert.False(MuiWindowLifecycleStateAdmission.Validate(value));
+	}
+
+	[Fact]
 	public void WindowLifecyclePublishesNamedGuestRecordAcrossOpenAndClose()
 	{
 		var platform = CreatePlatform(out var cl);
@@ -1111,6 +1381,37 @@ public sealed class MuiApplicationWindowTests
 		Assert.Equal(0u, lifecycle.Open);
 		Assert.Equal(0x1204u, lifecycle.EventMask);
 		Assert.Equal(0u, lifecycle.IconifiedOpen);
+	}
+
+	[Fact]
+	public void MalformedWindowLifecycleFailsClosedBeforeNativeOpen()
+	{
+		var platform = CreatePlatform(out var cl);
+		var window = Object(ref platform, cl);
+		Assert.True(MuiApplicationWindowCore.OpenWindow(ref platform, State,
+			window, 0));
+		Assert.True(MuiApplicationWindowCore.CloseWindow(ref platform, State,
+			window));
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, window,
+			MuiApplicationWindowCore.WindowLifecycleStateKey);
+		Assert.True(MuiWindowLifecycleStateRecordCodec.TryReadStructural(
+			ref platform, block, out _));
+		Assert.True(MuiWindowLifecycleStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiWindowLifecycleStateField.Open, 2));
+		Assert.False(MuiWindowLifecycleStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		Assert.False(MuiApplicationWindowCore.TryGetWindowLifecycleState(
+			ref platform, State, window, out _));
+
+		var opens = platform.WindowOpenCount;
+		var closes = platform.WindowCloseCount;
+		Assert.False(MuiApplicationWindowCore.OpenWindow(ref platform, State,
+			window, 0));
+		Assert.Equal(opens, platform.WindowOpenCount);
+		Assert.Equal(closes, platform.WindowCloseCount);
+		Assert.False(MuiApplicationWindowCore.CloseWindow(ref platform, State,
+			window));
 	}
 
 	[Fact]
@@ -1260,6 +1561,39 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void MalformedWindowOpenPolicyFailsClosedBeforeNativeConfiguration()
+	{
+		var platform = CreatePlatform(out var cl);
+		var window = Object(ref platform, cl);
+		Assert.True(MuiApplicationWindowCore.OpenWindow(ref platform, State,
+			window, 0));
+		Assert.True(MuiApplicationWindowCore.CloseWindow(ref platform, State,
+			window));
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, window,
+			MuiApplicationWindowCore.WindowOpenPolicyStateKey);
+		Assert.True(MuiWindowOpenPolicyStateRecordCodec.TryReadStructural(
+			ref platform, block, out var policy));
+		policy.Borderless = 2;
+		Assert.True(MuiWindowOpenPolicyStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiWindowOpenPolicyStateField.Borderless,
+			policy.Borderless));
+		Assert.False(MuiWindowOpenPolicyStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		Assert.False(MuiApplicationWindowCore.TryGetWindowOpenPolicyState(
+			ref platform, State, window, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.Borderless, out _));
+
+		var opens = platform.WindowOpenCount;
+		var closes = platform.WindowCloseCount;
+		Assert.False(MuiApplicationWindowCore.OpenWindow(ref platform, State,
+			window, 0));
+		Assert.Equal(opens + 1, platform.WindowOpenCount);
+		Assert.Equal(closes + 1, platform.WindowCloseCount);
+	}
+
+	[Fact]
 	public void WindowPresentationStateCodecUsesNamedPointerFields()
 	{
 		var platform = CreatePlatform(out _);
@@ -1288,6 +1622,23 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiWindowPresentationStateField)255;
 		Assert.False(MuiWindowPresentationStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void WindowPresentationAdmissionRejectsUnmappedGuestPointers()
+	{
+		var platform = CreatePlatform(out _);
+		var value = default(MuiWindowPresentationStateRecord);
+		value.Magic = MuiWindowPresentationStateRecord.Cookie;
+		Assert.True(MuiWindowPresentationStateAdmission.Validate(ref platform,
+			value));
+		value.Screen = APTR.FromPointer(0xF0000000);
+		Assert.False(MuiWindowPresentationStateAdmission.Validate(ref platform,
+			value));
+		value.Screen = APTR.Null;
+		value.Title = APTR.FromPointer(0xF0000000);
+		Assert.False(MuiWindowPresentationStateAdmission.Validate(ref platform,
+			value));
 	}
 
 	[Fact]
@@ -1347,6 +1698,41 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void MalformedWindowPresentationStateFailsClosedBeforeConsumerMutation()
+	{
+		var platform = CreatePlatform(out var cl);
+		var window = Object(ref platform, cl);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.Title, out var initial));
+		Assert.Equal(0u, initial);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, window,
+			MuiWindowPublicCore.WindowPresentationStateKey);
+		Assert.True(MuiWindowPresentationStateRecordCodec.TryReadStructural(
+			ref platform, block, out _));
+		Assert.True(MuiWindowPresentationStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiWindowPresentationStateField.Title,
+			0xF0000000));
+		Assert.False(MuiWindowPresentationStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		Assert.False(MuiWindowPublicCore.TryGetWindowPresentationState(
+			ref platform, State, window, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.Title, out _));
+
+		var title = APTR.FromPointer(0x2A00);
+		platform.WriteCString(title, "Replacement");
+		var packet = APTR.FromPointer(0x2A40);
+		Assert.True(MuiCommonControlPacketCore.WriteAttribute(ref platform, packet,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.ScreenTitle,
+			title.Raw));
+		Assert.Equal(0u, MuiApplicationDispatcher.DispatchWindowScreenTitle(
+			ref platform, State, window, packet));
+		Assert.False(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			window, MuiWindowPublicCore.ScreenTitle, out _));
+	}
+
+	[Fact]
 	public void WindowVisualStateCodecUsesNamedPolicyFields()
 	{
 		var platform = CreatePlatform(out _);
@@ -1377,6 +1763,26 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiWindowVisualStateField)255;
 		Assert.False(MuiWindowVisualStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void WindowVisualAdmissionRejectsNoncanonicalPolicy()
+	{
+		var value = default(MuiWindowVisualStateRecord);
+		value.Magic = MuiWindowVisualStateRecord.Cookie;
+		value.NoMenus = 1;
+		value.HasAlpha = 1;
+		value.Opacity = 255;
+		value.FancyDrawing = 1;
+		Assert.True(MuiWindowVisualStateAdmission.Validate(value));
+		value.NoMenus = 2;
+		Assert.False(MuiWindowVisualStateAdmission.Validate(value));
+		value.NoMenus = 1;
+		value.Opacity = 256;
+		Assert.False(MuiWindowVisualStateAdmission.Validate(value));
+		value.Opacity = 255;
+		value.FancyDrawing = 2;
+		Assert.False(MuiWindowVisualStateAdmission.Validate(value));
 	}
 
 	[Fact]
@@ -1425,6 +1831,37 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void MalformedWindowVisualStateFailsClosedBeforeConsumerMutation()
+	{
+		var platform = CreatePlatform(out var cl);
+		var window = Object(ref platform, cl);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.NoMenus, out var initial));
+		Assert.Equal(0u, initial);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, window,
+			MuiWindowPublicCore.WindowVisualStateKey);
+		Assert.True(MuiWindowVisualStateRecordCodec.TryReadStructural(
+			ref platform, block, out _));
+		Assert.True(MuiWindowVisualStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiWindowVisualStateField.NoMenus, 2));
+		Assert.False(MuiWindowVisualStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		Assert.False(MuiWindowPublicCore.TryGetWindowVisualState(ref platform,
+			State, window, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.NoMenus, out _));
+
+		var packet = APTR.FromPointer(0x26C0);
+		Assert.True(MuiCommonControlPacketCore.WriteAttribute(ref platform, packet,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.HasAlpha, 1));
+		Assert.Equal(0u, MuiApplicationDispatcher.DispatchWindowHasAlpha(
+			ref platform, State, window, packet));
+		Assert.False(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			window, MuiWindowPublicCore.HasAlpha, out _));
+	}
+
+	[Fact]
 	public void SleepStateCodecUsesNamedFields()
 	{
 		var platform = CreatePlatform(out _);
@@ -1433,7 +1870,7 @@ public sealed class MuiApplicationWindowTests
 		value.Magic = MuiSleepStateRecord.Cookie;
 		value.Depth = 2;
 		value.SavedDisabled = 1;
-		value.Request = 3;
+		value.Request = 2;
 		Assert.True(MuiSleepStateRecordCodec.Write(ref platform, address, value));
 		Assert.True(MuiSleepStateRecordCodec.TryRead(ref platform, address,
 			out var decoded));
@@ -1450,6 +1887,85 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiSleepStateField)255;
 		Assert.False(MuiSleepStateFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out _));
+		Assert.True(MuiSleepStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiSleepStateField.SavedDisabled, 2));
+		Assert.True(MuiSleepStateRecordCodec.TryReadStructural(ref platform,
+			address, out _));
+		Assert.False(MuiSleepStateRecordCodec.TryRead(ref platform, address,
+			out _));
+		Assert.True(MuiSleepStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiSleepStateField.SavedDisabled, 1));
+		Assert.True(MuiSleepStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			address, MuiSleepStateField.Request, 3));
+		Assert.False(MuiSleepStateRecordCodec.TryRead(ref platform, address,
+			out _));
+	}
+
+	[Fact]
+	public void SleepStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x31C0);
+		var value = default(MuiSleepStateRecord);
+		value.Magic = MuiSleepStateRecord.Cookie;
+		value.Depth = 2;
+		value.SavedDisabled = 1;
+		value.Request = 2;
+
+		Assert.True(MuiSleepStateRecordCodec.Write(ref platform, address, value));
+		Assert.True(MuiSleepStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Depth, decoded.Depth);
+		Assert.Equal(value.SavedDisabled, decoded.SavedDisabled);
+		Assert.Equal(value.Request, decoded.Request);
+		Assert.True(MuiSleepStateRecordCodec.TryRead(ref platform, address,
+			out decoded));
+		Assert.False(MuiSleepStateRecordCodec.TryReadStructural(ref platform,
+			APTR.Null, out _));
+	}
+
+	[Fact]
+	public void MalformedSleepStateFailsClosedBeforeSleepConsumers()
+	{
+		var platform = CreatePlatform(out var cl);
+		var window = Object(ref platform, cl);
+		Assert.True(MuiApplicationWindowCore.PublishWindowSleepState(
+			ref platform, State, window));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, window,
+			MuiApplicationWindowCore.WindowSleepStateKey);
+		Assert.True(MuiSleepStateRecordCodec.TryReadStructural(ref platform,
+			block, out var initial));
+		Assert.Equal(0u, initial.Depth);
+		Assert.Equal(0u, initial.Request);
+		Assert.True(MuiSleepStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			block, MuiSleepStateField.Request, 1));
+		Assert.False(MuiSleepStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		Assert.False(MuiApplicationWindowCore.TryGetWindowSleepState(ref platform,
+			State, window, out _));
+		Assert.False(MuiApplicationWindowCore.SetSleepValue(ref platform, State,
+			window, 1));
+		Assert.False(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			window, 0x7FFE003D, out _));
+		Assert.False(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			window, 0x8042E7DB, out _));
+		Assert.Equal(0u, MuiApplicationWindowCore.DispatchWindowEvent(
+			ref platform, State, window, APTR.Null, 4));
+
+		var application = Object(ref platform, cl);
+		Assert.True(MuiApplicationWindowCore.InitializeApplication(ref platform,
+			State, application, 0));
+		Assert.True(MuiApplicationWindowCore.SetApplicationSleepValue(
+			ref platform, State, application, 1));
+		var applicationBlock = MuiStoreCore.DataspaceFind(ref platform, State,
+			application, MuiApplicationWindowCore.ApplicationSleepStateKey);
+		Assert.True(MuiSleepStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			applicationBlock, MuiSleepStateField.Request, 0));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationSleepState(
+			ref platform, State, application, out _));
+		Assert.False(MuiApplicationWindowCore.SetApplicationSleepValue(
+			ref platform, State, application, 1));
 	}
 
 	[Fact]
@@ -1501,15 +2017,30 @@ public sealed class MuiApplicationWindowTests
 		var address = APTR.FromPointer(0x2740);
 		var value = default(MuiApplicationSchedulerStateRecord);
 		value.Magic = MuiApplicationSchedulerStateRecord.Cookie;
+		value.SignalMask = 0x20;
+		Assert.True(MuiApplicationSchedulerStateRecordCodec.Write(ref platform,
+			address, value));
 		value.ReturnHead = APTR.FromPointer(0x2800);
 		value.ReturnTail = APTR.FromPointer(0x2820);
 		value.InputHandlers = APTR.FromPointer(0x2840);
-		value.SignalMask = 0x20;
 		value.PushHead = APTR.FromPointer(0x2860);
 		value.PushTail = APTR.FromPointer(0x2880);
-		Assert.True(MuiApplicationSchedulerStateRecordCodec.Write(ref platform,
-			address, value));
-		Assert.True(MuiApplicationSchedulerStateRecordCodec.TryRead(ref platform,
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSchedulerStateField.ReturnHead,
+			0x2800));
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSchedulerStateField.ReturnTail,
+			0x2820));
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSchedulerStateField.InputHandlers,
+			0x2840));
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSchedulerStateField.PushHead,
+			0x2860));
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSchedulerStateField.PushTail,
+			0x2880));
+		Assert.True(MuiApplicationSchedulerStateRecordCodec.TryReadStructural(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.ReturnHead, decoded.ReturnHead);
@@ -1527,6 +2058,134 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiApplicationSchedulerStateField)255;
 		Assert.False(MuiApplicationSchedulerStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationSchedulerAdmissionRejectsMalformedQueueTopology()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x2740);
+		var value = default(MuiApplicationSchedulerStateRecord);
+		value.Magic = MuiApplicationSchedulerStateRecord.Cookie;
+		Assert.True(MuiApplicationSchedulerStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiApplicationSchedulerStateRecordCodec.TryRead(ref platform,
+			address, out _));
+
+		// A return queue must have a paired tail, and the tail must be the last
+		// reachable node rather than an unrelated guest address.
+		value.ReturnHead = APTR.FromPointer(0x2800);
+		value.ReturnTail = APTR.FromPointer(0x2820);
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSchedulerStateField.ReturnHead,
+			value.ReturnHead.Raw));
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSchedulerStateField.ReturnTail,
+			value.ReturnTail.Raw));
+		Assert.False(MuiApplicationSchedulerStateRecordCodec.TryRead(ref platform,
+			address, out _));
+
+		var cyclic = default(MuiApplicationWindowNodeRecord);
+		cyclic.Next = APTR.FromPointer(0x2800);
+		Assert.True(MuiApplicationWindowNodeCodec.Write(ref platform,
+			APTR.FromPointer(0x2800), cyclic));
+		value.ReturnTail = value.ReturnHead;
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSchedulerStateField.ReturnTail,
+			value.ReturnTail.Raw));
+		Assert.False(MuiApplicationSchedulerStateRecordCodec.TryRead(ref platform,
+			address, out _));
+
+		// Input-handler nodes carry a packet identity that must agree with the
+		// caller-owned named handler record.
+		value.ReturnHead = APTR.Null;
+		value.ReturnTail = APTR.Null;
+		value.InputHandlers = APTR.FromPointer(0x2840);
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSchedulerStateField.ReturnHead, 0));
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSchedulerStateField.ReturnTail, 0));
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiApplicationSchedulerStateField.InputHandlers,
+			value.InputHandlers.Raw));
+		var handler = APTR.FromPointer(0x2880);
+		Assert.True(MuiInputHandlerFieldCursorCodec.TryWriteUInt32(ref platform,
+			handler, MuiInputHandlerField.Packet, 0x1234));
+		var inputNode = default(MuiApplicationWindowNodeRecord);
+		inputNode.Value = handler;
+		inputNode.Packet = 0x5678;
+		Assert.True(MuiApplicationWindowNodeCodec.Write(ref platform,
+			value.InputHandlers, inputNode));
+		Assert.False(MuiApplicationSchedulerStateRecordCodec.TryRead(ref platform,
+			address, out _));
+		inputNode.Packet = 0x1234;
+		Assert.True(MuiApplicationWindowNodeCodec.Write(ref platform,
+			value.InputHandlers, inputNode));
+		Assert.True(MuiApplicationSchedulerStateRecordCodec.TryRead(ref platform,
+			address, out _));
+
+		// Pushed-method nodes are bounded to seven 32-bit arguments.
+		value.InputHandlers = APTR.Null;
+		value.PushHead = APTR.FromPointer(0x28C0);
+		value.PushTail = value.PushHead;
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSchedulerStateField.InputHandlers,
+			0));
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSchedulerStateField.PushHead,
+			value.PushHead.Raw));
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSchedulerStateField.PushTail,
+			value.PushTail.Raw));
+		var pushNode = default(MuiApplicationWindowNodeRecord);
+		pushNode.Value = APTR.FromPointer(0x2900);
+		pushNode.Auxiliary = 8;
+		Assert.True(MuiApplicationWindowNodeCodec.Write(ref platform,
+			value.PushHead, pushNode));
+		Assert.False(MuiApplicationSchedulerStateRecordCodec.TryRead(ref platform,
+			address, out _));
+	}
+
+	[Fact]
+	public void MalformedApplicationSchedulerStateFailsClosedBeforeConsumers()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var target = Object(ref platform, cl);
+		Assert.True(MuiApplicationWindowCore.InitializeApplication(ref platform,
+			State, application, 0x20));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationSchedulerStateKey);
+		var malformedNode = APTR.FromPointer(0x2C00);
+		var node = default(MuiApplicationWindowNodeRecord);
+		node.Value = target;
+		node.Auxiliary = 8;
+		Assert.True(MuiApplicationWindowNodeCodec.Write(ref platform,
+			malformedNode, node));
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationSchedulerStateField.PushHead,
+			malformedNode.Raw));
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationSchedulerStateField.PushTail,
+			malformedNode.Raw));
+		Assert.False(MuiApplicationSchedulerStateRecordCodec.TryRead(ref platform,
+			block, out _));
+
+		// The malformed sidecar is rejected before any consumer can reset or
+		// append queue state; its raw head remains observable for diagnosis.
+		Assert.False(MuiApplicationWindowCore.InitializeApplication(ref platform,
+			State, application, 0x40));
+		Assert.False(MuiApplicationWindowCore.ReturnId(ref platform, State,
+			application, 7));
+		Assert.Equal(0u, MuiApplicationWindowCore.PushMethod(ref platform, State,
+			application, target, 1, APTR.FromPointer(0x1200)));
+		Assert.False(MuiApplicationWindowCore.AddInputHandler(ref platform, State,
+			application, APTR.FromPointer(0x1300)));
+		Assert.True(MuiApplicationSchedulerStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiApplicationSchedulerStateField.PushHead,
+			out var preservedHead));
+		Assert.Equal(malformedNode.Raw, preservedHead);
 	}
 
 	[Fact]
@@ -1623,6 +2282,109 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void WindowInteractionAdmissionRejectsMalformedFlagsAndChainPointers()
+	{
+		var platform = CreatePlatform(out _);
+		var value = default(MuiWindowInteractionStateRecord);
+		value.Magic = MuiWindowInteractionStateRecord.Cookie;
+		value.SnapshotFlags = 1;
+		Assert.True(MuiWindowInteractionStateAdmission.Validate(ref platform,
+			value));
+
+		value.SnapshotFlags = 2;
+		Assert.False(MuiWindowInteractionStateAdmission.Validate(ref platform,
+			value));
+		value.SnapshotFlags = 0;
+		value.CycleChainCount = 1;
+		value.CycleChainHead = APTR.FromPointer(0xF0000000);
+		Assert.False(MuiWindowInteractionStateAdmission.Validate(ref platform,
+			value));
+		value.CycleChainCount = 0;
+		Assert.False(MuiWindowInteractionStateAdmission.Validate(ref platform,
+			value));
+	}
+
+	[Fact]
+	public void MalformedWindowInteractionStateFailsClosedBeforeConsumerMutation()
+	{
+		var platform = CreatePlatform(out var cl);
+		var window = Object(ref platform, cl);
+		var member = Object(ref platform, cl);
+		var vector = APTR.FromPointer(0x2A40);
+		platform.WriteUInt32(vector, 0, member.Raw);
+		platform.WriteUInt32(vector, 4, 0);
+		Assert.True(MuiApplicationWindowCore.SetCycleChain(ref platform, State,
+			window, vector));
+		Assert.True(MuiApplicationWindowCore.TryGetWindowInteractionState(
+			ref platform, State, window, out _));
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, window,
+			MuiApplicationWindowCore.WindowInteractionStateKey);
+		Assert.True(MuiWindowInteractionStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiWindowInteractionStateField.SnapshotFlags, 2));
+		Assert.False(MuiApplicationWindowCore.SnapshotWindow(ref platform, State,
+			window, 1));
+		Assert.Equal(0u, platform.WindowSnapshotCount);
+		Assert.False(MuiApplicationWindowCore.TryGetWindowInteractionState(
+			ref platform, State, window, out _));
+	}
+
+	[Fact]
+	public void WindowEventReuseAdmissionRejectsMalformedFlagsAndPointers()
+	{
+		var platform = CreatePlatform(out _);
+		var value = default(MuiWindowEventReuseStateRecord);
+		value.Magic = MuiWindowEventReuseStateRecord.Cookie;
+		value.MuiKey = -1;
+		Assert.True(MuiWindowEventReuseStateAdmission.Validate(ref platform,
+			value));
+
+		value.ContextActive = 2;
+		Assert.False(MuiWindowEventReuseStateAdmission.Validate(ref platform,
+			value));
+		value.ContextActive = 0;
+		value.EventMessage = APTR.FromPointer(0xF0000000);
+		Assert.False(MuiWindowEventReuseStateAdmission.Validate(ref platform,
+			value));
+		value.EventMessage = APTR.Null;
+		value.InputEvent = APTR.FromPointer(0xF0000000);
+		Assert.True(MuiWindowEventReuseStateAdmission.Validate(ref platform,
+			value));
+		value.InputEvent = APTR.Null;
+		value.ContextActive = 1;
+		value.EventClass = 4;
+		Assert.True(MuiWindowEventReuseStateAdmission.Validate(ref platform,
+			value));
+		value.Pending = 1;
+		Assert.False(MuiWindowEventReuseStateAdmission.Validate(ref platform,
+			value));
+	}
+
+	[Fact]
+	public void MalformedWindowEventReuseStateFailsClosedBeforeDispatchAndQueue()
+	{
+		var platform = CreatePlatform(out var cl);
+		var window = Object(ref platform, cl);
+		var eventMessage = APTR.FromPointer(0x2C00);
+		Assert.Equal(0u, MuiApplicationWindowCore.DispatchWindowEvent(
+			ref platform, State, window, eventMessage, 4));
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, window,
+			MuiApplicationWindowCore.WindowEventReuseStateKey);
+		Assert.True(MuiWindowEventReuseStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiWindowEventReuseStateField.ContextActive, 2));
+		Assert.Equal(0u, MuiApplicationWindowCore.DispatchWindowEvent(
+			ref platform, State, window, eventMessage, 4));
+		Assert.False(MuiApplicationWindowCore.QueueWindowEventReuse(ref platform,
+			State, window, APTR.Null));
+		Assert.False(MuiApplicationWindowCore.TakeWindowEventReuse(ref platform,
+			State, window, out _));
+		Assert.True(MuiWindowEventReuseStateRecordCodec.TryReadStructural(
+			ref platform, block, out var raw));
+		Assert.Equal(2u, raw.ContextActive);
+	}
+
+	[Fact]
 	public void WindowInteractionPublishesSnapshotAndCycleChainState()
 	{
 		var platform = CreatePlatform(out var cl);
@@ -1687,6 +2449,51 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiWindowEventStateField)255;
 		Assert.False(MuiWindowEventStateFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void WindowEventAdmissionRejectsMalformedPointersAndBoolean()
+	{
+		var platform = CreatePlatform(out _);
+		var value = default(MuiWindowEventStateRecord);
+		value.Magic = MuiWindowEventStateRecord.Cookie;
+		Assert.True(MuiWindowEventStateAdmission.Validate(ref platform, value));
+
+		value.CloseRequest = 2;
+		Assert.False(MuiWindowEventStateAdmission.Validate(ref platform, value));
+		value.CloseRequest = 0;
+		value.InputEvent = APTR.FromPointer(0xF0000000);
+		Assert.False(MuiWindowEventStateAdmission.Validate(ref platform, value));
+		value.InputEvent = APTR.Null;
+		value.MouseObject = APTR.FromPointer(0xF0000000);
+		Assert.False(MuiWindowEventStateAdmission.Validate(ref platform, value));
+	}
+
+	[Fact]
+	public void MalformedWindowEventStateFailsClosedBeforeConsumerMutation()
+	{
+		var platform = CreatePlatform(out var cl);
+		var window = Object(ref platform, cl);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.InputEvent, out var initial));
+		Assert.Equal(0u, initial);
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, window,
+			MuiApplicationWindowCore.WindowEventStateKey);
+		Assert.True(MuiWindowEventStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiWindowEventStateField.InputEvent,
+			0xF0000000));
+		Assert.False(MuiWindowEventStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		Assert.False(MuiApplicationWindowCore.TryGetWindowEventState(ref platform,
+			State, window, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.InputEvent, out _));
+
+		var replacement = APTR.FromPointer(0x2D00);
+		Assert.False(MuiApplicationWindowCore.PublishWindowInputEventValue(
+			ref platform, State, window, replacement));
+		Assert.False(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			window, MuiWindowPublicCore.InputEvent, out _));
 	}
 
 	[Fact]
@@ -1817,7 +2624,7 @@ public sealed class MuiApplicationWindowTests
 		value.HelpRequests = 2;
 		Assert.True(MuiApplicationHelpStateRecordCodec.Write(ref platform, address,
 			value));
-		Assert.True(MuiApplicationHelpStateRecordCodec.TryRead(ref platform,
+		Assert.True(MuiApplicationHelpStateRecordCodec.TryReadStructural(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.AboutReferenceWindow, decoded.AboutReferenceWindow);
@@ -1836,6 +2643,28 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiApplicationHelpStateField)255;
 		Assert.False(MuiApplicationHelpStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationHelpStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x2E00);
+		var value = default(MuiApplicationHelpStateRecord);
+		value.Magic = MuiApplicationHelpStateRecord.Cookie;
+		value.AboutRequests = uint.MaxValue;
+		value.HelpLine = unchecked((uint)-9);
+		value.HelpRequests = 7;
+		Assert.True(MuiApplicationHelpStateRecordCodec.Write(ref platform, address,
+			value));
+		Assert.True(MuiApplicationHelpStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.AboutRequests, decoded.AboutRequests);
+		Assert.Equal(value.HelpLine, decoded.HelpLine);
+		Assert.Equal(value.HelpRequests, decoded.HelpRequests);
+		Assert.False(MuiApplicationHelpStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
 	}
 
 	[Fact]
@@ -1867,6 +2696,78 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void ApplicationHelpAdmissionValidatesPointersStringsAndLiveReferences()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var referenceWindow = Object(ref platform, cl);
+		var name = APTR.FromPointer(0x2D40);
+		var node = APTR.FromPointer(0x2D80);
+		platform.WriteCString(name, "SYS:Help.guide");
+		platform.WriteCString(node, "main");
+		var value = default(MuiApplicationHelpStateRecord);
+		value.Magic = MuiApplicationHelpStateRecord.Cookie;
+		Assert.True(MuiApplicationHelpStateAdmission.Validate(ref platform, value));
+
+		value.AboutReferenceWindow = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiApplicationHelpStateAdmission.Validate(ref platform, value));
+		value.AboutReferenceWindow = referenceWindow;
+		value.HelpName = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiApplicationHelpStateAdmission.Validate(ref platform, value));
+		value.HelpName = name;
+		value.HelpNode = node;
+		value.HelpWindow = referenceWindow;
+		Assert.True(MuiApplicationHelpStateAdmission.Validate(ref platform, value));
+		Assert.True(MuiApplicationHelpStateAdmission.ValidateLive(ref platform,
+			State, application, value));
+
+		value.HelpWindow = APTR.FromPointer(0x3100);
+		Assert.True(MuiApplicationHelpStateAdmission.Validate(ref platform, value));
+		Assert.False(MuiApplicationHelpStateAdmission.ValidateLive(ref platform,
+			State, application, value));
+	}
+
+	[Fact]
+	public void MalformedApplicationHelpStateFailsClosedBeforePresentation()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var referenceWindow = Object(ref platform, cl);
+		var name = APTR.FromPointer(0x2DC0);
+		var node = APTR.FromPointer(0x2E00);
+		platform.WriteCString(name, "SYS:Help.guide");
+		platform.WriteCString(node, "main");
+		Assert.True(MuiApplicationWindowCore.AboutMUI(ref platform, State,
+			application, referenceWindow));
+		Assert.True(MuiApplicationWindowCore.ShowHelp(ref platform, State,
+			application, referenceWindow, name, node, 1));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationHelpStateKey);
+		Assert.True(MuiApplicationHelpStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationHelpStateField.HelpNode,
+			0xFFFFFF00u));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationHelpState(
+			ref platform, State, application, out _));
+
+		var aboutRequests = platform.AboutMUIRequestCount;
+		Assert.False(MuiApplicationWindowCore.AboutMUI(ref platform, State,
+			application, referenceWindow));
+		Assert.Equal(aboutRequests, platform.AboutMUIRequestCount);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, 0x7FFE0020, out var preservedReference));
+		Assert.Equal(referenceWindow.Raw, preservedReference);
+
+		var showHelpRequests = platform.ShowHelpRequestCount;
+		Assert.False(MuiApplicationWindowCore.ShowHelp(ref platform, State,
+			application, referenceWindow, name, node, 2));
+		Assert.Equal(showHelpRequests, platform.ShowHelpRequestCount);
+		Assert.True(MuiApplicationHelpStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiApplicationHelpStateField.HelpNode,
+			out var preservedNode));
+		Assert.Equal(0xFFFFFF00u, preservedNode);
+	}
+
+	[Fact]
 	public void ApplicationDefaultConfigStateCodecUsesNamedResultFields()
 	{
 		var platform = CreatePlatform(out _);
@@ -1878,7 +2779,7 @@ public sealed class MuiApplicationWindowTests
 		value.Requests = 7;
 		Assert.True(MuiApplicationDefaultConfigStateRecordCodec.Write(ref platform,
 			address, value));
-		Assert.True(MuiApplicationDefaultConfigStateRecordCodec.TryRead(
+		Assert.True(MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
 			ref platform, address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.ConfigId, decoded.ConfigId);
@@ -1893,6 +2794,28 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiApplicationDefaultConfigStateField)255;
 		Assert.False(MuiApplicationDefaultConfigStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationDefaultConfigStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x2E80);
+		var value = default(MuiApplicationDefaultConfigStateRecord);
+		value.Magic = MuiApplicationDefaultConfigStateRecord.Cookie;
+		value.ConfigId = 0x44;
+		value.Value = 0x12345678;
+		value.Requests = 7;
+		Assert.True(MuiApplicationDefaultConfigStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.ConfigId, decoded.ConfigId);
+		Assert.Equal(value.Value, decoded.Value);
+		Assert.Equal(value.Requests, decoded.Requests);
+		Assert.False(MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
 	}
 
 	[Fact]
@@ -1924,6 +2847,52 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void ApplicationDefaultConfigAdmissionRequiresCookieAndLiveApplication()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var value = default(MuiApplicationDefaultConfigStateRecord);
+		value.Magic = MuiApplicationDefaultConfigStateRecord.Cookie;
+		value.ConfigId = 0x44;
+		value.Value = 0x12345678;
+		Assert.True(MuiApplicationDefaultConfigStateAdmission.Validate(value));
+		Assert.True(MuiApplicationDefaultConfigStateAdmission.ValidateLive(
+			ref platform, State, application, value));
+		value.Magic = 0;
+		Assert.False(MuiApplicationDefaultConfigStateAdmission.Validate(value));
+		Assert.False(MuiApplicationDefaultConfigStateAdmission.ValidateLive(
+			ref platform, State, application, value));
+	}
+
+	[Fact]
+	public void MalformedApplicationDefaultConfigStateFailsClosedBeforeCapability()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		platform.DefaultConfigItemValue = 0x12345678;
+		Assert.Equal(0x12345678u, MuiApplicationWindowCore.DefaultConfigItem(
+			ref platform, State, application, 0x44));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationDefaultConfigStateKey);
+		Assert.True(MuiApplicationDefaultConfigStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationDefaultConfigStateField.Magic, 0));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationDefaultConfigState(
+			ref platform, State, application, out _));
+		var requests = platform.DefaultConfigRequestCount;
+		platform.DefaultConfigItemValue = 0xCAFEBABE;
+		Assert.Equal(0u, MuiApplicationWindowCore.DefaultConfigItem(ref platform,
+			State, application, 0x45));
+		Assert.Equal(requests, platform.DefaultConfigRequestCount);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, 0x7FFE0029, out var preservedId));
+		Assert.Equal(0x44u, preservedId);
+		Assert.True(MuiApplicationDefaultConfigStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiApplicationDefaultConfigStateField.Magic,
+			out var preservedMagic));
+		Assert.Equal(0u, preservedMagic);
+	}
+
+	[Fact]
 	public void ApplicationConfigWindowStateCodecUsesNamedFields()
 	{
 		var platform = CreatePlatform(out _);
@@ -1935,7 +2904,7 @@ public sealed class MuiApplicationWindowTests
 		value.Requests = 5;
 		Assert.True(MuiApplicationConfigWindowStateRecordCodec.Write(ref platform,
 			address, value));
-		Assert.True(MuiApplicationConfigWindowStateRecordCodec.TryRead(
+		Assert.True(MuiApplicationConfigWindowStateRecordCodec.TryReadStructural(
 			ref platform, address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.Flags, decoded.Flags);
@@ -1950,6 +2919,29 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiApplicationConfigWindowStateField)255;
 		Assert.False(MuiApplicationConfigWindowStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationConfigWindowStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x2F20);
+		var value = default(MuiApplicationConfigWindowStateRecord);
+		value.Magic = MuiApplicationConfigWindowStateRecord.Cookie;
+		value.Flags = 0xA5A5A5A5;
+		value.ClassId = APTR.Null;
+		value.Requests = 7;
+
+		Assert.True(MuiApplicationConfigWindowStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiApplicationConfigWindowStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Flags, decoded.Flags);
+		Assert.Equal(value.ClassId, decoded.ClassId);
+		Assert.Equal(value.Requests, decoded.Requests);
+		Assert.False(MuiApplicationConfigWindowStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
 	}
 
 	[Fact]
@@ -1992,7 +2984,7 @@ public sealed class MuiApplicationWindowTests
 		value.Requests = 4;
 		Assert.True(MuiApplicationSettingsPanelStateRecordCodec.Write(ref platform,
 			address, value));
-		Assert.True(MuiApplicationSettingsPanelStateRecordCodec.TryRead(
+		Assert.True(MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
 			ref platform, address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.Number, decoded.Number);
@@ -2007,6 +2999,28 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiApplicationSettingsPanelStateField)255;
 		Assert.False(MuiApplicationSettingsPanelStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationSettingsPanelStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x2FC0);
+		var value = default(MuiApplicationSettingsPanelStateRecord);
+		value.Magic = MuiApplicationSettingsPanelStateRecord.Cookie;
+		value.Number = 9;
+		value.Panel = APTR.FromPointer(0x2F80);
+		value.Requests = 4;
+		Assert.True(MuiApplicationSettingsPanelStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Number, decoded.Number);
+		Assert.Equal(value.Panel, decoded.Panel);
+		Assert.Equal(value.Requests, decoded.Requests);
+		Assert.False(MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
 	}
 
 	[Fact]
@@ -2036,6 +3050,65 @@ public sealed class MuiApplicationWindowTests
 		Assert.Equal(4u, panelState.Number);
 		Assert.True(panelState.Panel.IsNull);
 		Assert.Equal(2u, panelState.Requests);
+	}
+
+	[Fact]
+	public void ApplicationSettingsPanelAdmissionValidatesMappedAndLivePanel()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var panel = Object(ref platform, cl);
+		var value = default(MuiApplicationSettingsPanelStateRecord);
+		value.Magic = MuiApplicationSettingsPanelStateRecord.Cookie;
+		value.Number = 3;
+		value.Panel = panel;
+		Assert.True(MuiApplicationSettingsPanelStateAdmission.Validate(
+			ref platform, value));
+		Assert.True(MuiApplicationSettingsPanelStateAdmission.ValidateLive(
+			ref platform, State, application, value));
+
+		value.Panel = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiApplicationSettingsPanelStateAdmission.Validate(
+			ref platform, value));
+		value.Panel = APTR.FromPointer(0x3100);
+		Assert.True(MuiApplicationSettingsPanelStateAdmission.Validate(
+			ref platform, value));
+		Assert.False(MuiApplicationSettingsPanelStateAdmission.ValidateLive(
+			ref platform, State, application, value));
+	}
+
+	[Fact]
+	public void MalformedApplicationSettingsPanelStateFailsClosedBeforeCapability()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var panel = Object(ref platform, cl);
+		var replacement = Object(ref platform, cl);
+		Assert.True(MuiApplicationWindowCore.InitializeApplication(ref platform,
+			State, application, 0));
+		platform.SettingsPanelResult = panel;
+		Assert.Equal(panel, MuiApplicationWindowCore.BuildSettingsPanel(ref platform,
+			State, application, 3));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationSettingsPanelStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiApplicationSettingsPanelStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationSettingsPanelStateField.Panel,
+			0xFFFFFF00u));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationSettingsPanelState(
+			ref platform, State, application, out _));
+
+		var calls = platform.BuildSettingsPanelRequestCount;
+		platform.SettingsPanelResult = replacement;
+		Assert.True(MuiApplicationWindowCore.BuildSettingsPanel(ref platform,
+			State, application, 4).IsNull);
+		Assert.Equal(calls, platform.BuildSettingsPanelRequestCount);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			application, 0x7FFE002F, out var number));
+		Assert.Equal(3u, number);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			application, 0x7FFE0030, out var storedPanel));
+		Assert.Equal(panel.Raw, storedPanel);
 	}
 
 	[Fact]
@@ -2072,6 +3145,96 @@ public sealed class MuiApplicationWindowTests
 		Assert.False(
 			MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryGetAddress(
 				ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationSettingsPersistenceStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x30A0);
+		var value = default(MuiApplicationSettingsPersistenceStateRecord);
+		value.Magic = MuiApplicationSettingsPersistenceStateRecord.Cookie;
+		value.Operation = 0;
+		value.Name = APTR.FromPointer(uint.MaxValue);
+		value.Requests = 9;
+		value.Saves = 4;
+		value.Loads = 5;
+
+		Assert.True(MuiApplicationSettingsPersistenceStateRecordCodec.Write(
+			ref platform, address, value));
+		Assert.True(MuiApplicationSettingsPersistenceStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Operation, decoded.Operation);
+		Assert.Equal(value.Name, decoded.Name);
+		Assert.Equal(value.Requests, decoded.Requests);
+		Assert.Equal(value.Saves, decoded.Saves);
+		Assert.Equal(value.Loads, decoded.Loads);
+		Assert.False(MuiApplicationSettingsPersistenceStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void ApplicationSettingsPersistenceAdmissionValidatesSentinelsAndOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var value = default(MuiApplicationSettingsPersistenceStateRecord);
+		value.Magic = MuiApplicationSettingsPersistenceStateRecord.Cookie;
+		value.Operation = 1;
+		Assert.True(MuiApplicationSettingsPersistenceStateAdmission.Validate(
+			ref platform, value));
+		Assert.True(MuiApplicationSettingsPersistenceStateAdmission.ValidateLive(
+			ref platform, State, application, value));
+
+		value.Operation = 2;
+		Assert.False(MuiApplicationSettingsPersistenceStateAdmission.Validate(
+			ref platform, value));
+		value.Operation = 0;
+		value.Name = APTR.FromPointer(uint.MaxValue);
+		Assert.True(MuiApplicationSettingsPersistenceStateAdmission.Validate(
+			ref platform, value));
+		value.Name = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiApplicationSettingsPersistenceStateAdmission.Validate(
+			ref platform, value));
+		value.Name = APTR.FromPointer(0x3080);
+		platform.WriteCString(value.Name, "ENV:CopperOS.prefs");
+		Assert.True(MuiApplicationSettingsPersistenceStateAdmission.Validate(
+			ref platform, value));
+		Assert.False(MuiApplicationSettingsPersistenceStateAdmission.ValidateLive(
+			ref platform, State, APTR.FromPointer(0x32000), value));
+	}
+
+	[Fact]
+	public void MalformedApplicationSettingsPersistenceStateFailsClosedBeforeCapability()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var name = APTR.FromPointer(0x3080);
+		platform.WriteCString(name, "ENV:CopperOS.prefs");
+		Assert.True(MuiApplicationWindowCore.InitializeApplication(ref platform,
+			State, application, 0));
+		Assert.True(MuiApplicationWindowCore.SaveApplicationSettings(ref platform,
+			State, application, name));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationSettingsPersistenceStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiApplicationSettingsPersistenceStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationSettingsPersistenceStateField.Operation,
+			2));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationSettingsPersistenceState(
+			ref platform, State, application, out _));
+
+		var calls = platform.SettingsSaveRequestCount;
+		Assert.False(MuiApplicationWindowCore.SaveApplicationSettings(ref platform,
+			State, application, name));
+		Assert.Equal(calls, platform.SettingsSaveRequestCount);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			application, 0x7FFE0032, out var operation));
+		Assert.Equal(1u, operation);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			application, 0x7FFE0033, out var storedName));
+		Assert.Equal(name.Raw, storedName);
 	}
 
 	[Fact]
@@ -2132,6 +3295,79 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiApplicationRefreshStateField)255;
 		Assert.False(MuiApplicationRefreshStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationRefreshStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x30E0);
+		var value = default(MuiApplicationRefreshStateRecord);
+		value.Magic = MuiApplicationRefreshStateRecord.Cookie;
+		value.Checks = uint.MaxValue;
+		value.RefreshedWindows = 7;
+		Assert.True(MuiApplicationRefreshStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiApplicationRefreshStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Checks, decoded.Checks);
+		Assert.Equal(value.RefreshedWindows, decoded.RefreshedWindows);
+		Assert.False(MuiApplicationRefreshStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void ApplicationRefreshAdmissionValidatesCookieAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var value = default(MuiApplicationRefreshStateRecord);
+		value.Magic = MuiApplicationRefreshStateRecord.Cookie;
+		value.Checks = 3;
+		value.RefreshedWindows = 2;
+		Assert.True(MuiApplicationRefreshStateAdmission.Validate(value));
+		Assert.True(MuiApplicationRefreshStateAdmission.ValidateLive(ref platform,
+			State, application, value));
+		value.Magic = 0;
+		Assert.False(MuiApplicationRefreshStateAdmission.Validate(value));
+		value.Magic = MuiApplicationRefreshStateRecord.Cookie;
+		Assert.False(MuiApplicationRefreshStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x32000), value));
+	}
+
+	[Fact]
+	public void MalformedApplicationRefreshStateFailsClosedBeforeTraversal()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var window = Object(ref platform, cl);
+		Assert.True(MuiApplicationWindowCore.InitializeApplication(ref platform,
+			State, application, 0));
+		Assert.True(MuiApplicationWindowCore.AddWindow(ref platform, State,
+			application, window));
+		Assert.True(MuiApplicationWindowCore.OpenWindow(ref platform, State,
+			window, 0));
+		Assert.True(MuiApplicationWindowCore.CheckRefresh(ref platform, State,
+			application));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationRefreshStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiApplicationRefreshStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationRefreshStateField.Magic, 0));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationRefreshState(
+			ref platform, State, application, out _));
+
+		var calls = platform.RefreshMuiWindowCount;
+		Assert.False(MuiApplicationWindowCore.CheckRefresh(ref platform, State,
+			application));
+		Assert.Equal(calls, platform.RefreshMuiWindowCount);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			application, 0x7FFE0022, out var checks));
+		Assert.Equal(1u, checks);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			application, 0x7FFE0023, out var refreshed));
+		Assert.Equal(1u, refreshed);
 	}
 
 	[Fact]
@@ -2902,6 +4138,9 @@ public sealed class MuiApplicationWindowTests
 		platform.WriteUInt32(vector, 4, 0x21000);
 		Assert.Equal(0u, MuiApplicationDispatcher.DispatchApplicationUsedClasses(
 			ref platform, State, application, packet));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			application, usedClasses, out _));
+		platform.WriteUInt32(vector, 4, secondName.Raw);
 		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
 			application, usedClasses, out value));
 		Assert.Equal(vector.Raw, value);
@@ -2958,7 +4197,7 @@ public sealed class MuiApplicationWindowTests
 		value.Vector = APTR.FromPointer(0x3600);
 		Assert.True(MuiApplicationUsedClassesStateRecordCodec.Write(ref platform,
 			address, value));
-		Assert.True(MuiApplicationUsedClassesStateRecordCodec.TryRead(
+		Assert.True(MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(
 			ref platform, address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.Vector, decoded.Vector);
@@ -2971,6 +4210,95 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiApplicationUsedClassesStateField)255;
 		Assert.False(MuiApplicationUsedClassesStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationUsedClassesStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x3640);
+		var value = default(MuiApplicationUsedClassesStateRecord);
+		value.Magic = MuiApplicationUsedClassesStateRecord.Cookie;
+		value.Vector = APTR.FromPointer(0x3680);
+
+		Assert.True(MuiApplicationUsedClassesStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Vector, decoded.Vector);
+		Assert.True(MuiApplicationUsedClassesStateRecordCodec.TryRead(ref platform,
+			address, out decoded));
+		Assert.Equal(value.Vector, decoded.Vector);
+		Assert.False(MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void ApplicationUsedClassesAdmissionValidatesBoundedNamedVector()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var vector = APTR.FromPointer(0x3E00);
+		var className = APTR.FromPointer(0x3E40);
+		var value = default(MuiApplicationUsedClassesStateRecord);
+		value.Magic = MuiApplicationUsedClassesStateRecord.Cookie;
+		value.Vector = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiApplicationUsedClassesStateAdmission.Validate(ref platform,
+			value));
+
+		value.Vector = vector;
+		platform.WriteUInt32(vector, 0, 0xFFFFFF00u);
+		Assert.False(MuiApplicationUsedClassesStateAdmission.Validate(ref platform,
+			value));
+		platform.WriteCString(className, "Listtree.mcc");
+		platform.WriteUInt32(vector, 0, className.Raw);
+		platform.WriteUInt32(vector, 4, 0);
+		Assert.True(MuiApplicationUsedClassesStateAdmission.Validate(ref platform,
+			value));
+		Assert.True(MuiApplicationUsedClassesStateAdmission.ValidateLive(ref platform,
+			State, application, value));
+
+		platform.WriteUInt32(vector, 4, 0xFFFFFF00u);
+		Assert.False(MuiApplicationUsedClassesStateAdmission.Validate(ref platform,
+			value));
+	}
+
+	[Fact]
+	public void MalformedApplicationUsedClassesStateFailsClosedBeforeSetter()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var original = APTR.FromPointer(0x3EC0);
+		var replacement = APTR.FromPointer(0x3F00);
+		var originalName = APTR.FromPointer(0x3F40);
+		var replacementName = APTR.FromPointer(0x3F80);
+		platform.WriteCString(originalName, "Listtree.mcc");
+		platform.WriteCString(replacementName, "Busy.mcc");
+		platform.WriteUInt32(original, 0, originalName.Raw);
+		platform.WriteUInt32(original, 4, 0);
+		platform.WriteUInt32(replacement, 0, replacementName.Raw);
+		platform.WriteUInt32(replacement, 4, 0);
+		Assert.True(MuiApplicationWindowCore.SetApplicationUsedClassesValue(
+			ref platform, State, application, original.Raw));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationUsedClassesStateKey);
+		Assert.True(MuiApplicationUsedClassesStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationUsedClassesStateField.Vector,
+			0xFFFFFF00u));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationUsedClassesState(
+			ref platform, State, application, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			application, 0x8042E9A7u, out _));
+		Assert.False(MuiApplicationWindowCore.SetApplicationUsedClassesValue(
+			ref platform, State, application, replacement.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, 0x8042E9A7u, out var preservedRaw));
+		Assert.Equal(original.Raw, preservedRaw);
+		Assert.True(MuiApplicationUsedClassesStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiApplicationUsedClassesStateField.Vector,
+			out var preservedSidecar));
+		Assert.Equal(0xFFFFFF00u, preservedSidecar);
 	}
 
 	[Fact]
@@ -3001,6 +4329,100 @@ public sealed class MuiApplicationWindowTests
 		Assert.False(
 			MuiApplicationWindowRelationshipStateFieldCursorCodec.TryGetAddress(
 				ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationWindowRelationshipStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x36C0);
+		var value = default(MuiApplicationWindowRelationshipStateRecord);
+		value.Magic = MuiApplicationWindowRelationshipStateRecord.Cookie;
+		value.LastWindow = APTR.FromPointer(0x3680);
+		value.AddedCount = 3;
+		Assert.True(MuiApplicationWindowRelationshipStateRecordCodec.Write(
+			ref platform, address, value));
+		Assert.True(MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.LastWindow, decoded.LastWindow);
+		Assert.Equal(value.AddedCount, decoded.AddedCount);
+		Assert.False(MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void ApplicationWindowRelationshipAdmissionValidatesLastWindowAndOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var window = Object(ref platform, cl);
+		var value = default(MuiApplicationWindowRelationshipStateRecord);
+		value.Magic = MuiApplicationWindowRelationshipStateRecord.Cookie;
+		Assert.True(MuiApplicationWindowRelationshipStateAdmission.Validate(
+			ref platform, value));
+		Assert.True(MuiApplicationWindowRelationshipStateAdmission.ValidateLive(
+			ref platform, State, application, value));
+		value.LastWindow = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiApplicationWindowRelationshipStateAdmission.Validate(
+			ref platform, value));
+		value.LastWindow = window;
+		Assert.True(MuiApplicationWindowRelationshipStateAdmission.Validate(
+			ref platform, value));
+		Assert.False(MuiApplicationWindowRelationshipStateAdmission.ValidateLive(
+			ref platform, State, application, value));
+
+		Assert.True(MuiApplicationWindowCore.SetApplicationWindowValue(
+			ref platform, State, application, window.Raw));
+		Assert.True(MuiApplicationWindowRelationshipStateAdmission.ValidateLive(
+			ref platform, State, application, value));
+		Assert.False(MuiApplicationWindowRelationshipStateAdmission.ValidateLive(
+			ref platform, State, APTR.FromPointer(0x32000), value));
+	}
+
+	[Fact]
+	public void MalformedApplicationWindowRelationshipStateFailsClosedBeforeMutation()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var first = Object(ref platform, cl);
+		var replacement = Object(ref platform, cl);
+		Assert.True(MuiApplicationWindowCore.SetApplicationWindowValue(
+			ref platform, State, application, first.Raw));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationWindowRelationshipStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiApplicationWindowRelationshipStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationWindowRelationshipStateField.LastWindow,
+			0x21000));
+
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationWindowRelationshipState(
+			ref platform, State, application, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			application, 0x8042BFE0u, out _));
+		Assert.False(MuiApplicationWindowCore.SetApplicationWindowValue(
+			ref platform, State, application, replacement.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, 0x8042BFE0u, out var raw));
+		Assert.Equal(first.Raw, raw);
+		Assert.Equal(first, MuiFamilyCore.GetChild(ref platform, State,
+			application, 0, APTR.Null));
+		Assert.True(MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+			ref platform, block, out var structural));
+		Assert.Equal(0x21000u, structural.LastWindow.Raw);
+		Assert.Equal(1u, structural.AddedCount);
+
+		// Repair the caller-owned sidecar before retrying; admission remains
+		// fail-closed until LastWindow is mapped and attached again.
+		Assert.True(MuiApplicationWindowRelationshipStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationWindowRelationshipStateField.LastWindow,
+			first.Raw));
+		Assert.True(MuiApplicationWindowCore.SetApplicationWindowValue(
+			ref platform, State, application, replacement.Raw));
+		Assert.True(MuiApplicationWindowCore.TryGetApplicationWindowRelationshipState(
+			ref platform, State, application, out var relationship));
+		Assert.Equal(replacement, relationship.LastWindow);
+		Assert.Equal(2u, relationship.AddedCount);
 	}
 
 	[Fact]
@@ -3092,6 +4514,55 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void WindowRelationshipAdmissionRejectsUnmappedPointers()
+	{
+		var platform = CreatePlatform(out _);
+		var value = default(MuiWindowRelationshipStateRecord);
+		value.Magic = MuiWindowRelationshipStateRecord.Cookie;
+		Assert.True(MuiWindowRelationshipStateAdmission.Validate(ref platform,
+			value));
+
+		value.RootObject = APTR.FromPointer(0xF0000000);
+		Assert.False(MuiWindowRelationshipStateAdmission.Validate(ref platform,
+			value));
+		value.RootObject = APTR.Null;
+		value.RefWindow = APTR.FromPointer(0xF0000000);
+		Assert.False(MuiWindowRelationshipStateAdmission.Validate(ref platform,
+			value));
+	}
+
+	[Fact]
+	public void WindowRelationshipConsumersFailClosedOnMalformedState()
+	{
+		var platform = CreatePlatform(out var cl);
+		var window = Object(ref platform, cl);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.RootObject, out var initial));
+		Assert.Equal(0u, initial);
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, window,
+			MuiWindowPublicCore.WindowRelationshipStateKey);
+		Assert.True(MuiWindowRelationshipStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiWindowRelationshipStateField.RootObject,
+			0xF0000000));
+		Assert.False(MuiWindowRelationshipStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		Assert.False(MuiWindowPublicCore.TryGetWindowRelationshipState(
+			ref platform, State, window, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.RootObject, out _));
+
+		var target = Object(ref platform, cl);
+		var packet = APTR.FromPointer(0x38C0);
+		Assert.True(MuiCommonControlPacketCore.WriteAttribute(ref platform, packet,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.RootObject,
+			target.Raw));
+		Assert.Equal(0u, MuiApplicationDispatcher.DispatchWindowRootObject(
+			ref platform, State, window, packet));
+		Assert.False(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			window, MuiWindowPublicCore.RootObject, out _));
+	}
+
+	[Fact]
 	public void WindowRelationshipPublishesRootMenuAndReferencePointers()
 	{
 		var platform = CreatePlatform(out var cl);
@@ -3168,6 +4639,27 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void WindowControlAdmissionRejectsNoncanonicalBooleans()
+	{
+		var value = default(MuiWindowControlStateRecord);
+		value.Magic = MuiWindowControlStateRecord.Cookie;
+		value.Id = 0x12345678;
+		value.DisableKeys = 0xA5;
+		value.VisibleOnMaximize = 1;
+		value.IsSubWindow = 1;
+		value.NeedsMouseObject = 1;
+		Assert.True(MuiWindowControlStateAdmission.Validate(value));
+		value.VisibleOnMaximize = 2;
+		Assert.False(MuiWindowControlStateAdmission.Validate(value));
+		value.VisibleOnMaximize = 1;
+		value.IsSubWindow = 2;
+		Assert.False(MuiWindowControlStateAdmission.Validate(value));
+		value.IsSubWindow = 1;
+		value.NeedsMouseObject = 2;
+		Assert.False(MuiWindowControlStateAdmission.Validate(value));
+	}
+
+	[Fact]
 	public void WindowControlPublishesCanonicalScalarState()
 	{
 		var platform = CreatePlatform(out var cl);
@@ -3204,6 +4696,37 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
 			MuiWindowPublicCore.NeedsMouseObject, out var needsMouseObject));
 		Assert.Equal(1u, needsMouseObject);
+	}
+
+	[Fact]
+	public void MalformedWindowControlStateFailsClosedBeforeConsumerMutation()
+	{
+		var platform = CreatePlatform(out var cl);
+		var window = Object(ref platform, cl);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.VisibleOnMaximize, out var initial));
+		Assert.Equal(0u, initial);
+
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, window,
+			MuiWindowPublicCore.WindowControlStateKey);
+		Assert.True(MuiWindowControlStateRecordCodec.TryReadStructural(
+			ref platform, block, out _));
+		Assert.True(MuiWindowControlStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiWindowControlStateField.VisibleOnMaximize, 2));
+		Assert.False(MuiWindowControlStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		Assert.False(MuiWindowPublicCore.TryGetWindowControlState(ref platform,
+			State, window, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiWindowPublicCore.VisibleOnMaximize, out _));
+
+		var packet = APTR.FromPointer(0x3900);
+		Assert.True(MuiCommonControlPacketCore.WriteAttribute(ref platform, packet,
+			MuiCommonControlPacketCore.Set, MuiWindowPublicCore.IsSubWindow, 1));
+		Assert.Equal(0u, MuiApplicationDispatcher.DispatchWindowIsSubWindow(
+			ref platform, State, window, packet));
+		Assert.False(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			window, MuiWindowPublicCore.IsSubWindow, out _));
 	}
 
 	[Fact]
@@ -3287,6 +4810,38 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = MuiApplicationCommandField.Reserved4;
 		Assert.False(MuiApplicationCommandFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationCommandRecordUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1d80);
+		var value = default(MuiApplicationCommandRecord);
+		value.Name = APTR.FromPointer(0x7100);
+		value.Template = APTR.FromPointer(0x7120);
+		value.Parameters = -3;
+		value.Hook = APTR.FromPointer(0x7140);
+		value.Reserved0 = 1;
+		value.Reserved1 = -2;
+		value.Reserved2 = 3;
+		value.Reserved3 = -4;
+		value.Reserved4 = 5;
+		Assert.True(MuiApplicationCommandRecordCodec.Write(ref platform, address,
+			value));
+		Assert.True(MuiApplicationCommandRecordCodec.TryRead(ref platform, address,
+			out var decoded));
+		Assert.Equal(value.Name, decoded.Name);
+		Assert.Equal(value.Template, decoded.Template);
+		Assert.Equal(value.Parameters, decoded.Parameters);
+		Assert.Equal(value.Hook, decoded.Hook);
+		Assert.Equal(value.Reserved0, decoded.Reserved0);
+		Assert.Equal(value.Reserved1, decoded.Reserved1);
+		Assert.Equal(value.Reserved2, decoded.Reserved2);
+		Assert.Equal(value.Reserved3, decoded.Reserved3);
+		Assert.Equal(value.Reserved4, decoded.Reserved4);
+		Assert.False(MuiApplicationCommandRecordCodec.TryRead(ref platform,
+			APTR.Null, out _));
 	}
 
 	[Fact]
@@ -3424,6 +4979,59 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void ApplicationWindowListRecordAdaptersUseStructMembers()
+	{
+		var platform = CreatePlatform(out _);
+		var stateAddress = APTR.FromPointer(0x1D00);
+		var state = new MuiApplicationWindowListState
+		{
+			Application = APTR.FromPointer(0x1E00),
+			List = APTR.FromPointer(0x1F00),
+			Entries = APTR.FromPointer(0x2000),
+			Count = 2,
+			Capacity = 4,
+			Mutation = 7,
+			Generation = 9,
+		};
+		Assert.True(MuiApplicationWindowListStateCodec.Write(ref platform,
+			stateAddress, state));
+		Assert.True(MuiApplicationWindowListStateRecordMemoryCodec.TryGetAddress(
+			ref platform, stateAddress,
+			MuiApplicationWindowListStateField.Entries, out var entries));
+		Assert.Equal(stateAddress.Raw + MuiApplicationWindowListState.EntriesOffset,
+			entries.Raw);
+		Assert.True(MuiApplicationWindowListStateCodec.TryRead(ref platform,
+			stateAddress, out var decodedState));
+		Assert.Equal(state.Entries, decodedState.Entries);
+		Assert.Equal(state.Generation, decodedState.Generation);
+
+		var entryAddress = APTR.FromPointer(0x2100);
+		var entry = new MuiApplicationWindowListEntry
+		{
+			Next = APTR.FromPointer(0x2200),
+			Previous = APTR.FromPointer(0x2300),
+			Object = APTR.FromPointer(0x2400),
+			Reserved = APTR.FromPointer(MuiApplicationWindowListEntry.ProjectionMagic),
+		};
+		Assert.True(MuiApplicationWindowListEntryCodec.Write(ref platform,
+			entryAddress, entry));
+		Assert.True(MuiApplicationWindowListEntryRecordMemoryCodec.TryGetAddress(
+			ref platform, entryAddress, MuiApplicationWindowListEntryField.Object,
+			out var objectAddress));
+		Assert.Equal(entryAddress.Raw + MuiApplicationWindowListEntry.ObjectOffset,
+			objectAddress.Raw);
+		Assert.True(MuiApplicationWindowListEntryCodec.TryRead(ref platform,
+			entryAddress, out var decodedEntry));
+		Assert.Equal(entry.Object, decodedEntry.Object);
+		Assert.False(MuiApplicationWindowListStateRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0xFFFFFFF0u),
+			MuiApplicationWindowListStateField.Generation, out _));
+		Assert.False(MuiApplicationWindowListEntryRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiApplicationWindowListEntryField.Next,
+			out _));
+	}
+
+	[Fact]
 	public void ApplicationIconifyTitleRetainsValidatedMutableGuestPointer()
 	{
 		var platform = CreatePlatform(out var cl);
@@ -3472,11 +5080,17 @@ public sealed class MuiApplicationWindowTests
 		var address = APTR.FromPointer(0x3280);
 		var value = default(MuiApplicationTextStateRecord);
 		value.Magic = MuiApplicationTextStateRecord.Cookie;
-		value.HelpFile = APTR.FromPointer(0x32C0);
-		value.IconifyTitle = APTR.FromPointer(0x3300);
 		Assert.True(MuiApplicationTextStateRecordCodec.Write(ref platform,
 			address, value));
-		Assert.True(MuiApplicationTextStateRecordCodec.TryRead(ref platform,
+		value.HelpFile = APTR.FromPointer(0x32C0);
+		value.IconifyTitle = APTR.FromPointer(0x3300);
+		Assert.True(MuiApplicationTextStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationTextStateField.HelpFile,
+			value.HelpFile.Raw));
+		Assert.True(MuiApplicationTextStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationTextStateField.IconifyTitle,
+			value.IconifyTitle.Raw));
+		Assert.True(MuiApplicationTextStateRecordCodec.TryReadStructural(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.HelpFile, decoded.HelpFile);
@@ -3490,6 +5104,30 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiApplicationTextStateField)255;
 		Assert.False(MuiApplicationTextStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationTextStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x33C0);
+		var helpFile = APTR.FromPointer(0x3400);
+		var iconifyTitle = APTR.FromPointer(0x3440);
+		platform.WriteCString(helpFile, "SYS:Help.guide");
+		platform.WriteCString(iconifyTitle, "CopperOS");
+		var value = default(MuiApplicationTextStateRecord);
+		value.Magic = MuiApplicationTextStateRecord.Cookie;
+		value.HelpFile = helpFile;
+		value.IconifyTitle = iconifyTitle;
+		Assert.True(MuiApplicationTextStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiApplicationTextStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.HelpFile, decoded.HelpFile);
+		Assert.Equal(value.IconifyTitle, decoded.IconifyTitle);
+		Assert.False(MuiApplicationTextStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
 	}
 
 	[Fact]
@@ -3546,6 +5184,48 @@ public sealed class MuiApplicationWindowTests
 			ref platform, State, application, out var textState));
 		Assert.Equal(helpValue, textState.HelpFile.Raw);
 		Assert.Equal(titleValue, textState.IconifyTitle.Raw);
+	}
+
+	[Fact]
+	public void ApplicationTextAdmissionRejectsUnmappedPointers()
+	{
+		var platform = CreatePlatform(out _);
+		var value = default(MuiApplicationTextStateRecord);
+		value.Magic = MuiApplicationTextStateRecord.Cookie;
+		Assert.True(MuiApplicationTextStateAdmission.Validate(ref platform, value));
+		value.HelpFile = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiApplicationTextStateAdmission.Validate(ref platform, value));
+		value.HelpFile = APTR.FromPointer(0x3A00);
+		platform.WriteCString(value.HelpFile, "SYS:Help.guide");
+		Assert.True(MuiApplicationTextStateAdmission.Validate(ref platform, value));
+	}
+
+	[Fact]
+	public void MalformedApplicationTextStateFailsClosedBeforeSetter()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var original = APTR.FromPointer(0x3A40);
+		var replacement = APTR.FromPointer(0x3A80);
+		platform.WriteCString(original, "SYS:Help.guide");
+		platform.WriteCString(replacement, "SYS:Other.guide");
+		Assert.True(MuiApplicationWindowCore.SetApplicationHelpFileValue(ref platform,
+			State, application, original.Raw));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationTextStateKey);
+		Assert.True(MuiApplicationTextStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationTextStateField.HelpFile,
+			0xFFFFFF00u));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationTextState(ref platform,
+			State, application, out _));
+		Assert.False(MuiApplicationWindowCore.SetApplicationHelpFileValue(ref platform,
+			State, application, replacement.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, 0x804293F4u, out var preservedRaw));
+		Assert.Equal(original.Raw, preservedRaw);
+		Assert.True(MuiApplicationTextStateFieldCursorCodec.TryReadUInt32(ref platform,
+			block, MuiApplicationTextStateField.HelpFile, out var preservedSidecar));
+		Assert.Equal(0xFFFFFF00u, preservedSidecar);
 	}
 
 	[Fact]
@@ -3671,7 +5351,7 @@ public sealed class MuiApplicationWindowTests
 		value.Menustrip = APTR.FromPointer(0x3200);
 		Assert.True(MuiApplicationObjectStateRecordCodec.Write(ref platform,
 			address, value));
-		Assert.True(MuiApplicationObjectStateRecordCodec.TryRead(ref platform,
+		Assert.True(MuiApplicationObjectStateRecordCodec.TryReadStructural(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.DiskObject, decoded.DiskObject);
@@ -3686,6 +5366,28 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiApplicationObjectStateField)255;
 		Assert.False(MuiApplicationObjectStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationObjectStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x3220);
+		var value = default(MuiApplicationObjectStateRecord);
+		value.Magic = MuiApplicationObjectStateRecord.Cookie;
+		value.DiskObject = APTR.FromPointer(0x3180);
+		value.DropObject = APTR.FromPointer(0x31C0);
+		value.Menustrip = APTR.FromPointer(0x3200);
+		Assert.True(MuiApplicationObjectStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiApplicationObjectStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.DiskObject, decoded.DiskObject);
+		Assert.Equal(value.DropObject, decoded.DropObject);
+		Assert.Equal(value.Menustrip, decoded.Menustrip);
+		Assert.False(MuiApplicationObjectStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
 	}
 
 	[Fact]
@@ -3756,6 +5458,99 @@ public sealed class MuiApplicationWindowTests
 		Assert.Equal(diskValue, objectState.DiskObject.Raw);
 		Assert.Equal(dropValue, objectState.DropObject.Raw);
 		Assert.Equal(menustripValue, objectState.Menustrip.Raw);
+	}
+
+	[Fact]
+	public void ApplicationObjectAdmissionRejectsUnmappedPointersAndInvalidTopology()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var dropObject = Object(ref platform, cl);
+		var diskObject = APTR.FromPointer(0x3BC0);
+		platform.WriteUInt8(diskObject, (int)Amiga.DiskObject.Size - 1, 0xA5);
+		var value = default(MuiApplicationObjectStateRecord);
+		value.Magic = MuiApplicationObjectStateRecord.Cookie;
+		Assert.True(MuiApplicationObjectStateAdmission.Validate(ref platform, value));
+
+		value.DiskObject = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiApplicationObjectStateAdmission.Validate(ref platform, value));
+		value.DiskObject = diskObject;
+		value.DropObject = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiApplicationObjectStateAdmission.Validate(ref platform, value));
+		value.DropObject = dropObject;
+		Assert.True(MuiApplicationObjectStateAdmission.Validate(ref platform, value));
+		Assert.True(MuiApplicationObjectStateAdmission.ValidateLive(ref platform,
+			State, application, value));
+
+		value.DropObject = APTR.FromPointer(0x3C40);
+		Assert.False(MuiApplicationObjectStateAdmission.ValidateLive(ref platform,
+			State, application, value));
+	}
+
+	[Fact]
+	public void MalformedApplicationObjectStateFailsClosedBeforeSetters()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var replacement = APTR.FromPointer(0x3C80);
+		var diskObject = APTR.FromPointer(0x3CC0);
+		platform.WriteUInt8(diskObject, (int)Amiga.DiskObject.Size - 1, 0xA5);
+		platform.WriteUInt8(replacement, (int)Amiga.DiskObject.Size - 1, 0x5A);
+		Assert.True(MuiApplicationWindowCore.SetApplicationDiskObjectValue(
+			ref platform, State, application, diskObject.Raw));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationObjectStateKey);
+		Assert.True(MuiApplicationObjectStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationObjectStateField.DiskObject,
+			0xFFFFFF00u));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationObjectState(
+			ref platform, State, application, out _));
+		Assert.False(MuiApplicationWindowCore.SetApplicationDiskObjectValue(
+			ref platform, State, application, replacement.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, 0x804235CBu, out var preservedRaw));
+		Assert.Equal(diskObject.Raw, preservedRaw);
+		Assert.True(MuiApplicationObjectStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiApplicationObjectStateField.DiskObject,
+			out var preservedSidecar));
+		Assert.Equal(0xFFFFFF00u, preservedSidecar);
+	}
+
+	[Fact]
+	public void MalformedApplicationMenustripStateFailsClosedBeforeRelationshipMutation()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var name = APTR.FromPointer(0x3D00);
+		platform.WriteCString(name, "Menustrip.mui");
+		var stripClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			name, APTR.Null, 0, APTR.FromPointer(3), false);
+		var menustrip = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			stripClass, APTR.Null);
+		Assert.True(MuiMenuSpecialistCore.Attach(ref platform, State, menustrip,
+			MuiMenuSpecialistClass.Menustrip).IsNotNull);
+		Assert.True(MuiApplicationWindowCore.SetApplicationMenustripValue(
+			ref platform, State, application, menustrip.Raw));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationObjectStateKey);
+		Assert.True(MuiApplicationObjectStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationObjectStateField.Menustrip,
+			menustrip.Raw));
+		// Detach the object from the Application family without repairing the
+		// retained raw attribute; the sidecar now has invalid parent topology.
+		Assert.True(MuiFamilyCore.Remove(ref platform, State, application,
+			menustrip));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationObjectState(
+			ref platform, State, application, out _));
+		Assert.False(MuiApplicationWindowCore.SetApplicationMenustripValue(
+			ref platform, State, application, menustrip.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, 0x804252D9u, out var preservedRaw));
+		Assert.Equal(menustrip.Raw, preservedRaw);
+		Assert.True(MuiApplicationObjectStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiApplicationObjectStateField.Menustrip,
+			out var preservedSidecar));
+		Assert.Equal(menustrip.Raw, preservedSidecar);
 	}
 
 	[Fact]
@@ -3847,6 +5642,77 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void ApplicationMenuStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x3120);
+		var value = default(MuiApplicationMenuStateRecord);
+		value.Magic = MuiApplicationMenuStateRecord.Cookie;
+		value.MenuAction = uint.MaxValue;
+		value.MenuHelp = 0xBEEF;
+		Assert.True(MuiApplicationMenuStateRecordCodec.Write(ref platform, address,
+			value));
+		Assert.True(MuiApplicationMenuStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.MenuAction, decoded.MenuAction);
+		Assert.Equal(value.MenuHelp, decoded.MenuHelp);
+		Assert.False(MuiApplicationMenuStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void ApplicationMenuAdmissionValidatesCookieAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var value = default(MuiApplicationMenuStateRecord);
+		value.Magic = MuiApplicationMenuStateRecord.Cookie;
+		value.MenuAction = uint.MaxValue;
+		value.MenuHelp = 0xCAFE;
+		Assert.True(MuiApplicationMenuStateAdmission.Validate(value));
+		Assert.True(MuiApplicationMenuStateAdmission.ValidateLive(ref platform,
+			State, application, value));
+		value.Magic = 0;
+		Assert.False(MuiApplicationMenuStateAdmission.Validate(value));
+		value.Magic = MuiApplicationMenuStateRecord.Cookie;
+		Assert.False(MuiApplicationMenuStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x32000), value));
+	}
+
+	[Fact]
+	public void MalformedApplicationMenuStateFailsClosedBeforeTraversal()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var window = Object(ref platform, cl);
+		Assert.True(MuiApplicationWindowCore.InitializeApplication(ref platform,
+			State, application, 0));
+		Assert.True(MuiApplicationWindowCore.SetApplicationMenuActionValue(
+			ref platform, State, application, 0xCAFE));
+		Assert.True(MuiApplicationWindowCore.AddWindow(ref platform, State,
+			application, window));
+		Assert.True(MuiApplicationWindowCore.OpenWindow(ref platform, State,
+			window, 0));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationMenuStateKey);
+		Assert.True(block.IsNotNull);
+		platform.WriteUInt32(block, 0, 0);
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationMenuState(
+			ref platform, State, application, out _));
+
+		Assert.False(MuiApplicationWindowCore.SetApplicationMenuActionValue(
+			ref platform, State, application, 0xBEEF));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, 0x80428961, out var action));
+		Assert.Equal(0xCAFEu, action);
+		var calls = platform.MenuOperationCount;
+		Assert.Equal(0u, MuiApplicationWindowCore.SetApplicationMenu(ref platform,
+			State, application, 7, true, true, true));
+		Assert.Equal(calls, platform.MenuOperationCount);
+	}
+
+	[Fact]
 	public void ApplicationMenuPublicationUpdatesNamedState()
 	{
 		var platform = CreatePlatform(out var cl);
@@ -3871,15 +5737,33 @@ public sealed class MuiApplicationWindowTests
 		var address = APTR.FromPointer(0x33C0);
 		var value = default(MuiApplicationIdentityStateRecord);
 		value.Magic = MuiApplicationIdentityStateRecord.Cookie;
+		Assert.True(MuiApplicationIdentityStateRecordCodec.Write(ref platform,
+			address, value));
 		value.Author = APTR.FromPointer(0x3400);
 		value.Base = APTR.FromPointer(0x3440);
 		value.Copyright = APTR.FromPointer(0x3480);
 		value.Description = APTR.FromPointer(0x34C0);
 		value.Title = APTR.FromPointer(0x3500);
 		value.Version = APTR.FromPointer(0x3540);
-		Assert.True(MuiApplicationIdentityStateRecordCodec.Write(ref platform,
-			address, value));
-		Assert.True(MuiApplicationIdentityStateRecordCodec.TryRead(ref platform,
+		Assert.True(MuiApplicationIdentityStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationIdentityStateField.Author,
+			value.Author.Raw));
+		Assert.True(MuiApplicationIdentityStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationIdentityStateField.Base,
+			value.Base.Raw));
+		Assert.True(MuiApplicationIdentityStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationIdentityStateField.Copyright,
+			value.Copyright.Raw));
+		Assert.True(MuiApplicationIdentityStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationIdentityStateField.Description,
+			value.Description.Raw));
+		Assert.True(MuiApplicationIdentityStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationIdentityStateField.Title,
+			value.Title.Raw));
+		Assert.True(MuiApplicationIdentityStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationIdentityStateField.Version,
+			value.Version.Raw));
+		Assert.True(MuiApplicationIdentityStateRecordCodec.TryReadStructural(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.Author, decoded.Author);
@@ -3897,6 +5781,40 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiApplicationIdentityStateField)255;
 		Assert.False(MuiApplicationIdentityStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationIdentityStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x3580);
+		var title = APTR.FromPointer(0x35C0);
+		platform.WriteCString(title, "CopperOS");
+		var value = default(MuiApplicationIdentityStateRecord);
+		value.Magic = MuiApplicationIdentityStateRecord.Cookie;
+		value.Author = APTR.Null;
+		value.Base = APTR.Null;
+		value.Copyright = APTR.Null;
+		value.Description = APTR.Null;
+		value.Title = title;
+		value.Version = APTR.Null;
+
+		Assert.True(MuiApplicationIdentityStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiApplicationIdentityStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Author, decoded.Author);
+		Assert.Equal(value.Base, decoded.Base);
+		Assert.Equal(value.Copyright, decoded.Copyright);
+		Assert.Equal(value.Description, decoded.Description);
+		Assert.Equal(value.Title, decoded.Title);
+		Assert.Equal(value.Version, decoded.Version);
+		Assert.True(MuiApplicationIdentityStateRecordCodec.TryRead(ref platform,
+			address, out decoded));
+		Assert.Equal(value.Title, decoded.Title);
+		Assert.False(MuiApplicationIdentityStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
 	}
 
 	[Fact]
@@ -4005,6 +5923,49 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void ApplicationIdentityAdmissionRejectsUnmappedPointers()
+	{
+		var platform = CreatePlatform(out _);
+		var value = default(MuiApplicationIdentityStateRecord);
+		value.Magic = MuiApplicationIdentityStateRecord.Cookie;
+		Assert.True(MuiApplicationIdentityStateAdmission.Validate(ref platform, value));
+		value.Title = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiApplicationIdentityStateAdmission.Validate(ref platform, value));
+		value.Title = APTR.FromPointer(0x3AC0);
+		platform.WriteCString(value.Title, "CopperOS");
+		Assert.True(MuiApplicationIdentityStateAdmission.Validate(ref platform, value));
+	}
+
+	[Fact]
+	public void MalformedApplicationIdentityStateFailsClosedBeforeSetter()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var original = APTR.FromPointer(0x3B00);
+		var replacement = APTR.FromPointer(0x3B40);
+		platform.WriteCString(original, "CopperOS");
+		platform.WriteCString(replacement, "CopperOS 2");
+		Assert.True(MuiApplicationWindowCore.SetApplicationInitializerStringValue(
+			ref platform, State, application, 0x804281B8u, original.Raw));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationIdentityStateKey);
+		Assert.True(MuiApplicationIdentityStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationIdentityStateField.Title,
+			0xFFFFFF00u));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationIdentityState(
+			ref platform, State, application, out _));
+		Assert.False(MuiApplicationWindowCore.SetApplicationInitializerStringValue(
+			ref platform, State, application, 0x804281B8u, replacement.Raw));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, 0x804281B8u, out var preservedRaw));
+		Assert.Equal(original.Raw, preservedRaw);
+		Assert.True(MuiApplicationIdentityStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiApplicationIdentityStateField.Title,
+			out var preservedSidecar));
+		Assert.Equal(0xFFFFFF00u, preservedSidecar);
+	}
+
+	[Fact]
 	public void ApplicationPolicyStateCodecUsesNamedBooleanFields()
 	{
 		var platform = CreatePlatform(out _);
@@ -4016,7 +5977,7 @@ public sealed class MuiApplicationWindowTests
 		value.UseScreenNotify = 1;
 		Assert.True(MuiApplicationPolicyStateRecordCodec.Write(ref platform,
 			address, value));
-		Assert.True(MuiApplicationPolicyStateRecordCodec.TryRead(ref platform,
+		Assert.True(MuiApplicationPolicyStateRecordCodec.TryReadStructural(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.UseRexx, decoded.UseRexx);
@@ -4031,6 +5992,44 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiApplicationPolicyStateField)255;
 		Assert.False(MuiApplicationPolicyStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationPolicyStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x35A0);
+		var value = default(MuiApplicationPolicyStateRecord);
+		value.Magic = MuiApplicationPolicyStateRecord.Cookie;
+		value.UseRexx = 0;
+		value.UseCommodities = 1;
+		value.UseScreenNotify = 1;
+		Assert.True(MuiApplicationPolicyStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiApplicationPolicyStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.UseRexx, decoded.UseRexx);
+		Assert.Equal(value.UseCommodities, decoded.UseCommodities);
+		Assert.Equal(value.UseScreenNotify, decoded.UseScreenNotify);
+		Assert.False(MuiApplicationPolicyStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void ApplicationPolicyAdmissionRejectsNonCanonicalBooleans()
+	{
+		var value = default(MuiApplicationPolicyStateRecord);
+		value.Magic = MuiApplicationPolicyStateRecord.Cookie;
+		Assert.True(MuiApplicationPolicyStateAdmission.Validate(value));
+		value.UseRexx = 2;
+		Assert.False(MuiApplicationPolicyStateAdmission.Validate(value));
+		value.UseRexx = 0;
+		value.UseCommodities = 0xFFFFFFFFu;
+		Assert.False(MuiApplicationPolicyStateAdmission.Validate(value));
+		value.UseCommodities = 0;
+		value.UseScreenNotify = 1;
+		Assert.True(MuiApplicationPolicyStateAdmission.Validate(value));
 	}
 
 	[Fact]
@@ -4087,6 +6086,35 @@ public sealed class MuiApplicationWindowTests
 		Assert.Equal(useRexx, policyState.UseRexx);
 		Assert.Equal(useCommodities, policyState.UseCommodities);
 		Assert.Equal(useScreenNotify, policyState.UseScreenNotify);
+	}
+
+	[Fact]
+	public void MalformedApplicationPolicyStateFailsClosedBeforeConsumers()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		Assert.True(MuiApplicationWindowCore.SetApplicationUseRexxValue(
+			ref platform, State, application, 0));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationPolicyStateKey);
+		Assert.True(MuiApplicationPolicyStateRecordCodec.TryReadStructural(
+			ref platform, block, out var policy));
+		policy.UseCommodities = 2;
+		Assert.True(MuiApplicationPolicyStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationPolicyStateField.UseCommodities,
+			policy.UseCommodities));
+
+		Assert.False(MuiApplicationPolicyStateRecordCodec.TryRead(ref platform,
+			block, out _));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationPolicyState(
+			ref platform, State, application, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			application, 0x80425EE5u, out _));
+		Assert.False(MuiApplicationWindowCore.SetApplicationUseRexxValue(
+			ref platform, State, application, 1));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, 0x80422387u, out var rawUseRexx));
+		Assert.Equal(0u, rawUseRexx);
 	}
 
 	[Fact]
@@ -4333,6 +6361,48 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiWindowFocusStateField)255;
 		Assert.False(MuiWindowFocusStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void WindowFocusAdmissionRejectsUnmappedPointers()
+	{
+		var platform = CreatePlatform(out _);
+		var value = default(MuiWindowFocusStateRecord);
+		value.Magic = MuiWindowFocusStateRecord.Cookie;
+		Assert.True(MuiWindowFocusStateAdmission.Validate(ref platform, value));
+
+		value.ActiveObject = APTR.FromPointer(0xF0000000);
+		Assert.False(MuiWindowFocusStateAdmission.Validate(ref platform, value));
+		value.ActiveObject = APTR.Null;
+		value.DefaultObject = APTR.FromPointer(0xF0000000);
+		Assert.False(MuiWindowFocusStateAdmission.Validate(ref platform, value));
+	}
+
+	[Fact]
+	public void MalformedWindowFocusStateFailsClosedBeforeConsumerMutation()
+	{
+		var platform = CreatePlatform(out var cl);
+		var window = Object(ref platform, cl);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			0x80427925, out var initial));
+		Assert.Equal(0u, initial);
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, window,
+			MuiApplicationWindowCore.WindowFocusStateKey);
+		Assert.True(MuiWindowFocusStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiWindowFocusStateField.ActiveObject,
+			0xF0000000));
+		Assert.False(MuiWindowFocusStateRecordCodec.TryRead(ref platform, block,
+			out _));
+		Assert.False(MuiApplicationWindowCore.TryGetWindowFocusState(ref platform,
+			State, window, out _));
+		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			0x80427925, out _));
+
+		var member = Object(ref platform, cl);
+		Assert.False(MuiApplicationWindowCore.SetDefaultObjectValue(ref platform,
+			State, window, member));
+		Assert.False(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			window, 0x804294D7, out _));
 	}
 
 	[Fact]
@@ -4702,6 +6772,66 @@ public sealed class MuiApplicationWindowTests
 		Assert.Equal(0u, MuiApplicationDispatcher.Dispatch(ref platform, State,
 			dead, packet));
 		Assert.Equal(2u, platform.OpenConfigWindowRequestCount);
+	}
+
+	[Fact]
+	public void ApplicationConfigWindowAdmissionValidatesClassIdAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var classId = APTR.FromPointer(0x2F00);
+		platform.WriteCString(classId, "MUI:Config");
+		var value = default(MuiApplicationConfigWindowStateRecord);
+		value.Magic = MuiApplicationConfigWindowStateRecord.Cookie;
+		value.Flags = 3;
+		value.ClassId = classId;
+		Assert.True(MuiApplicationConfigWindowStateAdmission.Validate(ref platform,
+			value));
+		Assert.True(MuiApplicationConfigWindowStateAdmission.ValidateLive(
+			ref platform, State, application, value));
+		value.ClassId = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiApplicationConfigWindowStateAdmission.Validate(ref platform,
+			value));
+		value.ClassId = APTR.FromPointer(0x3100);
+		Assert.True(MuiApplicationConfigWindowStateAdmission.Validate(ref platform,
+			value));
+		value.ClassId = classId;
+		Assert.False(MuiApplicationConfigWindowStateAdmission.ValidateLive(
+			ref platform, State, APTR.FromPointer(0x3100), value));
+	}
+
+	[Fact]
+	public void MalformedApplicationConfigWindowStateFailsClosedBeforeCapability()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var original = APTR.FromPointer(0x2F40);
+		var replacement = APTR.FromPointer(0x2F80);
+		platform.WriteCString(original, "MUI:Config");
+		platform.WriteCString(replacement, "MUI:Other");
+		Assert.True(MuiApplicationWindowCore.OpenConfigWindow(ref platform, State,
+			application, 3, original));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationWindowCore.ApplicationConfigWindowStateKey);
+		Assert.True(MuiApplicationConfigWindowStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationConfigWindowStateField.ClassId,
+			0xFFFFFF00u));
+		Assert.False(MuiApplicationWindowCore.TryGetApplicationConfigWindowState(
+			ref platform, State, application, out _));
+		var requests = platform.OpenConfigWindowRequestCount;
+		Assert.False(MuiApplicationWindowCore.OpenConfigWindow(ref platform, State,
+			application, 4, replacement));
+		Assert.Equal(requests, platform.OpenConfigWindowRequestCount);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, 0x7FFE002C, out var preservedFlags));
+		Assert.Equal(3u, preservedFlags);
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, 0x7FFE002D, out var preservedClassId));
+		Assert.Equal(original.Raw, preservedClassId);
+		Assert.True(MuiApplicationConfigWindowStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block, MuiApplicationConfigWindowStateField.ClassId,
+			out var preservedSidecar));
+		Assert.Equal(0xFFFFFF00u, preservedSidecar);
 	}
 
 	[Fact]
@@ -5089,10 +7219,15 @@ public sealed class MuiApplicationWindowTests
 		platform.WriteUInt32(table, 0, 0x21000);
 		Assert.Equal(0u, MuiApplicationDispatcher.DispatchApplicationCommands(
 			ref platform, State, application, packet));
-		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+		Assert.False(MuiApplicationCommandsCore.TryGetApplicationCommandsState(
+			ref platform, State, application, out _));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
 			application, commands, out value));
 		Assert.Equal(table.Raw, value);
 
+		// Repair the caller-owned table before retrying the setter; strict state
+		// admission remains fail-closed until the guest table is valid again.
+		platform.WriteUInt32(table, 0, name.Raw);
 		Assert.True(MuiCommonControlPacketCore.WriteAttribute(ref platform, packet,
 			MuiCommonControlPacketCore.NoNotifySet, commands, 0));
 		Assert.Equal(1u, MuiApplicationDispatcher.DispatchApplicationCommands(
@@ -5128,6 +7263,69 @@ public sealed class MuiApplicationWindowTests
 		cursor.Field = (MuiApplicationCommandsStateField)255;
 		Assert.False(MuiApplicationCommandsStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationCommandsStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x3D00);
+		var value = default(MuiApplicationCommandsStateRecord);
+		value.Magic = MuiApplicationCommandsStateRecord.Cookie;
+		value.Table = APTR.Null;
+		Assert.True(MuiApplicationCommandsStateRecordCodec.Write(ref platform,
+			address, value));
+		Assert.True(MuiApplicationCommandsStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Table, decoded.Table);
+		Assert.False(MuiApplicationCommandsStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void ApplicationCommandsAdmissionValidatesTableAndLiveOwner()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var value = default(MuiApplicationCommandsStateRecord);
+		value.Magic = MuiApplicationCommandsStateRecord.Cookie;
+		Assert.True(MuiApplicationCommandsStateAdmission.Validate(ref platform,
+			value));
+		Assert.True(MuiApplicationCommandsStateAdmission.ValidateLive(ref platform,
+			State, application, value));
+		value.Table = APTR.FromPointer(0x3C00);
+		Assert.True(MuiApplicationCommandsStateAdmission.Validate(ref platform,
+			value));
+		value.Table = APTR.FromPointer(0xFFFFFF00u);
+		Assert.False(MuiApplicationCommandsStateAdmission.Validate(ref platform,
+			value));
+		value.Table = APTR.FromPointer(0x3C00);
+		Assert.False(MuiApplicationCommandsStateAdmission.ValidateLive(ref platform,
+			State, APTR.FromPointer(0x32000), value));
+	}
+
+	[Fact]
+	public void MalformedApplicationCommandsStateFailsClosedBeforeMutation()
+	{
+		var platform = CreatePlatform(out var cl);
+		var application = Object(ref platform, cl);
+		var table = APTR.FromPointer(0x3C00);
+		Assert.True(MuiApplicationCommandsCore.SetApplicationCommandsValue(
+			ref platform, State, application, table.Raw));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, application,
+			MuiApplicationCommandsCore.CommandsStateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiApplicationCommandsStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiApplicationCommandsStateField.Table,
+			0xFFFFFF00u));
+		Assert.False(MuiApplicationCommandsCore.TryGetApplicationCommandsState(
+			ref platform, State, application, out _));
+		Assert.False(MuiApplicationCommandsCore.SetApplicationCommandsValue(
+			ref platform, State, application, 0));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State,
+			application, MuiApplicationCommandsCore.Commands, out var stored));
+		Assert.Equal(table.Raw, stored);
 	}
 
 	[Fact]
@@ -5221,11 +7419,15 @@ public sealed class MuiApplicationWindowTests
 		var address = APTR.FromPointer(0x3AC0);
 		var value = default(MuiApplicationMessageRoutingStateRecord);
 		value.Magic = MuiApplicationMessageRoutingStateRecord.Cookie;
-		value.AppMessage = APTR.FromPointer(0x3B00);
 		value.WindowAppWindow = 1;
 		Assert.True(MuiApplicationMessageRoutingStateRecordCodec.Write(
 			ref platform, address, value));
-		Assert.True(MuiApplicationMessageRoutingStateRecordCodec.TryRead(
+		value.AppMessage = APTR.FromPointer(0x3B00);
+		Assert.True(MuiApplicationMessageRoutingStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiApplicationMessageRoutingStateField.AppMessage,
+			value.AppMessage.Raw));
+		Assert.True(MuiApplicationMessageRoutingStateRecordCodec.TryReadStructural(
 			ref platform, address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.AppMessage, decoded.AppMessage);
@@ -5242,6 +7444,94 @@ public sealed class MuiApplicationWindowTests
 		Assert.False(
 			MuiApplicationMessageRoutingStateFieldCursorCodec.TryGetAddress(
 				ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationMessageRoutingStateUsesDedicatedStructCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x3B80);
+		var value = default(MuiApplicationMessageRoutingStateRecord);
+		value.Magic = MuiApplicationMessageRoutingStateRecord.Cookie;
+		value.WindowAppWindow = 1;
+		Assert.True(MuiApplicationMessageRoutingStateRecordCodec.Write(
+			ref platform, address, value));
+		Assert.True(MuiApplicationMessageRoutingStateRecordCodec.TryReadStructural(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.AppMessage, decoded.AppMessage);
+		Assert.Equal(value.WindowAppWindow, decoded.WindowAppWindow);
+		Assert.False(MuiApplicationMessageRoutingStateRecordCodec.TryReadStructural(
+			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void ApplicationMessageRoutingAdmissionRejectsMalformedPointersAndBooleans()
+	{
+		var platform = CreatePlatform(out _);
+		var value = default(MuiApplicationMessageRoutingStateRecord);
+		value.Magic = MuiApplicationMessageRoutingStateRecord.Cookie;
+		Assert.True(MuiApplicationMessageRoutingStateAdmission.Validate(
+			ref platform, value));
+
+		value.WindowAppWindow = 2;
+		Assert.False(MuiApplicationMessageRoutingStateAdmission.Validate(
+			ref platform, value));
+		value.WindowAppWindow = 0;
+		value.AppMessage = APTR.FromPointer(0x21000);
+		Assert.False(MuiApplicationMessageRoutingStateAdmission.Validate(
+			ref platform, value));
+
+		value.AppMessage = APTR.FromPointer(0x3B00);
+		Assert.True(MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform,
+			value.AppMessage, MuiAppMessageField.NumberOfArguments,
+			unchecked((uint)-1)));
+		Assert.False(MuiApplicationMessageRoutingStateAdmission.Validate(
+			ref platform, value));
+		Assert.True(MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform,
+			value.AppMessage, MuiAppMessageField.NumberOfArguments, 0));
+		Assert.True(MuiApplicationMessageRoutingStateAdmission.Validate(
+			ref platform, value));
+	}
+
+	[Fact]
+	public void MalformedApplicationMessageRoutingStateFailsClosedBeforeConsumers()
+	{
+		var platform = CreatePlatform(out _);
+		var windowName = APTR.FromPointer(0x3C80);
+		platform.WriteCString(windowName, "Window.mui");
+		var windowClass = MuiHeadlessObjectCore.RegisterClass(ref platform, State,
+			windowName, APTR.Null, 0, APTR.FromPointer(1), false);
+		var window = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			windowClass, APTR.Null);
+		Assert.NotEqual(APTR.Null, window);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiApplicationMessageCore.AppMessage, out _));
+		Assert.True(MuiApplicationMessageCore.TryGetApplicationMessageRoutingState(
+			ref platform, State, window, out _));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, window,
+			MuiApplicationMessageCore.RoutingStateKey);
+		Assert.True(MuiApplicationMessageRoutingStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block,
+			MuiApplicationMessageRoutingStateField.WindowAppWindow, 2));
+		Assert.False(MuiApplicationMessageCore.TryGetApplicationMessageRoutingState(
+			ref platform, State, window, out _));
+		Assert.False(MuiApplicationMessageCore.SetWindowAppWindowValue(ref platform,
+			State, window, 1));
+		var windowRecord = MuiHeadlessObjectCore.FindObject(ref platform, State,
+			window);
+		Assert.True(MuiHeadlessObjectCore.SetRecordAttributeRaw(ref platform, State,
+			windowRecord, MuiApplicationMessageCore.WindowAppWindow, 1, false));
+		Assert.False(MuiApplicationMessageCore.PublishAppMessage(ref platform,
+			State, window, APTR.FromPointer(0x3D00)));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State, window,
+			MuiApplicationMessageCore.AppMessage, out var appMessage));
+		Assert.Equal(0u, appMessage);
+		Assert.True(MuiApplicationMessageRoutingStateFieldCursorCodec.TryReadUInt32(
+			ref platform, block,
+			MuiApplicationMessageRoutingStateField.WindowAppWindow,
+			out var preserved));
+		Assert.Equal(2u, preserved);
 	}
 
 	[Fact]
