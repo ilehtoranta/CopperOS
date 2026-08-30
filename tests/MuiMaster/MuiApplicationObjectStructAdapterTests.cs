@@ -37,4 +37,34 @@ public sealed class MuiApplicationObjectStructAdapterTests
 		Assert.False(MuiApplicationObjectStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiApplicationObjectStateField.Magic, out _));
 	}
+
+	[Fact]
+	public void ApplicationObjectSequentialRecordPreservesPointersAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x35C0);
+		var value = new MuiApplicationObjectStateRecord
+		{
+			Magic = MuiApplicationObjectStateRecord.Cookie,
+			DiskObject = APTR.FromPointer(uint.MaxValue),
+			DropObject = APTR.FromPointer(0x01020304u),
+			Menustrip = APTR.FromPointer(0xAABBCCDDu),
+		};
+
+		Assert.True(MuiApplicationObjectStateRecordCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiApplicationObjectStateRecordCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.DiskObject, decoded.DiskObject);
+		Assert.Equal(value.DropObject, decoded.DropObject);
+		Assert.Equal(value.Menustrip, decoded.Menustrip);
+
+		var crossingEnd = APTR.FromPointer(0x30FF1);
+		Assert.False(MuiApplicationObjectStateRecordCodec.WriteRecord(
+			ref platform, crossingEnd, value));
+		Assert.False(MuiApplicationObjectStateRecordCodec.TryReadRecord(
+			ref platform, crossingEnd, out _));
+	}
 }

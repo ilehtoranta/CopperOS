@@ -167,18 +167,19 @@ public static class MuiObjectPersistenceCore
 	{
 		MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj,
 			attribute, out var value);
-		var scratch = MuiHeadlessMemory.Allocate(ref platform, 4);
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiGuestUlongStorage.Size);
 		if (scratch.IsNull) return false;
 		if (!MuiGuestUlongStorageCodec.WriteValue(ref platform, scratch, value))
 		{
-			platform.Clear(scratch, 4);
-			platform.Free(scratch, 4);
+			platform.Clear(scratch, MuiGuestUlongStorage.Size);
+			platform.Free(scratch, MuiGuestUlongStorage.Size);
 			return false;
 		}
 		var result = MuiStoreCore.DataspaceAdd(ref platform, state, dataspace,
-			objectId, scratch, 4);
-		platform.Clear(scratch, 4);
-		platform.Free(scratch, 4);
+			objectId, scratch, unchecked((int)MuiGuestUlongStorage.Size));
+		platform.Clear(scratch, MuiGuestUlongStorage.Size);
+		platform.Free(scratch, MuiGuestUlongStorage.Size);
 		return result;
 	}
 
@@ -226,11 +227,12 @@ public static class MuiObjectPersistenceCore
 		uint kind) where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (MuiStoreCore.DataspaceLength(ref platform, state, dataspace,
-			objectId) != 4) return false;
+			objectId) != MuiGuestUlongStorage.Size) return false;
 		var data = MuiStoreCore.DataspaceFind(ref platform, state, dataspace,
 			objectId);
-		if (data.IsNull || !platform.IsMapped(data, 4)) return false;
-		var value = platform.ReadUInt32(data, 0);
+		if (data.IsNull || !MuiGuestUlongStorageCodec.TryRead(ref platform, data,
+			out var stored)) return false;
+		var value = stored.Value;
 		if (kind == 2 && !MuiListCore.SetAttribute(ref platform, state, obj,
 			attribute, value, false)) return false;
 		if (kind == 3)

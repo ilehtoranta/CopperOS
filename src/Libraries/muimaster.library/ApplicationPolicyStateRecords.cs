@@ -86,9 +86,10 @@ internal static class MuiApplicationPolicyStateFieldCursorCodec
 	}
 }
 
-// Fixed initializer-policy state is read and written as a named value. Keep
-// the packed guest positions in this ABI adapter; production consumers do not
-// select fields through the compatibility cursor.
+// Fixed initializer-policy state is transferred as a named record. Numeric
+// guest positions are confined to the bounded ABI adapter; production
+// consumers exchange the declaration-order struct through the sequential
+// cursor below.
 internal static class MuiApplicationPolicyStateRecordMemoryCodec
 {
 	private static bool TryResolve(MuiApplicationPolicyStateField field,
@@ -150,29 +151,44 @@ internal static class MuiApplicationPolicyStateRecordMemoryCodec
 
 internal static class MuiApplicationPolicyStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationPolicyStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiApplicationPolicyStateField.Magic,
-			out var magic) ||
-			!MuiApplicationPolicyStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationPolicyStateField.UseRexx,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationPolicyStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.UseRexx) ||
-			!MuiApplicationPolicyStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationPolicyStateField.UseCommodities,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.UseCommodities) ||
-			!MuiApplicationPolicyStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationPolicyStateField.UseScreenNotify,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.UseScreenNotify)) return false;
-		value.Magic = magic;
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationPolicyStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.UseRexx) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.UseCommodities) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.UseScreenNotify) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationPolicyStateRecord value)
@@ -187,22 +203,8 @@ internal static class MuiApplicationPolicyStateRecordCodec
 		MuiApplicationPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationPolicyStateRecord.Size) ||
-			!MuiApplicationPolicyStateAdmission.Validate(value)) return false;
-		return MuiApplicationPolicyStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationPolicyStateField.Magic,
-			value.Magic) &&
-			MuiApplicationPolicyStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationPolicyStateField.UseRexx,
-				value.UseRexx) &&
-			MuiApplicationPolicyStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationPolicyStateField.UseCommodities,
-				value.UseCommodities) &&
-			MuiApplicationPolicyStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationPolicyStateField.UseScreenNotify,
-				value.UseScreenNotify);
+		if (address.IsNull || !MuiApplicationPolicyStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

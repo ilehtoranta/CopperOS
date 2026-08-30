@@ -168,22 +168,43 @@ internal static class MuiWindowPresentationStateRecordMemoryCodec
 
 internal static class MuiWindowPresentationStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
-		APTR address,
-		out MuiWindowPresentationStateRecord value)
+	// Sequential named-struct path used by Window.mui. The cookie and four
+	// caller-owned APTR fields are exchanged in declaration order; numeric
+	// positions remain confined to the bounded compatibility adapter.
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiWindowPresentationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWindowPresentationStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Title.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Screen.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ScreenTitle.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.PublicScreen.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiWindowPresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiWindowPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out var magic) ||
-			!MuiWindowPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 4, out var title) ||
-			!MuiWindowPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 8, out var screen) ||
-			!MuiWindowPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 12, out var screenTitle) ||
-			!MuiWindowPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 16, out var publicScreen)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWindowPresentationStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var title) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var screen) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var screenTitle) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var publicScreen) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.Magic = magic;
 		value.Title = APTR.FromPointer(title);
 		value.Screen = APTR.FromPointer(screen);
@@ -191,6 +212,12 @@ internal static class MuiWindowPresentationStateRecordCodec
 		value.PublicScreen = APTR.FromPointer(publicScreen);
 		return true;
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiWindowPresentationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiWindowPresentationStateRecord value)
@@ -204,15 +231,6 @@ internal static class MuiWindowPresentationStateRecordCodec
 	{
 		if (!MuiWindowPresentationStateAdmission.Validate(ref platform, value))
 			return false;
-		return MuiWindowPresentationStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 0, value.Magic) &&
-			MuiWindowPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 4, value.Title.Raw) &&
-			MuiWindowPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 8, value.Screen.Raw) &&
-			MuiWindowPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 12, value.ScreenTitle.Raw) &&
-			MuiWindowPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 16, value.PublicScreen.Raw);
+		return WriteRecord(ref platform, address, value);
 	}
 }

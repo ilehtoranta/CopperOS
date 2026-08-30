@@ -94,6 +94,12 @@ public sealed class MuiRequesterServiceTests
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
 			State);
 		platform.WriteUInt32(Parameters, 0, 7);
+		Assert.True(MuiRequesterParameterSlotMemoryCodec.TryGetAddress(ref platform,
+			Parameters, MuiRequesterParameterSlotField.Value, out var valueAddress));
+		Assert.Equal(Parameters, valueAddress);
+		Assert.True(MuiRequesterParameterSlotMemoryCodec.TryReadUInt32(ref platform,
+			Parameters, MuiRequesterParameterSlotField.Value, out var directValue));
+		Assert.Equal(7u, directValue);
 		Assert.True(MuiRequesterParameterSlotCodec.TryRead(ref platform,
 			Parameters, out var slot));
 		Assert.Equal(7u, slot.Value);
@@ -104,6 +110,27 @@ public sealed class MuiRequesterServiceTests
 		Assert.True(MuiRequesterParameterSlotCodec.TryRead(ref platform,
 			Parameters, out var updated));
 		Assert.Equal(0xABCDu, updated.Value);
+	}
+
+	[Fact]
+	public void RequesterServiceStateMemoryAdapterOwnsStructBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var state = APTR.FromPointer(0x1A00);
+		Assert.True(MuiRequesterServiceStateMemoryCodec.TryGetAddress(ref platform,
+			state, MuiRequesterServiceStateField.Generation, out var generation));
+		Assert.Equal(APTR.FromPointer(0x1A04), generation);
+		Assert.True(MuiRequesterServiceStateMemoryCodec.TryWriteUInt32(ref platform,
+			state, MuiRequesterServiceStateField.Generation, 3));
+		Assert.True(MuiRequesterServiceStateMemoryCodec.TryReadUInt32(ref platform,
+			state, MuiRequesterServiceStateField.Generation, out var version));
+		Assert.Equal(3u, version);
+		Assert.False(MuiRequesterServiceStateMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20FFC), MuiRequesterServiceStateField.Magic,
+			out _));
+		Assert.False(MuiRequesterServiceStateMemoryCodec.TryGetAddress(ref platform,
+			state, (MuiRequesterServiceStateField)255, out _));
 	}
 
 	[Fact]
@@ -124,6 +151,24 @@ public sealed class MuiRequesterServiceTests
 		cursor.Index = 0;
 		Assert.False(MuiRequesterParameterCursorCodec.TryGetEntry(ref platform,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void RequesterParameterVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var vector = Parameters;
+		Assert.True(MuiRequesterParameterVectorMemoryCodec.TryGetEntry(
+			ref platform, vector, 2, out var address));
+		Assert.Equal(APTR.FromPointer(vector.Raw + 8), address);
+		Assert.False(MuiRequesterParameterVectorMemoryCodec.TryGetEntry(
+			ref platform, vector,
+			MuiRequesterParameterCursor.MaximumEntries, out _));
+		Assert.False(MuiRequesterParameterVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0x20FFE), 0, out _));
+		Assert.False(MuiRequesterParameterVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0xFFFFFFF0), 4, out _));
 	}
 
 	[Fact]

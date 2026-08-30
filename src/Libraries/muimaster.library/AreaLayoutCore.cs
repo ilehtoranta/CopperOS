@@ -9,9 +9,17 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiMinMaxValues
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 2;
+	internal const uint MinWidthOffset = 0;
+	internal const uint MinHeightOffset = 2;
+	internal const uint MaxWidthOffset = 4;
+	internal const uint MaxHeightOffset = 6;
+	internal const uint DefWidthOffset = 8;
+	internal const uint DefHeightOffset = 10;
 	public short MinWidth;
 	public short MinHeight;
 	public short MaxWidth;
@@ -48,7 +56,10 @@ internal struct MuiMinMaxFieldCursor
 	internal MuiMinMaxField Field;
 }
 
-internal static class MuiMinMaxFieldCursorCodec
+// The fixed six-short MinMax record owns its packed positions in this bounded
+// adapter. Live layout code uses it directly; the typed cursor remains only
+// for compatibility callers and adapter-focused tests.
+internal static class MuiMinMaxMemoryCodec
 {
 	private static bool TryResolve(MuiMinMaxField field,
 		out uint offset)
@@ -56,22 +67,22 @@ internal static class MuiMinMaxFieldCursorCodec
 		switch (field)
 		{
 			case MuiMinMaxField.MinWidth:
-				offset = 0;
+				offset = MuiMinMaxValues.MinWidthOffset;
 				break;
 			case MuiMinMaxField.MinHeight:
-				offset = 2;
+				offset = MuiMinMaxValues.MinHeightOffset;
 				break;
 			case MuiMinMaxField.MaxWidth:
-				offset = 4;
+				offset = MuiMinMaxValues.MaxWidthOffset;
 				break;
 			case MuiMinMaxField.MaxHeight:
-				offset = 6;
+				offset = MuiMinMaxValues.MaxHeightOffset;
 				break;
 			case MuiMinMaxField.DefWidth:
-				offset = 8;
+				offset = MuiMinMaxValues.DefWidthOffset;
 				break;
 			case MuiMinMaxField.DefHeight:
-				offset = 10;
+				offset = MuiMinMaxValues.DefHeightOffset;
 				break;
 			default:
 				offset = 0;
@@ -81,14 +92,15 @@ internal static class MuiMinMaxFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiMinMaxFieldCursor cursor, out APTR address)
+		APTR record, MuiMinMaxField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 2);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiMinMaxValues.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiMinMaxValues.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -96,10 +108,8 @@ internal static class MuiMinMaxFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiMinMaxFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = unchecked((short)platform.ReadUInt16(address, 0));
 		return true;
 	}
@@ -108,57 +118,94 @@ internal static class MuiMinMaxFieldCursorCodec
 		APTR record, MuiMinMaxField field, short value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiMinMaxFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt16(address, 0, unchecked((ushort)value));
 		return true;
 	}
 }
 
+internal static class MuiMinMaxFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMinMaxFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMinMaxMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR record, MuiMinMaxField field, out short value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMinMaxMemoryCodec.TryRead(ref platform, record, field, out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR record, MuiMinMaxField field, short value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMinMaxMemoryCodec.TryWrite(ref platform, record, field, value);
+}
+
 internal static class MuiMinMaxRecordCodec
 {
+	// Sequential named-struct path used by layout and control code. The
+	// six-short wire shape is consumed in declaration order; numeric offsets
+	// remain confined to MuiMinMaxMemoryCodec for compatibility diagnostics.
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiMinMaxValues values)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMinMaxValues.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+			unchecked((ushort)values.MinWidth)) &&
+		MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+			unchecked((ushort)values.MinHeight)) &&
+		MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+			unchecked((ushort)values.MaxWidth)) &&
+		MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+			unchecked((ushort)values.MaxHeight)) &&
+		MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+			unchecked((ushort)values.DefWidth)) &&
+		MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+			unchecked((ushort)values.DefHeight)) &&
+		MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiMinMaxValues values)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		values = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMinMaxValues.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var minWidth) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var minHeight) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var maxWidth) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var maxHeight) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var defWidth) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var defHeight) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		values.MinWidth = unchecked((short)minWidth);
+		values.MinHeight = unchecked((short)minHeight);
+		values.MaxWidth = unchecked((short)maxWidth);
+		values.MaxHeight = unchecked((short)maxHeight);
+		values.DefWidth = unchecked((short)defWidth);
+		values.DefHeight = unchecked((short)defHeight);
+		return true;
+	}
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiMinMaxValues values)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMinMaxValues.Size)) return false;
-		return MuiMinMaxFieldCursorCodec.TryWrite(ref platform, address,
-			MuiMinMaxField.MinWidth, values.MinWidth) &&
-			MuiMinMaxFieldCursorCodec.TryWrite(ref platform, address,
-				MuiMinMaxField.MinHeight, values.MinHeight) &&
-			MuiMinMaxFieldCursorCodec.TryWrite(ref platform, address,
-				MuiMinMaxField.MaxWidth, values.MaxWidth) &&
-			MuiMinMaxFieldCursorCodec.TryWrite(ref platform, address,
-				MuiMinMaxField.MaxHeight, values.MaxHeight) &&
-			MuiMinMaxFieldCursorCodec.TryWrite(ref platform, address,
-				MuiMinMaxField.DefWidth, values.DefWidth) &&
-			MuiMinMaxFieldCursorCodec.TryWrite(ref platform, address,
-				MuiMinMaxField.DefHeight, values.DefHeight);
-	}
+		=> WriteRecord(ref platform, address, values);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiMinMaxValues values)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		values = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMinMaxValues.Size)) return false;
-		return MuiMinMaxFieldCursorCodec.TryRead(ref platform, address,
-			MuiMinMaxField.MinWidth, out values.MinWidth) &&
-			MuiMinMaxFieldCursorCodec.TryRead(ref platform, address,
-				MuiMinMaxField.MinHeight, out values.MinHeight) &&
-			MuiMinMaxFieldCursorCodec.TryRead(ref platform, address,
-				MuiMinMaxField.MaxWidth, out values.MaxWidth) &&
-			MuiMinMaxFieldCursorCodec.TryRead(ref platform, address,
-				MuiMinMaxField.MaxHeight, out values.MaxHeight) &&
-			MuiMinMaxFieldCursorCodec.TryRead(ref platform, address,
-				MuiMinMaxField.DefWidth, out values.DefWidth) &&
-			MuiMinMaxFieldCursorCodec.TryRead(ref platform, address,
-				MuiMinMaxField.DefHeight, out values.DefHeight);
-	}
+		=> TryReadRecord(ref platform, address, out values);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]

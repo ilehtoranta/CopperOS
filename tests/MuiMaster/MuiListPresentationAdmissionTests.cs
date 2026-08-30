@@ -64,4 +64,47 @@ public sealed class MuiListPresentationAdmissionTests
 		Assert.True(MuiListCore.MuiListPresentationPolicyStateCodec.TryReadStorage(
 			ref platform, address, out _));
 	}
+
+	[Fact]
+	public void ListPresentationSequentialRecordPreservesFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3580);
+		var value = new MuiListCore.MuiListPresentationPolicyState
+		{
+			Magic = MuiListCore.MuiListPresentationPolicyState.Cookie,
+			Editable = 0x01020304u,
+			Quiet = 0x11223344u,
+			AdjustHeight = 0x55667788u,
+			AdjustWidth = 0x99AABBCCu,
+			Stripes = 0xDDEEFF00u,
+			ShowDropMarks = 0x13579BDFu,
+			DragSortable = 0x2468ACE0u,
+			DragType = 0x80000001u,
+			AutoVisible = 0xFFFFFFFFu,
+			AutoLineHeight = 0x7FFFFFFFu,
+			MinLineHeight = 0x40000000u,
+		};
+
+		Assert.True(MuiListCore.MuiListPresentationPolicyStateCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiListCore.MuiListPresentationPolicyStateCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Editable, decoded.Editable);
+		Assert.Equal(value.Quiet, decoded.Quiet);
+		Assert.Equal(value.AdjustHeight, decoded.AdjustHeight);
+		Assert.Equal(value.AdjustWidth, decoded.AdjustWidth);
+		Assert.Equal(value.Stripes, decoded.Stripes);
+		Assert.Equal(value.ShowDropMarks, decoded.ShowDropMarks);
+		Assert.Equal(value.DragSortable, decoded.DragSortable);
+		Assert.Equal(value.DragType, decoded.DragType);
+		Assert.Equal(value.AutoVisible, decoded.AutoVisible);
+		Assert.Equal(value.AutoLineHeight, decoded.AutoLineHeight);
+		Assert.Equal(value.MinLineHeight, decoded.MinLineHeight);
+
+		Assert.False(MuiListCore.MuiListPresentationPolicyStateCodec.TryReadRecord(
+			ref platform, APTR.FromPointer(0x30FD1), out _));
+	}
 }

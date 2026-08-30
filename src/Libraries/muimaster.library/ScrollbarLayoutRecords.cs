@@ -133,18 +133,40 @@ internal static class MuiScrollbarLayoutStateRecordMemoryCodec
 
 internal static class MuiScrollbarLayoutStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// Declaration-order guest record: { Magic, Horizontal, Type }.  Keep the
+	// production boundary cursor-based so callers exchange the named record,
+	// while the field adapter remains available for malformed-state probes.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiScrollbarLayoutStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiScrollbarLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic)) return false;
-		return MuiScrollbarLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out value.Horizontal) &&
-			MuiScrollbarLayoutStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 8, out value.Type);
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiScrollbarLayoutStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Horizontal) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Type) && MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiScrollbarLayoutStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiScrollbarLayoutStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Horizontal) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Type) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiScrollbarLayoutStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiScrollbarLayoutStateRecord value)
@@ -157,12 +179,7 @@ internal static class MuiScrollbarLayoutStateRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiScrollbarLayoutStateAdmission.Validate(value)) return false;
-		return MuiScrollbarLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiScrollbarLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 4, value.Horizontal) &&
-			MuiScrollbarLayoutStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 8, value.Type);
+		return WriteRecord(ref platform, address, value);
 	}
 }
 

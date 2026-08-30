@@ -42,4 +42,29 @@ public sealed class MuiImageFontMatchStateAdmissionTests
 		Assert.False(MuiImageFontMatchStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}
+
+	[Fact]
+	public void ImageFontMatchSequentialRecordPreservesScalarsAndRejectsTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3600);
+		var value = new MuiImageFontMatchStateRecord
+		{
+			Magic = MuiImageFontMatchStateRecord.Cookie,
+			Match = uint.MaxValue,
+			Height = 0x80000000u,
+			Width = 640,
+		};
+		Assert.True(MuiImageFontMatchStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiImageFontMatchStateRecordCodec.TryReadRecord(ref platform,
+			address, out var actual));
+		Assert.Equal(value.Magic, actual.Magic);
+		Assert.Equal(value.Match, actual.Match);
+		Assert.Equal(value.Height, actual.Height);
+		Assert.Equal(value.Width, actual.Width);
+		Assert.False(MuiImageFontMatchStateRecordCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FFC), out _));
+	}
 }

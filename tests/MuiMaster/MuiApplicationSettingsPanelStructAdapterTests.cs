@@ -40,4 +40,34 @@ public sealed class MuiApplicationSettingsPanelStructAdapterTests
 		Assert.False(MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}
+
+	[Fact]
+	public void ApplicationSettingsPanelSequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x35C0);
+		var value = new MuiApplicationSettingsPanelStateRecord
+		{
+			Magic = MuiApplicationSettingsPanelStateRecord.Cookie,
+			Number = uint.MaxValue,
+			Panel = APTR.FromPointer(uint.MaxValue),
+			Requests = 0xA5A5A5A5u,
+		};
+
+		Assert.True(MuiApplicationSettingsPanelStateRecordCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiApplicationSettingsPanelStateRecordCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Number, decoded.Number);
+		Assert.Equal(value.Panel, decoded.Panel);
+		Assert.Equal(value.Requests, decoded.Requests);
+
+		var crossingEnd = APTR.FromPointer(0x30FF1);
+		Assert.False(MuiApplicationSettingsPanelStateRecordCodec.WriteRecord(
+			ref platform, crossingEnd, value));
+		Assert.False(MuiApplicationSettingsPanelStateRecordCodec.TryReadRecord(
+			ref platform, crossingEnd, out _));
+	}
 }

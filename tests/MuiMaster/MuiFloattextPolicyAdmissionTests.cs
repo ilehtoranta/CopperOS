@@ -30,6 +30,11 @@ public sealed class MuiFloattextPolicyAdmissionTests
 		Assert.Equal(value.Justify, read.Justify);
 		Assert.Equal(value.Width, read.Width);
 		Assert.True(MuiFloattextPolicyValidation.IsValid(read));
+		Assert.True(MuiFloattextPolicyStateMemoryCodec.TryGetAddress(ref platform,
+			address, MuiFloattextPolicyField.Width, out var widthAddress));
+		Assert.Equal(APTR.FromPointer(0x2694), widthAddress);
+		Assert.False(MuiFloattextPolicyStateMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x31000), MuiFloattextPolicyField.Width, out _));
 	}
 
 	[Fact]
@@ -48,7 +53,7 @@ public sealed class MuiFloattextPolicyAdmissionTests
 			Width = 320,
 		};
 		Assert.True(MuiFloattextPolicyStateCodec.Write(ref platform, address, value));
-		Assert.True(MuiFloattextPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
+		Assert.True(MuiFloattextPolicyStateMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiFloattextPolicyField.Magic, 0));
 		Assert.True(MuiFloattextPolicyStateCodec.TryReadStructural(ref platform,
 			address, out var structural));

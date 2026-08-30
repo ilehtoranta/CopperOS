@@ -90,9 +90,9 @@ internal static class MuiApplicationTextStateFieldCursorCodec
 	}
 }
 
-// Fixed application text state is read and written as a named value. Keep
-// packed guest positions in this ABI adapter; production consumers do not
-// select fields through the compatibility cursor.
+// Fixed application text state is transferred as a named record. Numeric guest
+// positions are confined to the bounded ABI adapter; production consumers
+// exchange the declaration-order struct through the sequential cursor below.
 internal static class MuiApplicationTextStateRecordMemoryCodec
 {
 	private static bool TryResolve(MuiApplicationTextStateField field,
@@ -151,25 +151,42 @@ internal static class MuiApplicationTextStateRecordMemoryCodec
 
 internal static class MuiApplicationTextStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationTextStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationTextStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiApplicationTextStateField.Magic, out var magic) ||
-			!MuiApplicationTextStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationTextStateField.HelpFile,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationTextStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var helpFile) ||
-			!MuiApplicationTextStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationTextStateField.IconifyTitle,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var iconifyTitle)) return false;
-		value.Magic = magic;
 		value.HelpFile = APTR.FromPointer(helpFile);
 		value.IconifyTitle = APTR.FromPointer(iconifyTitle);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationTextStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationTextStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.HelpFile.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.IconifyTitle.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationTextStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationTextStateRecord value)
@@ -181,17 +198,9 @@ internal static class MuiApplicationTextStateRecordCodec
 		MuiApplicationTextStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationTextStateRecord.Size) ||
-			!MuiApplicationTextStateAdmission.Validate(ref platform, value))
+		if (address.IsNull || !MuiApplicationTextStateAdmission.Validate(ref platform,
+			value))
 			return false;
-		return MuiApplicationTextStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationTextStateField.Magic, value.Magic) &&
-			MuiApplicationTextStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationTextStateField.HelpFile,
-				value.HelpFile.Raw) &&
-			MuiApplicationTextStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationTextStateField.IconifyTitle,
-				value.IconifyTitle.Raw);
+		return WriteRecord(ref platform, address, value);
 	}
 }

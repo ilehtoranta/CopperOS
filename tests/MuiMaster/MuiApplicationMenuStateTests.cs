@@ -12,9 +12,12 @@ public sealed class MuiApplicationMenuStateTests
 	{
 		var platform = CreatePlatform(out _);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0,
-			MuiApplicationDispatcher.ApplicationGetMenuCheckMethod);
-		platform.WriteUInt32(packet, 4, 7);
+		Assert.True(MuiApplicationMenuQueryMessageCodec.Write(ref platform, packet,
+			new MuiApplicationMenuQueryMessage
+			{
+				MethodId = MuiApplicationDispatcher.ApplicationGetMenuCheckMethod,
+				MenuId = 7,
+			}));
 		var applicationQuery = new MuiApplicationMenuPacketCodec.MenuPacketAddress
 		{
 			Address = packet,
@@ -23,13 +26,53 @@ public sealed class MuiApplicationMenuStateTests
 		Assert.True(MuiApplicationMenuPacketCodec.TryReadApplicationQuery(
 			ref platform, ref applicationQuery, out var query));
 		Assert.Equal(applicationQuery.Method, query.MethodId);
+		Assert.Equal(7u, query.MenuId);
 		Assert.True(MuiApplicationMenuPacketCodec.TryReadMethodIdValue(
 			ref platform, packet, MuiApplicationMenuPacketKind.ApplicationQuery,
 			out var methodId));
 		Assert.Equal(applicationQuery.Method, methodId);
-		platform.WriteUInt32(packet, 0,
-			MuiApplicationDispatcher.WindowSetMenuStateMethod);
-		platform.WriteUInt32(packet, 8, 1);
+		Assert.True(MuiApplicationMenuSetMessageCodec.Write(ref platform, packet,
+			new MuiApplicationMenuSetMessage
+			{
+				MethodId = MuiApplicationDispatcher.ApplicationSetMenuStateMethod,
+				MenuId = 8,
+				State = 1,
+			}));
+		var applicationSet = new MuiApplicationMenuPacketCodec.MenuPacketAddress
+		{
+			Address = packet,
+			Method = MuiApplicationDispatcher.ApplicationSetMenuStateMethod,
+		};
+		Assert.True(MuiApplicationMenuPacketCodec.TryReadApplicationSet(
+			ref platform, ref applicationSet, out var appSet));
+		Assert.Equal(8u, appSet.MenuId);
+		Assert.Equal(1u, appSet.State);
+
+		Assert.True(MuiWindowMenuQueryMessageCodec.Write(ref platform, packet,
+			new MuiWindowMenuQueryMessage
+			{
+				MethodId = MuiApplicationDispatcher.WindowGetMenuStateMethod,
+				MenuId = 9,
+			}));
+		var windowQuery = new MuiApplicationMenuPacketCodec.MenuPacketAddress
+		{
+			Address = packet,
+			Method = MuiApplicationDispatcher.WindowGetMenuStateMethod,
+		};
+		Assert.True(MuiApplicationMenuPacketCodec.TryReadWindowQuery(ref platform,
+			ref windowQuery, out var winQuery));
+		Assert.Equal(9u, winQuery.MenuId);
+		Assert.True(MuiApplicationMenuPacketCodec.TryReadMethodIdValue(
+			ref platform, packet, MuiApplicationMenuPacketKind.WindowQuery,
+			out var windowQueryMethodId));
+		Assert.Equal(windowQuery.Method, windowQueryMethodId);
+		Assert.True(MuiWindowMenuSetMessageCodec.Write(ref platform, packet,
+			new MuiWindowMenuSetMessage
+			{
+				MethodId = MuiApplicationDispatcher.WindowSetMenuStateMethod,
+				MenuId = 7,
+				State = 1,
+			}));
 		var windowSet = new MuiApplicationMenuPacketCodec.MenuPacketAddress
 		{
 			Address = packet,
@@ -38,9 +81,20 @@ public sealed class MuiApplicationMenuStateTests
 		Assert.True(MuiApplicationMenuPacketCodec.TryReadWindowSet(ref platform,
 			ref windowSet, out var set));
 		Assert.Equal(windowSet.Method, set.MethodId);
+		Assert.Equal(7u, set.MenuId);
+		Assert.Equal(1u, set.State);
 		platform.WriteUInt32(packet, 0, 0xDEADBEEFu);
 		Assert.False(MuiApplicationMenuPacketCodec.TryReadWindowSet(ref platform,
 			ref windowSet, out _));
+
+		Assert.False(MuiApplicationMenuQueryMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiApplicationMenuSetMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiWindowMenuQueryMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiWindowMenuSetMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
 	}
 
 	[Fact]

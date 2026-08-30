@@ -52,4 +52,29 @@ public sealed class MuiListRedrawAdmissionTests
 			address, out var storage));
 		Assert.Equal(0u, storage.Magic);
 	}
+
+	[Fact]
+	public void ListRedrawSequentialRecordPreservesCountersAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3600);
+		var value = new MuiListCore.MuiListRedrawState
+		{
+			Magic = MuiListCore.MuiListRedrawState.Cookie,
+			Dirty = 0x80000001u,
+			Requests = 0xFFFFFFFFu,
+		};
+
+		Assert.True(MuiListCore.MuiListRedrawStateCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiListCore.MuiListRedrawStateCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Dirty, decoded.Dirty);
+		Assert.Equal(value.Requests, decoded.Requests);
+
+		Assert.False(MuiListCore.MuiListRedrawStateCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FF5), out _));
+	}
 }

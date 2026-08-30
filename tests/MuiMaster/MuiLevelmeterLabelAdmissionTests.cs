@@ -46,7 +46,7 @@ public sealed class MuiLevelmeterLabelAdmissionTests
 		Assert.True(block.IsNotNull);
 		Assert.True(MuiLevelmeterLabelStateFieldCursorCodec.TryWriteUInt32(
 			ref platform, block, MuiLevelmeterLabelStateField.Label, 0x30000));
-		Assert.True(MuiLevelmeterLabelStateRecordCodec.TryReadStructural(
+		Assert.True(MuiLevelmeterLabelStateRecordCodec.TryReadRecord(
 			ref platform, block, out var structural));
 		Assert.Equal(0x30000u, structural.Label.Raw);
 		Assert.True(MuiLevelmeterLabelStateAdmission.Validate(structural));

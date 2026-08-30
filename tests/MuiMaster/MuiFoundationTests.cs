@@ -26,6 +26,56 @@ public sealed class MuiFoundationTests
 	}
 
 	[Fact]
+	public void MasterPrivateRootCodecUsesNamedFieldsAndBounds()
+	{
+		var state = APTR.FromPointer(0x1000);
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			state);
+		var address = APTR.FromPointer(0x2400);
+		var value = new MuiMasterPrivateRoot
+		{
+			ClassRegistry = 0x11111111,
+			AllocationPolicy = 0x22222222,
+			ErrorState = 0x33333333,
+			ApplicationHead = 0x44444444,
+			ExternalClassHead = 0x55555555,
+			CallbackState = 0x66666666,
+			LoaderState = 0x77777777,
+			RegistryGeneration = 8,
+			ActiveDispatchDepth = 9,
+			ActiveCallbackDepth = 10,
+			Flags = 11,
+			Reserved = 12,
+		};
+
+		Assert.True(MuiMasterPrivateRootCodec.Write(ref platform, address, value));
+		Assert.True(MuiMasterPrivateRootCodec.TryRead(ref platform, address,
+			out var decoded));
+		Assert.Equal(value.ClassRegistry, decoded.ClassRegistry);
+		Assert.Equal(value.RegistryGeneration, decoded.RegistryGeneration);
+		Assert.Equal(value.Reserved, decoded.Reserved);
+
+		var cursor = default(MuiMasterPrivateRootFieldCursor);
+		cursor.Record = address;
+		cursor.Field = MuiMasterPrivateRootField.Flags;
+		Assert.True(MuiMasterPrivateRootRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor, out var fieldAddress));
+		Assert.Equal(address.Raw + MuiMasterPrivateRoot.FlagsOffset,
+			fieldAddress.Raw);
+		Assert.True(MuiMasterPrivateRootFieldCursorCodec.TryWriteUInt32(
+			ref platform, address, MuiMasterPrivateRootField.Flags, 0xCAFEBABE));
+		Assert.True(MuiMasterPrivateRootFieldCursorCodec.TryReadUInt32(
+			ref platform, address, MuiMasterPrivateRootField.Flags, out var flags));
+		Assert.Equal(0xCAFEBABEu, flags);
+
+		cursor.Field = (MuiMasterPrivateRootField)255;
+		Assert.False(MuiMasterPrivateRootRecordMemoryCodec.TryGetAddress(
+			ref platform, cursor, out _));
+		Assert.False(MuiMasterPrivateRootCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FF0), out _));
+	}
+
+	[Fact]
 	public void GuestUlongStorageCodecUsesNamedValue()
 	{
 		var state = APTR.FromPointer(0x1000);
@@ -71,6 +121,29 @@ public sealed class MuiFoundationTests
 		cursor.Field = MuiGuestUlongStorageField.Value;
 		Assert.False(MuiGuestUlongStorageFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void GuestUlongStorageMemoryAdapterOwnsStructBounds()
+	{
+		var state = APTR.FromPointer(0x1000);
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			state);
+		var storage = APTR.FromPointer(0x2300);
+
+		Assert.True(MuiGuestUlongStorageMemoryCodec.TryGetAddress(ref platform,
+			storage, MuiGuestUlongStorageField.Value, out var valueAddress));
+		Assert.Equal(storage.Raw + MuiGuestUlongStorage.ValueOffset,
+			valueAddress.Raw);
+		Assert.True(MuiGuestUlongStorageMemoryCodec.TryWrite(ref platform,
+			storage, MuiGuestUlongStorageField.Value, 0xCAFEBABEu));
+		Assert.True(MuiGuestUlongStorageMemoryCodec.TryRead(ref platform,
+			storage, MuiGuestUlongStorageField.Value, out var value));
+		Assert.Equal(0xCAFEBABEu, value);
+		Assert.False(MuiGuestUlongStorageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x30FFF), MuiGuestUlongStorageField.Value, out _));
+		Assert.False(MuiGuestUlongStorageMemoryCodec.TryGetAddress(ref platform,
+			storage, (MuiGuestUlongStorageField)255, out _));
 	}
 
 	[Fact]

@@ -68,7 +68,7 @@ public sealed class MuiWindowOpenPolicyAdmissionTests
 			CloseGadget = 1,
 			Borderless = 1,
 		};
-		Assert.True(MuiWindowOpenPolicyStateRecordCodec.Write(ref platform,
+		Assert.True(MuiWindowOpenPolicyStateRecordCodec.WriteRecord(ref platform,
 			address, value));
 		Assert.True(MuiWindowOpenPolicyStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, 84, out var rightScroller) && rightScroller.Raw ==

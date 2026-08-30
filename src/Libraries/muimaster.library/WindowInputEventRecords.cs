@@ -124,31 +124,37 @@ internal static class MuiWindowInputEventMemoryCodec
 
 internal static class MuiWindowInputEventCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out InputEvent value)
+	// Sequential named-struct path used by Window event dispatch. The mixed
+	// byte/word/LONG InputEvent fields are consumed in declaration order; the
+	// field adapter remains only for compatibility diagnostics.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out InputEvent value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiWindowInputEventMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiWindowInputEventField.NextEvent, out var nextEvent) ||
-			!MuiWindowInputEventMemoryCodec.TryReadUInt8(ref platform, address,
-				MuiWindowInputEventField.Class, out var @class) ||
-			!MuiWindowInputEventMemoryCodec.TryReadUInt8(ref platform, address,
-				MuiWindowInputEventField.SubClass, out var subClass) ||
-			!MuiWindowInputEventMemoryCodec.TryReadUInt16(ref platform, address,
-				MuiWindowInputEventField.Code, out value.Code) ||
-			!MuiWindowInputEventMemoryCodec.TryReadUInt16(ref platform, address,
-				MuiWindowInputEventField.Qualifier, out var qualifier) ||
-			!MuiWindowInputEventMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiWindowInputEventField.Position, out var position) ||
-			!MuiWindowInputEventMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiWindowInputEventField.Seconds, out var seconds) ||
-			!MuiWindowInputEventMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiWindowInputEventField.Microseconds, out var microseconds))
-			return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			InputEvent.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var nextEvent) ||
+			!MuiGuestStructCursor.TryReadUInt8(ref platform, ref cursor,
+				out var @class) ||
+			!MuiGuestStructCursor.TryReadUInt8(ref platform, ref cursor,
+				out var subClass) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var code) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var qualifier) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var position) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var seconds) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var microseconds) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.NextEvent = APTR.FromPointer(nextEvent);
 		value.Class = (InputEventClass)@class;
 		value.SubClass = (InputEventSubClass)subClass;
+		value.Code = code;
 		value.Qualifier = (InputEventQualifier)qualifier;
 		value.Position = unchecked((int)position);
 		value.TimeStamp.Seconds = seconds;
@@ -156,25 +162,35 @@ internal static class MuiWindowInputEventCodec
 		return true;
 	}
 
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, InputEvent value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			InputEvent.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.NextEvent.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt8(ref platform, ref cursor,
+			(byte)value.Class) &&
+		MuiGuestStructCursor.TryWriteUInt8(ref platform, ref cursor,
+			(byte)value.SubClass) &&
+		MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+			value.Code) &&
+		MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+			(ushort)value.Qualifier) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Position)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.TimeStamp.Seconds) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.TimeStamp.Microseconds) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out InputEvent value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		InputEvent value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiWindowInputEventMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiWindowInputEventField.NextEvent, value.NextEvent.Raw) &&
-			MuiWindowInputEventMemoryCodec.TryWriteUInt8(ref platform, address,
-				MuiWindowInputEventField.Class, (byte)value.Class) &&
-			MuiWindowInputEventMemoryCodec.TryWriteUInt8(ref platform, address,
-				MuiWindowInputEventField.SubClass, (byte)value.SubClass) &&
-			MuiWindowInputEventMemoryCodec.TryWriteUInt16(ref platform, address,
-				MuiWindowInputEventField.Code, value.Code) &&
-			MuiWindowInputEventMemoryCodec.TryWriteUInt16(ref platform, address,
-				MuiWindowInputEventField.Qualifier, (ushort)value.Qualifier) &&
-			MuiWindowInputEventMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiWindowInputEventField.Position, unchecked((uint)value.Position)) &&
-			MuiWindowInputEventMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiWindowInputEventField.Seconds, value.TimeStamp.Seconds) &&
-			MuiWindowInputEventMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiWindowInputEventField.Microseconds, value.TimeStamp.Microseconds);
-	}
+		=> WriteRecord(ref platform, address, value);
 }

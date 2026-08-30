@@ -143,33 +143,46 @@ internal static class MuiTextCopyStateRecordMemoryCodec
 
 internal static class MuiTextCopyStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiTextCopyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		return MuiTextCopyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) &&
-			MuiTextCopyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out value.Copy);
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiTextCopyStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Copy) && MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiTextCopyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiTextCopyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> TryReadStructural(ref platform, address, out value) &&
+		=> TryReadRecord(ref platform, address, out value) &&
 		MuiTextCopyStateAdmission.Validate(value);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiTextCopyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiTextCopyStateAdmission.Validate(value) &&
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiTextCopyStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Copy) && MuiGuestStructCursor.IsComplete(cursor);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiTextCopyStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiTextCopyStateAdmission.Validate(value)) return false;
-		return MuiTextCopyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiTextCopyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 4, value.Copy);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, value);
 }
 
 // Keep the wire value lossless for malformed-state diagnostics. MUIA_Text_Copy

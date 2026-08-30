@@ -245,6 +245,9 @@ internal struct MuiDataspaceEntryRecord
 internal struct MuiDataspaceIffEntryHeader
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint IdOffset = 0;
+	internal const uint LengthOffset = 4;
 	internal uint Id;
 	internal uint Length;
 }
@@ -273,10 +276,10 @@ internal static class MuiDataspaceIffEntryHeaderFieldCursorCodec
 		switch (cursor.Field)
 		{
 			case MuiDataspaceIffEntryHeaderField.Id:
-				offset = 0;
+				offset = MuiDataspaceIffEntryHeader.IdOffset;
 				break;
 			case MuiDataspaceIffEntryHeaderField.Length:
-				offset = 4;
+				offset = MuiDataspaceIffEntryHeader.LengthOffset;
 				break;
 			default:
 				return false;
@@ -284,7 +287,7 @@ internal static class MuiDataspaceIffEntryHeaderFieldCursorCodec
 		if (cursor.Header.IsNull || cursor.Header.Raw >
 			uint.MaxValue - offset) return false;
 		address = APTR.FromPointer(cursor.Header.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiDataspaceIffEntryHeader.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -322,10 +325,11 @@ internal static class MuiDataspaceIffEntryHeaderCodec
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiDataspaceIffEntryHeader.Size)) return false;
-		return MuiDataspaceIffEntryHeaderFieldCursorCodec.TryRead(ref platform,
-			address, MuiDataspaceIffEntryHeaderField.Id, out value.Id) &&
-			MuiDataspaceIffEntryHeaderFieldCursorCodec.TryRead(ref platform,
-				address, MuiDataspaceIffEntryHeaderField.Length, out value.Length);
+		value.Id = platform.ReadUInt32(address,
+			(int)MuiDataspaceIffEntryHeader.IdOffset);
+		value.Length = platform.ReadUInt32(address,
+			(int)MuiDataspaceIffEntryHeader.LengthOffset);
+		return true;
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
@@ -334,10 +338,12 @@ internal static class MuiDataspaceIffEntryHeaderCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiDataspaceIffEntryHeader.Size)) return false;
-		return MuiDataspaceIffEntryHeaderFieldCursorCodec.TryWrite(ref platform,
-			address, MuiDataspaceIffEntryHeaderField.Id, value.Id) &&
-			MuiDataspaceIffEntryHeaderFieldCursorCodec.TryWrite(ref platform,
-				address, MuiDataspaceIffEntryHeaderField.Length, value.Length);
+		platform.WriteUInt32(address, (int)MuiDataspaceIffEntryHeader.IdOffset,
+			value.Id);
+		platform.WriteUInt32(address,
+			(int)MuiDataspaceIffEntryHeader.LengthOffset,
+			value.Length);
+		return true;
 	}
 }
 
@@ -348,18 +354,30 @@ internal struct MuiDataspaceIffTransferCursor
 	internal uint Offset;
 }
 
+internal static class MuiDataspaceIffTransferMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR baseAddress, uint offset, uint byteCount, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (baseAddress.IsNull || baseAddress.Raw >
+			uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(baseAddress.Raw + offset);
+		return byteCount == 0 || platform.IsMapped(address, byteCount);
+	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// Dataspace-IFF transfer cursor. New code passes the base address and offset
+// directly to the struct-backed memory adapter above.
 internal static class MuiDataspaceIffTransferCursorCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiDataspaceIffTransferCursor cursor, uint byteCount, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Base.Raw >
-			uint.MaxValue - cursor.Offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + cursor.Offset);
-		return byteCount == 0 || platform.IsMapped(address, byteCount);
-	}
+		=> MuiDataspaceIffTransferMemoryCodec.TryGetAddress(ref platform,
+			cursor.Base, cursor.Offset, byteCount, out address);
 }
 
 // Central codec for the two fixed Dataspace IFF packets. Consumers receive
@@ -434,8 +452,11 @@ internal static class MuiDataspaceIffMessageCodec
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiDataspaceIffMethodFieldCursorCodec.TryRead(ref platform,
-			message, MuiDataspaceIffMethodField.MethodId, out methodId);
+		methodId = 0;
+		if (message.IsNull || !platform.IsMapped(message,
+			MuiDataspaceIffMethodMessage.Size)) return false;
+		methodId = platform.ReadUInt32(message, 0);
+		return true;
 	}
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
@@ -468,7 +489,7 @@ internal static class MuiDataspaceIffMessageCodec
 		if (!IsPacket(ref platform, message, MuiDataspaceReadIffMessage.Size,
 			ReadIffMethod)) return false;
 		packet.MethodId = ReadIffMethod;
-		if (!MuiDataspaceReadIffFieldCursorCodec.TryRead(ref platform, message,
+		if (!MuiDataspaceReadIffMessageMemoryCodec.TryRead(ref platform, message,
 			MuiDataspaceReadIffField.Handle, out var rawHandle)) return false;
 		packet.Handle = APTR.FromPointer(rawHandle);
 		return true;
@@ -482,12 +503,12 @@ internal static class MuiDataspaceIffMessageCodec
 		if (!IsPacket(ref platform, message, MuiDataspaceWriteIffMessage.Size,
 			WriteIffMethod)) return false;
 		packet.MethodId = WriteIffMethod;
-		if (!MuiDataspaceWriteIffFieldCursorCodec.TryRead(ref platform, message,
+		if (!MuiDataspaceWriteIffMessageMemoryCodec.TryRead(ref platform, message,
 			MuiDataspaceWriteIffField.Handle, out var rawHandle)) return false;
 		packet.Handle = APTR.FromPointer(rawHandle);
-		return MuiDataspaceWriteIffFieldCursorCodec.TryRead(ref platform, message,
+		return MuiDataspaceWriteIffMessageMemoryCodec.TryRead(ref platform, message,
 			MuiDataspaceWriteIffField.Type, out packet.Type) &&
-			MuiDataspaceWriteIffFieldCursorCodec.TryRead(ref platform, message,
+			MuiDataspaceWriteIffMessageMemoryCodec.TryRead(ref platform, message,
 				MuiDataspaceWriteIffField.Id, out packet.Id);
 	}
 
@@ -497,9 +518,9 @@ internal static class MuiDataspaceIffMessageCodec
 	{
 		if (!IsMapped(ref platform, message, MuiDataspaceReadIffMessage.Size))
 			return false;
-		return MuiDataspaceReadIffFieldCursorCodec.TryWrite(ref platform,
+		return MuiDataspaceReadIffMessageMemoryCodec.TryWrite(ref platform,
 			message, MuiDataspaceReadIffField.MethodId, ReadIffMethod) &&
-			MuiDataspaceReadIffFieldCursorCodec.TryWrite(ref platform, message,
+			MuiDataspaceReadIffMessageMemoryCodec.TryWrite(ref platform, message,
 				MuiDataspaceReadIffField.Handle, packet.Handle.Raw);
 	}
 
@@ -509,13 +530,13 @@ internal static class MuiDataspaceIffMessageCodec
 	{
 		if (!IsMapped(ref platform, message, MuiDataspaceWriteIffMessage.Size))
 			return false;
-		return MuiDataspaceWriteIffFieldCursorCodec.TryWrite(ref platform,
+		return MuiDataspaceWriteIffMessageMemoryCodec.TryWrite(ref platform,
 			message, MuiDataspaceWriteIffField.MethodId, WriteIffMethod) &&
-			MuiDataspaceWriteIffFieldCursorCodec.TryWrite(ref platform, message,
+			MuiDataspaceWriteIffMessageMemoryCodec.TryWrite(ref platform, message,
 				MuiDataspaceWriteIffField.Handle, packet.Handle.Raw) &&
-			MuiDataspaceWriteIffFieldCursorCodec.TryWrite(ref platform, message,
+			MuiDataspaceWriteIffMessageMemoryCodec.TryWrite(ref platform, message,
 				MuiDataspaceWriteIffField.Type, packet.Type) &&
-			MuiDataspaceWriteIffFieldCursorCodec.TryWrite(ref platform, message,
+			MuiDataspaceWriteIffMessageMemoryCodec.TryWrite(ref platform, message,
 				MuiDataspaceWriteIffField.Id, packet.Id);
 	}
 
@@ -614,16 +635,13 @@ public static class MuiDataspaceIffCore
 			MuiDataspaceIffEntryHeader.Size);
 		if (header.IsNull) return NoMem;
 		var result = 0;
-		var headerCursor = default(MuiDataspaceIffTransferCursor);
-		headerCursor.Base = header;
 		while (result == 0)
 		{
 			var received = 0u;
 			while (received < MuiDataspaceIffEntryHeader.Size)
 			{
-				headerCursor.Offset = received;
-				if (!MuiDataspaceIffTransferCursorCodec.TryGetAddress(
-					ref platform, headerCursor,
+				if (!MuiDataspaceIffTransferMemoryCodec.TryGetAddress(
+					ref platform, header, received,
 					MuiDataspaceIffEntryHeader.Size - received,
 					out var headerAddress))
 				{
@@ -701,7 +719,8 @@ public static class MuiDataspaceIffCore
 			state, obj).IsNull) return Mangled;
 		var push = platform.PushChunk(handle, type, id, UnknownChunkSize);
 		if (push != 0) return push;
-		var counter = MuiHeadlessMemory.Allocate(ref platform, 4);
+		var counter = MuiHeadlessMemory.Allocate(ref platform,
+			MuiStoreIterationCounter.Size);
 		var header = MuiHeadlessMemory.Allocate(ref platform,
 			MuiDataspaceIffEntryHeader.Size);
 		var result = 0;
@@ -735,7 +754,8 @@ public static class MuiDataspaceIffCore
 		if (result == 0 && pop != 0) result = pop;
 		if (header.IsNotNull)
 			platform.Free(header, MuiDataspaceIffEntryHeader.Size);
-		if (counter.IsNotNull) platform.Free(counter, 4);
+		if (counter.IsNotNull)
+			platform.Free(counter, MuiStoreIterationCounter.Size);
 		return result;
 	}
 
@@ -744,13 +764,11 @@ public static class MuiDataspaceIffCore
 		where TPlatform : struct, IMuiIffCapability, IMuiGuestMemory
 	{
 		var received = 0u;
-		var cursor = default(MuiDataspaceIffTransferCursor);
-		cursor.Base = buffer;
 		while (received < length)
 		{
-			cursor.Offset = received;
-			if (!MuiDataspaceIffTransferCursorCodec.TryGetAddress(
-				ref platform, cursor, length - received, out var address))
+			if (!MuiDataspaceIffTransferMemoryCodec.TryGetAddress(
+				ref platform, buffer, received, length - received,
+				out var address))
 				return Mangled;
 			var count = platform.ReadChunkBytes(handle,
 				address, length - received);
@@ -767,13 +785,11 @@ public static class MuiDataspaceIffCore
 		where TPlatform : struct, IMuiIffCapability, IMuiGuestMemory
 	{
 		var written = 0u;
-		var cursor = default(MuiDataspaceIffTransferCursor);
-		cursor.Base = buffer;
 		while (written < length)
 		{
-			cursor.Offset = written;
-			if (!MuiDataspaceIffTransferCursorCodec.TryGetAddress(
-				ref platform, cursor, length - written, out var address))
+			if (!MuiDataspaceIffTransferMemoryCodec.TryGetAddress(
+				ref platform, buffer, written, length - written,
+				out var address))
 				return Mangled;
 			var count = platform.WriteChunkBytes(handle,
 				address, length - written);

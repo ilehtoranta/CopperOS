@@ -150,33 +150,55 @@ internal static class MuiLevelmeterLabelStateRecordMemoryCodec
 
 internal static class MuiLevelmeterLabelStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// Production access is sequential and struct-shaped. The field-address
+	// adapters above remain available for compatibility diagnostics only.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiLevelmeterLabelStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiLevelmeterLabelStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) ||
-			!MuiLevelmeterLabelStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out var label)) return false;
+		if ((address.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiLevelmeterLabelStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var label) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value.Magic = magic;
 		value.Label = APTR.FromPointer(label);
 		return true;
 	}
 
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiLevelmeterLabelStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiLevelmeterLabelStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> TryReadStructural(ref platform, address, out value) &&
+		=> TryReadRecord(ref platform, address, out value) &&
 		MuiLevelmeterLabelStateAdmission.Validate(value);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiLevelmeterLabelStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if ((address.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiLevelmeterLabelStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Label.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiLevelmeterLabelStateRecord value)
 	where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiLevelmeterLabelStateAdmission.Validate(value)) return false;
-		return MuiLevelmeterLabelStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 0, value.Magic) &&
-			MuiLevelmeterLabelStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 4, value.Label.Raw);
+		return WriteRecord(ref platform, address, value);
 	}
 }

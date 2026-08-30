@@ -46,7 +46,7 @@ public sealed class MuiNumericFormatAdmissionTests
 		Assert.True(block.IsNotNull);
 		Assert.True(MuiNumericFormatStateFieldCursorCodec.TryWriteUInt32(
 			ref platform, block, MuiNumericFormatStateField.Format, 0x30000));
-		Assert.True(MuiNumericFormatStateRecordCodec.TryReadStructural(
+		Assert.True(MuiNumericFormatStateRecordCodec.TryReadRecord(
 			ref platform, block, out var structural));
 		Assert.Equal(0x30000u, structural.Format.Raw);
 		Assert.True(MuiNumericFormatStateAdmission.Validate(structural));
@@ -84,7 +84,7 @@ public sealed class MuiNumericFormatAdmissionTests
 			Magic = MuiNumericFormatStateRecord.Cookie,
 			Format = source,
 		};
-		Assert.True(MuiNumericFormatStateRecordCodec.Write(ref platform, address,
+		Assert.True(MuiNumericFormatStateRecordCodec.WriteRecord(ref platform, address,
 			record));
 		Assert.True(MuiNumericFormatStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, 4, out var formatAddress));
@@ -94,14 +94,14 @@ public sealed class MuiNumericFormatAdmissionTests
 		Assert.Equal(source.Raw, format);
 		Assert.True(MuiNumericFormatStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, 4, 0));
-		Assert.True(MuiNumericFormatStateRecordCodec.TryReadStructural(ref platform,
+		Assert.True(MuiNumericFormatStateRecordCodec.TryReadRecord(ref platform,
 			address, out var updated));
 		Assert.True(updated.Format.IsNull);
 		Assert.False(MuiNumericFormatStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiNumericFormatStateRecord.Size, out _));
 		Assert.False(MuiNumericFormatStateRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, 0, out _));
-		Assert.False(MuiNumericFormatStateRecordCodec.TryReadStructural(ref platform,
+		Assert.False(MuiNumericFormatStateRecordCodec.TryReadRecord(ref platform,
 			APTR.Null, out _));
 	}
 

@@ -64,6 +64,27 @@ public sealed class MuiImageOldImageAdmissionTests
 	}
 
 	[Fact]
+	public void ImageOldImageSequentialRecordPreservesPointerAndRejectsTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			State);
+		var address = APTR.FromPointer(0x3600);
+		var value = new MuiImageOldImageStateRecord
+		{
+			Magic = MuiImageOldImageStateRecord.Cookie,
+			Image = APTR.FromPointer(0x2A00),
+		};
+		Assert.True(MuiImageOldImageStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiImageOldImageStateRecordCodec.TryReadRecord(ref platform,
+			address, out var actual));
+		Assert.Equal(value.Magic, actual.Magic);
+		Assert.Equal(value.Image, actual.Image);
+		Assert.False(MuiImageOldImageStateRecordCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FFC), out _));
+	}
+
+	[Fact]
 	public void MalformedImageOldImageFailsClosedBeforeRawRepairOrGet()
 	{
 		var platform = CreatePlatform(out var imageClass);

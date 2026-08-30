@@ -34,4 +34,32 @@ public sealed class MuiAreaShortHelpStructAdapterTests
 		Assert.False(MuiAreaShortHelpStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}
+
+	[Fact]
+	public void AreaShortHelpSequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x36C0);
+		var value = new MuiAreaShortHelpStateRecord
+		{
+			Magic = MuiAreaShortHelpStateRecord.Cookie,
+			Text = APTR.FromPointer(0xFEEDBEEF),
+			Generation = uint.MaxValue,
+		};
+
+		Assert.True(MuiAreaShortHelpStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaShortHelpStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Text, decoded.Text);
+		Assert.Equal(value.Generation, decoded.Generation);
+
+		var crossingEnd = APTR.FromPointer(0x30FF5);
+		Assert.False(MuiAreaShortHelpStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiAreaShortHelpStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
 }

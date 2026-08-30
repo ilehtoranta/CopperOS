@@ -46,4 +46,40 @@ public sealed class MuiApplicationLifecycleStructAdapterTests
 			ref platform, APTR.Null,
 			MuiApplicationLifecycleStateField.Initialized, out _));
 	}
+
+	[Fact]
+	public void ApplicationLifecycleStateSequentialRecordPreservesRawFlagsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3600);
+		var value = new MuiApplicationLifecycleStateRecord
+		{
+			Magic = MuiApplicationLifecycleStateRecord.Cookie,
+			Initialized = 0x01020304u,
+			Iconified = 0x11223344u,
+			Active = 0x55667788u,
+			SingleTask = 0x99AABBCCu,
+			DoubleStart = 0xDDEEFF00u,
+			ForceQuit = uint.MaxValue,
+		};
+
+		Assert.True(MuiApplicationLifecycleStateRecordCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiApplicationLifecycleStateRecordCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Initialized, decoded.Initialized);
+		Assert.Equal(value.Iconified, decoded.Iconified);
+		Assert.Equal(value.Active, decoded.Active);
+		Assert.Equal(value.SingleTask, decoded.SingleTask);
+		Assert.Equal(value.DoubleStart, decoded.DoubleStart);
+		Assert.Equal(value.ForceQuit, decoded.ForceQuit);
+
+		var crossingEnd = APTR.FromPointer(0x30FE5);
+		Assert.False(MuiApplicationLifecycleStateRecordCodec.WriteRecord(
+			ref platform, crossingEnd, value));
+		Assert.False(MuiApplicationLifecycleStateRecordCodec.TryReadRecord(
+			ref platform, crossingEnd, out _));
+	}
 }

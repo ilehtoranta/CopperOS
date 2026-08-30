@@ -18,6 +18,11 @@ internal static class MuiErrorServiceLayout
 internal struct MuiErrorServiceStateRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint VersionOffset = 4;
+	internal const uint ErrorOffset = 8;
+	internal const uint SequenceOffset = 12;
 	internal uint Magic;
 	internal uint Version;
 	internal uint Error;
@@ -39,33 +44,34 @@ internal struct MuiErrorServiceStateFieldCursor
 	internal MuiErrorServiceStateField Field;
 }
 
-internal static class MuiErrorServiceStateFieldCursorCodec
+// Struct-first guest-memory adapter for the process-local error record.
+internal static class MuiErrorServiceStateMemoryCodec
 {
 	private static bool TryResolve(MuiErrorServiceStateField field,
 		out uint offset)
 	{
 		offset = field switch
 		{
-			MuiErrorServiceStateField.Magic => 0,
-			MuiErrorServiceStateField.Version => 4,
-			MuiErrorServiceStateField.Error => 8,
-			MuiErrorServiceStateField.Sequence => 12,
+			MuiErrorServiceStateField.Magic => MuiErrorServiceStateRecord.MagicOffset,
+			MuiErrorServiceStateField.Version => MuiErrorServiceStateRecord.VersionOffset,
+			MuiErrorServiceStateField.Error => MuiErrorServiceStateRecord.ErrorOffset,
+			MuiErrorServiceStateField.Sequence => MuiErrorServiceStateRecord.SequenceOffset,
 			_ => uint.MaxValue,
 		};
 		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiErrorServiceStateFieldCursor cursor, out APTR address)
+		APTR record, MuiErrorServiceStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiErrorServiceStateRecord.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiErrorServiceStateRecord.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiErrorServiceStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -73,10 +79,8 @@ internal static class MuiErrorServiceStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiErrorServiceStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -85,13 +89,34 @@ internal static class MuiErrorServiceStateFieldCursorCodec
 		APTR record, MuiErrorServiceStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiErrorServiceStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for typed cursor callers; production state
+// access routes through the named-record adapter above.
+internal static class MuiErrorServiceStateFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiErrorServiceStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiErrorServiceStateMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiErrorServiceStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiErrorServiceStateMemoryCodec.TryReadUInt32(ref platform, record, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiErrorServiceStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform, record, field,
+			value);
 }
 
 internal static class MuiErrorServiceStateCodec
@@ -103,13 +128,13 @@ internal static class MuiErrorServiceStateCodec
 		record = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiErrorServiceStateRecord.Size)) return false;
-		if (!MuiErrorServiceStateFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiErrorServiceStateMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiErrorServiceStateField.Magic, out record.Magic) ||
-			!MuiErrorServiceStateFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiErrorServiceStateMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiErrorServiceStateField.Version, out record.Version) ||
-			!MuiErrorServiceStateFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiErrorServiceStateMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiErrorServiceStateField.Error, out record.Error) ||
-			!MuiErrorServiceStateFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiErrorServiceStateMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiErrorServiceStateField.Sequence, out record.Sequence)) return false;
 		return true;
 	}
@@ -120,13 +145,13 @@ internal static class MuiErrorServiceStateCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiErrorServiceStateRecord.Size)) return false;
-		return MuiErrorServiceStateFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiErrorServiceStateField.Magic, record.Magic) &&
-			MuiErrorServiceStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiErrorServiceStateField.Version, record.Version) &&
-			MuiErrorServiceStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiErrorServiceStateField.Error, record.Error) &&
-			MuiErrorServiceStateFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiErrorServiceStateField.Sequence, record.Sequence);
 	}
 }

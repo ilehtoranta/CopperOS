@@ -6,6 +6,94 @@ namespace CopperOS.MuiMaster.Tests;
 public sealed class MuiListTitlePolicyAdmissionTests
 {
 	[Fact]
+	public void ListTitleSequentialRecordPreservesFullWidthFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3B00);
+		var value = new MuiListCore.MuiListTitleState
+		{
+			Magic = MuiListCore.MuiListTitleState.Cookie,
+			Value = 0xFFFFFFFEu,
+		};
+		Assert.True(MuiListCore.MuiListTitleStateCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiListCore.MuiListTitleStateCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Value, decoded.Value);
+		Assert.False(MuiListCore.MuiListTitleStateCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FF9), out _));
+	}
+
+	[Fact]
+	public void ListSelectChangeSequentialRecordPreservesRawBitsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3B20);
+		var value = new MuiListCore.MuiListSelectionSignalState
+		{
+			Magic = MuiListCore.MuiListSelectionSignalState.Cookie,
+			Value = 0xDEADBEEFu,
+		};
+		Assert.True(MuiListCore.MuiListSelectionSignalStateCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiListCore.MuiListSelectionSignalStateCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Value, decoded.Value);
+		Assert.False(MuiListCore.MuiListSelectionSignalStateCodec.TryReadRecord(
+			ref platform, APTR.FromPointer(0x30FF9), out _));
+	}
+
+	[Fact]
+	public void ListFormatPolicySequentialRecordPreservesPointerAndFields()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3B40);
+		var value = new MuiListCore.MuiListFormatPolicyState
+		{
+			Magic = MuiListCore.MuiListFormatPolicyState.Cookie,
+			Format = APTR.FromPointer(0x2A00),
+			MaxColumns = 0xFFFFFFFEu,
+			Columns = 0x80000001u,
+		};
+		Assert.True(MuiListCore.MuiListFormatPolicyStateCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiListCore.MuiListFormatPolicyStateCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Format, decoded.Format);
+		Assert.Equal(value.MaxColumns, decoded.MaxColumns);
+		Assert.Equal(value.Columns, decoded.Columns);
+		Assert.False(MuiListCore.MuiListFormatPolicyStateCodec.TryReadRecord(
+			ref platform, APTR.FromPointer(0x30FF1), out _));
+	}
+
+	[Fact]
+	public void ListFontSequentialRecordPreservesBorrowedPointerAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3B80);
+		var value = new MuiListCore.MuiListFontState
+		{
+			Magic = MuiListCore.MuiListFontState.Cookie,
+			Font = APTR.FromPointer(0xFFFFFFFEu),
+		};
+		Assert.True(MuiListCore.MuiListFontStateCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiListCore.MuiListFontStateCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Font, decoded.Font);
+		Assert.False(MuiListCore.MuiListFontStateCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FF9), out _));
+	}
+
+	[Fact]
 	public void ListTitleSelectionFormatAndFontRecordsRoundTripThroughStructs()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,

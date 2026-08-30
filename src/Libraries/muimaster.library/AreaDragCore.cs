@@ -31,6 +31,15 @@ public struct MuiDragImageDeleteSample
 internal struct MuiAreaDragState
 {
 	internal const uint Size = 32;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint SourceOffset = 4;
+	internal const uint TargetOffset = 8;
+	internal const uint LastXOffset = 12;
+	internal const uint LastYOffset = 16;
+	internal const uint QualifierOffset = 20;
+	internal const uint EventFlagsOffset = 24;
+	internal const uint FlagsOffset = 28;
 	internal const uint ActiveFlag = 1;
 	internal const uint DroppedFlag = 2;
 	internal const uint ReportedFlag = 4;
@@ -65,35 +74,39 @@ internal struct MuiAreaDragStateFieldCursor
 	internal MuiAreaDragStateField Field;
 }
 
-internal static class MuiAreaDragStateFieldCursorCodec
+// The fixed state record owns its packed positions in this bounded adapter.
+// Live drag lifecycle code uses this codec directly; the typed cursor below
+// remains only for compatibility callers and adapter-focused tests.
+internal static class MuiAreaDragStateMemoryCodec
 {
 	private static bool TryResolve(MuiAreaDragStateField field,
 		out uint offset)
 	{
 		offset = field switch
 		{
-			MuiAreaDragStateField.Magic => 0,
-			MuiAreaDragStateField.Source => 4,
-			MuiAreaDragStateField.Target => 8,
-			MuiAreaDragStateField.LastX => 12,
-			MuiAreaDragStateField.LastY => 16,
-			MuiAreaDragStateField.Qualifier => 20,
-			MuiAreaDragStateField.EventFlags => 24,
-			MuiAreaDragStateField.Flags => 28,
+			MuiAreaDragStateField.Magic => MuiAreaDragState.MagicOffset,
+			MuiAreaDragStateField.Source => MuiAreaDragState.SourceOffset,
+			MuiAreaDragStateField.Target => MuiAreaDragState.TargetOffset,
+			MuiAreaDragStateField.LastX => MuiAreaDragState.LastXOffset,
+			MuiAreaDragStateField.LastY => MuiAreaDragState.LastYOffset,
+			MuiAreaDragStateField.Qualifier => MuiAreaDragState.QualifierOffset,
+			MuiAreaDragStateField.EventFlags => MuiAreaDragState.EventFlagsOffset,
+			MuiAreaDragStateField.Flags => MuiAreaDragState.FlagsOffset,
 			_ => uint.MaxValue,
 		};
 		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiAreaDragStateFieldCursor cursor, out APTR address)
+		APTR record, MuiAreaDragStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiAreaDragState.Size) &&
+			platform.IsMapped(address, MuiAreaDragState.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -101,10 +114,8 @@ internal static class MuiAreaDragStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaDragStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -113,70 +124,105 @@ internal static class MuiAreaDragStateFieldCursorCodec
 		APTR record, MuiAreaDragStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaDragStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+internal static class MuiAreaDragStateFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaDragStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaDragStateMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaDragStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaDragStateMemoryCodec.TryReadUInt32(ref platform, record, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaDragStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaDragStateMemoryCodec.TryWriteUInt32(ref platform, record, field,
+			value);
 }
 
 internal static class MuiAreaDragStateCodec
 {
 	internal const uint Cookie = 0x41445247u; // 'ADRG'
 
+	// The live state path is struct-first.  The legacy field adapter above is
+	// retained for targeted address/corruption tests, but production state is
+	// exchanged in declaration order through one bounded cursor.
+	internal static bool TryWriteStruct<TPlatform>(ref TPlatform platform,
+		APTR storage, MuiAreaDragState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, storage,
+			MuiAreaDragState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Source) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Target) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.LastX)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.LastY)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Qualifier) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.EventFlags) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadStruct<TPlatform>(ref TPlatform platform,
+		APTR storage, out MuiAreaDragState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, storage,
+			MuiAreaDragState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Source) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Target) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawLastX) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawLastY) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Qualifier) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.EventFlags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Flags) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value.LastX = unchecked((int)rawLastX);
+		value.LastY = unchecked((int)rawLastY);
+		return value.Magic == Cookie;
+	}
+
 	internal static void Write<TPlatform>(ref TPlatform platform, APTR storage,
 		MuiAreaDragState value) where TPlatform : struct, IMuiGuestMemory
 	{
-		_ = MuiAreaDragStateFieldCursorCodec.TryWriteUInt32(ref platform, storage,
-			MuiAreaDragStateField.Magic, value.Magic);
-		_ = MuiAreaDragStateFieldCursorCodec.TryWriteUInt32(ref platform, storage,
-			MuiAreaDragStateField.Source, value.Source);
-		_ = MuiAreaDragStateFieldCursorCodec.TryWriteUInt32(ref platform, storage,
-			MuiAreaDragStateField.Target, value.Target);
-		_ = MuiAreaDragStateFieldCursorCodec.TryWriteUInt32(ref platform, storage,
-			MuiAreaDragStateField.LastX, unchecked((uint)value.LastX));
-		_ = MuiAreaDragStateFieldCursorCodec.TryWriteUInt32(ref platform, storage,
-			MuiAreaDragStateField.LastY, unchecked((uint)value.LastY));
-		_ = MuiAreaDragStateFieldCursorCodec.TryWriteUInt32(ref platform, storage,
-			MuiAreaDragStateField.Qualifier, value.Qualifier);
-		_ = MuiAreaDragStateFieldCursorCodec.TryWriteUInt32(ref platform, storage,
-			MuiAreaDragStateField.EventFlags, value.EventFlags);
-		_ = MuiAreaDragStateFieldCursorCodec.TryWriteUInt32(ref platform, storage,
-			MuiAreaDragStateField.Flags, value.Flags);
+		_ = TryWriteStruct(ref platform, storage, value);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR storage,
 		out MuiAreaDragState value) where TPlatform : struct, IMuiGuestMemory
 	{
-		value = default;
-		if (storage.IsNull || !platform.IsMapped(storage, MuiAreaDragState.Size) ||
-			!MuiAreaDragStateFieldCursorCodec.TryReadUInt32(ref platform, storage,
-				MuiAreaDragStateField.Magic, out var magic) || magic != Cookie ||
-			!MuiAreaDragStateFieldCursorCodec.TryReadUInt32(ref platform, storage,
-				MuiAreaDragStateField.Source, out var source) ||
-			!MuiAreaDragStateFieldCursorCodec.TryReadUInt32(ref platform, storage,
-				MuiAreaDragStateField.Target, out var target) ||
-			!MuiAreaDragStateFieldCursorCodec.TryReadUInt32(ref platform, storage,
-				MuiAreaDragStateField.LastX, out var lastX) ||
-			!MuiAreaDragStateFieldCursorCodec.TryReadUInt32(ref platform, storage,
-				MuiAreaDragStateField.LastY, out var lastY) ||
-			!MuiAreaDragStateFieldCursorCodec.TryReadUInt32(ref platform, storage,
-				MuiAreaDragStateField.Qualifier, out var qualifier) ||
-			!MuiAreaDragStateFieldCursorCodec.TryReadUInt32(ref platform, storage,
-				MuiAreaDragStateField.EventFlags, out var eventFlags) ||
-			!MuiAreaDragStateFieldCursorCodec.TryReadUInt32(ref platform, storage,
-				MuiAreaDragStateField.Flags, out var flags)) return false;
-		value.Magic = Cookie;
-		value.Source = source;
-		value.Target = target;
-		value.LastX = unchecked((int)lastX);
-		value.LastY = unchecked((int)lastY);
-		value.Qualifier = qualifier;
-		value.EventFlags = eventFlags;
-		value.Flags = flags;
-		return true;
+		return TryReadStruct(ref platform, storage, out value);
 	}
 
 	internal static void Clear<TPlatform>(ref TPlatform platform, APTR storage)

@@ -33,6 +33,9 @@ public enum MuiControlClass
 	Scale,
 	Gadget,
 	Balance,
+	Datamap,
+	Dataspace,
+	Objectmap,
 }
 
 // Parsed form of a MUIA_Image_Spec string ("kind:value"). Mirrors the autodoc
@@ -49,6 +52,7 @@ public enum MuiImageSpecKind
 	Preconfigured = 6,     // "6:x" preconfigured image / background
 }
 
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiImageSpec
 {
 	public MuiImageSpecKind Kind;
@@ -65,6 +69,8 @@ public struct MuiImageSpec
 internal struct MuiChoiceEntry
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint TextOffset = 0;
 	internal APTR Text;
 }
 
@@ -85,12 +91,36 @@ internal static class MuiChoiceEntryFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiChoiceEntryFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
+		=> MuiChoiceEntryMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiChoiceEntryField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiChoiceEntryMemoryCodec.TryReadUInt32(ref platform, record, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiChoiceEntryField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiChoiceEntryMemoryCodec.TryWriteUInt32(ref platform, record, field,
+			value);
+}
+
+// Struct-first guest-memory adapter for one caller-owned Cycle/Radio entry.
+// The named pointer slot owns the wire position; this bounded adapter is the
+// only place that projects it into guest memory.
+internal static class MuiChoiceEntryMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiChoiceEntryField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (cursor.Field != MuiChoiceEntryField.Text || cursor.Record.IsNull ||
-			!platform.IsMapped(cursor.Record, MuiChoiceEntry.Size)) return false;
-		address = cursor.Record;
-		return true;
+		if (field != MuiChoiceEntryField.Text || record.IsNull ||
+			!platform.IsMapped(record, MuiChoiceEntry.Size)) return false;
+		address = APTR.FromPointer(record.Raw + MuiChoiceEntry.TextOffset);
+		return platform.IsMapped(address, MuiChoiceEntry.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -98,10 +128,8 @@ internal static class MuiChoiceEntryFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiChoiceEntryFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -110,10 +138,8 @@ internal static class MuiChoiceEntryFieldCursorCodec
 		APTR record, MuiChoiceEntryField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiChoiceEntryFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -126,7 +152,7 @@ internal static class MuiChoiceEntryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiChoiceEntryFieldCursorCodec.TryReadUInt32(ref platform, address,
+		if (!MuiChoiceEntryMemoryCodec.TryReadUInt32(ref platform, address,
 			MuiChoiceEntryField.Text, out var text)) return false;
 		value.Text = APTR.FromPointer(text);
 		return true;
@@ -136,7 +162,7 @@ internal static class MuiChoiceEntryCodec
 		MuiChoiceEntry value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiChoiceEntryFieldCursorCodec.TryWriteUInt32(ref platform, address,
+		return MuiChoiceEntryMemoryCodec.TryWriteUInt32(ref platform, address,
 			MuiChoiceEntryField.Text, value.Text.Raw);
 	}
 }
@@ -150,23 +176,33 @@ internal struct MuiChoiceEntryCursor
 	internal uint Index;
 }
 
+// Struct-first guest-memory adapter for caller-owned Cycle/Radio entry
+// vectors. Complete named pointer records and the MorphOS 4096-entry bound
+// are admitted here; the typed cursor remains a compatibility wrapper.
+internal static class MuiChoiceEntryVectorMemoryCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (vector.IsNull || index >= MuiChoiceEntryCursor.MaximumEntries ||
+			index > (uint.MaxValue - vector.Raw) / MuiChoiceEntry.Size) return false;
+		var offset = index * MuiChoiceEntry.Size;
+		if (vector.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(vector.Raw + offset);
+		return platform.IsMapped(address, MuiChoiceEntry.Size);
+	}
+}
+
 internal static class MuiChoiceEntryCursorCodec
 {
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiChoiceEntryCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >=
-			MuiChoiceEntryCursor.MaximumEntries || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiChoiceEntryCursor.EntrySize) return false;
-		var offset = cursor.Index * MuiChoiceEntryCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
-		return platform.IsMapped(address, MuiChoiceEntryCursor.EntrySize);
+		=> MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out address);
 	}
-}
 
 // The leading geometry of the caller-owned graphics.library Image record.
 // ImageData and the remaining tail are intentionally outside this bounded
@@ -177,6 +213,11 @@ internal static class MuiChoiceEntryCursorCodec
 internal struct MuiImageGeometryState
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 2;
+	internal const uint LeftEdgeOffset = 0;
+	internal const uint TopEdgeOffset = 2;
+	internal const uint WidthOffset = 4;
+	internal const uint HeightOffset = 6;
 	internal short LeftEdge;
 	internal short TopEdge;
 	internal ushort Width;
@@ -198,31 +239,35 @@ internal struct MuiImageGeometryFieldCursor
 	internal MuiImageGeometryField Field;
 }
 
-internal static class MuiImageGeometryFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed Image geometry record.
+// Numeric wire positions are confined here; callers exchange the named
+// MuiImageGeometryState value instead of carrying anonymous offsets.
+internal static class MuiImageGeometryMemoryCodec
 {
 	private static bool TryResolve(MuiImageGeometryField field,
 		out uint offset)
 	{
 		offset = field switch
 		{
-			MuiImageGeometryField.LeftEdge => 0,
-			MuiImageGeometryField.TopEdge => 2,
-			MuiImageGeometryField.Width => 4,
-			MuiImageGeometryField.Height => 6,
+			MuiImageGeometryField.LeftEdge => MuiImageGeometryState.LeftEdgeOffset,
+			MuiImageGeometryField.TopEdge => MuiImageGeometryState.TopEdgeOffset,
+			MuiImageGeometryField.Width => MuiImageGeometryState.WidthOffset,
+			MuiImageGeometryField.Height => MuiImageGeometryState.HeightOffset,
 			_ => uint.MaxValue,
 		};
 		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiImageGeometryFieldCursor cursor, out APTR address)
+		APTR record, MuiImageGeometryField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 2);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			!platform.IsMapped(record, MuiImageGeometryState.Size) ||
+			record.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiImageGeometryState.FieldSize);
 	}
 
 	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
@@ -230,10 +275,8 @@ internal static class MuiImageGeometryFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiImageGeometryFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt16(address, 0);
 		return true;
 	}
@@ -242,13 +285,34 @@ internal static class MuiImageGeometryFieldCursorCodec
 		APTR record, MuiImageGeometryField field, ushort value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiImageGeometryFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt16(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility-shaped cursor wrapper. New code should use the direct named
+// record adapter above; this wrapper is retained for existing callers/tests.
+internal static class MuiImageGeometryFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiImageGeometryFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiImageGeometryMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Field, out address);
+
+	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiImageGeometryField field, out ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiImageGeometryMemoryCodec.TryReadUInt16(ref platform, record, field,
+			out value);
+
+	internal static bool TryWriteUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiImageGeometryField field, ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiImageGeometryMemoryCodec.TryWriteUInt16(ref platform, record, field,
+			value);
 }
 
 internal static class MuiImageGeometryCodec
@@ -260,16 +324,18 @@ internal static class MuiImageGeometryCodec
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiImageGeometryState.Size)) return false;
-		if (!MuiImageGeometryFieldCursorCodec.TryReadUInt16(ref platform, address,
+		if (!MuiImageGeometryMemoryCodec.TryReadUInt16(ref platform, address,
 			MuiImageGeometryField.LeftEdge, out var leftEdge) ||
-			!MuiImageGeometryFieldCursorCodec.TryReadUInt16(ref platform, address,
+			!MuiImageGeometryMemoryCodec.TryReadUInt16(ref platform, address,
 				MuiImageGeometryField.TopEdge, out var topEdge) ||
-			!MuiImageGeometryFieldCursorCodec.TryReadUInt16(ref platform, address,
-				MuiImageGeometryField.Width, out value.Width) ||
-			!MuiImageGeometryFieldCursorCodec.TryReadUInt16(ref platform, address,
-				MuiImageGeometryField.Height, out value.Height)) return false;
+			!MuiImageGeometryMemoryCodec.TryReadUInt16(ref platform, address,
+				MuiImageGeometryField.Width, out var width) ||
+			!MuiImageGeometryMemoryCodec.TryReadUInt16(ref platform, address,
+				MuiImageGeometryField.Height, out var height)) return false;
 		value.LeftEdge = unchecked((short)leftEdge);
 		value.TopEdge = unchecked((short)topEdge);
+		value.Width = width;
+		value.Height = height;
 		return true;
 	}
 
@@ -279,14 +345,14 @@ internal static class MuiImageGeometryCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiImageGeometryState.Size)) return false;
-		return MuiImageGeometryFieldCursorCodec.TryWriteUInt16(ref platform,
+		return MuiImageGeometryMemoryCodec.TryWriteUInt16(ref platform,
 			address, MuiImageGeometryField.LeftEdge,
 			unchecked((ushort)value.LeftEdge)) &&
-			MuiImageGeometryFieldCursorCodec.TryWriteUInt16(ref platform, address,
+			MuiImageGeometryMemoryCodec.TryWriteUInt16(ref platform, address,
 				MuiImageGeometryField.TopEdge, unchecked((ushort)value.TopEdge)) &&
-			MuiImageGeometryFieldCursorCodec.TryWriteUInt16(ref platform, address,
+			MuiImageGeometryMemoryCodec.TryWriteUInt16(ref platform, address,
 				MuiImageGeometryField.Width, value.Width) &&
-			MuiImageGeometryFieldCursorCodec.TryWriteUInt16(ref platform, address,
+			MuiImageGeometryMemoryCodec.TryWriteUInt16(ref platform, address,
 				MuiImageGeometryField.Height, value.Height);
 	}
 }
@@ -295,6 +361,7 @@ internal static class MuiImageGeometryCodec
 // MUIA_String_Reject.  The pointers remain guest-resident [ISG] STRPTRs;
 // this record names the two related values without relying on positional
 // offsets in a private widget state block.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringFilterState
 {
 	public APTR Accept;
@@ -304,6 +371,7 @@ public struct MuiStringFilterState
 // Scalar interaction flags for String.mui.  MorphOS stores these as BOOL
 // attributes; keeping them together as a named value record avoids exposing
 // positional fields in a private widget block.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringInteractionState
 {
 	public uint Editable;
@@ -314,6 +382,7 @@ public struct MuiStringInteractionState
 // Initial String content policy. These four values are initializer-only in
 // MorphOS; keeping them together makes lifetime and normalization explicit
 // without introducing a private widget offset or managed text state.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringPresentationState
 {
 	public uint MaxLen;
@@ -326,6 +395,7 @@ public struct MuiStringPresentationState
 // enabling the service never requires a private widget offset or a managed
 // spellchecker object; actual dictionary/markup integration remains a platform
 // capability boundary.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringSpellCheckingState
 {
 	public uint Enabled;
@@ -334,6 +404,7 @@ public struct MuiStringSpellCheckingState
 // Getter-only MUIA_String_Acknowledge publication.  The pointer always names
 // the current guest-owned contents buffer; keeping it in a named record makes
 // the notification seam explicit without exposing a private String offset.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringAcknowledgeState
 {
 	public APTR Contents;
@@ -342,6 +413,7 @@ public struct MuiStringAcknowledgeState
 // The two public String cursor positions form one logical editing state.  The
 // attributes remain guest-visible MUI keys, but all validation and mutation use
 // this named record rather than relying on a positional private widget layout.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringCursorState
 {
 	public int BufferPos;
@@ -351,6 +423,7 @@ public struct MuiStringCursorState
 // Caller-owned String.mui Listview relationship.  The pointer remains a guest
 // MUI object; naming it as a state record keeps validation and key forwarding
 // independent of any private object-field offsets.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringAttachedListState
 {
 	public APTR Listview;
@@ -501,6 +574,10 @@ public static class MuiCommonControlCore
 	public const uint GaugeCurrent = 0x8042F0DD;
 	public const uint GaugeMax = 0x8042BCDB;
 	public const uint GaugeHoriz = 0x804232DD;
+	// Gauge.InfoRate is a MorphOS V4 signed LONG.  MorphOS documents the
+	// attribute as [ISG] but intentionally leaves its timing meaning open;
+	// retain the ABI value through a dedicated named state record.
+	public const uint GaugeInfoRate = 0x804253C8;
 	public const uint GaugeDivide = 0x8042D8DF;
 	// Gauge progress text is projected through MuiGaugeInfoTextStateRecord.
 	public const uint GaugeInfoText = 0x8042BF15;
@@ -511,6 +588,17 @@ public static class MuiCommonControlCore
 	// The Quiet initializer controls whether the separator is rendered with
 	// reduced visual feedback.  It is an initializer/getter-only BOOL.
 	public const uint BalanceQuiet = 0x80427486;
+
+	// Dataspace.mui. Count is a MorphOS V20 getter-only ULONG. The value is
+	// derived from the object's named Store records; no private class layout is
+	// exposed here.
+	public const uint DataspaceCount = 0x8042E7EA;
+	// Dataspace_Pool is a MorphOS V11 initializer-only opaque Exec pool handle.
+	public const uint DataspacePool = 0x80424CF9;
+	// Datamap.mui exposes the same V20 getter contract over string-key records.
+	public const uint DatamapCount = 0x80427580;
+	public const uint DatamapPool = 0x80424724;
+	public const uint ObjectmapPool = 0x80422ED3;
 
 	// Choices.
 	// Choice entries and active indices are projected through named guest
@@ -665,6 +753,7 @@ public static class MuiCommonControlCore
 	private const uint TextPreParseStateKey = 0x7F07001D;
 	private const uint NumericFormatStateKey = 0x7F07001E;
 	private const uint GaugeInfoTextStateKey = 0x7F07001F;
+	private const uint GaugeInfoRateStateKey = 0x7F070075;
 	private const uint LevelmeterLabelStateKey = 0x7F070020;
 	private const uint ImageOldImageStateKey = 0x7F070021;
 	private const uint ImageSpecStateKey = 0x7F070022;
@@ -820,6 +909,9 @@ public static class MuiCommonControlCore
 			case 0x86A77BD2u: return MuiControlClass.Scale;
 			case 0x6BEFC3B6u: return MuiControlClass.Gadget;
 			case 0x5EED8270u: return MuiControlClass.Balance;
+			case 0x528E6AF2u: return MuiControlClass.Datamap;
+			case 0xA096D0CEu: return MuiControlClass.Dataspace;
+			case 0x4BC2FBC7u: return MuiControlClass.Objectmap;
 		}
 		return MuiControlClass.Unknown;
 	}
@@ -839,6 +931,10 @@ public static class MuiCommonControlCore
 
 	internal static bool IsPropClass(MuiControlClass cls) =>
 		cls == MuiControlClass.Prop || cls == MuiControlClass.Scrollbar;
+
+	internal static bool IsAreaControlClass(MuiControlClass cls) =>
+		cls != MuiControlClass.Unknown && cls != MuiControlClass.Datamap &&
+		cls != MuiControlClass.Dataspace && cls != MuiControlClass.Objectmap;
 
 	// ---- Construction normalization / defaults -------------------------------
 
@@ -893,6 +989,12 @@ public static class MuiCommonControlCore
 	{
 		var cls = ClassifyRecord(ref platform, classRecord);
 		if (cls == MuiControlClass.Unknown) return true;
+		// Datamap.mui and Dataspace.mui are store objects, not Area/controls. Their
+		// state is already represented by MuiStoreRecord values, so skip control
+		// defaults.
+		if (cls == MuiControlClass.Datamap || cls == MuiControlClass.Dataspace ||
+			cls == MuiControlClass.Objectmap)
+			return true;
 		var font = default(MuiControlFontState);
 		if (MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj, Font,
 			out var rawFont))
@@ -1034,6 +1136,7 @@ public static class MuiCommonControlCore
 			EnsureDefault(ref platform, state, obj, GaugeMax, 100);
 			EnsureDefault(ref platform, state, obj, GaugeDivide, 0);
 			EnsureDefault(ref platform, state, obj, GaugeCurrent, 0);
+			EnsureDefault(ref platform, state, obj, GaugeInfoRate, 0);
 			var gaugeState = default(MuiGaugeState);
 			gaugeState.Maximum = Read(ref platform, state, obj, GaugeMax, 100);
 			gaugeState.Current = Read(ref platform, state, obj, GaugeCurrent, 0);
@@ -1049,6 +1152,11 @@ public static class MuiCommonControlCore
 			infoText.InfoText = APTR.FromPointer(Read(ref platform, state, obj,
 				GaugeInfoText, 0));
 			if (!PublishGaugeInfoTextState(ref platform, state, obj, infoText))
+				return false;
+			var infoRate = default(MuiGaugeInfoRateState);
+			infoRate.InfoRate = unchecked((int)ReadRaw(ref platform, state, obj,
+				GaugeInfoRate, 0));
+			if (!PublishGaugeInfoRateState(ref platform, state, obj, infoRate))
 				return false;
 			// A Current supplied at construction is divided before further
 			// processing, exactly as a later MUIA_Gauge_Current set would be.
@@ -1525,13 +1633,10 @@ public static class MuiCommonControlCore
 		// compatibility path; MakeObjectA roots register Text.mui and therefore
 		// produce semantically correct Text children.
 		if (textClass.IsNull) textClass = classRecord;
-		var cursor = default(MuiChoiceEntryCursor);
-		cursor.Base = entries;
 		for (var index = 0; index < count; index++)
 		{
-			cursor.Index = unchecked((uint)index);
-			if (!MuiChoiceEntryCursorCodec.TryGetEntry(ref platform, cursor,
-				out var address)) return false;
+			if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
+				entries, unchecked((uint)index), out var address)) return false;
 			if (!MuiChoiceEntryCodec.TryRead(ref platform, address,
 				out var entry)) return false;
 			var label = entry.Text;
@@ -2269,6 +2374,18 @@ public static class MuiCommonControlCore
 			return true;
 		}
 		var cls = Classify(ref platform, state, obj);
+		if (attribute == DataspaceCount && cls == MuiControlClass.Dataspace)
+		{
+			handled = true;
+			return MuiStoreCore.TryGetDataspaceCount(ref platform, state, obj,
+				out value);
+		}
+		if (attribute == DatamapCount && cls == MuiControlClass.Datamap)
+		{
+			handled = true;
+			return MuiStoreCore.TryGetDatamapCount(ref platform, state, obj,
+				out value);
+		}
 		if (attribute == TextColor && cls != MuiControlClass.Unknown)
 		{
 			// MorphOS exposes this value only while Area setup is active. The
@@ -3261,6 +3378,18 @@ public static class MuiCommonControlCore
 				attribute == GaugeDivide ? gauge.Divide : gauge.Horizontal;
 			return true;
 		}
+		if (attribute == GaugeInfoRate && cls == MuiControlClass.Gauge)
+		{
+			if (!MuiHeadlessObjectCore.GetRawAttribute(ref platform, state, obj,
+				attribute, out _) &&
+				!TryGetGaugeInfoRateStateRecord(ref platform, state, obj, out _))
+				return false;
+			handled = true;
+			if (!TryReadGaugeInfoRateState(ref platform, state, obj,
+				out var infoRate)) return false;
+			value = unchecked((uint)infoRate.InfoRate);
+			return true;
+		}
 		return false;
 	}
 
@@ -3423,7 +3552,7 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiSliderPresentationStateRecord.Size) ||
-				!MuiSliderPresentationStateRecordCodec.TryReadStructural(ref platform,
+				!MuiSliderPresentationStateRecordCodec.TryReadRecord(ref platform,
 					block, out var record) ||
 				!MuiSliderPresentationStateAdmission.ValidateLive(ref platform, state,
 					obj, record))
@@ -3455,7 +3584,7 @@ public static class MuiCommonControlCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			SliderPresentationStateKey) != unchecked((int)
 			MuiSliderPresentationStateRecord.Size)) return false;
-		return MuiSliderPresentationStateRecordCodec.TryReadStructural(ref platform,
+		return MuiSliderPresentationStateRecordCodec.TryReadRecord(ref platform,
 			block, out value) && MuiSliderPresentationStateAdmission.ValidateLive(
 				ref platform, state, obj, value);
 	}
@@ -3565,7 +3694,7 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiScalePresentationStateRecord.Size) ||
-				!MuiScalePresentationStateRecordCodec.TryReadStructural(ref platform,
+				!MuiScalePresentationStateRecordCodec.TryReadRecord(ref platform,
 					block, out var record) ||
 				!MuiScalePresentationStateAdmission.ValidateLive(ref platform, state,
 					obj, record))
@@ -3595,7 +3724,7 @@ public static class MuiCommonControlCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			ScalePresentationStateKey) != unchecked((int)
 			MuiScalePresentationStateRecord.Size)) return false;
-		return MuiScalePresentationStateRecordCodec.TryReadStructural(ref platform,
+		return MuiScalePresentationStateRecordCodec.TryReadRecord(ref platform,
 			block, out value) && MuiScalePresentationStateAdmission.ValidateLive(
 				ref platform, state, obj, value);
 	}
@@ -3971,7 +4100,7 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiLevelmeterPresentationStateRecord.Size) ||
-				!MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(ref platform,
+				!MuiLevelmeterPresentationStateRecordCodec.TryReadRecord(ref platform,
 					block, out var record) ||
 				!MuiLevelmeterPresentationStateAdmission.ValidateLive(ref platform,
 					state, obj, record))
@@ -4001,7 +4130,7 @@ public static class MuiCommonControlCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			LevelmeterPresentationStateKey) != unchecked((int)
 			MuiLevelmeterPresentationStateRecord.Size)) return false;
-		return MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(ref
+		return MuiLevelmeterPresentationStateRecordCodec.TryReadRecord(ref
 			platform, block, out value) &&
 			MuiLevelmeterPresentationStateAdmission.ValidateLive(ref platform, state,
 				obj, value);
@@ -4653,7 +4782,7 @@ public static class MuiCommonControlCore
 		if (present)
 		{
 			if (length != unchecked((int)MuiRectanglePresentationStateRecord.Size) ||
-				!MuiRectanglePresentationStateRecordCodec.TryReadStructural(ref platform,
+				!MuiRectanglePresentationStateRecordCodec.TryReadRecord(ref platform,
 					block, out record) ||
 				!MuiRectanglePresentationStateAdmission.ValidateLive(ref platform, state,
 					obj, record)) return false;
@@ -4688,7 +4817,7 @@ public static class MuiCommonControlCore
 		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			RectanglePresentationStateKey) != unchecked((int)
 			MuiRectanglePresentationStateRecord.Size) ||
-			!MuiRectanglePresentationStateRecordCodec.TryReadStructural(ref platform,
+			!MuiRectanglePresentationStateRecordCodec.TryReadRecord(ref platform,
 				block, out value)) return false;
 		return MuiRectanglePresentationStateAdmission.ValidateLive(ref platform,
 			state, obj, value);
@@ -4931,6 +5060,133 @@ public static class MuiCommonControlCore
 		out MuiGaugeStateRecord value)
 		where TPlatform : struct, IMuiHeadlessPlatform =>
 		TryReadGaugeStateRecord(ref platform, state, obj, out value);
+
+	internal static bool TryReadGaugeInfoRateState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiGaugeInfoRateState result)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		result = default;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var raw = unchecked((int)ReadRaw(ref platform, state, obj,
+			GaugeInfoRate, 0));
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			GaugeInfoRateStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			GaugeInfoRateStateKey);
+		var present = block.IsNotNull || length != 0;
+		if (present)
+		{
+			if (length != unchecked((int)MuiGaugeInfoRateStateRecord.Size) ||
+				!MuiGaugeInfoRateStateRecordCodec.TryReadStructural(ref platform,
+					block, out var record) ||
+				!MuiGaugeInfoRateStateAdmission.ValidateLive(ref platform, state,
+					obj, record)) return false;
+			if (record.InfoRate != raw)
+			{
+				record.InfoRate = raw;
+				if (!MuiGaugeInfoRateStateAdmission.ValidateLive(ref platform,
+					state, obj, record) ||
+					!MuiGaugeInfoRateStateRecordCodec.Write(ref platform, block,
+						record)) return false;
+			}
+		}
+		else if (!EnsureGaugeInfoRateStateRecord(ref platform, state, obj))
+			return false;
+		result.InfoRate = raw;
+		return true;
+	}
+
+	private static bool TryReadGaugeInfoRateStateRecord<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiGaugeInfoRateStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		value = default;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			GaugeInfoRateStateKey);
+		if (MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			GaugeInfoRateStateKey) !=
+			unchecked((int)MuiGaugeInfoRateStateRecord.Size)) return false;
+		return MuiGaugeInfoRateStateRecordCodec.TryReadStructural(ref platform,
+			block, out value) && MuiGaugeInfoRateStateAdmission.ValidateLive(
+			ref platform, state, obj, value);
+	}
+
+	internal static bool GaugeInfoRateStateAvailable<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			GaugeInfoRateStateKey);
+		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
+			GaugeInfoRateStateKey);
+		if (block.IsNull && length == 0) return true;
+		return length == unchecked((int)MuiGaugeInfoRateStateRecord.Size) &&
+			TryReadGaugeInfoRateStateRecord(ref platform, state, obj, out _);
+	}
+
+	private static bool EnsureGaugeInfoRateStateRecord<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!GaugeInfoRateStateAvailable(ref platform, state, obj)) return false;
+		if (TryReadGaugeInfoRateStateRecord(ref platform, state, obj, out _))
+			return true;
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull)
+			return false;
+		var scratch = MuiHeadlessMemory.Allocate(ref platform,
+			MuiGaugeInfoRateStateRecord.Size);
+		if (scratch.IsNull) return false;
+		platform.Clear(scratch, MuiGaugeInfoRateStateRecord.Size);
+		var value = default(MuiGaugeInfoRateStateRecord);
+		value.Magic = MuiGaugeInfoRateStateRecord.Cookie;
+		value.InfoRate = unchecked((int)ReadRaw(ref platform, state, obj,
+			GaugeInfoRate, 0));
+		if (!MuiGaugeInfoRateStateAdmission.ValidateLive(ref platform, state,
+			obj, value))
+		{
+			platform.Clear(scratch, MuiGaugeInfoRateStateRecord.Size);
+			platform.Free(scratch, MuiGaugeInfoRateStateRecord.Size);
+			return false;
+		}
+		var written = MuiGaugeInfoRateStateRecordCodec.Write(ref platform,
+			scratch, value);
+		var added = written && MuiStoreCore.DataspaceAdd(ref platform, state,
+			obj, GaugeInfoRateStateKey, scratch,
+			unchecked((int)MuiGaugeInfoRateStateRecord.Size));
+		platform.Clear(scratch, MuiGaugeInfoRateStateRecord.Size);
+		platform.Free(scratch, MuiGaugeInfoRateStateRecord.Size);
+		return added;
+	}
+
+	private static bool PublishGaugeInfoRateState<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		MuiGaugeInfoRateState value)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (MuiHeadlessObjectCore.FindObject(ref platform, state, obj).IsNull ||
+			!GaugeInfoRateStateAvailable(ref platform, state, obj) ||
+			!MuiGaugeInfoRateStateAdmission.Validate(value) ||
+			!EnsureGaugeInfoRateStateRecord(ref platform, state, obj)) return false;
+		var block = MuiStoreCore.DataspaceFind(ref platform, state, obj,
+			GaugeInfoRateStateKey);
+		var stored = default(MuiGaugeInfoRateStateRecord);
+		stored.Magic = MuiGaugeInfoRateStateRecord.Cookie;
+		stored.InfoRate = value.InfoRate;
+		if (!MuiGaugeInfoRateStateAdmission.ValidateLive(ref platform, state,
+			obj, stored) || !MuiGaugeInfoRateStateRecordCodec.Write(ref platform,
+			block, stored)) return false;
+		return MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
+			GaugeInfoRate, unchecked((uint)stored.InfoRate), false);
+	}
+
+	internal static bool TryGetGaugeInfoRateStateRecord<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj,
+		out MuiGaugeInfoRateStateRecord value)
+		where TPlatform : struct, IMuiHeadlessPlatform =>
+		TryReadGaugeInfoRateStateRecord(ref platform, state, obj, out value);
 
 	internal static bool TryReadBalancePolicyState<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj,
@@ -6659,7 +6915,7 @@ public static class MuiCommonControlCore
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			NumericFormatStateKey);
 		return length == unchecked((int)MuiNumericFormatStateRecord.Size) &&
-			MuiNumericFormatStateRecordCodec.TryReadStructural(ref platform, block,
+			MuiNumericFormatStateRecordCodec.TryReadRecord(ref platform, block,
 				out value) && MuiNumericFormatStateAdmission.ValidateLive(ref platform,
 				state, obj, value);
 	}
@@ -6898,7 +7154,7 @@ public static class MuiCommonControlCore
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			LevelmeterLabelStateKey);
 		return length == unchecked((int)MuiLevelmeterLabelStateRecord.Size) &&
-			MuiLevelmeterLabelStateRecordCodec.TryReadStructural(ref platform, block,
+			MuiLevelmeterLabelStateRecordCodec.TryReadRecord(ref platform, block,
 				out value) && MuiLevelmeterLabelStateAdmission.ValidateLive(
 				ref platform, state, obj, value);
 	}
@@ -8044,7 +8300,7 @@ public static class MuiCommonControlCore
 		var length = MuiStoreCore.DataspaceLength(ref platform, state, obj,
 			RectangleBarTitleStateKey);
 		return length == unchecked((int)MuiRectangleBarTitleStateRecord.Size) &&
-			MuiRectangleBarTitleStateRecordCodec.TryReadStructural(ref platform,
+			MuiRectangleBarTitleStateRecordCodec.TryReadRecord(ref platform,
 				block, out value) && MuiRectangleBarTitleStateAdmission.ValidateLive(
 				ref platform, state, obj, value);
 	}
@@ -9241,7 +9497,8 @@ public static class MuiCommonControlCore
 			handled = lonely;
 			return 0;
 		}
-		var commandAddress = MuiHeadlessMemory.Allocate(ref platform, 4);
+		var commandAddress = MuiHeadlessMemory.Allocate(ref platform,
+			MuiStringEditCommandRecord.Size);
 		if (commandAddress.IsNull)
 		{
 			platform.Free(workAddress, MuiStringEditWorkRecord.Size);
@@ -9253,7 +9510,7 @@ public static class MuiCommonControlCore
 		if (!TryReadStringContentsState(ref platform, state, obj,
 			out var hookContents))
 		{
-			platform.Free(commandAddress, 4);
+			platform.Free(commandAddress, MuiStringEditCommandRecord.Size);
 			platform.Free(workAddress, MuiStringEditWorkRecord.Size);
 			handled = lonely;
 			return 0;
@@ -9265,7 +9522,7 @@ public static class MuiCommonControlCore
 			if (!CStringCodec.TryReadLength(ref platform, hookContents.Contents,
 				4096, out snapshotLength))
 			{
-				platform.Free(commandAddress, 4);
+				platform.Free(commandAddress, MuiStringEditCommandRecord.Size);
 				platform.Free(workAddress, MuiStringEditWorkRecord.Size);
 				handled = lonely;
 				return 0;
@@ -9274,7 +9531,7 @@ public static class MuiCommonControlCore
 				snapshotLength + 1);
 			if (snapshotAddress.IsNull)
 			{
-				platform.Free(commandAddress, 4);
+				platform.Free(commandAddress, MuiStringEditCommandRecord.Size);
 				platform.Free(workAddress, MuiStringEditWorkRecord.Size);
 				handled = lonely;
 				return 0;
@@ -9303,17 +9560,29 @@ public static class MuiCommonControlCore
 		{
 			ReleaseStringEditSnapshot(ref platform, snapshotAddress,
 				snapshotLength + 1);
-			platform.Free(commandAddress, 4);
+			platform.Free(commandAddress, MuiStringEditCommandRecord.Size);
 			platform.Free(workAddress, MuiStringEditWorkRecord.Size);
 			handled = lonely;
 			return 0;
 		}
-		platform.WriteUInt32(commandAddress, 0, MuiStringEditWorkCodec.CommandKey);
+		var command = default(MuiStringEditCommandRecord);
+		command.Command = MuiStringEditWorkCodec.CommandKey;
+		if (!MuiStringEditCommandCodec.Write(ref platform, commandAddress,
+			command))
+		{
+			ReleaseStringEditSnapshot(ref platform, snapshotAddress,
+				snapshotLength + 1);
+			platform.Free(commandAddress, MuiStringEditCommandRecord.Size);
+			platform.Clear(workAddress, MuiStringEditWorkRecord.Size);
+			platform.Free(workAddress, MuiStringEditWorkRecord.Size);
+			handled = lonely;
+			return 0;
+		}
 		var result = platform.InvokeHook(hook, workAddress, commandAddress);
 		var read = MuiStringEditWorkCodec.TryRead(ref platform, workAddress,
 			out work);
-		platform.Clear(commandAddress, 4);
-		platform.Free(commandAddress, 4);
+		platform.Clear(commandAddress, MuiStringEditCommandRecord.Size);
+		platform.Free(commandAddress, MuiStringEditCommandRecord.Size);
 		platform.Clear(workAddress, MuiStringEditWorkRecord.Size);
 		platform.Free(workAddress, MuiStringEditWorkRecord.Size);
 		if (result == 0)
@@ -12435,6 +12704,19 @@ public static class MuiCommonControlCore
 			gauge.Divide = value;
 			return PublishGaugeState(ref platform, state, obj, gauge);
 		}
+		if (attribute == GaugeInfoRate && cls == MuiControlClass.Gauge)
+		{
+			// InfoRate is a signed LONG with no documented range.  Preserve the
+			// two's-complement value exactly while validating the complete named
+			// record before and after the raw compatibility write.
+			if (!TryReadGaugeInfoRateState(ref platform, state, obj,
+				out _)) return false;
+			var infoRate = default(MuiGaugeInfoRateState);
+			infoRate.InfoRate = unchecked((int)value);
+			if (!ChangeDetectedSet(ref platform, state, obj, attribute, value,
+				notify)) return false;
+			return PublishGaugeInfoRateState(ref platform, state, obj, infoRate);
+		}
 		if (attribute == GaugeInfoText)
 		{
 			// Admit the complete named InfoText state before changing raw storage;
@@ -12836,9 +13118,12 @@ public static class MuiCommonControlCore
 		attribute == DoubleClick ||
 		attribute == Timer ||
 		attribute == Pressed ||
-		attribute == GadgetGadget;
+		attribute == GadgetGadget ||
+		attribute == DataspaceCount ||
+		attribute == DatamapCount;
 
 	private static bool IsInitOnly(uint attribute) =>
+		MuiStorePolicyCore.IsInitOnlyAttribute(attribute) ||
 		attribute == StringMaxLen || attribute == StringSecret ||
 		attribute == StringFormat || attribute == StringMultiline ||
 		attribute == Unicode ||
@@ -14043,6 +14328,7 @@ public static class MuiCommonControlCore
 	{
 		if (!platform.IsMapped(storage, 12)) return false;
 		var cls = Classify(ref platform, state, obj);
+		if (!IsAreaControlClass(cls)) return false;
 		if (cls == MuiControlClass.Radio || cls == MuiControlClass.Scrollbar)
 			return MuiGroupLayoutCore.AskMinMax(ref platform, state, obj, storage);
 		return MuiAreaLayoutCore.WriteMinMax(ref platform, storage,
@@ -14150,7 +14436,7 @@ public static class MuiCommonControlCore
 		APTR state, APTR obj, out MuiMinMaxValues values)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (Classify(ref platform, state, obj) == MuiControlClass.Unknown)
+		if (!IsAreaControlClass(Classify(ref platform, state, obj)))
 		{
 			values = default;
 			return false;
@@ -14366,6 +14652,7 @@ public static class MuiCommonControlCore
 	public static bool DrawControl<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, uint flags) where TPlatform : struct, IMuiLayoutPlatform
 	{
+		if (!IsAreaControlClass(Classify(ref platform, state, obj))) return false;
 		// MorphOS hides an Area when MUIA_ShowMe is FALSE.  Resolve the named
 		// presentation record before acquiring a render port so hidden controls
 		// remain a successful no-op even when they have no active render target.
@@ -15596,13 +15883,10 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (entries.IsNull) return 0;
-		var cursor = default(MuiChoiceEntryCursor);
-		cursor.Base = entries;
 		for (var count = 0; count < 4096; count++)
 		{
-			cursor.Index = unchecked((uint)count);
-			if (!MuiChoiceEntryCursorCodec.TryGetEntry(ref platform, cursor,
-				out var slot)) return 0;
+			if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
+				entries, unchecked((uint)count), out var slot)) return 0;
 			if (!MuiChoiceEntryCodec.TryRead(ref platform, slot,
 				out var entry)) return 0;
 			if (entry.Text.IsNull) return count;
@@ -15613,11 +15897,8 @@ public static class MuiCommonControlCore
 	private static APTR ChoiceEntry<TPlatform>(ref TPlatform platform,
 		APTR entries, uint active) where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiChoiceEntryCursor);
-		cursor.Base = entries;
-		cursor.Index = active;
-		if (!MuiChoiceEntryCursorCodec.TryGetEntry(ref platform, cursor,
-			out var slot)) return APTR.Null;
+		if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
+			entries, active, out var slot)) return APTR.Null;
 		return MuiChoiceEntryCodec.TryRead(ref platform, slot,
 			out var entry) ? entry.Text : APTR.Null;
 	}
@@ -15646,10 +15927,11 @@ public static class MuiCommonControlCore
 	{
 		result = default;
 		result.Kind = MuiImageSpecKind.Invalid;
-		if (spec.IsNull || !platform.IsMapped(spec, 2)) return false;
-		var lead = platform.ReadUInt8(spec, 0);
+		if (!MuiImageSpecPrefixRecordCodec.TryRead(ref platform, spec,
+			out var prefix)) return false;
+		var lead = prefix.Kind;
 		if (lead < (byte)'0' || lead > (byte)'6') return false;
-		if (platform.ReadUInt8(spec, 1) != (byte)':') return false;
+		if (prefix.Separator != (byte)':') return false;
 		var kind = (MuiImageSpecKind)(lead - (byte)'0');
 		if (kind == MuiImageSpecKind.Color)
 			return TryParseSpecColor(ref platform, spec, ref result);
@@ -15808,23 +16090,23 @@ public static class MuiCommonControlDispatcher
 			case CreateBubble:
 				if (!MuiAreaBubbleMessageCodec.TryReadCreate(ref platform, message,
 					out var createBubble)) return 0;
-				if (MuiCommonControlCore.Classify(ref platform, state, obj) ==
-					MuiControlClass.Unknown) break;
+				if (!MuiCommonControlCore.IsAreaControlClass(
+					MuiCommonControlCore.Classify(ref platform, state, obj))) break;
 				return MuiAreaBubblePacketCore.Create(ref platform, state, obj,
 					createBubble.X, createBubble.Y, createBubble.Text,
 					createBubble.Flags).Raw;
 			case DeleteBubble:
 				if (!MuiAreaBubbleMessageCodec.TryReadDelete(ref platform, message,
 					out var deleteBubble)) return 0;
-				if (MuiCommonControlCore.Classify(ref platform, state, obj) ==
-					MuiControlClass.Unknown) break;
+				if (!MuiCommonControlCore.IsAreaControlClass(
+					MuiCommonControlCore.Classify(ref platform, state, obj))) break;
 				return MuiAreaBubblePacketCore.Delete(ref platform, state, obj,
 					deleteBubble.Bubble) ? 1u : 0u;
 			case ContextMenuAdd:
 				if (!MuiAreaContextMenuMessageCodec.TryReadAdd(ref platform, message,
 					out var contextMenuAdd)) return 0;
-				if (MuiCommonControlCore.Classify(ref platform, state, obj) ==
-					MuiControlClass.Unknown) break;
+				if (!MuiCommonControlCore.IsAreaControlClass(
+					MuiCommonControlCore.Classify(ref platform, state, obj))) break;
 				return MuiAreaContextMenuPacketCore.Add(ref platform, state, obj,
 					contextMenuAdd.MenuStrip, contextMenuAdd.MouseX,
 					contextMenuAdd.MouseY, contextMenuAdd.MouseXPointer,
@@ -15832,38 +16114,35 @@ public static class MuiCommonControlDispatcher
 			case ContextMenuBuild:
 				if (!MuiAreaContextMenuMessageCodec.TryReadBuild(ref platform, message,
 					out _)) return 0;
-				if (MuiCommonControlCore.Classify(ref platform, state, obj) ==
-					MuiControlClass.Unknown) break;
-				// MorphOS retained this legacy method as a default-builder hook;
-				// ContextMenuAdd is the active replacement and no synthetic menu is
-				// created by the headless core.
-				return MuiAreaContextMenuMessageCodec.BuildDefault;
+				if (!MuiCommonControlCore.IsAreaControlClass(
+					MuiCommonControlCore.Classify(ref platform, state, obj))) break;
+				return MuiAreaContextMenuPacketCore.Build(ref platform, state, obj).Raw;
 			case ContextMenuChoice:
 				if (!MuiAreaContextMenuMessageCodec.TryReadChoice(ref platform, message,
 					out var contextMenuChoice)) return 0;
-				if (MuiCommonControlCore.Classify(ref platform, state, obj) ==
-					MuiControlClass.Unknown) break;
+				if (!MuiCommonControlCore.IsAreaControlClass(
+					MuiCommonControlCore.Classify(ref platform, state, obj))) break;
 				return MuiAreaContextMenuPacketCore.Choice(ref platform, state, obj,
 					contextMenuChoice.Item);
 			case CheckShortHelp:
 				if (!MuiAreaShortHelpMessageCodec.TryReadCheck(ref platform, message,
 					out var checkShortHelp)) return 0;
-				if (MuiCommonControlCore.Classify(ref platform, state, obj) ==
-					MuiControlClass.Unknown) break;
+				if (!MuiCommonControlCore.IsAreaControlClass(
+					MuiCommonControlCore.Classify(ref platform, state, obj))) break;
 				return MuiAreaShortHelpPacketCore.Check(ref platform, state, obj,
 					checkShortHelp.Help, checkShortHelp.MouseX, checkShortHelp.MouseY).Raw;
 			case CreateShortHelp:
 				if (!MuiAreaShortHelpMessageCodec.TryReadCreate(ref platform, message,
 					out var createShortHelp)) return 0;
-				if (MuiCommonControlCore.Classify(ref platform, state, obj) ==
-					MuiControlClass.Unknown) break;
+				if (!MuiCommonControlCore.IsAreaControlClass(
+					MuiCommonControlCore.Classify(ref platform, state, obj))) break;
 				return MuiAreaShortHelpPacketCore.Create(ref platform, state, obj,
 					createShortHelp.MouseX, createShortHelp.MouseY).Raw;
 			case DeleteShortHelp:
 				if (!MuiAreaShortHelpMessageCodec.TryReadDelete(ref platform, message,
 					out var deleteShortHelp)) return 0;
-				if (MuiCommonControlCore.Classify(ref platform, state, obj) ==
-					MuiControlClass.Unknown) break;
+				if (!MuiCommonControlCore.IsAreaControlClass(
+					MuiCommonControlCore.Classify(ref platform, state, obj))) break;
 				return MuiAreaShortHelpPacketCore.Delete(ref platform, state, obj,
 					deleteShortHelp.Help) ? 1u : 0u;
 			case NumericDecrease:
@@ -15984,8 +16263,8 @@ public static class MuiCommonControlDispatcher
 			case AskMinMax:
 				if (!MuiCommonControlPacketCore.TryReadAskMinMax(ref platform,
 					message, out var askMinMax)) return 0;
-				if (MuiCommonControlCore.Classify(ref platform, state, obj) ==
-					MuiControlClass.Unknown) break;
+				if (!MuiCommonControlCore.IsAreaControlClass(
+					MuiCommonControlCore.Classify(ref platform, state, obj))) break;
 				return MuiCommonControlCore.AskMinMax(ref platform, state, obj,
 					APTR.FromPointer(askMinMax.Storage)) ? 1u : 0u;
 			case Layout:
@@ -16009,8 +16288,8 @@ public static class MuiCommonControlDispatcher
 			case Draw:
 				if (!MuiCommonControlPacketCore.TryReadDraw(ref platform, message,
 					out var drawPacket)) return 0;
-				if (MuiCommonControlCore.Classify(ref platform, state, obj) ==
-					MuiControlClass.Unknown) break;
+				if (!MuiCommonControlCore.IsAreaControlClass(
+					MuiCommonControlCore.Classify(ref platform, state, obj))) break;
 				return MuiCommonControlCore.DrawControl(ref platform, state, obj,
 					drawPacket.Flags) ? 1u : 0u;
 			case Setup:

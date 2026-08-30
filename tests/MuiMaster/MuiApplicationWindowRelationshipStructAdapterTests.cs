@@ -43,4 +43,32 @@ public sealed class MuiApplicationWindowRelationshipStructAdapterTests
 			.TryGetAddress(ref platform, APTR.Null,
 				MuiApplicationWindowRelationshipStateField.Magic, out _));
 	}
+
+	[Fact]
+	public void ApplicationWindowRelationshipSequentialRecordPreservesPointersAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x35C0);
+		var value = new MuiApplicationWindowRelationshipStateRecord
+		{
+			Magic = MuiApplicationWindowRelationshipStateRecord.Cookie,
+			LastWindow = APTR.FromPointer(uint.MaxValue),
+			AddedCount = uint.MaxValue,
+		};
+
+		Assert.True(MuiApplicationWindowRelationshipStateRecordCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiApplicationWindowRelationshipStateRecordCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.LastWindow, decoded.LastWindow);
+		Assert.Equal(value.AddedCount, decoded.AddedCount);
+
+		var crossingEnd = APTR.FromPointer(0x30FF5);
+		Assert.False(MuiApplicationWindowRelationshipStateRecordCodec.WriteRecord(
+			ref platform, crossingEnd, value));
+		Assert.False(MuiApplicationWindowRelationshipStateRecordCodec.TryReadRecord(
+			ref platform, crossingEnd, out _));
+	}
 }

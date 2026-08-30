@@ -72,6 +72,33 @@ public sealed class MuiImageSpecAdmissionTests
 	}
 
 	[Fact]
+	public void ImageSpecSequentialRecordPreservesUnionStateAndRejectsTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x8000,
+			State);
+		var address = APTR.FromPointer(0x3600);
+		var value = new MuiImageSpecStateRecord
+		{
+			Magic = MuiImageSpecStateRecord.Cookie,
+			Present = 1,
+			Raw = 0x2A00,
+			BuiltinPresent = 1,
+			Builtin = uint.MaxValue,
+		};
+		Assert.True(MuiImageSpecStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiImageSpecStateRecordCodec.TryReadRecord(ref platform,
+			address, out var actual));
+		Assert.Equal(value.Magic, actual.Magic);
+		Assert.Equal(value.Present, actual.Present);
+		Assert.Equal(value.Raw, actual.Raw);
+		Assert.Equal(value.BuiltinPresent, actual.BuiltinPresent);
+		Assert.Equal(value.Builtin, actual.Builtin);
+		Assert.False(MuiImageSpecStateRecordCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x40FFC), out _));
+	}
+
+	[Fact]
 	public void MalformedImageSpecFailsClosedBeforeRawRepairOrSet()
 	{
 		var platform = CreatePlatform(out var imageClass);

@@ -36,4 +36,34 @@ public sealed class MuiAreaFontSelectionStructAdapterTests
 		Assert.False(MuiAreaFontSelectionStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}
+
+	[Fact]
+	public void AreaFontSelectionSequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3CC0);
+		var value = new MuiAreaFontSelectionStateRecord
+		{
+			Magic = MuiAreaFontSelectionStateRecord.Cookie,
+			Active = uint.MaxValue,
+			Source = APTR.FromPointer(0xFEEDBEEF),
+			Generation = uint.MaxValue,
+		};
+
+		Assert.True(MuiAreaFontSelectionStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaFontSelectionStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Active, decoded.Active);
+		Assert.Equal(value.Source, decoded.Source);
+		Assert.Equal(value.Generation, decoded.Generation);
+
+		var crossingEnd = APTR.FromPointer(0x30FF1);
+		Assert.False(MuiAreaFontSelectionStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiAreaFontSelectionStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
 }

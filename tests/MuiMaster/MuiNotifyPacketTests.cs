@@ -16,7 +16,8 @@ public sealed class MuiNotifyPacketTests
 	{
 		var platform = CreatePlatform(out _);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0, MuiNotifyCore.NotifyMethod);
+		Assert.True(MuiNotifyMethodMessageCodec.Write(ref platform, packet,
+			new MuiNotifyMethodMessage { MethodId = MuiNotifyCore.NotifyMethod }));
 		Assert.True(MuiNotifyPacketCodec.TryReadMethodId(ref platform, packet,
 			out var header));
 		Assert.Equal(MuiNotifyCore.NotifyMethod, header.MethodId);
@@ -25,6 +26,8 @@ public sealed class MuiNotifyPacketTests
 		Assert.Equal(MuiNotifyCore.NotifyMethod, methodId);
 		Assert.False(MuiNotifyPacketCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
+		Assert.False(MuiNotifyMethodMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
 	}
 
 	[Fact]
@@ -32,11 +35,15 @@ public sealed class MuiNotifyPacketTests
 	{
 		var platform = CreatePlatform(out _);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0, MuiNotifyCore.NotifyMethod);
-		platform.WriteUInt32(packet, 4, Attribute);
-		platform.WriteUInt32(packet, 8, EveryTime);
-		platform.WriteUInt32(packet, 12, 0x1300);
-		platform.WriteUInt32(packet, 16, 1);
+		Assert.True(MuiNotifyMessageCodec.Write(ref platform, packet,
+			new MuiNotifyMessage
+			{
+				MethodId = MuiNotifyCore.NotifyMethod,
+				TriggerAttribute = Attribute,
+				TriggerValue = EveryTime,
+				Destination = 0x1300,
+				FollowCount = 1,
+			}));
 		var request = default(MuiNotifyPacketCodec.PacketAddress);
 		request.Address = packet;
 		request.Method = MuiNotifyCore.NotifyMethod;
@@ -45,6 +52,119 @@ public sealed class MuiNotifyPacketTests
 			ref request, out var message));
 		Assert.Equal(MuiNotifyCore.NotifyMethod, message.MethodId);
 		Assert.Equal(Attribute, message.TriggerAttribute);
+		Assert.Equal(EveryTime, message.TriggerValue);
+		Assert.Equal(0x1300u, message.Destination);
+		Assert.Equal(1u, message.FollowCount);
+		Assert.True(MuiNotifyMessageCodec.TryRead(ref platform, packet,
+			out var direct));
+		Assert.Equal(message.Destination, direct.Destination);
+		Assert.False(MuiNotifyMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+	}
+
+	[Fact]
+	public void SetPacketWriterUsesNamedRecord()
+	{
+		var platform = CreatePlatform(out _);
+		var packet = APTR.FromPointer(0x1200);
+		var value = new MuiSetAttributeMessage
+		{
+			MethodId = MuiNotifyCore.SetMethod,
+			Attribute = Attribute,
+			Value = 77,
+		};
+
+		Assert.True(MuiNotifyPacketCodec.TryWriteSet(ref platform, packet, value));
+		var request = default(MuiNotifyPacketCodec.PacketAddress);
+		request.Address = packet;
+		request.Method = MuiNotifyCore.SetMethod;
+		Assert.True(MuiNotifyPacketCodec.TryReadSet(ref platform, ref request,
+			out var roundTrip));
+		Assert.Equal(value.MethodId, roundTrip.MethodId);
+		Assert.Equal(value.Attribute, roundTrip.Attribute);
+		Assert.Equal(value.Value, roundTrip.Value);
+		Assert.True(MuiSetAttributeMessageCodec.TryRead(ref platform, packet,
+			out var direct));
+		Assert.Equal(value.Attribute, direct.Attribute);
+		Assert.Equal(value.Value, direct.Value);
+
+		value.MethodId = MuiNotifyCore.NotifyMethod;
+		Assert.False(MuiNotifyPacketCodec.TryWriteSet(ref platform, packet, value));
+		Assert.False(MuiNotifyPacketCodec.TryWriteSet(ref platform,
+			APTR.FromPointer(0x20FF8), value));
+		Assert.False(MuiSetAttributeMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+	}
+
+	[Fact]
+	public void KillNotifyAndFindObjectCodecsUseCompleteNamedRecords()
+	{
+		var platform = CreatePlatform(out _);
+		var packet = APTR.FromPointer(0x1200);
+
+		var kill = new MuiKillNotifyMessage
+		{
+			MethodId = MuiNotifyCore.KillNotifyMethod,
+			TriggerAttribute = Attribute,
+		};
+		Assert.True(MuiKillNotifyMessageCodec.Write(ref platform, packet, kill));
+		Assert.True(MuiKillNotifyMessageCodec.TryRead(ref platform, packet,
+			out var killRoundTrip));
+		Assert.Equal(kill.MethodId, killRoundTrip.MethodId);
+		Assert.Equal(kill.TriggerAttribute, killRoundTrip.TriggerAttribute);
+		var killRequest = default(MuiNotifyPacketCodec.PacketAddress);
+		killRequest.Address = packet;
+		killRequest.Method = MuiNotifyCore.KillNotifyMethod;
+		Assert.True(MuiNotifyPacketCodec.TryReadKillNotify(ref platform,
+			ref killRequest, out var admittedKill));
+		Assert.Equal(kill.TriggerAttribute, admittedKill.TriggerAttribute);
+
+		var killObject = new MuiKillNotifyObjectMessage
+		{
+			MethodId = MuiNotifyCore.KillNotifyObjectMethod,
+			TriggerAttribute = Attribute,
+			Destination = 0x1300,
+		};
+		Assert.True(MuiKillNotifyObjectMessageCodec.Write(ref platform, packet,
+			killObject));
+		Assert.True(MuiKillNotifyObjectMessageCodec.TryRead(ref platform, packet,
+			out var killObjectRoundTrip));
+		Assert.Equal(killObject.MethodId, killObjectRoundTrip.MethodId);
+		Assert.Equal(killObject.TriggerAttribute, killObjectRoundTrip.TriggerAttribute);
+		Assert.Equal(killObject.Destination, killObjectRoundTrip.Destination);
+		var killObjectRequest = default(MuiNotifyPacketCodec.PacketAddress);
+		killObjectRequest.Address = packet;
+		killObjectRequest.Method = MuiNotifyCore.KillNotifyObjectMethod;
+		Assert.True(MuiNotifyPacketCodec.TryReadKillNotifyObject(ref platform,
+			ref killObjectRequest, out var admittedKillObject));
+		Assert.Equal(killObject.Destination, admittedKillObject.Destination);
+
+		var find = new MuiFindObjectMessage
+		{
+			MethodId = MuiNotifyCore.FindObjectMethod,
+			FindObject = 0x1400,
+		};
+		Assert.True(MuiFindObjectMessageCodec.Write(ref platform, packet, find));
+		Assert.True(MuiFindObjectMessageCodec.TryRead(ref platform, packet,
+			out var findRoundTrip));
+		Assert.Equal(find.MethodId, findRoundTrip.MethodId);
+		Assert.Equal(find.FindObject, findRoundTrip.FindObject);
+		var findRequest = default(MuiNotifyPacketCodec.PacketAddress);
+		findRequest.Address = packet;
+		findRequest.Method = MuiNotifyCore.FindObjectMethod;
+		Assert.True(MuiNotifyPacketCodec.TryReadFindObject(ref platform,
+			ref findRequest, out var admittedFind));
+		Assert.Equal(find.FindObject, admittedFind.FindObject);
+
+		Assert.False(MuiKillNotifyMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiKillNotifyObjectMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiFindObjectMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		killRequest.Method = MuiNotifyCore.FindObjectMethod;
+		Assert.False(MuiNotifyPacketCodec.TryReadKillNotify(ref platform,
+			ref killRequest, out _));
 	}
 
 	[Fact]
@@ -52,7 +172,8 @@ public sealed class MuiNotifyPacketTests
 	{
 		var platform = CreatePlatform(out _);
 		var slotAddress = APTR.FromPointer(0x1300);
-		platform.WriteUInt32(slotAddress, 0, EveryTime);
+		Assert.True(MuiNotifyFollowParameterSlotCodec.Write(ref platform,
+			slotAddress, new MuiNotifyFollowParameterSlot { Value = EveryTime }));
 		Assert.True(MuiNotifyFollowParameterSlotCodec.TryRead(ref platform,
 			slotAddress, out var slot));
 		Assert.Equal(EveryTime, slot.Value);
@@ -89,6 +210,41 @@ public sealed class MuiNotifyPacketTests
 	}
 
 	[Fact]
+	public void NotifyFollowParameterMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var vector = APTR.FromPointer(0x1800);
+
+		Assert.True(MuiNotifyFollowParameterVectorMemoryCodec.TryGetEntry(
+			ref platform, vector, 2, out var address));
+		Assert.Equal(APTR.FromPointer(0x1808), address);
+		Assert.False(MuiNotifyFollowParameterVectorMemoryCodec.TryGetEntry(
+			ref platform, vector,
+			MuiNotifyFollowParameterVectorCursor.MaximumEntries, out _));
+		Assert.False(MuiNotifyFollowParameterVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0x20FFE), 0, out _));
+		Assert.False(MuiNotifyFollowParameterVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.Null, 0, out _));
+	}
+
+	[Fact]
+	public void MultiSetTargetMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var vector = APTR.FromPointer(0x1800);
+
+		Assert.True(MuiMultiSetTargetVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, 2, out var address));
+		Assert.Equal(APTR.FromPointer(0x1808), address);
+		Assert.False(MuiMultiSetTargetVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, MuiMultiSetTargetVectorCursor.MaximumEntries, out _));
+		Assert.False(MuiMultiSetTargetVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0x20FFE), 0, out _));
+		Assert.False(MuiMultiSetTargetVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.Null, 0, out _));
+	}
+
+	[Fact]
 	public void NotifyInlineVectorCursorUsesNamedPacketBoundary()
 	{
 		var cursor = default(MuiNotifyInlineVectorCursor);
@@ -106,6 +262,43 @@ public sealed class MuiNotifyPacketTests
 		cursor.Message = APTR.FromPointer(0xFFFFFFF0);
 		Assert.False(MuiNotifyInlineVectorCursorCodec.TryGetAddress(cursor,
 			out _));
+	}
+
+	[Fact]
+	public void NotifyInlineVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var message = APTR.FromPointer(0x1800);
+
+		Assert.True(MuiNotifyInlineVectorMemoryCodec.TryGetAddress(ref platform,
+			message, MuiNotifyInlineVectorKind.FollowParameters, 2,
+			out var address));
+		Assert.Equal(APTR.FromPointer(0x181C), address);
+		Assert.True(MuiNotifyInlineVectorMemoryCodec.TryGetAddress(ref platform,
+			message, MuiNotifyInlineVectorKind.MultiSetTargets, 1,
+			out address));
+		Assert.Equal(APTR.FromPointer(0x1814), address);
+		Assert.False(MuiNotifyInlineVectorMemoryCodec.TryGetAddress(ref platform,
+			message, MuiNotifyInlineVectorKind.FollowParameters,
+			MuiNotifyInlineVectorCursor.MaximumEntries, out _));
+		Assert.False(MuiNotifyInlineVectorMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20FEC), MuiNotifyInlineVectorKind.FollowParameters,
+			0, out _));
+		Assert.False(MuiNotifyInlineVectorMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0xFFFFFFF0), MuiNotifyInlineVectorKind.MultiSetTargets,
+			0, out _));
+	}
+
+	[Fact]
+	public void NotifyPacketVectorHelpersUseNamedInlineRecords()
+	{
+		var packet = APTR.FromPointer(0x1800);
+		Assert.Equal(APTR.FromPointer(0x1810),
+			MuiNotifyPacketCodec.MultiSetVector(packet));
+		Assert.Equal(APTR.FromPointer(0x1814),
+			MuiNotifyPacketCodec.FollowParameters(packet));
+		Assert.Equal(APTR.Null,
+			MuiNotifyPacketCodec.MultiSetVector(APTR.FromPointer(0xFFFFFFF0u)));
 	}
 
 	[Fact]
@@ -159,6 +352,33 @@ public sealed class MuiNotifyPacketTests
 		cursor.Field = MuiNotifyPacketField.FollowCount;
 		Assert.False(MuiNotifyPacketFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void NotifyPacketFieldMemoryCodecResolvesNamedMixedPacketBoundaries()
+	{
+		var platform = CreatePlatform(out _);
+		var packet = APTR.FromPointer(0x1400);
+		Assert.True(MuiNotifyPacketFieldMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiNotifyPacketKind.Notify,
+			MuiNotifyPacketField.TriggerAttribute, Attribute));
+		Assert.True(MuiNotifyPacketFieldMemoryCodec.TryReadUInt32(ref platform,
+			packet, MuiNotifyPacketKind.Notify,
+			MuiNotifyPacketField.TriggerAttribute, out var attribute));
+		Assert.Equal(Attribute, attribute);
+		Assert.True(MuiNotifyPacketFieldMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiNotifyPacketKind.MultiSet,
+			MuiNotifyPacketField.FirstObject, out var address));
+		Assert.Equal(packet.Raw + 12u, address.Raw);
+		Assert.False(MuiNotifyPacketFieldMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiNotifyPacketKind.KillNotify,
+			MuiNotifyPacketField.Destination, out _));
+		Assert.False(MuiNotifyPacketFieldMemoryCodec.TryGetAddress(ref platform,
+			packet, (MuiNotifyPacketKind)0xFF,
+			MuiNotifyPacketField.Value, out _));
+		Assert.False(MuiNotifyPacketFieldMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0xFFFFFFF0u), MuiNotifyPacketKind.Notify,
+			MuiNotifyPacketField.FollowCount, out _));
 	}
 
 	[Fact]

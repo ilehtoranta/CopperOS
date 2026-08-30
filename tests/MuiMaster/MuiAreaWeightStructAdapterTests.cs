@@ -35,4 +35,30 @@ public sealed class MuiAreaWeightStructAdapterTests
 		Assert.False(MuiAreaWeightStateRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiAreaWeightStateField.Magic, out _));
 	}
+
+	[Fact]
+	public void AreaWeightSequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x35C0);
+		var value = new MuiAreaWeightStateRecord
+		{
+			Magic = MuiAreaWeightStateRecord.Cookie,
+			Weight = uint.MaxValue,
+		};
+
+		Assert.True(MuiAreaWeightStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaWeightStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Weight, decoded.Weight);
+
+		var crossingEnd = APTR.FromPointer(0x30FF9);
+		Assert.False(MuiAreaWeightStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiAreaWeightStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
 }

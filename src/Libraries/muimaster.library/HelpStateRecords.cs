@@ -186,26 +186,43 @@ internal static class MuiHelpStateRecordMemoryCodec
 
 internal static class MuiHelpStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiHelpStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiHelpStateRecordMemoryCodec.TryReadUInt32(ref platform, address, 0,
-			out var magic) ||
-			!MuiHelpStateRecordMemoryCodec.TryReadUInt32(ref platform, address, 4,
-			out var node) ||
-			!MuiHelpStateRecordMemoryCodec.TryReadUInt32(ref platform, address, 8,
-			out var line) ||
-			!MuiHelpStateRecordMemoryCodec.TryReadUInt32(ref platform, address, 12,
-			out var generation))
-			return false;
-		value.Magic = magic;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHelpStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var node) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Line) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Generation)) return false;
 		value.Node = APTR.FromPointer(node);
-		value.Line = line;
-		value.Generation = generation;
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiHelpStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHelpStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Node.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Line) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Generation) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiHelpStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiHelpStateRecord value)
@@ -217,14 +234,7 @@ internal static class MuiHelpStateRecordCodec
 		MuiHelpStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiHelpStateAdmission.Validate(value)) return false;
-		return MuiHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			0, value.Magic) &&
-			MuiHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			4, value.Node.Raw) &&
-			MuiHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			8, value.Line) &&
-			MuiHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			12, value.Generation);
+		if (address.IsNull || !MuiHelpStateAdmission.Validate(value)) return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

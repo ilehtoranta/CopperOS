@@ -24,7 +24,7 @@ namespace CopperOS.MuiMaster;
 // the menu-specific bookkeeping below: the exact class discriminator, the
 // Menustrip change-nesting depth, the class-owned copied Title/Shortcut blocks
 // (governed by CopyStrings), the [I..] CopyStrings / CaseSensitive latches, the
-// Trigger publication token, and the runtime-change notification counters. That
+// Trigger projection pointer, and the runtime-change notification counters. That
 // bookkeeping lives in this small guest-resident sidecar block, which is
 // attached to its object through a single private attribute id and freed by the
 // family lifecycle. The frozen headless/family/object cores, dispatchers and
@@ -47,6 +47,7 @@ internal static class MuiMenuSpecialistLayout
 	public const uint FlagCaseSensitive = 1u << 1;  // MUIA_Menustrip_CaseSensitive
 	public const uint FlagWillOpen = 1u << 2;       // MUIM_Menustrip_WillOpen seen
 	public const uint FlagPublished = 1u << 3;      // Trigger published
+	public const uint FlagTriggerOwned = 1u << 4;   // Trigger points to owned MenuItem
 
 	// Bounded traversal for sibling/child walks.
 	public const uint MaximumChildren = 4096;
@@ -58,6 +59,20 @@ internal struct MuiMenuSpecialistState
 {
 	internal const uint Size = MuiMenuSpecialistLayout.InstanceSize;
 	internal const uint Cookie = MuiMenuSpecialistLayout.Magic;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint ClassOffset = 4;
+	internal const uint ChangeDepthOffset = 8;
+	internal const uint TitleOwnedOffset = 12;
+	internal const uint TitleOwnedSizeOffset = 16;
+	internal const uint ShortcutOwnedOffset = 20;
+	internal const uint ShortcutOwnedSizeOffset = 24;
+	internal const uint FlagsOffset = 28;
+	internal const uint TriggerOffset = 32;
+	internal const uint NotifyAttributeOffset = 36;
+	internal const uint NotifyValueOffset = 40;
+	internal const uint NotifyCountOffset = 44;
+	internal const uint Reserved0Offset = 48;
 
 	internal uint Magic;
 	internal uint Class;
@@ -98,42 +113,57 @@ internal struct MuiMenuRecordFieldCursor
 	internal MuiMenuRecordField Field;
 }
 
-internal static class MuiMenuRecordFieldCursorCodec
+internal static class MuiMenuRecordMemoryCodec
 {
 	private static bool TryResolve(MuiMenuRecordField field,
-		out uint offset)
+		out uint offset, out uint recordSize)
 	{
-		offset = field switch
+		recordSize = MuiMenuSpecialistState.Size;
+		if (field == MuiMenuRecordField.Magic)
+			offset = MuiMenuSpecialistState.MagicOffset;
+		else if (field == MuiMenuRecordField.Class)
+			offset = MuiMenuSpecialistState.ClassOffset;
+		else if (field == MuiMenuRecordField.ChangeDepth)
+			offset = MuiMenuSpecialistState.ChangeDepthOffset;
+		else if (field == MuiMenuRecordField.TitleOwned)
+			offset = MuiMenuSpecialistState.TitleOwnedOffset;
+		else if (field == MuiMenuRecordField.TitleOwnedSize)
+			offset = MuiMenuSpecialistState.TitleOwnedSizeOffset;
+		else if (field == MuiMenuRecordField.ShortcutOwned)
+			offset = MuiMenuSpecialistState.ShortcutOwnedOffset;
+		else if (field == MuiMenuRecordField.ShortcutOwnedSize)
+			offset = MuiMenuSpecialistState.ShortcutOwnedSizeOffset;
+		else if (field == MuiMenuRecordField.Flags)
+			offset = MuiMenuSpecialistState.FlagsOffset;
+		else if (field == MuiMenuRecordField.Trigger)
+			offset = MuiMenuSpecialistState.TriggerOffset;
+		else if (field == MuiMenuRecordField.NotifyAttribute)
+			offset = MuiMenuSpecialistState.NotifyAttributeOffset;
+		else if (field == MuiMenuRecordField.NotifyValue)
+			offset = MuiMenuSpecialistState.NotifyValueOffset;
+		else if (field == MuiMenuRecordField.NotifyCount)
+			offset = MuiMenuSpecialistState.NotifyCountOffset;
+		else if (field == MuiMenuRecordField.Reserved0)
+			offset = MuiMenuSpecialistState.Reserved0Offset;
+		else
 		{
-			MuiMenuRecordField.Magic => 0,
-			MuiMenuRecordField.Class => 4,
-			MuiMenuRecordField.ChangeDepth => 8,
-			MuiMenuRecordField.TitleOwned => 12,
-			MuiMenuRecordField.TitleOwnedSize => 16,
-			MuiMenuRecordField.ShortcutOwned => 20,
-			MuiMenuRecordField.ShortcutOwnedSize => 24,
-			MuiMenuRecordField.Flags => 28,
-			MuiMenuRecordField.Trigger => 32,
-			MuiMenuRecordField.NotifyAttribute => 36,
-			MuiMenuRecordField.NotifyValue => 40,
-			MuiMenuRecordField.NotifyCount => 44,
-			MuiMenuRecordField.Reserved0 => 48,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			recordSize = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiMenuRecordFieldCursor cursor, out APTR address)
+		APTR record, MuiMenuRecordField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, MuiMenuSpecialistState.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset, out var recordSize) ||
+			record.IsNull || record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, recordSize)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiMenuSpecialistState.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -141,10 +171,7 @@ internal static class MuiMenuRecordFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiMenuRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
 			return false;
 		value = platform.ReadUInt32(fieldAddress, 0);
 		return true;
@@ -154,58 +181,116 @@ internal static class MuiMenuRecordFieldCursorCodec
 		APTR address, MuiMenuRecordField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiMenuRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
 			return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
 		return true;
 	}
 }
 
+// Compatibility wrapper retained for callers that still construct the typed
+// Menu specialist cursor. Live sidecar serialization uses the direct adapter.
+internal static class MuiMenuRecordFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMenuRecordFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMenuRecordMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+			cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiMenuRecordField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMenuRecordMemoryCodec.TryReadUInt32(ref platform, address, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiMenuRecordField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiMenuRecordMemoryCodec.TryWriteUInt32(ref platform, address, field,
+			value);
+}
+
 internal static class MuiMenuSpecialistStateCodec
 {
+	// Declaration-order Menu specialist sidecar: class/change state, owned
+	// title/shortcut pointers and sizes, trigger/notification fields, and the
+	// reserved word. APTRs are converted only at this named cursor boundary.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiMenuSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMenuSpecialistState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Class) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.ChangeDepth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var titleOwned) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.TitleOwnedSize) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var shortcutOwned) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.ShortcutOwnedSize) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Flags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Trigger) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.NotifyAttribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.NotifyValue) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.NotifyCount) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved0)) return false;
+		value.TitleOwned = APTR.FromPointer(titleOwned);
+		value.ShortcutOwned = APTR.FromPointer(shortcutOwned);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiMenuSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMenuSpecialistState.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Class) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ChangeDepth) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.TitleOwned.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.TitleOwnedSize) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ShortcutOwned.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ShortcutOwnedSize) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Flags) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Trigger) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.NotifyAttribute) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.NotifyValue) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.NotifyCount) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Reserved0) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiMenuSpecialistState value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMenuSpecialistState.Size) ||
-			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiMenuRecordField.Magic, out var magic))
-			return false;
-		value.Magic = magic;
-		if (!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-			MuiMenuRecordField.Class, out value.Class) ||
-			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiMenuRecordField.ChangeDepth, out value.ChangeDepth) ||
-			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiMenuRecordField.TitleOwned, out var titleOwned) ||
-			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiMenuRecordField.TitleOwnedSize, out value.TitleOwnedSize) ||
-			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiMenuRecordField.ShortcutOwned, out var shortcutOwned) ||
-			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiMenuRecordField.ShortcutOwnedSize, out value.ShortcutOwnedSize) ||
-			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiMenuRecordField.Flags, out value.Flags) ||
-			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiMenuRecordField.Trigger, out value.Trigger) ||
-			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiMenuRecordField.NotifyAttribute, out value.NotifyAttribute) ||
-			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiMenuRecordField.NotifyValue, out value.NotifyValue) ||
-			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiMenuRecordField.NotifyCount, out value.NotifyCount) ||
-			!MuiMenuRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiMenuRecordField.Reserved0, out value.Reserved0)) return false;
-		value.TitleOwned = APTR.FromPointer(titleOwned);
-		value.ShortcutOwned = APTR.FromPointer(shortcutOwned);
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiMenuSpecialistState value)
@@ -222,32 +307,7 @@ internal static class MuiMenuSpecialistStateCodec
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiMenuSpecialistState.Size) || value.Magic !=
 			MuiMenuSpecialistState.Cookie) return false;
-		return MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiMenuRecordField.Magic, value.Magic) &&
-			MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMenuRecordField.Class, value.Class) &&
-			MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMenuRecordField.ChangeDepth, value.ChangeDepth) &&
-			MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMenuRecordField.TitleOwned, value.TitleOwned.Raw) &&
-			MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMenuRecordField.TitleOwnedSize, value.TitleOwnedSize) &&
-			MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMenuRecordField.ShortcutOwned, value.ShortcutOwned.Raw) &&
-			MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMenuRecordField.ShortcutOwnedSize, value.ShortcutOwnedSize) &&
-			MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMenuRecordField.Flags, value.Flags) &&
-			MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMenuRecordField.Trigger, value.Trigger) &&
-			MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMenuRecordField.NotifyAttribute, value.NotifyAttribute) &&
-			MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMenuRecordField.NotifyValue, value.NotifyValue) &&
-			MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMenuRecordField.NotifyCount, value.NotifyCount) &&
-			MuiMenuRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiMenuRecordField.Reserved0, value.Reserved0);
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
@@ -259,7 +319,8 @@ internal static class MuiMenuSpecialistStateAdmission
 	private const uint AllowedFlags = MuiMenuSpecialistLayout.FlagCopyStrings |
 		MuiMenuSpecialistLayout.FlagCaseSensitive |
 		MuiMenuSpecialistLayout.FlagWillOpen |
-		MuiMenuSpecialistLayout.FlagPublished;
+		MuiMenuSpecialistLayout.FlagPublished |
+		MuiMenuSpecialistLayout.FlagTriggerOwned;
 
 	internal static bool Validate<TPlatform>(ref TPlatform platform,
 		MuiMenuSpecialistState value)
@@ -271,9 +332,14 @@ internal static class MuiMenuSpecialistStateAdmission
 			(value.Flags & ~AllowedFlags) != 0 ||
 			value.ChangeDepth == uint.MaxValue || value.Reserved0 != 0)
 			return false;
-		return ValidateOwned(ref platform, value.TitleOwned,
-			value.TitleOwnedSize) && ValidateOwned(ref platform,
-			value.ShortcutOwned, value.ShortcutOwnedSize);
+		if (!ValidateOwned(ref platform, value.TitleOwned,
+			value.TitleOwnedSize) || !ValidateOwned(ref platform,
+			value.ShortcutOwned, value.ShortcutOwnedSize)) return false;
+		if ((value.Flags & MuiMenuSpecialistLayout.FlagTriggerOwned) == 0)
+			return true;
+		var trigger = APTR.FromPointer(value.Trigger);
+		return MuiMenuItemTriggerStorageCodec.IsMapped(ref platform, trigger) &&
+			MuiMenuItemMemoryCodec.TryRead(ref platform, trigger, out _);
 	}
 
 	private static bool ValidateOwned<TPlatform>(ref TPlatform platform,
@@ -337,48 +403,22 @@ public static class MuiMenuSpecialistCore
 	// ---- Classification ------------------------------------------------------
 
 	// Classify a guest C-string class id against the exact official names. The
-	// loader contract is case-sensitive, so the match is byte-exact against the
-	// documented "<Name>.mui" ids with no managed strings, arrays or spans.
+	// loader contract is case-sensitive, so fixed identities are admitted through
+	// named packed records rather than consumer-side byte walks.
 	public static MuiMenuSpecialistClass ClassifyName<TPlatform>(
 		ref TPlatform platform, APTR classId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (classId.IsNull) return MuiMenuSpecialistClass.None;
-		var c0 = B(ref platform, classId, 0);
-		var c1 = B(ref platform, classId, 1);
-		var c2 = B(ref platform, classId, 2);
-		var c3 = B(ref platform, classId, 3);
-		if (c0 != 'M' || c1 != 'e' || c2 != 'n' || c3 != 'u')
-			return MuiMenuSpecialistClass.None;
-		// Menu.mui
-		if (Suffix(ref platform, classId, 4)) return MuiMenuSpecialistClass.Menu;
-		var c4 = B(ref platform, classId, 4);
-		// Menustrip.mui
-		if (c4 == 's' && B(ref platform, classId, 5) == 't' &&
-			B(ref platform, classId, 6) == 'r' &&
-			B(ref platform, classId, 7) == 'i' &&
-			B(ref platform, classId, 8) == 'p' && Suffix(ref platform, classId, 9))
+		if (MuiMenuSpecialistMenuClassNameRecordCodec.TryMatch(ref platform,
+			classId)) return MuiMenuSpecialistClass.Menu;
+		if (MuiMenuSpecialistMenustripClassNameRecordCodec.TryMatch(ref platform,
+			classId))
 			return MuiMenuSpecialistClass.Menustrip;
-		// Menuitem.mui
-		if (c4 == 'i' && B(ref platform, classId, 5) == 't' &&
-			B(ref platform, classId, 6) == 'e' &&
-			B(ref platform, classId, 7) == 'm' && Suffix(ref platform, classId, 8))
+		if (MuiMenuSpecialistMenuitemClassNameRecordCodec.TryMatch(ref platform,
+			classId))
 			return MuiMenuSpecialistClass.Menuitem;
 		return MuiMenuSpecialistClass.None;
 	}
-
-	private static int B<TPlatform>(ref TPlatform platform, APTR text, int index)
-		where TPlatform : struct, IMuiGuestMemory =>
-		platform.IsMapped(text, (uint)index + 1) ? platform.ReadUInt8(text, index)
-			: -1;
-
-	private static bool Suffix<TPlatform>(ref TPlatform platform, APTR text,
-		int offset) where TPlatform : struct, IMuiGuestMemory =>
-		B(ref platform, text, offset) == '.' &&
-		B(ref platform, text, offset + 1) == 'm' &&
-		B(ref platform, text, offset + 2) == 'u' &&
-		B(ref platform, text, offset + 3) == 'i' &&
-		B(ref platform, text, offset + 4) == 0;
 
 	// Every menu class descends directly from Family.mui; None is the Family
 	// sentinel root.
@@ -743,8 +783,9 @@ public static class MuiMenuSpecialistCore
 
 	// Runtime selection of a menu item. A Toggle item flips its Checked state; a
 	// non-Toggle checkmark item is set checked. Becoming checked runs the mutual
-	// exclusion sweep across siblings. The item publishes itself as the Trigger.
-	// A disabled item ignores the trigger entirely.
+	// exclusion sweep across siblings. The item publishes a guest-backed
+	// Intuition MenuItem record as the Trigger. A disabled item ignores the
+	// trigger entirely.
 	public static bool TriggerItem<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform =>
 		TriggerItem(ref platform, state, obj, false);
@@ -776,15 +817,152 @@ public static class MuiMenuSpecialistCore
 			SetChecked(ref platform, state, obj, next, true);
 		}
 
-		sidecar.Trigger = obj.Raw;
-		if (!MuiMenuSpecialistStateCodec.Write(ref platform, sc, sidecar))
+		// SetChecked may have emitted a runtime notification and therefore
+		// advanced the sidecar counters. Refresh before publishing the trigger so
+		// the projection update cannot overwrite that state.
+		if (!MuiMenuSpecialistStateCodec.TryRead(ref platform, sc,
+			out sidecar)) return false;
+		if (!EnsureTriggerRecord(ref platform, state, obj, sc, ref sidecar,
+			out var trigger))
 			return false;
 		SetFlag(ref platform, sc, MuiMenuSpecialistLayout.FlagPublished, true);
 		Notify(ref platform, state, sc, MuiMenuAttributes.Menuitem_Trigger,
-			obj.Raw);
+			trigger.Raw);
 		MuiApplicationWindowCore.PublishApplicationMenuItemSelection(ref platform,
 			state, obj, help);
 		return true;
+	}
+
+	// Build or refresh the stable guest MenuItem projection for this object.
+	// Owned projections are updated in place so observers can retain the pointer
+	// across repeated triggers. An externally supplied Trigger value is never
+	// freed; the first trigger simply replaces it with an owned projection.
+	private static bool EnsureTriggerRecord<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, APTR sc, ref MuiMenuSpecialistState sidecar,
+		out APTR trigger) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		trigger = APTR.Null;
+		var projection = BuildMenuItemProjection(ref platform, state, obj,
+			out var title);
+		var owned = (sidecar.Flags & MuiMenuSpecialistLayout.FlagTriggerOwned) != 0;
+		var current = APTR.FromPointer(sidecar.Trigger);
+		if (owned && MuiMenuItemTriggerStorageCodec.IsMapped(ref platform,
+			current))
+		{
+			if (!MuiMenuItemTriggerStorageCodec.TryWrite(ref platform, current,
+				projection, title))
+				return false;
+			trigger = current;
+			return true;
+		}
+
+		var fresh = MuiHeadlessMemory.Allocate(ref platform,
+			MuiMenuItemTriggerStorageCodec.Size);
+		if (fresh.IsNull || !MuiMenuItemTriggerStorageCodec.TryWrite(ref platform,
+			fresh, projection, title))
+		{
+			if (fresh.IsNotNull)
+			{
+				platform.Clear(fresh, MuiMenuItemTriggerStorageCodec.Size);
+				platform.Free(fresh, MuiMenuItemTriggerStorageCodec.Size);
+			}
+			return false;
+		}
+
+		var previousOwned = owned && current.IsNotNull &&
+			MuiMenuItemTriggerStorageCodec.IsMapped(ref platform, current) ? current :
+			APTR.Null;
+		var updated = sidecar;
+		updated.Trigger = fresh.Raw;
+		updated.Flags |= MuiMenuSpecialistLayout.FlagTriggerOwned;
+		if (!MuiMenuSpecialistStateCodec.Write(ref platform, sc, updated))
+		{
+			platform.Clear(fresh, MuiMenuItemTriggerStorageCodec.Size);
+			platform.Free(fresh, MuiMenuItemTriggerStorageCodec.Size);
+			return false;
+		}
+		sidecar = updated;
+		if (previousOwned.IsNotNull)
+		{
+			platform.Clear(previousOwned, MuiMenuItemTriggerStorageCodec.Size);
+			platform.Free(previousOwned, MuiMenuItemTriggerStorageCodec.Size);
+		}
+		trigger = fresh;
+		return true;
+	}
+
+	private static MenuItem BuildMenuItemProjection<TPlatform>(
+		ref TPlatform platform, APTR state, APTR obj, out APTR titleSource)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var item = default(MenuItem);
+		titleSource = APTR.Null;
+		var flags = MenuItemFlags.None;
+		if (BoolAttribute(ref platform, state, obj,
+			MuiMenuAttributes.Menuitem_Enabled))
+			flags |= MenuItemFlags.Enabled;
+		if (BoolAttribute(ref platform, state, obj,
+			MuiMenuAttributes.Menuitem_Checkit))
+			flags |= MenuItemFlags.CheckIt;
+		if (BoolAttribute(ref platform, state, obj,
+			MuiMenuAttributes.Menuitem_Toggle))
+			flags |= MenuItemFlags.MenuToggle;
+		if (BoolAttribute(ref platform, state, obj,
+			MuiMenuAttributes.Menuitem_Checked))
+			flags |= MenuItemFlags.Checked;
+
+		if (MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj,
+			MuiMenuAttributes.Menuitem_Title, out var title) && title != 0 &&
+			title != 0xFFFFFFFFu && CStringCodec.TryReadLength(ref platform,
+			APTR.FromPointer(title), MuiMenuItemTriggerStorageCodec.StringCapacity,
+			out _))
+		{
+			flags |= MenuItemFlags.ItemText;
+			titleSource = APTR.FromPointer(title);
+		}
+		// Intuition's MenuItem.Command field represents a single key only.  The
+		// MorphOS CommandString attribute deliberately marks Shortcut as a
+		// display-only command string (for example, "shift alt q"), which MUI
+		// does not ask Intuition to process.  Keep COMMSEQ clear for that form;
+		// otherwise the first character of a multi-key string would be exposed
+		// as a false accelerator through the public MenuItem projection.
+		var commandString = BoolAttribute(ref platform, state, obj,
+			MuiMenuAttributes.Menuitem_CommandString);
+		if (!commandString && MuiHeadlessObjectCore.GetAttribute(ref platform,
+			state, obj, MuiMenuAttributes.Menuitem_Shortcut, out var shortcut) &&
+			shortcut != 0 && shortcut != 0xFFFFFFFFu &&
+			MuiMakeObjectMenuBarLabelRecordCodec.TryReadRecord(ref platform,
+				APTR.FromPointer(shortcut), out var shortcutRecord) &&
+			shortcutRecord.Terminator == 0)
+		{
+			flags |= MenuItemFlags.CommandSequence;
+			item.Command = unchecked((sbyte)shortcutRecord.Character);
+		}
+		if (MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj,
+			MuiMenuAttributes.Menuitem_Exclude, out var exclude))
+			item.MutualExclude = unchecked((int)exclude);
+		item.Flags = flags;
+		// ItemFill/SelectFill are populated by the storage codec, which owns the
+		// composed IntuiText and copied title after this value is built.
+		return item;
+	}
+
+	// Attribute changes after publication must be visible through the same
+	// guest MenuItem pointer. Refresh only an owned projection; borrowed Trigger
+	// values are outside this object's storage contract.
+	private static void RefreshTriggerProjection<TPlatform>(ref TPlatform platform,
+		APTR state, APTR obj, APTR sc)
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiMenuSpecialistStateCodec.TryRead(ref platform, sc,
+			out var sidecar) || (sidecar.Flags &
+			MuiMenuSpecialistLayout.FlagTriggerOwned) == 0) return;
+		var trigger = APTR.FromPointer(sidecar.Trigger);
+		if (!MuiMenuItemTriggerStorageCodec.IsMapped(ref platform, trigger)) return;
+		var projection = BuildMenuItemProjection(ref platform, state, obj,
+			out var title);
+		MuiMenuItemTriggerStorageCodec.TryWrite(ref platform, trigger, projection,
+			title);
 	}
 
 	public static uint Trigger<TPlatform>(ref TPlatform platform, APTR state,
@@ -931,14 +1109,21 @@ public static class MuiMenuSpecialistCore
 			//    CommandString/Enabled/Exclude/Menuitem; [I..] CopyStrings
 			case MuiMenuAttributes.Menuitem_Title:
 				if (cls != MuiMenuSpecialistClass.Menuitem) return false;
-				return SetString(ref platform, state, obj, sc, attribute,
+				var titleResult = SetString(ref platform, state, obj, sc, attribute,
 					MuiMenuOwnedSlot.Title, value, isInit, notify,
 					out changed);
+				if (titleResult && !isInit) RefreshTriggerProjection(ref platform,
+					state, obj, sc);
+				return titleResult;
 			case MuiMenuAttributes.Menuitem_Shortcut:
 				if (cls != MuiMenuSpecialistClass.Menuitem) return false;
-				return SetString(ref platform, state, obj, sc, attribute,
+				var shortcutResult = SetString(ref platform, state, obj, sc,
+					attribute,
 					MuiMenuOwnedSlot.Shortcut, value, isInit, notify,
 					out changed);
+				if (shortcutResult && !isInit) RefreshTriggerProjection(ref platform,
+					state, obj, sc);
+				return shortcutResult;
 			case MuiMenuAttributes.Menuitem_Checkit:
 			case MuiMenuAttributes.Menuitem_Toggle:
 			case MuiMenuAttributes.Menuitem_CommandString:
@@ -946,11 +1131,13 @@ public static class MuiMenuSpecialistCore
 				if (cls != MuiMenuSpecialistClass.Menuitem) return false;
 				changed = SetBool(ref platform, state, obj, sc, attribute, value,
 					isInit, notify);
+				if (!isInit) RefreshTriggerProjection(ref platform, state, obj, sc);
 				return true;
 			case MuiMenuAttributes.Menuitem_Exclude:
 				if (cls != MuiMenuSpecialistClass.Menuitem) return false;
 				changed = SetScalar(ref platform, state, obj, sc, attribute, value,
 					isInit, notify);
+				if (!isInit) RefreshTriggerProjection(ref platform, state, obj, sc);
 				return true;
 			case MuiMenuAttributes.Menuitem_Checked:
 				if (cls != MuiMenuSpecialistClass.Menuitem) return false;
@@ -958,6 +1145,7 @@ public static class MuiMenuSpecialistCore
 					!isInit && notify);
 				if (changed && !isInit) Notify(ref platform, state, sc, attribute,
 					value != 0 ? 1u : 0u);
+				if (!isInit) RefreshTriggerProjection(ref platform, state, obj, sc);
 				return true;
 			case MuiMenuAttributes.Menuitem_CopyStrings:
 				if (cls != MuiMenuSpecialistClass.Menuitem) return false;
@@ -975,15 +1163,21 @@ public static class MuiMenuSpecialistCore
 			case MuiMenuAttributes.Menuitem_Trigger:
 				// MorphOS exposes Trigger as [.SG]: it is a runtime publication
 				// token, not an initialization tag. Keep the named sidecar field
-				// authoritative and notify only when the token changes.
+				// authoritative and release only projections owned by this object.
 				if (cls != MuiMenuSpecialistClass.Menuitem || isInit)
 					return false;
 				changed = sidecar.Trigger != value;
 				if (changed)
 				{
+					var previousOwned = (sidecar.Flags &
+						MuiMenuSpecialistLayout.FlagTriggerOwned) != 0
+						? APTR.FromPointer(sidecar.Trigger) : APTR.Null;
 					sidecar.Trigger = value;
-					if (!MuiMenuSpecialistStateCodec.Write(ref platform, sc, sidecar))
+					sidecar.Flags &= ~MuiMenuSpecialistLayout.FlagTriggerOwned;
+					if (!MuiMenuSpecialistStateCodec.Write(ref platform, sc,
+						sidecar))
 						return false;
+					FreeTriggerBlock(ref platform, previousOwned);
 				}
 				if (changed && notify)
 					Notify(ref platform, state, sc, attribute, value);
@@ -1202,6 +1396,7 @@ public static class MuiMenuSpecialistCore
 		if (sc.IsNull) return;
 		FreeOwned(ref platform, sc, MuiMenuOwnedSlot.Title);
 		FreeOwned(ref platform, sc, MuiMenuOwnedSlot.Shortcut);
+		FreeTriggerRecord(ref platform, sc);
 		// Detach and invalidate so a repeated disposal is a no-op.
 		MuiHeadlessObjectCore.SetAttribute(ref platform, state, obj,
 			MuiMenuSpecialistLayout.SidecarAttribute, 0, false);
@@ -1222,6 +1417,29 @@ public static class MuiMenuSpecialistCore
 		platform.Free(block, size);
 		SetOwned(ref sidecar, slot, APTR.Null, 0);
 		MuiMenuSpecialistStateCodec.Write(ref platform, sc, sidecar);
+	}
+
+	private static void FreeTriggerRecord<TPlatform>(ref TPlatform platform,
+		APTR sc) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiMenuSpecialistStateCodec.TryRead(ref platform, sc,
+			out var sidecar)) return;
+		if ((sidecar.Flags & MuiMenuSpecialistLayout.FlagTriggerOwned) == 0)
+			return;
+		var block = APTR.FromPointer(sidecar.Trigger);
+		FreeTriggerBlock(ref platform, block);
+		sidecar.Trigger = 0;
+		sidecar.Flags &= ~MuiMenuSpecialistLayout.FlagTriggerOwned;
+		MuiMenuSpecialistStateCodec.Write(ref platform, sc, sidecar);
+	}
+
+	private static void FreeTriggerBlock<TPlatform>(ref TPlatform platform,
+		APTR block) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (block.IsNull || !MuiMenuItemTriggerStorageCodec.IsMapped(ref platform,
+			block)) return;
+		platform.Clear(block, MuiMenuItemTriggerStorageCodec.Size);
+		platform.Free(block, MuiMenuItemTriggerStorageCodec.Size);
 	}
 
 	// ---- Internals -----------------------------------------------------------

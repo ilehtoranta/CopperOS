@@ -30,6 +30,18 @@ internal struct MuiDirlistFilterStateRecord
 {
 	internal const uint Size = 44;
 	internal const uint Cookie = 0x444C464Cu; // 'DLFL'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint AcceptPatternOffset = 4;
+	internal const uint RejectPatternOffset = 8;
+	internal const uint PatternOffset = 12;
+	internal const uint DrawersOnlyOffset = 16;
+	internal const uint FilesOnlyOffset = 20;
+	internal const uint FilterDrawersOffset = 24;
+	internal const uint MultiSelDirsOffset = 28;
+	internal const uint RejectIconsOffset = 32;
+	internal const uint ExAllTypeOffset = 36;
+	internal const uint FilterHookOffset = 40;
 
 	internal uint Magic;
 	internal APTR AcceptPattern;
@@ -49,6 +61,13 @@ internal struct MuiDirlistScanStateRecord
 {
 	internal const uint Size = 24;
 	internal const uint Cookie = 0x444C5343u; // 'DLSC'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint StatusOffset = 4;
+	internal const uint NumFilesOffset = 8;
+	internal const uint NumDrawersOffset = 12;
+	internal const uint NumBytesOffset = 16;
+	internal const uint IoErrOffset = 20;
 
 	internal uint Magic;
 	internal uint Status;
@@ -72,6 +91,11 @@ internal struct MuiDirlistSortStateRecord
 {
 	internal const uint Size = 16;
 	internal const uint Cookie = 0x444C5354u; // 'DLST'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint SortTypeOffset = 4;
+	internal const uint SortDirsOffset = 8;
+	internal const uint SortHighLowOffset = 12;
 
 	internal uint Magic;
 	internal uint SortType;
@@ -158,9 +182,13 @@ public struct MuiDirlistScanEntryState
 // Named view of the guest QUAD retained by MUIA_Dirlist_NumBytes64. The
 // high/low words stay explicit so the 68k ABI remains visible without making
 // callers depend on raw word offsets.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiDirlistByteTotalState
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint HighOffset = 0;
+	public const uint LowOffset = 4;
 
 	public uint High;
 	public uint Low;
@@ -175,10 +203,10 @@ internal static class MuiDirlistByteTotalCodec
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiDirlistByteTotalState.Size)) return false;
-		if (!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiDirlistRecordKind.ByteTotal, MuiDirlistRecordField.High,
 			out value.High) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.ByteTotal, MuiDirlistRecordField.Low,
 				out value.Low)) return false;
 		return true;
@@ -190,10 +218,10 @@ internal static class MuiDirlistByteTotalCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiDirlistByteTotalState.Size)) return false;
-		return MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiDirlistRecordKind.ByteTotal, MuiDirlistRecordField.High,
 			value.High) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.ByteTotal, MuiDirlistRecordField.Low,
 				value.Low);
 	}
@@ -207,6 +235,16 @@ internal struct MuiDirlistEntryWireState
 {
 	internal const uint Size = 36;
 	internal const uint NameOffset = 36;
+	internal const uint FieldSize = 4;
+	internal const uint RecordSizeOffset = 0;
+	internal const uint TypeOffset = 4;
+	internal const uint SizeLowOffset = 8;
+	internal const uint SizeHighOffset = 12;
+	internal const uint ProtectionOffset = 16;
+	internal const uint DaysOffset = 20;
+	internal const uint MinsOffset = 24;
+	internal const uint TicksOffset = 28;
+	internal const uint CommentOffsetOffset = 32;
 
 	internal uint RecordSize;
 	internal int Type;
@@ -228,31 +266,31 @@ internal static class MuiDirlistEntryWireCodec
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiDirlistEntryWireState.Size)) return false;
-		if (!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiDirlistRecordKind.EntryWire,
 			MuiDirlistRecordField.RecordSize, out value.RecordSize) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Type,
 				out var type) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.SizeLow,
 				out value.SizeLow) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.SizeHigh,
 				out value.SizeHigh) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Protection,
 				out value.Protection) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Days,
 				out value.Days) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Mins,
 				out value.Mins) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Ticks,
 				out value.Ticks) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.CommentOffset,
 				out value.CommentOffset)) return false;
 		value.Type = unchecked((int)type);
@@ -265,31 +303,31 @@ internal static class MuiDirlistEntryWireCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiDirlistEntryWireState.Size)) return false;
-		return MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiDirlistRecordKind.EntryWire,
 			MuiDirlistRecordField.RecordSize, value.RecordSize) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Type,
 				unchecked((uint)value.Type)) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.SizeLow,
 				value.SizeLow) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.SizeHigh,
 				value.SizeHigh) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Protection,
 				value.Protection) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Days,
 				value.Days) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Mins,
 				value.Mins) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Ticks,
 				value.Ticks) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.CommentOffset,
 				value.CommentOffset);
 	}
@@ -304,6 +342,14 @@ internal struct MuiDirlistScanEntryWireState
 	internal const uint NameOffset = 28;
 	internal const uint CommentOffset = 136;
 	internal const uint TotalSize = 224;
+	internal const uint FieldSize = 4;
+	internal const uint TypeOffset = 0;
+	internal const uint SizeLowOffset = 4;
+	internal const uint SizeHighOffset = 8;
+	internal const uint ProtectionOffset = 12;
+	internal const uint DaysOffset = 16;
+	internal const uint MinsOffset = 20;
+	internal const uint TicksOffset = 24;
 
 	internal int Type;
 	internal uint SizeLow;
@@ -366,111 +412,141 @@ internal struct MuiDirlistRecordFieldCursor
 	internal MuiDirlistRecordField Field;
 }
 
-internal static class MuiDirlistRecordFieldCursorCodec
+internal static class MuiDirlistRecordMemoryCodec
 {
 	private static bool TryResolve(MuiDirlistRecordKind record,
 		MuiDirlistRecordField field, out uint offset, out uint size)
 	{
 		offset = 0;
 		size = 0;
-		switch (record)
+		if (record == MuiDirlistRecordKind.ByteTotal)
 		{
-			case MuiDirlistRecordKind.ByteTotal:
-				size = MuiDirlistByteTotalState.Size;
-				offset = field switch
-				{
-					MuiDirlistRecordField.High => 0,
-					MuiDirlistRecordField.Low => 4,
-					_ => uint.MaxValue,
-				};
-				break;
-			case MuiDirlistRecordKind.EntryWire:
-				size = MuiDirlistEntryWireState.Size;
-				offset = field switch
-				{
-					MuiDirlistRecordField.RecordSize => 0,
-					MuiDirlistRecordField.Type => 4,
-					MuiDirlistRecordField.SizeLow => 8,
-					MuiDirlistRecordField.SizeHigh => 12,
-					MuiDirlistRecordField.Protection => 16,
-					MuiDirlistRecordField.Days => 20,
-					MuiDirlistRecordField.Mins => 24,
-					MuiDirlistRecordField.Ticks => 28,
-					MuiDirlistRecordField.CommentOffset => 32,
-					_ => uint.MaxValue,
-				};
-				break;
-			case MuiDirlistRecordKind.ScanEntryWire:
-				size = MuiDirlistScanEntryWireState.Size;
-				offset = field switch
-				{
-					MuiDirlistRecordField.Type => 0,
-					MuiDirlistRecordField.SizeLow => 4,
-					MuiDirlistRecordField.SizeHigh => 8,
-					MuiDirlistRecordField.Protection => 12,
-					MuiDirlistRecordField.Days => 16,
-					MuiDirlistRecordField.Mins => 20,
-					MuiDirlistRecordField.Ticks => 24,
-					_ => uint.MaxValue,
-				};
-				break;
-			case MuiDirlistRecordKind.SortState:
-				size = MuiDirlistSortStateRecord.Size;
-				offset = field switch
-				{
-					MuiDirlistRecordField.Magic => 0,
-					MuiDirlistRecordField.SortTypeValue => 4,
-					MuiDirlistRecordField.SortDirsValue => 8,
-					MuiDirlistRecordField.SortHighLowValue => 12,
-					_ => uint.MaxValue,
-				};
-				break;
-			case MuiDirlistRecordKind.FilterState:
-				size = MuiDirlistFilterStateRecord.Size;
-				offset = field switch
-				{
-					MuiDirlistRecordField.Magic => 0,
-					MuiDirlistRecordField.AcceptPatternValue => 4,
-					MuiDirlistRecordField.RejectPatternValue => 8,
-					MuiDirlistRecordField.PatternValue => 12,
-					MuiDirlistRecordField.DrawersOnlyValue => 16,
-					MuiDirlistRecordField.FilesOnlyValue => 20,
-					MuiDirlistRecordField.FilterDrawersValue => 24,
-					MuiDirlistRecordField.MultiSelDirsValue => 28,
-					MuiDirlistRecordField.RejectIconsValue => 32,
-					MuiDirlistRecordField.ExAllTypeValue => 36,
-					MuiDirlistRecordField.FilterHookValue => 40,
-					_ => uint.MaxValue,
-				};
-				break;
-			case MuiDirlistRecordKind.ScanState:
-				size = MuiDirlistScanStateRecord.Size;
-				offset = field switch
-				{
-					MuiDirlistRecordField.Magic => 0,
-					MuiDirlistRecordField.StatusValue => 4,
-					MuiDirlistRecordField.NumFilesValue => 8,
-					MuiDirlistRecordField.NumDrawersValue => 12,
-					MuiDirlistRecordField.NumBytesValue => 16,
-					MuiDirlistRecordField.IoErrValue => 20,
-					_ => uint.MaxValue,
-				};
-				break;
+			size = MuiDirlistByteTotalState.Size;
+			if (field == MuiDirlistRecordField.High)
+				offset = MuiDirlistByteTotalState.HighOffset;
+			else if (field == MuiDirlistRecordField.Low)
+				offset = MuiDirlistByteTotalState.LowOffset;
+			else return false;
+			return true;
 		}
-		return offset != uint.MaxValue;
+		if (record == MuiDirlistRecordKind.EntryWire)
+		{
+			size = MuiDirlistEntryWireState.Size;
+			if (field == MuiDirlistRecordField.RecordSize)
+				offset = MuiDirlistEntryWireState.RecordSizeOffset;
+			else if (field == MuiDirlistRecordField.Type)
+				offset = MuiDirlistEntryWireState.TypeOffset;
+			else if (field == MuiDirlistRecordField.SizeLow)
+				offset = MuiDirlistEntryWireState.SizeLowOffset;
+			else if (field == MuiDirlistRecordField.SizeHigh)
+				offset = MuiDirlistEntryWireState.SizeHighOffset;
+			else if (field == MuiDirlistRecordField.Protection)
+				offset = MuiDirlistEntryWireState.ProtectionOffset;
+			else if (field == MuiDirlistRecordField.Days)
+				offset = MuiDirlistEntryWireState.DaysOffset;
+			else if (field == MuiDirlistRecordField.Mins)
+				offset = MuiDirlistEntryWireState.MinsOffset;
+			else if (field == MuiDirlistRecordField.Ticks)
+				offset = MuiDirlistEntryWireState.TicksOffset;
+			else if (field == MuiDirlistRecordField.CommentOffset)
+				offset = MuiDirlistEntryWireState.CommentOffsetOffset;
+			else return false;
+			return true;
+		}
+		if (record == MuiDirlistRecordKind.ScanEntryWire)
+		{
+			size = MuiDirlistScanEntryWireState.Size;
+			if (field == MuiDirlistRecordField.Type)
+				offset = MuiDirlistScanEntryWireState.TypeOffset;
+			else if (field == MuiDirlistRecordField.SizeLow)
+				offset = MuiDirlistScanEntryWireState.SizeLowOffset;
+			else if (field == MuiDirlistRecordField.SizeHigh)
+				offset = MuiDirlistScanEntryWireState.SizeHighOffset;
+			else if (field == MuiDirlistRecordField.Protection)
+				offset = MuiDirlistScanEntryWireState.ProtectionOffset;
+			else if (field == MuiDirlistRecordField.Days)
+				offset = MuiDirlistScanEntryWireState.DaysOffset;
+			else if (field == MuiDirlistRecordField.Mins)
+				offset = MuiDirlistScanEntryWireState.MinsOffset;
+			else if (field == MuiDirlistRecordField.Ticks)
+				offset = MuiDirlistScanEntryWireState.TicksOffset;
+			else return false;
+			return true;
+		}
+		if (record == MuiDirlistRecordKind.SortState)
+		{
+			size = MuiDirlistSortStateRecord.Size;
+			if (field == MuiDirlistRecordField.Magic)
+				offset = MuiDirlistSortStateRecord.MagicOffset;
+			else if (field == MuiDirlistRecordField.SortTypeValue)
+				offset = MuiDirlistSortStateRecord.SortTypeOffset;
+			else if (field == MuiDirlistRecordField.SortDirsValue)
+				offset = MuiDirlistSortStateRecord.SortDirsOffset;
+			else if (field == MuiDirlistRecordField.SortHighLowValue)
+				offset = MuiDirlistSortStateRecord.SortHighLowOffset;
+			else return false;
+			return true;
+		}
+		if (record == MuiDirlistRecordKind.FilterState)
+		{
+			size = MuiDirlistFilterStateRecord.Size;
+			if (field == MuiDirlistRecordField.Magic)
+				offset = MuiDirlistFilterStateRecord.MagicOffset;
+			else if (field == MuiDirlistRecordField.AcceptPatternValue)
+				offset = MuiDirlistFilterStateRecord.AcceptPatternOffset;
+			else if (field == MuiDirlistRecordField.RejectPatternValue)
+				offset = MuiDirlistFilterStateRecord.RejectPatternOffset;
+			else if (field == MuiDirlistRecordField.PatternValue)
+				offset = MuiDirlistFilterStateRecord.PatternOffset;
+			else if (field == MuiDirlistRecordField.DrawersOnlyValue)
+				offset = MuiDirlistFilterStateRecord.DrawersOnlyOffset;
+			else if (field == MuiDirlistRecordField.FilesOnlyValue)
+				offset = MuiDirlistFilterStateRecord.FilesOnlyOffset;
+			else if (field == MuiDirlistRecordField.FilterDrawersValue)
+				offset = MuiDirlistFilterStateRecord.FilterDrawersOffset;
+			else if (field == MuiDirlistRecordField.MultiSelDirsValue)
+				offset = MuiDirlistFilterStateRecord.MultiSelDirsOffset;
+			else if (field == MuiDirlistRecordField.RejectIconsValue)
+				offset = MuiDirlistFilterStateRecord.RejectIconsOffset;
+			else if (field == MuiDirlistRecordField.ExAllTypeValue)
+				offset = MuiDirlistFilterStateRecord.ExAllTypeOffset;
+			else if (field == MuiDirlistRecordField.FilterHookValue)
+				offset = MuiDirlistFilterStateRecord.FilterHookOffset;
+			else return false;
+			return true;
+		}
+		if (record == MuiDirlistRecordKind.ScanState)
+		{
+			size = MuiDirlistScanStateRecord.Size;
+			if (field == MuiDirlistRecordField.Magic)
+				offset = MuiDirlistScanStateRecord.MagicOffset;
+			else if (field == MuiDirlistRecordField.StatusValue)
+				offset = MuiDirlistScanStateRecord.StatusOffset;
+			else if (field == MuiDirlistRecordField.NumFilesValue)
+				offset = MuiDirlistScanStateRecord.NumFilesOffset;
+			else if (field == MuiDirlistRecordField.NumDrawersValue)
+				offset = MuiDirlistScanStateRecord.NumDrawersOffset;
+			else if (field == MuiDirlistRecordField.NumBytesValue)
+				offset = MuiDirlistScanStateRecord.NumBytesOffset;
+			else if (field == MuiDirlistRecordField.IoErrValue)
+				offset = MuiDirlistScanStateRecord.IoErrOffset;
+			else return false;
+			return true;
+		}
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiDirlistRecordFieldCursor cursor, out APTR address)
+		APTR recordAddress, MuiDirlistRecordKind record,
+		MuiDirlistRecordField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Record, cursor.Field, out var offset,
-			out var size) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, size)) return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(record, field, out var offset, out var size) ||
+			recordAddress.IsNull || recordAddress.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(recordAddress, size)) return false;
+		address = APTR.FromPointer(recordAddress.Raw + offset);
+		return platform.IsMapped(address, MuiDirlistByteTotalState.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -478,11 +554,8 @@ internal static class MuiDirlistRecordFieldCursorCodec
 		out uint value) where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiDirlistRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, address, record, field,
+			out var fieldAddress))
 			return false;
 		value = platform.ReadUInt32(fieldAddress, 0);
 		return true;
@@ -492,43 +565,75 @@ internal static class MuiDirlistRecordFieldCursorCodec
 		APTR address, MuiDirlistRecordKind record, MuiDirlistRecordField field,
 		uint value) where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiDirlistRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, address, record, field,
+			out var fieldAddress))
 			return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
 		return true;
 	}
 }
 
+// Compatibility wrapper retained for callers that still construct the typed
+// Dirlist record cursor. Live record codecs use the direct memory adapter.
+internal static class MuiDirlistRecordFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiDirlistRecordFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDirlistRecordMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiDirlistRecordKind record, MuiDirlistRecordField field,
+		out uint value) where TPlatform : struct, IMuiGuestMemory =>
+		MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address, record,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiDirlistRecordKind record, MuiDirlistRecordField field,
+		uint value) where TPlatform : struct, IMuiGuestMemory =>
+		MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address, record,
+			field, value);
+}
+
 internal static class MuiDirlistSortStateRecordCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiDirlistSortStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistSortStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.SortType) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.SortDirs) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.SortHighLow) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiDirlistSortStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistSortStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SortType) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SortDirs) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SortHighLow) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiDirlistSortStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistSortStateRecord.Size) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.SortState, MuiDirlistRecordField.Magic,
-				out var magic) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.SortState,
-				MuiDirlistRecordField.SortTypeValue, out value.SortType) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.SortState,
-				MuiDirlistRecordField.SortDirsValue, out value.SortDirs) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.SortState,
-				MuiDirlistRecordField.SortHighLowValue, out value.SortHighLow))
-			return false;
-		value.Magic = magic;
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiDirlistSortStateRecord value)
@@ -543,83 +648,84 @@ internal static class MuiDirlistSortStateRecordCodec
 		MuiDirlistSortStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistSortStateRecord.Size) ||
-			!MuiDirlistStateAdmission.ValidateSort(value)) return false;
-		return MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiDirlistRecordKind.SortState,
-			MuiDirlistRecordField.Magic, value.Magic) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.SortState,
-				MuiDirlistRecordField.SortTypeValue, value.SortType) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.SortState,
-				MuiDirlistRecordField.SortDirsValue, value.SortDirs) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.SortState,
-				MuiDirlistRecordField.SortHighLowValue, value.SortHighLow);
+		if (address.IsNull || !MuiDirlistStateAdmission.ValidateSort(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
 internal static class MuiDirlistFilterStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
-		APTR address,
-		out MuiDirlistFilterStateRecord value)
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiDirlistFilterStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistFilterStateRecord.Size) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState, MuiDirlistRecordField.Magic,
-				out var magic) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.AcceptPatternValue,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistFilterStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var acceptPattern) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.RejectPatternValue,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var rejectPattern) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.PatternValue, out var pattern) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.DrawersOnlyValue,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var pattern) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.DrawersOnly) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.FilesOnlyValue,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.FilesOnly) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.FilterDrawersValue,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.FilterDrawers) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.MultiSelDirsValue,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.MultiSelDirs) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.RejectIconsValue,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.RejectIcons) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.ExAllTypeValue,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.ExAllType) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.FilterHookValue,
-				out var filterHook)) return false;
-		value.Magic = magic;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var filterHook) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
 		value.AcceptPattern = APTR.FromPointer(acceptPattern);
 		value.RejectPattern = APTR.FromPointer(rejectPattern);
 		value.Pattern = APTR.FromPointer(pattern);
 		value.FilterHook = APTR.FromPointer(filterHook);
 		return true;
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiDirlistFilterStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistFilterStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.AcceptPattern.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.RejectPattern.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Pattern.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.DrawersOnly) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.FilesOnly) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.FilterDrawers) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.MultiSelDirs) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.RejectIcons) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ExAllType) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.FilterHook.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiDirlistFilterStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiDirlistFilterStateRecord value)
@@ -634,80 +740,61 @@ internal static class MuiDirlistFilterStateRecordCodec
 		MuiDirlistFilterStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistFilterStateRecord.Size) ||
-			!MuiDirlistStateAdmission.ValidateFilter(value)) return false;
-		return MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiDirlistRecordKind.FilterState,
-			MuiDirlistRecordField.Magic, value.Magic) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.AcceptPatternValue,
-				value.AcceptPattern.Raw) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.RejectPatternValue,
-				value.RejectPattern.Raw) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.PatternValue, value.Pattern.Raw) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.DrawersOnlyValue, value.DrawersOnly) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.FilesOnlyValue, value.FilesOnly) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.FilterDrawersValue,
-				value.FilterDrawers) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.MultiSelDirsValue, value.MultiSelDirs) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.RejectIconsValue, value.RejectIcons) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.ExAllTypeValue, value.ExAllType) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.FilterState,
-				MuiDirlistRecordField.FilterHookValue, value.FilterHook.Raw);
+		if (address.IsNull || !MuiDirlistStateAdmission.ValidateFilter(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
 internal static class MuiDirlistScanStateRecordCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiDirlistScanStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistScanStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Status) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.NumFiles) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.NumDrawers) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.NumBytes) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var ioErr) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		value.IoErr = unchecked((int)ioErr);
+		return true;
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiDirlistScanStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistScanStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Status) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.NumFiles) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.NumDrawers) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.NumBytes) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.IoErr)) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiDirlistScanStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistScanStateRecord.Size) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanState, MuiDirlistRecordField.Magic,
-				out var magic) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanState,
-				MuiDirlistRecordField.StatusValue, out value.Status) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanState,
-				MuiDirlistRecordField.NumFilesValue, out value.NumFiles) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanState,
-				MuiDirlistRecordField.NumDrawersValue, out value.NumDrawers) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanState,
-				MuiDirlistRecordField.NumBytesValue, out value.NumBytes) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanState,
-				MuiDirlistRecordField.IoErrValue, out var ioErr)) return false;
-		value.Magic = magic;
-		value.IoErr = unchecked((int)ioErr);
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiDirlistScanStateRecord value)
@@ -722,28 +809,9 @@ internal static class MuiDirlistScanStateRecordCodec
 		MuiDirlistScanStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistScanStateRecord.Size) ||
-			!MuiDirlistStateAdmission.ValidateScan(value)) return false;
-		return MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiDirlistRecordKind.ScanState,
-			MuiDirlistRecordField.Magic, value.Magic) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanState,
-				MuiDirlistRecordField.StatusValue, value.Status) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanState,
-				MuiDirlistRecordField.NumFilesValue, value.NumFiles) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanState,
-				MuiDirlistRecordField.NumDrawersValue, value.NumDrawers) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanState,
-				MuiDirlistRecordField.NumBytesValue, value.NumBytes) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanState,
-				MuiDirlistRecordField.IoErrValue,
-				unchecked((uint)value.IoErr));
+		if (address.IsNull || !MuiDirlistStateAdmission.ValidateScan(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
@@ -756,25 +824,25 @@ internal static class MuiDirlistScanEntryWireCodec
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiDirlistScanEntryWireState.Size)) return false;
-		if (!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiDirlistRecordKind.ScanEntryWire,
 			MuiDirlistRecordField.Type, out var type) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.SizeLow,
 				out value.SizeLow) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.SizeHigh,
 				out value.SizeHigh) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Protection,
 				out value.Protection) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Days,
 				out value.Days) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Mins,
 				out value.Mins) ||
-			!MuiDirlistRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Ticks,
 				out value.Ticks)) return false;
 		value.Type = unchecked((int)type);
@@ -787,25 +855,25 @@ internal static class MuiDirlistScanEntryWireCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiDirlistScanEntryWireState.Size)) return false;
-		return MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiDirlistRecordKind.ScanEntryWire,
 			MuiDirlistRecordField.Type, unchecked((uint)value.Type)) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.SizeLow,
 				value.SizeLow) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.SizeHigh,
 				value.SizeHigh) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Protection,
 				value.Protection) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Days,
 				value.Days) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Mins,
 				value.Mins) &&
-			MuiDirlistRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Ticks,
 				value.Ticks);
 	}
@@ -1575,17 +1643,8 @@ public static class MuiDirlistCore
 			return false;
 		var name = APTR.FromPointer(scratch.Raw +
 			MuiDirlistScanEntryWireState.NameOffset);
-		platform.WriteUInt8(name, 0, (byte)'E');
-		platform.WriteUInt8(name, 1, (byte)'x');
-		platform.WriteUInt8(name, 2, (byte)'a');
-		platform.WriteUInt8(name, 3, (byte)'m');
-		platform.WriteUInt8(name, 4, (byte)'p');
-		platform.WriteUInt8(name, 5, (byte)'l');
-		platform.WriteUInt8(name, 6, (byte)'e');
-		platform.WriteUInt8(name, 7, digit);
-		platform.WriteUInt8(name, 8, (byte)':');
-		platform.WriteUInt8(name, 9, 0);
-		return true;
+		return MuiDirlistExampleVolumeNameRecordCodec.WriteRecord(ref platform, name,
+			MuiDirlistExampleVolumeNameRecord.Create(digit));
 	}
 
 	// Decode the fixed 8-byte guest QUAD used for the 64-bit byte total.

@@ -67,7 +67,7 @@ public sealed class MuiWindowVisualAdmissionTests
 			FancyDrawing = 1,
 			MenuAction = 7,
 		};
-		Assert.True(MuiWindowVisualStateRecordCodec.Write(ref platform, address,
+		Assert.True(MuiWindowVisualStateRecordCodec.WriteRecord(ref platform, address,
 			value));
 		Assert.True(MuiWindowVisualStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, 12, out var opacity) && opacity.Raw == 0x170Cu);

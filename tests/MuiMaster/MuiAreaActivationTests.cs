@@ -12,8 +12,13 @@ public sealed class MuiAreaActivationTests
 	{
 		var platform = CreatePlatform(out _);
 		var packet = APTR.FromPointer(0x1200);
+		var activePacket = new MuiAreaActivationMessage
+		{
+			MethodId = MuiAreaActivationMessageCodec.GoActive,
+			Flags = 0xA5A5,
+		};
 		Assert.True(MuiAreaActivationMessageCodec.Write(ref platform, packet,
-			MuiAreaActivationMessageCodec.GoActive, 0xA5A5));
+			activePacket));
 		Assert.True(MuiAreaActivationMessageCodec.TryRead(ref platform, packet,
 			out var active));
 		Assert.Equal(MuiAreaActivationMessageCodec.GoActive, active.MethodId);

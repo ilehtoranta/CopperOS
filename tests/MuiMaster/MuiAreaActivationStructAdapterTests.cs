@@ -39,4 +39,34 @@ public sealed class MuiAreaActivationStructAdapterTests
 		Assert.False(MuiAreaActivationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiAreaActivationStateField.Signature, out _));
 	}
+
+	[Fact]
+	public void AreaActivationSequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x35C0);
+		var value = new MuiAreaActivationStateRecord
+		{
+			Signature = MuiAreaActivationStateRecord.Cookie,
+			Active = uint.MaxValue,
+			Flags = 0x01020304u,
+			Generation = uint.MaxValue,
+		};
+
+		Assert.True(MuiAreaActivationStateCodec.WriteRecord(ref platform, address,
+			value));
+		Assert.True(MuiAreaActivationStateCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Signature, decoded.Signature);
+		Assert.Equal(value.Active, decoded.Active);
+		Assert.Equal(value.Flags, decoded.Flags);
+		Assert.Equal(value.Generation, decoded.Generation);
+
+		var crossingEnd = APTR.FromPointer(0x30FF1);
+		Assert.False(MuiAreaActivationStateCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiAreaActivationStateCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
 }

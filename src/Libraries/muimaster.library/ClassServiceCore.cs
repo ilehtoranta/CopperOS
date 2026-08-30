@@ -64,6 +64,11 @@ internal static class MuiClassServiceLayout
 internal struct MuiClassServiceStateRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint HeadOffset = 4;
+	internal const uint HeadlessOffset = 8;
+	internal const uint GenerationOffset = 12;
 	internal uint Magic;
 	internal APTR Head;
 	internal APTR Headless;
@@ -111,7 +116,10 @@ internal struct MuiClassRecordFieldCursor
 	internal MuiClassRecordField Field;
 }
 
-internal static class MuiClassRecordFieldCursorCodec
+// Struct-first guest-memory adapter for class-service state, lease, and
+// MUI_CustomClass records. Named record layouts own the complete bounds and
+// packed field translation used by the production codecs.
+internal static class MuiClassRecordMemoryCodec
 {
 	private static bool TryResolve(MuiClassRecordKind record,
 		MuiClassRecordField field, out uint offset, out uint size)
@@ -124,10 +132,10 @@ internal static class MuiClassRecordFieldCursorCodec
 				size = MuiClassServiceStateRecord.Size;
 				offset = field switch
 				{
-					MuiClassRecordField.Magic => 0,
-					MuiClassRecordField.Head => 4,
-					MuiClassRecordField.Headless => 8,
-					MuiClassRecordField.Generation => 12,
+					MuiClassRecordField.Magic => MuiClassServiceStateRecord.MagicOffset,
+					MuiClassRecordField.Head => MuiClassServiceStateRecord.HeadOffset,
+					MuiClassRecordField.Headless => MuiClassServiceStateRecord.HeadlessOffset,
+					MuiClassRecordField.Generation => MuiClassServiceStateRecord.GenerationOffset,
 					_ => uint.MaxValue,
 				};
 				break;
@@ -135,17 +143,17 @@ internal static class MuiClassRecordFieldCursorCodec
 				size = MuiClassServiceLeaseRecord.Size;
 				offset = field switch
 				{
-					MuiClassRecordField.Next => 0,
-					MuiClassRecordField.Flags => 4,
-					MuiClassRecordField.ClassId => 8,
-					MuiClassRecordField.Boopsi => 12,
-					MuiClassRecordField.LibraryBase => 16,
-					MuiClassRecordField.RefCount => 20,
-					MuiClassRecordField.HeadlessClass => 24,
-					MuiClassRecordField.CustomClass => 28,
-					MuiClassRecordField.SuperService => 32,
-					MuiClassRecordField.ObjectCount => 36,
-					MuiClassRecordField.ChildCount => 40,
+					MuiClassRecordField.Next => MuiClassServiceLeaseRecord.NextOffset,
+					MuiClassRecordField.Flags => MuiClassServiceLeaseRecord.FlagsOffset,
+					MuiClassRecordField.ClassId => MuiClassServiceLeaseRecord.ClassIdOffset,
+					MuiClassRecordField.Boopsi => MuiClassServiceLeaseRecord.BoopsiOffset,
+					MuiClassRecordField.LibraryBase => MuiClassServiceLeaseRecord.LibraryBaseOffset,
+					MuiClassRecordField.RefCount => MuiClassServiceLeaseRecord.RefCountOffset,
+					MuiClassRecordField.HeadlessClass => MuiClassServiceLeaseRecord.HeadlessClassOffset,
+					MuiClassRecordField.CustomClass => MuiClassServiceLeaseRecord.CustomClassOffset,
+					MuiClassRecordField.SuperService => MuiClassServiceLeaseRecord.SuperServiceOffset,
+					MuiClassRecordField.ObjectCount => MuiClassServiceLeaseRecord.ObjectCountOffset,
+					MuiClassRecordField.ChildCount => MuiClassServiceLeaseRecord.ChildCountOffset,
 					_ => uint.MaxValue,
 				};
 				break;
@@ -153,31 +161,34 @@ internal static class MuiClassRecordFieldCursorCodec
 				size = MuiCustomClassRecord.Size;
 				offset = field switch
 				{
-					MuiClassRecordField.UserData => 0,
-					MuiClassRecordField.UtilityBase => 4,
-					MuiClassRecordField.DosBase => 8,
-					MuiClassRecordField.GfxBase => 12,
-					MuiClassRecordField.IntuitionBase => 16,
-					MuiClassRecordField.Super => 20,
-					MuiClassRecordField.Class => 24,
+					MuiClassRecordField.UserData => MuiCustomClassRecord.UserDataOffset,
+					MuiClassRecordField.UtilityBase => MuiCustomClassRecord.UtilityBaseOffset,
+					MuiClassRecordField.DosBase => MuiCustomClassRecord.DosBaseOffset,
+					MuiClassRecordField.GfxBase => MuiCustomClassRecord.GfxBaseOffset,
+					MuiClassRecordField.IntuitionBase => MuiCustomClassRecord.IntuitionBaseOffset,
+					MuiClassRecordField.Super => MuiCustomClassRecord.SuperOffset,
+					MuiClassRecordField.Class => MuiCustomClassRecord.ClassOffset,
 					_ => uint.MaxValue,
 				};
+				break;
+			default:
+				offset = uint.MaxValue;
 				break;
 		}
 		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiClassRecordFieldCursor cursor, out APTR address)
+		APTR recordAddress, MuiClassRecordKind record, MuiClassRecordField field,
+		out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Record, cursor.Field, out var offset,
-			out var size) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, size)) return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(record, field, out var offset, out var size) ||
+			recordAddress.IsNull || recordAddress.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(recordAddress, size)) return false;
+		address = APTR.FromPointer(recordAddress.Raw + offset);
+		return platform.IsMapped(address, MuiClassServiceStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -185,11 +196,8 @@ internal static class MuiClassRecordFieldCursorCodec
 		out uint value) where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiClassRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, address, record, field,
+			out var fieldAddress))
 			return false;
 		value = platform.ReadUInt32(fieldAddress, 0);
 		return true;
@@ -199,15 +207,35 @@ internal static class MuiClassRecordFieldCursorCodec
 		APTR address, MuiClassRecordKind record, MuiClassRecordField field,
 		uint value) where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiClassRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, address, record, field,
+			out var fieldAddress))
 			return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for typed cursor callers; production access
+// routes through MuiClassRecordMemoryCodec with named record layouts.
+internal static class MuiClassRecordFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiClassRecordFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiClassRecordMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiClassRecordKind record, MuiClassRecordField field,
+		out uint value) where TPlatform : struct, IMuiGuestMemory =>
+		MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address, record,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiClassRecordKind record, MuiClassRecordField field,
+		uint value) where TPlatform : struct, IMuiGuestMemory =>
+		MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address, record,
+			field, value);
 }
 
 internal static class MuiClassServiceStateCodec
@@ -219,16 +247,16 @@ internal static class MuiClassServiceStateCodec
 		record = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiClassServiceStateRecord.Size) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.State, MuiClassRecordField.Magic,
 				out record.Magic) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.State, MuiClassRecordField.Head,
 				out var head) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.State, MuiClassRecordField.Headless,
 				out var headless) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.State, MuiClassRecordField.Generation,
 				out record.Generation)) return false;
 		record.Head = APTR.FromPointer(head);
@@ -242,15 +270,15 @@ internal static class MuiClassServiceStateCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiClassServiceStateRecord.Size)) return false;
-		return MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+		return MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 			MuiClassRecordKind.State, MuiClassRecordField.Magic, record.Magic) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.State, MuiClassRecordField.Head,
 				record.Head.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.State, MuiClassRecordField.Headless,
 				record.Headless.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.State, MuiClassRecordField.Generation,
 				record.Generation);
 	}
@@ -260,6 +288,18 @@ internal static class MuiClassServiceStateCodec
 internal struct MuiClassServiceLeaseRecord
 {
 	internal const uint Size = 44;
+	internal const uint FieldSize = 4;
+	internal const uint NextOffset = 0;
+	internal const uint FlagsOffset = 4;
+	internal const uint ClassIdOffset = 8;
+	internal const uint BoopsiOffset = 12;
+	internal const uint LibraryBaseOffset = 16;
+	internal const uint RefCountOffset = 20;
+	internal const uint HeadlessClassOffset = 24;
+	internal const uint CustomClassOffset = 28;
+	internal const uint SuperServiceOffset = 32;
+	internal const uint ObjectCountOffset = 36;
+	internal const uint ChildCountOffset = 40;
 	internal APTR Next;
 	internal uint Flags;
 	internal APTR ClassId;
@@ -282,36 +322,36 @@ internal static class MuiClassServiceLeaseCodec
 		record = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiClassServiceLeaseRecord.Size)) return false;
-		if (!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+		if (!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 			MuiClassRecordKind.Lease, MuiClassRecordField.Next, out var next) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.Flags,
 				out record.Flags) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.ClassId,
 				out var classId) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.Boopsi,
 				out var boopsi) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.LibraryBase,
 				out var libraryBase) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.RefCount,
 				out record.RefCount) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.HeadlessClass,
 				out var headlessClass) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.CustomClass,
 				out var customClass) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.SuperService,
 				out var superService) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.ObjectCount,
 				out record.ObjectCount) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.ChildCount,
 				out record.ChildCount)) return false;
 		record.Next = APTR.FromPointer(next);
@@ -330,35 +370,35 @@ internal static class MuiClassServiceLeaseCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiClassServiceLeaseRecord.Size)) return false;
-		return MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+		return MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 			MuiClassRecordKind.Lease, MuiClassRecordField.Next, record.Next.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.Flags, record.Flags) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.ClassId,
 				record.ClassId.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.Boopsi,
 				record.Boopsi.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.LibraryBase,
 				record.LibraryBase.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.RefCount,
 				record.RefCount) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.HeadlessClass,
 				record.HeadlessClass.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.CustomClass,
 				record.CustomClass.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.SuperService,
 				record.SuperService.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.ObjectCount,
 				record.ObjectCount) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.Lease, MuiClassRecordField.ChildCount,
 				record.ChildCount);
 	}
@@ -368,6 +408,14 @@ internal static class MuiClassServiceLeaseCodec
 internal struct MuiCustomClassRecord
 {
 	internal const uint Size = 28;
+	internal const uint FieldSize = 4;
+	internal const uint UserDataOffset = 0;
+	internal const uint UtilityBaseOffset = 4;
+	internal const uint DosBaseOffset = 8;
+	internal const uint GfxBaseOffset = 12;
+	internal const uint IntuitionBaseOffset = 16;
+	internal const uint SuperOffset = 20;
+	internal const uint ClassOffset = 24;
 	internal APTR UserData;
 	internal APTR UtilityBase;
 	internal APTR DosBase;
@@ -386,25 +434,25 @@ internal static class MuiCustomClassCodec
 		record = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiCustomClassRecord.Size)) return false;
-		if (!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+		if (!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 			MuiClassRecordKind.CustomClass, MuiClassRecordField.UserData,
 			out var userData) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.CustomClass, MuiClassRecordField.UtilityBase,
 				out var utilityBase) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.CustomClass, MuiClassRecordField.DosBase,
 				out var dosBase) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.CustomClass, MuiClassRecordField.GfxBase,
 				out var gfxBase) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.CustomClass, MuiClassRecordField.IntuitionBase,
 				out var intuitionBase) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.CustomClass, MuiClassRecordField.Super,
 				out var super) ||
-			!MuiClassRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiClassRecordKind.CustomClass, MuiClassRecordField.Class,
 				out var @class)) return false;
 		record.UserData = APTR.FromPointer(userData);
@@ -423,25 +471,25 @@ internal static class MuiCustomClassCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiCustomClassRecord.Size)) return false;
-		return MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+		return MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 			MuiClassRecordKind.CustomClass, MuiClassRecordField.UserData,
 			record.UserData.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.CustomClass, MuiClassRecordField.UtilityBase,
 				record.UtilityBase.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.CustomClass, MuiClassRecordField.DosBase,
 				record.DosBase.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.CustomClass, MuiClassRecordField.GfxBase,
 				record.GfxBase.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.CustomClass, MuiClassRecordField.IntuitionBase,
 				record.IntuitionBase.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.CustomClass, MuiClassRecordField.Super,
 				record.Super.Raw) &&
-			MuiClassRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiClassRecordKind.CustomClass, MuiClassRecordField.Class,
 				record.Class.Raw);
 	}
@@ -921,17 +969,23 @@ public static class MuiClassServiceCore
 		var length = Measure(ref platform, classId,
 			MuiClassServiceLayout.ClassIdMaximum);
 		if (length == 0) return APTR.Null;
-		var total = 4u + length + 1u;   // "mui/" + classid + NUL
+		var prefixSize = MuiClassServiceLibraryPrefixRecord.Size;
+		var total = prefixSize + length + 1u;   // "mui/" + classid + NUL
 		var name = MuiHeadlessMemory.Allocate(ref platform, total);
 		if (name.IsNull) return APTR.Null;
-		platform.WriteUInt8(name, 0, (byte)'m');
-		platform.WriteUInt8(name, 1, (byte)'u');
-		platform.WriteUInt8(name, 2, (byte)'i');
-		platform.WriteUInt8(name, 3, (byte)'/');
+		var prefix = default(MuiClassServiceLibraryPrefixRecord);
+		prefix.Prefix = MuiClassServiceLibraryPrefixRecordCodec.MuiSlash;
+		if (!MuiClassServiceLibraryPrefixRecordCodec.WriteRecord(ref platform, name,
+			prefix))
+		{
+			platform.Clear(name, total);
+			platform.Free(name, total);
+			return APTR.Null;
+		}
 		for (uint index = 0; index < length; index++)
-			platform.WriteUInt8(name, (int)(4u + index),
+			platform.WriteUInt8(name, (int)(prefixSize + index),
 				platform.ReadUInt8(classId, (int)index));
-		platform.WriteUInt8(name, (int)(4u + length), 0);
+		platform.WriteUInt8(name, (int)(prefixSize + length), 0);
 
 		var library = platform.OpenLibrary(name, 0);
 		platform.Clear(name, total);

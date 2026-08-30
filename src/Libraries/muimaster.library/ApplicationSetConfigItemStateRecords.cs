@@ -90,9 +90,9 @@ internal static class MuiApplicationSetConfigItemStateFieldCursorCodec
 	}
 }
 
-// Fixed SetConfigItem state is read and written as a named value. Keep packed
-// guest positions in this bounded ABI adapter; production consumers do not
-// select numeric slots directly.
+// Fixed SetConfigItem state is transferred as a named record. Numeric guest
+// positions are confined to the bounded ABI adapter; production consumers
+// exchange the declaration-order struct through the sequential cursor below.
 internal static class MuiApplicationSetConfigItemStateRecordMemoryCodec
 {
 	private static bool TryResolve(MuiApplicationSetConfigItemStateField field,
@@ -156,29 +156,45 @@ internal static class MuiApplicationSetConfigItemStateRecordMemoryCodec
 
 internal static class MuiApplicationSetConfigItemStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationSetConfigItemStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationSetConfigItemStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiApplicationSetConfigItemStateField.Magic,
-			out var magic) ||
-			!MuiApplicationSetConfigItemStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationSetConfigItemStateField.Item,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationSetConfigItemStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.Item) ||
-			!MuiApplicationSetConfigItemStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationSetConfigItemStateField.Data,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var data) ||
-			!MuiApplicationSetConfigItemStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationSetConfigItemStateField.Requests, out value.Requests))
-			return false;
-		value.Magic = magic;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Requests)) return false;
 		value.Data = APTR.FromPointer(data);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationSetConfigItemStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationSetConfigItemStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Item) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Data.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Requests) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationSetConfigItemStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationSetConfigItemStateRecord value)
@@ -190,21 +206,9 @@ internal static class MuiApplicationSetConfigItemStateRecordCodec
 		MuiApplicationSetConfigItemStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationSetConfigItemStateRecord.Size) ||
-			!MuiApplicationSetConfigItemStateAdmission.Validate(ref platform, value))
+		if (address.IsNull || !MuiApplicationSetConfigItemStateAdmission.Validate(
+			ref platform, value))
 			return false;
-		return MuiApplicationSetConfigItemStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationSetConfigItemStateField.Magic,
-			value.Magic) &&
-			MuiApplicationSetConfigItemStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationSetConfigItemStateField.Item,
-				value.Item) &&
-			MuiApplicationSetConfigItemStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationSetConfigItemStateField.Data,
-				value.Data.Raw) &&
-			MuiApplicationSetConfigItemStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationSetConfigItemStateField.Requests, value.Requests);
+		return WriteRecord(ref platform, address, value);
 	}
 }

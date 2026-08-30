@@ -8,6 +8,30 @@ public sealed class MuiAreaBackfillTests
 	private static readonly APTR State = APTR.FromPointer(0x1000);
 
 	[Fact]
+	public void RenderingCapabilityRequestsUseNamedPackedLayouts()
+	{
+		Assert.Equal(56, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiDoubleBufferRenderRequest>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiDoubleBufferRenderRequest>(nameof(MuiDoubleBufferRenderRequest.Object)).ToInt32());
+		Assert.Equal(20, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiDoubleBufferRenderRequest>(nameof(MuiDoubleBufferRenderRequest.Left)).ToInt32());
+		Assert.Equal(52, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiDoubleBufferRenderRequest>(nameof(MuiDoubleBufferRenderRequest.Flags)).ToInt32());
+
+		Assert.Equal(64, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiBackfillRenderRequest>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiBackfillRenderRequest>(nameof(MuiBackfillRenderRequest.Object)).ToInt32());
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiBackfillRenderRequest>(nameof(MuiBackfillRenderRequest.Left)).ToInt32());
+		Assert.Equal(44, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiBackfillRenderRequest>(nameof(MuiBackfillRenderRequest.Brightness)).ToInt32());
+		Assert.Equal(60, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiBackfillRenderRequest>(nameof(MuiBackfillRenderRequest.Background)).ToInt32());
+	}
+
+	[Fact]
 	public void DrawBackgroundPacketPublishesNamedOffsetsToProvider()
 	{
 		var platform = CreatePlatform(out var areaClass, out var area);

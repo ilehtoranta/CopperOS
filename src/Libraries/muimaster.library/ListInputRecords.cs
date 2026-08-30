@@ -120,41 +120,58 @@ internal static class MuiListTestPosResultMemoryCodec
 
 internal static class MuiListTestPosResultCodec
 {
-	internal static bool Write<TPlatform>(ref TPlatform platform, APTR storage,
-		MuiListTestPosResult value) where TPlatform : struct, IMuiGuestMemory
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR storage, MuiListTestPosResult value)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiListTestPosResultMemoryCodec.TryWriteUInt32(ref platform,
-			storage, MuiListTestPosResultField.Entry, unchecked((uint)value.Entry)) &&
-			MuiListTestPosResultMemoryCodec.TryWriteUInt16(ref platform, storage,
-			MuiListTestPosResultField.Column, unchecked((ushort)value.Column)) &&
-			MuiListTestPosResultMemoryCodec.TryWriteUInt16(ref platform, storage,
-				MuiListTestPosResultField.Flags, value.Flags) &&
-			MuiListTestPosResultMemoryCodec.TryWriteUInt16(ref platform, storage,
-				MuiListTestPosResultField.XOffset, unchecked((ushort)value.XOffset)) &&
-			MuiListTestPosResultMemoryCodec.TryWriteUInt16(ref platform, storage,
-				MuiListTestPosResultField.YOffset, unchecked((ushort)value.YOffset));
+		if (!MuiGuestStructCursor.TryCreate(ref platform, storage,
+			MuiListTestPosResult.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Entry)) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				unchecked((ushort)value.Column)) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				value.Flags) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				unchecked((ushort)value.XOffset)) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				unchecked((ushort)value.YOffset))) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR storage,
-		out MuiListTestPosResult value) where TPlatform : struct, IMuiGuestMemory
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR storage, out MuiListTestPosResult value)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiListTestPosResultMemoryCodec.TryReadUInt32(ref platform, storage,
-			MuiListTestPosResultField.Entry, out var entry) ||
-			!MuiListTestPosResultMemoryCodec.TryReadUInt16(ref platform, storage,
-				MuiListTestPosResultField.Column, out var column) ||
-			!MuiListTestPosResultMemoryCodec.TryReadUInt16(ref platform, storage,
-				MuiListTestPosResultField.Flags, out value.Flags) ||
-			!MuiListTestPosResultMemoryCodec.TryReadUInt16(ref platform, storage,
-				MuiListTestPosResultField.XOffset, out var xOffset) ||
-			!MuiListTestPosResultMemoryCodec.TryReadUInt16(ref platform, storage,
-				MuiListTestPosResultField.YOffset, out var yOffset)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, storage,
+			MuiListTestPosResult.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var entry) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var column) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var flags) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var xOffset) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var yOffset)) return false;
 		value.Entry = unchecked((int)entry);
 		value.Column = unchecked((short)column);
+		value.Flags = flags;
 		value.XOffset = unchecked((short)xOffset);
 		value.YOffset = unchecked((short)yOffset);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR storage,
+		MuiListTestPosResult value) where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, storage, value);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR storage,
+		out MuiListTestPosResult value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, storage, out value);
 }
 
 // The selection and NextSelected APIs exchange a caller-owned LONG through a
@@ -205,22 +222,49 @@ internal static class MuiListScalarStorageRecordMemoryCodec
 
 internal static class MuiListScalarStorageCodec
 {
-	internal static bool Write<TPlatform>(ref TPlatform platform, APTR storage,
-		MuiListScalarStorageRecord value)
+	// A one-ULONG record is passed as a scalar at the native ABI seam. Keep the
+	// named record for semantic callers, but expose scalar helpers so the
+	// freestanding compiler never mistakes the value for a guest pointer.
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR storage, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.WriteValue(ref platform, storage, value);
+
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR storage, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiListScalarStorageRecordMemoryCodec.TryWriteUInt32(ref platform,
-			storage, value.Value);
+		value = 0;
+		if (!MuiGuestUlongStorageCodec.TryRead(ref platform, storage,
+			out var record)) return false;
+		value = record.Value;
+		return true;
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR storage, ref MuiListScalarStorageRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> WriteValue(ref platform, storage, value.Value);
+
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR storage, out MuiListScalarStorageRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadValue(ref platform, storage, out var raw)) return false;
+		value.Value = raw;
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR storage,
+		ref MuiListScalarStorageRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> WriteValue(ref platform, storage, value.Value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR storage,
 		out MuiListScalarStorageRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		return MuiListScalarStorageRecordMemoryCodec.TryReadUInt32(ref platform,
-			storage, out value.Value);
-	}
+		=> TryReadRecord(ref platform, storage, out value);
 }
 
 // MorphOS MUI V6 display hooks receive the zero-based row number in the ULONG
@@ -269,24 +313,48 @@ internal static class MuiListDisplayRowRecordMemoryCodec
 
 internal static class MuiListDisplayRowRecordCodec
 {
-	internal static bool Write<TPlatform>(ref TPlatform platform, APTR storage,
-		MuiListDisplayRowRecord value)
+	// Keep the one-ULONG row value scalar at the native ABI seam; the named
+	// record remains the semantic host representation and compatibility view.
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR storage, uint row)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.WriteValue(ref platform, storage, row);
+
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR storage, out uint row)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiListDisplayRowRecordMemoryCodec.TryWriteUInt32(ref platform,
-			storage, unchecked((uint)value.Row));
+		row = 0;
+		if (!MuiGuestUlongStorageCodec.TryRead(ref platform, storage,
+			out var record)) return false;
+		row = record.Value;
+		return true;
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR storage, ref MuiListDisplayRowRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> WriteValue(ref platform, storage, unchecked((uint)value.Row));
+
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR storage, out MuiListDisplayRowRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadValue(ref platform, storage, out var row)) return false;
+		value.Row = unchecked((int)row);
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR storage,
+		ref MuiListDisplayRowRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> WriteValue(ref platform, storage, unchecked((uint)value.Row));
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR storage,
 		out MuiListDisplayRowRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (!MuiListDisplayRowRecordMemoryCodec.TryReadUInt32(ref platform,
-			storage, out var row)) return false;
-		value.Row = unchecked((int)row);
-		return true;
-	}
+		=> TryReadRecord(ref platform, storage, out value);
 }
 
 // The stable IntuiMessage fields needed by a Listview mouse path.  The full
@@ -557,60 +625,145 @@ internal static class MuiIntuiMessageCodec
 	// offsets.
 	internal const uint RawKeyClass = 0x00000400u;
 
-	internal static bool TryReadPointer<TPlatform>(ref TPlatform platform,
+	// The Intuition message envelope has a stable, ABI-defined prefix before
+	// these named payload records. This helper confines that one wire offset to
+	// the boundary; all payload fields are then exchanged sequentially.
+	private static bool TryCreatePayloadCursor<TPlatform>(ref TPlatform platform,
+		APTR message, uint payloadSize, out MuiGuestStructCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		cursor = default;
+		if ((message.Raw & 1u) != 0 || message.IsNull ||
+			message.Raw > uint.MaxValue - MuiIntuiPointerMessage.ClassOffset ||
+			payloadSize > uint.MaxValue - MuiIntuiPointerMessage.ClassOffset ||
+			!platform.IsMapped(message,
+				MuiIntuiPointerMessage.ClassOffset + payloadSize))
+			return false;
+		return MuiGuestStructCursor.TryCreate(ref platform,
+			APTR.FromPointer(message.Raw + MuiIntuiPointerMessage.ClassOffset),
+			payloadSize, out cursor);
+	}
+
+	internal static bool TryReadPointerRecord<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiIntuiPointerMessage value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiIntuiPointerMessage.MinimumSize)) return false;
-		if (!MuiIntuiPointerMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiIntuiPointerMessageField.Class, out value.Class) ||
-			!MuiIntuiPointerMessageMemoryCodec.TryReadUInt16(ref platform,
-				message, MuiIntuiPointerMessageField.Code, out value.Code) ||
-			!MuiIntuiPointerMessageMemoryCodec.TryReadUInt16(ref platform,
-				message, MuiIntuiPointerMessageField.Qualifier, out value.Qualifier) ||
-			!MuiIntuiPointerMessageMemoryCodec.TryReadUInt32(ref platform,
-				message, MuiIntuiPointerMessageField.IAddress, out value.IAddress) ||
-			!MuiIntuiPointerMessageMemoryCodec.TryReadUInt16(ref platform,
-				message, MuiIntuiPointerMessageField.MouseX, out var mouseX) ||
-			!MuiIntuiPointerMessageMemoryCodec.TryReadUInt16(ref platform,
-				message, MuiIntuiPointerMessageField.MouseY, out var mouseY)) return false;
+		var timestamp = platform.IsMapped(message,
+			MuiIntuiPointerMessage.TimestampSize);
+		var payloadSize = timestamp
+			? MuiIntuiPointerMessage.TimestampSize -
+				MuiIntuiPointerMessage.ClassOffset
+			: MuiIntuiPointerMessage.MinimumSize -
+				MuiIntuiPointerMessage.ClassOffset;
+		if (!TryCreatePayloadCursor(ref platform, message, payloadSize,
+			out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var messageClass) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var code) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var qualifier) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var iAddress) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var mouseX) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var mouseY)) return false;
+		value.Class = messageClass;
+		value.Code = code;
+		value.Qualifier = qualifier;
+		value.IAddress = iAddress;
 		value.MouseX = unchecked((short)mouseX);
 		value.MouseY = unchecked((short)mouseY);
-		// Seconds/Micros are an optional extension of the stable pointer prefix.
-		// A short synthetic IntuiMessage remains valid; double-click policy simply
-		// treats it as an untimed single click rather than guessing from host time.
-		if (MuiIntuiPointerMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiIntuiPointerMessageField.Seconds, out value.Seconds) &&
-			MuiIntuiPointerMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiIntuiPointerMessageField.Micros, out value.Micros))
-			value.TimestampValid = 1;
-		return true;
+		if (timestamp &&
+			(!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Seconds) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Micros))) return false;
+		value.TimestampValid = timestamp ? 1u : 0u;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
-	internal static bool TryReadRawKey<TPlatform>(ref TPlatform platform,
+	internal static bool WritePointerRecord<TPlatform>(ref TPlatform platform,
+		APTR message, MuiIntuiPointerMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var timestamp = platform.IsMapped(message,
+			MuiIntuiPointerMessage.TimestampSize);
+		var payloadSize = timestamp
+			? MuiIntuiPointerMessage.TimestampSize -
+				MuiIntuiPointerMessage.ClassOffset
+			: MuiIntuiPointerMessage.MinimumSize -
+				MuiIntuiPointerMessage.ClassOffset;
+		if (!TryCreatePayloadCursor(ref platform, message, payloadSize,
+			out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Class) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				value.Code) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				value.Qualifier) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.IAddress) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				unchecked((ushort)value.MouseX)) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				unchecked((ushort)value.MouseY))) return false;
+		if (timestamp &&
+			(!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Seconds) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Micros))) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadRawKeyRecord<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiIntuiRawKeyMessage value)
-	where TPlatform : struct, IMuiGuestMemory
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		uint messageClass;
-		ushort code;
-		ushort qualifier;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiIntuiRawKeyMessage.Size) ||
-			!MuiIntuiRawKeyMessageMemoryCodec.TryReadUInt32(ref platform,
-				message, MuiIntuiRawKeyMessageField.Class, out messageClass) ||
-			messageClass != RawKeyClass ||
-			!MuiIntuiRawKeyMessageMemoryCodec.TryReadUInt16(ref platform,
-				message, MuiIntuiRawKeyMessageField.Code, out code) ||
-			!MuiIntuiRawKeyMessageMemoryCodec.TryReadUInt16(ref platform,
-				message, MuiIntuiRawKeyMessageField.Qualifier, out qualifier)) return false;
+		if (!TryCreatePayloadCursor(ref platform, message,
+			MuiIntuiRawKeyMessage.Size - MuiIntuiRawKeyMessage.ClassOffset,
+			out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var messageClass) || messageClass != RawKeyClass ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var code) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var qualifier) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
 		value.Class = messageClass;
 		value.Code = code;
 		value.Qualifier = qualifier;
 		return true;
 	}
+
+	internal static bool WriteRawKeyRecord<TPlatform>(ref TPlatform platform,
+		APTR message, MuiIntuiRawKeyMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryCreatePayloadCursor(ref platform, message,
+			MuiIntuiRawKeyMessage.Size - MuiIntuiRawKeyMessage.ClassOffset,
+			out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Class) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				value.Code) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				value.Qualifier)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadPointer<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiIntuiPointerMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadPointerRecord(ref platform, message, out value);
+
+	internal static bool TryReadRawKey<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiIntuiRawKeyMessage value)
+	where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRawKeyRecord(ref platform, message, out value);
 
 	internal static bool TryReadRawKeyCode<TPlatform>(ref TPlatform platform,
 		APTR message, out ushort code)
@@ -631,14 +784,11 @@ internal static class MuiIntuiMessageCodec
 		APTR message, uint messageClass, ushort code, ushort qualifier)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiIntuiRawKeyMessage.Size)) return false;
-		return MuiIntuiRawKeyMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiIntuiRawKeyMessageField.Class, messageClass) &&
-			MuiIntuiRawKeyMessageMemoryCodec.TryWriteUInt16(ref platform,
-				message, MuiIntuiRawKeyMessageField.Code, code) &&
-			MuiIntuiRawKeyMessageMemoryCodec.TryWriteUInt16(ref platform,
-				message, MuiIntuiRawKeyMessageField.Qualifier, qualifier);
+		var value = default(MuiIntuiRawKeyMessage);
+		value.Class = messageClass;
+		value.Code = code;
+		value.Qualifier = qualifier;
+		return WriteRawKeyRecord(ref platform, message, value);
 	}
 
 	internal static bool WritePointer<TPlatform>(ref TPlatform platform,
@@ -646,30 +796,14 @@ internal static class MuiIntuiMessageCodec
 		uint iAddress, short mouseX, short mouseY)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiIntuiPointerMessage.MinimumSize)) return false;
-		var written = MuiIntuiPointerMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiIntuiPointerMessageField.Class, messageClass) &&
-			MuiIntuiPointerMessageMemoryCodec.TryWriteUInt16(ref platform,
-				message, MuiIntuiPointerMessageField.Code, code) &&
-			MuiIntuiPointerMessageMemoryCodec.TryWriteUInt16(ref platform,
-				message, MuiIntuiPointerMessageField.Qualifier, qualifier) &&
-			MuiIntuiPointerMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiIntuiPointerMessageField.IAddress, iAddress) &&
-			MuiIntuiPointerMessageMemoryCodec.TryWriteUInt16(ref platform,
-				message, MuiIntuiPointerMessageField.MouseX, unchecked((ushort)mouseX)) &&
-			MuiIntuiPointerMessageMemoryCodec.TryWriteUInt16(ref platform,
-				message, MuiIntuiPointerMessageField.MouseY, unchecked((ushort)mouseY));
-		if (!written) return false;
-		// Reusing a caller-owned envelope must not retain a previous timestamp.
-		// A full IntuiMessage maps the optional suffix, so clear it to the
-		// canonical zero value when this prefix-only helper is used.
-		if (platform.IsMapped(message, MuiIntuiPointerMessage.TimestampSize))
-			return MuiIntuiPointerMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiIntuiPointerMessageField.Seconds, 0) &&
-				MuiIntuiPointerMessageMemoryCodec.TryWriteUInt32(ref platform,
-					message, MuiIntuiPointerMessageField.Micros, 0);
-		return true;
+		var value = default(MuiIntuiPointerMessage);
+		value.Class = messageClass;
+		value.Code = code;
+		value.Qualifier = qualifier;
+		value.IAddress = iAddress;
+		value.MouseX = mouseX;
+		value.MouseY = mouseY;
+		return WritePointerRecord(ref platform, message, value);
 	}
 
 	internal static bool WritePointerWithTime<TPlatform>(ref TPlatform platform,
@@ -677,14 +811,17 @@ internal static class MuiIntuiMessageCodec
 		uint iAddress, short mouseX, short mouseY, uint seconds, uint micros)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!WritePointer(ref platform, message, messageClass, code, qualifier,
-			iAddress, mouseX, mouseY) ||
-			!platform.IsMapped(message, MuiIntuiPointerMessage.TimestampSize))
-			return false;
-		return MuiIntuiPointerMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiIntuiPointerMessageField.Seconds, seconds) &&
-			MuiIntuiPointerMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiIntuiPointerMessageField.Micros, micros);
+		var value = default(MuiIntuiPointerMessage);
+		value.Class = messageClass;
+		value.Code = code;
+		value.Qualifier = qualifier;
+		value.IAddress = iAddress;
+		value.MouseX = mouseX;
+		value.MouseY = mouseY;
+		value.Seconds = seconds;
+		value.Micros = micros;
+		value.TimestampValid = 1;
+		return WritePointerRecord(ref platform, message, value);
 	}
 }
 
@@ -799,60 +936,59 @@ internal static class MuiListviewDragStateCodec
 {
 	internal const uint Cookie = 0x4C564447u; // 'LVDG'
 
-	internal static void Write<TPlatform>(ref TPlatform platform, APTR storage,
-		MuiListviewDragState value) where TPlatform : struct, IMuiGuestMemory
-	{
-		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
-			storage, MuiListviewDragStateField.Magic, value.Magic);
-		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
-			storage, MuiListviewDragStateField.Source, unchecked((uint)value.Source));
-		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
-			storage, MuiListviewDragStateField.Target, unchecked((uint)value.Target));
-		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
-			storage, MuiListviewDragStateField.StartX, unchecked((uint)value.StartX));
-		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
-			storage, MuiListviewDragStateField.StartY, unchecked((uint)value.StartY));
-		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
-			storage, MuiListviewDragStateField.LastX, unchecked((uint)value.LastX));
-		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
-			storage, MuiListviewDragStateField.LastY, unchecked((uint)value.LastY));
-		_ = MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
-			storage, MuiListviewDragStateField.Flags, value.Flags);
-	}
-
-	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+	// Production access is sequential and struct-shaped. The field-address
+	// adapter remains available only for compatibility diagnostics.
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
 		APTR storage, MuiListviewDragState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (storage.IsNull || !platform.IsMapped(storage,
-			MuiListviewDragState.Size)) return false;
-		Write(ref platform, storage, value);
-		return TryRead(ref platform, storage, out _);
+		if ((storage.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, storage,
+				MuiListviewDragState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Source)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Target)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.StartX)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.StartY)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.LastX)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.LastY)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR storage, out MuiListviewDragState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (storage.IsNull || !platform.IsMapped(storage,
-			MuiListviewDragState.Size) ||
-			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
-				storage, MuiListviewDragStateField.Magic, out var magic) ||
-			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
-				storage, MuiListviewDragStateField.Source, out var source) ||
-			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
-				storage, MuiListviewDragStateField.Target, out var target) ||
-			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
-				storage, MuiListviewDragStateField.StartX, out var startX) ||
-			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
-				storage, MuiListviewDragStateField.StartY, out var startY) ||
-			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
-				storage, MuiListviewDragStateField.LastX, out var lastX) ||
-			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
-				storage, MuiListviewDragStateField.LastY, out var lastY) ||
-			!MuiListviewDragStateMemoryCodec.TryReadUInt32(ref platform,
-				storage, MuiListviewDragStateField.Flags, out var flags)) return false;
+		if ((storage.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, storage,
+				MuiListviewDragState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var source) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var target) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var startX) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var startY) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var lastX) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var lastY) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var flags) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
 		value.Magic = magic;
 		value.Source = unchecked((int)source);
 		value.Target = unchecked((int)target);
@@ -862,6 +998,27 @@ internal static class MuiListviewDragStateCodec
 		value.LastY = unchecked((int)lastY);
 		value.Flags = flags;
 		return true;
+	}
+
+	internal static void Write<TPlatform>(ref TPlatform platform, APTR storage,
+		MuiListviewDragState value) where TPlatform : struct, IMuiGuestMemory
+	{
+		_ = WriteRecord(ref platform, storage, value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR storage, MuiListviewDragState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return WriteRecord(ref platform, storage, value) &&
+			TryReadRecord(ref platform, storage, out _);
+	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR storage, out MuiListviewDragState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return TryReadRecord(ref platform, storage, out value);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR storage,

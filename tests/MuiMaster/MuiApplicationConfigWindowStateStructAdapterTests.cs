@@ -17,6 +17,7 @@ public sealed class MuiApplicationConfigWindowStateStructAdapterTests
 			Flags = 0x10203040u,
 			ClassId = APTR.Null,
 			Requests = 3,
+			Reserved = 0x55667788u,
 		};
 
 		Assert.True(MuiApplicationConfigWindowStateRecordCodec.Write(ref platform,
@@ -37,11 +38,44 @@ public sealed class MuiApplicationConfigWindowStateStructAdapterTests
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(0x55667788u, decoded.Flags);
 		Assert.Equal(value.Requests, decoded.Requests);
+		Assert.Equal(value.Reserved, decoded.Reserved);
 		Assert.False(MuiApplicationConfigWindowStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.FromPointer(0x30FF4),
 			MuiApplicationConfigWindowStateField.Magic, out _));
 		Assert.False(MuiApplicationConfigWindowStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiApplicationConfigWindowStateField.Flags,
 			out _));
+	}
+
+	[Fact]
+	public void ApplicationConfigWindowStateSequentialRecordPreservesFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2CE0);
+		var value = new MuiApplicationConfigWindowStateRecord
+		{
+			Magic = MuiApplicationConfigWindowStateRecord.Cookie,
+			Flags = 0x10203040u,
+			ClassId = APTR.FromPointer(uint.MaxValue),
+			Requests = 0xAABBCCDDu,
+			Reserved = 0x55667788u,
+		};
+
+		Assert.True(MuiApplicationConfigWindowStateRecordCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiApplicationConfigWindowStateRecordCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Flags, decoded.Flags);
+		Assert.Equal(value.ClassId, decoded.ClassId);
+		Assert.Equal(value.Requests, decoded.Requests);
+		Assert.Equal(value.Reserved, decoded.Reserved);
+
+		var crossingEnd = APTR.FromPointer(0x30FED);
+		Assert.False(MuiApplicationConfigWindowStateRecordCodec.WriteRecord(
+			ref platform, crossingEnd, value));
+		Assert.False(MuiApplicationConfigWindowStateRecordCodec.TryReadRecord(
+			ref platform, crossingEnd, out _));
 	}
 }

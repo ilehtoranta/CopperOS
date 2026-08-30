@@ -26,7 +26,7 @@ public sealed class MuiGaugeLevelmeterAdmissionTests
 		};
 		Assert.True(MuiGaugeStateRecordCodec.Write(ref platform, gaugeAddress,
 			gauge));
-		Assert.True(MuiLevelmeterPresentationStateRecordCodec.Write(ref platform,
+		Assert.True(MuiLevelmeterPresentationStateRecordCodec.WriteRecord(ref platform,
 			levelmeterAddress, levelmeter));
 		Assert.True(MuiGaugeStateRecordCodec.TryRead(ref platform, gaugeAddress,
 			out var gaugeRead));
@@ -50,9 +50,9 @@ public sealed class MuiGaugeLevelmeterAdmissionTests
 			Horizontal = 1,
 		};
 
-		Assert.True(MuiLevelmeterPresentationStateRecordCodec.Write(ref platform,
+		Assert.True(MuiLevelmeterPresentationStateRecordCodec.WriteRecord(ref platform,
 			address, value));
-		Assert.True(MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(
+		Assert.True(MuiLevelmeterPresentationStateRecordCodec.TryReadRecord(
 			ref platform, address, out var structural));
 		Assert.Equal(value.Magic, structural.Magic);
 		Assert.Equal(value.Horizontal, structural.Horizontal);
@@ -68,7 +68,7 @@ public sealed class MuiGaugeLevelmeterAdmissionTests
 			ref platform, address, MuiLevelmeterPresentationStateRecord.Size, out _));
 		Assert.False(MuiLevelmeterPresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, 0, out _));
-		Assert.False(MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(
+		Assert.False(MuiLevelmeterPresentationStateRecordCodec.TryReadRecord(
 			ref platform, APTR.Null, out _));
 	}
 
@@ -161,7 +161,7 @@ public sealed class MuiGaugeLevelmeterAdmissionTests
 				Divide = 1,
 				Horizontal = 0,
 			}));
-		Assert.True(MuiLevelmeterPresentationStateRecordCodec.Write(ref platform,
+		Assert.True(MuiLevelmeterPresentationStateRecordCodec.WriteRecord(ref platform,
 			levelmeterAddress, new MuiLevelmeterPresentationStateRecord
 			{
 				Magic = MuiLevelmeterPresentationStateRecord.Cookie,
@@ -174,7 +174,7 @@ public sealed class MuiGaugeLevelmeterAdmissionTests
 			MuiLevelmeterPresentationStateField.Magic, 0));
 		Assert.True(MuiGaugeStateRecordCodec.TryReadStructural(ref platform,
 			gaugeAddress, out var gauge));
-		Assert.True(MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(
+		Assert.True(MuiLevelmeterPresentationStateRecordCodec.TryReadRecord(
 			ref platform, levelmeterAddress, out var levelmeter));
 		Assert.Equal(0u, gauge.Magic);
 		Assert.Equal(0u, levelmeter.Magic);

@@ -191,35 +191,38 @@ internal static class MuiScrollgroupViewportStateRecordMemoryCodec
 
 internal static class MuiScrollgroupViewportStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
-		APTR address,
-		out MuiScrollgroupViewportStateRecord value)
+	// Declaration-order guest record: magic, viewport/content geometry,
+	// scroll extents/positions, then visibility BOOLs.  Signed LONG values are
+	// transported as their lossless ULONG bit patterns by the cursor.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiScrollgroupViewportStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiScrollgroupViewportStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiScrollgroupViewportField.Magic, out var magic) ||
-			!MuiScrollgroupViewportStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiScrollgroupViewportField.ViewportWidth, out var viewportWidth) ||
-			!MuiScrollgroupViewportStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiScrollgroupViewportField.ViewportHeight, out var viewportHeight) ||
-			!MuiScrollgroupViewportStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiScrollgroupViewportField.ContentWidth, out var contentWidth) ||
-			!MuiScrollgroupViewportStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiScrollgroupViewportField.ContentHeight, out var contentHeight) ||
-			!MuiScrollgroupViewportStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiScrollgroupViewportField.MaximumScrollX, out var maximumScrollX) ||
-			!MuiScrollgroupViewportStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiScrollgroupViewportField.MaximumScrollY, out var maximumScrollY) ||
-			!MuiScrollgroupViewportStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiScrollgroupViewportField.ScrollLeft, out var scrollLeft) ||
-			!MuiScrollgroupViewportStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiScrollgroupViewportField.ScrollTop, out var scrollTop) ||
-			!MuiScrollgroupViewportStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiScrollgroupViewportField.HorizontalBarVisible, out value.HorizontalBarVisible) ||
-			!MuiScrollgroupViewportStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiScrollgroupViewportField.VerticalBarVisible, out value.VerticalBarVisible)) return false;
-		value.Magic = magic;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiScrollgroupViewportStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var viewportWidth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var viewportHeight) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var contentWidth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var contentHeight) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var maximumScrollX) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var maximumScrollY) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var scrollLeft) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var scrollTop) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.HorizontalBarVisible) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.VerticalBarVisible)) return false;
 		value.ViewportWidth = unchecked((int)viewportWidth);
 		value.ViewportHeight = unchecked((int)viewportHeight);
 		value.ContentWidth = unchecked((int)contentWidth);
@@ -228,8 +231,42 @@ internal static class MuiScrollgroupViewportStateRecordCodec
 		value.MaximumScrollY = unchecked((int)maximumScrollY);
 		value.ScrollLeft = unchecked((int)scrollLeft);
 		value.ScrollTop = unchecked((int)scrollTop);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiScrollgroupViewportStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiScrollgroupViewportStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.ViewportWidth)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.ViewportHeight)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.ContentWidth)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.ContentHeight)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.MaximumScrollX)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.MaximumScrollY)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.ScrollLeft)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.ScrollTop)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.HorizontalBarVisible) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.VerticalBarVisible) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiScrollgroupViewportStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiScrollgroupViewportStateRecord value)
@@ -242,27 +279,6 @@ internal static class MuiScrollgroupViewportStateRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiScrollgroupViewportStateAdmission.Validate(value)) return false;
-		return MuiScrollgroupViewportStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollgroupViewportField.Magic, value.Magic) &&
-			MuiScrollgroupViewportStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollgroupViewportField.ViewportWidth, unchecked((uint)value.ViewportWidth)) &&
-			MuiScrollgroupViewportStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollgroupViewportField.ViewportHeight, unchecked((uint)value.ViewportHeight)) &&
-			MuiScrollgroupViewportStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollgroupViewportField.ContentWidth, unchecked((uint)value.ContentWidth)) &&
-			MuiScrollgroupViewportStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollgroupViewportField.ContentHeight, unchecked((uint)value.ContentHeight)) &&
-			MuiScrollgroupViewportStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollgroupViewportField.MaximumScrollX, unchecked((uint)value.MaximumScrollX)) &&
-			MuiScrollgroupViewportStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollgroupViewportField.MaximumScrollY, unchecked((uint)value.MaximumScrollY)) &&
-			MuiScrollgroupViewportStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollgroupViewportField.ScrollLeft, unchecked((uint)value.ScrollLeft)) &&
-			MuiScrollgroupViewportStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollgroupViewportField.ScrollTop, unchecked((uint)value.ScrollTop)) &&
-			MuiScrollgroupViewportStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollgroupViewportField.HorizontalBarVisible, value.HorizontalBarVisible) &&
-			MuiScrollgroupViewportStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiScrollgroupViewportField.VerticalBarVisible, value.VerticalBarVisible);
+		return WriteRecord(ref platform, address, value);
 	}
 }

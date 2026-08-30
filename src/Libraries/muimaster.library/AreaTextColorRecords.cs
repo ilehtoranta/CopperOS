@@ -158,23 +158,43 @@ internal static class MuiAreaTextColorStateRecordMemoryCodec
 
 internal static class MuiAreaTextColorStateRecordCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaTextColorStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaTextColorStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Color) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Active) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Generation)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaTextColorStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaTextColorStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Color) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Active) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Generation) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiAreaTextColorStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (!MuiAreaTextColorStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaTextColorStateField.Magic, out value.Magic) ||
-			!MuiAreaTextColorStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaTextColorStateField.Color, out value.Color) ||
-			!MuiAreaTextColorStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaTextColorStateField.Active, out value.Active) ||
-			!MuiAreaTextColorStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaTextColorStateField.Generation, out value.Generation))
-			return false;
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAreaTextColorStateRecord value)
@@ -186,17 +206,8 @@ internal static class MuiAreaTextColorStateRecordCodec
 		MuiAreaTextColorStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaTextColorStateRecord.Size) || value.Magic !=
-			MuiAreaTextColorStateRecord.Cookie ||
-			!MuiAreaTextColorStateAdmission.Validate(value)) return false;
-		return MuiAreaTextColorStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiAreaTextColorStateField.Magic, value.Magic) &&
-			MuiAreaTextColorStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaTextColorStateField.Color, value.Color) &&
-			MuiAreaTextColorStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaTextColorStateField.Active, value.Active) &&
-			MuiAreaTextColorStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaTextColorStateField.Generation, value.Generation);
+		if (address.IsNull || !MuiAreaTextColorStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

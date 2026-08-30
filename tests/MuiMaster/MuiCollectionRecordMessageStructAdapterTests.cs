@@ -61,4 +61,18 @@ public sealed class MuiCollectionRecordMessageStructAdapterTests
 			ref platform, APTR.Null, MuiCollectionRecordPacketKind.TestPos,
 			MuiCollectionRecordField.Result, out _));
 	}
+
+	[Fact]
+	public void CollectionRecordDirectAdapterRejectsTruncatedPackets()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x20FF1);
+		Assert.False(MuiCollectionRecordMessageMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiCollectionRecordPacketKind.Display,
+			MuiCollectionRecordField.Row, 3));
+		Assert.False(MuiCollectionRecordMessageMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiCollectionRecordPacketKind.TestPos,
+			MuiCollectionRecordField.Result, out _));
+	}
 }

@@ -152,25 +152,50 @@ internal static class MuiAreaPresentationStateRecordMemoryCodec
 
 internal static class MuiAreaPresentationStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiAreaPresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		return MuiAreaPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaPresentationStateField.Magic, out value.Magic) &&
-			MuiAreaPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaPresentationStateField.Disabled, out value.Disabled) &&
-			MuiAreaPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaPresentationStateField.ShowMe, out value.ShowMe) &&
-			MuiAreaPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaPresentationStateField.Background, out value.Background) &&
-			MuiAreaPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaPresentationStateField.Frame, out value.Frame) &&
-			MuiAreaPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaPresentationStateField.CustomBackfill,
-			out value.CustomBackfill);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaPresentationStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Disabled) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.ShowMe) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Background) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Frame) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.CustomBackfill)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaPresentationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaPresentationStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Disabled) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ShowMe) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Background) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Frame) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.CustomBackfill) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaPresentationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAreaPresentationStateRecord value)
@@ -180,22 +205,10 @@ internal static class MuiAreaPresentationStateRecordCodec
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaPresentationStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiAreaPresentationStateAdmission.Validate(value)) return false;
-		return MuiAreaPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaPresentationStateField.Magic, value.Magic) &&
-			MuiAreaPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaPresentationStateField.Disabled, value.Disabled) &&
-			MuiAreaPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaPresentationStateField.ShowMe, value.ShowMe) &&
-			MuiAreaPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaPresentationStateField.Background, value.Background) &&
-			MuiAreaPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaPresentationStateField.Frame, value.Frame) &&
-			MuiAreaPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaPresentationStateField.CustomBackfill,
-			value.CustomBackfill);
+		return WriteRecord(ref platform, address, value);
 	}
 }
 

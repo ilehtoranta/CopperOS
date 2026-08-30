@@ -155,23 +155,39 @@ internal static class MuiAreaDoubleBufferStateRecordMemoryCodec
 
 internal static class MuiAreaDoubleBufferStateRecordCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaDoubleBufferStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaDoubleBufferStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Enabled) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Generation)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaDoubleBufferStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaDoubleBufferStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Enabled) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Generation) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiAreaDoubleBufferStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (!MuiAreaDoubleBufferStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiAreaDoubleBufferStateField.Magic,
-			out value.Magic) ||
-			!MuiAreaDoubleBufferStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiAreaDoubleBufferStateField.Enabled,
-				out value.Enabled) ||
-			!MuiAreaDoubleBufferStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiAreaDoubleBufferStateField.Generation,
-				out value.Generation)) return false;
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAreaDoubleBufferStateRecord value)
@@ -181,19 +197,10 @@ internal static class MuiAreaDoubleBufferStateRecordCodec
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaDoubleBufferStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaDoubleBufferStateRecord.Size) || value.Magic !=
-			MuiAreaDoubleBufferStateRecord.Cookie ||
-			!MuiAreaDoubleBufferStateAdmission.Validate(value)) return false;
-		return MuiAreaDoubleBufferStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiAreaDoubleBufferStateField.Magic,
-			value.Magic) &&
-			MuiAreaDoubleBufferStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaDoubleBufferStateField.Enabled, value.Enabled) &&
-			MuiAreaDoubleBufferStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaDoubleBufferStateField.Generation,
-				value.Generation);
+		if (address.IsNull || !MuiAreaDoubleBufferStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

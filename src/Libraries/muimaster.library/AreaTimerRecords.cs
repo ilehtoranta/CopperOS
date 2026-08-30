@@ -210,21 +210,39 @@ internal static class MuiAreaTimerStateRecordMemoryCodec
 
 internal static class MuiAreaTimerStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		Amiga.APTR address, out MuiAreaTimerStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiAreaTimerStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaTimerStateField.Magic, out value.Magic) ||
-			!MuiAreaTimerStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaTimerStateField.Value, out var rawValue) ||
-			!MuiAreaTimerStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaTimerStateField.Generation, out value.Generation))
-			return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaTimerStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawValue) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Generation)) return false;
 		value.Value = unchecked((int)rawValue);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		Amiga.APTR address, MuiAreaTimerStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaTimerStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Value)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Generation) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		Amiga.APTR address, out MuiAreaTimerStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		Amiga.APTR address, out MuiAreaTimerStateRecord value)
@@ -234,19 +252,11 @@ internal static class MuiAreaTimerStateRecordCodec
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		Amiga.APTR address, MuiAreaTimerStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaTimerStateRecord.Size) || value.Magic !=
-			MuiAreaTimerStateRecord.Cookie ||
-			!MuiAreaTimerStateAdmission.Validate(value)) return false;
-		return MuiAreaTimerStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaTimerStateField.Magic, value.Magic) &&
-			MuiAreaTimerStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaTimerStateField.Value,
-				unchecked((uint)value.Value)) &&
-			MuiAreaTimerStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaTimerStateField.Generation, value.Generation);
+		if (address.IsNull || !MuiAreaTimerStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
@@ -338,6 +348,48 @@ internal static class MuiAreaTimerEventStateRecordMemoryCodec
 
 internal static class MuiAreaTimerEventStateCodec
 {
+	// Declaration-order timer event record: magic, canonical BOOL flags,
+	// opaque tick identity, and generation. All fields are exchanged through
+	// the bounded named cursor; the enum adapter remains diagnostic only.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		Amiga.APTR address, out MuiAreaTimerEventStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaTimerEventStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Armed) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MouseOver) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.DelayElapsed) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.LastTick) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Generation) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		Amiga.APTR address, MuiAreaTimerEventStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaTimerEventStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Armed) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.MouseOver) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.DelayElapsed) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.LastTick) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Generation) && MuiGuestStructCursor.IsComplete(cursor);
+
 	private static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		Amiga.APTR record, MuiAreaTimerEventStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -353,31 +405,7 @@ internal static class MuiAreaTimerEventStateCodec
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		Amiga.APTR address, out MuiAreaTimerEventStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaTimerEventStateRecord.Size) ||
-			!TryReadUInt32(ref platform, address,
-				MuiAreaTimerEventStateField.Magic, out var magic) ||
-			!TryReadUInt32(ref platform, address,
-				MuiAreaTimerEventStateField.Armed, out var armed) ||
-			!TryReadUInt32(ref platform, address,
-				MuiAreaTimerEventStateField.MouseOver, out var mouseOver) ||
-			!TryReadUInt32(ref platform, address,
-				MuiAreaTimerEventStateField.DelayElapsed, out var delayElapsed) ||
-			!TryReadUInt32(ref platform, address,
-				MuiAreaTimerEventStateField.LastTick, out var lastTick) ||
-			!TryReadUInt32(ref platform, address,
-				MuiAreaTimerEventStateField.Generation, out var generation))
-			return false;
-		value.Magic = magic;
-		value.Armed = armed;
-		value.MouseOver = mouseOver;
-		value.DelayElapsed = delayElapsed;
-		value.LastTick = lastTick;
-		value.Generation = generation;
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		Amiga.APTR address, out MuiAreaTimerEventStateRecord value)
@@ -393,19 +421,6 @@ internal static class MuiAreaTimerEventStateCodec
 			MuiAreaTimerEventStateRecord.Size) || value.Magic !=
 			MuiAreaTimerEventStateRecord.Cookie ||
 			!MuiAreaTimerEventStateAdmission.Validate(value)) return false;
-		return TryWriteUInt32(ref platform, address,
-			MuiAreaTimerEventStateField.Magic, value.Magic) &&
-			TryWriteUInt32(ref platform, address,
-				MuiAreaTimerEventStateField.Armed, value.Armed == 0 ? 0u : 1u) &&
-			TryWriteUInt32(ref platform, address,
-				MuiAreaTimerEventStateField.MouseOver,
-				value.MouseOver == 0 ? 0u : 1u) &&
-			TryWriteUInt32(ref platform, address,
-				MuiAreaTimerEventStateField.DelayElapsed,
-				value.DelayElapsed == 0 ? 0u : 1u) &&
-			TryWriteUInt32(ref platform, address,
-				MuiAreaTimerEventStateField.LastTick, value.LastTick) &&
-			TryWriteUInt32(ref platform, address,
-				MuiAreaTimerEventStateField.Generation, value.Generation);
+		return WriteRecord(ref platform, address, value);
 	}
 }

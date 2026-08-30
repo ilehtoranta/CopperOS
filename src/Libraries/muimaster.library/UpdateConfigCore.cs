@@ -154,6 +154,9 @@ internal struct MuiUpdateConfigFlagTable
 internal struct MuiUpdateConfigMessage
 {
 	internal const uint Size = 332;
+	internal const uint MethodIdOffset = 0;
+	internal const uint CfgIdOffset = 4;
+	internal const uint RedrawCountOffset = 8;
 	internal uint MethodId;
 	internal uint CfgId;
 	internal int RedrawCount;
@@ -165,6 +168,7 @@ internal struct MuiUpdateConfigMessage
 internal struct MuiUpdateConfigMethodMessage
 {
 	internal const uint Size = 4;
+	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
 
@@ -182,26 +186,38 @@ internal struct MuiUpdateConfigPacketFieldCursor
 	internal MuiUpdateConfigPacketField Field;
 }
 
-internal static class MuiUpdateConfigPacketFieldCursorCodec
+internal static class MuiUpdateConfigPacketFieldMemoryCodec
 {
 	private static bool TryResolve(MuiUpdateConfigPacketField field,
 		out uint offset)
 	{
-		if (field == MuiUpdateConfigPacketField.MethodId) { offset = 0; return true; }
-		if (field == MuiUpdateConfigPacketField.CfgId) { offset = 4; return true; }
-		if (field == MuiUpdateConfigPacketField.RedrawCount) { offset = 8; return true; }
+		if (field == MuiUpdateConfigPacketField.MethodId)
+		{
+			offset = MuiUpdateConfigMessage.MethodIdOffset;
+			return true;
+		}
+		if (field == MuiUpdateConfigPacketField.CfgId)
+		{
+			offset = MuiUpdateConfigMessage.CfgIdOffset;
+			return true;
+		}
+		if (field == MuiUpdateConfigPacketField.RedrawCount)
+		{
+			offset = MuiUpdateConfigMessage.RedrawCountOffset;
+			return true;
+		}
 		offset = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiUpdateConfigPacketFieldCursor cursor, out APTR address)
+		APTR message, MuiUpdateConfigPacketField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
+		if (!TryResolve(field, out var offset) || message.IsNull ||
+			message.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(message.Raw + offset);
 		return platform.IsMapped(address, 4);
 	}
 
@@ -210,10 +226,8 @@ internal static class MuiUpdateConfigPacketFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiUpdateConfigPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -222,13 +236,35 @@ internal static class MuiUpdateConfigPacketFieldCursorCodec
 		APTR message, MuiUpdateConfigPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiUpdateConfigPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// UpdateConfig packet-field cursor. New code passes the message address and
+// named field directly to the struct-backed memory adapter above.
+internal static class MuiUpdateConfigPacketFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiUpdateConfigPacketFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiUpdateConfigPacketFieldMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiUpdateConfigPacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiUpdateConfigPacketFieldMemoryCodec.TryReadUInt32(ref platform,
+			message, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiUpdateConfigPacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiUpdateConfigPacketFieldMemoryCodec.TryWriteUInt32(ref platform,
+			message, field, value);
 }
 
 // The redraw object table is a contiguous array of APTR slots in the public
@@ -238,6 +274,7 @@ internal static class MuiUpdateConfigPacketFieldCursorCodec
 internal struct MuiUpdateConfigObjectSlot
 {
 	internal const uint Size = 4;
+	internal const uint ObjectOffset = 0;
 	internal APTR Object;
 }
 
@@ -253,17 +290,18 @@ internal struct MuiUpdateConfigObjectSlotFieldCursor
 	internal MuiUpdateConfigObjectSlotField Field;
 }
 
-internal static class MuiUpdateConfigObjectSlotFieldCursorCodec
+internal static class MuiUpdateConfigObjectSlotFieldMemoryCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiUpdateConfigObjectSlotFieldCursor cursor, out APTR address)
+		APTR record, MuiUpdateConfigObjectSlotField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (cursor.Field != MuiUpdateConfigObjectSlotField.Object ||
-			cursor.Record.IsNull || !platform.IsMapped(cursor.Record,
+		if (field != MuiUpdateConfigObjectSlotField.Object ||
+			record.IsNull || !platform.IsMapped(record,
 				MuiUpdateConfigObjectSlot.Size)) return false;
-		address = cursor.Record;
+		address = APTR.FromPointer(record.Raw +
+			MuiUpdateConfigObjectSlot.ObjectOffset);
 		return true;
 	}
 
@@ -272,10 +310,8 @@ internal static class MuiUpdateConfigObjectSlotFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiUpdateConfigObjectSlotFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -284,13 +320,35 @@ internal static class MuiUpdateConfigObjectSlotFieldCursorCodec
 		APTR record, MuiUpdateConfigObjectSlotField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiUpdateConfigObjectSlotFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// UpdateConfig object-slot cursor. New code uses the direct named-record
+// adapter above.
+internal static class MuiUpdateConfigObjectSlotFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiUpdateConfigObjectSlotFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiUpdateConfigObjectSlotFieldMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiUpdateConfigObjectSlotField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiUpdateConfigObjectSlotFieldMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiUpdateConfigObjectSlotField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiUpdateConfigObjectSlotFieldMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
 }
 
 internal static class MuiUpdateConfigObjectSlotCodec
@@ -300,7 +358,7 @@ internal static class MuiUpdateConfigObjectSlotCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		slot = default;
-		if (!MuiUpdateConfigObjectSlotFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiUpdateConfigObjectSlotFieldMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiUpdateConfigObjectSlotField.Object, out var value)) return false;
 		slot.Object = APTR.FromPointer(value);
 		return true;
@@ -310,7 +368,7 @@ internal static class MuiUpdateConfigObjectSlotCodec
 		MuiUpdateConfigObjectSlot slot)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiUpdateConfigObjectSlotFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiUpdateConfigObjectSlotFieldMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiUpdateConfigObjectSlotField.Object, slot.Object.Raw);
 	}
 }
@@ -321,6 +379,7 @@ internal static class MuiUpdateConfigObjectSlotCodec
 internal struct MuiUpdateConfigFlagSlot
 {
 	internal const uint Size = 1;
+	internal const uint ValueOffset = 0;
 	internal byte Value;
 }
 
@@ -336,17 +395,17 @@ internal struct MuiUpdateConfigFlagSlotFieldCursor
 	internal MuiUpdateConfigFlagSlotField Field;
 }
 
-internal static class MuiUpdateConfigFlagSlotFieldCursorCodec
+internal static class MuiUpdateConfigFlagSlotFieldMemoryCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiUpdateConfigFlagSlotFieldCursor cursor, out APTR address)
+		APTR record, MuiUpdateConfigFlagSlotField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (cursor.Field != MuiUpdateConfigFlagSlotField.Value ||
-			cursor.Record.IsNull || !platform.IsMapped(cursor.Record,
+		if (field != MuiUpdateConfigFlagSlotField.Value ||
+			record.IsNull || !platform.IsMapped(record,
 				MuiUpdateConfigFlagSlot.Size)) return false;
-		address = cursor.Record;
+		address = APTR.FromPointer(record.Raw + MuiUpdateConfigFlagSlot.ValueOffset);
 		return true;
 	}
 
@@ -355,10 +414,8 @@ internal static class MuiUpdateConfigFlagSlotFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiUpdateConfigFlagSlotFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt8(address, 0);
 		return true;
 	}
@@ -367,13 +424,34 @@ internal static class MuiUpdateConfigFlagSlotFieldCursorCodec
 		APTR record, MuiUpdateConfigFlagSlotField field, byte value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiUpdateConfigFlagSlotFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt8(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// UpdateConfig flag-slot cursor. New code uses the direct named-record adapter.
+internal static class MuiUpdateConfigFlagSlotFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiUpdateConfigFlagSlotFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiUpdateConfigFlagSlotFieldMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt8<TPlatform>(ref TPlatform platform,
+		APTR record, MuiUpdateConfigFlagSlotField field, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiUpdateConfigFlagSlotFieldMemoryCodec.TryReadUInt8(ref platform,
+			record, field, out value);
+
+	internal static bool TryWriteUInt8<TPlatform>(ref TPlatform platform,
+		APTR record, MuiUpdateConfigFlagSlotField field, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiUpdateConfigFlagSlotFieldMemoryCodec.TryWriteUInt8(ref platform,
+			record, field, value);
 }
 
 internal static class MuiUpdateConfigFlagSlotCodec
@@ -383,7 +461,7 @@ internal static class MuiUpdateConfigFlagSlotCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		slot = default;
-		if (!MuiUpdateConfigFlagSlotFieldCursorCodec.TryReadUInt8(ref platform,
+		if (!MuiUpdateConfigFlagSlotFieldMemoryCodec.TryReadUInt8(ref platform,
 			address, MuiUpdateConfigFlagSlotField.Value, out slot.Value)) return false;
 		return true;
 	}
@@ -392,7 +470,7 @@ internal static class MuiUpdateConfigFlagSlotCodec
 		MuiUpdateConfigFlagSlot slot)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiUpdateConfigFlagSlotFieldCursorCodec.TryWriteUInt8(ref platform,
+		return MuiUpdateConfigFlagSlotFieldMemoryCodec.TryWriteUInt8(ref platform,
 			address, MuiUpdateConfigFlagSlotField.Value, slot.Value);
 	}
 }
@@ -409,23 +487,33 @@ internal struct MuiUpdateConfigObjectCursor
 	internal uint Index;
 }
 
+// Struct-first adapter for the inline redraw-object table. A complete named
+// pointer slot and the 64-entry MorphOS bound are checked before exposure;
+// the typed cursor remains a compatibility wrapper for callers that carry it.
+internal static class MuiUpdateConfigObjectVectorMemoryCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (vector.IsNull || index >= MuiUpdateConfigObjectCursor.MaximumEntries ||
+			index > (uint.MaxValue - vector.Raw) /
+			MuiUpdateConfigObjectSlot.Size) return false;
+		var offset = index * MuiUpdateConfigObjectSlot.Size;
+		if (vector.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(vector.Raw + offset);
+		return platform.IsMapped(address, MuiUpdateConfigObjectSlot.Size);
+	}
+}
+
 internal static class MuiUpdateConfigObjectCursorCodec
 {
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiUpdateConfigObjectCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >=
-			MuiUpdateConfigObjectCursor.MaximumEntries || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiUpdateConfigObjectCursor.EntrySize) return false;
-		var offset = cursor.Index * MuiUpdateConfigObjectCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
-		return platform.IsMapped(address,
-			MuiUpdateConfigObjectCursor.EntrySize);
-	}
+		=> MuiUpdateConfigObjectVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out address);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -437,23 +525,32 @@ internal struct MuiUpdateConfigFlagCursor
 	internal uint Index;
 }
 
+// Struct-first adapter for the inline redraw-flag table. Its one-byte named
+// record and 64-entry bound stay separate from the four-byte object vector.
+internal static class MuiUpdateConfigFlagVectorMemoryCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (vector.IsNull || index >= MuiUpdateConfigFlagCursor.MaximumEntries ||
+			index > (uint.MaxValue - vector.Raw) /
+			MuiUpdateConfigFlagSlot.Size) return false;
+		var offset = index * MuiUpdateConfigFlagSlot.Size;
+		if (vector.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(vector.Raw + offset);
+		return platform.IsMapped(address, MuiUpdateConfigFlagSlot.Size);
+	}
+}
+
 internal static class MuiUpdateConfigFlagCursorCodec
 {
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiUpdateConfigFlagCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >=
-			MuiUpdateConfigFlagCursor.MaximumEntries || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiUpdateConfigFlagCursor.EntrySize) return false;
-		var offset = cursor.Index * MuiUpdateConfigFlagCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
-		return platform.IsMapped(address,
-			MuiUpdateConfigFlagCursor.EntrySize);
-	}
+		=> MuiUpdateConfigFlagVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out address);
 }
 
 // Focused, struct-first bridge for the public MorphOS UpdateConfig packet.
@@ -634,7 +731,7 @@ public static class MuiUpdateConfigCore
 		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiUpdateConfigMethodMessage.Size)) return false;
-		return MuiUpdateConfigPacketFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiUpdateConfigPacketFieldMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiUpdateConfigPacketField.MethodId, out methodId);
 	}
 
@@ -646,33 +743,29 @@ public static class MuiUpdateConfigCore
 		if (!TryReadMethodIdValue(ref platform, message, out var methodId) ||
 			methodId != Method || !platform.IsMapped(message,
 			MuiUpdateConfigMessage.Size)) return false;
-		if (!MuiUpdateConfigPacketFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiUpdateConfigPacketFieldMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiUpdateConfigPacketField.CfgId, out packet.CfgId) ||
-			!MuiUpdateConfigPacketFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiUpdateConfigPacketFieldMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiUpdateConfigPacketField.RedrawCount,
 				out var rawRedrawCount)) return false;
 		packet.MethodId = methodId;
 		packet.RedrawCount = unchecked((int)rawRedrawCount);
 		if (packet.RedrawCount < 0 || packet.RedrawCount > MaximumRedrawObjects)
 			return false;
-		var objectCursor = default(MuiUpdateConfigObjectCursor);
-		objectCursor.Base = APTR.FromPointer(message.Raw +
+		var objectVector = APTR.FromPointer(message.Raw +
 			unchecked((uint)ObjectTableOffset));
-		var flagCursor = default(MuiUpdateConfigFlagCursor);
-		flagCursor.Base = APTR.FromPointer(message.Raw +
+		var flagVector = APTR.FromPointer(message.Raw +
 			unchecked((uint)FlagTableOffset));
 		for (var index = 0u; index < MuiUpdateConfigObjectCursor.MaximumEntries;
 			index++)
 		{
-			objectCursor.Index = index;
-			if (!MuiUpdateConfigObjectCursorCodec.TryGetEntry(ref platform,
-				objectCursor, out var objectAddress) ||
+			if (!MuiUpdateConfigObjectVectorMemoryCodec.TryGetEntry(ref platform,
+				objectVector, index, out var objectAddress) ||
 				!MuiUpdateConfigObjectSlotCodec.TryRead(ref platform, objectAddress,
 				out var objectSlot)) return false;
 			SetObjectField(ref packet.RedrawObjects, index, objectSlot.Object);
-			flagCursor.Index = index;
-			if (!MuiUpdateConfigFlagCursorCodec.TryGetEntry(ref platform,
-				flagCursor, out var flagAddress) ||
+			if (!MuiUpdateConfigFlagVectorMemoryCodec.TryGetEntry(ref platform,
+				flagVector, index, out var flagAddress) ||
 				!MuiUpdateConfigFlagSlotCodec.TryRead(ref platform, flagAddress,
 				out var flagSlot)) return false;
 			SetFlagField(ref packet.RedrawFlags, index, flagSlot.Value);
@@ -690,11 +783,11 @@ public static class MuiUpdateConfigCore
 			redrawCount > MaximumRedrawObjects ||
 			!platform.IsMapped(message, MuiUpdateConfigMessage.Size)) return false;
 		platform.Clear(message, MuiUpdateConfigMessage.Size);
-		return MuiUpdateConfigPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiUpdateConfigPacketFieldMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiUpdateConfigPacketField.MethodId, Method) &&
-			MuiUpdateConfigPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiUpdateConfigPacketFieldMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiUpdateConfigPacketField.CfgId, cfgId) &&
-			MuiUpdateConfigPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiUpdateConfigPacketFieldMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiUpdateConfigPacketField.RedrawCount,
 				unchecked((uint)redrawCount));
 	}
@@ -710,22 +803,18 @@ public static class MuiUpdateConfigCore
 			!TryReadMethodIdValue(ref platform, message, out var methodId) ||
 			methodId != Method ||
 			!platform.IsMapped(message, MuiUpdateConfigMessage.Size)) return false;
-		var objectCursor = default(MuiUpdateConfigObjectCursor);
-		objectCursor.Base = APTR.FromPointer(message.Raw +
+		var objectVector = APTR.FromPointer(message.Raw +
 			unchecked((uint)ObjectTableOffset));
-		objectCursor.Index = unchecked((uint)index);
-		if (!MuiUpdateConfigObjectCursorCodec.TryGetEntry(ref platform,
-			objectCursor, out var objectSlot)) return false;
+		if (!MuiUpdateConfigObjectVectorMemoryCodec.TryGetEntry(ref platform,
+			objectVector, unchecked((uint)index), out var objectSlot)) return false;
 		var record = default(MuiUpdateConfigObjectSlot);
 		record.Object = redrawObject;
 		if (!MuiUpdateConfigObjectSlotCodec.Write(ref platform, objectSlot,
 			record)) return false;
-		var flagCursor = default(MuiUpdateConfigFlagCursor);
-		flagCursor.Base = APTR.FromPointer(message.Raw +
+		var flagVector = APTR.FromPointer(message.Raw +
 			unchecked((uint)FlagTableOffset));
-		flagCursor.Index = unchecked((uint)index);
-		if (!MuiUpdateConfigFlagCursorCodec.TryGetEntry(ref platform, flagCursor,
-			out var flagSlot)) return false;
+		if (!MuiUpdateConfigFlagVectorMemoryCodec.TryGetEntry(ref platform,
+			flagVector, unchecked((uint)index), out var flagSlot)) return false;
 		var flagRecord = default(MuiUpdateConfigFlagSlot);
 		flagRecord.Value = redrawFlags;
 		return MuiUpdateConfigFlagSlotCodec.Write(ref platform, flagSlot,

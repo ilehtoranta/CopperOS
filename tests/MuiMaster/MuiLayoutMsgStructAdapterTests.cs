@@ -33,7 +33,7 @@ public sealed class MuiLayoutMsgStructAdapterTests
 			},
 		};
 
-		Assert.True(MUI_LayoutMsgCodec.Write(ref platform, address, value));
+		Assert.True(MUI_LayoutMsgCodec.WriteRecord(ref platform, address, value));
 		Assert.True(MUI_LayoutMsgMemoryCodec.TryGetAddress(ref platform, address,
 			MUI_LayoutMsgField.Height, out var heightField, out var heightSize));
 		Assert.Equal(APTR.FromPointer(0x2918), heightField);
@@ -47,11 +47,16 @@ public sealed class MuiLayoutMsgStructAdapterTests
 		Assert.Equal(-8, unchecked((short)minWidth));
 		Assert.True(MUI_LayoutMsgMemoryCodec.TryWriteUInt32(ref platform, address,
 			MUI_LayoutMsgField.Width, 800));
-		Assert.True(MUI_LayoutMsgCodec.TryRead(ref platform, address,
+		Assert.True(MUI_LayoutMsgCodec.TryReadRecord(ref platform, address,
 			out var decoded));
 		Assert.Equal(800, decoded.lm_Layout.Width);
 		Assert.Equal(value.lm_Children, decoded.lm_Children);
 		Assert.Equal(value.lm_MinMax.DefHeight, decoded.lm_MinMax.DefHeight);
+		Assert.True(MUI_LayoutMsgCodec.Write(ref platform, address, value));
+		Assert.True(MUI_LayoutMsgCodec.TryRead(ref platform, address,
+			out _));
+		Assert.False(MUI_LayoutMsgCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FEA), out _));
 		Assert.False(MUI_LayoutMsgMemoryCodec.TryGetAddress(ref platform,
 			APTR.FromPointer(0x30FF0), MUI_LayoutMsgField.Height, out _, out _));
 		Assert.False(MUI_LayoutMsgMemoryCodec.TryGetAddress(ref platform, APTR.Null,

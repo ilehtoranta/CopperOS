@@ -40,4 +40,40 @@ public sealed class MuiWindowEventReuseStructAdapterTests
 		Assert.False(MuiWindowEventReuseStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiWindowEventReuseStateField.Magic, out _));
 	}
+
+	[Fact]
+	public void WindowEventReuseSequentialRecordPreservesPointersAndSignedKey()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3580);
+		var value = new MuiWindowEventReuseStateRecord
+		{
+			Magic = MuiWindowEventReuseStateRecord.Cookie,
+			ContextActive = 1,
+			Pending = 1,
+			EventMessage = APTR.FromPointer(0xFEEDBEEF),
+			InputEvent = APTR.FromPointer(0xCAFEBABE),
+			EventClass = 7,
+			MuiKey = -1,
+		};
+
+		Assert.True(MuiWindowEventReuseStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiWindowEventReuseStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.ContextActive, decoded.ContextActive);
+		Assert.Equal(value.Pending, decoded.Pending);
+		Assert.Equal(value.EventMessage, decoded.EventMessage);
+		Assert.Equal(value.InputEvent, decoded.InputEvent);
+		Assert.Equal(value.EventClass, decoded.EventClass);
+		Assert.Equal(value.MuiKey, decoded.MuiKey);
+
+		var crossingEnd = APTR.FromPointer(0x30FE5);
+		Assert.False(MuiWindowEventReuseStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiWindowEventReuseStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
 }

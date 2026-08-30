@@ -67,7 +67,7 @@ public sealed class MuiWindowControlAdmissionTests
 			IsSubWindow = 0,
 			NeedsMouseObject = 1,
 		};
-		Assert.True(MuiWindowControlStateRecordCodec.Write(ref platform, address,
+		Assert.True(MuiWindowControlStateRecordCodec.WriteRecord(ref platform, address,
 			value));
 		Assert.True(MuiWindowControlStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, 20, out var needsMouse) && needsMouse.Raw == 0x1514u);

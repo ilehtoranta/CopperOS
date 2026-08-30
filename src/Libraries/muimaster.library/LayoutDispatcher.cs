@@ -34,6 +34,12 @@ internal struct MuiLayoutFlagsMessage
 internal struct MuiLayoutTextDimensionsMessage
 {
 	public const uint Size = 20;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint TextOffset = 4;
+	public const uint LengthOffset = 8;
+	public const uint PreParseOffset = 12;
+	public const uint TextFlagsOffset = 16;
 	public uint MethodId;
 	public uint Text;
 	public uint Length;
@@ -96,7 +102,7 @@ public static class MuiLayoutDispatcher
 		{
 			if (!MuiAreaContextMenuMessageCodec.TryReadBuild(ref platform, message,
 				out _)) return 0;
-			return MuiAreaContextMenuMessageCodec.BuildDefault;
+			return MuiAreaContextMenuPacketCore.Build(ref platform, state, obj).Raw;
 		}
 		if (method == MuiAreaContextMenuMessageCodec.Choice)
 		{
@@ -143,8 +149,8 @@ public static class MuiLayoutDispatcher
 				return MuiAreaResizeCore.Init(ref platform, state, obj,
 					initResizePacket.Flags) ? 1u : 0u;
 			case ExitResize:
-				if (!MuiAreaResizeMessageCodec.TryReadExit(ref platform, message,
-					out _)) return 0;
+				if (!MuiAreaResizeMessageCodec.TryReadExitMethod(ref platform,
+					message, out _)) return 0;
 				return MuiAreaResizeCore.Exit(ref platform, state, obj) ? 1u : 0u;
 			case Cleanup:
 				return MuiAreaLayoutCore.Cleanup(ref platform, state, obj) ? 1u : 0u;

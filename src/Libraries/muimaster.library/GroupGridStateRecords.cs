@@ -191,32 +191,67 @@ internal static class MuiGroupGridStateRecordMemoryCodec
 
 internal static class MuiGroupGridStateRecordCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGroupGridStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupGridStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Columns) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Rows) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.HorizontalSpacing) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.VerticalSpacing) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.SameWidth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.SameHeight) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.HorizontalCenter) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.VerticalCenter) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGroupGridStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupGridStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Columns) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Rows) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.HorizontalSpacing) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.VerticalSpacing) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.SameWidth) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.SameHeight) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.HorizontalCenter) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.VerticalCenter)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiGroupGridStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupGridStateField.Magic, out value.Magic) ||
-			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupGridStateField.Columns, out value.Columns) ||
-			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupGridStateField.Rows, out value.Rows) ||
-			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupGridStateField.HorizontalSpacing, out value.HorizontalSpacing) ||
-			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupGridStateField.VerticalSpacing, out value.VerticalSpacing) ||
-			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupGridStateField.SameWidth, out value.SameWidth) ||
-			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupGridStateField.SameHeight, out value.SameHeight) ||
-			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupGridStateField.HorizontalCenter, out value.HorizontalCenter) ||
-			!MuiGroupGridStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupGridStateField.VerticalCenter, out value.VerticalCenter)) return false;
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiGroupGridStateRecord value)
@@ -228,24 +263,7 @@ internal static class MuiGroupGridStateRecordCodec
 		MuiGroupGridStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGroupGridStateAdmission.Validate(value)) return false;
-		return MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupGridStateField.Magic, value.Magic) &&
-			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupGridStateField.Columns, value.Columns) &&
-			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupGridStateField.Rows, value.Rows) &&
-			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupGridStateField.HorizontalSpacing, value.HorizontalSpacing) &&
-			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupGridStateField.VerticalSpacing, value.VerticalSpacing) &&
-			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupGridStateField.SameWidth, value.SameWidth) &&
-			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupGridStateField.SameHeight, value.SameHeight) &&
-			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupGridStateField.HorizontalCenter, value.HorizontalCenter) &&
-			MuiGroupGridStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupGridStateField.VerticalCenter, value.VerticalCenter);
+		return MuiGroupGridStateAdmission.Validate(value) &&
+			WriteRecord(ref platform, address, value);
 	}
 }

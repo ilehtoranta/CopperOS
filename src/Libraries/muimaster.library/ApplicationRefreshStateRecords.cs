@@ -82,9 +82,9 @@ internal static class MuiApplicationRefreshStateFieldCursorCodec
 	}
 }
 
-// Fixed CheckRefresh telemetry is read and written as a named value. Keep the
-// packed guest positions in this ABI adapter; production consumers do not
-// select fields through the compatibility cursor.
+// Fixed CheckRefresh telemetry is transferred as a named record. Numeric guest
+// positions are confined to the bounded ABI adapter; production consumers
+// exchange the declaration-order struct through the sequential cursor below.
 internal static class MuiApplicationRefreshStateRecordMemoryCodec
 {
 	private static bool TryResolve(MuiApplicationRefreshStateField field,
@@ -143,25 +143,40 @@ internal static class MuiApplicationRefreshStateRecordMemoryCodec
 
 internal static class MuiApplicationRefreshStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationRefreshStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationRefreshStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiApplicationRefreshStateField.Magic,
-			out var magic) ||
-			!MuiApplicationRefreshStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationRefreshStateField.Checks,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationRefreshStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.Checks) ||
-			!MuiApplicationRefreshStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationRefreshStateField.RefreshedWindows,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.RefreshedWindows)) return false;
-		value.Magic = magic;
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationRefreshStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationRefreshStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Checks) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.RefreshedWindows) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationRefreshStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationRefreshStateRecord value)
@@ -173,18 +188,8 @@ internal static class MuiApplicationRefreshStateRecordCodec
 		MuiApplicationRefreshStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationRefreshStateRecord.Size) ||
-			!MuiApplicationRefreshStateAdmission.Validate(value)) return false;
-		return MuiApplicationRefreshStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationRefreshStateField.Magic,
-			value.Magic) &&
-			MuiApplicationRefreshStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationRefreshStateField.Checks,
-				value.Checks) &&
-			MuiApplicationRefreshStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationRefreshStateField.RefreshedWindows,
-				value.RefreshedWindows);
+		if (address.IsNull || !MuiApplicationRefreshStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

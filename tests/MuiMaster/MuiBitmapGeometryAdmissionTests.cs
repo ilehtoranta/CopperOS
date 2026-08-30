@@ -67,6 +67,33 @@ public sealed class MuiBitmapGeometryAdmissionTests
 	}
 
 	[Fact]
+	public void BitmapGeometrySequentialRecordPreservesFullUlongRangeAndBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1B40);
+		var value = new MuiBitmapGeometryStateRecord
+		{
+			Magic = MuiBitmapGeometryStateRecord.Cookie,
+			Width = uint.MaxValue,
+			Height = 0xCAFEBABEu,
+		};
+
+		Assert.True(MuiBitmapGeometryStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiBitmapGeometryStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Width, decoded.Width);
+		Assert.Equal(value.Height, decoded.Height);
+
+		var crossingEnd = APTR.FromPointer(0x40FFF);
+		Assert.False(MuiBitmapGeometryStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiBitmapGeometryStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
+
+	[Fact]
 	public void MalformedBitmapGeometryFailsClosedBeforeRawRepairOrSet()
 	{
 		var platform = CreatePlatform(out var bitmapClass);

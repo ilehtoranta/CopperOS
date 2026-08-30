@@ -9,6 +9,7 @@ using Amiga;
 namespace CopperOS.MuiMaster;
 
 // Public semantic view of the object-owned String.mui contents pointer.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringContentsState
 {
 	public APTR Contents;
@@ -150,33 +151,47 @@ internal static class MuiStringContentsStateRecordMemoryCodec
 
 internal static class MuiStringContentsStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiStringContentsStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiStringContentsStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) ||
-			!MuiStringContentsStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out var contents)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringContentsStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var contents) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
 		value.Contents = APTR.FromPointer(contents);
 		return true;
 	}
 
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringContentsStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringContentsStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> TryReadStructural(ref platform, address, out value) &&
+		=> TryReadRecord(ref platform, address, out value) &&
 		MuiStringContentsStateAdmission.Validate(value);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiStringContentsStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStringContentsStateAdmission.Validate(value) &&
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringContentsStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Contents.Raw) && MuiGuestStructCursor.IsComplete(cursor);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringContentsStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiStringContentsStateAdmission.Validate(value)) return false;
-		return MuiStringContentsStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiStringContentsStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 4, value.Contents.Raw);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, value);
 }

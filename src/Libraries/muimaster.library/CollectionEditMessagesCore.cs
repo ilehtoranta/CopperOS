@@ -98,27 +98,22 @@ internal static class MuiCollectionEditMessageMemoryCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiCollectionEditFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			!TryGetPacketSize(cursor.Packet, out var packetSize) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize))
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, MuiCollectionMethodMessage.FieldSize);
-	}
+		=> TryGetAddress(ref platform, cursor.Message, cursor.Packet,
+			cursor.Field, out address);
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCollectionEditPacketKind packet,
 		MuiCollectionEditField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiCollectionEditFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		return TryGetAddress(ref platform, cursor, out address);
+		address = APTR.Null;
+		if (!TryResolve(packet, field, out var offset) ||
+			!TryGetPacketSize(packet, out var packetSize) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, packetSize))
+			return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiCollectionMethodMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -127,11 +122,8 @@ internal static class MuiCollectionEditMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiCollectionEditFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -141,11 +133,8 @@ internal static class MuiCollectionEditMessageMemoryCodec
 		MuiCollectionEditField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiCollectionEditFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -176,6 +165,148 @@ internal static class MuiCollectionEditFieldCursorCodec
 			message, packet, field, value);
 }
 
+// Live List edit packets use declaration-order named structs. Signed row and
+// column LONGs are transported as raw ULONG bit patterns so every 68k value is
+// preserved without an exception or managed conversion path.
+internal static class MuiCollectionEditStructPacketCodec
+{
+	private static bool TryCreate<TPlatform>(ref TPlatform platform,
+		APTR message, uint size, out MuiGuestStructCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, message, size,
+			out cursor);
+
+	internal static bool TryReadCreateEditObject<TPlatform>(
+		ref TPlatform platform, APTR message,
+		out MuiCollectionCreateEditObjectMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!TryCreate(ref platform, message,
+			MuiCollectionCreateEditObjectMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawRow) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawColumn) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Entry) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		packet.Row = unchecked((int)rawRow);
+		packet.Column = unchecked((int)rawColumn);
+		return true;
+	}
+
+	internal static bool TryWriteCreateEditObject<TPlatform>(
+		ref TPlatform platform, APTR message,
+		MuiCollectionCreateEditObjectMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message,
+			MuiCollectionCreateEditObjectMessage.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)packet.Row)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)packet.Column)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Entry) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadEdit<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionEditMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!TryCreate(ref platform, message, MuiCollectionEditMessage.Size,
+			out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawRow) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawColumn) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		packet.Row = unchecked((int)rawRow);
+		packet.Column = unchecked((int)rawColumn);
+		return true;
+	}
+
+	internal static bool TryWriteEdit<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionEditMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionEditMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)packet.Row)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)packet.Column)) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadEditDone<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionEditDoneMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!TryCreate(ref platform, message, MuiCollectionEditDoneMessage.Size,
+			out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawRow) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawColumn) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Entry) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.EditObject) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		packet.Row = unchecked((int)rawRow);
+		packet.Column = unchecked((int)rawColumn);
+		return true;
+	}
+
+	internal static bool TryWriteEditDone<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionEditDoneMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionEditDoneMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)packet.Row)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)packet.Column)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Entry) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.EditObject) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadEndEdit<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionEndEditMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiCollectionEndEditMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Mode) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteEndEdit<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionEndEditMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionEndEditMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Mode) && MuiGuestStructCursor.IsComplete(cursor);
+}
+
 internal static class MuiCollectionEditMessageCodec
 {
 	internal const uint CreateEditObject = 0x804219AEu;
@@ -189,44 +320,21 @@ internal static class MuiCollectionEditMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		uint methodId;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionCreateEditObjectMessage.Size) ||
-			!MuiCollectionBasicMessageCodec.TryReadMethodIdValue(ref platform, message,
-				out methodId) || methodId != CreateEditObject) return false;
-		packet.MethodId = methodId;
-		if (!MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionEditPacketKind.CreateEditObject,
-			MuiCollectionEditField.Row, out var rawRow) ||
-			!MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiCollectionEditPacketKind.CreateEditObject,
-				MuiCollectionEditField.Column, out var rawColumn) ||
-			!MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiCollectionEditPacketKind.CreateEditObject,
-				MuiCollectionEditField.Entry, out packet.Entry)) return false;
-		packet.Row = unchecked((int)rawRow);
-		packet.Column = unchecked((int)rawColumn);
-		return true;
+		return MuiCollectionEditStructPacketCodec.TryReadCreateEditObject(
+			ref platform, message, out packet) && packet.MethodId == CreateEditObject;
 	}
 
 	internal static bool WriteCreateEditObject<TPlatform>(
 		ref TPlatform platform, APTR message, int row, int column, uint entry)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionCreateEditObjectMessage.Size)) return false;
-		return MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionEditPacketKind.CreateEditObject,
-			MuiCollectionEditField.MethodId, CreateEditObject) &&
-			MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiCollectionEditPacketKind.CreateEditObject,
-				MuiCollectionEditField.Row, unchecked((uint)row)) &&
-			MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiCollectionEditPacketKind.CreateEditObject,
-				MuiCollectionEditField.Column, unchecked((uint)column)) &&
-			MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiCollectionEditPacketKind.CreateEditObject,
-				MuiCollectionEditField.Entry, entry);
+		var packet = default(MuiCollectionCreateEditObjectMessage);
+		packet.MethodId = CreateEditObject;
+		packet.Row = row;
+		packet.Column = column;
+		packet.Entry = entry;
+		return MuiCollectionEditStructPacketCodec.TryWriteCreateEditObject(
+			ref platform, message, packet);
 	}
 
 	internal static bool TryReadEdit<TPlatform>(ref TPlatform platform,
@@ -234,45 +342,32 @@ internal static class MuiCollectionEditMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		uint methodId;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionEditMessage.Size) ||
-			!MuiCollectionBasicMessageCodec.TryReadMethodIdValue(ref platform, message,
-				out methodId) || methodId != Edit)
-			return false;
-		packet.MethodId = methodId;
-		if (!MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionEditPacketKind.Edit,
-			MuiCollectionEditField.Row, out var rawRow) ||
-			!MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiCollectionEditPacketKind.Edit,
-				MuiCollectionEditField.Column, out var rawColumn)) return false;
-		packet.Row = unchecked((int)rawRow);
-		packet.Column = unchecked((int)rawColumn);
-		return true;
+		return MuiCollectionEditStructPacketCodec.TryReadEdit(ref platform,
+			message, out packet) && packet.MethodId == Edit;
 	}
 
 	internal static bool WriteEdit<TPlatform>(ref TPlatform platform,
 		APTR message, int row, int column)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionEditMessage.Size)) return false;
-		return MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionEditPacketKind.Edit,
-			MuiCollectionEditField.MethodId, Edit) &&
-			MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiCollectionEditPacketKind.Edit, MuiCollectionEditField.Row,
-				unchecked((uint)row)) &&
-			MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiCollectionEditPacketKind.Edit, MuiCollectionEditField.Column,
-				unchecked((uint)column));
+		var packet = default(MuiCollectionEditMessage);
+		packet.MethodId = Edit;
+		packet.Row = row;
+		packet.Column = column;
+		return MuiCollectionEditStructPacketCodec.TryWriteEdit(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadEditDone<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiCollectionEditDoneMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		if (MuiCollectionEditStructPacketCodec.TryReadEditDone(ref platform,
+			message, out var structural) && structural.MethodId == EditDone)
+		{
+			packet = structural;
+			return true;
+		}
 		packet = default;
 		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
@@ -280,16 +375,16 @@ internal static class MuiCollectionEditMessageCodec
 			!MuiCollectionBasicMessageCodec.TryReadMethodIdValue(ref platform, message,
 				out methodId) || methodId != EditDone) return false;
 		packet.MethodId = methodId;
-		if (!MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiCollectionEditMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionEditPacketKind.EditDone,
 			MuiCollectionEditField.Row, out var rawRow) ||
-			!MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiCollectionEditMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCollectionEditPacketKind.EditDone,
 				MuiCollectionEditField.Column, out var rawColumn) ||
-			!MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiCollectionEditMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCollectionEditPacketKind.EditDone,
 				MuiCollectionEditField.Entry, out packet.Entry) ||
-			!MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiCollectionEditMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCollectionEditPacketKind.EditDone,
 				MuiCollectionEditField.EditObject, out packet.EditObject)) return false;
 		packet.Row = unchecked((int)rawRow);
@@ -301,21 +396,29 @@ internal static class MuiCollectionEditMessageCodec
 		APTR message, int row, int column, uint entry, uint editObject)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var structural = default(MuiCollectionEditDoneMessage);
+		structural.MethodId = EditDone;
+		structural.Row = row;
+		structural.Column = column;
+		structural.Entry = entry;
+		structural.EditObject = editObject;
+		if (MuiCollectionEditStructPacketCodec.TryWriteEditDone(ref platform,
+			message, structural)) return true;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionEditDoneMessage.Size)) return false;
-		return MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiCollectionEditPacketKind.EditDone,
 			MuiCollectionEditField.MethodId, EditDone) &&
-			MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiCollectionEditPacketKind.EditDone, MuiCollectionEditField.Row,
 				unchecked((uint)row)) &&
-			MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiCollectionEditPacketKind.EditDone, MuiCollectionEditField.Column,
 				unchecked((uint)column)) &&
-			MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiCollectionEditPacketKind.EditDone, MuiCollectionEditField.Entry,
 				entry) &&
-			MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiCollectionEditPacketKind.EditDone,
 				MuiCollectionEditField.EditObject, editObject);
 	}
@@ -324,6 +427,12 @@ internal static class MuiCollectionEditMessageCodec
 		APTR message, out MuiCollectionEndEditMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		if (MuiCollectionEditStructPacketCodec.TryReadEndEdit(ref platform,
+			message, out var structural) && structural.MethodId == EndEdit)
+		{
+			packet = structural;
+			return true;
+		}
 		packet = default;
 		uint methodId;
 		if (message.IsNull || !platform.IsMapped(message,
@@ -331,7 +440,7 @@ internal static class MuiCollectionEditMessageCodec
 			!MuiCollectionBasicMessageCodec.TryReadMethodIdValue(ref platform, message,
 				out methodId) || methodId != EndEdit) return false;
 		packet.MethodId = methodId;
-		return MuiCollectionEditFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiCollectionEditMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiCollectionEditPacketKind.EndEdit,
 			MuiCollectionEditField.Mode, out packet.Mode);
 	}
@@ -340,12 +449,17 @@ internal static class MuiCollectionEditMessageCodec
 		APTR message, uint mode)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var structural = default(MuiCollectionEndEditMessage);
+		structural.MethodId = EndEdit;
+		structural.Mode = mode;
+		if (MuiCollectionEditStructPacketCodec.TryWriteEndEdit(ref platform,
+			message, structural)) return true;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiCollectionEndEditMessage.Size)) return false;
-		return MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiCollectionEditPacketKind.EndEdit,
 			MuiCollectionEditField.MethodId, EndEdit) &&
-			MuiCollectionEditFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiCollectionEditMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiCollectionEditPacketKind.EndEdit, MuiCollectionEditField.Mode,
 				mode);
 	}

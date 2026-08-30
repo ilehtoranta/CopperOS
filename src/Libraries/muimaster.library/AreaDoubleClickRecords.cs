@@ -149,24 +149,40 @@ internal static class MuiAreaDoubleClickStateRecordMemoryCodec
 
 internal static class MuiAreaDoubleClickStateRecordCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaDoubleClickStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaDoubleClickStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawValue) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Generation)) return false;
+		value.Value = unchecked((int)rawValue);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaDoubleClickStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaDoubleClickStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Value)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Generation) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiAreaDoubleClickStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (!MuiAreaDoubleClickStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiAreaDoubleClickStateField.Magic,
-			out value.Magic) ||
-			!MuiAreaDoubleClickStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiAreaDoubleClickStateField.Value,
-				out var rawValue) ||
-			!MuiAreaDoubleClickStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiAreaDoubleClickStateField.Generation,
-				out value.Generation)) return false;
-		value.Value = unchecked((int)rawValue);
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAreaDoubleClickStateRecord value)
@@ -176,18 +192,10 @@ internal static class MuiAreaDoubleClickStateRecordCodec
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaDoubleClickStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaDoubleClickStateRecord.Size) || value.Magic !=
-			MuiAreaDoubleClickStateRecord.Cookie ||
-			!MuiAreaDoubleClickStateAdmission.Validate(value)) return false;
-		return MuiAreaDoubleClickStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiAreaDoubleClickStateField.Magic, value.Magic) &&
-			MuiAreaDoubleClickStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaDoubleClickStateField.Value,
-				unchecked((uint)value.Value)) &&
-			MuiAreaDoubleClickStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaDoubleClickStateField.Generation, value.Generation);
+		if (address.IsNull || !MuiAreaDoubleClickStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

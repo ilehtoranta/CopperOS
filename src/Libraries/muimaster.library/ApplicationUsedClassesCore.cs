@@ -23,6 +23,8 @@ internal struct MuiApplicationUsedClassesVectorCursor
 internal struct MuiApplicationUsedClassesVectorEntry
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint NameOffset = 0;
 	internal APTR Name;
 }
 
@@ -38,29 +40,35 @@ internal struct MuiApplicationUsedClassesVectorEntryFieldCursor
 	internal MuiApplicationUsedClassesVectorEntryField Field;
 }
 
-internal static class MuiApplicationUsedClassesVectorEntryFieldCursorCodec
+// Struct-first guest-memory adapter for one caller-owned UsedClasses slot.
+// The NULL-terminated vector walker remains separate; this codec owns the
+// complete 4-byte entry admission and named Name field translation.
+internal static class MuiApplicationUsedClassesVectorEntryMemoryCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiApplicationUsedClassesVectorEntryFieldCursor cursor, out APTR address)
+		APTR record, MuiApplicationUsedClassesVectorEntryField field,
+		out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (cursor.Field != MuiApplicationUsedClassesVectorEntryField.Name ||
-			cursor.Record.IsNull || !platform.IsMapped(cursor.Record,
-				MuiApplicationUsedClassesVectorEntry.Size)) return false;
-		address = cursor.Record;
-		return true;
+		if (field != MuiApplicationUsedClassesVectorEntryField.Name ||
+			record.IsNull || record.Raw > uint.MaxValue -
+			MuiApplicationUsedClassesVectorEntry.NameOffset ||
+			!platform.IsMapped(record, MuiApplicationUsedClassesVectorEntry.Size))
+			return false;
+		address = APTR.FromPointer(record.Raw +
+			MuiApplicationUsedClassesVectorEntry.NameOffset);
+		return platform.IsMapped(address,
+			MuiApplicationUsedClassesVectorEntry.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
-		APTR record, MuiApplicationUsedClassesVectorEntryField field, out uint value)
+		APTR record, MuiApplicationUsedClassesVectorEntryField field,
+		out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiApplicationUsedClassesVectorEntryFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -69,13 +77,32 @@ internal static class MuiApplicationUsedClassesVectorEntryFieldCursorCodec
 		APTR record, MuiApplicationUsedClassesVectorEntryField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationUsedClassesVectorEntryFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for existing typed cursor diagnostics.
+internal static class MuiApplicationUsedClassesVectorEntryFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiApplicationUsedClassesVectorEntryFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationUsedClassesVectorEntryMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationUsedClassesVectorEntryField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationUsedClassesVectorEntryMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiApplicationUsedClassesVectorEntryField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationUsedClassesVectorEntryMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
 }
 
 internal static class MuiApplicationUsedClassesVectorEntryCodec
@@ -85,7 +112,7 @@ internal static class MuiApplicationUsedClassesVectorEntryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationUsedClassesVectorEntryFieldCursorCodec.TryReadUInt32(
+		if (!MuiApplicationUsedClassesVectorEntryMemoryCodec.TryReadUInt32(
 			ref platform, address,
 			MuiApplicationUsedClassesVectorEntryField.Name, out var name)) return false;
 		value.Name = APTR.FromPointer(name);
@@ -96,7 +123,7 @@ internal static class MuiApplicationUsedClassesVectorEntryCodec
 		APTR address, MuiApplicationUsedClassesVectorEntry value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiApplicationUsedClassesVectorEntryFieldCursorCodec.TryWriteUInt32(
+		return MuiApplicationUsedClassesVectorEntryMemoryCodec.TryWriteUInt32(
 			ref platform, address,
 			MuiApplicationUsedClassesVectorEntryField.Name, value.Name.Raw);
 	}
@@ -107,19 +134,37 @@ internal static class MuiApplicationUsedClassesVectorCodec
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiApplicationUsedClassesVectorCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
+		=> MuiApplicationUsedClassesVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out address);
+
+	internal static bool TryValidate<TPlatform>(ref TPlatform platform,
+		APTR vector) where TPlatform : struct, IMuiGuestMemory
+		=> MuiApplicationUsedClassesVectorMemoryCodec.TryValidate(ref platform,
+			vector);
+}
+
+// Struct-first guest-memory adapter for indexed UsedClasses pointer vectors.
+// The complete 4-byte named entry is admitted before its STRPTR field is
+// decoded; cursor callers continue through the compatibility codec above.
+internal static class MuiApplicationUsedClassesVectorMemoryCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiApplicationUsedClassesVectorCursor.EntrySize) return false;
-		var offset = cursor.Index *
-			MuiApplicationUsedClassesVectorCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
+		if (vector.IsNull || index >
+			(uint.MaxValue - vector.Raw) / MuiApplicationUsedClassesVectorEntry.Size)
+			return false;
+		var offset = index * MuiApplicationUsedClassesVectorEntry.Size;
+		if (vector.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(vector.Raw + offset);
 		return platform.IsMapped(address,
-			MuiApplicationUsedClassesVectorCursor.EntrySize);
+			MuiApplicationUsedClassesVectorEntry.Size);
 	}
 
+	// Validate the complete caller-owned NULL-terminated vector while keeping
+	// entry addressing and bounds in this struct-backed memory adapter.
 	internal static bool TryValidate<TPlatform>(ref TPlatform platform,
 		APTR vector) where TPlatform : struct, IMuiGuestMemory
 	{
@@ -128,7 +173,8 @@ internal static class MuiApplicationUsedClassesVectorCodec
 		cursor.Base = vector;
 		while (cursor.Index < MuiHeadlessLayout.MaximumTraversal)
 		{
-			if (!TryGetEntry(ref platform, cursor, out var slot)) return false;
+			if (!TryGetEntry(ref platform, cursor.Base, cursor.Index,
+				out var slot)) return false;
 			if (!MuiApplicationUsedClassesVectorEntryCodec.TryRead(ref platform,
 				slot, out var entryValue)) return false;
 			var entry = entryValue.Name;

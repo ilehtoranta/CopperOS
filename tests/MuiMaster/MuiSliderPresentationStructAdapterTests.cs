@@ -18,7 +18,7 @@ public sealed class MuiSliderPresentationStructAdapterTests
 			Quiet = 1,
 		};
 
-		Assert.True(MuiSliderPresentationStateRecordCodec.Write(ref platform,
+		Assert.True(MuiSliderPresentationStateRecordCodec.WriteRecord(ref platform,
 			address, value));
 		Assert.True(MuiSliderPresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiSliderPresentationStateField.Quiet,
@@ -26,7 +26,7 @@ public sealed class MuiSliderPresentationStructAdapterTests
 		Assert.Equal(0x3508u, quietAddress.Raw);
 		Assert.True(MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiSliderPresentationStateField.Horizontal, 0));
-		Assert.True(MuiSliderPresentationStateRecordCodec.TryReadStructural(
+		Assert.True(MuiSliderPresentationStateRecordCodec.TryReadRecord(
 			ref platform, address, out var decoded));
 		Assert.Equal(0u, decoded.Horizontal);
 		Assert.Equal(1u, decoded.Quiet);

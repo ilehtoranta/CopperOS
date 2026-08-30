@@ -181,36 +181,59 @@ internal static class MuiWindowEventReuseStateRecordMemoryCodec
 
 internal static class MuiWindowEventReuseStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiWindowEventReuseStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiWindowEventReuseStateField.Magic, out var magic) ||
-			!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiWindowEventReuseStateField.ContextActive,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWindowEventReuseStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.ContextActive) ||
-			!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiWindowEventReuseStateField.Pending, out value.Pending) ||
-			!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiWindowEventReuseStateField.EventMessage,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Pending) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var eventMessage) ||
-			!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiWindowEventReuseStateField.InputEvent,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var inputEvent) ||
-			!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiWindowEventReuseStateField.EventClass,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.EventClass) ||
-			!MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiWindowEventReuseStateField.MuiKey, out var muiKey)) return false;
-		value.Magic = magic;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var muiKey)) return false;
 		value.EventMessage = APTR.FromPointer(eventMessage);
 		value.InputEvent = APTR.FromPointer(inputEvent);
 		value.MuiKey = unchecked((int)muiKey);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiWindowEventReuseStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWindowEventReuseStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ContextActive) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Pending) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.EventMessage.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.InputEvent.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.EventClass) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.MuiKey)) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiWindowEventReuseStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiWindowEventReuseStateRecord value)
@@ -222,27 +245,9 @@ internal static class MuiWindowEventReuseStateRecordCodec
 		MuiWindowEventReuseStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiWindowEventReuseStateAdmission.Validate(ref platform, value))
+		if (address.IsNull || !MuiWindowEventReuseStateAdmission.Validate(ref platform,
+			value))
 			return false;
-		return MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiWindowEventReuseStateField.Magic, value.Magic) &&
-			MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiWindowEventReuseStateField.ContextActive,
-				value.ContextActive) &&
-			MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiWindowEventReuseStateField.Pending,
-				value.Pending) &&
-			MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiWindowEventReuseStateField.EventMessage,
-				value.EventMessage.Raw) &&
-			MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiWindowEventReuseStateField.InputEvent,
-				value.InputEvent.Raw) &&
-			MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiWindowEventReuseStateField.EventClass,
-				value.EventClass) &&
-			MuiWindowEventReuseStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiWindowEventReuseStateField.MuiKey,
-				unchecked((uint)value.MuiKey));
+		return WriteRecord(ref platform, address, value);
 	}
 }

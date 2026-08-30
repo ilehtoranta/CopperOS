@@ -10,8 +10,8 @@
     <NoWarn>1591</NoWarn>
     <CheckForOverflowUnderflow>false</CheckForOverflowUnderflow>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(CopperOSUseLocalCopperSharp)' == 'true'">
-    <DefineConstants>$(DefineConstants);COPPEROS_LOCAL_SDK</DefineConstants>
+  <PropertyGroup Condition="'$(CopperSharpSdkHasMuiLayoutPackets)' == 'true' or ('$(CopperOSUseLocalCopperSharp)' == 'true' and Exists('$(CopperSharp68kRoot)\Sdk.Amiga\CopperSharp.Sdk.Amiga.csproj'))">
+    <DefineConstants>$(DefineConstants);COPPEROS_SDK_MUI_LAYOUT</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\..\..\CopperSharp68k\Sdk.Amiga\GuestMemory\IAmigaGuestMemory.cs" Link="GuestMemory\IAmigaGuestMemory.cs" />

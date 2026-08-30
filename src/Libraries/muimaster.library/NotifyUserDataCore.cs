@@ -16,6 +16,9 @@ namespace CopperOS.MuiMaster;
 internal struct MuiFindUDataMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint UserDataOffset = 4;
 	public uint MethodId;
 	public uint UserData;
 }
@@ -24,6 +27,11 @@ internal struct MuiFindUDataMessage
 internal struct MuiGetUDataMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint UserDataOffset = 4;
+	public const uint AttributeOffset = 8;
+	public const uint StorageOffset = 12;
 	public uint MethodId;
 	public uint UserData;
 	public uint Attribute;
@@ -34,6 +42,11 @@ internal struct MuiGetUDataMessage
 internal struct MuiSetUDataMessage
 {
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint UserDataOffset = 4;
+	public const uint AttributeOffset = 8;
+	public const uint ValueOffset = 12;
 	public uint MethodId;
 	public uint UserData;
 	public uint Attribute;
@@ -44,6 +57,8 @@ internal struct MuiSetUDataMessage
 internal struct MuiNotifyUserDataMethodMessage
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
 
@@ -71,28 +86,35 @@ internal struct MuiNotifyUserDataPacketFieldCursor
 	internal MuiNotifyUserDataPacketField Field;
 }
 
-internal static class MuiNotifyUserDataPacketFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed Find/Get/Set envelopes.
+// Packet-specific record constants own the wire layout; callers select named
+// fields rather than carrying numeric offsets through the dispatcher.
+internal static class MuiNotifyUserDataPacketMemoryCodec
 {
 	private static bool TryResolve(MuiNotifyUserDataPacketKind packet,
-		MuiNotifyUserDataPacketField field, out uint offset)
+		MuiNotifyUserDataPacketField field, out uint size, out uint offset)
 	{
+		size = 0;
 		switch (packet)
 		{
 			case MuiNotifyUserDataPacketKind.Find:
-				if (field == MuiNotifyUserDataPacketField.MethodId) { offset = 0; return true; }
-				if (field == MuiNotifyUserDataPacketField.UserData) { offset = 4; return true; }
+				size = MuiFindUDataMessage.Size;
+				if (field == MuiNotifyUserDataPacketField.MethodId) { offset = MuiFindUDataMessage.MethodIdOffset; return true; }
+				if (field == MuiNotifyUserDataPacketField.UserData) { offset = MuiFindUDataMessage.UserDataOffset; return true; }
 				break;
 			case MuiNotifyUserDataPacketKind.Get:
-				if (field == MuiNotifyUserDataPacketField.MethodId) { offset = 0; return true; }
-				if (field == MuiNotifyUserDataPacketField.UserData) { offset = 4; return true; }
-				if (field == MuiNotifyUserDataPacketField.Attribute) { offset = 8; return true; }
-				if (field == MuiNotifyUserDataPacketField.Storage) { offset = 12; return true; }
+				size = MuiGetUDataMessage.Size;
+				if (field == MuiNotifyUserDataPacketField.MethodId) { offset = MuiGetUDataMessage.MethodIdOffset; return true; }
+				if (field == MuiNotifyUserDataPacketField.UserData) { offset = MuiGetUDataMessage.UserDataOffset; return true; }
+				if (field == MuiNotifyUserDataPacketField.Attribute) { offset = MuiGetUDataMessage.AttributeOffset; return true; }
+				if (field == MuiNotifyUserDataPacketField.Storage) { offset = MuiGetUDataMessage.StorageOffset; return true; }
 				break;
 			case MuiNotifyUserDataPacketKind.Set:
-				if (field == MuiNotifyUserDataPacketField.MethodId) { offset = 0; return true; }
-				if (field == MuiNotifyUserDataPacketField.UserData) { offset = 4; return true; }
-				if (field == MuiNotifyUserDataPacketField.Attribute) { offset = 8; return true; }
-				if (field == MuiNotifyUserDataPacketField.Value) { offset = 12; return true; }
+				size = MuiSetUDataMessage.Size;
+				if (field == MuiNotifyUserDataPacketField.MethodId) { offset = MuiSetUDataMessage.MethodIdOffset; return true; }
+				if (field == MuiNotifyUserDataPacketField.UserData) { offset = MuiSetUDataMessage.UserDataOffset; return true; }
+				if (field == MuiNotifyUserDataPacketField.Attribute) { offset = MuiSetUDataMessage.AttributeOffset; return true; }
+				if (field == MuiNotifyUserDataPacketField.Value) { offset = MuiSetUDataMessage.ValueOffset; return true; }
 				break;
 		}
 		offset = 0;
@@ -100,15 +122,17 @@ internal static class MuiNotifyUserDataPacketFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiNotifyUserDataPacketFieldCursor cursor, out APTR address)
+		APTR message, MuiNotifyUserDataPacketKind packet,
+		MuiNotifyUserDataPacketField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset)
+		if (!TryResolve(packet, field, out var size, out var offset) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, size))
 			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiFindUDataMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -117,11 +141,7 @@ internal static class MuiNotifyUserDataPacketFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiNotifyUserDataPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -131,14 +151,34 @@ internal static class MuiNotifyUserDataPacketFieldCursorCodec
 		MuiNotifyUserDataPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiNotifyUserDataPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for existing typed cursor diagnostics.
+internal static class MuiNotifyUserDataPacketFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiNotifyUserDataPacketFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiNotifyUserDataPacketMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Packet, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiNotifyUserDataPacketKind packet,
+		MuiNotifyUserDataPacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiNotifyUserDataPacketMemoryCodec.TryReadUInt32(ref platform, message,
+			packet, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiNotifyUserDataPacketKind packet,
+		MuiNotifyUserDataPacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiNotifyUserDataPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+			packet, field, value);
 }
 
 internal static class MuiNotifyUserDataMessageCodec
@@ -164,9 +204,115 @@ internal static class MuiNotifyUserDataMessageCodec
 		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiNotifyUserDataMethodMessage.Size)) return false;
-		return MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiNotifyUserDataPacketKind.Find,
-			MuiNotifyUserDataPacketField.MethodId, out methodId);
+		methodId = platform.ReadUInt32(message,
+			unchecked((int)MuiNotifyUserDataMethodMessage.MethodIdOffset));
+		return true;
+	}
+}
+
+internal static class MuiFindUDataMessageCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiFindUDataMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiFindUDataMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.UserData)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiFindUDataMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiFindUDataMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.UserData)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+internal static class MuiGetUDataMessageCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiGetUDataMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGetUDataMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.UserData) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Attribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Storage)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiGetUDataMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGetUDataMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.UserData) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Attribute) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Storage)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+internal static class MuiSetUDataMessageCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiSetUDataMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiSetUDataMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.UserData) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Attribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiSetUDataMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiSetUDataMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.UserData) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Attribute) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -174,6 +320,9 @@ internal static class MuiNotifyUserDataMessageCodec
 internal struct MuiUDataTraversalFrame
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint ObjectOffset = 0;
+	public const uint NextChildOffset = 4;
 	public APTR Object;
 	public uint NextChild;
 }
@@ -182,6 +331,7 @@ internal struct MuiUDataTraversalFrame
 internal struct MuiUDataTraversalCursor
 {
 	internal const uint EntrySize = MuiUDataTraversalFrame.Size;
+	internal const uint MaximumEntries = 256;
 	internal APTR Base;
 	internal uint Index;
 }
@@ -199,26 +349,30 @@ internal struct MuiUDataTraversalFieldCursor
 	internal MuiUDataTraversalField Field;
 }
 
-internal static class MuiUDataTraversalFieldCursorCodec
+// Struct-first guest-memory adapter for one traversal frame.  The stack
+// vector selects records; this codec owns the complete frame admission and
+// named Object/NextChild field translation.
+internal static class MuiUDataTraversalFrameMemoryCodec
 {
 	private static bool TryResolve(MuiUDataTraversalField field,
 		out uint offset)
 	{
-		if (field == MuiUDataTraversalField.Object) { offset = 0; return true; }
-		if (field == MuiUDataTraversalField.NextChild) { offset = 4; return true; }
+		if (field == MuiUDataTraversalField.Object) { offset = MuiUDataTraversalFrame.ObjectOffset; return true; }
+		if (field == MuiUDataTraversalField.NextChild) { offset = MuiUDataTraversalFrame.NextChildOffset; return true; }
 		offset = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiUDataTraversalFieldCursor cursor, out APTR address)
+		APTR frame, MuiUDataTraversalField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Frame.IsNull ||
-			cursor.Frame.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Frame.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || frame.IsNull ||
+			frame.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(frame, MuiUDataTraversalFrame.Size)) return false;
+		address = APTR.FromPointer(frame.Raw + offset);
+		return platform.IsMapped(address, MuiUDataTraversalFrame.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -226,10 +380,7 @@ internal static class MuiUDataTraversalFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiUDataTraversalFieldCursor);
-		cursor.Frame = frame;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, frame, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -238,12 +389,51 @@ internal static class MuiUDataTraversalFieldCursorCodec
 		APTR frame, MuiUDataTraversalField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiUDataTraversalFieldCursor);
-		cursor.Frame = frame;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, frame, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
+	}
+}
+
+// Compatibility wrapper retained for existing typed cursor diagnostics.
+internal static class MuiUDataTraversalFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiUDataTraversalFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiUDataTraversalFrameMemoryCodec.TryGetAddress(ref platform,
+			cursor.Frame, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR frame, MuiUDataTraversalField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiUDataTraversalFrameMemoryCodec.TryReadUInt32(ref platform, frame, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR frame, MuiUDataTraversalField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiUDataTraversalFrameMemoryCodec.TryWriteUInt32(ref platform, frame, field,
+			value);
+}
+
+// Struct-first guest-memory adapter for the bounded traversal-frame stack.
+// Complete named frames and the 256-level MorphOS traversal bound are
+// admitted here; the typed cursor remains a compatibility wrapper.
+internal static class MuiUDataTraversalFrameVectorMemoryCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (vector.IsNull || index >= MuiUDataTraversalCursor.MaximumEntries ||
+			index > (uint.MaxValue - vector.Raw) /
+			MuiUDataTraversalFrame.Size) return false;
+		var offset = index * MuiUDataTraversalFrame.Size;
+		if (vector.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(vector.Raw + offset);
+		return platform.IsMapped(address, MuiUDataTraversalFrame.Size);
 	}
 }
 
@@ -252,18 +442,9 @@ internal static class MuiUDataTraversalFrameCodec
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiUDataTraversalCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiUDataTraversalCursor.EntrySize) return false;
-		var offset = cursor.Index * MuiUDataTraversalCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
-		return platform.IsMapped(address,
-			MuiUDataTraversalCursor.EntrySize);
+		=> MuiUDataTraversalFrameVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out address);
 	}
-}
 
 internal static class MuiNotifyUserDataRecords
 {
@@ -273,9 +454,9 @@ internal static class MuiNotifyUserDataRecords
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiUDataTraversalFrame.Size)) return false;
-		if (!MuiUDataTraversalFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiUDataTraversalFrameMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiUDataTraversalField.Object, out var rawObject) ||
-			!MuiUDataTraversalFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiUDataTraversalFrameMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiUDataTraversalField.NextChild, out frame.NextChild)) return false;
 		frame.Object = APTR.FromPointer(rawObject);
 		return true;
@@ -287,9 +468,9 @@ internal static class MuiNotifyUserDataRecords
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiUDataTraversalFrame.Size)) return false;
-		return MuiUDataTraversalFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiUDataTraversalFrameMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiUDataTraversalField.Object, frame.Object.Raw) &&
-			MuiUDataTraversalFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiUDataTraversalFrameMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiUDataTraversalField.NextChild, frame.NextChild);
 	}
 }
@@ -431,15 +612,12 @@ internal static class MuiNotifyUserDataCore
 		APTR message, uint method, out MuiFindUDataMessage packet)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		packet = default;
-		uint methodId;
-		if (message.IsNull || !platform.IsMapped(message, MuiFindUDataMessage.Size) ||
-			!MuiNotifyUserDataMessageCodec.TryReadMethodIdValue(ref platform, message,
-				out methodId) || methodId != method) return false;
-		if (!MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiNotifyUserDataPacketKind.Find,
-			MuiNotifyUserDataPacketField.UserData, out packet.UserData)) return false;
-		packet.MethodId = methodId;
+		if (!MuiFindUDataMessageCodec.TryRead(ref platform, message,
+			out packet) || packet.MethodId != method)
+		{
+			packet = default;
+			return false;
+		}
 		return true;
 	}
 
@@ -447,21 +625,12 @@ internal static class MuiNotifyUserDataCore
 		APTR message, uint method, out MuiGetUDataMessage packet)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		packet = default;
-		uint methodId;
-		if (message.IsNull || !platform.IsMapped(message, MuiGetUDataMessage.Size) ||
-			!MuiNotifyUserDataMessageCodec.TryReadMethodIdValue(ref platform, message,
-				out methodId) || methodId != method) return false;
-		if (!MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiNotifyUserDataPacketKind.Get,
-			MuiNotifyUserDataPacketField.UserData, out packet.UserData) ||
-			!MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiNotifyUserDataPacketKind.Get,
-				MuiNotifyUserDataPacketField.Attribute, out packet.Attribute) ||
-			!MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiNotifyUserDataPacketKind.Get,
-				MuiNotifyUserDataPacketField.Storage, out packet.Storage)) return false;
-		packet.MethodId = methodId;
+		if (!MuiGetUDataMessageCodec.TryRead(ref platform, message,
+			out packet) || packet.MethodId != method)
+		{
+			packet = default;
+			return false;
+		}
 		return true;
 	}
 
@@ -469,21 +638,12 @@ internal static class MuiNotifyUserDataCore
 		APTR message, uint method, out MuiSetUDataMessage packet)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		packet = default;
-		uint methodId;
-		if (message.IsNull || !platform.IsMapped(message, MuiSetUDataMessage.Size) ||
-			!MuiNotifyUserDataMessageCodec.TryReadMethodIdValue(ref platform, message,
-				out methodId) || methodId != method) return false;
-		if (!MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiNotifyUserDataPacketKind.Set,
-			MuiNotifyUserDataPacketField.UserData, out packet.UserData) ||
-			!MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiNotifyUserDataPacketKind.Set,
-				MuiNotifyUserDataPacketField.Attribute, out packet.Attribute) ||
-			!MuiNotifyUserDataPacketFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiNotifyUserDataPacketKind.Set,
-				MuiNotifyUserDataPacketField.Value, out packet.Value)) return false;
-		packet.MethodId = methodId;
+		if (!MuiSetUDataMessageCodec.TryRead(ref platform, message,
+			out packet) || packet.MethodId != method)
+		{
+			packet = default;
+			return false;
+		}
 		return true;
 	}
 
@@ -513,11 +673,8 @@ internal static class MuiNotifyUserDataCore
 		current = APTR.Null;
 		nextChild = 0;
 		if (depth == 0 || depth > MaximumDepth) return false;
-		var cursor = default(MuiUDataTraversalCursor);
-		cursor.Base = stack;
-		cursor.Index = depth - 1;
-		if (!MuiUDataTraversalFrameCodec.TryGetEntry(ref platform, cursor,
-			out var frame)) return false;
+		if (!MuiUDataTraversalFrameVectorMemoryCodec.TryGetEntry(ref platform,
+			stack, depth - 1, out var frame)) return false;
 		var frameRecord = default(MuiUDataTraversalFrame);
 		if (!MuiNotifyUserDataRecords.TryReadFrame(ref platform, frame,
 			ref frameRecord)) return false;
@@ -543,11 +700,8 @@ internal static class MuiNotifyUserDataCore
 		if (depth >= MaximumDepth || nextChild == uint.MaxValue) return false;
 		if (!MuiNotifyUserDataRecords.WriteFrame(ref platform, frame,
 			CreateFrame(current, nextChild + 1))) return false;
-		var cursor = default(MuiUDataTraversalCursor);
-		cursor.Base = stack;
-		cursor.Index = depth;
-		if (!MuiUDataTraversalFrameCodec.TryGetEntry(ref platform, cursor,
-			out var childFrame)) return false;
+		if (!MuiUDataTraversalFrameVectorMemoryCodec.TryGetEntry(ref platform,
+			stack, depth, out var childFrame)) return false;
 		if (!MuiNotifyUserDataRecords.WriteFrame(ref platform, childFrame,
 			CreateFrame(child, NotVisited))) return false;
 		depth++;

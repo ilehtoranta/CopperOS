@@ -44,6 +44,56 @@ public sealed class MuiPropAdmissionTests
 	}
 
 	[Fact]
+	public void PropPolicySequentialRecordPreservesSignedFactorAndPolicyBits()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1500);
+		var expected = new MuiPropPolicyStateRecord
+		{
+			Magic = MuiPropPolicyStateRecord.Cookie,
+			Horizontal = 1,
+			DeltaFactor = unchecked((uint)-2),
+			Slider = 1,
+			UseWinBorder = 2,
+		};
+		Assert.True(MuiPropPolicyStateRecordCodec.WriteRecord(ref platform,
+			address, expected));
+		Assert.True(MuiPropPolicyStateRecordCodec.TryReadRecord(ref platform,
+			address, out var actual));
+		Assert.Equal(expected.Magic, actual.Magic);
+		Assert.Equal(expected.Horizontal, actual.Horizontal);
+		Assert.Equal(expected.DeltaFactor, actual.DeltaFactor);
+		Assert.Equal(expected.Slider, actual.Slider);
+		Assert.Equal(expected.UseWinBorder, actual.UseWinBorder);
+		Assert.False(MuiPropPolicyStateRecordCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x20FFC), out _));
+	}
+
+	[Fact]
+	public void PropRangeSequentialRecordPreservesLongRangeAndBounds()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1530);
+		var expected = new MuiPropRangeStateRecord
+		{
+			Magic = MuiPropRangeStateRecord.Cookie,
+			Entries = 100,
+			Visible = 10,
+			First = 5,
+		};
+		Assert.True(MuiPropRangeStateRecordCodec.WriteRecord(ref platform,
+			address, expected));
+		Assert.True(MuiPropRangeStateRecordCodec.TryReadRecord(ref platform,
+			address, out var actual));
+		Assert.Equal(expected.Magic, actual.Magic);
+		Assert.Equal(expected.Entries, actual.Entries);
+		Assert.Equal(expected.Visible, actual.Visible);
+		Assert.Equal(expected.First, actual.First);
+		Assert.False(MuiPropRangeStateRecordCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x20FFC), out _));
+	}
+
+	[Fact]
 	public void MalformedPropMagicRemainsStructuralButFailsClosed()
 	{
 		var platform = CreatePlatform();

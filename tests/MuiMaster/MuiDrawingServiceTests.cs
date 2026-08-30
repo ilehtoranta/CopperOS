@@ -66,6 +66,152 @@ public sealed class MuiDrawingServiceTests
 	}
 
 	[Fact]
+	public void DrawingRecordMemoryAdapterOwnsNamedStructBounds()
+	{
+		var platform = NewInitializedPlatform();
+		var state = APTR.FromPointer(0x1800);
+		var clip = APTR.FromPointer(0x1900);
+		var renderInfo = APTR.FromPointer(0x1A00);
+		var rasterPort = APTR.FromPointer(0x1B00);
+
+		Assert.True(MuiDrawingRecordMemoryCodec.TryGetAddress(ref platform, state,
+			MuiDrawingRecordKind.State, MuiDrawingRecordField.PenHead,
+			out var penHead));
+		Assert.Equal(APTR.FromPointer(0x180C), penHead);
+		Assert.True(MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, clip,
+			MuiDrawingRecordKind.Clip, MuiDrawingRecordField.Token, 0x12345678u));
+		Assert.True(MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, clip,
+			MuiDrawingRecordKind.Clip, MuiDrawingRecordField.Token, out var token));
+		Assert.Equal(0x12345678u, token);
+		Assert.True(MuiDrawingRecordMemoryCodec.TryGetAddress(ref platform,
+			renderInfo, MuiDrawingRecordKind.RenderInfo,
+			MuiDrawingRecordField.Flags, out var flags));
+		Assert.Equal(APTR.FromPointer(0x1A18), flags);
+		Assert.True(MuiDrawingRecordMemoryCodec.TryGetAddress(ref platform,
+			rasterPort, MuiDrawingRecordKind.RasterPort,
+			MuiDrawingRecordField.Layer, out var layer));
+		Assert.Equal(rasterPort, layer);
+
+		Assert.False(MuiDrawingRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20FF0), MuiDrawingRecordKind.RenderInfo,
+			MuiDrawingRecordField.Flags, out _));
+		Assert.False(MuiDrawingRecordMemoryCodec.TryGetAddress(ref platform, state,
+			(MuiDrawingRecordKind)255, MuiDrawingRecordField.PenHead, out _));
+		Assert.False(MuiDrawingRecordMemoryCodec.TryGetAddress(ref platform, state,
+			MuiDrawingRecordKind.State, (MuiDrawingRecordField)255, out _));
+	}
+
+	[Fact]
+	public void DrawingRefreshCodecUsesNamedRecordAdapter()
+	{
+		var platform = NewInitializedPlatform();
+		var address = APTR.FromPointer(0x1C00);
+		var value = new MuiDrawingRefreshRecord
+		{
+			Next = APTR.FromPointer(0x1D00),
+			RenderInfo = Mri,
+			Layer = Layer,
+			SavedFlags = 0xA5A5A5A5u,
+		};
+
+		Assert.True(MuiDrawingRefreshCodec.Write(ref platform, address, value));
+		Assert.True(MuiDrawingRefreshCodec.TryRead(ref platform, address,
+			out var actual));
+		Assert.Equal(value.Next, actual.Next);
+		Assert.Equal(value.RenderInfo, actual.RenderInfo);
+		Assert.Equal(value.Layer, actual.Layer);
+		Assert.Equal(value.SavedFlags, actual.SavedFlags);
+		Assert.True(MuiDrawingRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiDrawingRecordKind.Refresh,
+			MuiDrawingRecordField.SavedFlags, out var savedFlags));
+		Assert.Equal(address.Raw + MuiDrawingRefreshRecord.SavedFlagsOffset,
+			savedFlags.Raw);
+		Assert.False(MuiDrawingRefreshCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FF5), out _));
+	}
+
+	[Fact]
+	public void DrawingPenCodecUsesNamedRecordAdapter()
+	{
+		var platform = NewInitializedPlatform();
+		var address = APTR.FromPointer(0x1E00);
+		var value = new MuiDrawingPenRecord
+		{
+			Next = APTR.FromPointer(0x1F00),
+			RenderInfo = Mri,
+			Token = 0xC0FFEE42u,
+		};
+
+		Assert.True(MuiDrawingPenCodec.Write(ref platform, address, value));
+		Assert.True(MuiDrawingPenCodec.TryRead(ref platform, address,
+			out var actual));
+		Assert.Equal(value.Next, actual.Next);
+		Assert.Equal(value.RenderInfo, actual.RenderInfo);
+		Assert.Equal(value.Token, actual.Token);
+		Assert.True(MuiDrawingRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiDrawingRecordKind.Pen, MuiDrawingRecordField.Token,
+			out var token));
+		Assert.Equal(address.Raw + MuiDrawingPenRecord.TokenOffset, token.Raw);
+		Assert.False(MuiDrawingPenCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FF5), out _));
+	}
+
+	[Fact]
+	public void DrawingRenderInfoCodecUsesNamedRecordAdapter()
+	{
+		var platform = NewInitializedPlatform();
+		var address = APTR.FromPointer(0x1F20);
+		var value = new MuiDrawingRenderInfoRecord
+		{
+			WindowObject = APTR.FromPointer(0x1F40),
+			Screen = APTR.FromPointer(0x1F50),
+			DrawInfo = APTR.FromPointer(0x1F60),
+			Pens = APTR.FromPointer(0x1F70),
+			Window = APTR.FromPointer(0x1F80),
+			RastPort = RastPort,
+			Flags = 0x5A5AA5A5u,
+		};
+
+		Assert.True(MuiDrawingRenderInfoCodec.Write(ref platform, address, value));
+		Assert.True(MuiDrawingRenderInfoCodec.TryRead(ref platform, address,
+			out var actual));
+		Assert.Equal(value.WindowObject, actual.WindowObject);
+		Assert.Equal(value.Screen, actual.Screen);
+		Assert.Equal(value.DrawInfo, actual.DrawInfo);
+		Assert.Equal(value.Pens, actual.Pens);
+		Assert.Equal(value.Window, actual.Window);
+		Assert.Equal(value.RastPort, actual.RastPort);
+		Assert.Equal(value.Flags, actual.Flags);
+		Assert.True(MuiDrawingRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiDrawingRecordKind.RenderInfo,
+			MuiDrawingRecordField.Flags, out var flags));
+		Assert.Equal(address.Raw + MuiDrawingRenderInfoRecord.FlagsOffset,
+			flags.Raw);
+		Assert.False(MuiDrawingRenderInfoCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FE5), out _));
+	}
+
+	[Fact]
+	public void DrawingRasterPortCodecUsesNamedRecordAdapter()
+	{
+		var platform = NewInitializedPlatform();
+		var address = APTR.FromPointer(0x2050);
+		platform.WriteUInt32(address, (int)MuiDrawingRasterPortRecord.LayerOffset,
+			Layer.Raw);
+
+		Assert.True(MuiDrawingRasterPortCodec.TryRead(ref platform, address,
+			out var actual));
+		Assert.Equal(Layer, actual.Layer);
+		Assert.True(MuiDrawingRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiDrawingRecordKind.RasterPort,
+			MuiDrawingRecordField.Layer, out var layer));
+		Assert.Equal(address.Raw + MuiDrawingRasterPortRecord.LayerOffset,
+			layer.Raw);
+		Assert.False(MuiDrawingRasterPortCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFE), out _));
+	}
+
+	[Fact]
 	public void OperationsRequireInitialization()
 	{
 		var platform = new MuiHeadlessTestPlatform(Base, Size, FirstAllocation,

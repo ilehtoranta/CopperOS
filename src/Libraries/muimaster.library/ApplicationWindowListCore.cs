@@ -170,29 +170,26 @@ internal static class MuiApplicationWindowListStateCodec
 		MuiApplicationWindowListState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationWindowListState.Size) || value.Capacity < value.Count)
-			return false;
-		return MuiApplicationWindowListStateFieldCursorCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationWindowListStateField.Cookie,
-			MuiApplicationWindowListState.Magic) &&
-			MuiApplicationWindowListStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.Application,
-				value.Application.Raw) &&
-			MuiApplicationWindowListStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.List, value.List.Raw) &&
-			MuiApplicationWindowListStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.Entries,
-				value.Entries.Raw) &&
-			MuiApplicationWindowListStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.Count, value.Count) &&
-			MuiApplicationWindowListStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.Capacity, value.Capacity) &&
-			MuiApplicationWindowListStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.Mutation, value.Mutation) &&
-			MuiApplicationWindowListStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.Generation,
-				value.Generation);
+		if (value.Capacity < value.Count ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiApplicationWindowListState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				MuiApplicationWindowListState.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Application.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.List.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Entries.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Count) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Capacity) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Mutation) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Generation)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -200,31 +197,28 @@ internal static class MuiApplicationWindowListStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationWindowListState.Size) ||
-			!MuiApplicationWindowListStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.Cookie, out var cookie) ||
-			cookie != MuiApplicationWindowListState.Magic ||
-			!MuiApplicationWindowListStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.Application,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationWindowListState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var cookie) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var application) ||
-			!MuiApplicationWindowListStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.List, out var list) ||
-			!MuiApplicationWindowListStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.Entries,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var list) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var entries) ||
-			!MuiApplicationWindowListStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.Count, out var count) ||
-			!MuiApplicationWindowListStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.Capacity,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var count) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var capacity) ||
-			!MuiApplicationWindowListStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.Mutation,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var mutation) ||
-			!MuiApplicationWindowListStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationWindowListStateField.Generation,
-				out var generation)) return false;
-		value.Cookie = MuiApplicationWindowListState.Magic;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var generation) ||
+			!MuiGuestStructCursor.IsComplete(cursor) ||
+			cookie != MuiApplicationWindowListState.Magic ||
+			capacity < count) return false;
+		value.Cookie = cookie;
 		value.Application = APTR.FromPointer(application);
 		value.List = APTR.FromPointer(list);
 		value.Entries = APTR.FromPointer(entries);
@@ -232,7 +226,7 @@ internal static class MuiApplicationWindowListStateCodec
 		value.Capacity = capacity;
 		value.Mutation = mutation;
 		value.Generation = generation;
-		return value.Capacity >= value.Count;
+		return true;
 	}
 }
 
@@ -375,17 +369,28 @@ internal static class MuiApplicationWindowListEntryVectorCodec
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiApplicationWindowListEntryCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
+		=> MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out address);
+}
+
+// Struct-first guest-memory adapter for the caller-owned WindowList entry
+// vector. Index arithmetic is confined here; consumers receive only complete
+// named 16-byte list-entry records.
+internal static class MuiApplicationWindowListEntryVectorMemoryCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiApplicationWindowListEntryCursor.EntrySize) return false;
-		var offset = cursor.Index *
-			MuiApplicationWindowListEntryCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
+		if (vector.IsNull || index >
+			(uint.MaxValue - vector.Raw) / MuiApplicationWindowListEntry.Size)
+			return false;
+		var offset = index * MuiApplicationWindowListEntry.Size;
+		if (vector.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(vector.Raw + offset);
 		return platform.IsMapped(address,
-			MuiApplicationWindowListEntryCursor.EntrySize);
+			MuiApplicationWindowListEntry.Size);
 	}
 }
 
@@ -395,20 +400,17 @@ internal static class MuiApplicationWindowListEntryCodec
 		MuiApplicationWindowListEntry value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationWindowListEntry.Size)) return false;
-		return MuiApplicationWindowListEntryFieldCursorCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationWindowListEntryField.Next,
-			value.Next.Raw) &&
-			MuiApplicationWindowListEntryFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationWindowListEntryField.Previous,
-				value.Previous.Raw) &&
-			MuiApplicationWindowListEntryFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationWindowListEntryField.Object,
-				value.Object.Raw) &&
-			MuiApplicationWindowListEntryFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationWindowListEntryField.Reserved,
-				value.Reserved.Raw);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationWindowListEntry.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Next.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Previous.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Object.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -416,18 +418,17 @@ internal static class MuiApplicationWindowListEntryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationWindowListEntry.Size) ||
-			!MuiApplicationWindowListEntryFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationWindowListEntryField.Next, out var next) ||
-			!MuiApplicationWindowListEntryFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationWindowListEntryField.Previous,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationWindowListEntry.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var next) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var previous) ||
-			!MuiApplicationWindowListEntryFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationWindowListEntryField.Object, out var obj) ||
-			!MuiApplicationWindowListEntryFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationWindowListEntryField.Reserved,
-				out var reserved)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var obj) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var reserved) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.Next = APTR.FromPointer(next);
 		value.Previous = APTR.FromPointer(previous);
 		value.Object = APTR.FromPointer(obj);
@@ -543,8 +544,8 @@ public static class MuiApplicationWindowListCore
 			var cursor = default(MuiApplicationWindowListEntryCursor);
 			cursor.Base = entries;
 			cursor.Index = selected;
-			if (!MuiApplicationWindowListEntryVectorCodec.TryGetEntry(
-				ref platform, cursor, out var entry))
+			if (!MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(
+				ref platform, cursor.Base, cursor.Index, out var entry))
 			{
 				FreeProjection(ref platform, list, entries, entriesSize);
 				return APTR.Null;
@@ -553,8 +554,8 @@ public static class MuiApplicationWindowListCore
 			if (selected + 1 < count)
 			{
 				cursor.Index++;
-				if (!MuiApplicationWindowListEntryVectorCodec.TryGetEntry(
-					ref platform, cursor, out next))
+				if (!MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(
+					ref platform, cursor.Base, cursor.Index, out next))
 				{
 					FreeProjection(ref platform, list, entries, entriesSize);
 					return APTR.Null;

@@ -48,4 +48,40 @@ public sealed class MuiApplicationIdentityStructAdapterTests
 			ref platform, APTR.Null,
 			MuiApplicationIdentityStateField.Author, out _));
 	}
+
+	[Fact]
+	public void ApplicationIdentityStateSequentialRecordPreservesPointersAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x35C0);
+		var value = new MuiApplicationIdentityStateRecord
+		{
+			Magic = MuiApplicationIdentityStateRecord.Cookie,
+			Author = APTR.FromPointer(uint.MaxValue),
+			Base = APTR.FromPointer(0x01020304u),
+			Copyright = APTR.FromPointer(0x11223344u),
+			Description = APTR.FromPointer(0x55667788u),
+			Title = APTR.FromPointer(0x99AABBCCu),
+			Version = APTR.FromPointer(0xDDEEFF00u),
+		};
+
+		Assert.True(MuiApplicationIdentityStateRecordCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiApplicationIdentityStateRecordCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Author, decoded.Author);
+		Assert.Equal(value.Base, decoded.Base);
+		Assert.Equal(value.Copyright, decoded.Copyright);
+		Assert.Equal(value.Description, decoded.Description);
+		Assert.Equal(value.Title, decoded.Title);
+		Assert.Equal(value.Version, decoded.Version);
+
+		var crossingEnd = APTR.FromPointer(0x30FE5);
+		Assert.False(MuiApplicationIdentityStateRecordCodec.WriteRecord(
+			ref platform, crossingEnd, value));
+		Assert.False(MuiApplicationIdentityStateRecordCodec.TryReadRecord(
+			ref platform, crossingEnd, out _));
+	}
 }

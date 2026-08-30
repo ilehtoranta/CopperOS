@@ -17,6 +17,11 @@ namespace CopperOS.MuiMaster;
 internal struct MuiApplicationSettingsHeader
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint MagicValueOffset = 0;
+	internal const uint VersionValueOffset = 4;
+	internal const uint RecordCountOffset = 8;
+	internal const uint PayloadBytesOffset = 12;
 	internal uint MagicValue;
 	internal uint VersionValue;
 	internal uint RecordCount;
@@ -38,35 +43,38 @@ internal struct MuiApplicationSettingsHeaderFieldCursor
 	internal MuiApplicationSettingsHeaderField Field;
 }
 
-internal static class MuiApplicationSettingsHeaderFieldCursorCodec
+// Struct-first guest-memory adapter for the internal MUIS file header. The
+// format remains CopperOS-owned; this seam keeps all packed field translation
+// and complete-record bounds in one place.
+internal static class MuiApplicationSettingsHeaderMemoryCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiApplicationSettingsHeaderFieldCursor cursor, out APTR address)
+		APTR header, MuiApplicationSettingsHeaderField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
 		uint offset;
-		switch (cursor.Field)
+		switch (field)
 		{
 			case MuiApplicationSettingsHeaderField.MagicValue:
-				offset = 0;
+				offset = MuiApplicationSettingsHeader.MagicValueOffset;
 				break;
 			case MuiApplicationSettingsHeaderField.VersionValue:
-				offset = 4;
+				offset = MuiApplicationSettingsHeader.VersionValueOffset;
 				break;
 			case MuiApplicationSettingsHeaderField.RecordCount:
-				offset = 8;
+				offset = MuiApplicationSettingsHeader.RecordCountOffset;
 				break;
 			case MuiApplicationSettingsHeaderField.PayloadBytes:
-				offset = 12;
+				offset = MuiApplicationSettingsHeader.PayloadBytesOffset;
 				break;
 			default:
 				return false;
 		}
-		if (cursor.Header.IsNull || cursor.Header.Raw >
-			uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Header.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (header.IsNull || header.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(header, MuiApplicationSettingsHeader.Size)) return false;
+		address = APTR.FromPointer(header.Raw + offset);
+		return platform.IsMapped(address, MuiApplicationSettingsHeader.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -74,10 +82,7 @@ internal static class MuiApplicationSettingsHeaderFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiApplicationSettingsHeaderFieldCursor);
-		cursor.Header = header;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, header, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -86,19 +91,41 @@ internal static class MuiApplicationSettingsHeaderFieldCursorCodec
 		APTR header, MuiApplicationSettingsHeaderField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationSettingsHeaderFieldCursor);
-		cursor.Header = header;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, header, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for existing typed cursor diagnostics.
+internal static class MuiApplicationSettingsHeaderFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiApplicationSettingsHeaderFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationSettingsHeaderMemoryCodec.TryGetAddress(ref platform,
+			cursor.Header, cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR header,
+		MuiApplicationSettingsHeaderField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationSettingsHeaderMemoryCodec.TryRead(ref platform, header, field,
+			out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform, APTR header,
+		MuiApplicationSettingsHeaderField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationSettingsHeaderMemoryCodec.TryWrite(ref platform, header, field,
+			value);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiApplicationSettingsRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint KeyOffset = 0;
+	internal const uint LengthOffset = 4;
 	internal uint Key;
 	internal uint Length;
 }
@@ -116,29 +143,31 @@ internal struct MuiApplicationSettingsRecordFieldCursor
 	internal MuiApplicationSettingsRecordField Field;
 }
 
-internal static class MuiApplicationSettingsRecordFieldCursorCodec
+// Struct-first guest-memory adapter for one internal settings key/length
+// record. The surrounding transfer cursor remains a byte-stream concern.
+internal static class MuiApplicationSettingsRecordMemoryCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiApplicationSettingsRecordFieldCursor cursor, out APTR address)
+		APTR record, MuiApplicationSettingsRecordField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
 		uint offset;
-		switch (cursor.Field)
+		switch (field)
 		{
 			case MuiApplicationSettingsRecordField.Key:
-				offset = 0;
+				offset = MuiApplicationSettingsRecord.KeyOffset;
 				break;
 			case MuiApplicationSettingsRecordField.Length:
-				offset = 4;
+				offset = MuiApplicationSettingsRecord.LengthOffset;
 				break;
 			default:
 				return false;
 		}
-		if (cursor.Record.IsNull || cursor.Record.Raw >
-			uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (record.IsNull || record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiApplicationSettingsRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiApplicationSettingsRecord.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -146,10 +175,7 @@ internal static class MuiApplicationSettingsRecordFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiApplicationSettingsRecordFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -158,13 +184,32 @@ internal static class MuiApplicationSettingsRecordFieldCursorCodec
 		APTR record, MuiApplicationSettingsRecordField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationSettingsRecordFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for existing typed cursor diagnostics.
+internal static class MuiApplicationSettingsRecordFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiApplicationSettingsRecordFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationSettingsRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR record,
+		MuiApplicationSettingsRecordField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationSettingsRecordMemoryCodec.TryRead(ref platform, record, field,
+			out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform, APTR record,
+		MuiApplicationSettingsRecordField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationSettingsRecordMemoryCodec.TryWrite(ref platform, record, field,
+			value);
 }
 
 internal static class MuiApplicationSettingsHeaderCodec
@@ -176,16 +221,16 @@ internal static class MuiApplicationSettingsHeaderCodec
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiApplicationSettingsHeader.Size)) return false;
-		return MuiApplicationSettingsHeaderFieldCursorCodec.TryRead(ref platform,
+		return MuiApplicationSettingsHeaderMemoryCodec.TryRead(ref platform,
 			address, MuiApplicationSettingsHeaderField.MagicValue,
 			out value.MagicValue) &&
-			MuiApplicationSettingsHeaderFieldCursorCodec.TryRead(ref platform,
+			MuiApplicationSettingsHeaderMemoryCodec.TryRead(ref platform,
 				address, MuiApplicationSettingsHeaderField.VersionValue,
 				out value.VersionValue) &&
-			MuiApplicationSettingsHeaderFieldCursorCodec.TryRead(ref platform,
+			MuiApplicationSettingsHeaderMemoryCodec.TryRead(ref platform,
 				address, MuiApplicationSettingsHeaderField.RecordCount,
 				out value.RecordCount) &&
-			MuiApplicationSettingsHeaderFieldCursorCodec.TryRead(ref platform,
+			MuiApplicationSettingsHeaderMemoryCodec.TryRead(ref platform,
 				address, MuiApplicationSettingsHeaderField.PayloadBytes,
 				out value.PayloadBytes);
 	}
@@ -196,16 +241,16 @@ internal static class MuiApplicationSettingsHeaderCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiApplicationSettingsHeader.Size)) return false;
-		return MuiApplicationSettingsHeaderFieldCursorCodec.TryWrite(ref platform,
+		return MuiApplicationSettingsHeaderMemoryCodec.TryWrite(ref platform,
 			address, MuiApplicationSettingsHeaderField.MagicValue,
 			value.MagicValue) &&
-			MuiApplicationSettingsHeaderFieldCursorCodec.TryWrite(ref platform,
+			MuiApplicationSettingsHeaderMemoryCodec.TryWrite(ref platform,
 				address, MuiApplicationSettingsHeaderField.VersionValue,
 				value.VersionValue) &&
-			MuiApplicationSettingsHeaderFieldCursorCodec.TryWrite(ref platform,
+			MuiApplicationSettingsHeaderMemoryCodec.TryWrite(ref platform,
 				address, MuiApplicationSettingsHeaderField.RecordCount,
 				value.RecordCount) &&
-			MuiApplicationSettingsHeaderFieldCursorCodec.TryWrite(ref platform,
+			MuiApplicationSettingsHeaderMemoryCodec.TryWrite(ref platform,
 				address, MuiApplicationSettingsHeaderField.PayloadBytes,
 				value.PayloadBytes);
 	}
@@ -220,9 +265,9 @@ internal static class MuiApplicationSettingsRecordCodec
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiApplicationSettingsRecord.Size)) return false;
-		return MuiApplicationSettingsRecordFieldCursorCodec.TryRead(ref platform,
+		return MuiApplicationSettingsRecordMemoryCodec.TryRead(ref platform,
 			address, MuiApplicationSettingsRecordField.Key, out value.Key) &&
-			MuiApplicationSettingsRecordFieldCursorCodec.TryRead(ref platform,
+			MuiApplicationSettingsRecordMemoryCodec.TryRead(ref platform,
 				address, MuiApplicationSettingsRecordField.Length, out value.Length);
 	}
 
@@ -232,9 +277,9 @@ internal static class MuiApplicationSettingsRecordCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiApplicationSettingsRecord.Size)) return false;
-		return MuiApplicationSettingsRecordFieldCursorCodec.TryWrite(ref platform,
+		return MuiApplicationSettingsRecordMemoryCodec.TryWrite(ref platform,
 			address, MuiApplicationSettingsRecordField.Key, value.Key) &&
-			MuiApplicationSettingsRecordFieldCursorCodec.TryWrite(ref platform,
+			MuiApplicationSettingsRecordMemoryCodec.TryWrite(ref platform,
 				address, MuiApplicationSettingsRecordField.Length, value.Length);
 	}
 }
@@ -246,19 +291,32 @@ internal struct MuiApplicationSettingsTransferCursor
 	internal uint Offset;
 }
 
+internal static class MuiApplicationSettingsTransferMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR baseAddress, uint offset, uint byteCount,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (baseAddress.IsNull || baseAddress.Raw >
+			uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(baseAddress.Raw + offset);
+		return byteCount == 0 || platform.IsMapped(address, byteCount);
+	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// transfer cursor. New code passes the base address and offset directly to the
+// struct-backed memory adapter above.
 internal static class MuiApplicationSettingsTransferCursorCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiApplicationSettingsTransferCursor cursor, uint byteCount,
 		out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Base.Raw >
-			uint.MaxValue - cursor.Offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + cursor.Offset);
-		return byteCount == 0 || platform.IsMapped(address, byteCount);
-	}
+		=> MuiApplicationSettingsTransferMemoryCodec.TryGetAddress(ref platform,
+			cursor.Base, cursor.Offset, byteCount, out address);
 }
 
 public static class MuiApplicationSettingsPacketCore
@@ -361,8 +419,12 @@ public static class MuiApplicationSettingsFileCore
 				MuiApplicationSettingsHeader.Size,
 				APTR.Null, APTR.Null, APTR.Null, false, false);
 
-		var className = MuiHeadlessMemory.Allocate(ref platform, 14);
-		if (className.IsNotNull) WriteClassName(ref platform, className);
+		var className = MuiHeadlessMemory.Allocate(ref platform,
+			MuiApplicationSettingsDataspaceClassNameRecord.Size);
+		if (className.IsNotNull && !WriteClassName(ref platform, className))
+			return Finish(ref platform, state, handle, scratch,
+				MuiApplicationSettingsHeader.Size, APTR.Null, APTR.Null, className,
+				false, false);
 		var classRecord = className.IsNull ? APTR.Null :
 			MuiHeadlessObjectCore.FindClassByName(ref platform, state, className);
 		var classCreated = classRecord.IsNull;
@@ -394,12 +456,14 @@ public static class MuiApplicationSettingsFileCore
 				MuiApplicationSettingsHeader.Size,
 				dataspace, classRecord, className, classCreated, false);
 
-		var counter = MuiHeadlessMemory.Allocate(ref platform, 4);
+		var counter = MuiHeadlessMemory.Allocate(ref platform,
+			MuiStoreIterationCounter.Size);
 		if (counter.IsNull)
 			return Finish(ref platform, state, handle, scratch,
 				MuiApplicationSettingsHeader.Size,
 				dataspace, classRecord, className, classCreated, false);
-		platform.Clear(counter, 4);
+		_ = MuiStoreIterationCounterCodec.Write(ref platform, counter,
+			default(MuiStoreIterationCounter));
 		var writtenRecords = 0u;
 		var writtenPayload = 0u;
 		while (true)
@@ -410,8 +474,9 @@ public static class MuiApplicationSettingsFileCore
 			if (!MuiStoreRecordCodec.TryRead(ref platform, item,
 				out var storeRecord))
 			{
-				platform.Clear(counter, 4);
-				platform.Free(counter, 4);
+				_ = MuiStoreIterationCounterCodec.Write(ref platform, counter,
+					default(MuiStoreIterationCounter));
+				platform.Free(counter, MuiStoreIterationCounter.Size);
 				return Finish(ref platform, state, handle, scratch,
 					MuiApplicationSettingsHeader.Size,
 					dataspace, classRecord, className, classCreated, false);
@@ -421,8 +486,9 @@ public static class MuiApplicationSettingsFileCore
 			if (length > 65536 || (length != 0 &&
 				(data.IsNull || !platform.IsMapped(data, length))))
 			{
-				platform.Clear(counter, 4);
-				platform.Free(counter, 4);
+				_ = MuiStoreIterationCounterCodec.Write(ref platform, counter,
+					default(MuiStoreIterationCounter));
+				platform.Free(counter, MuiStoreIterationCounter.Size);
 				return Finish(ref platform, state, handle, scratch,
 					MuiApplicationSettingsHeader.Size,
 					dataspace, classRecord, className, classCreated, false);
@@ -433,8 +499,9 @@ public static class MuiApplicationSettingsFileCore
 					MuiApplicationSettingsRecord.Size) ||
 				!WriteExact(ref platform, handle, data, length))
 			{
-				platform.Clear(counter, 4);
-				platform.Free(counter, 4);
+				_ = MuiStoreIterationCounterCodec.Write(ref platform, counter,
+					default(MuiStoreIterationCounter));
+				platform.Free(counter, MuiStoreIterationCounter.Size);
 				return Finish(ref platform, state, handle, scratch,
 					MuiApplicationSettingsHeader.Size,
 					dataspace, classRecord, className, classCreated, false);
@@ -442,8 +509,9 @@ public static class MuiApplicationSettingsFileCore
 			writtenRecords++;
 			writtenPayload += length;
 		}
-		platform.Clear(counter, 4);
-		platform.Free(counter, 4);
+		_ = MuiStoreIterationCounterCodec.Write(ref platform, counter,
+			default(MuiStoreIterationCounter));
+		platform.Free(counter, MuiStoreIterationCounter.Size);
 		return Finish(ref platform, state, handle, scratch,
 			MuiApplicationSettingsHeader.Size,
 			dataspace, classRecord, className, classCreated,
@@ -477,8 +545,12 @@ public static class MuiApplicationSettingsFileCore
 				MuiApplicationSettingsHeader.Size,
 				APTR.Null, APTR.Null, APTR.Null, false, false);
 
-		var className = MuiHeadlessMemory.Allocate(ref platform, 14);
-		if (className.IsNotNull) WriteClassName(ref platform, className);
+		var className = MuiHeadlessMemory.Allocate(ref platform,
+			MuiApplicationSettingsDataspaceClassNameRecord.Size);
+		if (className.IsNotNull && !WriteClassName(ref platform, className))
+			return Finish(ref platform, state, handle, scratch,
+				MuiApplicationSettingsHeader.Size, APTR.Null, APTR.Null, className,
+				false, false);
 		var classRecord = className.IsNull ? APTR.Null :
 			MuiHeadlessObjectCore.FindClassByName(ref platform, state, className);
 		var classCreated = classRecord.IsNull;
@@ -575,9 +647,11 @@ public static class MuiApplicationSettingsFileCore
 	{
 		records = 0;
 		payloadBytes = 0;
-		var counter = MuiHeadlessMemory.Allocate(ref platform, 4);
+		var counter = MuiHeadlessMemory.Allocate(ref platform,
+			MuiStoreIterationCounter.Size);
 		if (counter.IsNull) return false;
-		platform.Clear(counter, 4);
+		_ = MuiStoreIterationCounterCodec.Write(ref platform, counter,
+			default(MuiStoreIterationCounter));
 		var result = true;
 		while (true)
 		{
@@ -604,41 +678,34 @@ public static class MuiApplicationSettingsFileCore
 			records++;
 			payloadBytes += length;
 		}
-		platform.Clear(counter, 4);
-		platform.Free(counter, 4);
+		_ = MuiStoreIterationCounterCodec.Write(ref platform, counter,
+			default(MuiStoreIterationCounter));
+		platform.Free(counter, MuiStoreIterationCounter.Size);
 		return result;
 	}
 
-	private static void WriteClassName<TPlatform>(ref TPlatform platform,
+	private static bool WriteClassName<TPlatform>(ref TPlatform platform,
 		APTR address) where TPlatform : struct, IMuiApplicationPlatform, IMuiHeadlessPlatform
 	{
-		platform.WriteUInt8(address, 0, (byte)'D');
-		platform.WriteUInt8(address, 1, (byte)'a');
-		platform.WriteUInt8(address, 2, (byte)'t');
-		platform.WriteUInt8(address, 3, (byte)'a');
-		platform.WriteUInt8(address, 4, (byte)'s');
-		platform.WriteUInt8(address, 5, (byte)'p');
-		platform.WriteUInt8(address, 6, (byte)'a');
-		platform.WriteUInt8(address, 7, (byte)'c');
-		platform.WriteUInt8(address, 8, (byte)'e');
-		platform.WriteUInt8(address, 9, (byte)'.');
-		platform.WriteUInt8(address, 10, (byte)'m');
-		platform.WriteUInt8(address, 11, (byte)'u');
-		platform.WriteUInt8(address, 12, (byte)'i');
-		platform.WriteUInt8(address, 13, 0);
+		var value = default(MuiApplicationSettingsDataspaceClassNameRecord);
+		value.Word0 = 0x44617461; // Data
+		value.Word1 = 0x73706163; // spac
+		value.Word2 = 0x652E6D75; // e.mu
+		value.Character = (byte)'i';
+		value.Terminator = 0;
+		return MuiApplicationSettingsDataspaceClassNameRecordCodec.Write(
+			ref platform, address, value);
 	}
 
 	private static bool WriteExact<TPlatform>(ref TPlatform platform, APTR handle,
 		APTR source, uint length) where TPlatform : struct, IMuiApplicationPlatform, IMuiHeadlessPlatform
 	{
 		var offset = 0u;
-		var cursor = default(MuiApplicationSettingsTransferCursor);
-		cursor.Base = source;
 		while (offset < length)
 		{
-			cursor.Offset = offset;
-			if (!MuiApplicationSettingsTransferCursorCodec.TryGetAddress(
-				ref platform, cursor, length - offset, out var address)) return false;
+			if (!MuiApplicationSettingsTransferMemoryCodec.TryGetAddress(
+				ref platform, source, offset, length - offset, out var address))
+				return false;
 			var result = platform.Write(handle, address, length - offset);
 			if (result <= 0 || (uint)result > length - offset) return false;
 			offset += (uint)result;
@@ -651,13 +718,11 @@ public static class MuiApplicationSettingsFileCore
 		where TPlatform : struct, IMuiApplicationPlatform, IMuiHeadlessPlatform
 	{
 		var offset = 0u;
-		var cursor = default(MuiApplicationSettingsTransferCursor);
-		cursor.Base = destination;
 		while (offset < length)
 		{
-			cursor.Offset = offset;
-			if (!MuiApplicationSettingsTransferCursorCodec.TryGetAddress(
-				ref platform, cursor, length - offset, out var address)) return false;
+			if (!MuiApplicationSettingsTransferMemoryCodec.TryGetAddress(
+				ref platform, destination, offset, length - offset, out var address))
+				return false;
 			var result = platform.Read(handle, address, length - offset);
 			if (result <= 0 || (uint)result > length - offset) return false;
 			offset += (uint)result;
@@ -681,8 +746,10 @@ public static class MuiApplicationSettingsFileCore
 			MuiHeadlessObjectCore.DeleteClass(ref platform, state, classRecord);
 		if (className.IsNotNull)
 		{
-			platform.Clear(className, 14);
-			platform.Free(className, 14);
+			platform.Clear(className,
+				MuiApplicationSettingsDataspaceClassNameRecord.Size);
+			platform.Free(className,
+				MuiApplicationSettingsDataspaceClassNameRecord.Size);
 		}
 		if (handle.IsNotNull) platform.Close(handle);
 		return result;

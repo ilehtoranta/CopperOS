@@ -37,4 +37,32 @@ public sealed class MuiAreaCycleChainStructAdapterTests
 		Assert.False(MuiAreaCycleChainStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}
+
+	[Fact]
+	public void AreaCycleChainSequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x37C0);
+		var value = new MuiAreaCycleChainStateRecord
+		{
+			Magic = MuiAreaCycleChainStateRecord.Cookie,
+			Value = int.MinValue,
+			Generation = uint.MaxValue,
+		};
+
+		Assert.True(MuiAreaCycleChainStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaCycleChainStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Value, decoded.Value);
+		Assert.Equal(value.Generation, decoded.Generation);
+
+		var crossingEnd = APTR.FromPointer(0x30FF5);
+		Assert.False(MuiAreaCycleChainStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiAreaCycleChainStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
 }

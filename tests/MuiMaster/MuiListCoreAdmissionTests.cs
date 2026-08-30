@@ -106,4 +106,89 @@ public sealed class MuiListCoreAdmissionTests
 		Assert.Equal(APTR.FromPointer(0x2920), image.ImageObject);
 		Assert.False(MuiListImageCodec.TryRead(ref platform, imageAddress, out _));
 	}
+
+	[Fact]
+	public void ListviewOwnerSequentialRecordPreservesPointerAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2A00);
+		var value = new MuiListviewOwnerState
+		{
+			Magic = MuiListviewOwnerState.Cookie,
+			Owner = APTR.FromPointer(0xFFFFFFFFu),
+		};
+
+		Assert.True(MuiListviewOwnerStateCodec.WriteRecord(ref platform, address,
+			value));
+		Assert.True(MuiListviewOwnerStateCodec.TryReadRecord(ref platform, address,
+			out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Owner, decoded.Owner);
+
+		Assert.False(MuiListviewOwnerStateCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FF9), out _));
+	}
+
+	[Fact]
+	public void ListviewHorizontalScrollerSequentialRecordPreservesRangeAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2A20);
+		var value = new MuiListHScrollerState
+		{
+			Magic = MuiListHScrollerState.Cookie,
+			Policy = 0x01020304u,
+			ContentWidth = 0x11223344u,
+			ViewWidth = 0x55667788u,
+			Visible = 0x99AABBCCu,
+			ScrollX = 0xDDEEFF00u,
+			MaxScrollX = 0xFFFFFFFFu,
+		};
+
+		Assert.True(MuiListHScrollerStateCodec.WriteRecord(ref platform, address,
+			value));
+		Assert.True(MuiListHScrollerStateCodec.TryReadRecord(ref platform, address,
+			out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Policy, decoded.Policy);
+		Assert.Equal(value.ContentWidth, decoded.ContentWidth);
+		Assert.Equal(value.ViewWidth, decoded.ViewWidth);
+		Assert.Equal(value.Visible, decoded.Visible);
+		Assert.Equal(value.ScrollX, decoded.ScrollX);
+		Assert.Equal(value.MaxScrollX, decoded.MaxScrollX);
+
+		Assert.False(MuiListHScrollerStateCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FE5), out _));
+	}
+
+	[Fact]
+	public void ListImageSequentialRecordPreservesPointersFlagsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2A40);
+		var value = new MuiListImageState
+		{
+			Magic = MuiListImageState.Cookie,
+			ImageObject = APTR.FromPointer(uint.MaxValue),
+			Flags = 0xAABBCCDDu,
+			Next = APTR.FromPointer(0x01020304u),
+		};
+
+		Assert.True(MuiListImageCodec.WriteRecord(ref platform, address, value));
+		Assert.True(MuiListImageCodec.TryReadRecord(ref platform, address,
+			out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.ImageObject, decoded.ImageObject);
+		Assert.Equal(value.Flags, decoded.Flags);
+		Assert.Equal(value.Next, decoded.Next);
+
+		var crossingEnd = APTR.FromPointer(0x30FF1);
+		Assert.False(MuiListImageCodec.WriteRecord(ref platform, crossingEnd,
+			value));
+		Assert.False(MuiListImageCodec.TryReadRecord(ref platform, crossingEnd,
+			out _));
+	}
 }

@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -166,52 +167,45 @@ internal struct MuiCommonFieldCursor
 	internal MuiCommonField Field;
 }
 
-internal static class MuiCommonFieldCursorCodec
+internal static class MuiCommonMessageMemoryCodec
 {
 	private static bool TryGetPacketSize(MuiCommonPacketKind packet,
 		out uint size)
 	{
-		switch (packet)
+		// Keep packet admission as a straight-line bounded chain. Besides being
+		// easy to audit, this avoids a compiler-generated jump table in the
+		// freestanding 68k path while the wire positions remain owned by the
+		// named record adapter below.
+		if (packet == MuiCommonPacketKind.Method)
+			size = MuiCommonMethodMessage.Size;
+		else if (packet == MuiCommonPacketKind.Signed)
+			size = MuiCommonSignedValueMessage.Size;
+		else if (packet == MuiCommonPacketKind.ScaleToValue)
+			size = MuiCommonScaleToValueMessage.Size;
+		else if (packet == MuiCommonPacketKind.ValueToScale)
+			size = MuiCommonValueToScaleMessage.Size;
+		else if (packet == MuiCommonPacketKind.Stringify)
+			size = MuiCommonStringifyMessage.Size;
+		else if (packet == MuiCommonPacketKind.HandleEvent)
+			size = MuiCommonHandleEventMessage.Size;
+		else if (packet == MuiCommonPacketKind.Get)
+			size = MuiCommonGetMessage.Size;
+		else if (packet == MuiCommonPacketKind.Attribute)
+			size = MuiCommonAttributeMessage.Size;
+		else if (packet == MuiCommonPacketKind.AskMinMax)
+			size = MuiCommonAskMinMaxMessage.Size;
+		else if (packet == MuiCommonPacketKind.Layout)
+			size = MuiLayoutMessage.Size;
+		else if (packet == MuiCommonPacketKind.Flags)
+			size = MuiLayoutFlagsMessage.Size;
+		else if (packet == MuiCommonPacketKind.RenderInfo)
+			size = MuiLayoutRenderInfoMessage.Size;
+		else
 		{
-			case MuiCommonPacketKind.Method:
-				size = MuiCommonMethodMessage.Size;
-				return true;
-			case MuiCommonPacketKind.Signed:
-				size = MuiCommonSignedValueMessage.Size;
-				return true;
-			case MuiCommonPacketKind.ScaleToValue:
-				size = MuiCommonScaleToValueMessage.Size;
-				return true;
-			case MuiCommonPacketKind.ValueToScale:
-				size = MuiCommonValueToScaleMessage.Size;
-				return true;
-			case MuiCommonPacketKind.Stringify:
-				size = MuiCommonStringifyMessage.Size;
-				return true;
-			case MuiCommonPacketKind.HandleEvent:
-				size = MuiCommonHandleEventMessage.Size;
-				return true;
-			case MuiCommonPacketKind.Get:
-				size = MuiCommonGetMessage.Size;
-				return true;
-			case MuiCommonPacketKind.Attribute:
-				size = MuiCommonAttributeMessage.Size;
-				return true;
-			case MuiCommonPacketKind.AskMinMax:
-				size = MuiCommonAskMinMaxMessage.Size;
-				return true;
-			case MuiCommonPacketKind.Layout:
-				size = MuiLayoutMessage.Size;
-				return true;
-			case MuiCommonPacketKind.Flags:
-				size = MuiLayoutFlagsMessage.Size;
-				return true;
-			case MuiCommonPacketKind.RenderInfo:
-				size = MuiLayoutRenderInfoMessage.Size;
-				return true;
+			size = 0;
+			return false;
 		}
-		size = 0;
-		return false;
+		return true;
 	}
 
 	private static bool TryResolve(MuiCommonPacketKind packet,
@@ -425,27 +419,22 @@ internal static class MuiCommonFieldCursorCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiCommonFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			!TryGetPacketSize(cursor.Packet, out var packetSize) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize))
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, MuiCommonMethodMessage.FieldSize);
-	}
+		=> TryGetAddress(ref platform, cursor.Message, cursor.Packet,
+			cursor.Field, out address);
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonPacketKind packet, MuiCommonField field,
 		out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiCommonFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		return TryGetAddress(ref platform, cursor, out address);
+		address = APTR.Null;
+		if (!TryResolve(packet, field, out var offset) ||
+			!TryGetPacketSize(packet, out var packetSize) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, packetSize))
+			return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiCommonMethodMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -454,11 +443,8 @@ internal static class MuiCommonFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiCommonFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -468,37 +454,100 @@ internal static class MuiCommonFieldCursorCodec
 		uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiCommonFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
+		return true;
+	}
+
+	// The common method header is the smallest fixed record and is used by
+	// nearly every dispatcher. Keep its complete-record admission and named
+	// field access in this specialised adapter so the native path does not
+	// need to lower the zero-valued Method packet selector through a switch.
+	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
+		APTR message, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (message.IsNull || message.Raw > uint.MaxValue -
+			MuiCommonMethodMessage.Size ||
+			!platform.IsMapped(message, MuiCommonMethodMessage.Size))
+			return false;
+		value = platform.ReadUInt32(message,
+			(int)MuiCommonMethodMessage.MethodIdOffset);
+		return true;
+	}
+
+	internal static bool TryWriteMethodId<TPlatform>(ref TPlatform platform,
+		APTR message, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (message.IsNull || message.Raw > uint.MaxValue -
+			MuiCommonMethodMessage.Size ||
+			!platform.IsMapped(message, MuiCommonMethodMessage.Size))
+			return false;
+		platform.WriteUInt32(message,
+			(int)MuiCommonMethodMessage.MethodIdOffset, value);
 		return true;
 	}
 }
 
-// Fixed common-control records cross the guest boundary through named field
-// cursors. Each cursor resolves against its semantic packet kind, so codec
-// callers never pass an untyped packet size or numeric member offset.
+// Compatibility wrapper retained for callers that still construct the typed
+// field cursor. Live common-control codecs use MuiCommonMessageMemoryCodec.
+internal static class MuiCommonFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiCommonFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiCommonMessageMemoryCodec.TryGetAddress(ref platform, cursor,
+			out address);
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCommonPacketKind packet, MuiCommonField field,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiCommonMessageMemoryCodec.TryGetAddress(ref platform, message, packet,
+			field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCommonPacketKind packet, MuiCommonField field,
+		out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message, packet,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCommonPacketKind packet, MuiCommonField field,
+		uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message, packet,
+			field, value);
+}
+
+// Fixed common-control records cross the guest boundary through named packet
+// structs and the direct memory adapter. The cursor wrapper below is retained
+// only for older callers; live codecs never construct a field cursor.
 internal static class MuiCommonMethodMessageCodec
 {
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiCommonMethodMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		return MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
-			MuiCommonPacketKind.Method, MuiCommonField.MethodId,
-			out packet.MethodId);
+		uint methodId;
+		if (!MuiCommonMessageMemoryCodec.TryReadMethodId(ref platform, message,
+			out methodId)) return false;
+		packet.MethodId = methodId;
+		return true;
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.Method, MuiCommonField.MethodId, method);
+		return MuiCommonMessageMemoryCodec.TryWriteMethodId(ref platform,
+			message, method);
 	}
 }
 
@@ -509,10 +558,10 @@ internal static class MuiCommonSignedValueMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+		if (!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.Signed, MuiCommonField.MethodId,
 			out packet.MethodId) ||
-			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.Signed, MuiCommonField.Value, out var rawValue))
 			return false;
 		packet.Value = unchecked((int)rawValue);
@@ -522,9 +571,9 @@ internal static class MuiCommonSignedValueMessageCodec
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonSignedValueMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.Signed, MuiCommonField.MethodId, packet.MethodId) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.Signed, MuiCommonField.Value,
 			unchecked((uint)packet.Value));
 }
@@ -536,16 +585,16 @@ internal static class MuiCommonScaleToValueMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+		if (!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.ScaleToValue, MuiCommonField.MethodId,
 			out packet.MethodId) ||
-			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.ScaleToValue, MuiCommonField.Min,
 				out var rawMin) ||
-			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.ScaleToValue, MuiCommonField.Max,
 				out var rawMax) ||
-			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.ScaleToValue, MuiCommonField.Value,
 				out var rawValue))
 			return false;
@@ -558,16 +607,16 @@ internal static class MuiCommonScaleToValueMessageCodec
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonScaleToValueMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.ScaleToValue, MuiCommonField.MethodId,
 			packet.MethodId) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.ScaleToValue, MuiCommonField.Min,
 			unchecked((uint)packet.Min)) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.ScaleToValue, MuiCommonField.Max,
 			unchecked((uint)packet.Max)) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.ScaleToValue, MuiCommonField.Value,
 			unchecked((uint)packet.Value));
 }
@@ -579,13 +628,13 @@ internal static class MuiCommonValueToScaleMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+		if (!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.ValueToScale, MuiCommonField.MethodId,
 			out packet.MethodId) ||
-			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.ValueToScale, MuiCommonField.Min,
 				out var rawMin) ||
-			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.ValueToScale, MuiCommonField.Max,
 				out var rawMax))
 			return false;
@@ -597,13 +646,13 @@ internal static class MuiCommonValueToScaleMessageCodec
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonValueToScaleMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.ValueToScale, MuiCommonField.MethodId,
 			packet.MethodId) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.ValueToScale, MuiCommonField.Min,
 			unchecked((uint)packet.Min)) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.ValueToScale, MuiCommonField.Max,
 			unchecked((uint)packet.Max));
 }
@@ -615,10 +664,10 @@ internal static class MuiCommonStringifyMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+		if (!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.Stringify, MuiCommonField.MethodId,
 			out packet.MethodId) ||
-			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.Stringify, MuiCommonField.Value,
 				out var rawValue))
 			return false;
@@ -629,10 +678,10 @@ internal static class MuiCommonStringifyMessageCodec
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonStringifyMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.Stringify, MuiCommonField.MethodId,
 			packet.MethodId) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.Stringify, MuiCommonField.Value,
 			unchecked((uint)packet.Value));
 }
@@ -644,16 +693,16 @@ internal static class MuiCommonHandleEventMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+		if (!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.HandleEvent, MuiCommonField.MethodId,
 			out packet.MethodId) ||
-			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.HandleEvent, MuiCommonField.InputMessage,
 				out packet.InputMessage) ||
-			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.HandleEvent, MuiCommonField.MuiKey,
 				out var rawKey) ||
-			!MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.HandleEvent, MuiCommonField.EventHandlerNode,
 				out packet.EventHandlerNode))
 			return false;
@@ -664,16 +713,16 @@ internal static class MuiCommonHandleEventMessageCodec
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonHandleEventMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.HandleEvent, MuiCommonField.MethodId,
 			packet.MethodId) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.HandleEvent, MuiCommonField.InputMessage,
 			packet.InputMessage) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.HandleEvent, MuiCommonField.MuiKey,
 			unchecked((uint)packet.MuiKey)) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.HandleEvent, MuiCommonField.EventHandlerNode,
 			packet.EventHandlerNode);
 }
@@ -685,13 +734,13 @@ internal static class MuiCommonGetMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		return MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+		return MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.Get, MuiCommonField.MethodId,
 			out packet.MethodId) &&
-			MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.Get, MuiCommonField.Attribute,
 				out packet.Attribute) &&
-			MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.Get, MuiCommonField.Storage,
 				out packet.Storage);
 	}
@@ -699,12 +748,12 @@ internal static class MuiCommonGetMessageCodec
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonGetMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.Get, MuiCommonField.MethodId, packet.MethodId) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.Get, MuiCommonField.Attribute,
 			packet.Attribute) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.Get, MuiCommonField.Storage, packet.Storage);
 }
 
@@ -715,13 +764,13 @@ internal static class MuiCommonAttributeMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		return MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+		return MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.Attribute, MuiCommonField.MethodId,
 			out packet.MethodId) &&
-			MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.Attribute, MuiCommonField.Attribute,
 				out packet.Attribute) &&
-			MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.Attribute, MuiCommonField.Value,
 				out packet.Value);
 	}
@@ -729,13 +778,13 @@ internal static class MuiCommonAttributeMessageCodec
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonAttributeMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.Attribute, MuiCommonField.MethodId,
 			packet.MethodId) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.Attribute, MuiCommonField.Attribute,
 			packet.Attribute) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.Attribute, MuiCommonField.Value, packet.Value);
 }
 
@@ -746,10 +795,10 @@ internal static class MuiCommonAskMinMaxMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		return MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+		return MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiCommonPacketKind.AskMinMax, MuiCommonField.MethodId,
 			out packet.MethodId) &&
-			MuiCommonFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiCommonPacketKind.AskMinMax, MuiCommonField.Storage,
 				out packet.Storage);
 	}
@@ -757,10 +806,10 @@ internal static class MuiCommonAskMinMaxMessageCodec
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonAskMinMaxMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.AskMinMax, MuiCommonField.MethodId,
 			packet.MethodId) &&
-		MuiCommonFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiCommonPacketKind.AskMinMax, MuiCommonField.Storage,
 			packet.Storage);
 }

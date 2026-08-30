@@ -22,9 +22,9 @@ public sealed class MuiSliderScaleAdmissionTests
 			Magic = MuiScalePresentationStateRecord.Cookie,
 			Horizontal = 0,
 		};
-		Assert.True(MuiSliderPresentationStateRecordCodec.Write(ref platform,
+		Assert.True(MuiSliderPresentationStateRecordCodec.WriteRecord(ref platform,
 			sliderAddress, slider));
-		Assert.True(MuiScalePresentationStateRecordCodec.Write(ref platform,
+		Assert.True(MuiScalePresentationStateRecordCodec.WriteRecord(ref platform,
 			scaleAddress, scale));
 		Assert.True(MuiSliderPresentationStateRecordCodec.TryRead(ref platform,
 			sliderAddress, out var sliderRead));
@@ -41,14 +41,14 @@ public sealed class MuiSliderScaleAdmissionTests
 		var platform = CreatePlatform();
 		var sliderAddress = APTR.FromPointer(0x1600);
 		var scaleAddress = APTR.FromPointer(0x1630);
-		Assert.True(MuiSliderPresentationStateRecordCodec.Write(ref platform,
+		Assert.True(MuiSliderPresentationStateRecordCodec.WriteRecord(ref platform,
 			sliderAddress, new MuiSliderPresentationStateRecord
 			{
 				Magic = MuiSliderPresentationStateRecord.Cookie,
 				Horizontal = 0,
 				Quiet = 1,
 			}));
-		Assert.True(MuiScalePresentationStateRecordCodec.Write(ref platform,
+		Assert.True(MuiScalePresentationStateRecordCodec.WriteRecord(ref platform,
 			scaleAddress, new MuiScalePresentationStateRecord
 			{
 				Magic = MuiScalePresentationStateRecord.Cookie,
@@ -58,9 +58,9 @@ public sealed class MuiSliderScaleAdmissionTests
 			ref platform, sliderAddress, MuiSliderPresentationStateField.Magic, 0));
 		Assert.True(MuiScalePresentationStateFieldCursorCodec.TryWriteUInt32(
 			ref platform, scaleAddress, MuiScalePresentationStateField.Magic, 0));
-		Assert.True(MuiSliderPresentationStateRecordCodec.TryReadStructural(
+		Assert.True(MuiSliderPresentationStateRecordCodec.TryReadRecord(
 			ref platform, sliderAddress, out var slider));
-		Assert.True(MuiScalePresentationStateRecordCodec.TryReadStructural(
+		Assert.True(MuiScalePresentationStateRecordCodec.TryReadRecord(
 			ref platform, scaleAddress, out var scale));
 		Assert.Equal(0u, slider.Magic);
 		Assert.Equal(0u, scale.Magic);
@@ -82,7 +82,7 @@ public sealed class MuiSliderScaleAdmissionTests
 			Magic = MuiScalePresentationStateRecord.Cookie,
 			Horizontal = 1,
 		};
-		Assert.True(MuiScalePresentationStateRecordCodec.Write(ref platform,
+		Assert.True(MuiScalePresentationStateRecordCodec.WriteRecord(ref platform,
 			address, record));
 		Assert.True(MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiScalePresentationStateField.Horizontal,
@@ -94,14 +94,14 @@ public sealed class MuiSliderScaleAdmissionTests
 		Assert.Equal(1u, horizontal);
 		Assert.True(MuiScalePresentationStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiScalePresentationStateField.Horizontal, 0));
-		Assert.True(MuiScalePresentationStateRecordCodec.TryReadStructural(
+		Assert.True(MuiScalePresentationStateRecordCodec.TryReadRecord(
 			ref platform, address, out var updated));
 		Assert.Equal(0u, updated.Horizontal);
 		Assert.False(MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, (MuiScalePresentationStateField)255, out _));
 		Assert.False(MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiScalePresentationStateField.Magic, out _));
-		Assert.False(MuiScalePresentationStateRecordCodec.TryReadStructural(
+		Assert.False(MuiScalePresentationStateRecordCodec.TryReadRecord(
 			ref platform, APTR.Null, out _));
 	}
 
@@ -116,7 +116,7 @@ public sealed class MuiSliderScaleAdmissionTests
 			Horizontal = 1,
 			Quiet = 1,
 		};
-		Assert.True(MuiSliderPresentationStateRecordCodec.Write(ref platform, address,
+		Assert.True(MuiSliderPresentationStateRecordCodec.WriteRecord(ref platform, address,
 			record));
 		Assert.True(MuiSliderPresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiSliderPresentationStateField.Quiet,
@@ -128,14 +128,14 @@ public sealed class MuiSliderScaleAdmissionTests
 		Assert.Equal(1u, horizontal);
 		Assert.True(MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiSliderPresentationStateField.Quiet, 0));
-		Assert.True(MuiSliderPresentationStateRecordCodec.TryReadStructural(ref platform,
+		Assert.True(MuiSliderPresentationStateRecordCodec.TryReadRecord(ref platform,
 			address, out var updated));
 		Assert.Equal(0u, updated.Quiet);
 		Assert.False(MuiSliderPresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, (MuiSliderPresentationStateField)255, out _));
 		Assert.False(MuiSliderPresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiSliderPresentationStateField.Magic, out _));
-		Assert.False(MuiSliderPresentationStateRecordCodec.TryReadStructural(ref platform,
+		Assert.False(MuiSliderPresentationStateRecordCodec.TryReadRecord(ref platform,
 			APTR.Null, out _));
 	}
 

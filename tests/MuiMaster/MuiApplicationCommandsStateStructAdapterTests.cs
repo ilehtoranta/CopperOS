@@ -44,4 +44,30 @@ public sealed class MuiApplicationCommandsStateStructAdapterTests
 			ref platform, APTR.Null, MuiApplicationCommandsStateField.Table,
 			out _));
 	}
+
+	[Fact]
+	public void ApplicationCommandsStateSequentialRecordPreservesPointerAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2BC0);
+		var value = new MuiApplicationCommandsStateRecord
+		{
+			Magic = MuiApplicationCommandsStateRecord.Cookie,
+			Table = APTR.FromPointer(uint.MaxValue),
+		};
+
+		Assert.True(MuiApplicationCommandsStateRecordCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiApplicationCommandsStateRecordCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Table, decoded.Table);
+
+		var crossingEnd = APTR.FromPointer(0x30FF9);
+		Assert.False(MuiApplicationCommandsStateRecordCodec.WriteRecord(
+			ref platform, crossingEnd, value));
+		Assert.False(MuiApplicationCommandsStateRecordCodec.TryReadRecord(
+			ref platform, crossingEnd, out _));
+	}
 }

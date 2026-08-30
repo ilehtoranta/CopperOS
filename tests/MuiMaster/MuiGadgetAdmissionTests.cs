@@ -117,6 +117,33 @@ public sealed class MuiGadgetAdmissionTests
 	}
 
 	[Fact]
+	public void GadgetInteractionSequentialRecordPreservesFieldsAndRejectsTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			State);
+		var address = APTR.FromPointer(0x3600);
+		var value = new MuiGadgetInteractionStateRecord
+		{
+			Magic = MuiGadgetInteractionStateRecord.Cookie,
+			InputMode = 3,
+			Selected = 1,
+			Pressed = 0,
+			ShowSelState = 1,
+		};
+		Assert.True(MuiGadgetInteractionStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiGadgetInteractionStateRecordCodec.TryReadRecord(ref platform,
+			address, out var actual));
+		Assert.Equal(value.Magic, actual.Magic);
+		Assert.Equal(value.InputMode, actual.InputMode);
+		Assert.Equal(value.Selected, actual.Selected);
+		Assert.Equal(value.Pressed, actual.Pressed);
+		Assert.Equal(value.ShowSelState, actual.ShowSelState);
+		Assert.False(MuiGadgetInteractionStateRecordCodec.TryReadRecord(
+			ref platform, APTR.FromPointer(0x30FFC), out _));
+	}
+
+	[Fact]
 	public void MalformedGadgetMagicRemainsStructuralButFailsClosed()
 	{
 		var platform = CreatePlatform();

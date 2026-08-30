@@ -142,18 +142,38 @@ internal static class MuiAreaDragPolicyStateRecordMemoryCodec
 
 internal static class MuiAreaDragPolicyStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiAreaDragPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		return MuiAreaDragPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaDragPolicyStateField.Magic, out value.Magic) &&
-			MuiAreaDragPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaDragPolicyStateField.Draggable, out value.Draggable) &&
-			MuiAreaDragPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaDragPolicyStateField.Dropable, out value.Dropable);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaDragPolicyStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Draggable) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Dropable)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaDragPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaDragPolicyStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Draggable) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Dropable) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaDragPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAreaDragPolicyStateRecord value)
@@ -165,16 +185,10 @@ internal static class MuiAreaDragPolicyStateRecordCodec
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaDragPolicyStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaDragPolicyStateRecord.Size) ||
-			!MuiAreaDragPolicyStateAdmission.Validate(value)) return false;
-		return MuiAreaDragPolicyStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiAreaDragPolicyStateField.Magic, value.Magic) &&
-			MuiAreaDragPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaDragPolicyStateField.Draggable, value.Draggable) &&
-			MuiAreaDragPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaDragPolicyStateField.Dropable, value.Dropable);
+		if (address.IsNull || !MuiAreaDragPolicyStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

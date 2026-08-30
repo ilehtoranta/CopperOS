@@ -43,4 +43,32 @@ public sealed class MuiApplicationMenuStructAdapterTests
 			ref platform, APTR.Null,
 			MuiApplicationMenuStateField.MenuAction, out _));
 	}
+
+	[Fact]
+	public void ApplicationMenuStateSequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x35C0);
+		var value = new MuiApplicationMenuStateRecord
+		{
+			Magic = MuiApplicationMenuStateRecord.Cookie,
+			MenuAction = uint.MaxValue,
+			MenuHelp = 0xDEADBEEFu,
+		};
+
+		Assert.True(MuiApplicationMenuStateRecordCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiApplicationMenuStateRecordCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.MenuAction, decoded.MenuAction);
+		Assert.Equal(value.MenuHelp, decoded.MenuHelp);
+
+		var crossingEnd = APTR.FromPointer(0x30FF5);
+		Assert.False(MuiApplicationMenuStateRecordCodec.WriteRecord(
+			ref platform, crossingEnd, value));
+		Assert.False(MuiApplicationMenuStateRecordCodec.TryReadRecord(
+			ref platform, crossingEnd, out _));
+	}
 }

@@ -90,4 +90,62 @@ public sealed class MuiListInteractionClickAdmissionTests
 		Assert.True(MuiListCore.MuiListClickStateCodec.TryReadStorage(ref platform,
 			clickAddress, out _));
 	}
+
+	[Fact]
+	public void ListInteractionPolicySequentialRecordPreservesFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3400);
+		var value = new MuiListCore.MuiListInteractionPolicyState
+		{
+			Magic = MuiListCore.MuiListInteractionPolicyState.Cookie,
+			Input = 1,
+			MultiSelect = 0xFFFFFFFFu,
+			ScrollerPos = 0x80000001u,
+		};
+
+		Assert.True(MuiListCore.MuiListInteractionPolicyStateCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiListCore.MuiListInteractionPolicyStateCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Input, decoded.Input);
+		Assert.Equal(value.MultiSelect, decoded.MultiSelect);
+		Assert.Equal(value.ScrollerPos, decoded.ScrollerPos);
+
+		Assert.False(MuiListCore.MuiListInteractionPolicyStateCodec.TryReadRecord(
+			ref platform, APTR.FromPointer(0x30FF1), out _));
+	}
+
+	[Fact]
+	public void ListClickSequentialRecordPreservesFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3400);
+		var value = new MuiListCore.MuiListClickState
+		{
+			Magic = MuiListCore.MuiListClickState.Cookie,
+			ClickColumn = 0xFFFFFFFFu,
+			DoubleClick = 2,
+			AgainClick = 0x80000000u,
+			Clicks = 0x13579BDFu,
+			DefClickColumn = 0x2468ACE0u,
+		};
+
+		Assert.True(MuiListCore.MuiListClickStateCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiListCore.MuiListClickStateCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.ClickColumn, decoded.ClickColumn);
+		Assert.Equal(value.DoubleClick, decoded.DoubleClick);
+		Assert.Equal(value.AgainClick, decoded.AgainClick);
+		Assert.Equal(value.Clicks, decoded.Clicks);
+		Assert.Equal(value.DefClickColumn, decoded.DefClickColumn);
+
+		Assert.False(MuiListCore.MuiListClickStateCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FE9), out _));
+	}
 }

@@ -105,9 +105,10 @@ internal static class MuiApplicationObjectStateFieldCursorCodec
 	}
 }
 
-// Fixed application object state is read and written as a named value. Keep
-// packed guest positions in this ABI adapter; production consumers do not
-// select fields through the compatibility cursor.
+// Fixed application object state is transferred as a named record. Numeric
+// guest positions are confined to the bounded ABI adapter; production
+// consumers exchange the declaration-order struct through the sequential
+// cursor below.
 internal static class MuiApplicationObjectStateRecordMemoryCodec
 {
 	private static bool TryResolve(MuiApplicationObjectStateField field,
@@ -171,29 +172,47 @@ internal static class MuiApplicationObjectStateRecordMemoryCodec
 
 internal static class MuiApplicationObjectStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationObjectStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationObjectStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiApplicationObjectStateField.Magic, out var magic) ||
-			!MuiApplicationObjectStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationObjectStateField.DiskObject,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationObjectStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var diskObject) ||
-			!MuiApplicationObjectStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationObjectStateField.DropObject,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var dropObject) ||
-			!MuiApplicationObjectStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationObjectStateField.Menustrip,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var menustrip)) return false;
-		value.Magic = magic;
 		value.DiskObject = APTR.FromPointer(diskObject);
 		value.DropObject = APTR.FromPointer(dropObject);
 		value.Menustrip = APTR.FromPointer(menustrip);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationObjectStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationObjectStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.DiskObject.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.DropObject.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Menustrip.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationObjectStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationObjectStateRecord value)
@@ -205,21 +224,9 @@ internal static class MuiApplicationObjectStateRecordCodec
 		MuiApplicationObjectStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationObjectStateRecord.Size) ||
-			!MuiApplicationObjectStateAdmission.Validate(ref platform, value))
+		if (address.IsNull || !MuiApplicationObjectStateAdmission.Validate(
+			ref platform, value))
 			return false;
-		return MuiApplicationObjectStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationObjectStateField.Magic,
-			value.Magic) &&
-			MuiApplicationObjectStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationObjectStateField.DiskObject,
-				value.DiskObject.Raw) &&
-			MuiApplicationObjectStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationObjectStateField.DropObject,
-				value.DropObject.Raw) &&
-			MuiApplicationObjectStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationObjectStateField.Menustrip,
-				value.Menustrip.Raw);
+		return WriteRecord(ref platform, address, value);
 	}
 }

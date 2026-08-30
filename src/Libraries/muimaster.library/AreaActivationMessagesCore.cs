@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -31,6 +32,44 @@ internal struct MuiAreaActivationMethodMessage
 	internal uint MethodId;
 }
 
+internal static class MuiAreaActivationMethodMessageCodec
+{
+	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaActivationMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		methodId = rawMethodId;
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiAreaActivationMethodMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadMethodId(ref platform, address, out var methodId)) return false;
+		value.MethodId = methodId;
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiAreaActivationMethodMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaActivationMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 internal enum MuiAreaActivationPacketKind : byte
 {
 	Method,
@@ -51,6 +90,8 @@ internal struct MuiAreaActivationFieldCursor
 	internal MuiAreaActivationField Field;
 }
 
+// Compatibility adapter retained for callers that still construct the typed
+// field cursor. Live activation packet consumers use the named record adapter.
 internal static class MuiAreaActivationFieldCursorCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -185,18 +226,17 @@ internal static class MuiAreaActivationMessageCodec
 		return true;
 	}
 
-	// Keep native selector admission scalar while the named method record remains
-	// the dispatcher-facing ABI type. Packed offsets stay inside this codec.
+	// Selector admission is decoded through the complete named method-header
+	// record; the field adapter remains available for explicit compatibility
+	// callers only.
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiAreaActivationMethodMessage.Size)) return false;
-		return MuiAreaActivationFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiAreaActivationPacketKind.Method,
-			MuiAreaActivationField.MethodId, out methodId);
+		return MuiAreaActivationMethodMessageCodec.TryReadMethodId(ref platform,
+			message, out methodId);
 	}
 
 	internal static bool IsMethod(uint method) => method == GoActive ||
@@ -206,29 +246,41 @@ internal static class MuiAreaActivationMessageCodec
 		out MuiAreaActivationMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		uint methodId;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiAreaActivationMessage.Size) ||
-			!TryReadMethodIdValue(ref platform, message, out methodId) ||
-			!IsMethod(methodId)) return false;
-		packet.MethodId = methodId;
-		return
-			MuiAreaActivationFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiAreaActivationPacketKind.Activation,
-				MuiAreaActivationField.Flags, out packet.Flags);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiAreaActivationMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags) ||
+			!MuiGuestStructCursor.IsComplete(cursor) ||
+			!IsMethod(packet.MethodId))
+		{
+			packet = default;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR message,
+		MuiAreaActivationMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!IsMethod(packet.MethodId)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiAreaActivationMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR message,
 		uint method, uint flags) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsMethod(method) || message.IsNull ||
-			!platform.IsMapped(message, MuiAreaActivationMessage.Size)) return false;
-		return MuiAreaActivationFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiAreaActivationPacketKind.Activation,
-			MuiAreaActivationField.MethodId, method) &&
-			MuiAreaActivationFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiAreaActivationPacketKind.Activation,
-				MuiAreaActivationField.Flags, flags);
+		var packet = default(MuiAreaActivationMessage);
+		packet.MethodId = method;
+		packet.Flags = flags;
+		return Write(ref platform, message, packet);
 	}
 }

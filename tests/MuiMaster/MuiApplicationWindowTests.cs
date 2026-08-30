@@ -14,8 +14,12 @@ public sealed class MuiApplicationWindowTests
 		const uint showHelpMethod = 0x80426479u;
 		var platform = CreatePlatform(out _);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0, aboutMethod);
-		platform.WriteUInt32(packet, 4, 0x1300);
+		Assert.True(MuiApplicationAboutMuiMessageCodec.Write(ref platform, packet,
+			new MuiApplicationAboutMuiMessage
+			{
+				MethodId = aboutMethod,
+				ReferenceWindow = 0x1300,
+			}));
 		var aboutRequest = new MuiApplicationPresentationPacketCodec.PresentationPacketAddress
 		{
 			Address = packet,
@@ -28,11 +32,24 @@ public sealed class MuiApplicationWindowTests
 			ref platform, packet, MuiApplicationPresentationPacketKind.AboutMui,
 			out var aboutMethodId));
 		Assert.Equal(aboutMethod, aboutMethodId);
-		platform.WriteUInt32(packet, 0, showHelpMethod);
-		platform.WriteUInt32(packet, 4, 0x1300);
-		platform.WriteUInt32(packet, 8, 0x1400);
-		platform.WriteUInt32(packet, 12, 0x1500);
-		platform.WriteUInt32(packet, 16, 9);
+		Assert.True(MuiApplicationShowHelpMessageCodec.Write(ref platform, packet,
+			new MuiApplicationShowHelpMessage
+			{
+				MethodId = showHelpMethod,
+				ReferenceWindow = 0x1300,
+				HelpFile = 0x1400,
+				Node = 0x1500,
+				Line = 9,
+			}));
+		Assert.True(MuiApplicationPresentationPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, packet, MuiApplicationPresentationPacketKind.ShowHelp,
+			MuiApplicationPresentationPacketField.Line, out var lineAddress));
+		Assert.Equal(packet.Raw + MuiApplicationShowHelpMessage.LineOffset,
+			lineAddress.Raw);
+		Assert.True(MuiApplicationPresentationPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, packet, MuiApplicationPresentationPacketKind.ShowHelp,
+			MuiApplicationPresentationPacketField.Line, out var directLine));
+		Assert.Equal(9u, directLine);
 		var helpRequest = new MuiApplicationPresentationPacketCodec.PresentationPacketAddress
 		{
 			Address = packet,
@@ -45,6 +62,10 @@ public sealed class MuiApplicationWindowTests
 		platform.WriteUInt32(packet, 0, 0xDEADBEEFu);
 		Assert.False(MuiApplicationPresentationPacketCodec.TryReadAboutMui(
 			ref platform, ref aboutRequest, out _));
+		Assert.False(MuiApplicationAboutMuiMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFC), out _));
+		Assert.False(MuiApplicationShowHelpMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFC), out _));
 	}
 
 	[Fact]
@@ -114,9 +135,22 @@ public sealed class MuiApplicationWindowTests
 		const uint loadMethod = 0x8042F90Du;
 		var platform = CreatePlatform(out _);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0, setConfigMethod);
-		platform.WriteUInt32(packet, 4, 0x22);
-		platform.WriteUInt32(packet, 8, 0x1300);
+		Assert.True(MuiApplicationSetConfigItemMessageCodec.Write(ref platform,
+			packet, new MuiApplicationSetConfigItemMessage
+			{
+				MethodId = setConfigMethod,
+				Item = 0x22,
+				Data = 0x1300,
+			}));
+		Assert.True(MuiApplicationSettingsPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, packet, MuiApplicationSettingsPacketKind.SetConfigItem,
+			MuiApplicationSettingsPacketField.Item, out var itemAddress));
+		Assert.Equal(packet.Raw + MuiApplicationSetConfigItemMessage.ItemOffset,
+			itemAddress.Raw);
+		Assert.True(MuiApplicationSettingsPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, packet, MuiApplicationSettingsPacketKind.SetConfigItem,
+			MuiApplicationSettingsPacketField.Item, out var directItem));
+		Assert.Equal(0x22u, directItem);
 		var setRequest = new MuiApplicationSettingsPacketCodec.SettingsPacketAddress
 		{
 			Address = packet,
@@ -125,11 +159,19 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationSettingsPacketCodec.TryReadSetConfigItem(
 			ref platform, ref setRequest, out var set));
 		Assert.Equal(setConfigMethod, set.MethodId);
+		Assert.Equal(0x22u, set.Item);
+		Assert.Equal(0x1300u, set.Data);
 		Assert.True(MuiApplicationSettingsPacketCodec.TryReadMethodIdValue(
 			ref platform, packet, MuiApplicationSettingsPacketKind.SetConfigItem,
 			out var setMethodId));
 		Assert.Equal(setConfigMethod, setMethodId);
-		platform.WriteUInt32(packet, 0, openConfigMethod);
+		Assert.True(MuiApplicationOpenConfigWindowMessageCodec.Write(ref platform,
+			packet, new MuiApplicationOpenConfigWindowMessage
+			{
+				MethodId = openConfigMethod,
+				Flags = 3,
+				ClassId = 0x1400,
+			}));
 		var openRequest = new MuiApplicationSettingsPacketCodec.SettingsPacketAddress
 		{
 			Address = packet,
@@ -138,11 +180,18 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationSettingsPacketCodec.TryReadOpenConfigWindow(
 			ref platform, ref openRequest, out var open));
 		Assert.Equal(openConfigMethod, open.MethodId);
+		Assert.Equal(3u, open.Flags);
+		Assert.Equal(0x1400u, open.ClassId);
 		Assert.True(MuiApplicationSettingsPacketCodec.TryReadMethodIdValue(
 			ref platform, packet, MuiApplicationSettingsPacketKind.OpenConfigWindow,
 			out var openMethodId));
 		Assert.Equal(openConfigMethod, openMethodId);
-		platform.WriteUInt32(packet, 0, buildPanelMethod);
+		Assert.True(MuiApplicationBuildSettingsPanelMessageCodec.Write(ref platform,
+			packet, new MuiApplicationBuildSettingsPanelMessage
+			{
+				MethodId = buildPanelMethod,
+				Number = 4,
+			}));
 		var buildRequest = new MuiApplicationSettingsPacketCodec.SettingsPacketAddress
 		{
 			Address = packet,
@@ -151,12 +200,17 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationSettingsPacketCodec.TryReadBuildSettingsPanel(
 			ref platform, ref buildRequest, out var build));
 		Assert.Equal(buildPanelMethod, build.MethodId);
+		Assert.Equal(4u, build.Number);
 		Assert.True(MuiApplicationSettingsPacketCodec.TryReadMethodIdValue(
 			ref platform, packet, MuiApplicationSettingsPacketKind.BuildSettingsPanel,
 			out var buildMethodId));
 		Assert.Equal(buildPanelMethod, buildMethodId);
-		platform.WriteUInt32(packet, 0, loadMethod);
-		platform.WriteUInt32(packet, 4, 0x1400);
+		Assert.True(MuiApplicationSettingsIoMessageCodec.Write(ref platform, packet,
+			new MuiApplicationSettingsIoMessage
+			{
+				MethodId = loadMethod,
+				Name = 0x1400,
+			}));
 		var ioRequest = new MuiApplicationSettingsPacketCodec.SettingsPacketAddress
 		{
 			Address = packet,
@@ -165,6 +219,7 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationSettingsPacketCodec.TryReadSettingsIo(ref platform,
 			ref ioRequest, out var io));
 		Assert.Equal(loadMethod, io.MethodId);
+		Assert.Equal(0x1400u, io.Name);
 		Assert.True(MuiApplicationSettingsPacketCodec.TryReadMethodIdValue(
 			ref platform, packet, MuiApplicationSettingsPacketKind.SettingsIo,
 			out var ioMethodId));
@@ -172,6 +227,15 @@ public sealed class MuiApplicationWindowTests
 		platform.WriteUInt32(packet, 0, 0xDEADBEEFu);
 		Assert.False(MuiApplicationSettingsPacketCodec.TryReadSettingsIo(
 			ref platform, ref ioRequest, out _));
+
+		Assert.False(MuiApplicationSetConfigItemMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFCu), out _));
+		Assert.False(MuiApplicationOpenConfigWindowMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFCu), out _));
+		Assert.False(MuiApplicationBuildSettingsPanelMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFCu), out _));
+		Assert.False(MuiApplicationSettingsIoMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFCu), out _));
 	}
 
 	[Fact]
@@ -412,6 +476,25 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void ApplicationSettingsTransferMemoryAdapterUsesNamedChunkBoundary()
+	{
+		var platform = CreatePlatform(out _);
+		var baseAddress = APTR.FromPointer(0x1800u);
+		Assert.True(MuiApplicationSettingsTransferMemoryCodec.TryGetAddress(
+			ref platform, baseAddress, 4, 4, out var address));
+		Assert.Equal(APTR.FromPointer(0x1804u), address);
+		Assert.True(MuiApplicationSettingsTransferMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0x20FFCu), 0, 4, out address));
+		Assert.Equal(APTR.FromPointer(0x20FFCu), address);
+		Assert.False(MuiApplicationSettingsTransferMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0x20FFCu), 0, 5, out _));
+		Assert.False(MuiApplicationSettingsTransferMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0xFFFFFFF0u), 0, 4, out _));
+		Assert.False(MuiApplicationSettingsTransferMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, 0, 1, out _));
+	}
+
+	[Fact]
 	public void ApplicationMethodReadersUseNamedMethodHeader()
 	{
 		const uint configMethod = 0x8042D934u;
@@ -421,8 +504,21 @@ public sealed class MuiApplicationWindowTests
 		const uint snapshotMethod = 0x8042945Eu;
 		var platform = CreatePlatform(out _);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0, configMethod);
-		platform.WriteUInt32(packet, 4, 0x44);
+		Assert.True(MuiApplicationConfigIdMessageCodec.Write(ref platform, packet,
+			new MuiApplicationConfigIdMessage
+			{
+				MethodId = configMethod,
+				ConfigId = 0x44,
+			}));
+		Assert.True(MuiApplicationMethodPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, packet, MuiApplicationMethodPacketKind.ConfigId,
+			MuiApplicationMethodPacketField.ConfigId, out var configIdAddress));
+		Assert.Equal(packet.Raw + MuiApplicationConfigIdMessage.ConfigIdOffset,
+			configIdAddress.Raw);
+		Assert.True(MuiApplicationMethodPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, packet, MuiApplicationMethodPacketKind.ConfigId,
+			MuiApplicationMethodPacketField.ConfigId, out var directConfigId));
+		Assert.Equal(0x44u, directConfigId);
 		var configRequest = new MuiApplicationMethodPacketCodec.MethodPacketAddress
 		{
 			Address = packet,
@@ -431,11 +527,16 @@ public sealed class MuiApplicationWindowTests
 		Assert.True(MuiApplicationMethodPacketCodec.TryReadConfigId(ref platform,
 			ref configRequest, out var config));
 		Assert.Equal(configMethod, config.MethodId);
+		Assert.Equal(0x44u, config.ConfigId);
 		Assert.True(MuiApplicationMethodPacketCodec.TryReadMethodIdValue(
 			ref platform, packet, MuiApplicationMethodPacketKind.ConfigId,
 			out var configMethodId));
 		Assert.Equal(configMethod, configMethodId);
-		platform.WriteUInt32(packet, 0, refreshMethod);
+		Assert.True(MuiApplicationCheckRefreshMessageCodec.Write(ref platform,
+			packet, new MuiApplicationCheckRefreshMessage
+			{
+				MethodId = refreshMethod,
+			}));
 		var refreshRequest = new MuiApplicationMethodPacketCodec.MethodPacketAddress
 		{
 			Address = packet,
@@ -448,7 +549,11 @@ public sealed class MuiApplicationWindowTests
 			ref platform, packet, MuiApplicationMethodPacketKind.CheckRefresh,
 			out var refreshMethodId));
 		Assert.Equal(refreshMethod, refreshMethodId);
-		platform.WriteUInt32(packet, 0, loopMethod);
+		Assert.True(MuiApplicationLoopMessageCodec.Write(ref platform, packet,
+			new MuiApplicationLoopMessage
+			{
+				MethodId = loopMethod,
+			}));
 		var loopRequest = new MuiApplicationMethodPacketCodec.MethodPacketAddress
 		{
 			Address = packet,
@@ -461,7 +566,11 @@ public sealed class MuiApplicationWindowTests
 			ref platform, packet, MuiApplicationMethodPacketKind.Loop,
 			out var loopMethodId));
 		Assert.Equal(loopMethod, loopMethodId);
-		platform.WriteUInt32(packet, 0, windowMethod);
+		Assert.True(MuiWindowMethodMessageCodec.Write(ref platform, packet,
+			new MuiWindowMethodMessage
+			{
+				MethodId = windowMethod,
+			}));
 		var windowRequest = new MuiApplicationMethodPacketCodec.MethodPacketAddress
 		{
 			Address = packet,
@@ -474,8 +583,12 @@ public sealed class MuiApplicationWindowTests
 			ref platform, packet, MuiApplicationMethodPacketKind.WindowMethod,
 			out var windowMethodId));
 		Assert.Equal(windowMethod, windowMethodId);
-		platform.WriteUInt32(packet, 0, snapshotMethod);
-		platform.WriteUInt32(packet, 4, 1);
+		Assert.True(MuiWindowSnapshotMessageCodec.Write(ref platform, packet,
+			new MuiWindowSnapshotMessage
+			{
+				MethodId = snapshotMethod,
+				Flags = 1,
+			}));
 		var snapshotRequest = new MuiApplicationMethodPacketCodec.MethodPacketAddress
 		{
 			Address = packet,
@@ -492,6 +605,17 @@ public sealed class MuiApplicationWindowTests
 		platform.WriteUInt32(packet, 0, 0xDEADBEEFu);
 		Assert.False(MuiApplicationMethodPacketCodec.TryReadSnapshot(ref platform,
 			ref snapshotRequest, out _));
+
+		Assert.False(MuiApplicationConfigIdMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiApplicationCheckRefreshMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiApplicationLoopMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiWindowMethodMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiWindowSnapshotMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
 	}
 
 	[Fact]
@@ -552,6 +676,21 @@ public sealed class MuiApplicationWindowTests
 		var applicationSet = APTR.FromPointer(0x1240);
 		var windowQuery = APTR.FromPointer(0x1280);
 		var windowSet = APTR.FromPointer(0x12C0);
+		Assert.True(MuiApplicationMenuPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, applicationQuery,
+			MuiApplicationMenuPacketKind.ApplicationQuery,
+			MuiApplicationMenuPacketField.MenuId, out var menuIdAddress));
+		Assert.Equal(applicationQuery.Raw + MuiApplicationMenuQueryMessage.MenuIdOffset,
+			menuIdAddress.Raw);
+		Assert.True(MuiApplicationMenuPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, applicationQuery,
+			MuiApplicationMenuPacketKind.ApplicationQuery,
+			MuiApplicationMenuPacketField.MenuId, 7u));
+		Assert.True(MuiApplicationMenuPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, applicationQuery,
+			MuiApplicationMenuPacketKind.ApplicationQuery,
+			MuiApplicationMenuPacketField.MenuId, out var directMenuId));
+		Assert.Equal(7u, directMenuId);
 
 		Assert.True(MuiApplicationMenuPacketFieldCursorCodec.TryWriteUInt32(
 			ref platform, applicationQuery,
@@ -646,8 +785,21 @@ public sealed class MuiApplicationWindowTests
 		const uint method = 0x80426510u;
 		var platform = CreatePlatform(out _);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0, method);
-		platform.WriteUInt32(packet, 4, 0x1300);
+		Assert.True(MuiWindowCycleChainMessageCodec.Write(ref platform, packet,
+			new MuiWindowCycleChainMessage
+			{
+				MethodId = method,
+				FirstObject = 0x1300,
+			}));
+		Assert.True(MuiWindowCycleChainPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, packet, MuiWindowCycleChainPacketField.FirstObject,
+			out var firstObjectAddress));
+		Assert.Equal(packet.Raw + MuiWindowCycleChainMessage.FirstObjectOffset,
+			firstObjectAddress.Raw);
+		Assert.True(MuiWindowCycleChainPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, packet, MuiWindowCycleChainPacketField.FirstObject,
+			out var directFirstObject));
+		Assert.Equal(0x1300u, directFirstObject);
 		var request = new MuiWindowCycleChainPacketCodec.CycleChainPacketAddress
 		{
 			Address = packet,
@@ -663,6 +815,8 @@ public sealed class MuiApplicationWindowTests
 		platform.WriteUInt32(packet, 0, 0xDEADBEEFu);
 		Assert.False(MuiWindowCycleChainPacketCodec.TryRead(ref platform,
 			ref request, out _));
+		Assert.False(MuiWindowCycleChainMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
 	}
 
 	[Fact]
@@ -719,6 +873,24 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void WindowCycleChainInlineMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var message = APTR.FromPointer(0x1800);
+
+		Assert.True(MuiWindowCycleChainInlineVectorMemoryCodec.TryGetEntry(
+			ref platform, message, 2, out var address));
+		Assert.Equal(APTR.FromPointer(0x180C), address);
+		Assert.False(MuiWindowCycleChainInlineVectorMemoryCodec.TryGetEntry(
+			ref platform, message,
+			MuiApplicationWindowCycleChainCursor.MaximumEntries, out _));
+		Assert.False(MuiWindowCycleChainInlineVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0x20FFC), 0, out _));
+		Assert.False(MuiWindowCycleChainInlineVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0xFFFFFFF0), 0, out _));
+	}
+
+	[Fact]
 	public void WindowCycleChainCursorUsesNamedEntryBoundary()
 	{
 		var platform = CreatePlatform(out _);
@@ -746,6 +918,24 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void WindowCycleChainVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var vector = APTR.FromPointer(0x1800);
+
+		Assert.True(MuiApplicationWindowCycleChainVectorMemoryCodec.TryGetEntry(
+			ref platform, vector, 1, out var address));
+		Assert.Equal(APTR.FromPointer(0x1804), address);
+		Assert.False(MuiApplicationWindowCycleChainVectorMemoryCodec.TryGetEntry(
+			ref platform, vector,
+			MuiApplicationWindowCycleChainCursor.MaximumEntries, out _));
+		Assert.False(MuiApplicationWindowCycleChainVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0x20FFE), 0, out _));
+		Assert.False(MuiApplicationWindowCycleChainVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.Null, 0, out _));
+	}
+
+	[Fact]
 	public void ApplicationMethodHeaderCodecUsesNamedField()
 	{
 		var platform = CreatePlatform(out _);
@@ -761,6 +951,8 @@ public sealed class MuiApplicationWindowTests
 		Assert.Equal(expected.MethodId, actual.MethodId);
 		Assert.False(MuiApplicationMethodHeaderCodec.TryRead(ref platform,
 			APTR.Null, out _));
+		Assert.False(MuiApplicationMethodHeaderCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
 	}
 
 	[Fact]
@@ -832,6 +1024,21 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void WindowNodePayloadMemoryAdapterUsesNamedRecordBoundary()
+	{
+		var platform = CreatePlatform(out _);
+		Assert.True(MuiApplicationWindowNodePayloadMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0x1600u), 8, out var payload));
+		Assert.Equal(APTR.FromPointer(0x1610u), payload);
+		Assert.False(MuiApplicationWindowNodePayloadMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0xFFFFFFF0u), 8, out _));
+		Assert.False(MuiApplicationWindowNodePayloadMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0x1600u), 0, out _));
+		Assert.False(MuiApplicationWindowNodePayloadMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, 8, out _));
+	}
+
+	[Fact]
 	public void WindowNodeFieldCursorUsesNamedRecordBoundary()
 	{
 		var platform = CreatePlatform(out _);
@@ -853,6 +1060,41 @@ public sealed class MuiApplicationWindowTests
 		Assert.False(MuiApplicationWindowNodeFieldCursorCodec.TryReadUInt32(
 			ref platform, APTR.FromPointer(0xFFFFFFF0u),
 			MuiApplicationWindowNodeField.Packet, out _));
+	}
+
+	[Fact]
+	public void WindowNodeRecordAdapterUsesNamedStructMembers()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1900);
+		var expected = new MuiApplicationWindowNodeRecord
+		{
+			Next = APTR.FromPointer(0x1A00),
+			Value = APTR.FromPointer(0x1B00),
+			Sequence = 2,
+			Auxiliary = 3,
+			Packet = 0x80420001,
+		};
+
+		Assert.True(MuiApplicationWindowNodeCodec.Write(ref platform, address,
+			expected));
+		Assert.True(MuiApplicationWindowNodeRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiApplicationWindowNodeField.Packet,
+			out var packet));
+		Assert.Equal(address.Raw + MuiApplicationWindowNodeRecord.PacketOffset,
+			packet.Raw);
+		Assert.True(MuiApplicationWindowNodeCodec.TryRead(ref platform, address,
+			out var actual));
+		Assert.Equal(expected.Next, actual.Next);
+		Assert.Equal(expected.Value, actual.Value);
+		Assert.Equal(expected.Sequence, actual.Sequence);
+		Assert.Equal(expected.Auxiliary, actual.Auxiliary);
+		Assert.Equal(expected.Packet, actual.Packet);
+		Assert.False(MuiApplicationWindowNodeRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0xFFFFFFF0u),
+			MuiApplicationWindowNodeField.Value, out _));
+		Assert.False(MuiApplicationWindowNodeRecordMemoryCodec.TryGetAddress(
+			ref platform, APTR.Null, MuiApplicationWindowNodeField.Next, out _));
 	}
 
 	[Fact]
@@ -1313,9 +1555,9 @@ public sealed class MuiApplicationWindowTests
 		value.Open = 1;
 		value.EventMask = 0x1234;
 		value.IconifiedOpen = 1;
-		Assert.True(MuiWindowLifecycleStateRecordCodec.Write(ref platform,
+		Assert.True(MuiWindowLifecycleStateRecordCodec.WriteRecord(ref platform,
 			address, value));
-		Assert.True(MuiWindowLifecycleStateRecordCodec.TryRead(ref platform,
+		Assert.True(MuiWindowLifecycleStateRecordCodec.TryReadRecord(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.NativeWindow, decoded.NativeWindow);
@@ -1442,9 +1684,9 @@ public sealed class MuiApplicationWindowTests
 		value.UseBottomBorderScroller = 1;
 		value.UseLeftBorderScroller = 0;
 		value.UseRightBorderScroller = 1;
-		Assert.True(MuiWindowOpenPolicyStateRecordCodec.Write(ref platform,
+		Assert.True(MuiWindowOpenPolicyStateRecordCodec.WriteRecord(ref platform,
 			address, value));
-		Assert.True(MuiWindowOpenPolicyStateRecordCodec.TryRead(ref platform,
+		Assert.True(MuiWindowOpenPolicyStateRecordCodec.TryReadRecord(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.AlternateHeight, decoded.AlternateHeight);
@@ -1604,9 +1846,9 @@ public sealed class MuiApplicationWindowTests
 		value.Screen = APTR.FromPointer(0x2300);
 		value.ScreenTitle = APTR.FromPointer(0x2400);
 		value.PublicScreen = APTR.FromPointer(0x2500);
-		Assert.True(MuiWindowPresentationStateRecordCodec.Write(ref platform,
+		Assert.True(MuiWindowPresentationStateRecordCodec.WriteRecord(ref platform,
 			address, value));
-		Assert.True(MuiWindowPresentationStateRecordCodec.TryRead(ref platform,
+		Assert.True(MuiWindowPresentationStateRecordCodec.TryReadRecord(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.Title, decoded.Title);
@@ -1744,9 +1986,9 @@ public sealed class MuiApplicationWindowTests
 		value.Opacity = 128;
 		value.FancyDrawing = 1;
 		value.MenuAction = 0xCAFE;
-		Assert.True(MuiWindowVisualStateRecordCodec.Write(ref platform, address,
+		Assert.True(MuiWindowVisualStateRecordCodec.WriteRecord(ref platform, address,
 			value));
-		Assert.True(MuiWindowVisualStateRecordCodec.TryRead(ref platform, address,
+		Assert.True(MuiWindowVisualStateRecordCodec.TryReadRecord(ref platform, address,
 			out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.NoMenus, decoded.NoMenus);
@@ -2260,9 +2502,9 @@ public sealed class MuiApplicationWindowTests
 		value.CycleChainHead = APTR.FromPointer(0x2A00);
 		value.CycleChainCount = 3;
 		value.CycleChainRequests = 4;
-		Assert.True(MuiWindowInteractionStateRecordCodec.Write(ref platform,
+		Assert.True(MuiWindowInteractionStateRecordCodec.WriteRecord(ref platform,
 			address, value));
-		Assert.True(MuiWindowInteractionStateRecordCodec.TryRead(ref platform,
+		Assert.True(MuiWindowInteractionStateRecordCodec.TryReadRecord(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.SnapshotFlags, decoded.SnapshotFlags);
@@ -2432,9 +2674,9 @@ public sealed class MuiApplicationWindowTests
 		value.CloseRequest = 1;
 		value.InputEvent = APTR.FromPointer(0x2B40);
 		value.MouseObject = APTR.FromPointer(0x2B80);
-		Assert.True(MuiWindowEventStateRecordCodec.Write(ref platform, address,
+		Assert.True(MuiWindowEventStateRecordCodec.WriteRecord(ref platform, address,
 			value));
-		Assert.True(MuiWindowEventStateRecordCodec.TryRead(ref platform, address,
+		Assert.True(MuiWindowEventStateRecordCodec.TryReadRecord(ref platform, address,
 			out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.CloseRequest, decoded.CloseRequest);
@@ -2511,8 +2753,8 @@ public sealed class MuiApplicationWindowTests
 			Position = unchecked((int)0xFFFE0003),
 			TimeStamp = new TimeVal { Seconds = 7, Microseconds = 11 },
 		};
-		Assert.True(MuiWindowInputEventCodec.Write(ref platform, address, value));
-		Assert.True(MuiWindowInputEventCodec.TryRead(ref platform, address,
+		Assert.True(MuiWindowInputEventCodec.WriteRecord(ref platform, address, value));
+		Assert.True(MuiWindowInputEventCodec.TryReadRecord(ref platform, address,
 			out var decoded));
 		Assert.Equal(value.NextEvent, decoded.NextEvent);
 		Assert.Equal(value.Class, decoded.Class);
@@ -4494,9 +4736,9 @@ public sealed class MuiApplicationWindowTests
 		value.RootObject = APTR.FromPointer(0x3740);
 		value.Menustrip = APTR.FromPointer(0x3780);
 		value.RefWindow = APTR.FromPointer(0x37C0);
-		Assert.True(MuiWindowRelationshipStateRecordCodec.Write(ref platform,
+		Assert.True(MuiWindowRelationshipStateRecordCodec.WriteRecord(ref platform,
 			address, value));
-		Assert.True(MuiWindowRelationshipStateRecordCodec.TryRead(ref platform,
+		Assert.True(MuiWindowRelationshipStateRecordCodec.TryReadRecord(ref platform,
 			address, out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.RootObject, decoded.RootObject);
@@ -4617,9 +4859,9 @@ public sealed class MuiApplicationWindowTests
 		value.VisibleOnMaximize = 1;
 		value.IsSubWindow = 1;
 		value.NeedsMouseObject = 0;
-		Assert.True(MuiWindowControlStateRecordCodec.Write(ref platform, address,
+		Assert.True(MuiWindowControlStateRecordCodec.WriteRecord(ref platform, address,
 			value));
-		Assert.True(MuiWindowControlStateRecordCodec.TryRead(ref platform, address,
+		Assert.True(MuiWindowControlStateRecordCodec.TryReadRecord(ref platform, address,
 			out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.Id, decoded.Id);
@@ -4765,6 +5007,20 @@ public sealed class MuiApplicationWindowTests
 		cursor.Index = 0;
 		Assert.False(MuiApplicationCommandTableCodec.TryGetEntry(ref platform,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationCommandTableMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var table = APTR.FromPointer(0x1800);
+		Assert.True(MuiApplicationCommandTableMemoryCodec.TryGetEntry(
+			ref platform, table, 2, out var address));
+		Assert.Equal(APTR.FromPointer(0x1848), address);
+		Assert.False(MuiApplicationCommandTableMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0x20FFC), 0, out _));
+		Assert.False(MuiApplicationCommandTableMemoryCodec.TryGetEntry(
+			ref platform, table, uint.MaxValue, out _));
 	}
 
 	[Fact]
@@ -4931,6 +5187,22 @@ public sealed class MuiApplicationWindowTests
 		cursor.Index = 0;
 		Assert.False(MuiApplicationWindowListEntryVectorCodec.TryGetEntry(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationWindowListEntryVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var vector = APTR.FromPointer(0x1A00);
+		Assert.True(MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(
+			ref platform, vector, 2, out var address));
+		Assert.Equal(APTR.FromPointer(0x1A20), address);
+		Assert.False(MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0x20FF1), 0, out _));
+		Assert.False(MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0xFFFFFFF0), 2, out _));
+		Assert.False(MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.Null, 0, out _));
 	}
 
 	[Fact]
@@ -6345,9 +6617,9 @@ public sealed class MuiApplicationWindowTests
 		value.Magic = MuiWindowFocusStateRecord.Cookie;
 		value.ActiveObject = APTR.FromPointer(0x3D00);
 		value.DefaultObject = APTR.FromPointer(0x3D40);
-		Assert.True(MuiWindowFocusStateRecordCodec.Write(ref platform, address,
+		Assert.True(MuiWindowFocusStateRecordCodec.WriteRecord(ref platform, address,
 			value));
-		Assert.True(MuiWindowFocusStateRecordCodec.TryRead(ref platform, address,
+		Assert.True(MuiWindowFocusStateRecordCodec.TryReadRecord(ref platform, address,
 			out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.ActiveObject, decoded.ActiveObject);
@@ -7655,6 +7927,24 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void ApplicationMessageArgumentMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var vector = APTR.FromPointer(0x1800);
+
+		Assert.True(MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(
+			ref platform, vector, 2, out var address));
+		Assert.Equal(APTR.FromPointer(0x1810), address);
+		Assert.False(MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(
+			ref platform, vector,
+			MuiWorkbenchArgumentVectorCursor.MaximumEntries, out _));
+		Assert.False(MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0x20FFC), 0, out _));
+		Assert.False(MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.Null, 0, out _));
+	}
+
+	[Fact]
 	public void WorkbenchArgumentFieldCursorUsesNamedBoundary()
 	{
 		var platform = CreatePlatform(out _);
@@ -8408,6 +8698,35 @@ public sealed class MuiApplicationWindowTests
 	[Fact]
 	public void WindowAlternateGeometryIsInitializerOnlyAndForwardsAsRecord()
 	{
+		Assert.Equal(16, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiWindowPublicCore.MuiWindowAlternateGeometry>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiWindowPublicCore.MuiWindowAlternateGeometry>(nameof(
+				MuiWindowPublicCore.MuiWindowAlternateGeometry.Height)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiWindowPublicCore.MuiWindowAlternateGeometry>(nameof(
+				MuiWindowPublicCore.MuiWindowAlternateGeometry.Width)).ToInt32());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiWindowPublicCore.MuiWindowAlternateGeometry>(nameof(
+				MuiWindowPublicCore.MuiWindowAlternateGeometry.LeftEdge)).ToInt32());
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiWindowPublicCore.MuiWindowAlternateGeometry>(nameof(
+				MuiWindowPublicCore.MuiWindowAlternateGeometry.TopEdge)).ToInt32());
+		Assert.Equal(16, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiWindowPublicCore.MuiWindowGeometry>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiWindowPublicCore.MuiWindowGeometry>(nameof(
+				MuiWindowPublicCore.MuiWindowGeometry.Height)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiWindowPublicCore.MuiWindowGeometry>(nameof(
+				MuiWindowPublicCore.MuiWindowGeometry.Width)).ToInt32());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiWindowPublicCore.MuiWindowGeometry>(nameof(
+				MuiWindowPublicCore.MuiWindowGeometry.LeftEdge)).ToInt32());
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiWindowPublicCore.MuiWindowGeometry>(nameof(
+				MuiWindowPublicCore.MuiWindowGeometry.TopEdge)).ToInt32());
+
 		var platform = CreatePlatform(out var cl);
 		var tags = APTR.FromPointer(0x1D00);
 		platform.WriteUInt32(tags, 0, MuiWindowPublicCore.AltHeight);

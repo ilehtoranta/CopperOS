@@ -89,9 +89,9 @@ internal static class MuiApplicationMessageRoutingStateFieldCursorCodec
 	}
 }
 
-// Fixed routing state is read and written as a named value. Keep packed guest
-// positions in this bounded ABI adapter; production consumers do not select
-// numeric slots directly.
+// Fixed routing state is transferred as a named record. Numeric guest
+// positions are confined to this bounded ABI adapter; production consumers
+// exchange the declaration-order struct through the sequential cursor below.
 internal static class MuiApplicationMessageRoutingStateRecordMemoryCodec
 {
 	private static bool TryResolve(
@@ -152,27 +152,41 @@ internal static class MuiApplicationMessageRoutingStateRecordMemoryCodec
 
 internal static class MuiApplicationMessageRoutingStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationMessageRoutingStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationMessageRoutingStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address,
-			MuiApplicationMessageRoutingStateField.Magic, out var magic) ||
-			!MuiApplicationMessageRoutingStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationMessageRoutingStateField.AppMessage,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationMessageRoutingStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var appMessage) ||
-			!MuiApplicationMessageRoutingStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationMessageRoutingStateField.WindowAppWindow,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.WindowAppWindow)) return false;
-		value.Magic = magic;
 		value.AppMessage = APTR.FromPointer(appMessage);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationMessageRoutingStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationMessageRoutingStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.AppMessage.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.WindowAppWindow) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationMessageRoutingStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationMessageRoutingStateRecord value)
@@ -184,20 +198,9 @@ internal static class MuiApplicationMessageRoutingStateRecordCodec
 		MuiApplicationMessageRoutingStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationMessageRoutingStateRecord.Size) ||
-			!MuiApplicationMessageRoutingStateAdmission.Validate(ref platform, value))
+		if (address.IsNull || !MuiApplicationMessageRoutingStateAdmission.Validate(
+			ref platform, value))
 			return false;
-		return MuiApplicationMessageRoutingStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationMessageRoutingStateField.Magic,
-			value.Magic) &&
-			MuiApplicationMessageRoutingStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationMessageRoutingStateField.AppMessage,
-				value.AppMessage.Raw) &&
-			MuiApplicationMessageRoutingStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationMessageRoutingStateField.WindowAppWindow,
-				value.WindowAppWindow);
+		return WriteRecord(ref platform, address, value);
 	}
 }

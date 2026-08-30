@@ -19,12 +19,14 @@ internal struct MuiApplicationConfigWindowStateRecord
 	internal const uint FlagsOffset = 4;
 	internal const uint ClassIdOffset = 8;
 	internal const uint RequestsOffset = 12;
+	internal const uint ReservedOffset = 16;
 	internal const uint Cookie = 0x41435754u; // 'ACWT'
 
 	internal uint Magic;
 	internal uint Flags;
 	internal APTR ClassId;
 	internal uint Requests;
+	internal uint Reserved;
 }
 
 // OpenConfigWindow retains raw MorphOS flags and a caller-owned class-id
@@ -55,6 +57,7 @@ internal enum MuiApplicationConfigWindowStateField : byte
 	Flags,
 	ClassId,
 	Requests,
+	Reserved,
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -113,6 +116,9 @@ internal static class MuiApplicationConfigWindowStateRecordMemoryCodec
 			case MuiApplicationConfigWindowStateField.Requests:
 				offset = MuiApplicationConfigWindowStateRecord.RequestsOffset;
 				return true;
+			case MuiApplicationConfigWindowStateField.Reserved:
+				offset = MuiApplicationConfigWindowStateRecord.ReservedOffset;
+				return true;
 		}
 		offset = 0;
 		return false;
@@ -157,29 +163,52 @@ internal static class MuiApplicationConfigWindowStateRecordMemoryCodec
 
 internal static class MuiApplicationConfigWindowStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// OpenConfigWindow state is a fixed five-ULONG record. Exchange the
+	// declaration-ordered fields as one named struct; class-id pointer validity
+	// remains the responsibility of the admission layer below.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationConfigWindowStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationConfigWindowStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address,
-			MuiApplicationConfigWindowStateField.Magic, out var magic) ||
-			!MuiApplicationConfigWindowStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationConfigWindowStateField.Flags, out value.Flags) ||
-			!MuiApplicationConfigWindowStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationConfigWindowStateField.ClassId, out var classId) ||
-			!MuiApplicationConfigWindowStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationConfigWindowStateField.Requests, out value.Requests))
-			return false;
-		value.Magic = magic;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationConfigWindowStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Flags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var classId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Requests) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved)) return false;
 		value.ClassId = APTR.FromPointer(classId);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationConfigWindowStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationConfigWindowStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Flags) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ClassId.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Requests) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Reserved) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationConfigWindowStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationConfigWindowStateRecord value)
@@ -195,17 +224,6 @@ internal static class MuiApplicationConfigWindowStateRecordCodec
 			MuiApplicationConfigWindowStateRecord.Size) ||
 			!MuiApplicationConfigWindowStateAdmission.Validate(ref platform, value))
 			return false;
-		return MuiApplicationConfigWindowStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationConfigWindowStateField.Magic,
-			value.Magic) &&
-			MuiApplicationConfigWindowStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationConfigWindowStateField.Flags,
-				value.Flags) &&
-			MuiApplicationConfigWindowStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationConfigWindowStateField.ClassId,
-				value.ClassId.Raw) &&
-			MuiApplicationConfigWindowStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationConfigWindowStateField.Requests,
-				value.Requests);
+		return WriteRecord(ref platform, address, value);
 	}
 }

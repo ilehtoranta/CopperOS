@@ -186,28 +186,62 @@ internal static class MuiWindowInteractionStateRecordMemoryCodec
 
 internal static class MuiWindowInteractionStateRecordCodec
 {
+	// Sequential named-struct path used by Window snapshot/cycle-chain code.
+	// Cookie, counters, and the cycle-chain pointer are exchanged in
+	// declaration order; numeric positions remain confined to the compatibility
+	// adapter.
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiWindowInteractionStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWindowInteractionStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SnapshotFlags) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SnapshotRequests) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.CycleChainHead.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.CycleChainCount) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.CycleChainRequests) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiWindowInteractionStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWindowInteractionStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var snapshotFlags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var snapshotRequests) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var cycleChainHead) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var cycleChainCount) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var cycleChainRequests) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value.Magic = magic;
+		value.SnapshotFlags = snapshotFlags;
+		value.SnapshotRequests = snapshotRequests;
+		value.CycleChainHead = APTR.FromPointer(cycleChainHead);
+		value.CycleChainCount = cycleChainCount;
+		value.CycleChainRequests = cycleChainRequests;
+		return true;
+	}
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiWindowInteractionStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (!MuiWindowInteractionStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 0, out var magic) ||
-			!MuiWindowInteractionStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, 4, out value.SnapshotFlags) ||
-			!MuiWindowInteractionStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, 8, out value.SnapshotRequests) ||
-			!MuiWindowInteractionStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, 12, out var cycleHead) ||
-			!MuiWindowInteractionStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, 16, out value.CycleChainCount) ||
-			!MuiWindowInteractionStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, 20, out value.CycleChainRequests)) return false;
-		value.Magic = magic;
-		value.CycleChainHead = APTR.FromPointer(cycleHead);
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiWindowInteractionStateRecord value)
@@ -221,17 +255,6 @@ internal static class MuiWindowInteractionStateRecordCodec
 	{
 		if (!MuiWindowInteractionStateAdmission.Validate(ref platform, value))
 			return false;
-		return MuiWindowInteractionStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 0, value.Magic) &&
-			MuiWindowInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 4, value.SnapshotFlags) &&
-			MuiWindowInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 8, value.SnapshotRequests) &&
-			MuiWindowInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 12, value.CycleChainHead.Raw) &&
-			MuiWindowInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 16, value.CycleChainCount) &&
-			MuiWindowInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 20, value.CycleChainRequests);
+		return WriteRecord(ref platform, address, value);
 	}
 }

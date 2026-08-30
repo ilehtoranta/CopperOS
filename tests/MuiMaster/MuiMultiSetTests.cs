@@ -51,6 +51,39 @@ public sealed class MuiMultiSetTests
 	}
 
 	[Fact]
+	public void MultiSetPacketCodecUsesCompleteNamedRecord()
+	{
+		var platform = CreatePlatform(out _);
+		var packet = APTR.FromPointer(0x1200);
+		var expected = new MuiMultiSetMessage
+		{
+			MethodId = MuiNotifyCore.MultiSetMethod,
+			Attribute = Attribute,
+			Value = 0xCAFE,
+			FirstObject = 0x1300,
+		};
+
+		Assert.True(MuiMultiSetMessageCodec.Write(ref platform, packet, expected));
+		Assert.True(MuiMultiSetMessageCodec.TryRead(ref platform, packet,
+			out var actual));
+		Assert.Equal(expected.MethodId, actual.MethodId);
+		Assert.Equal(expected.Attribute, actual.Attribute);
+		Assert.Equal(expected.Value, actual.Value);
+		Assert.Equal(expected.FirstObject, actual.FirstObject);
+		Assert.True(MuiNotifyCore.TryReadMultiSet(ref platform, packet,
+			MuiNotifyCore.MultiSetMethod, out var admitted));
+		Assert.Equal(expected.FirstObject, admitted.FirstObject);
+
+		Assert.False(MuiMultiSetMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiMultiSetMessageCodec.Write(ref platform,
+			APTR.FromPointer(0x20FFFu), expected));
+		platform.WriteUInt32(packet, 0, 0xDEADBEEFu);
+		Assert.False(MuiNotifyCore.TryReadMultiSet(ref platform, packet,
+			MuiNotifyCore.MultiSetMethod, out _));
+	}
+
+	[Fact]
 	public void MultiSetUpdatesTheListedObjectsButNotItsExecutor()
 	{
 		var platform = CreatePlatform(out var cl);
@@ -63,13 +96,23 @@ public sealed class MuiMultiSetTests
 		var third = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
 			APTR.Null);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0, MuiNotifyCore.MultiSetMethod);
-		platform.WriteUInt32(packet, 4, Attribute);
-		platform.WriteUInt32(packet, 8, 0xCAFE);
-		platform.WriteUInt32(packet, 12, first.Raw);
-		platform.WriteUInt32(packet, 16, second.Raw);
-		platform.WriteUInt32(packet, 20, third.Raw);
-		platform.WriteUInt32(packet, 24, 0);
+		Assert.True(MuiMultiSetMessageCodec.Write(ref platform, packet,
+			new MuiMultiSetMessage
+			{
+				MethodId = MuiNotifyCore.MultiSetMethod,
+				Attribute = Attribute,
+				Value = 0xCAFE,
+				FirstObject = first.Raw,
+			}));
+		var vector = MuiNotifyCore.MultiSetVector(ref platform, packet);
+		Assert.True(MuiMultiSetTargetEntryCodec.Write(ref platform, vector,
+			new MuiMultiSetTargetEntry { Target = second }));
+		Assert.True(MuiMultiSetTargetEntryCodec.Write(ref platform,
+			APTR.FromPointer(vector.Raw + MuiMultiSetTargetEntry.Size),
+			new MuiMultiSetTargetEntry { Target = third }));
+		Assert.True(MuiMultiSetTargetEntryCodec.Write(ref platform,
+			APTR.FromPointer(vector.Raw + 2 * MuiMultiSetTargetEntry.Size),
+			default));
 		Assert.Equal(1u, MuiHeadlessDispatcher.DispatchNotify(ref platform, State,
 			executor, packet));
 		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
@@ -94,12 +137,20 @@ public sealed class MuiMultiSetTests
 		var target = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
 			APTR.Null);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0, MuiNotifyCore.MultiSetMethod);
-		platform.WriteUInt32(packet, 4, Attribute);
-		platform.WriteUInt32(packet, 8, 7);
-		platform.WriteUInt32(packet, 12, executor.Raw);
-		platform.WriteUInt32(packet, 16, target.Raw);
-		platform.WriteUInt32(packet, 20, 0);
+		Assert.True(MuiMultiSetMessageCodec.Write(ref platform, packet,
+			new MuiMultiSetMessage
+			{
+				MethodId = MuiNotifyCore.MultiSetMethod,
+				Attribute = Attribute,
+				Value = 7,
+				FirstObject = executor.Raw,
+			}));
+		var vector = MuiNotifyCore.MultiSetVector(ref platform, packet);
+		Assert.True(MuiMultiSetTargetEntryCodec.Write(ref platform, vector,
+			new MuiMultiSetTargetEntry { Target = target }));
+		Assert.True(MuiMultiSetTargetEntryCodec.Write(ref platform,
+			APTR.FromPointer(vector.Raw + MuiMultiSetTargetEntry.Size),
+			default));
 		Assert.Equal(1u, MuiHeadlessDispatcher.DispatchNotify(ref platform, State,
 			executor, packet));
 		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
@@ -118,21 +169,31 @@ public sealed class MuiMultiSetTests
 		var target = MuiHeadlessObjectCore.CreateObjectA(ref platform, State, cl,
 			APTR.Null);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0, MuiNotifyCore.MultiSetMethod);
-		platform.WriteUInt32(packet, 4, Attribute);
-		platform.WriteUInt32(packet, 8, 9);
-		platform.WriteUInt32(packet, 12, target.Raw);
-		platform.WriteUInt32(packet, 16, 0x1F000);
+		Assert.True(MuiMultiSetMessageCodec.Write(ref platform, packet,
+			new MuiMultiSetMessage
+			{
+				MethodId = MuiNotifyCore.MultiSetMethod,
+				Attribute = Attribute,
+				Value = 9,
+				FirstObject = target.Raw,
+			}));
+		var vector = MuiNotifyCore.MultiSetVector(ref platform, packet);
+		Assert.True(MuiMultiSetTargetEntryCodec.Write(ref platform, vector,
+			new MuiMultiSetTargetEntry { Target = APTR.FromPointer(0x1F000) }));
 		Assert.Equal(0u, MuiHeadlessDispatcher.DispatchNotify(ref platform, State,
 			executor, packet));
 		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, target,
 			Attribute, out _));
 
 		packet = APTR.FromPointer(0x20FF0);
-		platform.WriteUInt32(packet, 0, MuiNotifyCore.MultiSetMethod);
-		platform.WriteUInt32(packet, 4, Attribute);
-		platform.WriteUInt32(packet, 8, 10);
-		platform.WriteUInt32(packet, 12, target.Raw);
+		Assert.True(MuiMultiSetMessageCodec.Write(ref platform, packet,
+			new MuiMultiSetMessage
+			{
+				MethodId = MuiNotifyCore.MultiSetMethod,
+				Attribute = Attribute,
+				Value = 10,
+				FirstObject = target.Raw,
+			}));
 		Assert.Equal(0u, MuiHeadlessDispatcher.DispatchNotify(ref platform, State,
 			executor, packet));
 		Assert.False(MuiHeadlessObjectCore.GetAttribute(ref platform, State, target,

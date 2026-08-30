@@ -49,4 +49,42 @@ public sealed class MuiApplicationHelpStructAdapterTests
 			ref platform, APTR.Null,
 			MuiApplicationHelpStateField.HelpNode, out _));
 	}
+
+	[Fact]
+	public void ApplicationHelpStateSequentialRecordPreservesPointersAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3580);
+		var value = new MuiApplicationHelpStateRecord
+		{
+			Magic = MuiApplicationHelpStateRecord.Cookie,
+			AboutReferenceWindow = APTR.FromPointer(uint.MaxValue),
+			AboutRequests = 0x01020304u,
+			HelpWindow = APTR.FromPointer(0x11223344u),
+			HelpName = APTR.FromPointer(0x55667788u),
+			HelpNode = APTR.FromPointer(0x99AABBCCu),
+			HelpLine = unchecked((uint)int.MinValue + 5u),
+			HelpRequests = 0xDDEEFF00u,
+		};
+
+		Assert.True(MuiApplicationHelpStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiApplicationHelpStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.AboutReferenceWindow, decoded.AboutReferenceWindow);
+		Assert.Equal(value.AboutRequests, decoded.AboutRequests);
+		Assert.Equal(value.HelpWindow, decoded.HelpWindow);
+		Assert.Equal(value.HelpName, decoded.HelpName);
+		Assert.Equal(value.HelpNode, decoded.HelpNode);
+		Assert.Equal(value.HelpLine, decoded.HelpLine);
+		Assert.Equal(value.HelpRequests, decoded.HelpRequests);
+
+		var crossingEnd = APTR.FromPointer(0x30FE1);
+		Assert.False(MuiApplicationHelpStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiApplicationHelpStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
 }

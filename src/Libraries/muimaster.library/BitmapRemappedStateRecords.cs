@@ -145,20 +145,37 @@ internal static class MuiBitmapRemappedStateRecordMemoryCodec
 
 internal static class MuiBitmapRemappedStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiBitmapRemappedStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiBitmapRemappedStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiBitmapRemappedStateField.Magic, out value.Magic) ||
-			!MuiBitmapRemappedStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiBitmapRemappedStateField.Remapped,
-			out var remapped)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiBitmapRemappedStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var remapped)) return false;
 		value.Remapped = APTR.FromPointer(remapped);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiBitmapRemappedStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiBitmapRemappedStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Remapped.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiBitmapRemappedStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiBitmapRemappedStateRecord value)
@@ -170,13 +187,9 @@ internal static class MuiBitmapRemappedStateRecordCodec
 		MuiBitmapRemappedStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiBitmapRemappedStateAdmission.Validate(ref platform, value))
+		if (address.IsNull || !MuiBitmapRemappedStateAdmission.Validate(ref platform,
+			value))
 			return false;
-		return MuiBitmapRemappedStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiBitmapRemappedStateField.Magic,
-			value.Magic) &&
-			MuiBitmapRemappedStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiBitmapRemappedStateField.Remapped,
-			value.Remapped.Raw);
+		return WriteRecord(ref platform, address, value);
 	}
 }

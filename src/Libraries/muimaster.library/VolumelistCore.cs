@@ -22,6 +22,9 @@ public static class MuiVolumelistCore
 	internal struct MuiVolumelistModeStateRecord
 	{
 		internal const uint Size = 8;
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint ExampleModeOffset = 4;
 		internal const uint Cookie = 0x564C4D44u; // 'VLMD'
 
 		internal uint Magic;
@@ -51,35 +54,58 @@ public static class MuiVolumelistCore
 		internal MuiVolumelistModeField Field;
 	}
 
-	internal static class MuiVolumelistModeFieldCursorCodec
+internal static class MuiVolumelistModeFieldCursorCodec
+{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiVolumelistModeFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
+			=> MuiVolumelistModeStateRecordMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiVolumelistModeField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> MuiVolumelistModeStateRecordMemoryCodec.TryReadUInt32(ref platform,
+				address, field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiVolumelistModeField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> MuiVolumelistModeStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+				address, field, value);
+	}
+
+	// Struct-first guest-memory adapter for the fixed Volumelist mode sidecar.
+	// The named record owns the wire positions; this bounded adapter is the only
+	// place that projects them into guest addresses.
+	internal static class MuiVolumelistModeStateRecordMemoryCodec
 	{
 		private static bool TryResolve(MuiVolumelistModeField field,
 			out uint offset)
 		{
-			switch (field)
+			offset = field switch
 			{
-				case MuiVolumelistModeField.Magic:
-					offset = 0;
-					return true;
-				case MuiVolumelistModeField.ExampleMode:
-					offset = 4;
-					return true;
-			}
-			offset = 0;
-			return false;
+				MuiVolumelistModeField.Magic =>
+					MuiVolumelistModeStateRecord.MagicOffset,
+				MuiVolumelistModeField.ExampleMode =>
+					MuiVolumelistModeStateRecord.ExampleModeOffset,
+				_ => uint.MaxValue,
+			};
+			return offset != uint.MaxValue;
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiVolumelistModeFieldCursor cursor, out APTR address)
+			APTR address, MuiVolumelistModeField field, out APTR fieldAddress)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address,
-					MuiVolumelistModeStateRecord.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			fieldAddress = APTR.Null;
+			if (!TryResolve(field, out var offset) || address.IsNull ||
+				address.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(address, MuiVolumelistModeStateRecord.Size))
+				return false;
+			fieldAddress = APTR.FromPointer(address.Raw + offset);
+			return platform.IsMapped(fieldAddress,
+				MuiVolumelistModeStateRecord.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -87,10 +113,7 @@ public static class MuiVolumelistCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiVolumelistModeFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
 				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
@@ -100,10 +123,7 @@ public static class MuiVolumelistCore
 			APTR address, MuiVolumelistModeField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiVolumelistModeFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
 				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
@@ -119,9 +139,9 @@ public static class MuiVolumelistCore
 			value = default;
 			if (address.IsNull || !platform.IsMapped(address,
 				MuiVolumelistModeStateRecord.Size) ||
-				!MuiVolumelistModeFieldCursorCodec.TryReadUInt32(ref platform,
+				!MuiVolumelistModeStateRecordMemoryCodec.TryReadUInt32(ref platform,
 					address, MuiVolumelistModeField.Magic, out var magic) ||
-				!MuiVolumelistModeFieldCursorCodec.TryReadUInt32(ref platform, address,
+				!MuiVolumelistModeStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
 					MuiVolumelistModeField.ExampleMode, out value.ExampleMode))
 				return false;
 			value.Magic = magic;
@@ -144,9 +164,9 @@ public static class MuiVolumelistCore
 			if (address.IsNull || !platform.IsMapped(address,
 				MuiVolumelistModeStateRecord.Size) ||
 				!MuiVolumelistModeStateAdmission.Validate(value)) return false;
-			return MuiVolumelistModeFieldCursorCodec.TryWriteUInt32(ref platform,
+			return MuiVolumelistModeStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiVolumelistModeField.Magic, value.Magic) &&
-				MuiVolumelistModeFieldCursorCodec.TryWriteUInt32(ref platform, address,
+				MuiVolumelistModeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 					MuiVolumelistModeField.ExampleMode, value.ExampleMode);
 		}
 	}

@@ -12,6 +12,10 @@ namespace CopperOS.MuiMaster;
 internal struct MuiGroupMoveMemberMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ObjectOffset = 4;
+	public const uint PositionOffset = 8;
 	public uint MethodId;
 	public uint Object;
 	public int Position;
@@ -21,6 +25,10 @@ internal struct MuiGroupMoveMemberMessage
 internal struct MuiGroupReorderMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint AfterOffset = 4;
+	public const uint ObjectsOffset = 8;
 	public uint MethodId;
 	public uint After;
 	public uint Objects;
@@ -30,6 +38,9 @@ internal struct MuiGroupReorderMessage
 internal struct MuiGroupSortMessage
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint ObjectsOffset = 4;
 	public uint MethodId;
 	public uint Objects;
 }
@@ -38,6 +49,8 @@ internal struct MuiGroupSortMessage
 internal struct MuiGroupOrderingMethodMessage
 {
 	public const uint Size = 4;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -66,7 +79,7 @@ internal struct MuiGroupOrderingPacketFieldCursor
 	internal MuiGroupOrderingPacketField Field;
 }
 
-internal static class MuiGroupOrderingPacketFieldCursorCodec
+internal static class MuiGroupOrderingPacketMemoryCodec
 {
 	private static bool TryResolve(MuiGroupOrderingPacketKind packet,
 		MuiGroupOrderingPacketField field, out uint offset, out uint size,
@@ -75,65 +88,67 @@ internal static class MuiGroupOrderingPacketFieldCursorCodec
 		offset = 0;
 		size = 0;
 		fieldSize = 0;
-		switch (packet)
+		if (packet == MuiGroupOrderingPacketKind.Header)
 		{
-			case MuiGroupOrderingPacketKind.Header:
-				size = MuiGroupOrderingMethodMessage.Size;
-				offset = field == MuiGroupOrderingPacketField.MethodId ? 0u :
-					uint.MaxValue;
-				fieldSize = 4;
-				break;
-			case MuiGroupOrderingPacketKind.MoveMember:
-				size = MuiGroupMoveMemberMessage.Size;
-				offset = field switch
-				{
-					MuiGroupOrderingPacketField.MethodId => 0,
-					MuiGroupOrderingPacketField.Object => 4,
-					MuiGroupOrderingPacketField.Position => 8,
-					_ => uint.MaxValue,
-				};
-				fieldSize = 4;
-				break;
-			case MuiGroupOrderingPacketKind.Reorder:
-				size = MuiGroupReorderMessage.Size;
-				offset = field switch
-				{
-					MuiGroupOrderingPacketField.MethodId => 0,
-					MuiGroupOrderingPacketField.After => 4,
-					MuiGroupOrderingPacketField.Objects => 8,
-					_ => uint.MaxValue,
-				};
-				fieldSize = 4;
-				break;
-			case MuiGroupOrderingPacketKind.Sort:
-				size = MuiGroupSortMessage.Size;
-				offset = field switch
-				{
-					MuiGroupOrderingPacketField.MethodId => 0,
-					MuiGroupOrderingPacketField.Objects => 4,
-					_ => uint.MaxValue,
-				};
-				fieldSize = 4;
-				break;
-			default:
-				offset = uint.MaxValue;
-				break;
+			if (field != MuiGroupOrderingPacketField.MethodId) return false;
+			offset = MuiGroupOrderingMethodMessage.MethodIdOffset;
+			size = MuiGroupOrderingMethodMessage.Size;
+			fieldSize = MuiGroupOrderingMethodMessage.FieldSize;
+			return true;
 		}
-		return offset != uint.MaxValue;
+		if (packet == MuiGroupOrderingPacketKind.MoveMember)
+		{
+			size = MuiGroupMoveMemberMessage.Size;
+			fieldSize = MuiGroupMoveMemberMessage.FieldSize;
+			if (field == MuiGroupOrderingPacketField.MethodId)
+				offset = MuiGroupMoveMemberMessage.MethodIdOffset;
+			else if (field == MuiGroupOrderingPacketField.Object)
+				offset = MuiGroupMoveMemberMessage.ObjectOffset;
+			else if (field == MuiGroupOrderingPacketField.Position)
+				offset = MuiGroupMoveMemberMessage.PositionOffset;
+			else return false;
+			return true;
+		}
+		if (packet == MuiGroupOrderingPacketKind.Reorder)
+		{
+			size = MuiGroupReorderMessage.Size;
+			fieldSize = MuiGroupReorderMessage.FieldSize;
+			if (field == MuiGroupOrderingPacketField.MethodId)
+				offset = MuiGroupReorderMessage.MethodIdOffset;
+			else if (field == MuiGroupOrderingPacketField.After)
+				offset = MuiGroupReorderMessage.AfterOffset;
+			else if (field == MuiGroupOrderingPacketField.Objects)
+				offset = MuiGroupReorderMessage.ObjectsOffset;
+			else return false;
+			return true;
+		}
+		if (packet == MuiGroupOrderingPacketKind.Sort)
+		{
+			size = MuiGroupSortMessage.Size;
+			fieldSize = MuiGroupSortMessage.FieldSize;
+			if (field == MuiGroupOrderingPacketField.MethodId)
+				offset = MuiGroupSortMessage.MethodIdOffset;
+			else if (field == MuiGroupOrderingPacketField.Objects)
+				offset = MuiGroupSortMessage.ObjectsOffset;
+			else return false;
+			return true;
+		}
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiGroupOrderingPacketFieldCursor cursor, out APTR address,
+		APTR message, MuiGroupOrderingPacketKind packet,
+		MuiGroupOrderingPacketField field, out APTR address,
 		out uint fieldSize)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
 		fieldSize = 0;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset,
-			out var packetSize, out fieldSize) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize)) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
+		if (!TryResolve(packet, field, out var offset, out var packetSize,
+			out fieldSize) || message.IsNull ||
+			message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, packetSize)) return false;
+		address = APTR.FromPointer(message.Raw + offset);
 		return platform.IsMapped(address, fieldSize);
 	}
 
@@ -143,12 +158,8 @@ internal static class MuiGroupOrderingPacketFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiGroupOrderingPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address,
-			out var fieldSize) || fieldSize != 4) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address, out var fieldSize) || fieldSize != 4) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -158,19 +169,148 @@ internal static class MuiGroupOrderingPacketFieldCursorCodec
 		MuiGroupOrderingPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiGroupOrderingPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address,
-			out var fieldSize) || fieldSize != 4) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address, out var fieldSize) || fieldSize != 4) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+
+	// Keep the four-byte method header scalar in native lowering. Its wire
+	// position remains owned by the named method record.
+	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
+		APTR message, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiGroupOrderingMethodMessage.Size, out var cursor)) return false;
+		return MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+			out value) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// packet cursor. Live group-ordering codecs use the direct memory adapter.
+internal static class MuiGroupOrderingPacketFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGroupOrderingPacketFieldCursor cursor, out APTR address,
+		out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGroupOrderingPacketMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Packet, cursor.Field, out address, out fieldSize);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiGroupOrderingPacketKind packet,
+		MuiGroupOrderingPacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGroupOrderingPacketMemoryCodec.TryReadUInt32(ref platform, message,
+			packet, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiGroupOrderingPacketKind packet,
+		MuiGroupOrderingPacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGroupOrderingPacketMemoryCodec.TryWriteUInt32(ref platform, message,
+			packet, field, value);
 }
 
 internal static class MuiGroupOrderingMessageCodec
 {
+	internal static bool TryReadMoveMemberRecord<TPlatform>(
+		ref TPlatform platform, APTR address,
+		out MuiGroupMoveMemberMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupMoveMemberMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Object) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawPosition) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value.Position = unchecked((int)rawPosition);
+		return true;
+	}
+
+	internal static bool WriteMoveMemberRecord<TPlatform>(
+		ref TPlatform platform, APTR address, MuiGroupMoveMemberMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupMoveMemberMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Object) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Position))) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadReorderRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGroupReorderMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupReorderMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.After) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Objects) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool WriteReorderRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGroupReorderMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupReorderMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.After) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Objects)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadSortRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGroupSortMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupSortMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Objects) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool WriteSortRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGroupSortMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupSortMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Objects)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiGroupOrderingMethodMessage value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -190,102 +330,46 @@ internal static class MuiGroupOrderingMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		methodId = 0;
-		return MuiGroupOrderingPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiGroupOrderingPacketKind.Header,
-			MuiGroupOrderingPacketField.MethodId, out methodId);
+		return MuiGroupOrderingPacketMemoryCodec.TryReadMethodId(ref platform,
+			address, out methodId);
 	}
 
 	internal static bool WriteMoveMember<TPlatform>(ref TPlatform platform,
 		APTR address, MuiGroupMoveMemberMessage value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiGroupOrderingPacketFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupOrderingPacketKind.MoveMember,
-			MuiGroupOrderingPacketField.MethodId, value.MethodId) &&
-			MuiGroupOrderingPacketFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiGroupOrderingPacketKind.MoveMember,
-				MuiGroupOrderingPacketField.Object, value.Object) &&
-			MuiGroupOrderingPacketFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiGroupOrderingPacketKind.MoveMember,
-				MuiGroupOrderingPacketField.Position, unchecked((uint)value.Position));
-	}
+		=> WriteMoveMemberRecord(ref platform, address, value);
 
 	internal static bool WriteReorder<TPlatform>(ref TPlatform platform,
 		APTR address, MuiGroupReorderMessage value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiGroupOrderingPacketFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupOrderingPacketKind.Reorder,
-			MuiGroupOrderingPacketField.MethodId, value.MethodId) &&
-			MuiGroupOrderingPacketFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiGroupOrderingPacketKind.Reorder,
-				MuiGroupOrderingPacketField.After, value.After) &&
-			MuiGroupOrderingPacketFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiGroupOrderingPacketKind.Reorder,
-				MuiGroupOrderingPacketField.Objects, value.Objects);
-	}
+		=> WriteReorderRecord(ref platform, address, value);
 
 	internal static bool WriteSort<TPlatform>(ref TPlatform platform, APTR address,
 		MuiGroupSortMessage value) where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiGroupOrderingPacketFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupOrderingPacketKind.Sort,
-			MuiGroupOrderingPacketField.MethodId, value.MethodId) &&
-			MuiGroupOrderingPacketFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiGroupOrderingPacketKind.Sort,
-				MuiGroupOrderingPacketField.Objects, value.Objects);
-	}
+		=> WriteSortRecord(ref platform, address, value);
 
 	internal static bool TryReadMoveMember<TPlatform>(ref TPlatform platform,
 		APTR address, uint method, out MuiGroupMoveMemberMessage value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = default;
-		if (!TryReadMethodIdValue(ref platform, address, out var methodId) ||
-			methodId != method || !platform.IsMapped(address,
-			MuiGroupMoveMemberMessage.Size)) return false;
-		value.MethodId = methodId;
-		if (!MuiGroupOrderingPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiGroupOrderingPacketKind.MoveMember,
-			MuiGroupOrderingPacketField.Object, out value.Object) ||
-			!MuiGroupOrderingPacketFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiGroupOrderingPacketKind.MoveMember,
-				MuiGroupOrderingPacketField.Position, out var position)) return false;
-		value.Position = unchecked((int)position);
-		return true;
+		return TryReadMoveMemberRecord(ref platform, address, out value) &&
+			value.MethodId == method;
 	}
 
 	internal static bool TryReadReorder<TPlatform>(ref TPlatform platform,
 		APTR address, uint method, out MuiGroupReorderMessage value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = default;
-		if (!TryReadMethodIdValue(ref platform, address, out var methodId) ||
-			methodId != method || !platform.IsMapped(address,
-			MuiGroupReorderMessage.Size)) return false;
-		value.MethodId = methodId;
-		if (!MuiGroupOrderingPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiGroupOrderingPacketKind.Reorder,
-			MuiGroupOrderingPacketField.After, out value.After) ||
-			!MuiGroupOrderingPacketFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiGroupOrderingPacketKind.Reorder,
-				MuiGroupOrderingPacketField.Objects, out value.Objects)) return false;
-		return true;
+		return TryReadReorderRecord(ref platform, address, out value) &&
+			value.MethodId == method;
 	}
 
 	internal static bool TryReadSort<TPlatform>(ref TPlatform platform,
 		APTR address, uint method, out MuiGroupSortMessage value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = default;
-		if (!TryReadMethodIdValue(ref platform, address, out var methodId) ||
-			methodId != method || !platform.IsMapped(address,
-			MuiGroupSortMessage.Size)) return false;
-		value.MethodId = methodId;
-		if (!MuiGroupOrderingPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiGroupOrderingPacketKind.Sort,
-			MuiGroupOrderingPacketField.Objects, out value.Objects)) return false;
-		return true;
+		return TryReadSortRecord(ref platform, address, out value) &&
+			value.MethodId == method;
 	}
 }
 
@@ -589,12 +673,9 @@ public static class MuiGroupOperationsCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = APTR.Null;
-		var cursor = default(MuiFamilyMutationVectorCursor);
-		cursor.Base = objects;
-		cursor.Index = index;
-		if (!MuiFamilyMutationVectorCodec.TryGetEntry(ref platform, cursor,
-			out var address)) return false;
-		if (!MuiFamilyMutationVectorCodec.TryRead(ref platform, address,
+		if (!MuiFamilyMutationVectorMemoryCodec.TryGetEntry(ref platform,
+			objects, index, out var address)) return false;
+		if (!MuiFamilyMutationVectorEntryCodec.TryRead(ref platform, address,
 			out var entry)) return false;
 		value = entry.Object;
 		return true;

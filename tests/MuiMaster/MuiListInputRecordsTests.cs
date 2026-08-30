@@ -142,8 +142,8 @@ public sealed class MuiListInputRecordsTests
 			Flags = MuiListviewDragState.ActiveFlag |
 				MuiListviewDragState.MovedFlag,
 		};
-		MuiListviewDragStateCodec.Write(ref platform, dragAddress, drag);
-		Assert.True(MuiListviewDragStateCodec.TryRead(ref platform, dragAddress,
+		Assert.True(MuiListviewDragStateCodec.WriteRecord(ref platform, dragAddress, drag));
+		Assert.True(MuiListviewDragStateCodec.TryReadRecord(ref platform, dragAddress,
 			out var actualDrag));
 		Assert.Equal(drag.Magic, actualDrag.Magic);
 		Assert.Equal(drag.Source, actualDrag.Source);
@@ -153,5 +153,32 @@ public sealed class MuiListInputRecordsTests
 		Assert.Equal(drag.LastX, actualDrag.LastX);
 		Assert.Equal(drag.LastY, actualDrag.LastY);
 		Assert.Equal(drag.Flags, actualDrag.Flags);
+	}
+
+	[Fact]
+	public void ListTestPosSequentialRecordPreservesMixedWidthsAndRejectsTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3600);
+		var expected = new MuiListTestPosResult
+		{
+			Entry = int.MinValue,
+			Column = short.MinValue,
+			Flags = 0xA55A,
+			XOffset = -9,
+			YOffset = short.MaxValue,
+		};
+		Assert.True(MuiListTestPosResultCodec.WriteRecord(ref platform, address,
+			expected));
+		Assert.True(MuiListTestPosResultCodec.TryReadRecord(ref platform, address,
+			out var actual));
+		Assert.Equal(expected.Entry, actual.Entry);
+		Assert.Equal(expected.Column, actual.Column);
+		Assert.Equal(expected.Flags, actual.Flags);
+		Assert.Equal(expected.XOffset, actual.XOffset);
+		Assert.Equal(expected.YOffset, actual.YOffset);
+		Assert.False(MuiListTestPosResultCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x40FF5), out _));
 	}
 }

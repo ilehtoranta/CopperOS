@@ -171,37 +171,58 @@ internal static class MuiApplicationLifecycleStateRecordMemoryCodec
 
 internal static class MuiApplicationLifecycleStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// Lifecycle policy is a fixed seven-ULONG record. Exchange all fields in
+	// declaration order as one named struct; BOOL normalization/admission stays
+	// separate so structural diagnostics preserve raw guest values.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationLifecycleStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationLifecycleStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiApplicationLifecycleStateField.Magic,
-			out var magic) ||
-			!MuiApplicationLifecycleStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationLifecycleStateField.Initialized, out value.Initialized) ||
-			!MuiApplicationLifecycleStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationLifecycleStateField.Iconified, out value.Iconified) ||
-			!MuiApplicationLifecycleStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationLifecycleStateField.Active, out value.Active) ||
-			!MuiApplicationLifecycleStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationLifecycleStateField.SingleTask, out value.SingleTask) ||
-			!MuiApplicationLifecycleStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationLifecycleStateField.DoubleStart, out value.DoubleStart) ||
-			!MuiApplicationLifecycleStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationLifecycleStateField.ForceQuit, out value.ForceQuit))
-			return false;
-		value.Magic = magic;
-		return true;
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationLifecycleStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Initialized) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Iconified) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Active) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.SingleTask) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.DoubleStart) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.ForceQuit) && MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationLifecycleStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationLifecycleStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Initialized) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Iconified) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Active) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SingleTask) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.DoubleStart) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ForceQuit) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationLifecycleStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationLifecycleStateRecord value)
@@ -216,26 +237,6 @@ internal static class MuiApplicationLifecycleStateRecordCodec
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiApplicationLifecycleStateRecord.Size) ||
 			!MuiApplicationLifecycleStateAdmission.Validate(value)) return false;
-		return MuiApplicationLifecycleStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationLifecycleStateField.Magic,
-			value.Magic) &&
-			MuiApplicationLifecycleStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationLifecycleStateField.Initialized, value.Initialized) &&
-			MuiApplicationLifecycleStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationLifecycleStateField.Iconified, value.Iconified) &&
-			MuiApplicationLifecycleStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationLifecycleStateField.Active, value.Active) &&
-			MuiApplicationLifecycleStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationLifecycleStateField.SingleTask, value.SingleTask) &&
-			MuiApplicationLifecycleStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationLifecycleStateField.DoubleStart, value.DoubleStart) &&
-			MuiApplicationLifecycleStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationLifecycleStateField.ForceQuit, value.ForceQuit);
+		return WriteRecord(ref platform, address, value);
 	}
 }

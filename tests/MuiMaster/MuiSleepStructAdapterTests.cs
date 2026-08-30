@@ -39,4 +39,34 @@ public sealed class MuiSleepStructAdapterTests
 		Assert.False(MuiSleepStateRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiSleepStateField.Magic, out _));
 	}
+
+	[Fact]
+	public void SleepSequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x35C0);
+		var value = new MuiSleepStateRecord
+		{
+			Magic = MuiSleepStateRecord.Cookie,
+			Depth = uint.MaxValue,
+			SavedDisabled = 0x01020304u,
+			Request = 0xAABBCCDDu,
+		};
+
+		Assert.True(MuiSleepStateRecordCodec.WriteRecord(ref platform, address,
+			value));
+		Assert.True(MuiSleepStateRecordCodec.TryReadRecord(ref platform, address,
+			out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Depth, decoded.Depth);
+		Assert.Equal(value.SavedDisabled, decoded.SavedDisabled);
+		Assert.Equal(value.Request, decoded.Request);
+
+		var crossingEnd = APTR.FromPointer(0x30FF1);
+		Assert.False(MuiSleepStateRecordCodec.WriteRecord(ref platform, crossingEnd,
+			value));
+		Assert.False(MuiSleepStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
 }

@@ -166,8 +166,8 @@ public sealed class MuiColorSpecialistTests
 		value.NotifyAttribute = MuiColorAttributes.ColoradjustAlpha;
 		value.NotifyValue = 0x01020304;
 		value.NotifyCount = 5;
-		Assert.True(MuiColorSpecialistStateCodec.Write(ref p, address, value));
-		Assert.True(MuiColorSpecialistStateCodec.TryReadStructural(ref p, address,
+		Assert.True(MuiColorSpecialistStateCodec.WriteRecord(ref p, address, value));
+		Assert.True(MuiColorSpecialistStateCodec.TryReadRecord(ref p, address,
 			out var decoded));
 		Assert.Equal(value.Magic, decoded.Magic);
 		Assert.Equal(value.Class, decoded.Class);
@@ -225,8 +225,8 @@ public sealed class MuiColorSpecialistTests
 		value.Reserved0 = 0xDEADBEEF;
 		value.Reserved1 = 0x0BADF00D;
 		value.Reserved2 = 0xFEEDFACE;
-		Assert.True(MuiColorPenSpecCodec.Write(ref p, address, value));
-		Assert.True(MuiColorPenSpecCodec.TryRead(ref p, address,
+		Assert.True(MuiColorPenSpecCodec.WriteRecord(ref p, address, value));
+		Assert.True(MuiColorPenSpecCodec.TryReadRecord(ref p, address,
 			out var decoded));
 		Assert.Equal(value.Kind, decoded.Kind);
 		Assert.Equal(value.Scalar, decoded.Scalar);
@@ -894,8 +894,8 @@ public sealed class MuiColorSpecialistTests
 		record.Red = 0x11223344;
 		record.Green = 0x55667788;
 		record.Blue = 0x99AABBCC;
-		Assert.True(MuiColorRgbCodec.Write(ref p, RgbSource, record));
-		Assert.True(MuiColorRgbCodec.TryRead(ref p, RgbSource,
+		Assert.True(MuiColorRgbCodec.WriteRecord(ref p, RgbSource, record));
+		Assert.True(MuiColorRgbCodec.TryReadRecord(ref p, RgbSource,
 			out var decoded));
 		Assert.Equal(record.Red, decoded.Red);
 		Assert.Equal(record.Green, decoded.Green);

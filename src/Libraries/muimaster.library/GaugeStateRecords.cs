@@ -146,22 +146,49 @@ internal static class MuiGaugeStateRecordMemoryCodec
 
 internal static class MuiGaugeStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiGaugeStateRecord value)
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGaugeStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		return MuiGaugeStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiGaugeStateField.Magic, out value.Magic) &&
-			MuiGaugeStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiGaugeStateField.Maximum, out value.Maximum) &&
-			MuiGaugeStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiGaugeStateField.Current, out value.Current) &&
-			MuiGaugeStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiGaugeStateField.Divide, out value.Divide) &&
-			MuiGaugeStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiGaugeStateField.Horizontal, out value.Horizontal);
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGaugeStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Maximum) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Current) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Divide) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Horizontal) &&
+			MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGaugeStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGaugeStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Maximum) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Current) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Divide) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Horizontal) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiGaugeStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiGaugeStateRecord value)
@@ -173,17 +200,8 @@ internal static class MuiGaugeStateRecordCodec
 		MuiGaugeStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGaugeStateAdmission.Validate(value)) return false;
-		return MuiGaugeStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGaugeStateField.Magic, value.Magic) &&
-			MuiGaugeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiGaugeStateField.Maximum, value.Maximum) &&
-			MuiGaugeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiGaugeStateField.Current, value.Current) &&
-			MuiGaugeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiGaugeStateField.Divide, value.Divide) &&
-			MuiGaugeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiGaugeStateField.Horizontal, value.Horizontal);
+		return MuiGaugeStateAdmission.Validate(value) &&
+			WriteRecord(ref platform, address, value);
 	}
 }
 

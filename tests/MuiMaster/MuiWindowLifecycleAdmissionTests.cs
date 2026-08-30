@@ -65,7 +65,7 @@ public sealed class MuiWindowLifecycleAdmissionTests
 			EventMask = 0x40,
 			IconifiedOpen = 1,
 		};
-		Assert.True(MuiWindowLifecycleStateRecordCodec.Write(ref platform, address,
+		Assert.True(MuiWindowLifecycleStateRecordCodec.WriteRecord(ref platform, address,
 			value));
 		Assert.True(MuiWindowLifecycleStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, 16, out var iconified) && iconified.Raw == 0x1590u);

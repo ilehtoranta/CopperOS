@@ -176,38 +176,53 @@ internal static class MuiApplicationSettingsPersistenceStateRecordMemoryCodec
 
 internal static class MuiApplicationSettingsPersistenceStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationSettingsPersistenceStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiApplicationSettingsPersistenceStateField.Magic,
-			out var magic) ||
-			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationSettingsPersistenceStateField.Operation,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationSettingsPersistenceStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.Operation) ||
-			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationSettingsPersistenceStateField.Name,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var name) ||
-			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationSettingsPersistenceStateField.Requests,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.Requests) ||
-			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationSettingsPersistenceStateField.Saves,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.Saves) ||
-			!MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationSettingsPersistenceStateField.Loads,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.Loads)) return false;
-		value.Magic = magic;
 		value.Name = APTR.FromPointer(name);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationSettingsPersistenceStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationSettingsPersistenceStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Operation) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Name.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Requests) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Saves) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Loads) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationSettingsPersistenceStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationSettingsPersistenceStateRecord value)
@@ -220,29 +235,8 @@ internal static class MuiApplicationSettingsPersistenceStateRecordCodec
 		MuiApplicationSettingsPersistenceStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationSettingsPersistenceStateRecord.Size) ||
-			!MuiApplicationSettingsPersistenceStateAdmission.Validate(ref platform,
-				value)) return false;
-		return MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiApplicationSettingsPersistenceStateField.Magic, value.Magic) &&
-			MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationSettingsPersistenceStateField.Operation,
-				value.Operation) &&
-			MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationSettingsPersistenceStateField.Name,
-				value.Name.Raw) &&
-			MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationSettingsPersistenceStateField.Requests,
-				value.Requests) &&
-			MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationSettingsPersistenceStateField.Saves, value.Saves) &&
-			MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationSettingsPersistenceStateField.Loads, value.Loads);
+		if (address.IsNull || !MuiApplicationSettingsPersistenceStateAdmission
+			.Validate(ref platform, value)) return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

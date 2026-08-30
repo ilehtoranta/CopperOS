@@ -141,20 +141,42 @@ internal static class MuiBodychunkFormatStateRecordMemoryCodec
 
 internal static class MuiBodychunkFormatStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiBodychunkFormatStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		return MuiBodychunkFormatStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) &&
-			MuiBodychunkFormatStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out value.Compression) &&
-			MuiBodychunkFormatStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 8, out value.Depth) &&
-			MuiBodychunkFormatStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 12, out value.Masking);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiBodychunkFormatStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Compression) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Depth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Masking)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiBodychunkFormatStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiBodychunkFormatStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Compression) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Depth) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Masking) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiBodychunkFormatStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiBodychunkFormatStateRecord value)
@@ -166,15 +188,9 @@ internal static class MuiBodychunkFormatStateRecordCodec
 		MuiBodychunkFormatStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiBodychunkFormatStateAdmission.Validate(value)) return false;
-		return MuiBodychunkFormatStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiBodychunkFormatStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 4, value.Compression) &&
-			MuiBodychunkFormatStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 8, value.Depth) &&
-			MuiBodychunkFormatStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 12, value.Masking);
+		if (address.IsNull || !MuiBodychunkFormatStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 

@@ -18,6 +18,9 @@ internal static class MuiRequesterServiceLayout
 internal struct MuiRequesterServiceStateRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint GenerationOffset = 4;
 	internal uint Magic;
 	internal uint Generation;
 }
@@ -35,31 +38,35 @@ internal struct MuiRequesterServiceStateFieldCursor
 	internal MuiRequesterServiceStateField Field;
 }
 
-internal static class MuiRequesterServiceStateFieldCursorCodec
+// Struct-first guest-memory adapter for the requester service state. The
+// record owns its packed field positions and complete-record admission.
+internal static class MuiRequesterServiceStateMemoryCodec
 {
 	private static bool TryResolve(MuiRequesterServiceStateField field,
 		out uint offset)
 	{
 		offset = field switch
 		{
-			MuiRequesterServiceStateField.Magic => 0,
-			MuiRequesterServiceStateField.Generation => 4,
+			MuiRequesterServiceStateField.Magic =>
+				MuiRequesterServiceStateRecord.MagicOffset,
+			MuiRequesterServiceStateField.Generation =>
+				MuiRequesterServiceStateRecord.GenerationOffset,
 			_ => uint.MaxValue,
 		};
 		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiRequesterServiceStateFieldCursor cursor, out APTR address)
+		APTR record, MuiRequesterServiceStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiRequesterServiceStateRecord.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiRequesterServiceStateRecord.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiRequesterServiceStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -67,10 +74,8 @@ internal static class MuiRequesterServiceStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiRequesterServiceStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -79,13 +84,34 @@ internal static class MuiRequesterServiceStateFieldCursorCodec
 		APTR record, MuiRequesterServiceStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiRequesterServiceStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for typed cursor callers; production access
+// routes through the named record adapter above.
+internal static class MuiRequesterServiceStateFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiRequesterServiceStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiRequesterServiceStateMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiRequesterServiceStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiRequesterServiceStateMemoryCodec.TryReadUInt32(ref platform, record,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiRequesterServiceStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiRequesterServiceStateMemoryCodec.TryWriteUInt32(ref platform, record,
+			field, value);
 }
 
 internal static class MuiRequesterServiceStateCodec
@@ -97,9 +123,9 @@ internal static class MuiRequesterServiceStateCodec
 		record = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiRequesterServiceStateRecord.Size)) return false;
-		if (!MuiRequesterServiceStateFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiRequesterServiceStateMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiRequesterServiceStateField.Magic, out record.Magic) ||
-			!MuiRequesterServiceStateFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiRequesterServiceStateMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiRequesterServiceStateField.Generation,
 				out record.Generation)) return false;
 		return true;
@@ -111,9 +137,9 @@ internal static class MuiRequesterServiceStateCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiRequesterServiceStateRecord.Size)) return false;
-		return MuiRequesterServiceStateFieldCursorCodec.TryWriteUInt32(
+		return MuiRequesterServiceStateMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiRequesterServiceStateField.Magic, record.Magic) &&
-			MuiRequesterServiceStateFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiRequesterServiceStateMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiRequesterServiceStateField.Generation, record.Generation);
 	}
 }

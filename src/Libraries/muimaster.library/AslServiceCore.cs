@@ -19,6 +19,10 @@ internal static class MuiAslServiceLayout
 internal struct MuiAslServiceStateRecord
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint HeadOffset = 4;
+	internal const uint GenerationOffset = 8;
 	internal uint Magic;
 	internal APTR Head;
 	internal uint Generation;
@@ -49,7 +53,10 @@ internal struct MuiAslRecordFieldCursor
 	internal MuiAslRecordField Field;
 }
 
-internal static class MuiAslRecordFieldCursorCodec
+// Struct-first guest-memory adapter for the ASL state and requester-lease
+// records. The record kind selects a named struct; this seam owns complete
+// record admission and the packed field translation.
+internal static class MuiAslRecordMemoryCodec
 {
 	private static bool TryResolve(MuiAslRecordKind kind,
 		MuiAslRecordField field, out uint offset, out uint size,
@@ -64,24 +71,24 @@ internal static class MuiAslRecordFieldCursorCodec
 				size = MuiAslServiceStateRecord.Size;
 				offset = field switch
 				{
-					MuiAslRecordField.Magic => 0,
-					MuiAslRecordField.Head => 4,
-					MuiAslRecordField.Generation => 8,
+					MuiAslRecordField.Magic => MuiAslServiceStateRecord.MagicOffset,
+					MuiAslRecordField.Head => MuiAslServiceStateRecord.HeadOffset,
+					MuiAslRecordField.Generation => MuiAslServiceStateRecord.GenerationOffset,
 					_ => uint.MaxValue,
 				};
-				fieldSize = 4;
+				fieldSize = MuiAslServiceStateRecord.FieldSize;
 				break;
 			case MuiAslRecordKind.Lease:
 				size = MuiAslRequestLeaseRecord.Size;
 				offset = field switch
 				{
-					MuiAslRecordField.Next => 0,
-					MuiAslRecordField.Requester => 4,
-					MuiAslRecordField.Type => 8,
-					MuiAslRecordField.Tags => 12,
+					MuiAslRecordField.Next => MuiAslRequestLeaseRecord.NextOffset,
+					MuiAslRecordField.Requester => MuiAslRequestLeaseRecord.RequesterOffset,
+					MuiAslRecordField.Type => MuiAslRequestLeaseRecord.TypeOffset,
+					MuiAslRecordField.Tags => MuiAslRequestLeaseRecord.TagsOffset,
 					_ => uint.MaxValue,
 				};
-				fieldSize = 4;
+				fieldSize = MuiAslRequestLeaseRecord.FieldSize;
 				break;
 			default:
 				offset = uint.MaxValue;
@@ -91,16 +98,17 @@ internal static class MuiAslRecordFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiAslRecordFieldCursor cursor, out APTR address, out uint fieldSize)
+		APTR record, MuiAslRecordKind kind, MuiAslRecordField field,
+		out APTR address, out uint fieldSize)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
 		fieldSize = 0;
-		if (!TryResolve(cursor.Kind, cursor.Field, out var offset,
-			out var recordSize, out fieldSize) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, recordSize)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
+		if (!TryResolve(kind, field, out var offset,
+			out var recordSize, out fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, recordSize)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
 		return platform.IsMapped(address, fieldSize);
 	}
 
@@ -109,11 +117,7 @@ internal static class MuiAslRecordFieldCursorCodec
 		out uint value) where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAslRecordFieldCursor);
-		cursor.Record = record;
-		cursor.Kind = kind;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address,
+		if (!TryGetAddress(ref platform, record, kind, field, out var address,
 			out var fieldSize) || fieldSize != 4) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
@@ -123,15 +127,34 @@ internal static class MuiAslRecordFieldCursorCodec
 		APTR record, MuiAslRecordKind kind, MuiAslRecordField field,
 		uint value) where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAslRecordFieldCursor);
-		cursor.Record = record;
-		cursor.Kind = kind;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address,
+		if (!TryGetAddress(ref platform, record, kind, field, out var address,
 			out var fieldSize) || fieldSize != 4) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for typed cursor callers. Production access
+// uses MuiAslRecordMemoryCodec with the complete named record and field.
+internal static class MuiAslRecordFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAslRecordFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAslRecordMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Kind, cursor.Field, out address, out fieldSize);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAslRecordKind kind, MuiAslRecordField field,
+		out uint value) where TPlatform : struct, IMuiGuestMemory =>
+		MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, record, kind, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAslRecordKind kind, MuiAslRecordField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, record, kind, field,
+			value);
 }
 
 internal static class MuiAslServiceStateCodec
@@ -143,11 +166,11 @@ internal static class MuiAslServiceStateCodec
 		record = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiAslServiceStateRecord.Size)) return false;
-		if (!MuiAslRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+		if (!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
 			MuiAslRecordKind.State, MuiAslRecordField.Magic, out record.Magic) ||
-			!MuiAslRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiAslRecordKind.State, MuiAslRecordField.Head, out var head) ||
-			!MuiAslRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiAslRecordKind.State, MuiAslRecordField.Generation,
 				out record.Generation)) return false;
 		record.Head = APTR.FromPointer(head);
@@ -160,11 +183,11 @@ internal static class MuiAslServiceStateCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiAslServiceStateRecord.Size)) return false;
-		return MuiAslRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+		return MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 			MuiAslRecordKind.State, MuiAslRecordField.Magic, record.Magic) &&
-			MuiAslRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiAslRecordKind.State, MuiAslRecordField.Head, record.Head.Raw) &&
-			MuiAslRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiAslRecordKind.State, MuiAslRecordField.Generation,
 				record.Generation);
 	}
@@ -174,6 +197,11 @@ internal static class MuiAslServiceStateCodec
 internal struct MuiAslRequestLeaseRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint NextOffset = 0;
+	internal const uint RequesterOffset = 4;
+	internal const uint TypeOffset = 8;
+	internal const uint TagsOffset = 12;
 	internal APTR Next;
 	internal APTR Requester;
 	internal uint Type;
@@ -189,14 +217,14 @@ internal static class MuiAslRequestLeaseCodec
 		record = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiAslRequestLeaseRecord.Size)) return false;
-		if (!MuiAslRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+		if (!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
 			MuiAslRecordKind.Lease, MuiAslRecordField.Next, out var next) ||
-			!MuiAslRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiAslRecordKind.Lease, MuiAslRecordField.Requester,
 				out var requester) ||
-			!MuiAslRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiAslRecordKind.Lease, MuiAslRecordField.Type, out record.Type) ||
-			!MuiAslRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiAslRecordKind.Lease, MuiAslRecordField.Tags, out var tags))
 			return false;
 		record.Next = APTR.FromPointer(next);
@@ -211,14 +239,14 @@ internal static class MuiAslRequestLeaseCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiAslRequestLeaseRecord.Size)) return false;
-		return MuiAslRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+		return MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 			MuiAslRecordKind.Lease, MuiAslRecordField.Next, record.Next.Raw) &&
-			MuiAslRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiAslRecordKind.Lease, MuiAslRecordField.Requester,
 				record.Requester.Raw) &&
-			MuiAslRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiAslRecordKind.Lease, MuiAslRecordField.Type, record.Type) &&
-			MuiAslRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiAslRecordKind.Lease, MuiAslRecordField.Tags, record.Tags.Raw);
 	}
 }

@@ -12,6 +12,9 @@ namespace CopperOS.MuiMaster;
 internal struct MuiAslTagItemRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint TagOffset = 0;
+	internal const uint DataOffset = 4;
 	internal uint Tag;
 	internal uint Data;
 }
@@ -29,7 +32,10 @@ internal struct MuiAslTagItemFieldCursor
 	internal MuiAslTagItemField Field;
 }
 
-internal static class MuiAslTagItemFieldCursorCodec
+// Struct-first guest-memory adapter for one standard 8-byte TagItem record.
+// The vector walker remains separate; every field access first admits the
+// complete named record and rejects odd, null, or truncated addresses.
+internal static class MuiAslTagItemMessageMemoryCodec
 {
 	private static bool TryResolve(MuiAslTagItemField field,
 		out uint offset)
@@ -37,10 +43,10 @@ internal static class MuiAslTagItemFieldCursorCodec
 		switch (field)
 		{
 			case MuiAslTagItemField.Tag:
-				offset = 0;
+				offset = MuiAslTagItemRecord.TagOffset;
 				break;
 			case MuiAslTagItemField.Data:
-				offset = 4;
+				offset = MuiAslTagItemRecord.DataOffset;
 				break;
 			default:
 				offset = 0;
@@ -50,15 +56,15 @@ internal static class MuiAslTagItemFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiAslTagItemFieldCursor cursor, out APTR address)
+		APTR record, MuiAslTagItemField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			(cursor.Record.Raw & 1u) != 0 ||
-			cursor.Record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			(record.Raw & 1u) != 0 || record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiAslTagItemRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiAslTagItemRecord.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -66,10 +72,8 @@ internal static class MuiAslTagItemFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAslTagItemFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -78,13 +82,34 @@ internal static class MuiAslTagItemFieldCursorCodec
 		APTR record, MuiAslTagItemField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAslTagItemFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for typed cursor callers; the record codec
+// and tag-list walker route through the named-record adapter above.
+internal static class MuiAslTagItemFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAslTagItemFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAslTagItemMessageMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAslTagItemField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAslTagItemMessageMemoryCodec.TryRead(ref platform, record, field,
+			out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAslTagItemField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAslTagItemMessageMemoryCodec.TryWrite(ref platform, record, field,
+			value);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -95,63 +120,95 @@ internal struct MuiAslTagItemCursor
 	internal uint Index;
 }
 
-internal static class MuiAslTagItemVectorCodec
+// Struct-first guest-memory adapter for indexed TagItem vectors. The cursor
+// wrapper below is retained for typed callers, but production walkers resolve
+// entries through this adapter so complete named records are admitted at the
+// guest-memory boundary before any field codec is invoked.
+internal static class MuiAslTagItemVectorMemoryCodec
 {
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
-		MuiAslTagItemCursor cursor, out APTR address)
+		APTR vector, uint index, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiAslTagItemCursor.EntrySize) return false;
-		var offset = cursor.Index * MuiAslTagItemCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
-		return platform.IsMapped(address, MuiAslTagItemCursor.EntrySize);
+		if (vector.IsNull || index >
+			(uint.MaxValue - vector.Raw) / MuiAslTagItemRecord.Size)
+			return false;
+		var offset = index * MuiAslTagItemRecord.Size;
+		if (vector.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(vector.Raw + offset);
+		return platform.IsMapped(address, MuiAslTagItemRecord.Size);
 	}
 
 	internal static bool TryAdvance(ref MuiAslTagItemCursor cursor,
 		uint items)
 	{
 		if (items == 0 || items > uint.MaxValue /
-			MuiAslTagItemCursor.EntrySize || cursor.Index >
-			uint.MaxValue - items) return false;
+			MuiAslTagItemRecord.Size || cursor.Index > uint.MaxValue - items)
+			return false;
 		cursor.Index += items;
 		return true;
 	}
+}
+
+internal static class MuiAslTagItemVectorCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		MuiAslTagItemCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out address);
+
+	internal static bool TryAdvance(ref MuiAslTagItemCursor cursor,
+		uint items)
+		=> MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, items);
 }
 
 // Central codec for the standard 8-byte TagItem guest record. The walker uses
 // named Tag/Data fields; only this adapter knows the packed wire offsets.
 internal static class MuiAslTagItemCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiAslTagItemRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
 		if (address.IsNull || (address.Raw & 1u) != 0 ||
-			address.Raw > uint.MaxValue - MuiAslTagItemRecord.Size ||
-			!platform.IsMapped(address, MuiAslTagItemRecord.Size)) return false;
-		return MuiAslTagItemFieldCursorCodec.TryRead(ref platform, address,
-			MuiAslTagItemField.Tag, out record.Tag) &&
-			MuiAslTagItemFieldCursorCodec.TryRead(ref platform, address,
-				MuiAslTagItemField.Data, out record.Data);
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiAslTagItemRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var tag) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var data)) return false;
+		record.Tag = tag;
+		record.Data = data;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAslTagItemRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (address.IsNull || (address.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiAslTagItemRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Tag) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Data)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiAslTagItemRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out record);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAslTagItemRecord record)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || (address.Raw & 1u) != 0 ||
-			address.Raw > uint.MaxValue - MuiAslTagItemRecord.Size ||
-			!platform.IsMapped(address, MuiAslTagItemRecord.Size)) return false;
-		return MuiAslTagItemFieldCursorCodec.TryWrite(ref platform, address,
-			MuiAslTagItemField.Tag, record.Tag) &&
-			MuiAslTagItemFieldCursorCodec.TryWrite(ref platform, address,
-				MuiAslTagItemField.Data, record.Data);
-	}
+		=> WriteRecord(ref platform, address, record);
 }
 
 // Bounded guest TagItem traversal for the ASL-facing MUI entry points. The
@@ -200,7 +257,8 @@ public static class MuiAslTagListCore
 		uint steps = 0;
 		while (cursor.Base.IsNotNull && steps++ < MaximumSteps)
 		{
-			if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
+			if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index,
 				out var current) || !MuiAslTagItemCodec.TryRead(ref platform, current,
 				out var item)) return false;
 			var tag = item.Tag;
@@ -216,13 +274,13 @@ public static class MuiAslTagListCore
 			if (tag == TagSkip)
 			{
 				if (data == uint.MaxValue ||
-					!MuiAslTagItemVectorCodec.TryAdvance(ref cursor,
+					!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor,
 						data + 1u)) return false;
 				continue;
 			}
 			if (tag == TagIgnore)
 			{
-				if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
+				if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
 					return false;
 				continue;
 			}
@@ -232,7 +290,7 @@ public static class MuiAslTagListCore
 				found = true;
 				return true;
 			}
-			if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
+			if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
 				return false;
 		}
 		return false;

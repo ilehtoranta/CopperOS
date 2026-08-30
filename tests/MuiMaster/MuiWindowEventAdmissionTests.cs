@@ -67,7 +67,7 @@ public sealed class MuiWindowEventAdmissionTests
 			InputEvent = APTR.Null,
 			MouseObject = APTR.Null,
 		};
-		Assert.True(MuiWindowEventStateRecordCodec.Write(ref platform, address,
+		Assert.True(MuiWindowEventStateRecordCodec.WriteRecord(ref platform, address,
 			value));
 		Assert.True(MuiWindowEventStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, 12, out var mouseObject) && mouseObject.Raw == 0x15CCu);

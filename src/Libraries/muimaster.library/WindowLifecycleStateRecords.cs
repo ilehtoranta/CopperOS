@@ -157,26 +157,57 @@ internal static class MuiWindowLifecycleStateRecordMemoryCodec
 
 internal static class MuiWindowLifecycleStateRecordCodec
 {
+	// Sequential named-struct path used by Window lifecycle operations. Cookie,
+	// native-window capability, and lifecycle projections are exchanged in
+	// declaration order; numeric positions remain confined to the compatibility
+	// adapter.
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiWindowLifecycleStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWindowLifecycleStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.NativeWindow.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Open) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.EventMask) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.IconifiedOpen) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiWindowLifecycleStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWindowLifecycleStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var nativeWindow) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var open) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var eventMask) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var iconifiedOpen) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value.Magic = magic;
+		value.NativeWindow = APTR.FromPointer(nativeWindow);
+		value.Open = open;
+		value.EventMask = eventMask;
+		value.IconifiedOpen = iconifiedOpen;
+		return true;
+	}
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiWindowLifecycleStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (!MuiWindowLifecycleStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out var magic) ||
-			!MuiWindowLifecycleStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 4, out var nativeWindow) ||
-			!MuiWindowLifecycleStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 8, out value.Open) ||
-			!MuiWindowLifecycleStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 12, out value.EventMask) ||
-			!MuiWindowLifecycleStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 16, out value.IconifiedOpen)) return false;
-		value.Magic = magic;
-		value.NativeWindow = APTR.FromPointer(nativeWindow);
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiWindowLifecycleStateRecord value)
@@ -189,15 +220,6 @@ internal static class MuiWindowLifecycleStateRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiWindowLifecycleStateAdmission.Validate(value)) return false;
-		return MuiWindowLifecycleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiWindowLifecycleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 4, value.NativeWindow.Raw) &&
-			MuiWindowLifecycleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 8, value.Open) &&
-			MuiWindowLifecycleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 12, value.EventMask) &&
-			MuiWindowLifecycleStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 16, value.IconifiedOpen);
+		return WriteRecord(ref platform, address, value);
 	}
 }

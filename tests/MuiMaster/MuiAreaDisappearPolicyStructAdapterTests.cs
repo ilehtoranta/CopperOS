@@ -37,4 +37,32 @@ public sealed class MuiAreaDisappearPolicyStructAdapterTests
 		Assert.False(MuiAreaDisappearPolicyStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}
+
+	[Fact]
+	public void AreaDisappearPolicySequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x35C0);
+		var value = new MuiAreaDisappearPolicyStateRecord
+		{
+			Magic = MuiAreaDisappearPolicyStateRecord.Cookie,
+			HorizDisappear = int.MinValue,
+			VertDisappear = int.MaxValue,
+		};
+
+		Assert.True(MuiAreaDisappearPolicyStateRecordCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiAreaDisappearPolicyStateRecordCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.HorizDisappear, decoded.HorizDisappear);
+		Assert.Equal(value.VertDisappear, decoded.VertDisappear);
+
+		var crossingEnd = APTR.FromPointer(0x30FF5);
+		Assert.False(MuiAreaDisappearPolicyStateRecordCodec.WriteRecord(
+			ref platform, crossingEnd, value));
+		Assert.False(MuiAreaDisappearPolicyStateRecordCodec.TryReadRecord(
+			ref platform, crossingEnd, out _));
+	}
 }

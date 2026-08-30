@@ -86,4 +86,60 @@ public sealed class MuiListHookSortAdmissionTests
 		Assert.True(MuiListCore.MuiListSortStateCodec.TryReadStorage(ref platform,
 			sortAddress, out _));
 	}
+
+	[Fact]
+	public void ListHookPolicySequentialRecordPreservesPointersAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3440);
+		var value = new MuiListCore.MuiListHookPolicyState
+		{
+			Magic = MuiListCore.MuiListHookPolicyState.Cookie,
+			ConstructHook = 0x01020304u,
+			DestructHook = 0x11223344u,
+			DisplayHook = 0x55667788u,
+			CompareHook = 0x99AABBCCu,
+			MultiTestHook = 0xDDEEFF00u,
+		};
+
+		Assert.True(MuiListCore.MuiListHookPolicyStateCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiListCore.MuiListHookPolicyStateCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.ConstructHook, decoded.ConstructHook);
+		Assert.Equal(value.DestructHook, decoded.DestructHook);
+		Assert.Equal(value.DisplayHook, decoded.DisplayHook);
+		Assert.Equal(value.CompareHook, decoded.CompareHook);
+		Assert.Equal(value.MultiTestHook, decoded.MultiTestHook);
+
+		Assert.False(MuiListCore.MuiListHookPolicyStateCodec.TryReadRecord(
+			ref platform, APTR.FromPointer(0x30FE9), out _));
+	}
+
+	[Fact]
+	public void ListSortSequentialRecordPreservesColumnsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3480);
+		var value = new MuiListCore.MuiListSortState
+		{
+			Magic = MuiListCore.MuiListSortState.Cookie,
+			SortColumn = 0xFFFFFFFFu,
+			TitleClick = 0x80000001u,
+		};
+
+		Assert.True(MuiListCore.MuiListSortStateCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiListCore.MuiListSortStateCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.SortColumn, decoded.SortColumn);
+		Assert.Equal(value.TitleClick, decoded.TitleClick);
+
+		Assert.False(MuiListCore.MuiListSortStateCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FF5), out _));
+	}
 }

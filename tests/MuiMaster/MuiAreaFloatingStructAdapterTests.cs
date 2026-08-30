@@ -36,4 +36,32 @@ public sealed class MuiAreaFloatingStructAdapterTests
 		Assert.False(MuiAreaFloatingStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}
+
+	[Fact]
+	public void AreaFloatingSequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x39C0);
+		var value = new MuiAreaFloatingStateRecord
+		{
+			Magic = MuiAreaFloatingStateRecord.Cookie,
+			Enabled = uint.MaxValue,
+			Generation = uint.MaxValue,
+		};
+
+		Assert.True(MuiAreaFloatingStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaFloatingStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Enabled, decoded.Enabled);
+		Assert.Equal(value.Generation, decoded.Generation);
+
+		var crossingEnd = APTR.FromPointer(0x30FF5);
+		Assert.False(MuiAreaFloatingStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiAreaFloatingStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
 }

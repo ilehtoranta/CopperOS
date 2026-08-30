@@ -69,6 +69,35 @@ public sealed class MuiHelpAttributeTests
 	}
 
 	[Fact]
+	public void HelpStateSequentialRecordPreservesPointerSignedLineAndBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1D40);
+		var value = new MuiHelpStateRecord
+		{
+			Magic = MuiHelpStateRecord.Cookie,
+			Node = APTR.FromPointer(0xFEEDBEEF),
+			Line = unchecked((uint)-7),
+			Generation = uint.MaxValue,
+		};
+
+		Assert.True(MuiHelpStateRecordCodec.WriteRecord(ref platform, address,
+			value));
+		Assert.True(MuiHelpStateRecordCodec.TryReadRecord(ref platform, address,
+			out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Node, decoded.Node);
+		Assert.Equal(value.Line, decoded.Line);
+		Assert.Equal(value.Generation, decoded.Generation);
+
+		var crossingEnd = APTR.FromPointer(0x40FFF);
+		Assert.False(MuiHelpStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiHelpStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
+
+	[Fact]
 	public void GenericAndDispatcherAccessUseNamedHelpStateForExternalObjects()
 	{
 		var platform = CreatePlatform(out var classRecord);

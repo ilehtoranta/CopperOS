@@ -195,44 +195,67 @@ internal static class MuiApplicationHelpStateRecordMemoryCodec
 
 internal static class MuiApplicationHelpStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// AboutMUI/ShowHelp state is a fixed eight-ULONG record. Exchange the
+	// declaration-ordered fields through one named struct; pointer and string
+	// validity remains in the admission layer rather than in the wire codec.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationHelpStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationHelpStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiApplicationHelpStateField.Magic,
-			out var magic) ||
-			!MuiApplicationHelpStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationHelpStateField.AboutReferenceWindow,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationHelpStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var aboutWindow) ||
-			!MuiApplicationHelpStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationHelpStateField.AboutRequests,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.AboutRequests) ||
-			!MuiApplicationHelpStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationHelpStateField.HelpWindow,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var helpWindow) ||
-			!MuiApplicationHelpStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationHelpStateField.HelpName,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var helpName) ||
-			!MuiApplicationHelpStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationHelpStateField.HelpNode,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var helpNode) ||
-			!MuiApplicationHelpStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationHelpStateField.HelpLine,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.HelpLine) ||
-			!MuiApplicationHelpStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationHelpStateField.HelpRequests,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.HelpRequests)) return false;
-		value.Magic = magic;
 		value.AboutReferenceWindow = APTR.FromPointer(aboutWindow);
 		value.HelpWindow = APTR.FromPointer(helpWindow);
 		value.HelpName = APTR.FromPointer(helpName);
 		value.HelpNode = APTR.FromPointer(helpNode);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationHelpStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationHelpStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.AboutReferenceWindow.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.AboutRequests) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.HelpWindow.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.HelpName.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.HelpNode.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.HelpLine) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.HelpRequests) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationHelpStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationHelpStateRecord value)
@@ -248,30 +271,6 @@ internal static class MuiApplicationHelpStateRecordCodec
 			MuiApplicationHelpStateRecord.Size) ||
 			!MuiApplicationHelpStateAdmission.Validate(ref platform, value))
 			return false;
-		return MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationHelpStateField.Magic,
-			value.Magic) &&
-			MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationHelpStateField.AboutReferenceWindow,
-				value.AboutReferenceWindow.Raw) &&
-			MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationHelpStateField.AboutRequests,
-				value.AboutRequests) &&
-			MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationHelpStateField.HelpWindow,
-				value.HelpWindow.Raw) &&
-			MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationHelpStateField.HelpName,
-				value.HelpName.Raw) &&
-			MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationHelpStateField.HelpNode,
-				value.HelpNode.Raw) &&
-			MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationHelpStateField.HelpLine,
-				value.HelpLine) &&
-			MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationHelpStateField.HelpRequests,
-				value.HelpRequests);
+		return WriteRecord(ref platform, address, value);
 	}
 }

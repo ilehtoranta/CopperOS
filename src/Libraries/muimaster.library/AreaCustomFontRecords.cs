@@ -155,23 +155,43 @@ internal static class MuiAreaCustomFontStateRecordMemoryCodec
 
 internal static class MuiAreaCustomFontStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiAreaCustomFontStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiAreaCustomFontStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaCustomFontStateField.Magic, out value.Magic) ||
-			!MuiAreaCustomFontStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaCustomFontStateField.Spec, out var spec) ||
-			!MuiAreaCustomFontStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaCustomFontStateField.Present, out value.Present) ||
-			!MuiAreaCustomFontStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaCustomFontStateField.Generation,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaCustomFontStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var spec) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Present) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.Generation)) return false;
 		value.Spec = APTR.FromPointer(spec);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaCustomFontStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaCustomFontStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Spec.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Present) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Generation) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaCustomFontStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAreaCustomFontStateRecord value)
@@ -185,17 +205,8 @@ internal static class MuiAreaCustomFontStateRecordCodec
 		MuiAreaCustomFontStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaCustomFontStateRecord.Size) ||
-			!MuiAreaCustomFontStateAdmission.Validate(value)) return false;
-		return MuiAreaCustomFontStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiAreaCustomFontStateField.Magic,
-			value.Magic) &&
-			MuiAreaCustomFontStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaCustomFontStateField.Spec, value.Spec.Raw) &&
-			MuiAreaCustomFontStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaCustomFontStateField.Present, value.Present) &&
-			MuiAreaCustomFontStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaCustomFontStateField.Generation, value.Generation);
+		if (address.IsNull || !MuiAreaCustomFontStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

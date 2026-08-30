@@ -155,12 +155,15 @@ internal static class MuiTextPreParseStateRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiTextPreParseStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) ||
-			!MuiTextPreParseStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out var preParse)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiTextPreParseStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var preParse)) return false;
+		value.Magic = magic;
 		value.PreParse = APTR.FromPointer(preParse);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -174,9 +177,11 @@ internal static class MuiTextPreParseStateRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiTextPreParseStateAdmission.Validate(value)) return false;
-		return MuiTextPreParseStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiTextPreParseStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 4, value.PreParse.Raw);
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiTextPreParseStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PreParse.Raw) && MuiGuestStructCursor.IsComplete(cursor);
 	}
 }

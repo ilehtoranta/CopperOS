@@ -12,6 +12,9 @@ namespace CopperOS.MuiMaster;
 internal struct MuiObjectPersistenceMessage
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint DataspaceOffset = 4;
 	internal uint MethodId;
 	internal APTR Dataspace;
 }
@@ -20,6 +23,8 @@ internal struct MuiObjectPersistenceMessage
 internal struct MuiObjectPersistenceMethodMessage
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
 
@@ -36,26 +41,41 @@ internal struct MuiObjectPersistencePacketFieldCursor
 	internal MuiObjectPersistencePacketField Field;
 }
 
-internal static class MuiObjectPersistencePacketFieldCursorCodec
+// The fixed Export/Import records own their packed positions in this bounded
+// adapter. Live consumers use it directly; the typed cursor remains only for
+// compatibility callers and adapter-focused tests.
+internal static class MuiObjectPersistenceMessageMemoryCodec
 {
 	private static bool TryResolve(MuiObjectPersistencePacketField field,
-		out uint offset)
+		out uint offset, out uint size)
 	{
-		if (field == MuiObjectPersistencePacketField.MethodId) { offset = 0; return true; }
-		if (field == MuiObjectPersistencePacketField.Dataspace) { offset = 4; return true; }
+		if (field == MuiObjectPersistencePacketField.MethodId)
+		{
+			offset = MuiObjectPersistenceMethodMessage.MethodIdOffset;
+			size = MuiObjectPersistenceMethodMessage.Size;
+			return true;
+		}
+		if (field == MuiObjectPersistencePacketField.Dataspace)
+		{
+			offset = MuiObjectPersistenceMessage.DataspaceOffset;
+			size = MuiObjectPersistenceMessage.Size;
+			return true;
+		}
 		offset = 0;
+		size = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiObjectPersistencePacketFieldCursor cursor, out APTR address)
+		APTR message, MuiObjectPersistencePacketField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset, out var size) || message.IsNull ||
+			message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, size)) return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiObjectPersistenceMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -63,10 +83,8 @@ internal static class MuiObjectPersistencePacketFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiObjectPersistencePacketFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -75,13 +93,32 @@ internal static class MuiObjectPersistencePacketFieldCursorCodec
 		APTR message, MuiObjectPersistencePacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiObjectPersistencePacketFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+internal static class MuiObjectPersistencePacketFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiObjectPersistencePacketFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiObjectPersistenceMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiObjectPersistencePacketField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiObjectPersistenceMessageMemoryCodec.TryReadUInt32(ref platform, message,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiObjectPersistencePacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiObjectPersistenceMessageMemoryCodec.TryWriteUInt32(ref platform,
+			message, field, value);
 }
 
 // Central codec for the fixed MorphOS Export/Import packet pair. The public
@@ -113,7 +150,7 @@ internal static class MuiObjectPersistenceMessageCodec
 		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiObjectPersistenceMethodMessage.Size)) return false;
-		return MuiObjectPersistencePacketFieldCursorCodec.TryReadUInt32(
+		return MuiObjectPersistenceMessageMemoryCodec.TryReadUInt32(
 			ref platform, message, MuiObjectPersistencePacketField.MethodId,
 			out methodId);
 	}
@@ -138,7 +175,7 @@ internal static class MuiObjectPersistenceMessageCodec
 			MuiObjectPersistenceMessage.Size) ||
 			!TryReadMethodIdValue(ref platform, message, out methodId) ||
 			methodId != method) return false;
-		if (!MuiObjectPersistencePacketFieldCursorCodec.TryReadUInt32(
+		if (!MuiObjectPersistenceMessageMemoryCodec.TryReadUInt32(
 			ref platform, message, MuiObjectPersistencePacketField.Dataspace,
 			out var rawDataspace)) return false;
 		packet.MethodId = methodId;
@@ -153,10 +190,10 @@ internal static class MuiObjectPersistenceMessageCodec
 		if ((method != ExportMethod && method != ImportMethod) ||
 			message.IsNull || !platform.IsMapped(message,
 			MuiObjectPersistenceMessage.Size)) return false;
-		return MuiObjectPersistencePacketFieldCursorCodec.TryWriteUInt32(
+		return MuiObjectPersistenceMessageMemoryCodec.TryWriteUInt32(
 			ref platform, message, MuiObjectPersistencePacketField.MethodId,
 			method) &&
-			MuiObjectPersistencePacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiObjectPersistenceMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiObjectPersistencePacketField.Dataspace,
 				packet.Dataspace.Raw);
 	}

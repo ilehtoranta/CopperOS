@@ -15,6 +15,9 @@ namespace CopperOS.MuiMaster;
 internal struct MuiAreaInitResizeMessage
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint FlagsOffset = 4;
 	internal uint MethodId;
 	internal uint Flags;
 }
@@ -23,6 +26,8 @@ internal struct MuiAreaInitResizeMessage
 internal struct MuiAreaExitResizeMessage
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
 
@@ -39,35 +44,42 @@ internal struct MuiAreaResizeMessageFieldCursor
 	internal MuiAreaResizeMessageField Field;
 }
 
-internal static class MuiAreaResizeMessageFieldCursorCodec
+// The fixed initResize/exitResize records own their packed positions in this
+// bounded adapter. Live packet consumers use it directly; the typed cursor
+// below remains only for compatibility callers.
+internal static class MuiAreaResizeMessageMemoryCodec
 {
 	private static bool TryResolve(MuiAreaResizeMessageField field,
-		out uint offset)
+		out uint offset, out uint size)
 	{
 		switch (field)
 		{
 			case MuiAreaResizeMessageField.MethodId:
-				offset = 0;
+				offset = MuiAreaExitResizeMessage.MethodIdOffset;
+				size = MuiAreaExitResizeMessage.Size;
 				return true;
 			case MuiAreaResizeMessageField.Flags:
-				offset = 4;
+				offset = MuiAreaInitResizeMessage.FlagsOffset;
+				size = MuiAreaInitResizeMessage.Size;
 				return true;
 			default:
 				offset = 0;
+				size = 0;
 				return false;
 		}
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiAreaResizeMessageFieldCursor cursor, out APTR address)
+		APTR message, MuiAreaResizeMessageField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - offset)
+		if (!TryResolve(field, out var offset, out var size) || message.IsNull ||
+			message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, size))
 			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiAreaInitResizeMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -75,10 +87,8 @@ internal static class MuiAreaResizeMessageFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaResizeMessageFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -87,12 +97,90 @@ internal static class MuiAreaResizeMessageFieldCursorCodec
 		APTR message, MuiAreaResizeMessageField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaResizeMessageFieldCursor);
-		cursor.Message = message;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
+	}
+}
+
+internal static class MuiAreaResizeMessageFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaResizeMessageFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaResizeMessageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaResizeMessageField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaResizeMessageMemoryCodec.TryReadUInt32(ref platform, message,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaResizeMessageField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaResizeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
+			field, value);
+}
+
+internal static class MuiAreaInitResizeMessageCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiAreaInitResizeMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaInitResizeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Flags) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiAreaInitResizeMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaInitResizeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+internal static class MuiAreaExitResizeMessageCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiAreaExitResizeMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaExitResizeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value.MethodId = methodId;
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiAreaExitResizeMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaExitResizeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -108,16 +196,12 @@ internal static class MuiAreaResizeMessageCodec
 		APTR message, out MuiAreaInitResizeMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiAreaInitResizeMessage.Size) ||
-			!MuiAreaResizeMessageFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiAreaResizeMessageField.MethodId, out var method) ||
-			method != InitResize ||
-			!MuiAreaResizeMessageFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiAreaResizeMessageField.Flags, out var flags)) return false;
-		packet.MethodId = method;
-		packet.Flags = flags;
+		if (!MuiAreaInitResizeMessageCodec.TryRead(ref platform, message,
+			out packet) || packet.MethodId != InitResize)
+		{
+			packet = default;
+			return false;
+		}
 		return true;
 	}
 
@@ -125,35 +209,52 @@ internal static class MuiAreaResizeMessageCodec
 		APTR message, out MuiAreaExitResizeMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiAreaExitResizeMessage.Size) ||
-			!MuiAreaResizeMessageFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiAreaResizeMessageField.MethodId, out var method) ||
-			method != ExitResize) return false;
-		packet.MethodId = method;
+		if (!MuiAreaExitResizeMessageCodec.TryRead(ref platform, message,
+			out packet) || packet.MethodId != ExitResize)
+		{
+			packet = default;
+			return false;
+		}
 		return true;
 	}
 
 	internal static bool WriteInit<TPlatform>(ref TPlatform platform,
 		APTR message, uint flags) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiAreaInitResizeMessage.Size) ||
-			!MuiAreaResizeMessageFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiAreaResizeMessageField.MethodId, InitResize) ||
-			!MuiAreaResizeMessageFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiAreaResizeMessageField.Flags, flags)) return false;
-		return true;
+		var packet = default(MuiAreaInitResizeMessage);
+		packet.MethodId = InitResize;
+		packet.Flags = flags;
+		return MuiAreaInitResizeMessageCodec.Write(ref platform, message, packet);
 	}
 
 	internal static bool WriteExit<TPlatform>(ref TPlatform platform,
 		APTR message) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiAreaExitResizeMessage.Size) ||
-			!MuiAreaResizeMessageFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiAreaResizeMessageField.MethodId, ExitResize)) return false;
+		// Keep this one-field packet on the sequential cursor path. The
+		// compiler's by-value ABI for a single-LONG managed struct is not a
+		// guest pointer, so passing the record through a helper would lose the
+		// record address in freestanding native code.
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiAreaExitResizeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				ExitResize)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadExitMethod<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiAreaExitResizeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out methodId) || !MuiGuestStructCursor.IsComplete(cursor) ||
+			methodId != ExitResize)
+		{
+			methodId = 0;
+			return false;
+		}
 		return true;
 	}
 }
@@ -173,6 +274,11 @@ public struct MuiAreaResizeStateInput
 internal struct MuiAreaResizeStateRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint ActiveOffset = 4;
+	internal const uint FlagsOffset = 8;
+	internal const uint GenerationOffset = 12;
 	internal const uint Cookie = 0x4152535Au; // "ARSZ"
 
 	internal uint Magic;
@@ -196,7 +302,10 @@ internal struct MuiAreaResizeStateFieldCursor
 	internal MuiAreaResizeStateField Field;
 }
 
-internal static class MuiAreaResizeStateFieldCursorCodec
+// The fixed resize lifecycle record owns its packed positions in this bounded
+// adapter. Live lifecycle code uses it directly; the typed cursor remains only
+// for compatibility callers and adapter-focused tests.
+internal static class MuiAreaResizeStateMemoryCodec
 {
 	private static bool TryResolve(MuiAreaResizeStateField field,
 		out uint offset)
@@ -204,16 +313,16 @@ internal static class MuiAreaResizeStateFieldCursorCodec
 		switch (field)
 		{
 			case MuiAreaResizeStateField.Magic:
-				offset = 0;
+				offset = MuiAreaResizeStateRecord.MagicOffset;
 				return true;
 			case MuiAreaResizeStateField.Active:
-				offset = 4;
+				offset = MuiAreaResizeStateRecord.ActiveOffset;
 				return true;
 			case MuiAreaResizeStateField.Flags:
-				offset = 8;
+				offset = MuiAreaResizeStateRecord.FlagsOffset;
 				return true;
 			case MuiAreaResizeStateField.Generation:
-				offset = 12;
+				offset = MuiAreaResizeStateRecord.GenerationOffset;
 				return true;
 			default:
 				offset = 0;
@@ -222,16 +331,16 @@ internal static class MuiAreaResizeStateFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiAreaResizeStateFieldCursor cursor, out APTR address)
+		APTR record, MuiAreaResizeStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiAreaResizeStateRecord.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiAreaResizeStateRecord.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiAreaResizeStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -239,10 +348,8 @@ internal static class MuiAreaResizeStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaResizeStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -251,13 +358,32 @@ internal static class MuiAreaResizeStateFieldCursorCodec
 		APTR record, MuiAreaResizeStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaResizeStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+internal static class MuiAreaResizeStateFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaResizeStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaResizeStateMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaResizeStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaResizeStateMemoryCodec.TryReadUInt32(ref platform, record, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiAreaResizeStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiAreaResizeStateMemoryCodec.TryWriteUInt32(ref platform, record, field,
+			value);
 }
 
 internal static class MuiAreaResizeStateRecordCodec
@@ -267,22 +393,19 @@ internal static class MuiAreaResizeStateRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaResizeStateRecord.Size) ||
-			!MuiAreaResizeStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiAreaResizeStateField.Magic, out var magic) ||
-			magic != MuiAreaResizeStateRecord.Cookie ||
-			!MuiAreaResizeStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiAreaResizeStateField.Active, out var active) ||
-			!MuiAreaResizeStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiAreaResizeStateField.Flags, out var flags) ||
-			!MuiAreaResizeStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiAreaResizeStateField.Generation, out var generation))
-			return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaResizeStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) || magic != MuiAreaResizeStateRecord.Cookie ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var active) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Flags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Generation) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.Magic = magic;
 		value.Active = active == 0 ? 0u : 1u;
-		value.Flags = flags;
-		value.Generation = generation;
 		return true;
 	}
 
@@ -290,17 +413,18 @@ internal static class MuiAreaResizeStateRecordCodec
 		MuiAreaResizeStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaResizeStateRecord.Size) || value.Magic !=
-			MuiAreaResizeStateRecord.Cookie) return false;
-		return MuiAreaResizeStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaResizeStateField.Magic, value.Magic) &&
-			MuiAreaResizeStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaResizeStateField.Active, value.Active == 0 ? 0u : 1u) &&
-			MuiAreaResizeStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaResizeStateField.Flags, value.Flags) &&
-			MuiAreaResizeStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaResizeStateField.Generation, value.Generation);
+		if (value.Magic != MuiAreaResizeStateRecord.Cookie ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiAreaResizeStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Active == 0 ? 0u : 1u) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Generation)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 

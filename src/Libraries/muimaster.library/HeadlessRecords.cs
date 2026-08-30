@@ -88,6 +88,8 @@ internal static class MuiHeadlessLayout
 internal struct MuiGuestUlongStorage
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint ValueOffset = 0;
 	internal uint Value;
 }
 
@@ -103,17 +105,19 @@ internal struct MuiGuestUlongStorageFieldCursor
 	internal MuiGuestUlongStorageField Field;
 }
 
-internal static class MuiGuestUlongStorageFieldCursorCodec
+// Struct-first guest-memory adapter for a caller-owned ULONG result slot.
+internal static class MuiGuestUlongStorageMemoryCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiGuestUlongStorageFieldCursor cursor, out APTR address)
+		APTR storage, MuiGuestUlongStorageField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (cursor.Field != MuiGuestUlongStorageField.Value ||
-			cursor.Storage.IsNull) return false;
-		address = cursor.Storage;
-		return platform.IsMapped(address, 4);
+		if (field != MuiGuestUlongStorageField.Value || storage.IsNull ||
+			storage.Raw > uint.MaxValue - MuiGuestUlongStorage.ValueOffset ||
+			!platform.IsMapped(storage, MuiGuestUlongStorage.Size)) return false;
+		address = APTR.FromPointer(storage.Raw + MuiGuestUlongStorage.ValueOffset);
+		return platform.IsMapped(address, MuiGuestUlongStorage.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -121,10 +125,7 @@ internal static class MuiGuestUlongStorageFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiGuestUlongStorageFieldCursor);
-		cursor.Storage = storage;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, storage, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -133,13 +134,33 @@ internal static class MuiGuestUlongStorageFieldCursorCodec
 		APTR storage, MuiGuestUlongStorageField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiGuestUlongStorageFieldCursor);
-		cursor.Storage = storage;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, storage, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for typed cursor callers; production access
+// routes through MuiGuestUlongStorageMemoryCodec.
+internal static class MuiGuestUlongStorageFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGuestUlongStorageFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestUlongStorageMemoryCodec.TryGetAddress(ref platform,
+			cursor.Storage, cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR storage, MuiGuestUlongStorageField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestUlongStorageMemoryCodec.TryRead(ref platform, storage, field,
+			out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR storage, MuiGuestUlongStorageField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestUlongStorageMemoryCodec.TryWrite(ref platform, storage, field,
+			value);
 }
 
 internal static class MuiGuestUlongStorageCodec
@@ -157,7 +178,7 @@ internal static class MuiGuestUlongStorageCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiGuestUlongStorage.Size)) return false;
-		return MuiGuestUlongStorageFieldCursorCodec.TryWrite(ref platform,
+		return MuiGuestUlongStorageMemoryCodec.TryWrite(ref platform,
 			address, MuiGuestUlongStorageField.Value, record.Value);
 	}
 
@@ -168,7 +189,7 @@ internal static class MuiGuestUlongStorageCodec
 		record = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiGuestUlongStorage.Size)) return false;
-		return MuiGuestUlongStorageFieldCursorCodec.TryRead(ref platform, address,
+		return MuiGuestUlongStorageMemoryCodec.TryRead(ref platform, address,
 			MuiGuestUlongStorageField.Value, out record.Value);
 	}
 }
@@ -183,6 +204,15 @@ internal static class MuiGuestUlongStorageCodec
 internal struct MuiHeadlessStateRecord
 {
 	internal const uint Size = 32;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint VersionOffset = 4;
+	internal const uint ClassesOffset = 8;
+	internal const uint ObjectsOffset = 12;
+	internal const uint NextSequenceOffset = 16;
+	internal const uint NotifyDepthOffset = 20;
+	internal const uint MutationOffset = 24;
+	internal const uint ReservedOffset = 28;
 	internal uint Magic;
 	internal uint Version;
 	internal APTR Classes;
@@ -221,47 +251,39 @@ internal struct MuiHeadlessStateFieldCursor
 	internal MuiHeadlessStateField Field;
 }
 
-internal static class MuiHeadlessStateFieldCursorCodec
+// Struct-first guest-memory adapter for the canonical headless state header.
+internal static class MuiHeadlessStateMemoryCodec
 {
+	private static bool TryResolve(MuiHeadlessStateField field,
+		out uint offset)
+	{
+		offset = field switch
+		{
+			MuiHeadlessStateField.Magic => MuiHeadlessStateRecord.MagicOffset,
+			MuiHeadlessStateField.Version => MuiHeadlessStateRecord.VersionOffset,
+			MuiHeadlessStateField.Classes => MuiHeadlessStateRecord.ClassesOffset,
+			MuiHeadlessStateField.Objects => MuiHeadlessStateRecord.ObjectsOffset,
+			MuiHeadlessStateField.NextSequence =>
+				MuiHeadlessStateRecord.NextSequenceOffset,
+			MuiHeadlessStateField.NotifyDepth =>
+				MuiHeadlessStateRecord.NotifyDepthOffset,
+			MuiHeadlessStateField.Mutation => MuiHeadlessStateRecord.MutationOffset,
+			MuiHeadlessStateField.Reserved => MuiHeadlessStateRecord.ReservedOffset,
+			_ => uint.MaxValue,
+		};
+		return offset != uint.MaxValue;
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiHeadlessStateFieldCursor cursor, out APTR address)
+		APTR state, MuiHeadlessStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		uint offset;
-		switch (cursor.Field)
-		{
-			case MuiHeadlessStateField.Magic:
-				offset = 0;
-				break;
-			case MuiHeadlessStateField.Version:
-				offset = 4;
-				break;
-			case MuiHeadlessStateField.Classes:
-				offset = 8;
-				break;
-			case MuiHeadlessStateField.Objects:
-				offset = 12;
-				break;
-			case MuiHeadlessStateField.NextSequence:
-				offset = 16;
-				break;
-			case MuiHeadlessStateField.NotifyDepth:
-				offset = 20;
-				break;
-			case MuiHeadlessStateField.Mutation:
-				offset = 24;
-				break;
-			case MuiHeadlessStateField.Reserved:
-				offset = 28;
-				break;
-			default:
-				return false;
-		}
-		if (cursor.State.IsNull || cursor.State.Raw >
-			uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.State.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || state.IsNull ||
+			state.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(state, MuiHeadlessStateRecord.Size)) return false;
+		address = APTR.FromPointer(state.Raw + offset);
+		return platform.IsMapped(address, MuiHeadlessStateRecord.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -269,10 +291,7 @@ internal static class MuiHeadlessStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiHeadlessStateFieldCursor);
-		cursor.State = state;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, state, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -281,13 +300,31 @@ internal static class MuiHeadlessStateFieldCursorCodec
 		APTR state, MuiHeadlessStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiHeadlessStateFieldCursor);
-		cursor.State = state;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, state, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for typed cursor callers; production access
+// routes through MuiHeadlessStateMemoryCodec.
+internal static class MuiHeadlessStateFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiHeadlessStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessStateMemoryCodec.TryGetAddress(ref platform, cursor.State,
+			cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR state,
+		MuiHeadlessStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessStateMemoryCodec.TryRead(ref platform, state, field, out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform, APTR state,
+		MuiHeadlessStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessStateMemoryCodec.TryWrite(ref platform, state, field, value);
 }
 
 internal static class MuiHeadlessStateAdmission
@@ -300,61 +337,74 @@ internal static class MuiHeadlessStateAdmission
 
 internal static class MuiHeadlessStateCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// Sequential named-struct path used by all state-header consumers. The
+	// complete fixed record is admitted before any field is exposed; the
+	// field adapter above remains only for compatibility diagnostics.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiHeadlessStateRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiHeadlessStateRecord.Size)) return false;
-		if (!MuiHeadlessStateFieldCursorCodec.TryRead(ref platform, address,
-			MuiHeadlessStateField.Magic, out record.Magic) ||
-			!MuiHeadlessStateFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessStateField.Version, out record.Version)) return false;
-		if (!MuiHeadlessStateFieldCursorCodec.TryRead(ref platform, address,
-			MuiHeadlessStateField.Classes, out var rawClasses) ||
-			!MuiHeadlessStateFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessStateField.Objects, out var rawObjects)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Version) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawClasses) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawObjects) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.NextSequence) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.NotifyDepth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Mutation) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Reserved) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Classes = APTR.FromPointer(rawClasses);
 		record.Objects = APTR.FromPointer(rawObjects);
-		return MuiHeadlessStateFieldCursorCodec.TryRead(ref platform, address,
-			MuiHeadlessStateField.NextSequence, out record.NextSequence) &&
-			MuiHeadlessStateFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessStateField.NotifyDepth, out record.NotifyDepth) &&
-			MuiHeadlessStateFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessStateField.Mutation, out record.Mutation) &&
-			MuiHeadlessStateFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessStateField.Reserved, out record.Reserved);
+		return true;
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiHeadlessStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out record);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiHeadlessStateRecord record) where TPlatform : struct, IMuiGuestMemory
-		=> TryReadStructural(ref platform, address, out record) &&
+		=> TryReadRecord(ref platform, address, out record) &&
 		MuiHeadlessStateAdmission.Validate(record);
 
-	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform, APTR address,
 		MuiHeadlessStateRecord record) where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiHeadlessStateRecord.Size) ||
-			!MuiHeadlessStateAdmission.Validate(record)) return false;
-		return MuiHeadlessStateFieldCursorCodec.TryWrite(ref platform, address,
-			MuiHeadlessStateField.Magic, record.Magic) &&
-			MuiHeadlessStateFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessStateField.Version, record.Version) &&
-			MuiHeadlessStateFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessStateField.Classes, record.Classes.Raw) &&
-			MuiHeadlessStateFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessStateField.Objects, record.Objects.Raw) &&
-			MuiHeadlessStateFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessStateField.NextSequence, record.NextSequence) &&
-			MuiHeadlessStateFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessStateField.NotifyDepth, record.NotifyDepth) &&
-			MuiHeadlessStateFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessStateField.Mutation, record.Mutation) &&
-			MuiHeadlessStateFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessStateField.Reserved, record.Reserved);
-	}
+		=> MuiHeadlessStateAdmission.Validate(record) &&
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Version) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Classes.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Objects.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.NextSequence) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.NotifyDepth) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Mutation) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Reserved) &&
+		MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiHeadlessStateRecord record) where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, record);
 }
 
 // Fixed 28-byte class registry entry. The explicit reserved UWORD preserves
@@ -364,6 +414,16 @@ internal static class MuiHeadlessStateCodec
 internal struct MuiHeadlessClassRecord
 {
 	internal const uint Size = 28;
+	internal const uint PointerFieldSize = 4;
+	internal const uint WordFieldSize = 2;
+	internal const uint NextOffset = 0;
+	internal const uint NameOffset = 4;
+	internal const uint BoopsiOffset = 8;
+	internal const uint SuperOffset = 12;
+	internal const uint InstanceSizeOffset = 16;
+	internal const uint ReservedOffset = 18;
+	internal const uint FlagsOffset = 20;
+	internal const uint ObjectCountOffset = 24;
 	internal APTR Next;
 	internal APTR Name;
 	internal APTR Boopsi;
@@ -393,7 +453,8 @@ internal struct MuiHeadlessClassFieldCursor
 	internal MuiHeadlessClassField Field;
 }
 
-internal static class MuiHeadlessClassFieldCursorCodec
+// Struct-first guest-memory adapter for a headless class registry entry.
+internal static class MuiHeadlessClassMemoryCodec
 {
 	private static bool TryResolve(MuiHeadlessClassField field,
 		out uint offset, out uint size)
@@ -403,36 +464,36 @@ internal static class MuiHeadlessClassFieldCursorCodec
 		switch (field)
 		{
 			case MuiHeadlessClassField.Next:
-				offset = unchecked((uint)MuiHeadlessLayout.ClassNext);
-				size = 4;
+				offset = MuiHeadlessClassRecord.NextOffset;
+				size = MuiHeadlessClassRecord.PointerFieldSize;
 				break;
 			case MuiHeadlessClassField.Name:
-				offset = unchecked((uint)MuiHeadlessLayout.ClassName);
-				size = 4;
+				offset = MuiHeadlessClassRecord.NameOffset;
+				size = MuiHeadlessClassRecord.PointerFieldSize;
 				break;
 			case MuiHeadlessClassField.Boopsi:
-				offset = unchecked((uint)MuiHeadlessLayout.ClassBoopsi);
-				size = 4;
+				offset = MuiHeadlessClassRecord.BoopsiOffset;
+				size = MuiHeadlessClassRecord.PointerFieldSize;
 				break;
 			case MuiHeadlessClassField.Super:
-				offset = unchecked((uint)MuiHeadlessLayout.ClassSuper);
-				size = 4;
+				offset = MuiHeadlessClassRecord.SuperOffset;
+				size = MuiHeadlessClassRecord.PointerFieldSize;
 				break;
 			case MuiHeadlessClassField.InstanceSize:
-				offset = unchecked((uint)MuiHeadlessLayout.ClassInstanceSize);
-				size = 2;
+				offset = MuiHeadlessClassRecord.InstanceSizeOffset;
+				size = MuiHeadlessClassRecord.WordFieldSize;
 				break;
 			case MuiHeadlessClassField.Reserved:
-				offset = unchecked((uint)(MuiHeadlessLayout.ClassInstanceSize + 2));
-				size = 2;
+				offset = MuiHeadlessClassRecord.ReservedOffset;
+				size = MuiHeadlessClassRecord.WordFieldSize;
 				break;
 			case MuiHeadlessClassField.Flags:
-				offset = unchecked((uint)MuiHeadlessLayout.ClassFlags);
-				size = 4;
+				offset = MuiHeadlessClassRecord.FlagsOffset;
+				size = MuiHeadlessClassRecord.PointerFieldSize;
 				break;
 			case MuiHeadlessClassField.ObjectCount:
-				offset = unchecked((uint)MuiHeadlessLayout.ClassObjectCount);
-				size = 4;
+				offset = MuiHeadlessClassRecord.ObjectCountOffset;
+				size = MuiHeadlessClassRecord.PointerFieldSize;
 				break;
 			default:
 				return false;
@@ -441,14 +502,15 @@ internal static class MuiHeadlessClassFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiHeadlessClassFieldCursor cursor, out APTR address)
+		APTR record, MuiHeadlessClassField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset, out var size) ||
-			cursor.Record.IsNull || cursor.Record.Raw > uint.MaxValue - offset)
+		if (!TryResolve(field, out var offset, out var size) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiHeadlessClassRecord.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
+		address = APTR.FromPointer(record.Raw + offset);
 		return platform.IsMapped(address, size);
 	}
 
@@ -457,10 +519,7 @@ internal static class MuiHeadlessClassFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiHeadlessClassFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
+		if (!TryGetAddress(ref platform, record, field, out var address) ||
 			!TryResolve(field, out _, out var size) || size != 4) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
@@ -470,10 +529,7 @@ internal static class MuiHeadlessClassFieldCursorCodec
 		APTR record, MuiHeadlessClassField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiHeadlessClassFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
+		if (!TryGetAddress(ref platform, record, field, out var address) ||
 			!TryResolve(field, out _, out var size) || size != 4) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
@@ -484,10 +540,7 @@ internal static class MuiHeadlessClassFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiHeadlessClassFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
+		if (!TryGetAddress(ref platform, record, field, out var address) ||
 			!TryResolve(field, out _, out var size) || size != 2) return false;
 		value = platform.ReadUInt16(address, 0);
 		return true;
@@ -497,68 +550,115 @@ internal static class MuiHeadlessClassFieldCursorCodec
 		APTR record, MuiHeadlessClassField field, ushort value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiHeadlessClassFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address) ||
+		if (!TryGetAddress(ref platform, record, field, out var address) ||
 			!TryResolve(field, out _, out var size) || size != 2) return false;
 		platform.WriteUInt16(address, 0, value);
 		return true;
 	}
 }
 
+// Compatibility wrapper retained for typed cursor callers; production access
+// routes through MuiHeadlessClassMemoryCodec.
+internal static class MuiHeadlessClassFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiHeadlessClassFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessClassMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiHeadlessClassField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessClassMemoryCodec.TryReadUInt32(ref platform, record, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiHeadlessClassField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessClassMemoryCodec.TryWriteUInt32(ref platform, record, field,
+			value);
+
+	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiHeadlessClassField field, out ushort value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessClassMemoryCodec.TryReadUInt16(ref platform, record, field,
+			out value);
+
+	internal static bool TryWriteUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiHeadlessClassField field, ushort value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessClassMemoryCodec.TryWriteUInt16(ref platform, record, field,
+			value);
+}
+
 internal static class MuiHeadlessClassCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiHeadlessClassRecord record) where TPlatform : struct, IMuiGuestMemory
+	// Sequential named-struct path used by class-registry consumers. The
+	// explicit UWORD pair is consumed in declaration order between the APTR
+	// links and the ULONG counters; the field adapter remains diagnostic only.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiHeadlessClassRecord record)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiHeadlessClassRecord.Size)) return false;
-		if (!MuiHeadlessClassFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiHeadlessClassField.Next, out var rawNext) ||
-			!MuiHeadlessClassFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiHeadlessClassField.Name, out var rawName) ||
-			!MuiHeadlessClassFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiHeadlessClassField.Boopsi, out var rawBoopsi) ||
-			!MuiHeadlessClassFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiHeadlessClassField.Super, out var rawSuper)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessClassRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawNext) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawName) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawBoopsi) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawSuper) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out record.InstanceSize) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out record.Reserved) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Flags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.ObjectCount) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Next = APTR.FromPointer(rawNext);
 		record.Name = APTR.FromPointer(rawName);
 		record.Boopsi = APTR.FromPointer(rawBoopsi);
 		record.Super = APTR.FromPointer(rawSuper);
-		return MuiHeadlessClassFieldCursorCodec.TryReadUInt16(ref platform,
-			address, MuiHeadlessClassField.InstanceSize, out record.InstanceSize) &&
-			MuiHeadlessClassFieldCursorCodec.TryReadUInt16(ref platform, address,
-				MuiHeadlessClassField.Reserved, out record.Reserved) &&
-			MuiHeadlessClassFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiHeadlessClassField.Flags, out record.Flags) &&
-			MuiHeadlessClassFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiHeadlessClassField.ObjectCount, out record.ObjectCount);
+		return true;
 	}
 
-	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiHeadlessClassRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out record);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
 		MuiHeadlessClassRecord record) where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiHeadlessClassRecord.Size)) return false;
-		return MuiHeadlessClassFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiHeadlessClassField.Next, record.Next.Raw) &&
-			MuiHeadlessClassFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiHeadlessClassField.Name, record.Name.Raw) &&
-			MuiHeadlessClassFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiHeadlessClassField.Boopsi, record.Boopsi.Raw) &&
-			MuiHeadlessClassFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiHeadlessClassField.Super, record.Super.Raw) &&
-			MuiHeadlessClassFieldCursorCodec.TryWriteUInt16(ref platform, address,
-				MuiHeadlessClassField.InstanceSize, record.InstanceSize) &&
-			MuiHeadlessClassFieldCursorCodec.TryWriteUInt16(ref platform, address,
-				MuiHeadlessClassField.Reserved, record.Reserved) &&
-			MuiHeadlessClassFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiHeadlessClassField.Flags, record.Flags) &&
-			MuiHeadlessClassFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiHeadlessClassField.ObjectCount, record.ObjectCount);
-	}
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessClassRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Next.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Name.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Boopsi.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Super.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+			record.InstanceSize) &&
+		MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+			record.Reserved) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Flags) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.ObjectCount) &&
+		MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiHeadlessClassRecord record) where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, record);
 }
 
 // Fixed 64-byte headless object record. Pointer-bearing links are represented
@@ -568,6 +668,23 @@ internal static class MuiHeadlessClassCodec
 internal struct MuiHeadlessObjectRecord
 {
 	internal const uint Size = 64;
+	internal const uint FieldSize = 4;
+	internal const uint NextOffset = 0;
+	internal const uint BoopsiOffset = 4;
+	internal const uint ClassOffset = 8;
+	internal const uint AttributesOffset = 12;
+	internal const uint NotificationsOffset = 16;
+	internal const uint ChildrenHeadOffset = 20;
+	internal const uint ChildrenTailOffset = 24;
+	internal const uint ParentOffset = 28;
+	internal const uint StoresOffset = 32;
+	internal const uint SemaphoreOwnerOffset = 36;
+	internal const uint SemaphoreDepthOffset = 40;
+	internal const uint SemaphoreSharedOffset = 44;
+	internal const uint FlagsOffset = 48;
+	internal const uint GenerationOffset = 52;
+	internal const uint ObjectIdOffset = 56;
+	internal const uint UserDataOffset = 60;
 	internal APTR Next;
 	internal APTR Boopsi;
 	internal APTR Class;
@@ -613,77 +730,53 @@ internal struct MuiHeadlessObjectFieldCursor
 	internal MuiHeadlessObjectField Field;
 }
 
-internal static class MuiHeadlessObjectFieldCursorCodec
+// Struct-first guest-memory adapter for a headless object record.
+internal static class MuiHeadlessObjectMemoryCodec
 {
 	private static bool TryResolve(MuiHeadlessObjectField field,
 		out uint offset)
 	{
-		switch (field)
+		offset = field switch
 		{
-			case MuiHeadlessObjectField.Next:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectNext);
-				break;
-			case MuiHeadlessObjectField.Boopsi:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectBoopsi);
-				break;
-			case MuiHeadlessObjectField.Class:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectClass);
-				break;
-			case MuiHeadlessObjectField.Attributes:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectAttributes);
-				break;
-			case MuiHeadlessObjectField.Notifications:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectNotifications);
-				break;
-			case MuiHeadlessObjectField.ChildrenHead:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectChildrenHead);
-				break;
-			case MuiHeadlessObjectField.ChildrenTail:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectChildrenTail);
-				break;
-			case MuiHeadlessObjectField.Parent:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectParent);
-				break;
-			case MuiHeadlessObjectField.Stores:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectStores);
-				break;
-			case MuiHeadlessObjectField.SemaphoreOwner:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectSemaphoreOwner);
-				break;
-			case MuiHeadlessObjectField.SemaphoreDepth:
-				offset = unchecked((uint)(MuiHeadlessLayout.ObjectSemaphoreOwner + 4));
-				break;
-			case MuiHeadlessObjectField.SemaphoreShared:
-				offset = unchecked((uint)(MuiHeadlessLayout.ObjectSemaphoreOwner + 8));
-				break;
-			case MuiHeadlessObjectField.Flags:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectFlags);
-				break;
-			case MuiHeadlessObjectField.Generation:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectGeneration);
-				break;
-			case MuiHeadlessObjectField.ObjectId:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectId);
-				break;
-			case MuiHeadlessObjectField.UserData:
-				offset = unchecked((uint)MuiHeadlessLayout.ObjectUserData);
-				break;
-			default:
-				offset = 0;
-				return false;
-		}
-		return true;
+			MuiHeadlessObjectField.Next => MuiHeadlessObjectRecord.NextOffset,
+			MuiHeadlessObjectField.Boopsi => MuiHeadlessObjectRecord.BoopsiOffset,
+			MuiHeadlessObjectField.Class => MuiHeadlessObjectRecord.ClassOffset,
+			MuiHeadlessObjectField.Attributes =>
+				MuiHeadlessObjectRecord.AttributesOffset,
+			MuiHeadlessObjectField.Notifications =>
+				MuiHeadlessObjectRecord.NotificationsOffset,
+			MuiHeadlessObjectField.ChildrenHead =>
+				MuiHeadlessObjectRecord.ChildrenHeadOffset,
+			MuiHeadlessObjectField.ChildrenTail =>
+				MuiHeadlessObjectRecord.ChildrenTailOffset,
+			MuiHeadlessObjectField.Parent => MuiHeadlessObjectRecord.ParentOffset,
+			MuiHeadlessObjectField.Stores => MuiHeadlessObjectRecord.StoresOffset,
+			MuiHeadlessObjectField.SemaphoreOwner =>
+				MuiHeadlessObjectRecord.SemaphoreOwnerOffset,
+			MuiHeadlessObjectField.SemaphoreDepth =>
+				MuiHeadlessObjectRecord.SemaphoreDepthOffset,
+			MuiHeadlessObjectField.SemaphoreShared =>
+				MuiHeadlessObjectRecord.SemaphoreSharedOffset,
+			MuiHeadlessObjectField.Flags => MuiHeadlessObjectRecord.FlagsOffset,
+			MuiHeadlessObjectField.Generation =>
+				MuiHeadlessObjectRecord.GenerationOffset,
+			MuiHeadlessObjectField.ObjectId => MuiHeadlessObjectRecord.ObjectIdOffset,
+			MuiHeadlessObjectField.UserData => MuiHeadlessObjectRecord.UserDataOffset,
+			_ => uint.MaxValue,
+		};
+		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiHeadlessObjectFieldCursor cursor, out APTR address)
+		APTR record, MuiHeadlessObjectField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiHeadlessObjectRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiHeadlessObjectRecord.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -691,10 +784,7 @@ internal static class MuiHeadlessObjectFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiHeadlessObjectFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -703,44 +793,79 @@ internal static class MuiHeadlessObjectFieldCursorCodec
 		APTR record, MuiHeadlessObjectField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiHeadlessObjectFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
+// Compatibility wrapper retained for typed cursor callers; production access
+// routes through MuiHeadlessObjectMemoryCodec.
+internal static class MuiHeadlessObjectFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiHeadlessObjectFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR record,
+		MuiHeadlessObjectField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessObjectMemoryCodec.TryRead(ref platform, record, field,
+			out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform, APTR record,
+		MuiHeadlessObjectField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessObjectMemoryCodec.TryWrite(ref platform, record, field, value);
+}
+
 internal static class MuiHeadlessObjectCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiHeadlessObjectRecord record) where TPlatform : struct, IMuiGuestMemory
+	// Sequential named-struct path used by object-graph consumers. All ten
+	// APTR links precede the six ULONG scalar fields exactly as declared; the
+	// field adapter remains only for compatibility diagnostics.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiHeadlessObjectRecord record)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiHeadlessObjectRecord.Size)) return false;
-		if (!MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-			MuiHeadlessObjectField.Next, out var rawNext) ||
-			!MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.Boopsi, out var rawBoopsi) ||
-			!MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.Class, out var rawClass) ||
-			!MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.Attributes, out var rawAttributes) ||
-			!MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.Notifications, out var rawNotifications) ||
-			!MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.ChildrenHead, out var rawChildrenHead) ||
-			!MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.ChildrenTail, out var rawChildrenTail) ||
-			!MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.Parent, out var rawParent) ||
-			!MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.Stores, out var rawStores) ||
-			!MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.SemaphoreOwner, out var rawSemaphoreOwner))
-			return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessObjectRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawNext) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawBoopsi) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawClass) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawAttributes) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawNotifications) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawChildrenHead) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawChildrenTail) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawParent) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawStores) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawSemaphoreOwner) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.SemaphoreDepth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.SemaphoreShared) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Flags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Generation) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.ObjectId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.UserData) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Next = APTR.FromPointer(rawNext);
 		record.Boopsi = APTR.FromPointer(rawBoopsi);
 		record.Class = APTR.FromPointer(rawClass);
@@ -751,58 +876,56 @@ internal static class MuiHeadlessObjectCodec
 		record.Parent = APTR.FromPointer(rawParent);
 		record.Stores = APTR.FromPointer(rawStores);
 		record.SemaphoreOwner = APTR.FromPointer(rawSemaphoreOwner);
-		return MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-			MuiHeadlessObjectField.SemaphoreDepth, out record.SemaphoreDepth) &&
-			MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.SemaphoreShared, out record.SemaphoreShared) &&
-			MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.Flags, out record.Flags) &&
-			MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.Generation, out record.Generation) &&
-			MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.ObjectId, out record.ObjectId) &&
-			MuiHeadlessObjectFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessObjectField.UserData, out record.UserData);
+		return true;
 	}
 
-	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiHeadlessObjectRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out record);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
 		MuiHeadlessObjectRecord record) where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiHeadlessObjectRecord.Size)) return false;
-		return MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-			MuiHeadlessObjectField.Next, record.Next.Raw) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.Boopsi, record.Boopsi.Raw) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.Class, record.Class.Raw) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.Attributes, record.Attributes.Raw) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.Notifications, record.Notifications.Raw) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.ChildrenHead, record.ChildrenHead.Raw) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.ChildrenTail, record.ChildrenTail.Raw) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.Parent, record.Parent.Raw) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.Stores, record.Stores.Raw) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.SemaphoreOwner, record.SemaphoreOwner.Raw) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.SemaphoreDepth, record.SemaphoreDepth) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.SemaphoreShared, record.SemaphoreShared) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.Flags, record.Flags) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.Generation, record.Generation) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.ObjectId, record.ObjectId) &&
-			MuiHeadlessObjectFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessObjectField.UserData, record.UserData);
-	}
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessObjectRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Next.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Boopsi.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Class.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Attributes.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Notifications.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.ChildrenHead.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.ChildrenTail.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Parent.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Stores.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.SemaphoreOwner.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.SemaphoreDepth) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.SemaphoreShared) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Flags) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Generation) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.ObjectId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.UserData) &&
+		MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiHeadlessObjectRecord record) where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, record);
 }
 
 // Scalar qualification surface for the fixed headless object record. The
@@ -936,6 +1059,11 @@ public static class MuiHeadlessStatePacketCore
 internal struct MuiHeadlessAttributeRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint NextOffset = 0;
+	internal const uint IdOffset = 4;
+	internal const uint ValueOffset = 8;
+	internal const uint GenerationOffset = 12;
 	internal APTR Next;
 	internal uint Id;
 	internal uint Value;
@@ -957,41 +1085,34 @@ internal struct MuiHeadlessAttributeFieldCursor
 	internal MuiHeadlessAttributeField Field;
 }
 
-internal static class MuiHeadlessAttributeFieldCursorCodec
+// Struct-first guest-memory adapter for a headless attribute node.
+internal static class MuiHeadlessAttributeMemoryCodec
 {
 	private static bool TryResolve(MuiHeadlessAttributeField field,
 		out uint offset)
 	{
-		switch (field)
+		offset = field switch
 		{
-			case MuiHeadlessAttributeField.Next:
-				offset = unchecked((uint)MuiHeadlessLayout.AttributeNext);
-				break;
-			case MuiHeadlessAttributeField.Id:
-				offset = unchecked((uint)MuiHeadlessLayout.AttributeId);
-				break;
-			case MuiHeadlessAttributeField.Value:
-				offset = unchecked((uint)MuiHeadlessLayout.AttributeValue);
-				break;
-			case MuiHeadlessAttributeField.Generation:
-				offset = unchecked((uint)MuiHeadlessLayout.AttributeGeneration);
-				break;
-			default:
-				offset = 0;
-				return false;
-		}
-		return true;
+			MuiHeadlessAttributeField.Next => MuiHeadlessAttributeRecord.NextOffset,
+			MuiHeadlessAttributeField.Id => MuiHeadlessAttributeRecord.IdOffset,
+			MuiHeadlessAttributeField.Value => MuiHeadlessAttributeRecord.ValueOffset,
+			MuiHeadlessAttributeField.Generation =>
+				MuiHeadlessAttributeRecord.GenerationOffset,
+			_ => uint.MaxValue,
+		};
+		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiHeadlessAttributeFieldCursor cursor, out APTR address)
+		APTR record, MuiHeadlessAttributeField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiHeadlessAttributeRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiHeadlessAttributeRecord.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -999,10 +1120,7 @@ internal static class MuiHeadlessAttributeFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiHeadlessAttributeFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -1011,50 +1129,85 @@ internal static class MuiHeadlessAttributeFieldCursorCodec
 		APTR record, MuiHeadlessAttributeField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiHeadlessAttributeFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
+// Compatibility wrapper retained for typed cursor callers; production access
+// routes through MuiHeadlessAttributeMemoryCodec.
+internal static class MuiHeadlessAttributeFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiHeadlessAttributeFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessAttributeMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR record,
+		MuiHeadlessAttributeField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessAttributeMemoryCodec.TryRead(ref platform, record, field,
+			out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform, APTR record,
+		MuiHeadlessAttributeField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessAttributeMemoryCodec.TryWrite(ref platform, record, field,
+			value);
+}
+
 internal static class MuiHeadlessAttributeCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiHeadlessAttributeRecord record)
+	// Sequential named-struct path used by attribute-list consumers. The APTR
+	// link and three ULONG fields are exchanged in declaration order; the field
+	// adapter remains only for compatibility diagnostics.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiHeadlessAttributeRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiHeadlessAttributeRecord.Size)) return false;
-		if (!MuiHeadlessAttributeFieldCursorCodec.TryRead(ref platform, address,
-			MuiHeadlessAttributeField.Next, out var rawNext)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessAttributeRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawNext) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Id) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Value) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Generation) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Next = APTR.FromPointer(rawNext);
-		return MuiHeadlessAttributeFieldCursorCodec.TryRead(ref platform, address,
-			MuiHeadlessAttributeField.Id, out record.Id) &&
-			MuiHeadlessAttributeFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessAttributeField.Value, out record.Value) &&
-			MuiHeadlessAttributeFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessAttributeField.Generation, out record.Generation);
+		return true;
 	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiHeadlessAttributeRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out record);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiHeadlessAttributeRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessAttributeRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Next.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Id) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Value) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Generation) &&
+		MuiGuestStructCursor.IsComplete(cursor);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiHeadlessAttributeRecord record)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiHeadlessAttributeRecord.Size)) return false;
-		return MuiHeadlessAttributeFieldCursorCodec.TryWrite(ref platform, address,
-			MuiHeadlessAttributeField.Next, record.Next.Raw) &&
-			MuiHeadlessAttributeFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessAttributeField.Id, record.Id) &&
-			MuiHeadlessAttributeFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessAttributeField.Value, record.Value) &&
-			MuiHeadlessAttributeFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessAttributeField.Generation, record.Generation);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, record);
 }
 
 // Scalar qualification surface for the fixed attribute node. Production
@@ -1089,6 +1242,11 @@ public static class MuiHeadlessAttributePacketCore
 internal struct MuiHeadlessChildRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint NextOffset = 0;
+	internal const uint PreviousOffset = 4;
+	internal const uint ObjectOffset = 8;
+	internal const uint OwnerOffset = 12;
 	internal APTR Next;
 	internal APTR Previous;
 	internal APTR Object;
@@ -1110,41 +1268,33 @@ internal struct MuiHeadlessChildFieldCursor
 	internal MuiHeadlessChildField Field;
 }
 
-internal static class MuiHeadlessChildFieldCursorCodec
+// Struct-first guest-memory adapter for a Family child-list node.
+internal static class MuiHeadlessChildMemoryCodec
 {
 	private static bool TryResolve(MuiHeadlessChildField field,
 		out uint offset)
 	{
-		switch (field)
+		offset = field switch
 		{
-			case MuiHeadlessChildField.Next:
-				offset = unchecked((uint)MuiHeadlessLayout.ChildNext);
-				break;
-			case MuiHeadlessChildField.Previous:
-				offset = unchecked((uint)MuiHeadlessLayout.ChildPrevious);
-				break;
-			case MuiHeadlessChildField.Object:
-				offset = unchecked((uint)MuiHeadlessLayout.ChildObject);
-				break;
-			case MuiHeadlessChildField.Owner:
-				offset = unchecked((uint)MuiHeadlessLayout.ChildOwner);
-				break;
-			default:
-				offset = 0;
-				return false;
-		}
-		return true;
+			MuiHeadlessChildField.Next => MuiHeadlessChildRecord.NextOffset,
+			MuiHeadlessChildField.Previous => MuiHeadlessChildRecord.PreviousOffset,
+			MuiHeadlessChildField.Object => MuiHeadlessChildRecord.ObjectOffset,
+			MuiHeadlessChildField.Owner => MuiHeadlessChildRecord.OwnerOffset,
+			_ => uint.MaxValue,
+		};
+		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiHeadlessChildFieldCursor cursor, out APTR address)
+		APTR record, MuiHeadlessChildField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiHeadlessChildRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiHeadlessChildRecord.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -1152,10 +1302,7 @@ internal static class MuiHeadlessChildFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiHeadlessChildFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -1164,32 +1311,54 @@ internal static class MuiHeadlessChildFieldCursorCodec
 		APTR record, MuiHeadlessChildField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiHeadlessChildFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
+// Compatibility wrapper retained for typed cursor callers; production access
+// routes through MuiHeadlessChildMemoryCodec.
+internal static class MuiHeadlessChildFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiHeadlessChildFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessChildMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR record,
+		MuiHeadlessChildField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessChildMemoryCodec.TryRead(ref platform, record, field, out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform, APTR record,
+		MuiHeadlessChildField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessChildMemoryCodec.TryWrite(ref platform, record, field, value);
+}
+
 internal static class MuiHeadlessChildCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiHeadlessChildRecord record)
+	// Sequential named-struct path used by Family topology consumers. The four
+	// APTR links are exchanged in declaration order; the field adapter remains
+	// only for compatibility diagnostics.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiHeadlessChildRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiHeadlessChildRecord.Size)) return false;
-		if (!MuiHeadlessChildFieldCursorCodec.TryRead(ref platform, address,
-			MuiHeadlessChildField.Next, out var rawNext) ||
-			!MuiHeadlessChildFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessChildField.Previous, out var rawPrevious) ||
-			!MuiHeadlessChildFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessChildField.Object, out var rawObject) ||
-			!MuiHeadlessChildFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessChildField.Owner, out var rawOwner)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessChildRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawNext) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawPrevious) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawObject) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawOwner) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Next = APTR.FromPointer(rawNext);
 		record.Previous = APTR.FromPointer(rawPrevious);
 		record.Object = APTR.FromPointer(rawObject);
@@ -1197,21 +1366,31 @@ internal static class MuiHeadlessChildCodec
 		return true;
 	}
 
-	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiHeadlessChildRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out record);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
 		MuiHeadlessChildRecord record)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiHeadlessChildRecord.Size)) return false;
-		return MuiHeadlessChildFieldCursorCodec.TryWrite(ref platform, address,
-			MuiHeadlessChildField.Next, record.Next.Raw) &&
-			MuiHeadlessChildFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessChildField.Previous, record.Previous.Raw) &&
-			MuiHeadlessChildFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessChildField.Object, record.Object.Raw) &&
-			MuiHeadlessChildFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessChildField.Owner, record.Owner.Raw);
-	}
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessChildRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Next.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Previous.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Object.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Owner.Raw) &&
+		MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiHeadlessChildRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, record);
 }
 
 // Scalar qualification surface for the Family child-list node.  The live
@@ -1248,6 +1427,15 @@ public static class MuiHeadlessChildPacketCore
 internal struct MuiHeadlessNotificationRecord
 {
 	internal const uint Size = 32;
+	internal const uint FieldSize = 4;
+	internal const uint NextOffset = 0;
+	internal const uint SequenceOffset = 4;
+	internal const uint TriggerAttributeOffset = 8;
+	internal const uint TriggerValueOffset = 12;
+	internal const uint DestinationOffset = 16;
+	internal const uint FollowCountOffset = 20;
+	internal const uint FlagsOffset = 24;
+	internal const uint ReservedOffset = 28;
 	internal APTR Next;
 	internal uint Sequence;
 	internal uint TriggerAttribute;
@@ -1277,53 +1465,45 @@ internal struct MuiHeadlessNotificationFieldCursor
 	internal MuiHeadlessNotificationField Field;
 }
 
-internal static class MuiHeadlessNotificationFieldCursorCodec
+// Struct-first guest-memory adapter for a headless notification header.
+internal static class MuiHeadlessNotificationMemoryCodec
 {
 	private static bool TryResolve(MuiHeadlessNotificationField field,
 		out uint offset)
 	{
-		switch (field)
+		offset = field switch
 		{
-			case MuiHeadlessNotificationField.Next:
-				offset = unchecked((uint)MuiHeadlessLayout.NotificationNext);
-				break;
-			case MuiHeadlessNotificationField.Sequence:
-				offset = unchecked((uint)MuiHeadlessLayout.NotificationSequence);
-				break;
-			case MuiHeadlessNotificationField.TriggerAttribute:
-				offset = unchecked((uint)MuiHeadlessLayout.NotificationTriggerAttribute);
-				break;
-			case MuiHeadlessNotificationField.TriggerValue:
-				offset = unchecked((uint)MuiHeadlessLayout.NotificationTriggerValue);
-				break;
-			case MuiHeadlessNotificationField.Destination:
-				offset = unchecked((uint)MuiHeadlessLayout.NotificationDestination);
-				break;
-			case MuiHeadlessNotificationField.FollowCount:
-				offset = unchecked((uint)MuiHeadlessLayout.NotificationFollowCount);
-				break;
-			case MuiHeadlessNotificationField.Flags:
-				offset = unchecked((uint)MuiHeadlessLayout.NotificationFlags);
-				break;
-			case MuiHeadlessNotificationField.Reserved:
-				offset = unchecked((uint)(MuiHeadlessLayout.NotificationPayload - 4));
-				break;
-			default:
-				offset = 0;
-				return false;
-		}
-		return true;
+			MuiHeadlessNotificationField.Next =>
+				MuiHeadlessNotificationRecord.NextOffset,
+			MuiHeadlessNotificationField.Sequence =>
+				MuiHeadlessNotificationRecord.SequenceOffset,
+			MuiHeadlessNotificationField.TriggerAttribute =>
+				MuiHeadlessNotificationRecord.TriggerAttributeOffset,
+			MuiHeadlessNotificationField.TriggerValue =>
+				MuiHeadlessNotificationRecord.TriggerValueOffset,
+			MuiHeadlessNotificationField.Destination =>
+				MuiHeadlessNotificationRecord.DestinationOffset,
+			MuiHeadlessNotificationField.FollowCount =>
+				MuiHeadlessNotificationRecord.FollowCountOffset,
+			MuiHeadlessNotificationField.Flags =>
+				MuiHeadlessNotificationRecord.FlagsOffset,
+			MuiHeadlessNotificationField.Reserved =>
+				MuiHeadlessNotificationRecord.ReservedOffset,
+			_ => uint.MaxValue,
+		};
+		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiHeadlessNotificationFieldCursor cursor, out APTR address)
+		APTR record, MuiHeadlessNotificationField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiHeadlessNotificationRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiHeadlessNotificationRecord.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -1331,10 +1511,7 @@ internal static class MuiHeadlessNotificationFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiHeadlessNotificationFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -1343,13 +1520,33 @@ internal static class MuiHeadlessNotificationFieldCursorCodec
 		APTR record, MuiHeadlessNotificationField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiHeadlessNotificationFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for typed cursor callers; production access
+// routes through MuiHeadlessNotificationMemoryCodec.
+internal static class MuiHeadlessNotificationFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiHeadlessNotificationFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessNotificationMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR record,
+		MuiHeadlessNotificationField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessNotificationMemoryCodec.TryRead(ref platform, record, field,
+			out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform, APTR record,
+		MuiHeadlessNotificationField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessNotificationMemoryCodec.TryWrite(ref platform, record, field,
+			value);
 }
 
 // Named view of the variable payload trailing a notification header. Keeping
@@ -1362,23 +1559,36 @@ internal struct MuiHeadlessNotificationPayloadCursor
 	internal uint PayloadBytes;
 }
 
+// Struct-first guest-memory adapter for the variable payload trailing a
+// notification header. The complete header and requested payload range must
+// be mapped before the payload address is exposed.
+internal static class MuiHeadlessNotificationPayloadMemoryCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, uint payloadBytes, out APTR payload)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		payload = APTR.Null;
+		if (record.IsNull || record.Raw >
+			uint.MaxValue - MuiHeadlessNotificationRecord.Size ||
+			payloadBytes > uint.MaxValue -
+			MuiHeadlessNotificationRecord.Size) return false;
+		var total = MuiHeadlessNotificationRecord.Size + payloadBytes;
+		if (!platform.IsMapped(record, total)) return false;
+		payload = APTR.FromPointer(record.Raw +
+			MuiHeadlessNotificationRecord.Size);
+		return payload.Raw <= uint.MaxValue - payloadBytes;
+	}
+}
+
+// Compatibility wrapper retained for the typed payload-range cursor.
 internal static class MuiHeadlessNotificationPayloadCursorCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiHeadlessNotificationPayloadCursor cursor, out APTR payload)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		payload = APTR.Null;
-		if (cursor.Record.IsNull || cursor.Record.Raw >
-			uint.MaxValue - MuiHeadlessNotificationRecord.Size ||
-			cursor.PayloadBytes > uint.MaxValue -
-			MuiHeadlessNotificationRecord.Size) return false;
-		var total = MuiHeadlessNotificationRecord.Size + cursor.PayloadBytes;
-		if (!platform.IsMapped(cursor.Record, total)) return false;
-		payload = APTR.FromPointer(cursor.Record.Raw +
-			MuiHeadlessNotificationRecord.Size);
-		return payload.Raw <= uint.MaxValue - cursor.PayloadBytes;
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiHeadlessNotificationPayloadMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.PayloadBytes, out payload);
 }
 
 internal static class MuiHeadlessNotificationCodec
@@ -1386,67 +1596,74 @@ internal static class MuiHeadlessNotificationCodec
 	internal static bool TryGetPayload<TPlatform>(ref TPlatform platform,
 		APTR address, uint payloadBytes, out APTR payload)
 		where TPlatform : struct, IMuiGuestMemory
+		=> MuiHeadlessNotificationPayloadMemoryCodec.TryGetAddress(ref platform,
+			address, payloadBytes, out payload);
+
+	// Sequential named-struct path used by notification consumers. The APTR
+	// links and six ULONG header fields are exchanged in declaration order; the
+	// field adapter remains only for compatibility diagnostics.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiHeadlessNotificationRecord record)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiHeadlessNotificationPayloadCursor);
-		cursor.Record = address;
-		cursor.PayloadBytes = payloadBytes;
-		return MuiHeadlessNotificationPayloadCursorCodec.TryGetAddress(
-			ref platform, cursor, out payload);
+		record = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessNotificationRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawNext) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Sequence) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.TriggerAttribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.TriggerValue) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawDestination) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.FollowCount) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Flags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Reserved) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		record.Next = APTR.FromPointer(rawNext);
+		record.Destination = APTR.FromPointer(rawDestination);
+		return true;
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiHeadlessNotificationRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out record);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiHeadlessNotificationRecord record)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiHeadlessNotificationRecord.Size)) return false;
-		if (!MuiHeadlessNotificationFieldCursorCodec.TryRead(ref platform,
-			address, MuiHeadlessNotificationField.Next, out var rawNext) ||
-			!MuiHeadlessNotificationFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessNotificationField.Destination, out var rawDestination))
-			return false;
-		record.Next = APTR.FromPointer(rawNext);
-		record.Destination = APTR.FromPointer(rawDestination);
-		return MuiHeadlessNotificationFieldCursorCodec.TryRead(ref platform,
-			address, MuiHeadlessNotificationField.Sequence, out record.Sequence) &&
-			MuiHeadlessNotificationFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessNotificationField.TriggerAttribute,
-				out record.TriggerAttribute) &&
-			MuiHeadlessNotificationFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessNotificationField.TriggerValue, out record.TriggerValue) &&
-			MuiHeadlessNotificationFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessNotificationField.FollowCount, out record.FollowCount) &&
-			MuiHeadlessNotificationFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessNotificationField.Flags, out record.Flags) &&
-			MuiHeadlessNotificationFieldCursorCodec.TryRead(ref platform, address,
-				MuiHeadlessNotificationField.Reserved, out record.Reserved);
-	}
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessNotificationRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Next.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Sequence) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.TriggerAttribute) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.TriggerValue) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Destination.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.FollowCount) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Flags) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Reserved) &&
+		MuiGuestStructCursor.IsComplete(cursor);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiHeadlessNotificationRecord record)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiHeadlessNotificationRecord.Size)) return false;
-		return MuiHeadlessNotificationFieldCursorCodec.TryWrite(ref platform,
-			address, MuiHeadlessNotificationField.Next, record.Next.Raw) &&
-			MuiHeadlessNotificationFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessNotificationField.Sequence, record.Sequence) &&
-			MuiHeadlessNotificationFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessNotificationField.TriggerAttribute,
-				record.TriggerAttribute) &&
-			MuiHeadlessNotificationFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessNotificationField.TriggerValue, record.TriggerValue) &&
-			MuiHeadlessNotificationFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessNotificationField.Destination, record.Destination.Raw) &&
-			MuiHeadlessNotificationFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessNotificationField.FollowCount, record.FollowCount) &&
-			MuiHeadlessNotificationFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessNotificationField.Flags, record.Flags) &&
-			MuiHeadlessNotificationFieldCursorCodec.TryWrite(ref platform, address,
-				MuiHeadlessNotificationField.Reserved, record.Reserved);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, record);
 }
 
 // Scalar qualification surface for the fixed notification header.  Payload
@@ -1489,6 +1706,13 @@ public static class MuiHeadlessNotificationPacketCore
 internal struct MuiStoreRecord
 {
 	internal const uint Size = 24;
+	internal const uint FieldSize = 4;
+	internal const uint NextOffset = 0;
+	internal const uint KeyOffset = 4;
+	internal const uint DataOffset = 8;
+	internal const uint LengthOffset = 12;
+	internal const uint FlagsOffset = 16;
+	internal const uint GenerationOffset = 20;
 	internal APTR Next;
 	internal uint Key;
 	internal APTR Data;
@@ -1515,41 +1739,43 @@ internal struct MuiStoreRecordFieldCursor
 	internal MuiStoreRecordField Field;
 }
 
-internal static class MuiStoreRecordFieldCursorCodec
+// Struct-first guest-memory adapter for the native Store/Dataspace record.
+internal static class MuiStoreRecordMemoryCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiStoreRecordFieldCursor cursor, out APTR address)
+		APTR record, MuiStoreRecordField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
 		uint offset;
-		switch (cursor.Field)
+		switch (field)
 		{
 			case MuiStoreRecordField.Next:
-				offset = unchecked((uint)MuiHeadlessLayout.StoreNext);
+				offset = MuiStoreRecord.NextOffset;
 				break;
 			case MuiStoreRecordField.Key:
-				offset = unchecked((uint)MuiHeadlessLayout.StoreKey);
+				offset = MuiStoreRecord.KeyOffset;
 				break;
 			case MuiStoreRecordField.Data:
-				offset = unchecked((uint)MuiHeadlessLayout.StoreData);
+				offset = MuiStoreRecord.DataOffset;
 				break;
 			case MuiStoreRecordField.Length:
-				offset = unchecked((uint)MuiHeadlessLayout.StoreLength);
+				offset = MuiStoreRecord.LengthOffset;
 				break;
 			case MuiStoreRecordField.Flags:
-				offset = unchecked((uint)MuiHeadlessLayout.StoreFlags);
+				offset = MuiStoreRecord.FlagsOffset;
 				break;
 			case MuiStoreRecordField.Generation:
-				offset = unchecked((uint)MuiHeadlessLayout.StoreGeneration);
+				offset = MuiStoreRecord.GenerationOffset;
 				break;
 			default:
 				return false;
 		}
-		if (cursor.Record.IsNull || cursor.Record.Raw >
-			uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (record.IsNull || record.Raw >
+			uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiStoreRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiStoreRecord.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -1557,10 +1783,7 @@ internal static class MuiStoreRecordFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiStoreRecordFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -1569,57 +1792,90 @@ internal static class MuiStoreRecordFieldCursorCodec
 		APTR record, MuiStoreRecordField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiStoreRecordFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
+// Compatibility wrapper retained for typed cursor callers; production access
+// routes through MuiStoreRecordMemoryCodec and its named record layout.
+internal static class MuiStoreRecordFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStoreRecordFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStoreRecordMemoryCodec.TryGetAddress(ref platform, cursor.Record,
+			cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStoreRecordField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStoreRecordMemoryCodec.TryRead(ref platform, record, field, out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStoreRecordField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStoreRecordMemoryCodec.TryWrite(ref platform, record, field, value);
+}
+
 internal static class MuiStoreRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiStoreRecord record) where TPlatform : struct, IMuiGuestMemory
+	// Sequential named-struct path used by dataspace/store consumers. The two
+	// APTR links and four ULONG fields are exchanged in declaration order; the
+	// field adapter remains only for compatibility diagnostics.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStoreRecord record)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address, MuiStoreRecord.Size))
-			return false;
-		if (!MuiStoreRecordFieldCursorCodec.TryRead(ref platform, address,
-			MuiStoreRecordField.Next, out var rawNext)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStoreRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawNext) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Key) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawData) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Length) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Flags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Generation) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Next = APTR.FromPointer(rawNext);
-		if (!MuiStoreRecordFieldCursorCodec.TryRead(ref platform, address,
-			MuiStoreRecordField.Data, out var rawData)) return false;
 		record.Data = APTR.FromPointer(rawData);
-		return MuiStoreRecordFieldCursorCodec.TryRead(ref platform, address,
-			MuiStoreRecordField.Key, out record.Key) &&
-			MuiStoreRecordFieldCursorCodec.TryRead(ref platform, address,
-				MuiStoreRecordField.Length, out record.Length) &&
-			MuiStoreRecordFieldCursorCodec.TryRead(ref platform, address,
-				MuiStoreRecordField.Flags, out record.Flags) &&
-			MuiStoreRecordFieldCursorCodec.TryRead(ref platform, address,
-				MuiStoreRecordField.Generation, out record.Generation);
+		return true;
 	}
 
-	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiStoreRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out record);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
 		MuiStoreRecord record) where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address, MuiStoreRecord.Size))
-			return false;
-		return MuiStoreRecordFieldCursorCodec.TryWrite(ref platform, address,
-			MuiStoreRecordField.Next, record.Next.Raw) &&
-			MuiStoreRecordFieldCursorCodec.TryWrite(ref platform, address,
-				MuiStoreRecordField.Key, record.Key) &&
-			MuiStoreRecordFieldCursorCodec.TryWrite(ref platform, address,
-				MuiStoreRecordField.Data, record.Data.Raw) &&
-			MuiStoreRecordFieldCursorCodec.TryWrite(ref platform, address,
-				MuiStoreRecordField.Length, record.Length) &&
-			MuiStoreRecordFieldCursorCodec.TryWrite(ref platform, address,
-				MuiStoreRecordField.Flags, record.Flags) &&
-			MuiStoreRecordFieldCursorCodec.TryWrite(ref platform, address,
-				MuiStoreRecordField.Generation, record.Generation);
-	}
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStoreRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Next.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Key) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Data.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Length) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Flags) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			record.Generation) &&
+		MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiStoreRecord record) where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, record);
 }
 
 // Scalar qualification surface for the fixed 24-byte Store/Dataspace record.

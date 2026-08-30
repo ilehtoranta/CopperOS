@@ -137,16 +137,34 @@ internal static class MuiBalancePolicyStateRecordMemoryCodec
 
 internal static class MuiBalancePolicyStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiBalancePolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		return MuiBalancePolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) &&
-			MuiBalancePolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out value.Quiet);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiBalancePolicyStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Quiet)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiBalancePolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiBalancePolicyStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Quiet) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiBalancePolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiBalancePolicyStateRecord value)
@@ -158,11 +176,9 @@ internal static class MuiBalancePolicyStateRecordCodec
 		MuiBalancePolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiBalancePolicyStateAdmission.Validate(value)) return false;
-		return MuiBalancePolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiBalancePolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 4, value.Quiet);
+		if (address.IsNull || !MuiBalancePolicyStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 

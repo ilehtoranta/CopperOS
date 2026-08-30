@@ -635,23 +635,451 @@ internal static class MuiListtreeMessageMemoryCodec
 	}
 }
 
+// Live Listtree packet transport is declaration-order based.  The public
+// records are intentionally kept as named structs in ListtreeDispatcher.cs;
+// this codec only performs the bounded guest-memory exchange for those
+// structs.  The older field/offset adapters above remain available for
+// malformed-packet diagnostics and compatibility tests.
+internal static class MuiListtreeStructPacketCodec
+{
+	private static bool TryCreate<TPlatform>(ref TPlatform platform,
+		APTR message, uint size, out MuiGuestStructCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, message, size,
+			out cursor);
+
+	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeMethodMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteMethod<TPlatform>(ref TPlatform platform,
+		APTR message, uint method)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeMethodMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, method) &&
+		MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadSet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeSetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeSetMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Attribute) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Value) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteSet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiListtreeSetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeSetMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Attribute) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Value) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadGet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeGetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeGetMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Attribute) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Storage) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteGet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiListtreeGetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeGetMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Attribute) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Storage) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadGetEntry<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeGetEntryMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeGetEntryMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Node) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Position) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteGetEntry<TPlatform>(ref TPlatform platform,
+		APTR message, MuiListtreeGetEntryMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeGetEntryMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Node) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Position) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadInsert<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeInsertMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeInsertMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Name) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.User) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.ListNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.PrevNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteInsert<TPlatform>(ref TPlatform platform,
+		APTR message, MuiListtreeInsertMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeInsertMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Name) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.User) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.ListNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.PrevNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadRemove<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeRemoveMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeRemoveMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.ListNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.TreeNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteRemove<TPlatform>(ref TPlatform platform,
+		APTR message, MuiListtreeRemoveMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeRemoveMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.ListNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.TreeNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadOpenClose<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeOpenCloseMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeOpenCloseMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.ListNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.TreeNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteOpenClose<TPlatform>(ref TPlatform platform,
+		APTR message, MuiListtreeOpenCloseMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeOpenCloseMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.ListNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.TreeNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadSort<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeSortMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeSortMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.ListNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteSort<TPlatform>(ref TPlatform platform,
+		APTR message, MuiListtreeSortMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeSortMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.ListNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadGetNr<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeGetNrMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeGetNrMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.TreeNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteGetNr<TPlatform>(ref TPlatform platform,
+		APTR message, MuiListtreeGetNrMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeGetNrMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.TreeNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadMoveExchange<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeMoveExchangeMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeMoveExchangeMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.OldListNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.OldTreeNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.NewListNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.NewTreeNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteMoveExchange<TPlatform>(ref TPlatform platform,
+		APTR message, MuiListtreeMoveExchangeMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeMoveExchangeMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.OldListNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.OldTreeNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.NewListNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.NewTreeNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadRename<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeRenameMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeRenameMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.TreeNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.NewName) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteRename<TPlatform>(ref TPlatform platform,
+		APTR message, MuiListtreeRenameMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeRenameMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.TreeNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.NewName) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadFindName<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeFindNameMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeFindNameMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.ListNode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Name) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteFindName<TPlatform>(ref TPlatform platform,
+		APTR message, MuiListtreeFindNameMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeFindNameMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.ListNode) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Name) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadDropMark<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeDropMarkMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeDropMarkMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Entry) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Values) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteDropMark<TPlatform>(ref TPlatform platform,
+		APTR message, MuiListtreeDropMarkMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeDropMarkMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Entry) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Values) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadTestPos<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiListtreeTestPosMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiListtreeTestPosMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.X) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Y) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Result) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteTestPos<TPlatform>(ref TPlatform platform,
+		APTR message, MuiListtreeTestPosMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiListtreeTestPosMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.X) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Y) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Result) && MuiGuestStructCursor.IsComplete(cursor);
+}
+
 internal static class MuiListtreeMethodMessageCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeMethodMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.Method, MuiListtreeField.MethodId,
-			out packet.MethodId);
-	}
+		=> MuiListtreeStructPacketCodec.TryReadMethod(ref platform, message,
+			out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.Method, MuiListtreeField.MethodId, method);
+		MuiListtreeStructPacketCodec.TryWriteMethod(ref platform, message,
+			method);
 }
 
 internal static class MuiListtreeSetMessageCodec
@@ -659,33 +1087,14 @@ internal static class MuiListtreeSetMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeSetMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.Set, MuiListtreeField.MethodId,
-			out packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Set, MuiListtreeField.Attribute,
-				out packet.Attribute) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Set, MuiListtreeField.Value,
-				out packet.Value);
-	}
+		=> MuiListtreeStructPacketCodec.TryReadSet(ref platform, message,
+			out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiListtreeSetMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.Set, MuiListtreeField.MethodId,
-			packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Set, MuiListtreeField.Attribute,
-				packet.Attribute) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Set, MuiListtreeField.Value,
-				packet.Value);
-	}
+		=> MuiListtreeStructPacketCodec.TryWriteSet(ref platform, message,
+			packet);
 }
 
 internal static class MuiListtreeGetMessageCodec
@@ -693,33 +1102,14 @@ internal static class MuiListtreeGetMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeGetMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.Get, MuiListtreeField.MethodId,
-			out packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Get, MuiListtreeField.Attribute,
-				out packet.Attribute) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Get, MuiListtreeField.Storage,
-				out packet.Storage);
-	}
+		=> MuiListtreeStructPacketCodec.TryReadGet(ref platform, message,
+			out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiListtreeGetMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.Get, MuiListtreeField.MethodId,
-			packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Get, MuiListtreeField.Attribute,
-				packet.Attribute) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Get, MuiListtreeField.Storage,
-				packet.Storage);
-	}
+		=> MuiListtreeStructPacketCodec.TryWriteGet(ref platform, message,
+			packet);
 }
 
 internal static class MuiListtreeGetEntryMessageCodec
@@ -727,39 +1117,14 @@ internal static class MuiListtreeGetEntryMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeGetEntryMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.GetEntry, MuiListtreeField.MethodId,
-			out packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.GetEntry, MuiListtreeField.Node,
-				out packet.Node) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.GetEntry, MuiListtreeField.Position,
-				out packet.Position) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.GetEntry, MuiListtreeField.Flags,
-				out packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryReadGetEntry(ref platform, message,
+			out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiListtreeGetEntryMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.GetEntry, MuiListtreeField.MethodId,
-			packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.GetEntry, MuiListtreeField.Node,
-				packet.Node) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.GetEntry, MuiListtreeField.Position,
-				packet.Position) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.GetEntry, MuiListtreeField.Flags,
-				packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryWriteGetEntry(ref platform, message,
+			packet);
 }
 
 internal static class MuiListtreeInsertMessageCodec
@@ -767,48 +1132,14 @@ internal static class MuiListtreeInsertMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeInsertMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.Insert, MuiListtreeField.MethodId,
-			out packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Insert, MuiListtreeField.Name,
-				out packet.Name) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Insert, MuiListtreeField.User,
-				out packet.User) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Insert, MuiListtreeField.ListNode,
-				out packet.ListNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Insert, MuiListtreeField.PrevNode,
-				out packet.PrevNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Insert, MuiListtreeField.Flags,
-				out packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryReadInsert(ref platform, message,
+			out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiListtreeInsertMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.Insert, MuiListtreeField.MethodId,
-			packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Insert, MuiListtreeField.Name, packet.Name) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Insert, MuiListtreeField.User, packet.User) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Insert, MuiListtreeField.ListNode,
-				packet.ListNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Insert, MuiListtreeField.PrevNode,
-				packet.PrevNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Insert, MuiListtreeField.Flags, packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryWriteInsert(ref platform, message,
+			packet);
 }
 
 internal static class MuiListtreeRemoveMessageCodec
@@ -816,38 +1147,14 @@ internal static class MuiListtreeRemoveMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeRemoveMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.Remove, MuiListtreeField.MethodId,
-			out packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Remove, MuiListtreeField.ListNode,
-				out packet.ListNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Remove, MuiListtreeField.TreeNode,
-				out packet.TreeNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Remove, MuiListtreeField.Flags,
-				out packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryReadRemove(ref platform, message,
+			out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiListtreeRemoveMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.Remove, MuiListtreeField.MethodId,
-			packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Remove, MuiListtreeField.ListNode,
-				packet.ListNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Remove, MuiListtreeField.TreeNode,
-				packet.TreeNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Remove, MuiListtreeField.Flags, packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryWriteRemove(ref platform, message,
+			packet);
 }
 
 internal static class MuiListtreeOpenCloseMessageCodec
@@ -855,39 +1162,14 @@ internal static class MuiListtreeOpenCloseMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeOpenCloseMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.OpenClose, MuiListtreeField.MethodId,
-			out packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.OpenClose, MuiListtreeField.ListNode,
-				out packet.ListNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.OpenClose, MuiListtreeField.TreeNode,
-				out packet.TreeNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.OpenClose, MuiListtreeField.Flags,
-				out packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryReadOpenClose(ref platform, message,
+			out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiListtreeOpenCloseMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.OpenClose, MuiListtreeField.MethodId,
-			packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.OpenClose, MuiListtreeField.ListNode,
-				packet.ListNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.OpenClose, MuiListtreeField.TreeNode,
-				packet.TreeNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.OpenClose, MuiListtreeField.Flags,
-				packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryWriteOpenClose(ref platform, message,
+			packet);
 }
 
 internal static class MuiListtreeSortMessageCodec
@@ -895,32 +1177,14 @@ internal static class MuiListtreeSortMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeSortMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.Sort, MuiListtreeField.MethodId,
-			out packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Sort, MuiListtreeField.ListNode,
-				out packet.ListNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Sort, MuiListtreeField.Flags,
-				out packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryReadSort(ref platform, message,
+			out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiListtreeSortMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.Sort, MuiListtreeField.MethodId,
-			packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Sort, MuiListtreeField.ListNode,
-				packet.ListNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Sort, MuiListtreeField.Flags, packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryWriteSort(ref platform, message,
+			packet);
 }
 
 internal static class MuiListtreeGetNrMessageCodec
@@ -928,32 +1192,14 @@ internal static class MuiListtreeGetNrMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeGetNrMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.GetNr, MuiListtreeField.MethodId,
-			out packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.GetNr, MuiListtreeField.TreeNode,
-				out packet.TreeNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.GetNr, MuiListtreeField.Flags,
-				out packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryReadGetNr(ref platform, message,
+			out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiListtreeGetNrMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.GetNr, MuiListtreeField.MethodId,
-			packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.GetNr, MuiListtreeField.TreeNode,
-				packet.TreeNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.GetNr, MuiListtreeField.Flags, packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryWriteGetNr(ref platform, message,
+			packet);
 }
 
 internal static class MuiListtreeMoveExchangeMessageCodec
@@ -961,51 +1207,14 @@ internal static class MuiListtreeMoveExchangeMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeMoveExchangeMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.MoveExchange, MuiListtreeField.MethodId,
-			out packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.MoveExchange, MuiListtreeField.OldListNode,
-				out packet.OldListNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.MoveExchange, MuiListtreeField.OldTreeNode,
-				out packet.OldTreeNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.MoveExchange, MuiListtreeField.NewListNode,
-				out packet.NewListNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.MoveExchange, MuiListtreeField.NewTreeNode,
-				out packet.NewTreeNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.MoveExchange, MuiListtreeField.Flags,
-				out packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryReadMoveExchange(ref platform,
+			message, out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiListtreeMoveExchangeMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.MoveExchange, MuiListtreeField.MethodId,
-			packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.MoveExchange, MuiListtreeField.OldListNode,
-				packet.OldListNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.MoveExchange, MuiListtreeField.OldTreeNode,
-				packet.OldTreeNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.MoveExchange, MuiListtreeField.NewListNode,
-				packet.NewListNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.MoveExchange, MuiListtreeField.NewTreeNode,
-				packet.NewTreeNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.MoveExchange, MuiListtreeField.Flags,
-				packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryWriteMoveExchange(ref platform,
+			message, packet);
 }
 
 internal static class MuiListtreeRenameMessageCodec
@@ -1013,38 +1222,14 @@ internal static class MuiListtreeRenameMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeRenameMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.Rename, MuiListtreeField.MethodId,
-			out packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Rename, MuiListtreeField.TreeNode,
-				out packet.TreeNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Rename, MuiListtreeField.NewName,
-				out packet.NewName) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.Rename, MuiListtreeField.Flags,
-				out packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryReadRename(ref platform, message,
+			out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiListtreeRenameMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.Rename, MuiListtreeField.MethodId,
-			packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Rename, MuiListtreeField.TreeNode,
-				packet.TreeNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Rename, MuiListtreeField.NewName,
-				packet.NewName) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.Rename, MuiListtreeField.Flags, packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryWriteRename(ref platform, message,
+			packet);
 }
 
 internal static class MuiListtreeFindNameMessageCodec
@@ -1052,37 +1237,14 @@ internal static class MuiListtreeFindNameMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeFindNameMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.FindName, MuiListtreeField.MethodId,
-			out packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.FindName, MuiListtreeField.ListNode,
-				out packet.ListNode) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.FindName, MuiListtreeField.Name,
-				out packet.Name) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.FindName, MuiListtreeField.Flags,
-				out packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryReadFindName(ref platform, message,
+			out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiListtreeFindNameMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.FindName, MuiListtreeField.MethodId,
-			packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.FindName, MuiListtreeField.ListNode,
-				packet.ListNode) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.FindName, MuiListtreeField.Name, packet.Name) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.FindName, MuiListtreeField.Flags, packet.Flags);
-	}
+		=> MuiListtreeStructPacketCodec.TryWriteFindName(ref platform, message,
+			packet);
 }
 
 internal static class MuiListtreeDropMarkMessageCodec
@@ -1090,33 +1252,14 @@ internal static class MuiListtreeDropMarkMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeDropMarkMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.DropMark, MuiListtreeField.MethodId,
-			out packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.DropMark, MuiListtreeField.Entry,
-				out packet.Entry) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.DropMark, MuiListtreeField.Values,
-				out packet.Values);
-	}
+		=> MuiListtreeStructPacketCodec.TryReadDropMark(ref platform, message,
+			out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiListtreeDropMarkMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.DropMark, MuiListtreeField.MethodId,
-			packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.DropMark, MuiListtreeField.Entry,
-				packet.Entry) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.DropMark, MuiListtreeField.Values,
-				packet.Values);
-	}
+		=> MuiListtreeStructPacketCodec.TryWriteDropMark(ref platform, message,
+			packet);
 }
 
 internal static class MuiListtreeTestPosMessageCodec
@@ -1124,37 +1267,14 @@ internal static class MuiListtreeTestPosMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeTestPosMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiListtreePacketKind.TestPos, MuiListtreeField.MethodId,
-			out packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.TestPos, MuiListtreeField.X,
-				out packet.X) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.TestPos, MuiListtreeField.Y,
-				out packet.Y) &&
-			MuiListtreeMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiListtreePacketKind.TestPos, MuiListtreeField.Result,
-				out packet.Result);
-}
+		=> MuiListtreeStructPacketCodec.TryReadTestPos(ref platform, message,
+			out packet);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiListtreeTestPosMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiListtreePacketKind.TestPos, MuiListtreeField.MethodId,
-			packet.MethodId) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.TestPos, MuiListtreeField.X, packet.X) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.TestPos, MuiListtreeField.Y, packet.Y) &&
-			MuiListtreeMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiListtreePacketKind.TestPos, MuiListtreeField.Result,
-				packet.Result);
-	}
+		=> MuiListtreeStructPacketCodec.TryWriteTestPos(ref platform, message,
+			packet);
 }
 
 internal static class MuiListtreeMessageCodec

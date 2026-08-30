@@ -196,7 +196,7 @@ internal static class MuiProcessSpecialistMessageCodec
 		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiProcessSpecialistMethodMessage.Size)) return false;
-		return MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Method,
 			MuiProcessSpecialistField.MethodId, out methodId);
 	}
@@ -228,7 +228,7 @@ internal static class MuiProcessSpecialistMessageCodec
 	{
 		if (!IsMethod(method) || message.IsNull || !platform.IsMapped(message,
 			MuiProcessSpecialistMethodMessage.Size)) return false;
-		return MuiProcessSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Method,
 			MuiProcessSpecialistField.MethodId, method);
 	}
@@ -242,10 +242,10 @@ internal static class MuiProcessSpecialistMessageCodec
 			OmGet)) return false;
 		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
 		packet.MethodId = methodId;
-		return MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Get,
 			MuiProcessSpecialistField.Attribute, out packet.Attribute) &&
-			MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+			MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiProcessSpecialistPacketKind.Get,
 				MuiProcessSpecialistField.Storage, out packet.Storage);
 	}
@@ -256,13 +256,13 @@ internal static class MuiProcessSpecialistMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiProcessSpecialistGetMessage.Size)) return false;
-		return MuiProcessSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Get,
 			MuiProcessSpecialistField.MethodId, OmGet) &&
-			MuiProcessSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiProcessSpecialistPacketKind.Get,
 				MuiProcessSpecialistField.Attribute, attribute) &&
-			MuiProcessSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiProcessSpecialistPacketKind.Get,
 				MuiProcessSpecialistField.Storage, storage);
 	}
@@ -276,10 +276,10 @@ internal static class MuiProcessSpecialistMessageCodec
 			MuiProcessSpecialistSetMessage.Size, method)) return false;
 		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
 		packet.MethodId = methodId;
-		return MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Set,
 			MuiProcessSpecialistField.Attribute, out packet.Attribute) &&
-			MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+			MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiProcessSpecialistPacketKind.Set,
 				MuiProcessSpecialistField.Value, out packet.Value);
 	}
@@ -290,13 +290,13 @@ internal static class MuiProcessSpecialistMessageCodec
 	{
 		if (!IsSetMethod(method) || message.IsNull || !platform.IsMapped(
 			message, MuiProcessSpecialistSetMessage.Size)) return false;
-		return MuiProcessSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Set,
 			MuiProcessSpecialistField.MethodId, method) &&
-			MuiProcessSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiProcessSpecialistPacketKind.Set,
 				MuiProcessSpecialistField.Attribute, attribute) &&
-			MuiProcessSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiProcessSpecialistPacketKind.Set,
 				MuiProcessSpecialistField.Value, value);
 	}
@@ -310,7 +310,7 @@ internal static class MuiProcessSpecialistMessageCodec
 			MuiProcessSpecialistSignalMessage.Size, method)) return false;
 		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
 		packet.MethodId = methodId;
-		return MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Signal,
 			MuiProcessSpecialistField.Signals, out packet.Signals);
 	}
@@ -321,10 +321,10 @@ internal static class MuiProcessSpecialistMessageCodec
 	{
 		if (!IsSignalMethod(method) || message.IsNull || !platform.IsMapped(
 			message, MuiProcessSpecialistSignalMessage.Size)) return false;
-		return MuiProcessSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Signal,
 			MuiProcessSpecialistField.MethodId, method) &&
-			MuiProcessSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiProcessSpecialistPacketKind.Signal,
 				MuiProcessSpecialistField.Signals, signals);
 	}
@@ -338,7 +338,7 @@ internal static class MuiProcessSpecialistMessageCodec
 			MuiProcessAttributes.Slave_Error)) return false;
 		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
 		packet.MethodId = methodId;
-		return MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Error,
 			MuiProcessSpecialistField.ErrorCode, out packet.ErrorCode);
 	}
@@ -349,11 +349,11 @@ internal static class MuiProcessSpecialistMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiProcessSpecialistErrorMessage.Size)) return false;
-		return MuiProcessSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Error,
 			MuiProcessSpecialistField.MethodId,
 			MuiProcessAttributes.Slave_Error) &&
-			MuiProcessSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiProcessSpecialistPacketKind.Error,
 				MuiProcessSpecialistField.ErrorCode, errorCode);
 	}
@@ -368,7 +368,7 @@ internal static class MuiProcessSpecialistMessageCodec
 			MuiProcessAttributes.Slave_Dispatch)) return false;
 		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
 		packet.MethodId = methodId;
-		return MuiProcessSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Dispatch,
 			MuiProcessSpecialistField.Packet, out packet.Packet);
 	}
@@ -379,11 +379,11 @@ internal static class MuiProcessSpecialistMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiProcessSpecialistDispatchMessage.Size)) return false;
-		return MuiProcessSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiProcessSpecialistPacketKind.Dispatch,
 			MuiProcessSpecialistField.MethodId,
 			MuiProcessAttributes.Slave_Dispatch) &&
-			MuiProcessSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiProcessSpecialistPacketKind.Dispatch,
 				MuiProcessSpecialistField.Packet, packet);
 	}

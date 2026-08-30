@@ -132,33 +132,46 @@ internal static class MuiTextShortenedStateRecordMemoryCodec
 
 internal static class MuiTextShortenedStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiTextShortenedStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		return MuiTextShortenedStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) &&
-			MuiTextShortenedStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out value.Shortened);
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiTextShortenedStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Shortened) && MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiTextShortenedStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiTextShortenedStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> TryReadStructural(ref platform, address, out value) &&
+		=> TryReadRecord(ref platform, address, out value) &&
 		MuiTextShortenedStateAdmission.Validate(value);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiTextShortenedStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiTextShortenedStateAdmission.Validate(value) &&
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiTextShortenedStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Shortened) && MuiGuestStructCursor.IsComplete(cursor);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiTextShortenedStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiTextShortenedStateAdmission.Validate(value)) return false;
-		return MuiTextShortenedStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiTextShortenedStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 4, value.Shortened);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, value);
 }
 
 // Keep the wire value lossless for malformed-state diagnostics. The renderer's

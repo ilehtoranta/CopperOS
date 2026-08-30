@@ -445,6 +445,14 @@ public sealed class MuiStringscrollTests
 			ref platform, State, composition.Horizontal));
 		Assert.Equal(MuiControlClass.Scrollbar, MuiCommonControlCore.Classify(
 			ref platform, State, composition.Vertical));
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			composition.Horizontal, MuiCommonControlCore.GroupHoriz,
+			out var horizontalGroup));
+		Assert.Equal(1u, horizontalGroup);
+		Assert.True(MuiHeadlessObjectCore.GetAttribute(ref platform, State,
+			composition.Vertical, MuiCommonControlCore.GroupHoriz,
+			out var verticalGroup));
+		Assert.Equal(0u, verticalGroup);
 
 		var renderInfo = APTR.FromPointer(0x5B80);
 		platform.WriteUInt32(renderInfo, 20, 0x5BC0);

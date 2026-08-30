@@ -17,7 +17,7 @@ public sealed class MuiScalePresentationStructAdapterTests
 			Horizontal = 1,
 		};
 
-		Assert.True(MuiScalePresentationStateRecordCodec.Write(ref platform,
+		Assert.True(MuiScalePresentationStateRecordCodec.WriteRecord(ref platform,
 			address, value));
 		Assert.True(MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiScalePresentationStateField.Horizontal,
@@ -25,7 +25,7 @@ public sealed class MuiScalePresentationStructAdapterTests
 		Assert.Equal(0x3504u, horizontalAddress.Raw);
 		Assert.True(MuiScalePresentationStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiScalePresentationStateField.Horizontal, 0));
-		Assert.True(MuiScalePresentationStateRecordCodec.TryReadStructural(
+		Assert.True(MuiScalePresentationStateRecordCodec.TryReadRecord(
 			ref platform, address, out var decoded));
 		Assert.Equal(0u, decoded.Horizontal);
 		Assert.False(MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(

@@ -171,32 +171,63 @@ internal static class MuiAreaRenderPolicyStateRecordMemoryCodec
 
 internal static class MuiAreaRenderPolicyStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiAreaRenderPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiAreaRenderPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaRenderPolicyStateField.Magic, out value.Magic) ||
-			!MuiAreaRenderPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaRenderPolicyStateField.FillArea, out value.FillArea) ||
-			!MuiAreaRenderPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaRenderPolicyStateField.Background, out value.Background) ||
-			!MuiAreaRenderPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaRenderPolicyStateField.Frame, out value.Frame) ||
-			!MuiAreaRenderPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaRenderPolicyStateField.Font, out value.Font) ||
-			!MuiAreaRenderPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaRenderPolicyStateField.FrameVisible, out value.FrameVisible) ||
-			!MuiAreaRenderPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaRenderPolicyStateField.FramePhantomHoriz, out value.FramePhantomHoriz) ||
-			!MuiAreaRenderPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaRenderPolicyStateField.FrameTitle, out var frameTitle) ||
-			!MuiAreaRenderPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaRenderPolicyStateField.FrameDynamic, out value.FrameDynamic)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaRenderPolicyStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.FillArea) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Background) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Frame) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Font) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.FrameVisible) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.FramePhantomHoriz) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var frameTitle) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.FrameDynamic)) return false;
 		value.FrameTitle = APTR.FromPointer(frameTitle);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaRenderPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaRenderPolicyStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.FillArea) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Background) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Frame) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Font) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.FrameVisible) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.FramePhantomHoriz) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.FrameTitle.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.FrameDynamic) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaRenderPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAreaRenderPolicyStateRecord value)
@@ -206,27 +237,10 @@ internal static class MuiAreaRenderPolicyStateRecordCodec
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaRenderPolicyStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiAreaRenderPolicyStateAdmission.Validate(value)) return false;
-		return MuiAreaRenderPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaRenderPolicyStateField.Magic, value.Magic) &&
-			MuiAreaRenderPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaRenderPolicyStateField.FillArea, value.FillArea) &&
-			MuiAreaRenderPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaRenderPolicyStateField.Background, value.Background) &&
-			MuiAreaRenderPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaRenderPolicyStateField.Frame, value.Frame) &&
-			MuiAreaRenderPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaRenderPolicyStateField.Font, value.Font) &&
-			MuiAreaRenderPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaRenderPolicyStateField.FrameVisible, value.FrameVisible) &&
-			MuiAreaRenderPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaRenderPolicyStateField.FramePhantomHoriz, value.FramePhantomHoriz) &&
-			MuiAreaRenderPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaRenderPolicyStateField.FrameTitle, value.FrameTitle.Raw) &&
-			MuiAreaRenderPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaRenderPolicyStateField.FrameDynamic, value.FrameDynamic);
+		return WriteRecord(ref platform, address, value);
 	}
 }
 

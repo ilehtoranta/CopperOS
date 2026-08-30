@@ -33,6 +33,12 @@ internal struct MuiListHeaderState
 {
 	internal const uint Size = 20;
 	internal const uint Cookie = 0x4C495354u; // 'LIST'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint IndexOffset = 4;
+	internal const uint CapacityOffset = 8;
+	internal const uint CountOffset = 12;
+	internal const uint ImagesOffset = 16;
 
 	internal uint Magic;
 	internal APTR Index;
@@ -57,26 +63,26 @@ internal struct MuiListHeaderFieldCursor
 	internal MuiListHeaderField Field;
 }
 
-internal static class MuiListHeaderFieldCursorCodec
+internal static class MuiListHeaderMemoryCodec
 {
 	private static bool TryResolve(MuiListHeaderField field, out uint offset)
 	{
 		switch (field)
 		{
 			case MuiListHeaderField.Magic:
-				offset = 0;
+				offset = MuiListHeaderState.MagicOffset;
 				return true;
 			case MuiListHeaderField.Index:
-				offset = 4;
+				offset = MuiListHeaderState.IndexOffset;
 				return true;
 			case MuiListHeaderField.Capacity:
-				offset = 8;
+				offset = MuiListHeaderState.CapacityOffset;
 				return true;
 			case MuiListHeaderField.Count:
-				offset = 12;
+				offset = MuiListHeaderState.CountOffset;
 				return true;
 			case MuiListHeaderField.Images:
-				offset = 16;
+				offset = MuiListHeaderState.ImagesOffset;
 				return true;
 		}
 		offset = 0;
@@ -84,15 +90,15 @@ internal static class MuiListHeaderFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiListHeaderFieldCursor cursor, out APTR address)
+		APTR record, MuiListHeaderField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, MuiListHeaderState.Size)) return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiListHeaderState.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiListHeaderState.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -100,10 +106,8 @@ internal static class MuiListHeaderFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiListHeaderFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+			return false;
 		value = platform.ReadUInt32(fieldAddress, 0);
 		return true;
 	}
@@ -112,17 +116,77 @@ internal static class MuiListHeaderFieldCursorCodec
 		APTR address, MuiListHeaderField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiListHeaderFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+			return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
 		return true;
 	}
 }
 
+internal static class MuiListHeaderFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiListHeaderFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListHeaderMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+			cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListHeaderField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListHeaderMemoryCodec.TryReadUInt32(ref platform, address, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListHeaderField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListHeaderMemoryCodec.TryWriteUInt32(ref platform, address, field,
+			value);
+}
+
 internal static class MuiListHeaderCodec
 {
+	// The List header is a fixed five-field guest record. Keep the declaration
+	// order explicit so production paths exchange one named struct while the
+	// older field adapter remains available for bounded corruption tests.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiListHeaderState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiListHeaderState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var index) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Capacity) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Count) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var images)) return false;
+		value.Index = APTR.FromPointer(index);
+		value.Images = APTR.FromPointer(images);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListHeaderState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiListHeaderState.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Index.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Capacity) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Count) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Images.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiListHeaderState value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -142,24 +206,7 @@ internal static class MuiListHeaderCodec
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiListHeaderState value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiListHeaderState.Size) ||
-			!MuiListHeaderFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiListHeaderField.Magic, out value.Magic) ||
-			!MuiListHeaderFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiListHeaderField.Index, out var index) ||
-			!MuiListHeaderFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiListHeaderField.Capacity, out value.Capacity) ||
-			!MuiListHeaderFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiListHeaderField.Count, out value.Count) ||
-			!MuiListHeaderFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiListHeaderField.Images, out var images)) return false;
-		value.Index = APTR.FromPointer(index);
-		value.Images = APTR.FromPointer(images);
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	// Keep the older storage-named entry point for ListCore's recovery path;
 	// both names intentionally share the same lossless structural decoder.
@@ -175,16 +222,7 @@ internal static class MuiListHeaderCodec
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiListHeaderState.Size) || value.Magic != MuiListHeaderState.Cookie)
 			return false;
-		return MuiListHeaderFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiListHeaderField.Magic, value.Magic) &&
-			MuiListHeaderFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiListHeaderField.Index, value.Index.Raw) &&
-			MuiListHeaderFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiListHeaderField.Capacity, value.Capacity) &&
-			MuiListHeaderFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiListHeaderField.Count, value.Count) &&
-			MuiListHeaderFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiListHeaderField.Images, value.Images.Raw);
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
@@ -197,6 +235,9 @@ internal struct MuiListviewOwnerState
 {
 	internal const uint Size = 8;
 	internal const uint Cookie = 0x4C564F57u; // 'LVOW'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint OwnerOffset = 4;
 
 	internal uint Magic;
 	internal APTR Owner;
@@ -215,31 +256,31 @@ internal struct MuiListviewOwnerStateFieldCursor
 	internal MuiListviewOwnerStateField Field;
 }
 
-internal static class MuiListviewOwnerStateFieldCursorCodec
+internal static class MuiListviewOwnerStateMemoryCodec
 {
 	private static bool TryResolve(MuiListviewOwnerStateField field,
 		out uint offset)
 	{
 		offset = field switch
 		{
-			MuiListviewOwnerStateField.Magic => 0,
-			MuiListviewOwnerStateField.Owner => 4,
+			MuiListviewOwnerStateField.Magic => MuiListviewOwnerState.MagicOffset,
+			MuiListviewOwnerStateField.Owner => MuiListviewOwnerState.OwnerOffset,
 			_ => uint.MaxValue,
 		};
 		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiListviewOwnerStateFieldCursor cursor, out APTR address)
+		APTR record, MuiListviewOwnerStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiListviewOwnerState.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiListviewOwnerState.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiListviewOwnerState.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -247,10 +288,8 @@ internal static class MuiListviewOwnerStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiListviewOwnerStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -259,32 +298,69 @@ internal static class MuiListviewOwnerStateFieldCursorCodec
 		APTR record, MuiListviewOwnerStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiListviewOwnerStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
+internal static class MuiListviewOwnerStateFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiListviewOwnerStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListviewOwnerStateMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiListviewOwnerStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListviewOwnerStateMemoryCodec.TryReadUInt32(ref platform, record,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiListviewOwnerStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListviewOwnerStateMemoryCodec.TryWriteUInt32(ref platform, record,
+			field, value);
+}
+
 internal static class MuiListviewOwnerStateCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// Listview ownership is a fixed two-ULONG relationship record. Keep the
+	// owner pointer beside its cookie in declaration order so adoption and
+	// teardown exchange one named struct rather than raw offsets.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiListviewOwnerState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiListviewOwnerState.Size) ||
-			!MuiListviewOwnerStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListviewOwnerStateField.Magic, out var magic) ||
-			!MuiListviewOwnerStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListviewOwnerStateField.Owner, out var owner))
-			return false;
-		value.Magic = magic;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiListviewOwnerState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var owner)) return false;
 		value.Owner = APTR.FromPointer(owner);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListviewOwnerState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiListviewOwnerState.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Owner.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiListviewOwnerState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return TryReadRecord(ref platform, address, out value);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -300,10 +376,7 @@ internal static class MuiListviewOwnerStateCodec
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiListviewOwnerState.Size) || value.Magic !=
 			MuiListviewOwnerState.Cookie) return false;
-		return MuiListviewOwnerStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiListviewOwnerStateField.Magic, value.Magic) &&
-			MuiListviewOwnerStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiListviewOwnerStateField.Owner, value.Owner.Raw);
+		return WriteRecord(ref platform, address, value);
 	}
 
 	internal static bool Clear<TPlatform>(ref TPlatform platform, APTR address)
@@ -326,6 +399,14 @@ internal struct MuiListHScrollerState
 {
 	internal const uint Size = 28;
 	internal const uint Cookie = 0x48435352u; // 'HCSR'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint PolicyOffset = 4;
+	internal const uint ContentWidthOffset = 8;
+	internal const uint ViewWidthOffset = 12;
+	internal const uint VisibleOffset = 16;
+	internal const uint ScrollXOffset = 20;
+	internal const uint MaxScrollXOffset = 24;
 
 	internal uint Magic;
 	internal uint Policy;
@@ -354,7 +435,7 @@ internal struct MuiListHScrollerStateFieldCursor
 	internal MuiListHScrollerStateField Field;
 }
 
-internal static class MuiListHScrollerStateFieldCursorCodec
+internal static class MuiListHScrollerStateMemoryCodec
 {
 	private static bool TryResolve(MuiListHScrollerStateField field,
 		out uint offset)
@@ -362,25 +443,25 @@ internal static class MuiListHScrollerStateFieldCursorCodec
 		switch (field)
 		{
 			case MuiListHScrollerStateField.Magic:
-				offset = 0;
+				offset = MuiListHScrollerState.MagicOffset;
 				return true;
 			case MuiListHScrollerStateField.Policy:
-				offset = 4;
+				offset = MuiListHScrollerState.PolicyOffset;
 				return true;
 			case MuiListHScrollerStateField.ContentWidth:
-				offset = 8;
+				offset = MuiListHScrollerState.ContentWidthOffset;
 				return true;
 			case MuiListHScrollerStateField.ViewWidth:
-				offset = 12;
+				offset = MuiListHScrollerState.ViewWidthOffset;
 				return true;
 			case MuiListHScrollerStateField.Visible:
-				offset = 16;
+				offset = MuiListHScrollerState.VisibleOffset;
 				return true;
 			case MuiListHScrollerStateField.ScrollX:
-				offset = 20;
+				offset = MuiListHScrollerState.ScrollXOffset;
 				return true;
 			case MuiListHScrollerStateField.MaxScrollX:
-				offset = 24;
+				offset = MuiListHScrollerState.MaxScrollXOffset;
 				return true;
 		}
 		offset = 0;
@@ -388,16 +469,16 @@ internal static class MuiListHScrollerStateFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiListHScrollerStateFieldCursor cursor, out APTR address)
+		APTR record, MuiListHScrollerStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, MuiListHScrollerState.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiListHScrollerState.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiListHScrollerState.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -405,10 +486,8 @@ internal static class MuiListHScrollerStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiListHScrollerStateFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+			return false;
 		value = platform.ReadUInt32(fieldAddress, 0);
 		return true;
 	}
@@ -417,45 +496,88 @@ internal static class MuiListHScrollerStateFieldCursorCodec
 		APTR address, MuiListHScrollerStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiListHScrollerStateFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+			return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
 		return true;
 	}
 }
 
+internal static class MuiListHScrollerStateFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiListHScrollerStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListHScrollerStateMemoryCodec.TryGetAddress(ref platform,
+			cursor.Address, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListHScrollerStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListHScrollerStateMemoryCodec.TryReadUInt32(ref platform, address,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListHScrollerStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListHScrollerStateMemoryCodec.TryWriteUInt32(ref platform, address,
+			field, value);
+}
+
 internal static class MuiListHScrollerStateCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// Horizontal-scroller state is a fixed seven-ULONG record. Keep policy,
+	// dimensions, and scroll range in declaration order so composition consumes
+	// one named struct instead of separate scalar offsets.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiListHScrollerState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiListHScrollerState.Size) ||
-			!MuiListHScrollerStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListHScrollerStateField.Magic, out var magic))
-			return false;
-		value.Magic = magic;
-		if (!MuiListHScrollerStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiListHScrollerStateField.Policy, out value.Policy) ||
-			!MuiListHScrollerStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListHScrollerStateField.ContentWidth,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiListHScrollerState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Policy) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.ContentWidth) ||
-			!MuiListHScrollerStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListHScrollerStateField.ViewWidth,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.ViewWidth) ||
-			!MuiListHScrollerStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListHScrollerStateField.Visible, out value.Visible) ||
-			!MuiListHScrollerStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListHScrollerStateField.ScrollX, out value.ScrollX) ||
-			!MuiListHScrollerStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListHScrollerStateField.MaxScrollX,
-				out value.MaxScrollX))
-			return false;
-		return true;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Visible) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.ScrollX) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MaxScrollX)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListHScrollerState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiListHScrollerState.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Policy) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ContentWidth) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ViewWidth) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Visible) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ScrollX) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.MaxScrollX) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiListHScrollerState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return TryReadRecord(ref platform, address, out value);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -471,23 +593,7 @@ internal static class MuiListHScrollerStateCodec
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiListHScrollerState.Size) || value.Magic !=
 			MuiListHScrollerState.Cookie) return false;
-		return MuiListHScrollerStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiListHScrollerStateField.Magic, value.Magic) &&
-			MuiListHScrollerStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiListHScrollerStateField.Policy, value.Policy) &&
-			MuiListHScrollerStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiListHScrollerStateField.ContentWidth,
-				value.ContentWidth) &&
-			MuiListHScrollerStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiListHScrollerStateField.ViewWidth,
-				value.ViewWidth) &&
-			MuiListHScrollerStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiListHScrollerStateField.Visible, value.Visible) &&
-			MuiListHScrollerStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiListHScrollerStateField.ScrollX, value.ScrollX) &&
-			MuiListHScrollerStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiListHScrollerStateField.MaxScrollX,
-				value.MaxScrollX);
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
@@ -498,6 +604,9 @@ internal static class MuiListHScrollerStateCodec
 internal struct MuiListSlotState
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint EntryOffset = 0;
+	internal const uint FlagsOffset = 4;
 
 	internal APTR Entry;
 	internal uint Flags;
@@ -516,17 +625,17 @@ internal struct MuiListSlotFieldCursor
 	internal MuiListSlotField Field;
 }
 
-internal static class MuiListSlotFieldCursorCodec
+internal static class MuiListSlotMemoryCodec
 {
 	private static bool TryResolve(MuiListSlotField field, out uint offset)
-	{
-		switch (field)
 		{
+			switch (field)
+			{
 			case MuiListSlotField.Entry:
-				offset = 0;
+				offset = MuiListSlotState.EntryOffset;
 				return true;
 			case MuiListSlotField.Flags:
-				offset = 4;
+				offset = MuiListSlotState.FlagsOffset;
 				return true;
 		}
 		offset = 0;
@@ -534,15 +643,15 @@ internal static class MuiListSlotFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiListSlotFieldCursor cursor, out APTR address)
+		APTR record, MuiListSlotField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, MuiListSlotState.Size)) return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiListSlotState.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiListSlotState.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -550,10 +659,8 @@ internal static class MuiListSlotFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiListSlotFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+			return false;
 		value = platform.ReadUInt32(fieldAddress, 0);
 		return true;
 	}
@@ -562,31 +669,68 @@ internal static class MuiListSlotFieldCursorCodec
 		APTR address, MuiListSlotField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiListSlotFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+			return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
 		return true;
 	}
 }
 
+internal static class MuiListSlotFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiListSlotFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListSlotMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+			cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListSlotField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListSlotMemoryCodec.TryReadUInt32(ref platform, address, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListSlotField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListSlotMemoryCodec.TryWriteUInt32(ref platform, address, field,
+			value);
+}
+
 internal static class MuiListSlotCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiListSlotState value)
+	// Each index element is a fixed two-ULONG record. Exchange both named
+	// fields sequentially in production; vector arithmetic stays in the
+	// bounded adapter above for callers that need an element address.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiListSlotState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiListSlotState.Size)) return false;
-		if (!MuiListSlotFieldCursorCodec.TryReadUInt32(ref platform, address,
-			MuiListSlotField.Entry, out var entry) ||
-			!MuiListSlotFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiListSlotField.Flags, out value.Flags)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiListSlotState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var entry) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Flags)) return false;
 		value.Entry = APTR.FromPointer(entry);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListSlotState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiListSlotState.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Entry.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiListSlotState value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiListSlotState value)
@@ -594,10 +738,7 @@ internal static class MuiListSlotCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiListSlotState.Size)) return false;
-		return MuiListSlotFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiListSlotField.Entry, value.Entry.Raw) &&
-			MuiListSlotFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiListSlotField.Flags, value.Flags);
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
@@ -609,6 +750,11 @@ internal struct MuiListImageState
 {
 	internal const uint Size = 16;
 	internal const uint Cookie = 0x4C494D47u; // 'LIMG'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint ImageObjectOffset = 4;
+	internal const uint FlagsOffset = 8;
+	internal const uint NextOffset = 12;
 
 	internal uint Magic;
 	internal APTR ImageObject;
@@ -631,23 +777,23 @@ internal struct MuiListImageFieldCursor
 	internal MuiListImageField Field;
 }
 
-internal static class MuiListImageFieldCursorCodec
+internal static class MuiListImageMemoryCodec
 {
 	private static bool TryResolve(MuiListImageField field, out uint offset)
 	{
 		switch (field)
 		{
 			case MuiListImageField.Magic:
-				offset = 0;
+				offset = MuiListImageState.MagicOffset;
 				return true;
 			case MuiListImageField.ImageObject:
-				offset = 4;
+				offset = MuiListImageState.ImageObjectOffset;
 				return true;
 			case MuiListImageField.Flags:
-				offset = 8;
+				offset = MuiListImageState.FlagsOffset;
 				return true;
 			case MuiListImageField.Next:
-				offset = 12;
+				offset = MuiListImageState.NextOffset;
 				return true;
 		}
 		offset = 0;
@@ -655,15 +801,15 @@ internal static class MuiListImageFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiListImageFieldCursor cursor, out APTR address)
+		APTR record, MuiListImageField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, MuiListImageState.Size)) return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiListImageState.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiListImageState.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -671,10 +817,8 @@ internal static class MuiListImageFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiListImageFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+			return false;
 		value = platform.ReadUInt32(fieldAddress, 0);
 		return true;
 	}
@@ -683,38 +827,77 @@ internal static class MuiListImageFieldCursorCodec
 		APTR address, MuiListImageField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiListImageFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+			return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
 		return true;
 	}
 }
 
+internal static class MuiListImageFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiListImageFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListImageMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+			cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListImageField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListImageMemoryCodec.TryReadUInt32(ref platform, address, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListImageField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListImageMemoryCodec.TryWriteUInt32(ref platform, address, field,
+			value);
+}
+
 internal static class MuiListImageCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// Image handles are fixed four-field records. Keep the image object and
+	// chain pointers beside their flags in declaration order so production
+	// handle lifecycle code exchanges one named struct.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiListImageState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiListImageState.Size) ||
-			!MuiListImageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiListImageField.Magic, out var magic))
-			return false;
-		value.Magic = magic;
-		if (!MuiListImageFieldCursorCodec.TryReadUInt32(ref platform, address,
-			MuiListImageField.ImageObject, out var imageObject) ||
-			!MuiListImageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiListImageField.Flags, out value.Flags) ||
-			!MuiListImageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiListImageField.Next, out var next)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiListImageState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var imageObject) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Flags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var next)) return false;
 		value.ImageObject = APTR.FromPointer(imageObject);
 		value.Next = APTR.FromPointer(next);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiListImageState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiListImageState.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ImageObject.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Flags) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Next.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiListImageState value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiListImageState value)
@@ -729,14 +912,7 @@ internal static class MuiListImageCodec
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiListImageState.Size) || value.Magic != MuiListImageState.Cookie)
 			return false;
-		return MuiListImageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiListImageField.Magic, value.Magic) &&
-			MuiListImageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiListImageField.ImageObject, value.ImageObject.Raw) &&
-			MuiListImageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiListImageField.Flags, value.Flags) &&
-			MuiListImageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiListImageField.Next, value.Next.Raw);
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
@@ -762,22 +938,33 @@ public static class MuiListCore
 		internal uint Index;
 	}
 
+	// Struct-first guest-memory adapter for the private List entry/flag vector.
+	// Complete fixed-size slots are admitted here; the typed cursor below is a
+	// compatibility wrapper so no consumer has to reproduce vector arithmetic.
+	internal static class MuiListSlotVectorMemoryCodec
+	{
+		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			address = APTR.Null;
+			if (vector.IsNull || index >= MuiListSlotCursor.MaximumEntries ||
+				index > (uint.MaxValue - vector.Raw) /
+				MuiListSlotState.Size) return false;
+			var offset = index * MuiListSlotState.Size;
+			if (vector.Raw > uint.MaxValue - offset) return false;
+			address = APTR.FromPointer(vector.Raw + offset);
+			return platform.IsMapped(address, MuiListSlotState.Size);
+		}
+	}
+
 	internal static class MuiListSlotCursorCodec
 	{
 		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 			MuiListSlotCursor cursor, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			address = APTR.Null;
-			if (cursor.Base.IsNull || cursor.Index >=
-				MuiListSlotCursor.MaximumEntries || cursor.Index >
-				(uint.MaxValue - cursor.Base.Raw) /
-				MuiListSlotCursor.EntrySize) return false;
-			var offset = cursor.Index * MuiListSlotCursor.EntrySize;
-			if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-			address = APTR.FromPointer(cursor.Base.Raw + offset);
-			return platform.IsMapped(address, MuiListSlotCursor.EntrySize);
-		}
+			=> MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index, out address);
 	}
 
 	// Caller-supplied entry vectors use the same four-byte pointer-slot record
@@ -798,17 +985,28 @@ public static class MuiListCore
 		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 			MuiListPointerVectorCursor cursor, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
+			=> MuiListPointerVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index, out address);
+	}
+
+	// Struct-first guest-memory adapter for caller-owned List pointer vectors.
+	// The large MorphOS entry bound and complete 4-byte slot admission live in
+	// this boundary; typed cursors remain compatibility wrappers.
+	internal static class MuiListPointerVectorMemoryCodec
+	{
+		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (cursor.Base.IsNull || cursor.Index >=
-				MuiListPointerVectorCursor.MaximumEntries || cursor.Index >
-				(uint.MaxValue - cursor.Base.Raw) /
-				MuiListPointerVectorCursor.EntrySize) return false;
-			var offset = cursor.Index * MuiListPointerVectorCursor.EntrySize;
-			if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-			address = APTR.FromPointer(cursor.Base.Raw + offset);
-			return platform.IsMapped(address,
-				MuiListPointerVectorCursor.EntrySize);
+			if (vector.IsNull || index >=
+				MuiListPointerVectorCursor.MaximumEntries || index >
+				(uint.MaxValue - vector.Raw) /
+				MuiListPointerSlotRecord.Size) return false;
+			var offset = index * MuiListPointerSlotRecord.Size;
+			if (vector.Raw > uint.MaxValue - offset) return false;
+			address = APTR.FromPointer(vector.Raw + offset);
+			return platform.IsMapped(address, MuiListPointerSlotRecord.Size);
 		}
 	}
 
@@ -816,6 +1014,13 @@ public static class MuiListCore
 	internal struct MuiListEditState
 	{
 		internal const uint Size = 24;
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint RowOffset = 4;
+		internal const uint ColumnOffset = 8;
+		internal const uint EntryOffset = 12;
+		internal const uint EditObjectOffset = 16;
+		internal const uint FlagsOffset = 20;
 		internal uint Magic;
 		internal int Row;
 		internal int Column;
@@ -841,45 +1046,45 @@ public static class MuiListCore
 		internal MuiListEditField Field;
 	}
 
-	internal static class MuiListEditFieldCursorCodec
+	internal static class MuiListEditMemoryCodec
 	{
 		private static bool TryResolve(MuiListEditField field, out uint offset)
 		{
 			switch (field)
 			{
-				case MuiListEditField.Magic:
-					offset = 0;
+			case MuiListEditField.Magic:
+					offset = MuiListEditState.MagicOffset;
 					return true;
-				case MuiListEditField.Row:
-					offset = 4;
+			case MuiListEditField.Row:
+					offset = MuiListEditState.RowOffset;
 					return true;
-				case MuiListEditField.Column:
-					offset = 8;
+			case MuiListEditField.Column:
+					offset = MuiListEditState.ColumnOffset;
 					return true;
-				case MuiListEditField.Entry:
-					offset = 12;
+			case MuiListEditField.Entry:
+					offset = MuiListEditState.EntryOffset;
 					return true;
-				case MuiListEditField.EditObject:
-					offset = 16;
+			case MuiListEditField.EditObject:
+					offset = MuiListEditState.EditObjectOffset;
 					return true;
-				case MuiListEditField.Flags:
-					offset = 20;
+			case MuiListEditField.Flags:
+					offset = MuiListEditState.FlagsOffset;
 					return true;
 			}
 			offset = 0;
 			return false;
 		}
 
-		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListEditFieldCursor cursor, out APTR address)
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiListEditField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListEditState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiListEditState.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiListEditState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -887,10 +1092,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListEditFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+			return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -899,17 +1102,83 @@ public static class MuiListCore
 			APTR address, MuiListEditField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListEditFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
-			platform.WriteUInt32(fieldAddress, 0, value);
-			return true;
-		}
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+			return false;
+		platform.WriteUInt32(fieldAddress, 0, value);
+		return true;
+	}
+}
+
+	internal static class MuiListEditFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListEditFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListEditMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+				cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListEditField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListEditMemoryCodec.TryReadUInt32(ref platform, address, field,
+				out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListEditField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListEditMemoryCodec.TryWriteUInt32(ref platform, address, field,
+				value);
 	}
 
 	internal static class MuiListEditStateCodec
 	{
+		// Edit state is a fixed six-field record with signed row/column LONGs and
+		// two opaque pointers. Preserve the exact guest widths while exchanging the
+		// complete declaration-ordered struct through the bounded cursor.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListEditState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListEditState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var row) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var column) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var entry) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var editObject) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Flags)) return false;
+			value.Row = unchecked((int)row);
+			value.Column = unchecked((int)column);
+			value.Entry = APTR.FromPointer(entry);
+			value.EditObject = APTR.FromPointer(editObject);
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListEditState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListEditState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Row)) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Column)) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Entry.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.EditObject.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListEditState value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -917,46 +1186,14 @@ public static class MuiListCore
 			if (block.IsNull || !platform.IsMapped(block,
 				MuiListEditState.Size) || value.Magic != EditStateCookie)
 				return false;
-			return MuiListEditFieldCursorCodec.TryWriteUInt32(ref platform, block,
-				MuiListEditField.Magic, value.Magic) &&
-				MuiListEditFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListEditField.Row, unchecked((uint)value.Row)) &&
-				MuiListEditFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListEditField.Column, unchecked((uint)value.Column)) &&
-				MuiListEditFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListEditField.Entry, value.Entry.Raw) &&
-				MuiListEditFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListEditField.EditObject, value.EditObject.Raw) &&
-				MuiListEditFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListEditField.Flags, value.Flags);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListEditState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListEditState.Size) ||
-				!MuiListEditFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListEditField.Magic, out var magic))
-				return false;
-			value.Magic = magic;
-			if (!MuiListEditFieldCursorCodec.TryReadUInt32(ref platform, block,
-				MuiListEditField.Row, out var row) ||
-				!MuiListEditFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListEditField.Column, out var column) ||
-				!MuiListEditFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListEditField.Entry, out var entry) ||
-				!MuiListEditFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListEditField.EditObject, out var editObject) ||
-				!MuiListEditFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListEditField.Flags, out value.Flags)) return false;
-			value.Row = unchecked((int)row);
-			value.Column = unchecked((int)column);
-			value.Entry = APTR.FromPointer(entry);
-			value.EditObject = APTR.FromPointer(editObject);
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -964,12 +1201,20 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory =>
 			TryReadStructural(ref platform, block, out value) &&
 			value.Magic == EditStateCookie;
+
+		internal static bool TryReadStorage<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListEditState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			TryReadStructural(ref platform, block, out value);
 		}
 
 	[StructLayout(LayoutKind.Sequential, Pack = 2)]
 	internal struct MuiListColumnGeometry
 	{
 		public const uint Size = 8;
+		public const uint FieldSize = 4;
+		public const uint OffsetOffset = 0;
+		public const uint WidthOffset = 4;
 		public uint Offset;
 		public uint Width;
 	}
@@ -987,18 +1232,18 @@ public static class MuiListCore
 		internal MuiListColumnGeometryField Field;
 	}
 
-	internal static class MuiListColumnGeometryFieldCursorCodec
+	internal static class MuiListColumnGeometryMemoryCodec
 	{
 		private static bool TryResolve(MuiListColumnGeometryField field,
 			out uint offset)
 		{
 			switch (field)
 			{
-				case MuiListColumnGeometryField.Offset:
-					offset = 0;
+			case MuiListColumnGeometryField.Offset:
+					offset = MuiListColumnGeometry.OffsetOffset;
 					return true;
-				case MuiListColumnGeometryField.Width:
-					offset = 4;
+			case MuiListColumnGeometryField.Width:
+					offset = MuiListColumnGeometry.WidthOffset;
 					return true;
 			}
 			offset = 0;
@@ -1006,15 +1251,15 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListColumnGeometryFieldCursor cursor, out APTR address)
+			APTR record, MuiListColumnGeometryField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListColumnGeometry.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListColumnGeometry.Size)) return false;
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListColumnGeometry.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -1022,10 +1267,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListColumnGeometryFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -1034,43 +1277,72 @@ public static class MuiListCore
 			APTR address, MuiListColumnGeometryField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListColumnGeometryFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListColumnGeometryFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListColumnGeometryFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnGeometryMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnGeometryField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnGeometryMemoryCodec.TryReadUInt32(ref platform, address,
+				field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnGeometryField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnGeometryMemoryCodec.TryWriteUInt32(ref platform, address,
+				field, value);
+	}
+
 	internal static class MuiListColumnGeometryCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		// Geometry entries are fixed two-ULONG records. Keep the production
+		// representation sequential and leave address arithmetic to the bounded
+		// vector adapter below.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListColumnGeometry value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListColumnGeometry.Size)) return false;
-			if (!MuiListColumnGeometryFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListColumnGeometryField.Offset, out value.Offset) ||
-				!MuiListColumnGeometryFieldCursorCodec.TryReadUInt32(ref platform,
-					address, MuiListColumnGeometryField.Width, out value.Width))
-				return false;
-			return true;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListColumnGeometry.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Offset) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Width)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
 		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnGeometry value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListColumnGeometry.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Offset) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Width) && MuiGuestStructCursor.IsComplete(cursor);
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListColumnGeometry value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> TryReadRecord(ref platform, address, out value);
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListColumnGeometry value)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListColumnGeometry.Size)) return false;
-			return MuiListColumnGeometryFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiListColumnGeometryField.Offset, value.Offset) &&
-				MuiListColumnGeometryFieldCursorCodec.TryWriteUInt32(ref platform,
-					address, MuiListColumnGeometryField.Width, value.Width);
-		}
+			=> WriteRecord(ref platform, address, value);
 	}
 
 	// Layout publishes a named owner record for the contiguous geometry vector.
@@ -1081,6 +1353,11 @@ public static class MuiListCore
 	{
 		internal const uint Size = 16;
 		internal const uint Cookie = 0x434C4159u; // 'CLAY'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint WidthOffset = 4;
+		internal const uint ColumnsOffset = 8;
+		internal const uint ValuesOffset = 12;
 		internal uint Magic;
 		internal uint Width;
 		internal uint Columns;
@@ -1102,24 +1379,24 @@ public static class MuiListCore
 		internal MuiListColumnLayoutField Field;
 	}
 
-	internal static class MuiListColumnLayoutFieldCursorCodec
+	internal static class MuiListColumnLayoutMemoryCodec
 	{
 		private static bool TryResolve(MuiListColumnLayoutField field,
 			out uint offset)
 		{
 			switch (field)
 			{
-				case MuiListColumnLayoutField.Magic:
-					offset = 0;
+			case MuiListColumnLayoutField.Magic:
+					offset = MuiListColumnLayoutState.MagicOffset;
 					return true;
-				case MuiListColumnLayoutField.Width:
-					offset = 4;
+			case MuiListColumnLayoutField.Width:
+					offset = MuiListColumnLayoutState.WidthOffset;
 					return true;
-				case MuiListColumnLayoutField.Columns:
-					offset = 8;
+			case MuiListColumnLayoutField.Columns:
+					offset = MuiListColumnLayoutState.ColumnsOffset;
 					return true;
-				case MuiListColumnLayoutField.Values:
-					offset = 12;
+			case MuiListColumnLayoutField.Values:
+					offset = MuiListColumnLayoutState.ValuesOffset;
 					return true;
 			}
 			offset = 0;
@@ -1127,16 +1404,16 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListColumnLayoutFieldCursor cursor, out APTR address)
+			APTR record, MuiListColumnLayoutField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListColumnLayoutState.Size))
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListColumnLayoutState.Size))
 				return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListColumnLayoutState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -1144,10 +1421,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListColumnLayoutFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -1156,17 +1431,73 @@ public static class MuiListCore
 			APTR address, MuiListColumnLayoutField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListColumnLayoutFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListColumnLayoutFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListColumnLayoutFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnLayoutMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnLayoutField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnLayoutMemoryCodec.TryReadUInt32(ref platform, address,
+				field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnLayoutField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnLayoutMemoryCodec.TryWriteUInt32(ref platform, address,
+				field, value);
+	}
+
 	internal static class MuiListColumnLayoutStateCodec
 	{
+		// Layout ownership is a fixed four-ULONG record. Keep structural access
+		// in declaration order so geometry consumers receive a named value and
+		// only the bounded guest adapter performs wire-address arithmetic.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListColumnLayoutState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListColumnLayoutState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Width) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Columns) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var values)) return false;
+			value.Values = APTR.FromPointer(values);
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListColumnLayoutState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListColumnLayoutState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Width) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Columns) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Values.Raw) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListColumnLayoutState value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -1177,36 +1508,14 @@ public static class MuiListCore
 				value.Columns == 0 || value.Columns > MaximumGeometryColumns ||
 				value.Values.IsNull || !platform.IsMapped(value.Values,
 					value.Columns * MuiListColumnGeometry.Size)) return false;
-			return MuiListColumnLayoutFieldCursorCodec.TryWriteUInt32(ref platform,
-				block, MuiListColumnLayoutField.Magic, value.Magic) &&
-				MuiListColumnLayoutFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListColumnLayoutField.Width, value.Width) &&
-				MuiListColumnLayoutFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListColumnLayoutField.Columns, value.Columns) &&
-				MuiListColumnLayoutFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListColumnLayoutField.Values, value.Values.Raw);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListColumnLayoutState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListColumnLayoutState.Size) ||
-				!MuiListColumnLayoutFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListColumnLayoutField.Magic, out value.Magic) ||
-				!MuiListColumnLayoutFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListColumnLayoutField.Width, out var width) ||
-				!MuiListColumnLayoutFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListColumnLayoutField.Columns, out var columns) ||
-				!MuiListColumnLayoutFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListColumnLayoutField.Values, out var valuesRaw))
-				return false;
-			value.Width = width;
-			value.Columns = columns;
-			value.Values = APTR.FromPointer(valuesRaw);
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -1255,23 +1564,33 @@ public static class MuiListCore
 		internal uint Index;
 	}
 
+	// Struct-first guest-memory adapter for the fixed {offset,width} geometry
+	// vector. Complete records and the 256-column MorphOS bound are enforced at
+	// this boundary; the cursor below remains a compatibility wrapper.
+	internal static class MuiListColumnGeometryVectorMemoryCodec
+	{
+		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			address = APTR.Null;
+			if (vector.IsNull || index >= MuiListColumnGeometryCursor.MaximumEntries ||
+				index > (uint.MaxValue - vector.Raw) /
+				MuiListColumnGeometry.Size) return false;
+			var offset = index * MuiListColumnGeometry.Size;
+			if (vector.Raw > uint.MaxValue - offset) return false;
+			address = APTR.FromPointer(vector.Raw + offset);
+			return platform.IsMapped(address, MuiListColumnGeometry.Size);
+		}
+	}
+
 	internal static class MuiListColumnGeometryCursorCodec
 	{
 		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 			MuiListColumnGeometryCursor cursor, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			address = APTR.Null;
-			if (cursor.Base.IsNull || cursor.Index >=
-				MuiListColumnGeometryCursor.MaximumEntries || cursor.Index >
-				(uint.MaxValue - cursor.Base.Raw) /
-				MuiListColumnGeometryCursor.EntrySize) return false;
-			var offset = cursor.Index * MuiListColumnGeometryCursor.EntrySize;
-			if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-			address = APTR.FromPointer(cursor.Base.Raw + offset);
-			return platform.IsMapped(address,
-				MuiListColumnGeometryCursor.EntrySize);
-		}
+			=> MuiListColumnGeometryVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index, out address);
 	}
 
 	// Column hiding is derived from the current rectangle and FORMAT minimums.
@@ -1378,7 +1697,7 @@ public static class MuiListCore
 		internal MuiListStateField Field;
 	}
 
-	internal static class MuiListStateFieldCursorCodec
+	internal static class MuiListStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListStateRecordKind record,
 			MuiListStateField field, out uint offset, out uint size)
@@ -1391,12 +1710,12 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 8;
+							offset = MuiListInsertPositionState.MagicOffset;
+							size = MuiListInsertPositionState.Size;
 							return true;
 						case MuiListStateField.Position:
-							offset = 4;
-							size = 8;
+							offset = MuiListInsertPositionState.PositionOffset;
+							size = MuiListInsertPositionState.Size;
 							return true;
 					}
 					break;
@@ -1404,16 +1723,16 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 12;
+							offset = MuiListTitleArrayState.MagicOffset;
+							size = MuiListTitleArrayState.Size;
 							return true;
 						case MuiListStateField.Pointers:
-							offset = 4;
-							size = 12;
+							offset = MuiListTitleArrayState.PointersOffset;
+							size = MuiListTitleArrayState.Size;
 							return true;
 						case MuiListStateField.Count:
-							offset = 8;
-							size = 12;
+							offset = MuiListTitleArrayState.CountOffset;
+							size = MuiListTitleArrayState.Size;
 							return true;
 					}
 					break;
@@ -1421,12 +1740,12 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 8;
+							offset = MuiListTitleState.MagicOffset;
+							size = MuiListTitleState.Size;
 							return true;
 						case MuiListStateField.TitleValue:
-							offset = 4;
-							size = 8;
+							offset = MuiListTitleState.ValueOffset;
+							size = MuiListTitleState.Size;
 							return true;
 					}
 					break;
@@ -1434,12 +1753,12 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 8;
+							offset = MuiListSelectionSignalState.MagicOffset;
+							size = MuiListSelectionSignalState.Size;
 							return true;
 						case MuiListStateField.SelectionValue:
-							offset = 4;
-							size = 8;
+							offset = MuiListSelectionSignalState.ValueOffset;
+							size = MuiListSelectionSignalState.Size;
 							return true;
 					}
 					break;
@@ -1447,20 +1766,20 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 16;
+							offset = MuiListFormatPolicyState.MagicOffset;
+							size = MuiListFormatPolicyState.Size;
 							return true;
 						case MuiListStateField.FormatValue:
-							offset = 4;
-							size = 16;
+							offset = MuiListFormatPolicyState.FormatOffset;
+							size = MuiListFormatPolicyState.Size;
 							return true;
 						case MuiListStateField.MaxColumnsValue:
-							offset = 8;
-							size = 16;
+							offset = MuiListFormatPolicyState.MaxColumnsOffset;
+							size = MuiListFormatPolicyState.Size;
 							return true;
 						case MuiListStateField.FormatColumnsValue:
-							offset = 12;
-							size = 16;
+							offset = MuiListFormatPolicyState.ColumnsOffset;
+							size = MuiListFormatPolicyState.Size;
 							return true;
 					}
 					break;
@@ -1468,12 +1787,12 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 8;
+							offset = MuiListFontState.MagicOffset;
+							size = MuiListFontState.Size;
 							return true;
 						case MuiListStateField.FontValue:
-							offset = 4;
-							size = 8;
+							offset = MuiListFontState.FontOffset;
+							size = MuiListFontState.Size;
 							return true;
 					}
 					break;
@@ -1481,16 +1800,16 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 12;
+							offset = MuiListRedrawState.MagicOffset;
+							size = MuiListRedrawState.Size;
 							return true;
 						case MuiListStateField.Dirty:
-							offset = 4;
-							size = 12;
+							offset = MuiListRedrawState.DirtyOffset;
+							size = MuiListRedrawState.Size;
 							return true;
 						case MuiListStateField.Requests:
-							offset = 8;
-							size = 12;
+							offset = MuiListRedrawState.RequestsOffset;
+							size = MuiListRedrawState.Size;
 							return true;
 					}
 					break;
@@ -1498,16 +1817,16 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 12;
+							offset = MuiListActiveState.MagicOffset;
+							size = MuiListActiveState.Size;
 							return true;
 						case MuiListStateField.HasActive:
-							offset = 4;
-							size = 12;
+							offset = MuiListActiveState.HasActiveOffset;
+							size = MuiListActiveState.Size;
 							return true;
 						case MuiListStateField.Active:
-							offset = 8;
-							size = 12;
+							offset = MuiListActiveState.ActiveOffset;
+							size = MuiListActiveState.Size;
 							return true;
 					}
 					break;
@@ -1515,40 +1834,40 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 36;
+							offset = MuiListColumnVisibilityState.MagicOffset;
+							size = MuiListColumnVisibilityState.Size;
 							return true;
 						case MuiListStateField.Low:
-							offset = 4;
-							size = 36;
+							offset = MuiListColumnVisibilityState.LowOffset;
+							size = MuiListColumnVisibilityState.Size;
 							return true;
 						case MuiListStateField.High:
-							offset = 8;
-							size = 36;
+							offset = MuiListColumnVisibilityState.HighOffset;
+							size = MuiListColumnVisibilityState.Size;
 							return true;
 						case MuiListStateField.Word2:
-							offset = 12;
-							size = 36;
+							offset = MuiListColumnVisibilityState.Word2Offset;
+							size = MuiListColumnVisibilityState.Size;
 							return true;
 						case MuiListStateField.Word3:
-							offset = 16;
-							size = 36;
+							offset = MuiListColumnVisibilityState.Word3Offset;
+							size = MuiListColumnVisibilityState.Size;
 							return true;
 						case MuiListStateField.Word4:
-							offset = 20;
-							size = 36;
+							offset = MuiListColumnVisibilityState.Word4Offset;
+							size = MuiListColumnVisibilityState.Size;
 							return true;
 						case MuiListStateField.Word5:
-							offset = 24;
-							size = 36;
+							offset = MuiListColumnVisibilityState.Word5Offset;
+							size = MuiListColumnVisibilityState.Size;
 							return true;
 						case MuiListStateField.Word6:
-							offset = 28;
-							size = 36;
+							offset = MuiListColumnVisibilityState.Word6Offset;
+							size = MuiListColumnVisibilityState.Size;
 							return true;
 						case MuiListStateField.Word7:
-							offset = 32;
-							size = 36;
+							offset = MuiListColumnVisibilityState.Word7Offset;
+							size = MuiListColumnVisibilityState.Size;
 							return true;
 					}
 					break;
@@ -1556,20 +1875,20 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 16;
+							offset = MuiListColumnOrderState.MagicOffset;
+							size = MuiListColumnOrderState.Size;
 							return true;
 						case MuiListStateField.Count:
-							offset = 4;
-							size = 16;
+							offset = MuiListColumnOrderState.CountOffset;
+							size = MuiListColumnOrderState.Size;
 							return true;
 						case MuiListStateField.Values:
-							offset = 8;
-							size = 16;
+							offset = MuiListColumnOrderState.ValuesOffset;
+							size = MuiListColumnOrderState.Size;
 							return true;
 						case MuiListStateField.Reserved:
-							offset = 12;
-							size = 16;
+							offset = MuiListColumnOrderState.ReservedOffset;
+							size = MuiListColumnOrderState.Size;
 							return true;
 					}
 					break;
@@ -1577,36 +1896,36 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 32;
+							offset = MuiListViewportState.MagicOffset;
+							size = MuiListViewportState.Size;
 							return true;
 						case MuiListStateField.TopPixel:
-							offset = 4;
-							size = 32;
+							offset = MuiListViewportState.TopPixelOffset;
+							size = MuiListViewportState.Size;
 							return true;
 						case MuiListStateField.VisiblePixel:
-							offset = 8;
-							size = 32;
+							offset = MuiListViewportState.VisiblePixelOffset;
+							size = MuiListViewportState.Size;
 							return true;
 						case MuiListStateField.TotalPixel:
-							offset = 12;
-							size = 32;
+							offset = MuiListViewportState.TotalPixelOffset;
+							size = MuiListViewportState.Size;
 							return true;
 						case MuiListStateField.First:
-							offset = 16;
-							size = 32;
+							offset = MuiListViewportState.FirstOffset;
+							size = MuiListViewportState.Size;
 							return true;
 						case MuiListStateField.LineHeight:
-							offset = 20;
-							size = 32;
+							offset = MuiListViewportState.LineHeightOffset;
+							size = MuiListViewportState.Size;
 							return true;
 						case MuiListStateField.Visible:
-							offset = 24;
-							size = 32;
+							offset = MuiListViewportState.VisibleOffset;
+							size = MuiListViewportState.Size;
 							return true;
 						case MuiListStateField.DropMark:
-							offset = 28;
-							size = 32;
+							offset = MuiListViewportState.DropMarkOffset;
+							size = MuiListViewportState.Size;
 							return true;
 					}
 					break;
@@ -1614,20 +1933,20 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 16;
+							offset = MuiListInteractionPolicyState.MagicOffset;
+							size = MuiListInteractionPolicyState.Size;
 							return true;
 						case MuiListStateField.Input:
-							offset = 4;
-							size = 16;
+							offset = MuiListInteractionPolicyState.InputOffset;
+							size = MuiListInteractionPolicyState.Size;
 							return true;
 						case MuiListStateField.MultiSelect:
-							offset = 8;
-							size = 16;
+							offset = MuiListInteractionPolicyState.MultiSelectOffset;
+							size = MuiListInteractionPolicyState.Size;
 							return true;
 						case MuiListStateField.ScrollerPos:
-							offset = 12;
-							size = 16;
+							offset = MuiListInteractionPolicyState.ScrollerPosOffset;
+							size = MuiListInteractionPolicyState.Size;
 							return true;
 					}
 					break;
@@ -1635,28 +1954,28 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 24;
+							offset = MuiListClickState.MagicOffset;
+							size = MuiListClickState.Size;
 							return true;
 						case MuiListStateField.ClickColumn:
-							offset = 4;
-							size = 24;
+							offset = MuiListClickState.ClickColumnOffset;
+							size = MuiListClickState.Size;
 							return true;
 						case MuiListStateField.DoubleClick:
-							offset = 8;
-							size = 24;
+							offset = MuiListClickState.DoubleClickOffset;
+							size = MuiListClickState.Size;
 							return true;
 						case MuiListStateField.AgainClick:
-							offset = 12;
-							size = 24;
+							offset = MuiListClickState.AgainClickOffset;
+							size = MuiListClickState.Size;
 							return true;
 						case MuiListStateField.Clicks:
-							offset = 16;
-							size = 24;
+							offset = MuiListClickState.ClicksOffset;
+							size = MuiListClickState.Size;
 							return true;
 						case MuiListStateField.DefClickColumn:
-							offset = 20;
-							size = 24;
+							offset = MuiListClickState.DefClickColumnOffset;
+							size = MuiListClickState.Size;
 							return true;
 					}
 					break;
@@ -1664,28 +1983,28 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 24;
+							offset = MuiListHookPolicyState.MagicOffset;
+							size = MuiListHookPolicyState.Size;
 							return true;
 						case MuiListStateField.ConstructHook:
-							offset = 4;
-							size = 24;
+							offset = MuiListHookPolicyState.ConstructHookOffset;
+							size = MuiListHookPolicyState.Size;
 							return true;
 						case MuiListStateField.DestructHook:
-							offset = 8;
-							size = 24;
+							offset = MuiListHookPolicyState.DestructHookOffset;
+							size = MuiListHookPolicyState.Size;
 							return true;
 						case MuiListStateField.DisplayHook:
-							offset = 12;
-							size = 24;
+							offset = MuiListHookPolicyState.DisplayHookOffset;
+							size = MuiListHookPolicyState.Size;
 							return true;
 						case MuiListStateField.CompareHook:
-							offset = 16;
-							size = 24;
+							offset = MuiListHookPolicyState.CompareHookOffset;
+							size = MuiListHookPolicyState.Size;
 							return true;
 						case MuiListStateField.MultiTestHook:
-							offset = 20;
-							size = 24;
+							offset = MuiListHookPolicyState.MultiTestHookOffset;
+							size = MuiListHookPolicyState.Size;
 							return true;
 					}
 					break;
@@ -1693,16 +2012,16 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 12;
+							offset = MuiListSortState.MagicOffset;
+							size = MuiListSortState.Size;
 							return true;
 						case MuiListStateField.SortColumn:
-							offset = 4;
-							size = 12;
+							offset = MuiListSortState.SortColumnOffset;
+							size = MuiListSortState.Size;
 							return true;
 						case MuiListStateField.TitleClick:
-							offset = 8;
-							size = 12;
+							offset = MuiListSortState.TitleClickOffset;
+							size = MuiListSortState.Size;
 							return true;
 					}
 					break;
@@ -1710,52 +2029,52 @@ public static class MuiListCore
 					switch (field)
 					{
 						case MuiListStateField.Magic:
-							offset = 0;
-							size = 48;
+							offset = MuiListPresentationPolicyState.MagicOffset;
+							size = MuiListPresentationPolicyState.Size;
 							return true;
 						case MuiListStateField.Editable:
-							offset = 4;
-							size = 48;
+							offset = MuiListPresentationPolicyState.EditableOffset;
+							size = MuiListPresentationPolicyState.Size;
 							return true;
 						case MuiListStateField.Quiet:
-							offset = 8;
-							size = 48;
+							offset = MuiListPresentationPolicyState.QuietOffset;
+							size = MuiListPresentationPolicyState.Size;
 							return true;
 						case MuiListStateField.AdjustHeight:
-							offset = 12;
-							size = 48;
+							offset = MuiListPresentationPolicyState.AdjustHeightOffset;
+							size = MuiListPresentationPolicyState.Size;
 							return true;
 						case MuiListStateField.AdjustWidth:
-							offset = 16;
-							size = 48;
+							offset = MuiListPresentationPolicyState.AdjustWidthOffset;
+							size = MuiListPresentationPolicyState.Size;
 							return true;
 						case MuiListStateField.Stripes:
-							offset = 20;
-							size = 48;
+							offset = MuiListPresentationPolicyState.StripesOffset;
+							size = MuiListPresentationPolicyState.Size;
 							return true;
 						case MuiListStateField.ShowDropMarks:
-							offset = 24;
-							size = 48;
+							offset = MuiListPresentationPolicyState.ShowDropMarksOffset;
+							size = MuiListPresentationPolicyState.Size;
 							return true;
 						case MuiListStateField.DragSortable:
-							offset = 28;
-							size = 48;
+							offset = MuiListPresentationPolicyState.DragSortableOffset;
+							size = MuiListPresentationPolicyState.Size;
 							return true;
 						case MuiListStateField.DragType:
-							offset = 32;
-							size = 48;
+							offset = MuiListPresentationPolicyState.DragTypeOffset;
+							size = MuiListPresentationPolicyState.Size;
 							return true;
 						case MuiListStateField.AutoVisible:
-							offset = 36;
-							size = 48;
+							offset = MuiListPresentationPolicyState.AutoVisibleOffset;
+							size = MuiListPresentationPolicyState.Size;
 							return true;
 						case MuiListStateField.AutoLineHeight:
-							offset = 40;
-							size = 48;
+							offset = MuiListPresentationPolicyState.AutoLineHeightOffset;
+							size = MuiListPresentationPolicyState.Size;
 							return true;
 						case MuiListStateField.MinLineHeight:
-							offset = 44;
-							size = 48;
+							offset = MuiListPresentationPolicyState.MinLineHeightOffset;
+							size = MuiListPresentationPolicyState.Size;
 							return true;
 					}
 					break;
@@ -1764,15 +2083,16 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListStateRecordKind recordKind,
+			MuiListStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Record, cursor.Field, out var offset,
-				out var size) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
+			if (!TryResolve(recordKind, field, out var offset,
+				out var size) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, size)) return false;
+			address = APTR.FromPointer(record.Raw + offset);
 			return platform.IsMapped(address, 4);
 		}
 
@@ -1782,11 +2102,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListStateFieldCursor);
-			cursor.Address = address;
-			cursor.Record = record;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+			if (!TryGetAddress(ref platform, address, record, field,
+				out var fieldAddress))
 				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
@@ -1797,15 +2114,38 @@ public static class MuiListCore
 			MuiListStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListStateFieldCursor);
-			cursor.Address = address;
-			cursor.Record = record;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+			if (!TryGetAddress(ref platform, address, record, field,
+				out var fieldAddress))
 				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
+	}
+
+	// Compatibility wrapper for callers that still package the address, record,
+	// and field as a cursor. New List code uses MuiListStateMemoryCodec directly
+	// so the guest record is explicit at every access boundary.
+	internal static class MuiListStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListStateMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+				cursor.Record, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListStateRecordKind record,
+			MuiListStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListStateMemoryCodec.TryReadUInt32(ref platform, address, record,
+				field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListStateRecordKind record,
+			MuiListStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListStateMemoryCodec.TryWriteUInt32(ref platform, address, record,
+				field, value);
 	}
 
 	// Explicit MUIA_List_HideColumn/ShowColumn state is retained in one
@@ -1817,6 +2157,16 @@ public static class MuiListCore
 	{
 		public const uint Size = 36;
 		public const uint Cookie = 0x434F4C56u; // 'COLV'
+		public const uint FieldSize = 4;
+		public const uint MagicOffset = 0;
+		public const uint LowOffset = 4;
+		public const uint HighOffset = 8;
+		public const uint Word2Offset = 12;
+		public const uint Word3Offset = 16;
+		public const uint Word4Offset = 20;
+		public const uint Word5Offset = 24;
+		public const uint Word6Offset = 28;
+		public const uint Word7Offset = 32;
 		public uint Magic;
 		public uint Low;
 		public uint High;
@@ -1848,37 +2198,37 @@ public static class MuiListCore
 		internal MuiListColumnVisibilityStateField Field;
 	}
 
-	internal static class MuiListColumnVisibilityStateFieldCursorCodec
+	internal static class MuiListColumnVisibilityStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListColumnVisibilityStateField field,
 			out uint offset)
 		{
 			switch (field)
 			{
-				case MuiListColumnVisibilityStateField.Magic: offset = 0; return true;
-				case MuiListColumnVisibilityStateField.Low: offset = 4; return true;
-				case MuiListColumnVisibilityStateField.High: offset = 8; return true;
-				case MuiListColumnVisibilityStateField.Word2: offset = 12; return true;
-				case MuiListColumnVisibilityStateField.Word3: offset = 16; return true;
-				case MuiListColumnVisibilityStateField.Word4: offset = 20; return true;
-				case MuiListColumnVisibilityStateField.Word5: offset = 24; return true;
-				case MuiListColumnVisibilityStateField.Word6: offset = 28; return true;
-				case MuiListColumnVisibilityStateField.Word7: offset = 32; return true;
+				case MuiListColumnVisibilityStateField.Magic: offset = MuiListColumnVisibilityState.MagicOffset; return true;
+				case MuiListColumnVisibilityStateField.Low: offset = MuiListColumnVisibilityState.LowOffset; return true;
+				case MuiListColumnVisibilityStateField.High: offset = MuiListColumnVisibilityState.HighOffset; return true;
+				case MuiListColumnVisibilityStateField.Word2: offset = MuiListColumnVisibilityState.Word2Offset; return true;
+				case MuiListColumnVisibilityStateField.Word3: offset = MuiListColumnVisibilityState.Word3Offset; return true;
+				case MuiListColumnVisibilityStateField.Word4: offset = MuiListColumnVisibilityState.Word4Offset; return true;
+				case MuiListColumnVisibilityStateField.Word5: offset = MuiListColumnVisibilityState.Word5Offset; return true;
+				case MuiListColumnVisibilityStateField.Word6: offset = MuiListColumnVisibilityState.Word6Offset; return true;
+				case MuiListColumnVisibilityStateField.Word7: offset = MuiListColumnVisibilityState.Word7Offset; return true;
 			}
 			offset = 0;
 			return false;
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListColumnVisibilityStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListColumnVisibilityStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListColumnVisibilityState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListColumnVisibilityState.Size)) return false;
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListColumnVisibilityState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -1886,10 +2236,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListColumnVisibilityStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -1898,17 +2246,92 @@ public static class MuiListCore
 			APTR address, MuiListColumnVisibilityStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListColumnVisibilityStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListColumnVisibilityStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListColumnVisibilityStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnVisibilityStateMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnVisibilityStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnVisibilityStateMemoryCodec.TryReadUInt32(ref platform,
+				address, field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnVisibilityStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnVisibilityStateMemoryCodec.TryWriteUInt32(ref platform,
+				address, field, value);
+	}
+
 	internal static class MuiListColumnVisibilityStateCodec
 	{
+		// Visibility is a fixed nine-ULONG mask record. Keep all mask words in
+		// declaration order so callers exchange a named struct instead of a chain
+		// of private offsets; the mask's column semantics remain unchanged.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListColumnVisibilityState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListColumnVisibilityState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Low) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.High) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Word2) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Word3) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Word4) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Word5) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Word6) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Word7)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListColumnVisibilityState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListColumnVisibilityState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Low) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.High) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Word2) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Word3) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Word4) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Word5) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Word6) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Word7) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListColumnVisibilityState value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -1916,34 +2339,14 @@ public static class MuiListCore
 			if (block.IsNull || !platform.IsMapped(block,
 				MuiListColumnVisibilityState.Size) || value.Magic !=
 				MuiListColumnVisibilityState.Cookie) return false;
-			return MuiListColumnVisibilityStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListColumnVisibilityStateField.Magic, value.Magic) &&
-				MuiListColumnVisibilityStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListColumnVisibilityStateField.Low, value.Low) &&
-				MuiListColumnVisibilityStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListColumnVisibilityStateField.High, value.High) &&
-				MuiListColumnVisibilityStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListColumnVisibilityStateField.Word2, value.Word2) &&
-				MuiListColumnVisibilityStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListColumnVisibilityStateField.Word3, value.Word3) &&
-				MuiListColumnVisibilityStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListColumnVisibilityStateField.Word4, value.Word4) &&
-				MuiListColumnVisibilityStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListColumnVisibilityStateField.Word5, value.Word5) &&
-				MuiListColumnVisibilityStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListColumnVisibilityStateField.Word6, value.Word6) &&
-				MuiListColumnVisibilityStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListColumnVisibilityStateField.Word7, value.Word7);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListColumnVisibilityState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListColumnVisibilityState.Size) ||
-				!MuiListColumnVisibilityStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListColumnVisibilityStateField.Magic, out value.Magic) ||
-				!MuiListColumnVisibilityStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListColumnVisibilityStateField.Low, out value.Low) ||
-				!MuiListColumnVisibilityStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListColumnVisibilityStateField.High, out value.High) ||
-				!MuiListColumnVisibilityStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListColumnVisibilityStateField.Word2, out value.Word2) ||
-				!MuiListColumnVisibilityStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListColumnVisibilityStateField.Word3, out value.Word3) ||
-				!MuiListColumnVisibilityStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListColumnVisibilityStateField.Word4, out value.Word4) ||
-				!MuiListColumnVisibilityStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListColumnVisibilityStateField.Word5, out value.Word5) ||
-				!MuiListColumnVisibilityStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListColumnVisibilityStateField.Word6, out value.Word6) ||
-				!MuiListColumnVisibilityStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListColumnVisibilityStateField.Word7, out value.Word7)) return false;
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -1968,6 +2371,11 @@ public static class MuiListCore
 	{
 		public const uint Size = 16;
 		public const uint Cookie = 0x434F5244u; // 'CORD'
+		public const uint FieldSize = 4;
+		public const uint MagicOffset = 0;
+		public const uint CountOffset = 4;
+		public const uint ValuesOffset = 8;
+		public const uint ReservedOffset = 12;
 		public uint Magic;
 		public uint Count;
 		public APTR Values;
@@ -1989,32 +2397,32 @@ public static class MuiListCore
 		internal MuiListColumnOrderStateField Field;
 	}
 
-	internal static class MuiListColumnOrderStateFieldCursorCodec
+	internal static class MuiListColumnOrderStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListColumnOrderStateField field,
 			out uint offset)
 		{
 			switch (field)
 			{
-				case MuiListColumnOrderStateField.Magic: offset = 0; return true;
-				case MuiListColumnOrderStateField.Count: offset = 4; return true;
-				case MuiListColumnOrderStateField.Values: offset = 8; return true;
-				case MuiListColumnOrderStateField.Reserved: offset = 12; return true;
+				case MuiListColumnOrderStateField.Magic: offset = MuiListColumnOrderState.MagicOffset; return true;
+				case MuiListColumnOrderStateField.Count: offset = MuiListColumnOrderState.CountOffset; return true;
+				case MuiListColumnOrderStateField.Values: offset = MuiListColumnOrderState.ValuesOffset; return true;
+				case MuiListColumnOrderStateField.Reserved: offset = MuiListColumnOrderState.ReservedOffset; return true;
 			}
 			offset = 0;
 			return false;
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListColumnOrderStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListColumnOrderStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListColumnOrderState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListColumnOrderState.Size)) return false;
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListColumnOrderState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -2022,10 +2430,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListColumnOrderStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -2034,17 +2440,73 @@ public static class MuiListCore
 			APTR address, MuiListColumnOrderStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListColumnOrderStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListColumnOrderStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListColumnOrderStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnOrderStateMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnOrderStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnOrderStateMemoryCodec.TryReadUInt32(ref platform, address,
+				field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnOrderStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnOrderStateMemoryCodec.TryWriteUInt32(ref platform, address,
+				field, value);
+	}
+
 	internal static class MuiListColumnOrderStateCodec
 	{
+		// Column-order ownership is a fixed four-ULONG record. Keep structural
+		// access in declaration order; the byte-permutation vector remains behind
+		// its separate bounded adapter and is not folded into this record.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListColumnOrderState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListColumnOrderState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Count) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var values) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Reserved)) return false;
+			value.Values = APTR.FromPointer(values);
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListColumnOrderState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListColumnOrderState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Count) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Values.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListColumnOrderState value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -2052,34 +2514,14 @@ public static class MuiListCore
 			if (block.IsNull || !platform.IsMapped(block,
 				MuiListColumnOrderState.Size) || value.Magic !=
 				MuiListColumnOrderState.Cookie) return false;
-			return MuiListColumnOrderStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				block, MuiListColumnOrderStateField.Magic, value.Magic) &&
-				MuiListColumnOrderStateFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListColumnOrderStateField.Count, value.Count) &&
-				MuiListColumnOrderStateFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListColumnOrderStateField.Values, value.Values.Raw) &&
-				MuiListColumnOrderStateFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListColumnOrderStateField.Reserved, value.Reserved);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListColumnOrderState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListColumnOrderState.Size) ||
-				!MuiListColumnOrderStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListColumnOrderStateField.Magic, out value.Magic) ||
-				!MuiListColumnOrderStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListColumnOrderStateField.Count, out value.Count) ||
-				!MuiListColumnOrderStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListColumnOrderStateField.Values, out var values) ||
-				!MuiListColumnOrderStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListColumnOrderStateField.Reserved, out value.Reserved))
-				return false;
-			value.Values = APTR.FromPointer(values);
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryReadStorage<TPlatform>(ref TPlatform platform,
@@ -2104,16 +2546,130 @@ public static class MuiListCore
 			value.Magic == MuiListColumnOrderState.Cookie;
 	}
 
-	// ColumnOrder is a caller-facing BYTE* permutation. Keep each byte
-	// addressable through a bounded cursor so source parsing and guest-owned
-	// comparison/lookup never reconstruct a raw byte offset independently.
+	// ColumnOrder is a caller-facing BYTE* permutation. Keep each byte in a
+	// named record so source parsing and guest-owned comparison/lookup do not
+	// reconstruct an anonymous byte offset independently.
+	[StructLayout(LayoutKind.Sequential, Pack = 2)]
+	internal struct MuiListColumnOrderByteRecord
+	{
+		internal const uint Size = 1;
+		internal const uint FieldSize = 1;
+		internal const uint ValueOffset = 0;
+		internal byte Value;
+	}
+
+	internal enum MuiListColumnOrderByteField : byte
+	{
+		Value,
+	}
+
+	// Keep the byte-vector index explicit so malformed caller memory fails
+	// before any guest read or write. The cursor is retained as a compatibility
+	// wrapper; the struct-first vector adapter below owns the address boundary.
 	[StructLayout(LayoutKind.Sequential, Pack = 2)]
 	internal struct MuiListColumnOrderByteCursor
 	{
-		internal const uint EntrySize = 1;
+		internal const uint EntrySize = MuiListColumnOrderByteRecord.Size;
 		internal const uint MaximumEntries = MaximumColumns;
 		internal APTR Base;
 		internal uint Index;
+	}
+
+	// Struct-first guest-memory adapter for the caller-owned BYTE* permutation.
+	// Every indexed entry is admitted as a complete named byte record and the
+	// MorphOS 256-column bound is enforced here.
+	internal static class MuiListColumnOrderByteVectorMemoryCodec
+	{
+		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			address = APTR.Null;
+			if (vector.IsNull || index >= MuiListColumnOrderByteCursor.MaximumEntries ||
+				index > (uint.MaxValue - vector.Raw) /
+				MuiListColumnOrderByteRecord.Size) return false;
+			var offset = index * MuiListColumnOrderByteRecord.Size;
+			if (vector.Raw > uint.MaxValue - offset) return false;
+			address = APTR.FromPointer(vector.Raw + offset);
+			return platform.IsMapped(address, MuiListColumnOrderByteRecord.Size);
+		}
+	}
+
+	// Keep the one-byte record's field boundary named as well. Vector index
+	// arithmetic belongs to the vector adapter above; this codec owns the
+	// complete byte record so consumers never reach into an anonymous offset.
+	internal static class MuiListColumnOrderByteRecordMemoryCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			APTR record, MuiListColumnOrderByteField field, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			address = APTR.Null;
+			if (field != MuiListColumnOrderByteField.Value || record.IsNull ||
+				!platform.IsMapped(record, MuiListColumnOrderByteRecord.Size)) return false;
+			if (record.Raw > uint.MaxValue - MuiListColumnOrderByteRecord.ValueOffset)
+				return false;
+			address = APTR.FromPointer(record.Raw +
+				MuiListColumnOrderByteRecord.ValueOffset);
+			return platform.IsMapped(address, MuiListColumnOrderByteRecord.FieldSize);
+		}
+
+		internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+			APTR record, MuiListColumnOrderByteField field, out byte value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = 0;
+			if (!TryGetAddress(ref platform, record, field, out var address))
+				return false;
+			value = platform.ReadUInt8(address, 0);
+			return true;
+		}
+
+		internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+			APTR record, MuiListColumnOrderByteField field, byte value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!TryGetAddress(ref platform, record, field, out var address))
+				return false;
+			platform.WriteUInt8(address, 0, value);
+			return true;
+		}
+	}
+
+	internal static class MuiListColumnOrderByteCodec
+	{
+		// ColumnOrder entries are one-byte named records. The vector adapter owns
+		// index arithmetic; this sequential codec owns the complete byte record.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListColumnOrderByteRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			return MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListColumnOrderByteRecord.Size, out var cursor) &&
+				MuiGuestStructCursor.TryReadUInt8(ref platform, ref cursor,
+					out value.Value) &&
+				MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnOrderByteRecord value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListColumnOrderByteRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt8(ref platform, ref cursor,
+				value.Value) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListColumnOrderByteRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> TryReadRecord(ref platform, address, out value);
+
+		internal static bool Write<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnOrderByteRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> WriteRecord(ref platform, address, value);
 	}
 
 	internal static class MuiListColumnOrderByteCursorCodec
@@ -2121,15 +2677,8 @@ public static class MuiListCore
 		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 			MuiListColumnOrderByteCursor cursor, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			address = APTR.Null;
-			if (cursor.Base.IsNull || cursor.Index >=
-				MuiListColumnOrderByteCursor.MaximumEntries || cursor.Index >
-				uint.MaxValue - cursor.Base.Raw) return false;
-			address = APTR.FromPointer(cursor.Base.Raw + cursor.Index);
-			return platform.IsMapped(address,
-				MuiListColumnOrderByteCursor.EntrySize);
-		}
+			=> MuiListColumnOrderByteVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index, out address);
 	}
 
 	// Parsed FORMAT columns are guest-resident records.  Keep the semantic
@@ -2139,6 +2688,17 @@ public static class MuiListCore
 	internal struct MuiListFormatDescriptor
 	{
 		internal const uint Size = 40;
+		internal const uint FieldSize = 4;
+		internal const uint DeltaOffset = 0;
+		internal const uint WeightOffset = 4;
+		internal const uint MinWidthOffset = 8;
+		internal const uint MaxWidthOffset = 12;
+		internal const uint ColumnOffset = 16;
+		internal const uint FlagsOffset = 20;
+		internal const uint PreparseOffset = 24;
+		internal const uint PreparseLengthOffset = 28;
+		internal const uint PreparseStorageOffset = 32;
+		internal const uint PreparseStorageLengthOffset = 36;
 		internal uint Delta;
 		internal uint Weight;
 		internal uint MinWidth;
@@ -2166,24 +2726,229 @@ public static class MuiListCore
 		internal uint Index;
 	}
 
+	// Struct-first guest-memory adapter for the fixed FORMAT descriptor table.
+	// Complete 40-byte records and the MorphOS 256-column bound are enforced at
+	// this boundary; parser callers keep only a typed cursor as a compatibility
+	// wrapper.
+	internal static class MuiListFormatDescriptorVectorMemoryCodec
+	{
+		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			address = APTR.Null;
+			if (vector.IsNull || index >= MuiListFormatDescriptorCursor.MaximumEntries ||
+				index > (uint.MaxValue - vector.Raw) /
+				MuiListFormatDescriptor.Size) return false;
+			var offset = index * MuiListFormatDescriptor.Size;
+			if (vector.Raw > uint.MaxValue - offset) return false;
+			address = APTR.FromPointer(vector.Raw + offset);
+			return platform.IsMapped(address, MuiListFormatDescriptor.Size);
+		}
+	}
+
 	internal static class MuiListFormatDescriptorCursorCodec
 	{
 		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 			MuiListFormatDescriptorCursor cursor, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
+			=> MuiListFormatDescriptorVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index, out address);
+	}
+
+	internal enum MuiListFormatDescriptorField : byte
+	{
+		Delta,
+		Weight,
+		MinWidth,
+		MaxWidth,
+		Column,
+		Flags,
+		Preparse,
+		PreparseLength,
+		PreparseStorage,
+		PreparseStorageLength,
+	}
+
+	[StructLayout(LayoutKind.Sequential, Pack = 2)]
+	internal struct MuiListFormatDescriptorFieldCursor
+	{
+		internal APTR Address;
+		internal MuiListFormatDescriptorField Field;
+	}
+
+	internal static class MuiListFormatDescriptorMemoryCodec
+	{
+		private static bool TryResolve(MuiListFormatDescriptorField field,
+			out uint offset)
+		{
+			switch (field)
+			{
+				case MuiListFormatDescriptorField.Delta:
+					offset = MuiListFormatDescriptor.DeltaOffset;
+					return true;
+				case MuiListFormatDescriptorField.Weight:
+					offset = MuiListFormatDescriptor.WeightOffset;
+					return true;
+				case MuiListFormatDescriptorField.MinWidth:
+					offset = MuiListFormatDescriptor.MinWidthOffset;
+					return true;
+				case MuiListFormatDescriptorField.MaxWidth:
+					offset = MuiListFormatDescriptor.MaxWidthOffset;
+					return true;
+				case MuiListFormatDescriptorField.Column:
+					offset = MuiListFormatDescriptor.ColumnOffset;
+					return true;
+				case MuiListFormatDescriptorField.Flags:
+					offset = MuiListFormatDescriptor.FlagsOffset;
+					return true;
+				case MuiListFormatDescriptorField.Preparse:
+					offset = MuiListFormatDescriptor.PreparseOffset;
+					return true;
+				case MuiListFormatDescriptorField.PreparseLength:
+					offset = MuiListFormatDescriptor.PreparseLengthOffset;
+					return true;
+				case MuiListFormatDescriptorField.PreparseStorage:
+					offset = MuiListFormatDescriptor.PreparseStorageOffset;
+					return true;
+				case MuiListFormatDescriptorField.PreparseStorageLength:
+					offset = MuiListFormatDescriptor.PreparseStorageLengthOffset;
+					return true;
+				default:
+					offset = 0;
+					return false;
+			}
+		}
+
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			APTR record, MuiListFormatDescriptorField field, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (cursor.Base.IsNull || cursor.Index >=
-				MuiListFormatDescriptorCursor.MaximumEntries || cursor.Index >
-				(uint.MaxValue - cursor.Base.Raw) /
-				MuiListFormatDescriptorCursor.EntrySize) return false;
-			var offset = cursor.Index *
-				MuiListFormatDescriptorCursor.EntrySize;
-			if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-			address = APTR.FromPointer(cursor.Base.Raw + offset);
-			return platform.IsMapped(address,
-				MuiListFormatDescriptorCursor.EntrySize);
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListFormatDescriptor.Size))
+				return false;
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListFormatDescriptor.FieldSize);
 		}
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFormatDescriptorField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = 0;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
+			value = platform.ReadUInt32(fieldAddress, 0);
+			return true;
+		}
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFormatDescriptorField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
+			platform.WriteUInt32(fieldAddress, 0, value);
+			return true;
+		}
+	}
+
+	internal static class MuiListFormatDescriptorFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListFormatDescriptorFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListFormatDescriptorMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFormatDescriptorField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListFormatDescriptorMemoryCodec.TryReadUInt32(ref platform, address,
+				field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFormatDescriptorField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListFormatDescriptorMemoryCodec.TryWriteUInt32(ref platform, address,
+				field, value);
+	}
+
+	internal static class MuiListFormatDescriptorCodec
+	{
+		// FORMAT descriptors are fixed ten-ULONG records. Keep the declaration
+		// order in one sequential codec so parsing and publication use the named
+		// descriptor fields rather than reconstructing offsets at each call site.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListFormatDescriptor value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListFormatDescriptor.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Delta) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Weight) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.MinWidth) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.MaxWidth) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Column) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Flags) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var preparse) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.PreparseLength) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var preparseStorage) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.PreparseStorageLength)) return false;
+			value.Preparse = APTR.FromPointer(preparse);
+			value.PreparseStorage = APTR.FromPointer(preparseStorage);
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFormatDescriptor value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListFormatDescriptor.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Delta) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Weight) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MinWidth) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MaxWidth) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Column) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Preparse.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PreparseLength) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PreparseStorage.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PreparseStorageLength) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListFormatDescriptor value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> TryReadRecord(ref platform, address, out value);
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFormatDescriptor value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> WriteRecord(ref platform, address, value);
 	}
 
 	// A FORMAT descriptor table owns a contiguous vector of named descriptor
@@ -2194,6 +2959,10 @@ public static class MuiListCore
 	{
 		internal const uint Size = 12;
 		internal const uint Cookie = 0x46445452u; // 'FDTR'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint ColumnsOffset = 4;
+		internal const uint ValuesOffset = 8;
 		internal uint Magic;
 		internal uint Columns;
 		internal APTR Values;
@@ -2213,7 +2982,7 @@ public static class MuiListCore
 		internal MuiListFormatDescriptorStateField Field;
 	}
 
-	internal static class MuiListFormatDescriptorStateFieldCursorCodec
+	internal static class MuiListFormatDescriptorStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListFormatDescriptorStateField field,
 			out uint offset)
@@ -2221,13 +2990,13 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListFormatDescriptorStateField.Magic:
-					offset = 0;
+					offset = MuiListFormatDescriptorState.MagicOffset;
 					return true;
 				case MuiListFormatDescriptorStateField.Columns:
-					offset = 4;
+					offset = MuiListFormatDescriptorState.ColumnsOffset;
 					return true;
 				case MuiListFormatDescriptorStateField.Values:
-					offset = 8;
+					offset = MuiListFormatDescriptorState.ValuesOffset;
 					return true;
 			}
 			offset = 0;
@@ -2235,16 +3004,16 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListFormatDescriptorStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListFormatDescriptorStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address,
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record,
 					MuiListFormatDescriptorState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListFormatDescriptorState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -2252,10 +3021,7 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListFormatDescriptorStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
 				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
@@ -2265,18 +3031,69 @@ public static class MuiListCore
 			APTR address, MuiListFormatDescriptorStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListFormatDescriptorStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
 				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListFormatDescriptorStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListFormatDescriptorStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListFormatDescriptorStateMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFormatDescriptorStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListFormatDescriptorStateMemoryCodec.TryReadUInt32(ref platform,
+				address, field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFormatDescriptorStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListFormatDescriptorStateMemoryCodec.TryWriteUInt32(ref platform,
+				address, field, value);
+	}
+
 	internal static class MuiListFormatDescriptorStateCodec
 	{
+		// Descriptor-table state is a fixed three-ULONG record. Keep the vector
+		// pointer as raw APTR bits in declaration order; table-size validation
+		// remains the admission layer around this structural codec.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListFormatDescriptorState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListFormatDescriptorState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Columns) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var values)) return false;
+			value.Values = APTR.FromPointer(values);
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListFormatDescriptorState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListFormatDescriptorState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Columns) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Values.Raw) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListFormatDescriptorState value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -2287,35 +3104,14 @@ public static class MuiListCore
 				value.Columns > MuiListFormatDescriptorCursor.MaximumEntries ||
 				value.Values.IsNull || !platform.IsMapped(value.Values,
 					value.Columns * MuiListFormatDescriptor.Size)) return false;
-			return MuiListFormatDescriptorStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, block, MuiListFormatDescriptorStateField.Magic,
-				value.Magic) &&
-				MuiListFormatDescriptorStateFieldCursorCodec.TryWriteUInt32(
-					ref platform, block, MuiListFormatDescriptorStateField.Columns,
-					value.Columns) &&
-				MuiListFormatDescriptorStateFieldCursorCodec.TryWriteUInt32(
-					ref platform, block, MuiListFormatDescriptorStateField.Values,
-					value.Values.Raw);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListFormatDescriptorState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListFormatDescriptorState.Size) ||
-				!MuiListFormatDescriptorStateFieldCursorCodec.TryReadUInt32(
-					ref platform, block, MuiListFormatDescriptorStateField.Magic,
-					out value.Magic) ||
-				!MuiListFormatDescriptorStateFieldCursorCodec.TryReadUInt32(
-					ref platform, block, MuiListFormatDescriptorStateField.Columns,
-					out value.Columns) ||
-				!MuiListFormatDescriptorStateFieldCursorCodec.TryReadUInt32(
-					ref platform, block, MuiListFormatDescriptorStateField.Values,
-					out var valuesRaw)) return false;
-			value.Values = APTR.FromPointer(valuesRaw);
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -2378,6 +3174,12 @@ public static class MuiListCore
 	internal struct MuiListColumnMetricsState
 	{
 		internal const uint Size = 16;
+		internal const uint Cookie = 0x434D4554u; // 'CMET'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint WidthOffset = 4;
+		internal const uint ColumnsOffset = 8;
+		internal const uint ValuesOffset = 12;
 		internal uint Magic;
 		internal uint Width;
 		internal uint Columns;
@@ -2399,7 +3201,7 @@ public static class MuiListCore
 		internal MuiListColumnMetricsField Field;
 	}
 
-	internal static class MuiListColumnMetricsFieldCursorCodec
+	internal static class MuiListColumnMetricsMemoryCodec
 	{
 		private static bool TryResolve(MuiListColumnMetricsField field,
 			out uint offset)
@@ -2407,16 +3209,16 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListColumnMetricsField.Magic:
-					offset = 0;
+					offset = MuiListColumnMetricsState.MagicOffset;
 					return true;
 				case MuiListColumnMetricsField.Width:
-					offset = 4;
+					offset = MuiListColumnMetricsState.WidthOffset;
 					return true;
 				case MuiListColumnMetricsField.Columns:
-					offset = 8;
+					offset = MuiListColumnMetricsState.ColumnsOffset;
 					return true;
 				case MuiListColumnMetricsField.Values:
-					offset = 12;
+					offset = MuiListColumnMetricsState.ValuesOffset;
 					return true;
 			}
 			offset = 0;
@@ -2424,16 +3226,16 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListColumnMetricsFieldCursor cursor, out APTR address)
+			APTR record, MuiListColumnMetricsField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListColumnMetricsState.Size))
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListColumnMetricsState.Size))
 				return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListColumnMetricsState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -2441,10 +3243,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListColumnMetricsFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -2453,55 +3253,88 @@ public static class MuiListCore
 			APTR address, MuiListColumnMetricsField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListColumnMetricsFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListColumnMetricsFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListColumnMetricsFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnMetricsMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnMetricsField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnMetricsMemoryCodec.TryReadUInt32(ref platform,
+				address, field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnMetricsField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnMetricsMemoryCodec.TryWriteUInt32(ref platform,
+				address, field, value);
+	}
+
 	internal static class MuiListColumnMetricsStateCodec
 	{
+		// The metrics owner is a fixed four-ULONG record. Keep its fields in
+		// declaration order so the production path carries a named value rather
+		// than rebuilding the record from private guest offsets.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListColumnMetricsState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListColumnMetricsState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Width) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Columns) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var values)) return false;
+			value.Values = APTR.FromPointer(values);
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListColumnMetricsState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListColumnMetricsState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Width) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Columns) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Values.Raw) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR block, MuiListColumnMetricsState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			if (block.IsNull || !platform.IsMapped(block,
 				MuiListColumnMetricsState.Size) ||
-				value.Magic != ColumnMetricsCookie) return false;
-			return MuiListColumnMetricsFieldCursorCodec.TryWriteUInt32(ref platform,
-				block, MuiListColumnMetricsField.Magic, value.Magic) &&
-				MuiListColumnMetricsFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListColumnMetricsField.Width, value.Width) &&
-				MuiListColumnMetricsFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListColumnMetricsField.Columns, value.Columns) &&
-				MuiListColumnMetricsFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListColumnMetricsField.Values, value.Values.Raw);
+				value.Magic != MuiListColumnMetricsState.Cookie) return false;
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListColumnMetricsState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListColumnMetricsState.Size) ||
-				!MuiListColumnMetricsFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListColumnMetricsField.Magic, out value.Magic) ||
-				!MuiListColumnMetricsFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListColumnMetricsField.Width, out value.Width) ||
-				!MuiListColumnMetricsFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListColumnMetricsField.Columns, out value.Columns) ||
-				!MuiListColumnMetricsFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListColumnMetricsField.Values, out var values))
-			{
-				value = default;
-				return false;
-			}
-			value.Values = APTR.FromPointer(values);
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -2509,7 +3342,7 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			if (!TryReadStructural(ref platform, block, out value) ||
-				value.Magic != ColumnMetricsCookie || value.Columns == 0 ||
+				value.Magic != MuiListColumnMetricsState.Cookie || value.Columns == 0 ||
 				value.Columns > MaximumGeometryColumns || value.Values.IsNull ||
 				!platform.IsMapped(value.Values,
 					value.Columns * MuiListColumnMetricValue.Size))
@@ -2547,6 +3380,8 @@ public static class MuiListCore
 	internal struct MuiListColumnMetricValue
 	{
 		internal const uint Size = 4;
+		internal const uint FieldSize = 4;
+		internal const uint ValueOffset = 0;
 		internal uint Value;
 	}
 
@@ -2562,18 +3397,21 @@ public static class MuiListCore
 		internal MuiListColumnMetricField Field;
 	}
 
-	internal static class MuiListColumnMetricFieldCursorCodec
+	internal static class MuiListColumnMetricMemoryCodec
 	{
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListColumnMetricFieldCursor cursor, out APTR address)
+			APTR record, MuiListColumnMetricField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (cursor.Field != MuiListColumnMetricField.Value ||
-				cursor.Record.IsNull || !platform.IsMapped(cursor.Record,
+			if (field != MuiListColumnMetricField.Value || record.IsNull ||
+				!platform.IsMapped(record,
 					MuiListColumnMetricValue.Size)) return false;
-			address = cursor.Record;
-			return true;
+			if (record.Raw > uint.MaxValue - MuiListColumnMetricValue.ValueOffset)
+				return false;
+			address = APTR.FromPointer(record.Raw +
+				MuiListColumnMetricValue.ValueOffset);
+			return platform.IsMapped(address, MuiListColumnMetricValue.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -2581,10 +3419,7 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListColumnMetricFieldCursor);
-			cursor.Record = record;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+			if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 			value = platform.ReadUInt32(address, 0);
 			return true;
 		}
@@ -2593,33 +3428,68 @@ public static class MuiListCore
 			APTR record, MuiListColumnMetricField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListColumnMetricFieldCursor);
-			cursor.Record = record;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+			if (!TryGetAddress(ref platform, record, field, out var address))
+				return false;
 			platform.WriteUInt32(address, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListColumnMetricFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListColumnMetricFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnMetricMemoryCodec.TryGetAddress(ref platform,
+				cursor.Record, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR record, MuiListColumnMetricField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnMetricMemoryCodec.TryReadUInt32(ref platform,
+				record, field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR record, MuiListColumnMetricField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListColumnMetricMemoryCodec.TryWriteUInt32(ref platform,
+				record, field, value);
+	}
+
 	internal static class MuiListColumnMetricCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		// A measured width is a single ULONG record. Keep its structural codec
+		// sequential so metric consumers exchange a named value rather than an
+		// implicit field offset.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListColumnMetricValue value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			return MuiListColumnMetricFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListColumnMetricField.Value, out value.Value);
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListColumnMetricValue.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Value)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
 		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListColumnMetricValue value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListColumnMetricValue.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Value) && MuiGuestStructCursor.IsComplete(cursor);
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListColumnMetricValue value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> TryReadRecord(ref platform, address, out value);
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListColumnMetricValue value)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			return MuiListColumnMetricFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiListColumnMetricField.Value, value.Value);
-		}
+			=> WriteRecord(ref platform, address, value);
 	}
 
 	// Measured column widths are a bounded guest ULONG table. Keep its cursor
@@ -2634,23 +3504,33 @@ public static class MuiListCore
 		internal uint Index;
 	}
 
+	// Struct-first guest-memory adapter for the measured-column ULONG vector.
+	// Complete metric records and the 256-column bound are enforced here; the
+	// typed cursor remains a compatibility wrapper for older callers.
+	internal static class MuiListColumnMetricVectorMemoryCodec
+	{
+		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			address = APTR.Null;
+			if (vector.IsNull || index >= MuiListColumnMetricCursor.MaximumEntries ||
+				index > (uint.MaxValue - vector.Raw) /
+				MuiListColumnMetricValue.Size) return false;
+			var offset = index * MuiListColumnMetricValue.Size;
+			if (vector.Raw > uint.MaxValue - offset) return false;
+			address = APTR.FromPointer(vector.Raw + offset);
+			return platform.IsMapped(address, MuiListColumnMetricValue.Size);
+		}
+	}
+
 	internal static class MuiListColumnMetricCursorCodec
 	{
 		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 			MuiListColumnMetricCursor cursor, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			address = APTR.Null;
-			if (cursor.Base.IsNull || cursor.Index >=
-				MuiListColumnMetricCursor.MaximumEntries || cursor.Index >
-				(uint.MaxValue - cursor.Base.Raw) /
-				MuiListColumnMetricCursor.EntrySize) return false;
-			var offset = cursor.Index * MuiListColumnMetricCursor.EntrySize;
-			if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-			address = APTR.FromPointer(cursor.Base.Raw + offset);
-			return platform.IsMapped(address,
-				MuiListColumnMetricCursor.EntrySize);
-		}
+			=> MuiListColumnMetricVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index, out address);
 	}
 
 	// MUIA_List_TitleArray owns a private pointer table, but not the strings it
@@ -2661,6 +3541,10 @@ public static class MuiListCore
 	{
 		public const uint Size = 12;
 		public const uint Cookie = 0x5449544Cu; // 'TITL'
+		public const uint FieldSize = 4;
+		public const uint MagicOffset = 0;
+		public const uint PointersOffset = 4;
+		public const uint CountOffset = 8;
 		public uint Magic;
 		public APTR Pointers;
 		public uint Count;
@@ -2680,31 +3564,31 @@ public static class MuiListCore
 		internal MuiListTitleArrayStateField Field;
 	}
 
-	internal static class MuiListTitleArrayStateFieldCursorCodec
+	internal static class MuiListTitleArrayStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListTitleArrayStateField field,
 			out uint offset)
 		{
 			switch (field)
 			{
-				case MuiListTitleArrayStateField.Magic: offset = 0; return true;
-				case MuiListTitleArrayStateField.Pointers: offset = 4; return true;
-				case MuiListTitleArrayStateField.Count: offset = 8; return true;
+				case MuiListTitleArrayStateField.Magic: offset = MuiListTitleArrayState.MagicOffset; return true;
+				case MuiListTitleArrayStateField.Pointers: offset = MuiListTitleArrayState.PointersOffset; return true;
+				case MuiListTitleArrayStateField.Count: offset = MuiListTitleArrayState.CountOffset; return true;
 			}
 			offset = 0;
 			return false;
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListTitleArrayStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListTitleArrayStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListTitleArrayState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListTitleArrayState.Size)) return false;
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListTitleArrayState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -2712,10 +3596,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListTitleArrayStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -2724,17 +3606,71 @@ public static class MuiListCore
 			APTR address, MuiListTitleArrayStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListTitleArrayStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListTitleArrayStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListTitleArrayStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListTitleArrayStateMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListTitleArrayStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListTitleArrayStateMemoryCodec.TryReadUInt32(ref platform, address,
+				field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListTitleArrayStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListTitleArrayStateMemoryCodec.TryWriteUInt32(ref platform, address,
+				field, value);
+	}
+
 	internal static class MuiListTitleArrayStateCodec
 	{
+		// The title-array metadata is a fixed three-ULONG record. Keep its
+		// declaration order in one sequential codec so production callers do not
+		// reconstruct Magic/Pointers/Count from field offsets.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListTitleArrayState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListTitleArrayState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var pointers) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Count)) return false;
+			value.Pointers = APTR.FromPointer(pointers);
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListTitleArrayState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListTitleArrayState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.Magic) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.Pointers.Raw) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.Count)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListTitleArrayState value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -2742,29 +3678,14 @@ public static class MuiListCore
 			if (block.IsNull || !platform.IsMapped(block,
 				MuiListTitleArrayState.Size) || value.Magic !=
 				MuiListTitleArrayState.Cookie) return false;
-			return MuiListTitleArrayStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				block, MuiListTitleArrayStateField.Magic, value.Magic) &&
-				MuiListTitleArrayStateFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListTitleArrayStateField.Pointers, value.Pointers.Raw) &&
-				MuiListTitleArrayStateFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListTitleArrayStateField.Count, value.Count);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListTitleArrayState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListTitleArrayState.Size) ||
-				!MuiListTitleArrayStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListTitleArrayStateField.Magic, out value.Magic) ||
-				!MuiListTitleArrayStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListTitleArrayStateField.Pointers, out var pointers) ||
-				!MuiListTitleArrayStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListTitleArrayStateField.Count, out value.Count)) return false;
-			value.Pointers = APTR.FromPointer(pointers);
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryReadStorage<TPlatform>(ref TPlatform platform,
@@ -2797,6 +3718,9 @@ public static class MuiListCore
 	{
 		internal const uint Size = 8;
 		internal const uint Cookie = 0x4C544954u; // 'LTIT'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint ValueOffset = 4;
 
 		internal uint Magic;
 		internal uint Value;
@@ -2815,7 +3739,7 @@ public static class MuiListCore
 		internal MuiListTitleStateField Field;
 	}
 
-	internal static class MuiListTitleStateFieldCursorCodec
+	internal static class MuiListTitleStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListTitleStateField field,
 			out uint offset)
@@ -2823,10 +3747,10 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListTitleStateField.Magic:
-					offset = 0;
+					offset = MuiListTitleState.MagicOffset;
 					return true;
 				case MuiListTitleStateField.Value:
-					offset = 4;
+					offset = MuiListTitleState.ValueOffset;
 					return true;
 			}
 			offset = 0;
@@ -2834,15 +3758,15 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListTitleStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListTitleStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListTitleState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListTitleState.Size)) return false;
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListTitleState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -2850,10 +3774,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListTitleStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -2862,40 +3784,78 @@ public static class MuiListCore
 			APTR address, MuiListTitleStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListTitleStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListTitleStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListTitleStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListTitleStateMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+				cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListTitleStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListTitleStateMemoryCodec.TryReadUInt32(ref platform, address, field,
+				out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListTitleStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListTitleStateMemoryCodec.TryWriteUInt32(ref platform, address, field,
+				value);
+	}
+
 	internal static class MuiListTitleStateCodec
 	{
+		// Title metadata is a fixed two-ULONG record. Keep the declaration order
+		// in one sequential codec; the field adapter remains only for legacy
+		// cursor and malformed-state diagnostics.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListTitleState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			return MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListTitleState.Size, out var cursor) &&
+				MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) &&
+				MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Value) &&
+				MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListTitleState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListTitleState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Value) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListTitleState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			if (block.IsNull || !platform.IsMapped(block, MuiListTitleState.Size) ||
 				value.Magic != MuiListTitleState.Cookie) return false;
-			return MuiListTitleStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				block, MuiListTitleStateField.Magic, value.Magic) &&
-				MuiListTitleStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListTitleStateField.Value, value.Value);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListTitleState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block, MuiListTitleState.Size) ||
-				!MuiListTitleStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListTitleStateField.Magic, out value.Magic) ||
-				!MuiListTitleStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListTitleStateField.Value, out value.Value)) return false;
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -2918,6 +3878,9 @@ public static class MuiListCore
 	{
 		internal const uint Size = 8;
 		internal const uint Cookie = 0x4C534947u; // 'LSIG'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint ValueOffset = 4;
 
 		internal uint Magic;
 		internal uint Value;
@@ -2936,7 +3899,7 @@ public static class MuiListCore
 		internal MuiListSelectionSignalStateField Field;
 	}
 
-	internal static class MuiListSelectionSignalStateFieldCursorCodec
+	internal static class MuiListSelectionSignalStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListSelectionSignalStateField field,
 			out uint offset)
@@ -2944,10 +3907,10 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListSelectionSignalStateField.Magic:
-					offset = 0;
+					offset = MuiListSelectionSignalState.MagicOffset;
 					return true;
 				case MuiListSelectionSignalStateField.Value:
-					offset = 4;
+					offset = MuiListSelectionSignalState.ValueOffset;
 					return true;
 			}
 			offset = 0;
@@ -2955,16 +3918,16 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListSelectionSignalStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListSelectionSignalStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address,
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record,
 					MuiListSelectionSignalState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListSelectionSignalState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -2972,10 +3935,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListSelectionSignalStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -2984,17 +3945,64 @@ public static class MuiListCore
 			APTR address, MuiListSelectionSignalStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListSelectionSignalStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListSelectionSignalStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListSelectionSignalStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListSelectionSignalStateMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListSelectionSignalStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListSelectionSignalStateMemoryCodec.TryReadUInt32(ref platform,
+				address, field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListSelectionSignalStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListSelectionSignalStateMemoryCodec.TryWriteUInt32(ref platform,
+				address, field, value);
+	}
+
 	internal static class MuiListSelectionSignalStateCodec
 	{
+		// SelectChange state is a fixed two-ULONG record. Keep raw structural
+		// reads lossless; strict admission continues to validate the cookie and
+		// the canonical BOOL separately.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListSelectionSignalState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			return MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListSelectionSignalState.Size, out var cursor) &&
+				MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) &&
+				MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Value) &&
+				MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListSelectionSignalState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListSelectionSignalState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Value) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListSelectionSignalState value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -3002,28 +4010,15 @@ public static class MuiListCore
 			if (block.IsNull || !platform.IsMapped(block,
 				MuiListSelectionSignalState.Size) || value.Magic !=
 				MuiListSelectionSignalState.Cookie) return false;
-			return MuiListSelectionSignalStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, block, MuiListSelectionSignalStateField.Magic,
-				value.Magic) &&
-				MuiListSelectionSignalStateFieldCursorCodec.TryWriteUInt32(
-					ref platform, block, MuiListSelectionSignalStateField.Value,
-					value.Value == 0 ? 0u : 1u);
+			value.Value = value.Value == 0 ? 0u : 1u;
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListSelectionSignalState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListSelectionSignalState.Size) ||
-				!MuiListSelectionSignalStateFieldCursorCodec.TryReadUInt32(
-					ref platform, block, MuiListSelectionSignalStateField.Magic,
-					out value.Magic) ||
-				!MuiListSelectionSignalStateFieldCursorCodec.TryReadUInt32(
-					ref platform, block, MuiListSelectionSignalStateField.Value,
-					out value.Value)) return false;
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -3046,6 +4041,11 @@ public static class MuiListCore
 	{
 		internal const uint Size = 16;
 		internal const uint Cookie = 0x4C464D54u; // 'LFMT'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint FormatOffset = 4;
+		internal const uint MaxColumnsOffset = 8;
+		internal const uint ColumnsOffset = 12;
 
 		internal uint Magic;
 		internal APTR Format;
@@ -3068,7 +4068,7 @@ public static class MuiListCore
 		internal MuiListFormatPolicyStateField Field;
 	}
 
-	internal static class MuiListFormatPolicyStateFieldCursorCodec
+	internal static class MuiListFormatPolicyStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListFormatPolicyStateField field,
 			out uint offset)
@@ -3076,16 +4076,16 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListFormatPolicyStateField.Magic:
-					offset = 0;
+					offset = MuiListFormatPolicyState.MagicOffset;
 					return true;
 				case MuiListFormatPolicyStateField.Format:
-					offset = 4;
+					offset = MuiListFormatPolicyState.FormatOffset;
 					return true;
 				case MuiListFormatPolicyStateField.MaxColumns:
-					offset = 8;
+					offset = MuiListFormatPolicyState.MaxColumnsOffset;
 					return true;
 				case MuiListFormatPolicyStateField.Columns:
-					offset = 12;
+					offset = MuiListFormatPolicyState.ColumnsOffset;
 					return true;
 			}
 			offset = 0;
@@ -3093,16 +4093,16 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListFormatPolicyStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListFormatPolicyStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListFormatPolicyState.Size))
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListFormatPolicyState.Size))
 				return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListFormatPolicyState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -3110,10 +4110,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListFormatPolicyStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -3122,17 +4120,73 @@ public static class MuiListCore
 			APTR address, MuiListFormatPolicyStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListFormatPolicyStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListFormatPolicyStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListFormatPolicyStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListFormatPolicyStateMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFormatPolicyStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListFormatPolicyStateMemoryCodec.TryReadUInt32(ref platform, address,
+				field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFormatPolicyStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListFormatPolicyStateMemoryCodec.TryWriteUInt32(ref platform, address,
+				field, value);
+	}
+
 	internal static class MuiListFormatPolicyStateCodec
 	{
+		// FORMAT policy is a fixed four-ULONG record. Preserve the nullable
+		// caller-owned string pointer as raw APTR bits while keeping all field
+		// order and bounds handling in the sequential struct codec.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListFormatPolicyState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListFormatPolicyState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var format) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.MaxColumns) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Columns)) return false;
+			value.Format = APTR.FromPointer(format);
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListFormatPolicyState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListFormatPolicyState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Format.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MaxColumns) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Columns) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListFormatPolicyState value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -3140,36 +4194,14 @@ public static class MuiListCore
 			if (block.IsNull || !platform.IsMapped(block,
 				MuiListFormatPolicyState.Size) || value.Magic !=
 				MuiListFormatPolicyState.Cookie) return false;
-			return MuiListFormatPolicyStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, block, MuiListFormatPolicyStateField.Magic,
-				value.Magic) && MuiListFormatPolicyStateFieldCursorCodec
-				.TryWriteUInt32(ref platform, block,
-					MuiListFormatPolicyStateField.Format, value.Format.Raw) &&
-				MuiListFormatPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListFormatPolicyStateField.MaxColumns, value.MaxColumns) &&
-				MuiListFormatPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListFormatPolicyStateField.Columns, value.Columns);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListFormatPolicyState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListFormatPolicyState.Size) ||
-				!MuiListFormatPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListFormatPolicyStateField.Magic, out value.Magic) ||
-				!MuiListFormatPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListFormatPolicyStateField.Format, out var format) ||
-				!MuiListFormatPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListFormatPolicyStateField.MaxColumns,
-					out value.MaxColumns) ||
-				!MuiListFormatPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListFormatPolicyStateField.Columns, out value.Columns))
-				return false;
-			value.Format = APTR.FromPointer(format);
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -3192,6 +4224,9 @@ public static class MuiListCore
 	{
 		internal const uint Size = 8;
 		internal const uint Cookie = 0x4C464E54u; // 'LFNT'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint FontOffset = 4;
 
 		internal uint Magic;
 		internal APTR Font;
@@ -3210,7 +4245,7 @@ public static class MuiListCore
 		internal MuiListFontStateField Field;
 	}
 
-	internal static class MuiListFontStateFieldCursorCodec
+	internal static class MuiListFontStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListFontStateField field,
 			out uint offset)
@@ -3218,10 +4253,10 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListFontStateField.Magic:
-					offset = 0;
+					offset = MuiListFontState.MagicOffset;
 					return true;
 				case MuiListFontStateField.Font:
-					offset = 4;
+					offset = MuiListFontState.FontOffset;
 					return true;
 			}
 			offset = 0;
@@ -3229,15 +4264,15 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListFontStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListFontStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListFontState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListFontState.Size)) return false;
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListFontState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -3245,10 +4280,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListFontStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -3257,41 +4290,79 @@ public static class MuiListCore
 			APTR address, MuiListFontStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListFontStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListFontStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListFontStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListFontStateMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+				cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFontStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListFontStateMemoryCodec.TryReadUInt32(ref platform, address, field,
+				out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListFontStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListFontStateMemoryCodec.TryWriteUInt32(ref platform, address, field,
+				value);
+	}
+
 	internal static class MuiListFontStateCodec
 	{
+		// Font policy is a fixed two-ULONG record. Preserve the borrowed TextFont
+		// APTR as raw guest bits while keeping declaration order in the bounded
+		// sequential struct codec.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListFontState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListFontState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var font)) return false;
+			value.Font = APTR.FromPointer(font);
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListFontState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListFontState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Font.Raw) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListFontState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			if (block.IsNull || !platform.IsMapped(block, MuiListFontState.Size) ||
 				value.Magic != MuiListFontState.Cookie) return false;
-			return MuiListFontStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				block, MuiListFontStateField.Magic, value.Magic) &&
-				MuiListFontStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListFontStateField.Font, value.Font.Raw);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListFontState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block, MuiListFontState.Size) ||
-				!MuiListFontStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListFontStateField.Magic, out value.Magic) ||
-				!MuiListFontStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListFontStateField.Font, out var font)) return false;
-			value.Font = APTR.FromPointer(font);
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -3313,6 +4384,8 @@ public static class MuiListCore
 	internal struct MuiListPointerSlotRecord
 	{
 		internal const uint Size = 4;
+		internal const uint FieldSize = 4;
+		internal const uint ValueOffset = 0;
 		internal APTR Value;
 	}
 
@@ -3328,18 +4401,21 @@ public static class MuiListCore
 		internal MuiListPointerSlotField Field;
 	}
 
-	internal static class MuiListPointerSlotFieldCursorCodec
+	internal static class MuiListPointerSlotMemoryCodec
 	{
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListPointerSlotFieldCursor cursor, out APTR address)
+			APTR record, MuiListPointerSlotField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (cursor.Field != MuiListPointerSlotField.Value ||
-				cursor.Record.IsNull || !platform.IsMapped(cursor.Record,
+			if (field != MuiListPointerSlotField.Value || record.IsNull ||
+				!platform.IsMapped(record,
 					MuiListPointerSlotRecord.Size)) return false;
-			address = cursor.Record;
-			return true;
+			if (record.Raw > uint.MaxValue - MuiListPointerSlotRecord.ValueOffset)
+				return false;
+			address = APTR.FromPointer(record.Raw +
+				MuiListPointerSlotRecord.ValueOffset);
+			return platform.IsMapped(address, MuiListPointerSlotRecord.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -3347,10 +4423,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListPointerSlotFieldCursor);
-			cursor.Record = record;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+			if (!TryGetAddress(ref platform, record, field, out var address))
+				return false;
 			value = platform.ReadUInt32(address, 0);
 			return true;
 		}
@@ -3359,35 +4433,70 @@ public static class MuiListCore
 			APTR record, MuiListPointerSlotField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListPointerSlotFieldCursor);
-			cursor.Record = record;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+			if (!TryGetAddress(ref platform, record, field, out var address))
+				return false;
 			platform.WriteUInt32(address, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListPointerSlotFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListPointerSlotFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListPointerSlotMemoryCodec.TryGetAddress(ref platform,
+				cursor.Record, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR record, MuiListPointerSlotField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListPointerSlotMemoryCodec.TryReadUInt32(ref platform,
+				record, field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR record, MuiListPointerSlotField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListPointerSlotMemoryCodec.TryWriteUInt32(ref platform,
+				record, field, value);
+	}
+
 	internal static class MuiListPointerSlotCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		// A pointer-table entry is one ULONG on the guest wire. Keep the named
+		// APTR record as the semantic value and serialize it in declaration order
+		// through the bounded cursor.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListPointerSlotRecord record)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			record = default;
-			if (!MuiListPointerSlotFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListPointerSlotField.Value, out var value)) return false;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListPointerSlotRecord.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var value)) return false;
 			record.Value = APTR.FromPointer(value);
-			return true;
+			return MuiGuestStructCursor.IsComplete(cursor);
 		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListPointerSlotRecord record)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListPointerSlotRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Value.Raw) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListPointerSlotRecord record)
+			where TPlatform : struct, IMuiGuestMemory
+			=> TryReadRecord(ref platform, address, out record);
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListPointerSlotRecord record)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			return MuiListPointerSlotFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiListPointerSlotField.Value, record.Value.Raw);
-		}
+			=> WriteRecord(ref platform, address, record);
 	}
 
 	// Internal display buffers include one leading ULONG for the MorphOS display
@@ -3413,7 +4522,8 @@ public static class MuiListCore
 		var cursor = default(MuiListPointerSlotCursor);
 		cursor.Base = value.Storage;
 		cursor.Index = 1;
-		if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+		if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index,
 			out value.Array))
 		{
 			platform.Free(value.Storage, value.ByteSize);
@@ -3448,23 +4558,34 @@ public static class MuiListCore
 		internal uint Index;
 	}
 
+	// Struct-first guest-memory adapter for internal pointer-slot vectors used by
+	// display, title, and string-array projections. NULL termination remains a
+	// consumer rule; this boundary only admits complete 4-byte records within
+	// the bounded table.
+	internal static class MuiListPointerSlotVectorMemoryCodec
+	{
+		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			address = APTR.Null;
+			if (vector.IsNull || index >= MuiListPointerSlotCursor.MaximumEntries ||
+				index > (uint.MaxValue - vector.Raw) /
+				MuiListPointerSlotRecord.Size) return false;
+			var offset = index * MuiListPointerSlotRecord.Size;
+			if (vector.Raw > uint.MaxValue - offset) return false;
+			address = APTR.FromPointer(vector.Raw + offset);
+			return platform.IsMapped(address, MuiListPointerSlotRecord.Size);
+		}
+	}
+
 	internal static class MuiListPointerSlotCursorCodec
 	{
 		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 			MuiListPointerSlotCursor cursor, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			address = APTR.Null;
-			if (cursor.Base.IsNull || cursor.Index >=
-				MuiListPointerSlotCursor.MaximumEntries || cursor.Index >
-				(uint.MaxValue - cursor.Base.Raw) /
-				MuiListPointerSlotCursor.EntrySize) return false;
-			var offset = cursor.Index * MuiListPointerSlotCursor.EntrySize;
-			if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-			address = APTR.FromPointer(cursor.Base.Raw + offset);
-			return platform.IsMapped(address,
-				MuiListPointerSlotCursor.EntrySize);
-		}
+			=> MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index, out address);
 	}
 
 	// Caller-owned records placed in a List are self-describing: the first
@@ -3475,6 +4596,8 @@ public static class MuiListCore
 	internal struct MuiListOwnedRecordHeader
 	{
 		internal const uint Size = 4;
+		internal const uint FieldSize = 4;
+		internal const uint LengthOffset = 0;
 		internal uint Length;
 	}
 
@@ -3490,18 +4613,21 @@ public static class MuiListCore
 		internal MuiListOwnedRecordHeaderField Field;
 	}
 
-	internal static class MuiListOwnedRecordHeaderFieldCursorCodec
+	internal static class MuiListOwnedRecordHeaderMemoryCodec
 	{
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListOwnedRecordHeaderFieldCursor cursor, out APTR address)
+			APTR record, MuiListOwnedRecordHeaderField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (cursor.Field != MuiListOwnedRecordHeaderField.Length ||
-				cursor.Record.IsNull || !platform.IsMapped(cursor.Record,
+			if (field != MuiListOwnedRecordHeaderField.Length || record.IsNull ||
+				!platform.IsMapped(record,
 					MuiListOwnedRecordHeader.Size)) return false;
-			address = cursor.Record;
-			return true;
+			if (record.Raw > uint.MaxValue - MuiListOwnedRecordHeader.LengthOffset)
+				return false;
+			address = APTR.FromPointer(record.Raw +
+				MuiListOwnedRecordHeader.LengthOffset);
+			return platform.IsMapped(address, MuiListOwnedRecordHeader.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -3509,10 +4635,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListOwnedRecordHeaderFieldCursor);
-			cursor.Record = record;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+			if (!TryGetAddress(ref platform, record, field, out var address))
+				return false;
 			value = platform.ReadUInt32(address, 0);
 			return true;
 		}
@@ -3521,35 +4645,65 @@ public static class MuiListCore
 			APTR record, MuiListOwnedRecordHeaderField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListOwnedRecordHeaderFieldCursor);
-			cursor.Record = record;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+			if (!TryGetAddress(ref platform, record, field, out var address))
+				return false;
 			platform.WriteUInt32(address, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListOwnedRecordHeaderFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListOwnedRecordHeaderFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListOwnedRecordHeaderMemoryCodec.TryGetAddress(ref platform,
+				cursor.Record, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR record, MuiListOwnedRecordHeaderField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListOwnedRecordHeaderMemoryCodec.TryReadUInt32(ref platform,
+				record, field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR record, MuiListOwnedRecordHeaderField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListOwnedRecordHeaderMemoryCodec.TryWriteUInt32(ref platform,
+				record, field, value);
+	}
+
 	internal static class MuiListOwnedRecordHeaderCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		// The self-describing allocation header is one ULONG wide. Keep the
+		// named-record entry points explicit, but use the bounded field adapter for
+		// this single-word transfer because CopperSharp's direct scalar/APTR native
+		// lowering is not yet reliable for one-ULONG record calls.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListOwnedRecordHeader value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			return MuiListOwnedRecordHeaderFieldCursorCodec.TryReadUInt32(
+			return MuiListOwnedRecordHeaderMemoryCodec.TryReadUInt32(
 				ref platform, address, MuiListOwnedRecordHeaderField.Length,
 				out value.Length);
 		}
 
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListOwnedRecordHeader value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListOwnedRecordHeaderMemoryCodec.TryWriteUInt32(ref platform,
+				address, MuiListOwnedRecordHeaderField.Length, value.Length);
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListOwnedRecordHeader value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> TryReadRecord(ref platform, address, out value);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListOwnedRecordHeader value)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			return MuiListOwnedRecordHeaderFieldCursorCodec.TryWriteUInt32(
-				ref platform, address, MuiListOwnedRecordHeaderField.Length,
-				value.Length);
-		}
+			=> WriteRecord(ref platform, address, value);
 	}
 
 	// Quiet/redraw coalescing is state, not a property of the List index. Keep
@@ -3560,6 +4714,10 @@ public static class MuiListCore
 	{
 		public const uint Size = 12;
 		public const uint Cookie = 0x52454452u; // 'REDR'
+		public const uint FieldSize = 4;
+		public const uint MagicOffset = 0;
+		public const uint DirtyOffset = 4;
+		public const uint RequestsOffset = 8;
 		public uint Magic;
 		public uint Dirty;
 		public uint Requests;
@@ -3579,7 +4737,7 @@ public static class MuiListCore
 		internal MuiListRedrawStateField Field;
 	}
 
-	internal static class MuiListRedrawStateFieldCursorCodec
+	internal static class MuiListRedrawStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListRedrawStateField field,
 			out uint offset)
@@ -3587,13 +4745,13 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListRedrawStateField.Magic:
-					offset = 0;
+					offset = MuiListRedrawState.MagicOffset;
 					return true;
 				case MuiListRedrawStateField.Dirty:
-					offset = 4;
+					offset = MuiListRedrawState.DirtyOffset;
 					return true;
 				case MuiListRedrawStateField.Requests:
-					offset = 8;
+					offset = MuiListRedrawState.RequestsOffset;
 					return true;
 			}
 			offset = 0;
@@ -3601,15 +4759,15 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListRedrawStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListRedrawStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListRedrawState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListRedrawState.Size)) return false;
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListRedrawState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -3617,10 +4775,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListRedrawStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -3629,44 +4785,81 @@ public static class MuiListCore
 			APTR address, MuiListRedrawStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListRedrawStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListRedrawStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListRedrawStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListRedrawStateMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+				cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListRedrawStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListRedrawStateMemoryCodec.TryReadUInt32(ref platform, address, field,
+				out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListRedrawStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListRedrawStateMemoryCodec.TryWriteUInt32(ref platform, address, field,
+				value);
+	}
+
 	internal static class MuiListRedrawStateCodec
 	{
+		// Redraw coalescing is a fixed three-ULONG record. Keep the dirty bit and
+		// request counter adjacent in declaration order so mutation paths exchange
+		// one named state struct rather than unrelated scalar offsets.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListRedrawState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListRedrawState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Dirty) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Requests)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListRedrawState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListRedrawState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Dirty) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Requests) && MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListRedrawState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			if (block.IsNull || !platform.IsMapped(block, MuiListRedrawState.Size) ||
 				value.Magic != MuiListRedrawState.Cookie) return false;
-			return MuiListRedrawStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				block, MuiListRedrawStateField.Magic, value.Magic) &&
-				MuiListRedrawStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListRedrawStateField.Dirty, value.Dirty) &&
-				MuiListRedrawStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListRedrawStateField.Requests, value.Requests);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListRedrawState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block, MuiListRedrawState.Size) ||
-				!MuiListRedrawStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListRedrawStateField.Magic, out value.Magic) ||
-				!MuiListRedrawStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListRedrawStateField.Dirty, out value.Dirty) ||
-				!MuiListRedrawStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListRedrawStateField.Requests, out value.Requests)) return false;
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -3689,6 +4882,10 @@ public static class MuiListCore
 	{
 		public const uint Size = 12;
 		public const uint Cookie = 0x41435456u; // 'ACTV'
+		public const uint FieldSize = 4;
+		public const uint MagicOffset = 0;
+		public const uint HasActiveOffset = 4;
+		public const uint ActiveOffset = 8;
 
 		public uint Magic;
 		public uint HasActive;
@@ -3709,7 +4906,7 @@ public static class MuiListCore
 		internal MuiListActiveStateField Field;
 	}
 
-	internal static class MuiListActiveStateFieldCursorCodec
+	internal static class MuiListActiveStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListActiveStateField field,
 			out uint offset)
@@ -3717,13 +4914,13 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListActiveStateField.Magic:
-					offset = 0;
+					offset = MuiListActiveState.MagicOffset;
 					return true;
 				case MuiListActiveStateField.HasActive:
-					offset = 4;
+					offset = MuiListActiveState.HasActiveOffset;
 					return true;
 				case MuiListActiveStateField.Active:
-					offset = 8;
+					offset = MuiListActiveState.ActiveOffset;
 					return true;
 			}
 			offset = 0;
@@ -3731,15 +4928,15 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListActiveStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListActiveStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListActiveState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListActiveState.Size)) return false;
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListActiveState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -3747,10 +4944,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListActiveStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -3759,44 +4954,82 @@ public static class MuiListCore
 			APTR address, MuiListActiveStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListActiveStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListActiveStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListActiveStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListActiveStateMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+				cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListActiveStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListActiveStateMemoryCodec.TryReadUInt32(ref platform, address, field,
+				out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListActiveStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListActiveStateMemoryCodec.TryWriteUInt32(ref platform, address, field,
+				value);
+	}
+
 	internal static class MuiListActiveStateCodec
 	{
+		// Active state is a fixed three-ULONG record. Keep the presence bit and
+		// selected row together in declaration order so empty-list semantics remain
+		// explicit at the named struct boundary.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListActiveState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListActiveState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.HasActive) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Active)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListActiveState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListActiveState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.HasActive) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Active) && MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListActiveState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			if (block.IsNull || !platform.IsMapped(block, MuiListActiveState.Size) ||
 				value.Magic != MuiListActiveState.Cookie) return false;
-			return MuiListActiveStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				block, MuiListActiveStateField.Magic, value.Magic) &&
-				MuiListActiveStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListActiveStateField.HasActive, value.HasActive == 0 ? 0u : 1u) &&
-				MuiListActiveStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListActiveStateField.Active, value.Active);
+			value.HasActive = value.HasActive == 0 ? 0u : 1u;
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListActiveState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block, MuiListActiveState.Size) ||
-				!MuiListActiveStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListActiveStateField.Magic, out value.Magic) ||
-				!MuiListActiveStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListActiveStateField.HasActive, out value.HasActive) ||
-				!MuiListActiveStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListActiveStateField.Active, out value.Active)) return false;
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -3819,6 +5052,9 @@ public static class MuiListCore
 	{
 		internal const uint Size = 8;
 		internal const uint Cookie = 0x4C494E53u; // 'LINS'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint PositionOffset = 4;
 
 		internal uint Magic;
 		internal uint Position;
@@ -3837,7 +5073,7 @@ public static class MuiListCore
 		internal MuiListInsertPositionStateField Field;
 	}
 
-	internal static class MuiListInsertPositionStateFieldCursorCodec
+	internal static class MuiListInsertPositionStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListInsertPositionStateField field,
 			out uint offset)
@@ -3845,10 +5081,10 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListInsertPositionStateField.Magic:
-					offset = 0;
+					offset = MuiListInsertPositionState.MagicOffset;
 					return true;
 				case MuiListInsertPositionStateField.Position:
-					offset = 4;
+					offset = MuiListInsertPositionState.PositionOffset;
 					return true;
 			}
 			offset = 0;
@@ -3856,16 +5092,16 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListInsertPositionStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListInsertPositionStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListInsertPositionState.Size))
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListInsertPositionState.Size))
 				return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListInsertPositionState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -3873,10 +5109,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListInsertPositionStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -3885,17 +5119,63 @@ public static class MuiListCore
 			APTR address, MuiListInsertPositionStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListInsertPositionStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListInsertPositionStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListInsertPositionStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListInsertPositionStateMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListInsertPositionStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListInsertPositionStateMemoryCodec.TryReadUInt32(ref platform, address,
+				field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListInsertPositionStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListInsertPositionStateMemoryCodec.TryWriteUInt32(ref platform,
+				address, field, value);
+	}
+
 	internal static class MuiListInsertPositionStateCodec
 	{
+		// Insert-position state is a fixed two-ULONG result record. Keep the
+		// signed LONG projection beside its cookie in declaration order so the
+		// getter-only publication path exchanges one named struct.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListInsertPositionState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListInsertPositionState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Position)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListInsertPositionState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListInsertPositionState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Position) && MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListInsertPositionState value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -3903,27 +5183,14 @@ public static class MuiListCore
 			if (block.IsNull || !platform.IsMapped(block,
 				MuiListInsertPositionState.Size) || value.Magic !=
 				MuiListInsertPositionState.Cookie) return false;
-			return MuiListInsertPositionStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, block, MuiListInsertPositionStateField.Magic,
-				value.Magic) && MuiListInsertPositionStateFieldCursorCodec
-				.TryWriteUInt32(ref platform, block,
-					MuiListInsertPositionStateField.Position, value.Position);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListInsertPositionState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListInsertPositionState.Size) ||
-				!MuiListInsertPositionStateFieldCursorCodec.TryReadUInt32(
-					ref platform, block, MuiListInsertPositionStateField.Magic,
-					out value.Magic) ||
-				!MuiListInsertPositionStateFieldCursorCodec.TryReadUInt32(
-					ref platform, block, MuiListInsertPositionStateField.Position,
-					out value.Position)) return false;
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -3946,6 +5213,15 @@ public static class MuiListCore
 	{
 		public const uint Size = 32;
 		public const uint Cookie = 0x56505754u; // 'VPWT'
+		public const uint FieldSize = 4;
+		public const uint MagicOffset = 0;
+		public const uint TopPixelOffset = 4;
+		public const uint VisiblePixelOffset = 8;
+		public const uint TotalPixelOffset = 12;
+		public const uint FirstOffset = 16;
+		public const uint LineHeightOffset = 20;
+		public const uint VisibleOffset = 24;
+		public const uint DropMarkOffset = 28;
 		public uint Magic;
 		public uint TopPixel;
 		public uint VisiblePixel;
@@ -3975,7 +5251,7 @@ public static class MuiListCore
 		internal MuiListViewportStateField Field;
 	}
 
-	internal static class MuiListViewportStateFieldCursorCodec
+	internal static class MuiListViewportStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListViewportStateField field,
 			out uint offset)
@@ -3983,28 +5259,28 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListViewportStateField.Magic:
-					offset = 0;
+					offset = MuiListViewportState.MagicOffset;
 					return true;
 				case MuiListViewportStateField.TopPixel:
-					offset = 4;
+					offset = MuiListViewportState.TopPixelOffset;
 					return true;
 				case MuiListViewportStateField.VisiblePixel:
-					offset = 8;
+					offset = MuiListViewportState.VisiblePixelOffset;
 					return true;
 				case MuiListViewportStateField.TotalPixel:
-					offset = 12;
+					offset = MuiListViewportState.TotalPixelOffset;
 					return true;
 				case MuiListViewportStateField.First:
-					offset = 16;
+					offset = MuiListViewportState.FirstOffset;
 					return true;
 				case MuiListViewportStateField.LineHeight:
-					offset = 20;
+					offset = MuiListViewportState.LineHeightOffset;
 					return true;
 				case MuiListViewportStateField.Visible:
-					offset = 24;
+					offset = MuiListViewportState.VisibleOffset;
 					return true;
 				case MuiListViewportStateField.DropMark:
-					offset = 28;
+					offset = MuiListViewportState.DropMarkOffset;
 					return true;
 			}
 			offset = 0;
@@ -4012,16 +5288,16 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListViewportStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListViewportStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListViewportState.Size))
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListViewportState.Size))
 				return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListViewportState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -4029,10 +5305,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListViewportStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -4041,17 +5315,87 @@ public static class MuiListCore
 			APTR address, MuiListViewportStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListViewportStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListViewportStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListViewportStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListViewportStateMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListViewportStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListViewportStateMemoryCodec.TryReadUInt32(ref platform, address,
+				field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListViewportStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListViewportStateMemoryCodec.TryWriteUInt32(ref platform, address,
+				field, value);
+	}
+
 	internal static class MuiListViewportStateCodec
 	{
+		// Viewport metrics are a fixed eight-ULONG record. Keep pixel, row, and
+		// drop-mark fields in declaration order so layout and notification paths
+		// exchange one named struct rather than rebuilding private offsets.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListViewportState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListViewportState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.TopPixel) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.VisiblePixel) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.TotalPixel) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.First) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.LineHeight) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Visible) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.DropMark)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListViewportState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListViewportState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.TopPixel) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.VisiblePixel) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.TotalPixel) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.First) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.LineHeight) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Visible) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.DropMark) && MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListViewportState value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -4059,52 +5403,14 @@ public static class MuiListCore
 			if (block.IsNull || !platform.IsMapped(block,
 				MuiListViewportState.Size) || value.Magic !=
 				MuiListViewportState.Cookie) return false;
-			return MuiListViewportStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				block, MuiListViewportStateField.Magic, value.Magic) &&
-				MuiListViewportStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListViewportStateField.TopPixel, value.TopPixel) &&
-				MuiListViewportStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListViewportStateField.VisiblePixel, value.VisiblePixel) &&
-				MuiListViewportStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListViewportStateField.TotalPixel, value.TotalPixel) &&
-				MuiListViewportStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListViewportStateField.First, value.First) &&
-				MuiListViewportStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListViewportStateField.LineHeight, value.LineHeight) &&
-				MuiListViewportStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListViewportStateField.Visible, value.Visible) &&
-				MuiListViewportStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListViewportStateField.DropMark, value.DropMark);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListViewportState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListViewportState.Size) ||
-				!MuiListViewportStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListViewportStateField.Magic, out value.Magic) ||
-				!MuiListViewportStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListViewportStateField.TopPixel, out value.TopPixel) ||
-				!MuiListViewportStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListViewportStateField.VisiblePixel,
-					out value.VisiblePixel) ||
-				!MuiListViewportStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListViewportStateField.TotalPixel,
-					out value.TotalPixel) ||
-				!MuiListViewportStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListViewportStateField.First, out value.First) ||
-				!MuiListViewportStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListViewportStateField.LineHeight,
-					out value.LineHeight) ||
-				!MuiListViewportStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListViewportStateField.Visible, out value.Visible) ||
-				!MuiListViewportStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListViewportStateField.DropMark,
-					out value.DropMark)) return false;
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -4128,6 +5434,11 @@ public static class MuiListCore
 	{
 		internal const uint Size = 16;
 		internal const uint Cookie = 0x4C49504Fu; // 'LIPO'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint InputOffset = 4;
+		internal const uint MultiSelectOffset = 8;
+		internal const uint ScrollerPosOffset = 12;
 
 		internal uint Magic;
 		internal uint Input;
@@ -4150,7 +5461,7 @@ public static class MuiListCore
 		internal MuiListInteractionPolicyStateField Field;
 	}
 
-	internal static class MuiListInteractionPolicyStateFieldCursorCodec
+	internal static class MuiListInteractionPolicyStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListInteractionPolicyStateField field,
 			out uint offset)
@@ -4158,16 +5469,16 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListInteractionPolicyStateField.Magic:
-					offset = 0;
+					offset = MuiListInteractionPolicyState.MagicOffset;
 					return true;
 				case MuiListInteractionPolicyStateField.Input:
-					offset = 4;
+					offset = MuiListInteractionPolicyState.InputOffset;
 					return true;
 				case MuiListInteractionPolicyStateField.MultiSelect:
-					offset = 8;
+					offset = MuiListInteractionPolicyState.MultiSelectOffset;
 					return true;
 				case MuiListInteractionPolicyStateField.ScrollerPos:
-					offset = 12;
+					offset = MuiListInteractionPolicyState.ScrollerPosOffset;
 					return true;
 			}
 			offset = 0;
@@ -4175,16 +5486,16 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListInteractionPolicyStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListInteractionPolicyStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address,
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record,
 					MuiListInteractionPolicyState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListInteractionPolicyState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -4192,10 +5503,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListInteractionPolicyStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -4204,17 +5513,71 @@ public static class MuiListCore
 			APTR address, MuiListInteractionPolicyStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListInteractionPolicyStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListInteractionPolicyStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListInteractionPolicyStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListInteractionPolicyStateMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListInteractionPolicyStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListInteractionPolicyStateMemoryCodec.TryReadUInt32(ref platform,
+				address, field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListInteractionPolicyStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListInteractionPolicyStateMemoryCodec.TryWriteUInt32(ref platform,
+				address, field, value);
+	}
+
 	internal static class MuiListInteractionPolicyStateCodec
 	{
+		// Interaction policy is a fixed four-ULONG record. Keep the BOOL and enum
+		// values in declaration order so input and scroller consumers exchange one
+		// named struct instead of rebuilding private field offsets.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListInteractionPolicyState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListInteractionPolicyState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Input) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.MultiSelect) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.ScrollerPos)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListInteractionPolicyState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListInteractionPolicyState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Input) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MultiSelect) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ScrollerPos) && MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListInteractionPolicyState value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -4222,41 +5585,14 @@ public static class MuiListCore
 			if (block.IsNull || !platform.IsMapped(block,
 				MuiListInteractionPolicyState.Size) || value.Magic !=
 				MuiListInteractionPolicyState.Cookie) return false;
-			return MuiListInteractionPolicyStateFieldCursorCodec.TryWriteUInt32(
-				ref platform, block, MuiListInteractionPolicyStateField.Magic,
-				value.Magic) && MuiListInteractionPolicyStateFieldCursorCodec
-				.TryWriteUInt32(ref platform, block,
-					MuiListInteractionPolicyStateField.Input, value.Input) &&
-				MuiListInteractionPolicyStateFieldCursorCodec.TryWriteUInt32(
-					ref platform, block,
-					MuiListInteractionPolicyStateField.MultiSelect,
-					value.MultiSelect) && MuiListInteractionPolicyStateFieldCursorCodec
-				.TryWriteUInt32(ref platform, block,
-					MuiListInteractionPolicyStateField.ScrollerPos, value.ScrollerPos);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListInteractionPolicyState value)
-			where TPlatform : struct, IMuiGuestMemory
+		where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListInteractionPolicyState.Size) ||
-				!MuiListInteractionPolicyStateFieldCursorCodec.TryReadUInt32(
-					ref platform, block, MuiListInteractionPolicyStateField.Magic,
-					out value.Magic) ||
-				!MuiListInteractionPolicyStateFieldCursorCodec.TryReadUInt32(
-					ref platform, block, MuiListInteractionPolicyStateField.Input,
-					out value.Input) ||
-				!MuiListInteractionPolicyStateFieldCursorCodec.TryReadUInt32(
-					ref platform, block,
-					MuiListInteractionPolicyStateField.MultiSelect,
-					out value.MultiSelect) ||
-				!MuiListInteractionPolicyStateFieldCursorCodec.TryReadUInt32(
-					ref platform, block,
-					MuiListInteractionPolicyStateField.ScrollerPos,
-					out value.ScrollerPos)) return false;
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -4280,6 +5616,13 @@ public static class MuiListCore
 	{
 		internal const uint Size = 24;
 		internal const uint Cookie = 0x4C434C4Bu; // 'LCLK'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint ClickColumnOffset = 4;
+		internal const uint DoubleClickOffset = 8;
+		internal const uint AgainClickOffset = 12;
+		internal const uint ClicksOffset = 16;
+		internal const uint DefClickColumnOffset = 20;
 
 		internal uint Magic;
 		internal uint ClickColumn;
@@ -4306,7 +5649,7 @@ public static class MuiListCore
 		internal MuiListClickStateField Field;
 	}
 
-	internal static class MuiListClickStateFieldCursorCodec
+	internal static class MuiListClickStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListClickStateField field,
 			out uint offset)
@@ -4314,22 +5657,22 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListClickStateField.Magic:
-					offset = 0;
+					offset = MuiListClickState.MagicOffset;
 					return true;
 				case MuiListClickStateField.ClickColumn:
-					offset = 4;
+					offset = MuiListClickState.ClickColumnOffset;
 					return true;
 				case MuiListClickStateField.DoubleClick:
-					offset = 8;
+					offset = MuiListClickState.DoubleClickOffset;
 					return true;
 				case MuiListClickStateField.AgainClick:
-					offset = 12;
+					offset = MuiListClickState.AgainClickOffset;
 					return true;
 				case MuiListClickStateField.Clicks:
-					offset = 16;
+					offset = MuiListClickState.ClicksOffset;
 					return true;
 				case MuiListClickStateField.DefClickColumn:
-					offset = 20;
+					offset = MuiListClickState.DefClickColumnOffset;
 					return true;
 			}
 			offset = 0;
@@ -4337,15 +5680,15 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListClickStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListClickStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListClickState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListClickState.Size)) return false;
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListClickState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -4353,10 +5696,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListClickStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -4365,57 +5706,95 @@ public static class MuiListCore
 			APTR address, MuiListClickStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListClickStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListClickStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListClickStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListClickStateMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+				cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListClickStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListClickStateMemoryCodec.TryReadUInt32(ref platform, address, field,
+				out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListClickStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListClickStateMemoryCodec.TryWriteUInt32(ref platform, address, field,
+				value);
+	}
+
 	internal static class MuiListClickStateCodec
 	{
+		// Click state is a fixed six-ULONG record. Keep structural reads lossless;
+		// strict publication canonicalizes the two BOOL fields before the named
+		// record is exchanged with guest memory.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListClickState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListClickState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.ClickColumn) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.DoubleClick) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.AgainClick) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Clicks) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.DefClickColumn)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListClickState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListClickState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ClickColumn) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.DoubleClick) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.AgainClick) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Clicks) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.DefClickColumn) && MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListClickState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			if (block.IsNull || !platform.IsMapped(block, MuiListClickState.Size) ||
 				value.Magic != MuiListClickState.Cookie) return false;
-			return MuiListClickStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				block, MuiListClickStateField.Magic, value.Magic) &&
-				MuiListClickStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListClickStateField.ClickColumn, value.ClickColumn) &&
-				MuiListClickStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListClickStateField.DoubleClick, value.DoubleClick == 0 ? 0u : 1u) &&
-				MuiListClickStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListClickStateField.AgainClick, value.AgainClick == 0 ? 0u : 1u) &&
-				MuiListClickStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListClickStateField.Clicks, value.Clicks) &&
-				MuiListClickStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListClickStateField.DefClickColumn, value.DefClickColumn);
+			value.DoubleClick = value.DoubleClick == 0 ? 0u : 1u;
+			value.AgainClick = value.AgainClick == 0 ? 0u : 1u;
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListClickState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block, MuiListClickState.Size) ||
-				!MuiListClickStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListClickStateField.Magic, out value.Magic) ||
-				!MuiListClickStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListClickStateField.ClickColumn, out value.ClickColumn) ||
-				!MuiListClickStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListClickStateField.DoubleClick, out value.DoubleClick) ||
-				!MuiListClickStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListClickStateField.AgainClick, out value.AgainClick) ||
-				!MuiListClickStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListClickStateField.Clicks, out value.Clicks) ||
-				!MuiListClickStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListClickStateField.DefClickColumn,
-					out value.DefClickColumn)) return false;
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -4439,6 +5818,13 @@ public static class MuiListCore
 	{
 		internal const uint Size = 24;
 		internal const uint Cookie = 0x4C484F4Bu; // 'LHOK'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint ConstructHookOffset = 4;
+		internal const uint DestructHookOffset = 8;
+		internal const uint DisplayHookOffset = 12;
+		internal const uint CompareHookOffset = 16;
+		internal const uint MultiTestHookOffset = 20;
 
 		internal uint Magic;
 		internal uint ConstructHook;
@@ -4457,6 +5843,10 @@ public static class MuiListCore
 	{
 		internal const uint Size = 12;
 		internal const uint Cookie = 0x4C534F52u; // 'LSOR'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint SortColumnOffset = 4;
+		internal const uint TitleClickOffset = 8;
 
 		internal uint Magic;
 		internal uint SortColumn;
@@ -4473,6 +5863,19 @@ public static class MuiListCore
 	{
 		internal const uint Size = 48;
 		internal const uint Cookie = 0x4C504F4Cu; // 'LPOL'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint EditableOffset = 4;
+		internal const uint QuietOffset = 8;
+		internal const uint AdjustHeightOffset = 12;
+		internal const uint AdjustWidthOffset = 16;
+		internal const uint StripesOffset = 20;
+		internal const uint ShowDropMarksOffset = 24;
+		internal const uint DragSortableOffset = 28;
+		internal const uint DragTypeOffset = 32;
+		internal const uint AutoVisibleOffset = 36;
+		internal const uint AutoLineHeightOffset = 40;
+		internal const uint MinLineHeightOffset = 44;
 
 		internal uint Magic;
 		internal uint Editable;
@@ -4511,40 +5914,40 @@ public static class MuiListCore
 		internal MuiListPresentationPolicyStateField Field;
 	}
 
-	internal static class MuiListPresentationPolicyStateFieldCursorCodec
+	internal static class MuiListPresentationPolicyStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListPresentationPolicyStateField field,
 			out uint offset)
 		{
 			switch (field)
 			{
-				case MuiListPresentationPolicyStateField.Magic: offset = 0; return true;
-				case MuiListPresentationPolicyStateField.Editable: offset = 4; return true;
-				case MuiListPresentationPolicyStateField.Quiet: offset = 8; return true;
-				case MuiListPresentationPolicyStateField.AdjustHeight: offset = 12; return true;
-				case MuiListPresentationPolicyStateField.AdjustWidth: offset = 16; return true;
-				case MuiListPresentationPolicyStateField.Stripes: offset = 20; return true;
-				case MuiListPresentationPolicyStateField.ShowDropMarks: offset = 24; return true;
-				case MuiListPresentationPolicyStateField.DragSortable: offset = 28; return true;
-				case MuiListPresentationPolicyStateField.DragType: offset = 32; return true;
-				case MuiListPresentationPolicyStateField.AutoVisible: offset = 36; return true;
-				case MuiListPresentationPolicyStateField.AutoLineHeight: offset = 40; return true;
-				case MuiListPresentationPolicyStateField.MinLineHeight: offset = 44; return true;
+				case MuiListPresentationPolicyStateField.Magic: offset = MuiListPresentationPolicyState.MagicOffset; return true;
+				case MuiListPresentationPolicyStateField.Editable: offset = MuiListPresentationPolicyState.EditableOffset; return true;
+				case MuiListPresentationPolicyStateField.Quiet: offset = MuiListPresentationPolicyState.QuietOffset; return true;
+				case MuiListPresentationPolicyStateField.AdjustHeight: offset = MuiListPresentationPolicyState.AdjustHeightOffset; return true;
+				case MuiListPresentationPolicyStateField.AdjustWidth: offset = MuiListPresentationPolicyState.AdjustWidthOffset; return true;
+				case MuiListPresentationPolicyStateField.Stripes: offset = MuiListPresentationPolicyState.StripesOffset; return true;
+				case MuiListPresentationPolicyStateField.ShowDropMarks: offset = MuiListPresentationPolicyState.ShowDropMarksOffset; return true;
+				case MuiListPresentationPolicyStateField.DragSortable: offset = MuiListPresentationPolicyState.DragSortableOffset; return true;
+				case MuiListPresentationPolicyStateField.DragType: offset = MuiListPresentationPolicyState.DragTypeOffset; return true;
+				case MuiListPresentationPolicyStateField.AutoVisible: offset = MuiListPresentationPolicyState.AutoVisibleOffset; return true;
+				case MuiListPresentationPolicyStateField.AutoLineHeight: offset = MuiListPresentationPolicyState.AutoLineHeightOffset; return true;
+				case MuiListPresentationPolicyStateField.MinLineHeight: offset = MuiListPresentationPolicyState.MinLineHeightOffset; return true;
 			}
 			offset = 0;
 			return false;
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListPresentationPolicyStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListPresentationPolicyStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListPresentationPolicyState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListPresentationPolicyState.Size)) return false;
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListPresentationPolicyState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -4552,10 +5955,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListPresentationPolicyStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -4564,17 +5965,103 @@ public static class MuiListCore
 			APTR address, MuiListPresentationPolicyStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListPresentationPolicyStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListPresentationPolicyStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListPresentationPolicyStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListPresentationPolicyStateMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListPresentationPolicyStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListPresentationPolicyStateMemoryCodec.TryReadUInt32(ref platform,
+				address, field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListPresentationPolicyStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListPresentationPolicyStateMemoryCodec.TryWriteUInt32(ref platform,
+				address, field, value);
+	}
+
 	internal static class MuiListPresentationPolicyStateCodec
 	{
+		// Presentation policy is a fixed twelve-ULONG record. Keep all normalized
+		// display and interaction switches in declaration order so drawing,
+		// editing, drag, and viewport paths share one named struct boundary.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListPresentationPolicyState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListPresentationPolicyState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Editable) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Quiet) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.AdjustHeight) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.AdjustWidth) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Stripes) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.ShowDropMarks) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.DragSortable) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.DragType) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.AutoVisible) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.AutoLineHeight) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.MinLineHeight)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListPresentationPolicyState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListPresentationPolicyState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Editable) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Quiet) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.AdjustHeight) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.AdjustWidth) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Stripes) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ShowDropMarks) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.DragSortable) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.DragType) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.AutoVisible) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.AutoLineHeight) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MinLineHeight) && MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListPresentationPolicyState value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -4582,40 +6069,14 @@ public static class MuiListCore
 			if (block.IsNull || !platform.IsMapped(block,
 				MuiListPresentationPolicyState.Size) || value.Magic !=
 				MuiListPresentationPolicyState.Cookie) return false;
-			return MuiListPresentationPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListPresentationPolicyStateField.Magic, value.Magic) &&
-				MuiListPresentationPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListPresentationPolicyStateField.Editable, value.Editable) &&
-				MuiListPresentationPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListPresentationPolicyStateField.Quiet, value.Quiet) &&
-				MuiListPresentationPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListPresentationPolicyStateField.AdjustHeight, value.AdjustHeight) &&
-				MuiListPresentationPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListPresentationPolicyStateField.AdjustWidth, value.AdjustWidth) &&
-				MuiListPresentationPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListPresentationPolicyStateField.Stripes, value.Stripes) &&
-				MuiListPresentationPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListPresentationPolicyStateField.ShowDropMarks, value.ShowDropMarks) &&
-				MuiListPresentationPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListPresentationPolicyStateField.DragSortable, value.DragSortable) &&
-				MuiListPresentationPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListPresentationPolicyStateField.DragType, value.DragType) &&
-				MuiListPresentationPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListPresentationPolicyStateField.AutoVisible, value.AutoVisible) &&
-				MuiListPresentationPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListPresentationPolicyStateField.AutoLineHeight, value.AutoLineHeight) &&
-				MuiListPresentationPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform, block, MuiListPresentationPolicyStateField.MinLineHeight, value.MinLineHeight);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListPresentationPolicyState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListPresentationPolicyState.Size) ||
-				!MuiListPresentationPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListPresentationPolicyStateField.Magic, out value.Magic) ||
-				!MuiListPresentationPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListPresentationPolicyStateField.Editable, out value.Editable) ||
-				!MuiListPresentationPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListPresentationPolicyStateField.Quiet, out value.Quiet) ||
-				!MuiListPresentationPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListPresentationPolicyStateField.AdjustHeight, out value.AdjustHeight) ||
-				!MuiListPresentationPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListPresentationPolicyStateField.AdjustWidth, out value.AdjustWidth) ||
-				!MuiListPresentationPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListPresentationPolicyStateField.Stripes, out value.Stripes) ||
-				!MuiListPresentationPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListPresentationPolicyStateField.ShowDropMarks, out value.ShowDropMarks) ||
-				!MuiListPresentationPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListPresentationPolicyStateField.DragSortable, out value.DragSortable) ||
-				!MuiListPresentationPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListPresentationPolicyStateField.DragType, out value.DragType) ||
-				!MuiListPresentationPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListPresentationPolicyStateField.AutoVisible, out value.AutoVisible) ||
-				!MuiListPresentationPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListPresentationPolicyStateField.AutoLineHeight, out value.AutoLineHeight) ||
-				!MuiListPresentationPolicyStateFieldCursorCodec.TryReadUInt32(ref platform, block, MuiListPresentationPolicyStateField.MinLineHeight, out value.MinLineHeight)) return false;
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -4647,7 +6108,7 @@ public static class MuiListCore
 		internal MuiListHookPolicyStateField Field;
 	}
 
-	internal static class MuiListHookPolicyStateFieldCursorCodec
+	internal static class MuiListHookPolicyStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListHookPolicyStateField field,
 			out uint offset)
@@ -4655,22 +6116,22 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListHookPolicyStateField.Magic:
-					offset = 0;
+					offset = MuiListHookPolicyState.MagicOffset;
 					return true;
 				case MuiListHookPolicyStateField.ConstructHook:
-					offset = 4;
+					offset = MuiListHookPolicyState.ConstructHookOffset;
 					return true;
 				case MuiListHookPolicyStateField.DestructHook:
-					offset = 8;
+					offset = MuiListHookPolicyState.DestructHookOffset;
 					return true;
 				case MuiListHookPolicyStateField.DisplayHook:
-					offset = 12;
+					offset = MuiListHookPolicyState.DisplayHookOffset;
 					return true;
 				case MuiListHookPolicyStateField.CompareHook:
-					offset = 16;
+					offset = MuiListHookPolicyState.CompareHookOffset;
 					return true;
 				case MuiListHookPolicyStateField.MultiTestHook:
-					offset = 20;
+					offset = MuiListHookPolicyState.MultiTestHookOffset;
 					return true;
 			}
 			offset = 0;
@@ -4678,15 +6139,15 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListHookPolicyStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListHookPolicyStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListHookPolicyState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListHookPolicyState.Size)) return false;
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListHookPolicyState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -4694,10 +6155,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListHookPolicyStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -4706,17 +6165,79 @@ public static class MuiListCore
 			APTR address, MuiListHookPolicyStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListHookPolicyStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListHookPolicyStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListHookPolicyStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListHookPolicyStateMemoryCodec.TryGetAddress(ref platform,
+				cursor.Address, cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListHookPolicyStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListHookPolicyStateMemoryCodec.TryReadUInt32(ref platform, address,
+				field, out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListHookPolicyStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListHookPolicyStateMemoryCodec.TryWriteUInt32(ref platform, address,
+				field, value);
+	}
+
 	internal static class MuiListHookPolicyStateCodec
 	{
+		// Hook policy is a fixed six-ULONG pointer record. Keep the hook entry
+		// points in declaration order so every List producer consumes one named
+		// configuration struct rather than rebuilding private offsets.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListHookPolicyState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListHookPolicyState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.ConstructHook) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.DestructHook) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.DisplayHook) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.CompareHook) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.MultiTestHook)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListHookPolicyState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListHookPolicyState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ConstructHook) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.DestructHook) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.DisplayHook) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.CompareHook) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MultiTestHook) && MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListHookPolicyState value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -4724,50 +6245,14 @@ public static class MuiListCore
 			if (block.IsNull || !platform.IsMapped(block,
 				MuiListHookPolicyState.Size) || value.Magic !=
 				MuiListHookPolicyState.Cookie) return false;
-			return MuiListHookPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				block, MuiListHookPolicyStateField.Magic, value.Magic) &&
-				MuiListHookPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListHookPolicyStateField.ConstructHook,
-					value.ConstructHook) &&
-				MuiListHookPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListHookPolicyStateField.DestructHook,
-					value.DestructHook) &&
-				MuiListHookPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListHookPolicyStateField.DisplayHook,
-					value.DisplayHook) &&
-				MuiListHookPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListHookPolicyStateField.CompareHook,
-					value.CompareHook) &&
-				MuiListHookPolicyStateFieldCursorCodec.TryWriteUInt32(ref platform,
-					block, MuiListHookPolicyStateField.MultiTestHook,
-					value.MultiTestHook);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListHookPolicyState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block,
-				MuiListHookPolicyState.Size) ||
-				!MuiListHookPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListHookPolicyStateField.Magic, out value.Magic) ||
-				!MuiListHookPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListHookPolicyStateField.ConstructHook,
-					out value.ConstructHook) ||
-				!MuiListHookPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListHookPolicyStateField.DestructHook,
-					out value.DestructHook) ||
-				!MuiListHookPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListHookPolicyStateField.DisplayHook,
-					out value.DisplayHook) ||
-				!MuiListHookPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListHookPolicyStateField.CompareHook,
-					out value.CompareHook) ||
-				!MuiListHookPolicyStateFieldCursorCodec.TryReadUInt32(ref platform,
-					block, MuiListHookPolicyStateField.MultiTestHook,
-					out value.MultiTestHook)) return false;
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -4796,20 +6281,20 @@ public static class MuiListCore
 		internal MuiListSortStateField Field;
 	}
 
-	internal static class MuiListSortStateFieldCursorCodec
+	internal static class MuiListSortStateMemoryCodec
 	{
 		private static bool TryResolve(MuiListSortStateField field, out uint offset)
 		{
 			switch (field)
 			{
 				case MuiListSortStateField.Magic:
-					offset = 0;
+					offset = MuiListSortState.MagicOffset;
 					return true;
 				case MuiListSortStateField.SortColumn:
-					offset = 4;
+					offset = MuiListSortState.SortColumnOffset;
 					return true;
 				case MuiListSortStateField.TitleClick:
-					offset = 8;
+					offset = MuiListSortState.TitleClickOffset;
 					return true;
 			}
 			offset = 0;
@@ -4817,15 +6302,15 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListSortStateFieldCursor cursor, out APTR address)
+			APTR record, MuiListSortStateField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListSortState.Size)) return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListSortState.Size)) return false;
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListSortState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -4833,10 +6318,8 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListSortStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
 		}
@@ -4845,44 +6328,81 @@ public static class MuiListCore
 			APTR address, MuiListSortStateField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListSortStateFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
+				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListSortStateFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListSortStateFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListSortStateMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+				cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListSortStateField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListSortStateMemoryCodec.TryReadUInt32(ref platform, address, field,
+				out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListSortStateField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListSortStateMemoryCodec.TryWriteUInt32(ref platform, address, field,
+				value);
+	}
+
 	internal static class MuiListSortStateCodec
 	{
+		// Sort state is a fixed three-ULONG record. Keep the selected and
+		// title-click columns adjacent in declaration order so sort notifications
+		// consume one named struct rather than unrelated scalar offsets.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+			APTR block, out MuiListSortState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListSortState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.SortColumn) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.TitleClick)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR block, MuiListSortState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, block,
+				MuiListSortState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.SortColumn) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.TitleClick) && MuiGuestStructCursor.IsComplete(cursor);
+
 		internal static bool Write<TPlatform>(ref TPlatform platform, APTR block,
 			MuiListSortState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			if (block.IsNull || !platform.IsMapped(block, MuiListSortState.Size) ||
 				value.Magic != MuiListSortState.Cookie) return false;
-			return MuiListSortStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				block, MuiListSortStateField.Magic, value.Magic) &&
-				MuiListSortStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListSortStateField.SortColumn, value.SortColumn) &&
-				MuiListSortStateFieldCursorCodec.TryWriteUInt32(ref platform, block,
-					MuiListSortStateField.TitleClick, value.TitleClick);
+			return WriteRecord(ref platform, block, value);
 		}
 
 		internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 			APTR block, out MuiListSortState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			value = default;
-			if (block.IsNull || !platform.IsMapped(block, MuiListSortState.Size) ||
-				!MuiListSortStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListSortStateField.Magic, out value.Magic) ||
-				!MuiListSortStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListSortStateField.SortColumn, out value.SortColumn) ||
-				!MuiListSortStateFieldCursorCodec.TryReadUInt32(ref platform, block,
-					MuiListSortStateField.TitleClick, out value.TitleClick)) return false;
-			return true;
+			return TryReadRecord(ref platform, block, out value);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR block,
@@ -4909,6 +6429,12 @@ public static class MuiListCore
 	{
 		internal const uint Size = 20;
 		internal const uint Cookie = 0x504F4F4Cu; // 'POOL'
+		internal const uint FieldSize = 4;
+		internal const uint MagicOffset = 0;
+		internal const uint PoolOffset = 4;
+		internal const uint PuddleSizeOffset = 8;
+		internal const uint ThresholdSizeOffset = 12;
+		internal const uint UsesExternalPoolOffset = 16;
 
 		internal uint Magic;
 		internal APTR Pool;
@@ -4933,7 +6459,7 @@ public static class MuiListCore
 		internal MuiListPoolPolicyField Field;
 	}
 
-	internal static class MuiListPoolPolicyFieldCursorCodec
+	internal static class MuiListPoolPolicyMemoryCodec
 	{
 		private static bool TryResolve(MuiListPoolPolicyField field,
 			out uint offset)
@@ -4941,19 +6467,19 @@ public static class MuiListCore
 			switch (field)
 			{
 				case MuiListPoolPolicyField.Magic:
-					offset = 0;
+					offset = MuiListPoolPolicyState.MagicOffset;
 					return true;
 				case MuiListPoolPolicyField.Pool:
-					offset = 4;
+					offset = MuiListPoolPolicyState.PoolOffset;
 					return true;
 				case MuiListPoolPolicyField.PuddleSize:
-					offset = 8;
+					offset = MuiListPoolPolicyState.PuddleSizeOffset;
 					return true;
 				case MuiListPoolPolicyField.ThresholdSize:
-					offset = 12;
+					offset = MuiListPoolPolicyState.ThresholdSizeOffset;
 					return true;
 				case MuiListPoolPolicyField.UsesExternalPool:
-					offset = 16;
+					offset = MuiListPoolPolicyState.UsesExternalPoolOffset;
 					return true;
 			}
 			offset = 0;
@@ -4961,16 +6487,16 @@ public static class MuiListCore
 		}
 
 		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-			MuiListPoolPolicyFieldCursor cursor, out APTR address)
+			APTR record, MuiListPoolPolicyField field, out APTR address)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			address = APTR.Null;
-			if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-				cursor.Address.Raw > uint.MaxValue - offset ||
-				!platform.IsMapped(cursor.Address, MuiListPoolPolicyState.Size))
+			if (!TryResolve(field, out var offset) || record.IsNull ||
+				record.Raw > uint.MaxValue - offset ||
+				!platform.IsMapped(record, MuiListPoolPolicyState.Size))
 				return false;
-			address = APTR.FromPointer(cursor.Address.Raw + offset);
-			return platform.IsMapped(address, 4);
+			address = APTR.FromPointer(record.Raw + offset);
+			return platform.IsMapped(address, MuiListPoolPolicyState.FieldSize);
 		}
 
 		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -4978,10 +6504,7 @@ public static class MuiListCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			var cursor = default(MuiListPoolPolicyFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
 				return false;
 			value = platform.ReadUInt32(fieldAddress, 0);
 			return true;
@@ -4991,47 +6514,82 @@ public static class MuiListCore
 			APTR address, MuiListPoolPolicyField field, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			var cursor = default(MuiListPoolPolicyFieldCursor);
-			cursor.Address = address;
-			cursor.Field = field;
-			if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+			if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
 				return false;
 			platform.WriteUInt32(fieldAddress, 0, value);
 			return true;
 		}
 	}
 
+	internal static class MuiListPoolPolicyFieldCursorCodec
+	{
+		internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+			MuiListPoolPolicyFieldCursor cursor, out APTR address)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListPoolPolicyMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+				cursor.Field, out address);
+
+		internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListPoolPolicyField field, out uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListPoolPolicyMemoryCodec.TryReadUInt32(ref platform, address, field,
+				out value);
+
+		internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListPoolPolicyField field, uint value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiListPoolPolicyMemoryCodec.TryWriteUInt32(ref platform, address, field,
+				value);
+	}
+
 	internal static class MuiListPoolPolicyStateCodec
 	{
-		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		// Pool policy is a fixed five-ULONG record. Keep the opaque Exec handle,
+		// allocation sizes, and ownership flag in declaration order; only the
+		// bounded guest-memory adapter knows their wire positions.
+		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListPoolPolicyState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListPoolPolicyState.Size) ||
-				!MuiListPoolPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-					address, MuiListPoolPolicyField.Magic, out var magic) ||
-				magic != MuiListPoolPolicyState.Cookie)
-				return false;
-			value.Magic = MuiListPoolPolicyState.Cookie;
-			if (!MuiListPoolPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiListPoolPolicyField.Pool, out var pool) ||
-				!MuiListPoolPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-					address, MuiListPoolPolicyField.PuddleSize,
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListPoolPolicyState.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var pool) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 					out value.PuddleSize) ||
-				!MuiListPoolPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-					address, MuiListPoolPolicyField.ThresholdSize,
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 					out value.ThresholdSize) ||
-				!MuiListPoolPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-					address, MuiListPoolPolicyField.UsesExternalPool,
-					out var external)) return false;
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.UsesExternalPool)) return false;
 			value.Pool = APTR.FromPointer(pool);
-			// Preserve the guest BOOL until policy admission validates it. The
-			// allocator-provenance record must not turn malformed state into a
-			// valid external-pool flag before consumers can fail closed.
-			value.UsesExternalPool = external;
-			return true;
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+			APTR address, MuiListPoolPolicyState value)
+			where TPlatform : struct, IMuiGuestMemory =>
+			MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListPoolPolicyState.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Pool.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PuddleSize) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ThresholdSize) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.UsesExternalPool) && MuiGuestStructCursor.IsComplete(cursor);
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR address, out MuiListPoolPolicyState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			return TryReadRecord(ref platform, address, out value) &&
+				value.Magic == MuiListPoolPolicyState.Cookie;
 		}
 
 		internal static bool Write<TPlatform>(ref TPlatform platform,
@@ -5041,17 +6599,8 @@ public static class MuiListCore
 			if (address.IsNull || !platform.IsMapped(address,
 				MuiListPoolPolicyState.Size) ||
 				value.Magic != MuiListPoolPolicyState.Cookie) return false;
-			return MuiListPoolPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiListPoolPolicyField.Magic, value.Magic) &&
-				MuiListPoolPolicyFieldCursorCodec.TryWriteUInt32(ref platform, address,
-					MuiListPoolPolicyField.Pool, value.Pool.Raw) &&
-				MuiListPoolPolicyFieldCursorCodec.TryWriteUInt32(ref platform, address,
-					MuiListPoolPolicyField.PuddleSize, value.PuddleSize) &&
-				MuiListPoolPolicyFieldCursorCodec.TryWriteUInt32(ref platform, address,
-					MuiListPoolPolicyField.ThresholdSize, value.ThresholdSize) &&
-				MuiListPoolPolicyFieldCursorCodec.TryWriteUInt32(ref platform, address,
-					MuiListPoolPolicyField.UsesExternalPool,
-					value.UsesExternalPool == 0 ? 0u : 1u);
+			value.UsesExternalPool = value.UsesExternalPool == 0 ? 0u : 1u;
+			return WriteRecord(ref platform, address, value);
 		}
 	}
 
@@ -5241,7 +6790,6 @@ public static class MuiListCore
 	private const uint FontStateCookie = MuiListFontState.Cookie;
 	private const uint RedrawStateCookie = 0x52454452u; // 'REDR'
 	private const uint ActiveStateCookie = MuiListActiveState.Cookie;
-	private const uint ColumnMetricsCookie = 0x434D4554u; // 'CMET'
 	private const uint ViewportStateCookie = 0x56505754u; // 'VPWT'
 	private const uint ColumnVisibilityCookie = 0x434F4C56u; // 'COLV'
 	private const uint ColumnOrderCookie = 0x434F5244u; // 'CORD'
@@ -5825,13 +7373,10 @@ public static class MuiListCore
 		if (!TryReadColumnOrderState(ref platform, storage, out var value) ||
 			!IsValidColumnOrderValues(ref platform, value) ||
 			displayColumn >= value.Count) return fallback;
-		var cursor = default(MuiListColumnOrderByteCursor);
-		cursor.Base = value.Values;
-		cursor.Index = displayColumn;
-		if (!MuiListColumnOrderByteCursorCodec.TryGetEntry(ref platform, cursor,
-			out var address)) return fallback;
-		var resolved = platform.ReadUInt8(address, 0);
-		return resolved;
+		if (!MuiListColumnOrderByteVectorMemoryCodec.TryGetEntry(ref platform,
+			value.Values, displayColumn, out var address)) return fallback;
+	return MuiListColumnOrderByteCodec.TryRead(ref platform, address,
+		out var resolved) ? resolved.Value : fallback;
 	}
 
 	// Create a List and normalize its construction. Class-aware defaults are
@@ -7043,20 +8588,16 @@ public static class MuiListCore
 			out var rightValue);
 		if (!leftValid || !rightValid) return leftValid == rightValid;
 		if (leftValue.Count != rightValue.Count) return false;
-		var leftCursor = default(MuiListColumnOrderByteCursor);
-		leftCursor.Base = leftValue.Values;
-		var rightCursor = default(MuiListColumnOrderByteCursor);
-		rightCursor.Base = rightValue.Values;
 		for (var index = 0u; index < leftValue.Count; index++)
 		{
-			leftCursor.Index = index;
-			rightCursor.Index = index;
-			if (!MuiListColumnOrderByteCursorCodec.TryGetEntry(ref platform,
-				leftCursor, out var leftAddress) ||
-				!MuiListColumnOrderByteCursorCodec.TryGetEntry(ref platform,
-					rightCursor, out var rightAddress) ||
-				platform.ReadUInt8(leftAddress, 0) != platform.ReadUInt8(rightAddress,
-					0))
+			if (!MuiListColumnOrderByteVectorMemoryCodec.TryGetEntry(ref platform,
+				leftValue.Values, index, out var leftAddress) ||
+				!MuiListColumnOrderByteVectorMemoryCodec.TryGetEntry(ref platform,
+					rightValue.Values, index, out var rightAddress) ||
+				!MuiListColumnOrderByteCodec.TryRead(ref platform, leftAddress,
+					out var leftByte) ||
+				!MuiListColumnOrderByteCodec.TryRead(ref platform, rightAddress,
+					out var rightByte) || leftByte.Value != rightByte.Value)
 				return false;
 		}
 		return true;
@@ -7073,27 +8614,27 @@ public static class MuiListCore
 	{
 		if (source.IsNull) return false;
 		var seen = default(MuiListHiddenColumns);
-		var sourceCursor = default(MuiListColumnOrderByteCursor);
-		sourceCursor.Base = source;
 		var copied = 0u;
 		for (var index = 0u; index < columns; index++)
 		{
-			sourceCursor.Index = index;
-			if (!MuiListColumnOrderByteCursorCodec.TryGetEntry(ref platform,
-				sourceCursor, out var slot)) return false;
-			var value = platform.ReadUInt8(slot, 0);
+			if (!MuiListColumnOrderByteVectorMemoryCodec.TryGetEntry(ref platform,
+				source, index, out var slot)) return false;
+			if (!MuiListColumnOrderByteCodec.TryRead(ref platform, slot,
+				out var sourceValue)) return false;
+			var value = sourceValue.Value;
 			if (value == 0xFF) break;
 			if (value >= columns || IsHidden(seen, value)) return false;
 			Hide(ref seen, value);
-			WriteColumnOrderByte(ref platform, values, copied, value);
+			if (!WriteColumnOrderByte(ref platform, values, copied, value))
+				return false;
 			copied++;
 		}
 		for (var value = 0u; copied < columns && value < columns; value++)
 			if (!IsHidden(seen, value))
 			{
 				Hide(ref seen, value);
-				WriteColumnOrderByte(ref platform, values, copied,
-					unchecked((byte)value));
+				if (!WriteColumnOrderByte(ref platform, values, copied,
+					unchecked((byte)value))) return false;
 				copied++;
 			}
 		return copied == columns;
@@ -7622,8 +9163,8 @@ public static class MuiListCore
 		for (var i = 0u; i < safeCount; i++)
 		{
 			descriptorCursor.Index = i;
-			if (!MuiListFormatDescriptorCursorCodec.TryGetEntry(ref platform,
-				descriptorCursor, out var descriptor))
+			if (!MuiListFormatDescriptorVectorMemoryCodec.TryGetEntry(ref platform,
+				descriptorCursor.Base, descriptorCursor.Index, out var descriptor))
 			{
 				FreeFormatDescriptors(ref platform, block, safeCount);
 				return APTR.Null;
@@ -7686,8 +9227,8 @@ public static class MuiListCore
 			}
 			if (!separator) continue;
 			descriptorCursor.Index = ordinal;
-			if (!MuiListFormatDescriptorCursorCodec.TryGetEntry(ref platform,
-				descriptorCursor, out var descriptor))
+			if (!MuiListFormatDescriptorVectorMemoryCodec.TryGetEntry(ref platform,
+				descriptorCursor.Base, descriptorCursor.Index, out var descriptor))
 			{
 				FreeFormatDescriptors(ref platform, block, safeCount);
 				return APTR.Null;
@@ -7731,15 +9272,15 @@ public static class MuiListCore
 		for (var current = 0u; current < count; current++)
 		{
 			cursor.Index = current;
-			if (!MuiListFormatDescriptorCursorCodec.TryGetEntry(ref platform,
-				cursor, out var currentAddress)) return false;
+			if (!MuiListFormatDescriptorVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index, out var currentAddress)) return false;
 			ReadFormatDescriptor(ref platform, currentAddress,
 				out var currentDescriptor);
 			for (var previous = 0u; previous < current; previous++)
 			{
 				cursor.Index = previous;
-				if (!MuiListFormatDescriptorCursorCodec.TryGetEntry(ref platform,
-					cursor, out var previousAddress)) return false;
+				if (!MuiListFormatDescriptorVectorMemoryCodec.TryGetEntry(ref platform,
+					cursor.Base, cursor.Index, out var previousAddress)) return false;
 				ReadFormatDescriptor(ref platform, previousAddress,
 					out var previousDescriptor);
 				if (previousDescriptor.Column == currentDescriptor.Column)
@@ -7952,14 +9493,6 @@ public static class MuiListCore
 			(byte)'D', (byte)'E', (byte)'R') ||
 		IsToken1(ref platform, text, start, end, (byte)'O');
 
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	private static uint ReadGuestLong<TPlatform>(ref TPlatform platform,
-		APTR address, int offset) where TPlatform : struct, IMuiGuestMemory =>
-		((uint)platform.ReadUInt8(address, offset) << 24) |
-		((uint)platform.ReadUInt8(address, offset + 1) << 16) |
-		((uint)platform.ReadUInt8(address, offset + 2) << 8) |
-		platform.ReadUInt8(address, offset + 3);
-
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	private static uint ReadGuestLongLower<TPlatform>(ref TPlatform platform,
 		APTR address, int offset) where TPlatform : struct, IMuiGuestMemory =>
@@ -7968,17 +9501,6 @@ public static class MuiListCore
 		((uint)Lower(platform.ReadUInt8(address, offset + 2)) << 8) |
 		Lower(platform.ReadUInt8(address, offset + 3));
 
-	[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	private static void WriteGuestLong<TPlatform>(ref TPlatform platform,
-		APTR address, int offset, uint value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		platform.WriteUInt8(address, offset, (byte)(value >> 24));
-		platform.WriteUInt8(address, offset + 1, (byte)(value >> 16));
-		platform.WriteUInt8(address, offset + 2, (byte)(value >> 8));
-		platform.WriteUInt8(address, offset + 3, (byte)value);
-	}
-
 	// The descriptor wire format is a fixed sequence of big-endian ULONGs.
 	// Keeping this marshalling in one place lets all format/layout code use the
 	// named record above instead of repeating guest offsets.
@@ -7986,34 +9508,14 @@ public static class MuiListCore
 		APTR address, out MuiListFormatDescriptor value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = default(MuiListFormatDescriptor);
-		value.Delta = ReadGuestLong(ref platform, address, 0);
-		value.Weight = ReadGuestLong(ref platform, address, 4);
-		value.MinWidth = ReadGuestLong(ref platform, address, 8);
-		value.MaxWidth = ReadGuestLong(ref platform, address, 12);
-		value.Column = ReadGuestLong(ref platform, address, 16);
-		value.Flags = ReadGuestLong(ref platform, address, 20);
-		value.Preparse = APTR.FromPointer(ReadGuestLong(ref platform, address, 24));
-		value.PreparseLength = ReadGuestLong(ref platform, address, 28);
-		value.PreparseStorage = APTR.FromPointer(ReadGuestLong(ref platform,
-			address, 32));
-		value.PreparseStorageLength = ReadGuestLong(ref platform, address, 36);
+		MuiListFormatDescriptorCodec.TryRead(ref platform, address, out value);
 	}
 
 	internal static void WriteFormatDescriptor<TPlatform>(ref TPlatform platform,
 		APTR address, ref MuiListFormatDescriptor value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		WriteGuestLong(ref platform, address, 0, value.Delta);
-		WriteGuestLong(ref platform, address, 4, value.Weight);
-		WriteGuestLong(ref platform, address, 8, value.MinWidth);
-		WriteGuestLong(ref platform, address, 12, value.MaxWidth);
-		WriteGuestLong(ref platform, address, 16, value.Column);
-		WriteGuestLong(ref platform, address, 20, value.Flags);
-		WriteGuestLong(ref platform, address, 24, value.Preparse.Raw);
-		WriteGuestLong(ref platform, address, 28, value.PreparseLength);
-		WriteGuestLong(ref platform, address, 32, value.PreparseStorage.Raw);
-		WriteGuestLong(ref platform, address, 36, value.PreparseStorageLength);
+		MuiListFormatDescriptorCodec.TryWrite(ref platform, address, value);
 	}
 
 	private static bool TryReadCStringLength<TPlatform>(ref TPlatform platform,
@@ -8399,8 +9901,8 @@ public static class MuiListCore
 			for (var column = 0u; column < safeCount; column++)
 			{
 				cursor.Index = column;
-				if (!MuiListFormatDescriptorCursorCodec.TryGetEntry(ref platform,
-					cursor, out var descriptor)) continue;
+				if (!MuiListFormatDescriptorVectorMemoryCodec.TryGetEntry(ref platform,
+					cursor.Base, cursor.Index, out var descriptor)) continue;
 				ReadFormatDescriptor(ref platform, descriptor, out var value);
 				if (value.PreparseStorage.IsNull ||
 					value.PreparseStorageLength == 0) continue;
@@ -8466,10 +9968,11 @@ public static class MuiListCore
 		{
 			sourceCursor.Index = column;
 			destinationCursor.Index = column;
-			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-				sourceCursor, out var sourceSlot) ||
-				!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-				destinationCursor, out var destinationSlot))
+			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				sourceCursor.Base, sourceCursor.Index, out var sourceSlot) ||
+				!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+					destinationCursor.Base, destinationCursor.Index,
+					out var destinationSlot))
 			{
 				platform.Clear(pointers, pointerBytes);
 				platform.Free(pointers, pointerBytes);
@@ -8525,7 +10028,8 @@ public static class MuiListCore
 		for (var column = 0u; column <= MaximumColumns; column++)
 		{
 			cursor.Index = column;
-			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index,
 				out var slot)) return uint.MaxValue;
 			if (!MuiListPointerSlotCodec.TryRead(ref platform, slot,
 				out var value)) return uint.MaxValue;
@@ -8949,14 +10453,16 @@ public static class MuiListCore
 		for (var column = 0u; column < value.Count; column++)
 		{
 			cursor.Index = column;
-			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index,
 				out var slot) || !MuiListPointerSlotCodec.TryRead(ref platform, slot,
 				out var entry) || entry.Value.IsNull ||
 				!TryReadCStringLength(ref platform, entry.Value,
 					MaximumStringLength, out _)) return false;
 		}
 		cursor.Index = value.Count;
-		if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+		if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index,
 			out var terminator) || !MuiListPointerSlotCodec.TryRead(ref platform,
 			terminator, out var terminatorValue)) return false;
 		return terminatorValue.Value.IsNull;
@@ -9124,14 +10630,13 @@ public static class MuiListCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		var seen = default(MuiListHiddenColumns);
-		var cursor = default(MuiListColumnOrderByteCursor);
-		cursor.Base = value.Values;
 		for (var index = 0u; index < value.Count; index++)
 		{
-			cursor.Index = index;
-			if (!MuiListColumnOrderByteCursorCodec.TryGetEntry(ref platform,
-				cursor, out var address)) return false;
-			var column = platform.ReadUInt8(address, 0);
+			if (!MuiListColumnOrderByteVectorMemoryCodec.TryGetEntry(ref platform,
+				value.Values, index, out var address)) return false;
+			if (!MuiListColumnOrderByteCodec.TryRead(ref platform, address,
+				out var byteValue)) return false;
+			var column = byteValue.Value;
 			if (column >= value.Count || IsHidden(seen, column)) return false;
 			Hide(ref seen, column);
 		}
@@ -9157,34 +10662,28 @@ public static class MuiListCore
 	private static void ClearColumnOrderBytes<TPlatform>(ref TPlatform platform,
 		APTR values, uint count) where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiListColumnOrderByteCursor);
-		cursor.Base = values;
-		for (var index = 0u; index < count; index += 4)
+		for (var index = 0u; index < count; index++)
 		{
-			cursor.Index = index;
-			if (!MuiListColumnOrderByteCursorCodec.TryGetEntry(ref platform,
-				cursor, out var word)) return;
-			platform.WriteUInt32(word, 0, 0);
+			if (!MuiListColumnOrderByteVectorMemoryCodec.TryGetEntry(ref platform,
+				values, index, out var address)) return;
+			var value = default(MuiListColumnOrderByteRecord);
+			if (!MuiListColumnOrderByteCodec.Write(ref platform, address, value))
+				return;
 		}
 	}
 
 	private static uint ColumnOrderValueBytes(uint columns) =>
 		(columns + 3u) & ~3u;
 
-	private static void WriteColumnOrderByte<TPlatform>(ref TPlatform platform,
+	private static bool WriteColumnOrderByte<TPlatform>(ref TPlatform platform,
 		APTR values, uint index, byte value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiListColumnOrderByteCursor);
-		cursor.Base = values;
-		cursor.Index = index & ~3u;
-		if (!MuiListColumnOrderByteCursorCodec.TryGetEntry(ref platform, cursor,
-			out var word)) return;
-		var shift = unchecked((int)((3u - (index & 3u)) * 8u));
-		var mask = 0xFFu << shift;
-		var current = platform.ReadUInt32(word, 0);
-		platform.WriteUInt32(word, 0,
-			(current & ~mask) | (unchecked((uint)value) << shift));
+		if (!MuiListColumnOrderByteVectorMemoryCodec.TryGetEntry(ref platform,
+			values, index, out var address)) return false;
+		var record = default(MuiListColumnOrderByteRecord);
+		record.Value = value;
+		return MuiListColumnOrderByteCodec.Write(ref platform, address, record);
 	}
 
 	private static void FreeRedrawState<TPlatform>(ref TPlatform platform,
@@ -9601,8 +11100,8 @@ public static class MuiListCore
 		var cursor = default(MuiListFormatDescriptorCursor);
 		cursor.Base = block;
 		cursor.Index = descriptorColumn;
-		if (!MuiListFormatDescriptorCursorCodec.TryGetEntry(ref platform, cursor,
-			out var descriptor)) return false;
+		if (!MuiListFormatDescriptorVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out var descriptor)) return false;
 		var value = default(MuiListFormatDescriptor);
 		ReadFormatDescriptor(ref platform, descriptor, out value);
 		WriteFormatDescriptor(ref platform, storage, ref value);
@@ -9672,7 +11171,8 @@ public static class MuiListCore
 						? remainingWeight - weight : 0;
 			}
 			cursor.Index = column;
-			if (!MuiListColumnGeometryCursorCodec.TryGetEntry(ref platform, cursor,
+			if (!MuiListColumnGeometryVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index,
 				out var record)) return false;
 			var geometry = default(MuiListColumnGeometry);
 			geometry.Offset = offset;
@@ -10247,12 +11747,11 @@ public static class MuiListCore
 		if (!TryReadColumnOrderAdmission(ref platform, state, obj,
 			out var order, out var present)) return false;
 		if (!present || displayColumn >= order.Count) return true;
-		var cursor = default(MuiListColumnOrderByteCursor);
-		cursor.Base = order.Values;
-		cursor.Index = displayColumn;
-		if (!MuiListColumnOrderByteCursorCodec.TryGetEntry(ref platform, cursor,
-			out var address)) return false;
-		descriptorColumn = platform.ReadUInt8(address, 0);
+		if (!MuiListColumnOrderByteVectorMemoryCodec.TryGetEntry(ref platform,
+			order.Values, displayColumn, out var address)) return false;
+		if (!MuiListColumnOrderByteCodec.TryRead(ref platform, address,
+			out var value)) return false;
+		descriptorColumn = value.Value;
 		return true;
 	}
 
@@ -10274,8 +11773,8 @@ public static class MuiListCore
 		var cursor = default(MuiListFormatDescriptorCursor);
 		cursor.Base = block;
 		cursor.Index = descriptorColumn;
-		if (!MuiListFormatDescriptorCursorCodec.TryGetEntry(ref platform, cursor,
-			out var descriptorAddress)) return false;
+		if (!MuiListFormatDescriptorVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out var descriptorAddress)) return false;
 		var descriptor = default(MuiListFormatDescriptor);
 		ReadFormatDescriptor(ref platform, descriptorAddress, out descriptor);
 		switch (field)
@@ -10384,17 +11883,20 @@ public static class MuiListCore
 		var preparse = APTR.FromPointer(address);
 		if (!platform.IsMapped(preparse, length))
 			return MuiListTextAlignment.Left;
-		var first = platform.ReadUInt8(preparse, 0);
+		if (length < 2) return MuiListTextAlignment.Left;
+		var prefixLength = length >= 4 ? 3u : 2u;
+		if (!MuiListPreparsePrefixRecordCodec.TryRead(ref platform, preparse,
+			prefixLength, out var prefix))
+			return MuiListTextAlignment.Left;
+		var first = prefix.First;
 		var codeOffset = -1;
 		if (first == 0x1Bu && length >= 2)
 			codeOffset = 1;
 		else if (first == (byte)'*' && length >= 3 &&
-			(platform.ReadUInt8(preparse, 1) == (byte)'e' ||
-				platform.ReadUInt8(preparse, 1) == (byte)'E'))
+			(prefix.Second == (byte)'e' || prefix.Second == (byte)'E'))
 			codeOffset = 2;
 		else if (first == (byte)'\\' && length >= 4 &&
-			platform.ReadUInt8(preparse, 1) == (byte)'3' &&
-			platform.ReadUInt8(preparse, 2) == (byte)'3')
+			prefix.Second == (byte)'3' && prefix.Third == (byte)'3')
 			codeOffset = 3;
 		if (codeOffset < 0) return MuiListTextAlignment.Left;
 		return platform.ReadUInt8(preparse, codeOffset) switch
@@ -10887,10 +12389,12 @@ public static class MuiListCore
 		{
 			sourceCursor.Index = index;
 			scratchCursor.Index = index;
-			if (!MuiListSlotCursorCodec.TryGetEntry(ref platform, sourceCursor,
+			if (!MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				sourceCursor.Base, sourceCursor.Index,
 				out var sourceAddress) || !MuiListSlotCodec.TryRead(ref platform,
 					sourceAddress, out var value) ||
-				!MuiListSlotCursorCodec.TryGetEntry(ref platform, scratchCursor,
+				!MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
+					scratchCursor.Base, scratchCursor.Index,
 					out var scratchAddress) || !MuiListSlotCodec.Write(ref platform,
 					scratchAddress, value))
 			{
@@ -10985,7 +12489,8 @@ public static class MuiListCore
 		var cursor = default(MuiListSlotCursor);
 		cursor.Base = scratch;
 		cursor.Index = index;
-		return MuiListSlotCursorCodec.TryGetEntry(ref platform, cursor,
+		return MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index,
 			out var address) && MuiListSlotCodec.TryRead(ref platform, address,
 			out value);
 	}
@@ -11218,16 +12723,16 @@ public static class MuiListCore
 			var value = default(MuiListPointerSlotRecord);
 			if (column == sourceColumn)
 				value.Value = APTR.FromPointer(contentsRaw);
-			else if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-				oldCursor, out var oldSlot) ||
+			else if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				oldCursor.Base, oldCursor.Index, out var oldSlot) ||
 				!MuiListPointerSlotCodec.TryRead(ref platform, oldSlot, out value))
 			{
 				platform.Clear(source, tableSize);
 				platform.Free(source, tableSize);
 				return false;
 			}
-			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-				sourceCursor, out var destinationSlot))
+			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				sourceCursor.Base, sourceCursor.Index, out var destinationSlot))
 			{
 				platform.Clear(source, tableSize);
 				platform.Free(source, tableSize);
@@ -11242,8 +12747,8 @@ public static class MuiListCore
 			}
 		}
 		sourceCursor.Index = columns;
-		if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-			sourceCursor, out var terminator))
+		if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+			sourceCursor.Base, sourceCursor.Index, out var terminator))
 		{
 			platform.Clear(source, tableSize);
 			platform.Free(source, tableSize);
@@ -11375,8 +12880,8 @@ public static class MuiListCore
 				for (var column = 0u; column < MaximumDrawColumns; column++)
 				{
 					cursor.Index = column;
-					if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-						cursor, out var address)) break;
+					if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+						cursor.Base, cursor.Index, out var address)) break;
 					if (!MuiListPointerSlotCodec.TryRead(ref platform, address,
 						out var slotValue)) break;
 					var text = slotValue.Value;
@@ -11473,10 +12978,11 @@ public static class MuiListCore
 		{
 			sourceCursor.Index = column;
 			destinationCursor.Index = column;
-			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-				sourceCursor, out var sourceSlot) ||
-				!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-					destinationCursor, out var destinationSlot)) return false;
+			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				sourceCursor.Base, sourceCursor.Index, out var sourceSlot) ||
+				!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+					destinationCursor.Base, destinationCursor.Index,
+					out var destinationSlot)) return false;
 			if (!MuiListPointerSlotCodec.TryRead(ref platform, sourceSlot,
 				out var sourceValue)) return false;
 			var destinationValue = default(MuiListPointerSlotRecord);
@@ -11485,8 +12991,9 @@ public static class MuiListCore
 				destinationValue)) return false;
 		}
 		destinationCursor.Index = columns;
-		if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-			destinationCursor, out var terminator)) return false;
+		if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+			destinationCursor.Base, destinationCursor.Index,
+			out var terminator)) return false;
 		var terminatorValue = default(MuiListPointerSlotRecord);
 		if (!MuiListPointerSlotCodec.Write(ref platform, terminator,
 			terminatorValue)) return false;
@@ -11632,7 +13139,8 @@ public static class MuiListCore
 				var cursor = default(MuiListPointerSlotCursor);
 				cursor.Base = displayArray;
 				cursor.Index = sourceColumn;
-				if (MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+				if (MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+					cursor.Base, cursor.Index,
 					out var displaySlot) && MuiListPointerSlotCodec.TryRead(ref platform,
 					displaySlot,
 					out var displayValue)) text = displayValue.Value;
@@ -11684,7 +13192,8 @@ public static class MuiListCore
 		var cursor = default(MuiListColumnMetricCursor);
 		cursor.Base = values;
 		cursor.Index = column;
-		return MuiListColumnMetricCursorCodec.TryGetEntry(ref platform, cursor,
+		return MuiListColumnMetricVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index,
 			out var slot) && MuiListColumnMetricCodec.TryRead(ref platform, slot,
 			out var metric) ? metric.Value : 0;
 	}
@@ -11946,7 +13455,8 @@ public static class MuiListCore
 					var cursor = default(MuiListPointerSlotCursor);
 					cursor.Base = displayArray;
 					cursor.Index = sourceColumn;
-					if (MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+					if (MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+						cursor.Base, cursor.Index,
 						out var displaySlot) && MuiListPointerSlotCodec.TryRead(ref platform,
 						displaySlot,
 						out var displayValue)) text = displayValue.Value;
@@ -11957,8 +13467,9 @@ public static class MuiListCore
 					unchecked((int)length));
 				if (measured <= 0) continue;
 				metricCursor.Index = column;
-				if (!MuiListColumnMetricCursorCodec.TryGetEntry(ref platform,
-					metricCursor, out var slot) ||
+				if (!MuiListColumnMetricVectorMemoryCodec.TryGetEntry(ref platform,
+					metricCursor.Base, metricCursor.Index,
+					out var slot) ||
 					!MuiListColumnMetricCodec.TryRead(ref platform, slot,
 					out var metric)) continue;
 				if (unchecked((uint)measured) > metric.Value)
@@ -11981,7 +13492,7 @@ public static class MuiListCore
 			return true;
 		}
 		var metrics = default(MuiListColumnMetricsState);
-		metrics.Magic = ColumnMetricsCookie;
+		metrics.Magic = MuiListColumnMetricsState.Cookie;
 		metrics.Width = unchecked((uint)(width < 0 ? 0 : width));
 		metrics.Columns = columns;
 		metrics.Values = values;
@@ -12502,7 +14013,8 @@ public static class MuiListCore
 				var cursor = default(MuiListPointerSlotCursor);
 				cursor.Base = displayArray;
 				cursor.Index = sourceColumn;
-				if (MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+				if (MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+					cursor.Base, cursor.Index,
 					out var displaySlot) && MuiListPointerSlotCodec.TryRead(ref platform,
 					displaySlot,
 					out var displayValue)) text = displayValue.Value;
@@ -12636,8 +14148,8 @@ public static class MuiListCore
 		for (var i = 0u; i < limit; i++)
 		{
 			cursor.Index = i;
-			if (!MuiListPointerVectorCursorCodec.TryGetEntry(ref platform,
-				cursor, out var slotAddr) ||
+			if (!MuiListPointerVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index, out var slotAddr) ||
 				!MuiListPointerSlotCodec.TryRead(ref platform, slotAddr,
 				out var slotValue))
 			{
@@ -12790,9 +14302,8 @@ public static class MuiListCore
 		{
 			if (pos == SelectAll && seltype == SelectAsk && stateStorage.IsNotNull)
 			{
-				var emptyResult = default(MuiListScalarStorageRecord);
-				if (MuiListScalarStorageCodec.Write(ref platform, stateStorage,
-					emptyResult)) return true;
+				if (MuiListScalarStorageCodec.WriteValue(ref platform, stateStorage,
+					0)) return true;
 			}
 			return pos == SelectAll && seltype == SelectAsk;
 		}
@@ -12826,7 +14337,8 @@ public static class MuiListCore
 			var result = default(MuiListScalarStorageRecord);
 			result.Value = reported;
 			if (platform.IsMapped(stateStorage, MuiListScalarStorageRecord.Size) &&
-				!MuiListScalarStorageCodec.Write(ref platform, stateStorage, result))
+				!MuiListScalarStorageCodec.WriteValue(ref platform, stateStorage,
+					result.Value))
 				return false;
 		}
 		if (changed && seltype != SelectAsk)
@@ -12848,8 +14360,10 @@ public static class MuiListCore
 			!platform.IsMapped(posStorage, MuiListScalarStorageRecord.Size))
 			return false;
 		var count = ReadHeaderCount(ref platform, header);
-		if (!MuiListScalarStorageCodec.TryRead(ref platform, posStorage,
-			out var position)) return false;
+		if (!MuiListScalarStorageCodec.TryReadValue(ref platform, posStorage,
+			out var positionRaw)) return false;
+		var position = default(MuiListScalarStorageRecord);
+		position.Value = positionRaw;
 		var current = unchecked((int)position.Value);
 		var start = current == NextSelectedStart ? 0u : (uint)(current + 1);
 		for (var i = start; i < count; i++)
@@ -12857,8 +14371,8 @@ public static class MuiListCore
 			if ((SlotFlagsAt(ref platform, header, i) & SlotSelected) != 0)
 			{
 				position.Value = i;
-				if (!MuiListScalarStorageCodec.Write(ref platform, posStorage,
-					position)) return false;
+				if (!MuiListScalarStorageCodec.WriteValue(ref platform, posStorage,
+					position.Value)) return false;
 				return true;
 			}
 		}
@@ -12872,13 +14386,14 @@ public static class MuiListCore
 			if (active >= 0 && (uint)active < count)
 			{
 				position.Value = unchecked((uint)active);
-				if (!MuiListScalarStorageCodec.Write(ref platform, posStorage,
-					position)) return false;
+				if (!MuiListScalarStorageCodec.WriteValue(ref platform, posStorage,
+					position.Value)) return false;
 				return true;
 			}
 		}
 		position.Value = unchecked((uint)NextSelectedEnd);
-		if (!MuiListScalarStorageCodec.Write(ref platform, posStorage, position))
+		if (!MuiListScalarStorageCodec.WriteValue(ref platform, posStorage,
+			position.Value))
 			return false;
 		return true;
 	}
@@ -12939,8 +14454,8 @@ public static class MuiListCore
 		while (count < MaximumEntries)
 		{
 			cursor.Index = count;
-			if (!MuiListPointerVectorCursorCodec.TryGetEntry(ref platform, cursor,
-				out var addr) || !MuiListPointerSlotCodec.TryRead(ref platform, addr,
+			if (!MuiListPointerVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index, out var addr) || !MuiListPointerSlotCodec.TryRead(ref platform, addr,
 				out var slotValue)) return false;
 			if (slotValue.Value.IsNull) break;
 			count++;
@@ -12948,8 +14463,8 @@ public static class MuiListCore
 		for (var i = 1u; i < count; i++)
 		{
 			cursor.Index = i;
-			if (!MuiListPointerVectorCursorCodec.TryGetEntry(ref platform, cursor,
-				out var entrySlot) || !MuiListPointerSlotCodec.TryRead(ref platform,
+			if (!MuiListPointerVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index, out var entrySlot) || !MuiListPointerSlotCodec.TryRead(ref platform,
 				entrySlot,
 				out var entryValue)) return false;
 			var entry = entryValue.Value;
@@ -12957,22 +14472,22 @@ public static class MuiListCore
 			while (j > 0)
 			{
 				cursor.Index = j - 1;
-				if (!MuiListPointerVectorCursorCodec.TryGetEntry(ref platform,
-					cursor, out var previousSlot) ||
+				if (!MuiListPointerVectorMemoryCodec.TryGetEntry(ref platform,
+					cursor.Base, cursor.Index, out var previousSlot) ||
 					!MuiListPointerSlotCodec.TryRead(ref platform, previousSlot,
 					out var previousValue)) return false;
 				if (CompareForSort(ref platform, state, obj, previousValue.Value,
 					entry, column) <= 0) break;
 				cursor.Index = j;
-				if (!MuiListPointerVectorCursorCodec.TryGetEntry(ref platform, cursor,
-					out var shiftSlot) || !MuiListPointerSlotCodec.Write(ref platform,
+				if (!MuiListPointerVectorMemoryCodec.TryGetEntry(ref platform,
+					cursor.Base, cursor.Index, out var shiftSlot) || !MuiListPointerSlotCodec.Write(ref platform,
 					shiftSlot,
 					previousValue)) return false;
 				j--;
 			}
 			cursor.Index = j;
-			if (!MuiListPointerVectorCursorCodec.TryGetEntry(ref platform, cursor,
-				out var destinationSlot)) return false;
+			if (!MuiListPointerVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index, out var destinationSlot)) return false;
 			var destinationValue = default(MuiListPointerSlotRecord);
 			destinationValue.Value = entry;
 			if (!MuiListPointerSlotCodec.Write(ref platform, destinationSlot,
@@ -13244,7 +14759,8 @@ public static class MuiListCore
 		var prefix = APTR.FromPointer(array.Raw - MuiListDisplayRowRecord.Size);
 		var value = default(MuiListDisplayRowRecord);
 		value.Row = row;
-		return MuiListDisplayRowRecordCodec.Write(ref platform, prefix, value);
+		return MuiListDisplayRowRecordCodec.WriteValue(ref platform, prefix,
+			unchecked((uint)row));
 	}
 
 	public static bool Display<TPlatform>(ref TPlatform platform, APTR state,
@@ -13262,7 +14778,8 @@ public static class MuiListCore
 			var cursor = default(MuiListPointerSlotCursor);
 			cursor.Base = array;
 			cursor.Index = 1;
-			return MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+			return MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index,
 				out var terminator) && MuiListPointerSlotCodec.Write(ref platform,
 				terminator, default);
 		}
@@ -13397,7 +14914,8 @@ public static class MuiListCore
 		var cursor = default(MuiListColumnGeometryCursor);
 		cursor.Base = block;
 		cursor.Index = column;
-		return MuiListColumnGeometryCursorCodec.TryGetEntry(ref platform, cursor,
+		return MuiListColumnGeometryVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index,
 			out var record) && MuiListColumnGeometryCodec.TryRead(ref platform,
 			record, out geometry);
 	}
@@ -13641,8 +15159,8 @@ public static class MuiListCore
 		for (var i = 0u; i < MaximumEntries; i++)
 		{
 			cursor.Index = i;
-			if (!MuiListPointerVectorCursorCodec.TryGetEntry(ref platform, cursor,
-				out var addr) || !MuiListPointerSlotCodec.TryRead(ref platform, addr,
+			if (!MuiListPointerVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index, out var addr) || !MuiListPointerSlotCodec.TryRead(ref platform, addr,
 				out var slotValue))
 			{
 				RollbackTo(ref platform, state, obj, header, before);
@@ -13666,7 +15184,8 @@ public static class MuiListCore
 		var cursor = default(MuiListSlotCursor);
 		cursor.Base = index;
 		cursor.Index = slot;
-		if (!MuiListSlotCursorCodec.TryGetEntry(ref platform, cursor,
+		if (!MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index,
 			out var address) || !MuiListSlotCodec.TryRead(ref platform, address,
 			out var value))
 			return;
@@ -13701,14 +15220,16 @@ public static class MuiListCore
 		while (count < MaximumArrayEntries)
 		{
 			cursor.Index = count;
-			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index,
 				out var slot) || !MuiListPointerSlotCodec.TryRead(ref platform, slot,
 				out var value)) return false;
 			if (value.Value.IsNull) return true;
 			count++;
 		}
 		cursor.Index = count;
-		return MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+		return MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index,
 			out var terminator) && MuiListPointerSlotCodec.TryRead(ref platform,
 			terminator,
 			out var terminatorValue) && terminatorValue.Value.IsNull;
@@ -13727,8 +15248,8 @@ public static class MuiListCore
 		while (count < MaximumArrayEntries)
 		{
 			sourceCursor.Index = count;
-			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-				sourceCursor, out var slot) ||
+			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				sourceCursor.Base, sourceCursor.Index, out var slot) ||
 				!MuiListPointerSlotCodec.TryRead(ref platform, slot,
 				out var value)) return APTR.Null;
 			var text = value.Value;
@@ -13740,8 +15261,8 @@ public static class MuiListCore
 		if (count == MaximumArrayEntries)
 		{
 			sourceCursor.Index = count;
-			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-				sourceCursor, out var terminator) ||
+			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				sourceCursor.Base, sourceCursor.Index, out var terminator) ||
 				!MuiListPointerSlotCodec.TryRead(ref platform, terminator,
 				out var terminatorValue) || !terminatorValue.Value.IsNull)
 				return APTR.Null;
@@ -13758,8 +15279,8 @@ public static class MuiListCore
 		{
 			sourceCursor.Index = i;
 			destinationCursor.Index = i;
-			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-				sourceCursor, out var sourceSlot) ||
+			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				sourceCursor.Base, sourceCursor.Index, out var sourceSlot) ||
 				!MuiListPointerSlotCodec.TryRead(ref platform, sourceSlot,
 				out var sourceValue))
 			{
@@ -13775,8 +15296,8 @@ public static class MuiListCore
 			}
 			var destinationValue = default(MuiListPointerSlotRecord);
 			destinationValue.Value = copy;
-			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-				destinationCursor, out var destinationSlot) ||
+			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				destinationCursor.Base, destinationCursor.Index, out var destinationSlot) ||
 				!MuiListPointerSlotCodec.Write(ref platform, destinationSlot,
 					destinationValue))
 			{
@@ -13804,10 +15325,10 @@ public static class MuiListCore
 		{
 			sourceCursor.Index = i;
 			destinationCursor.Index = i;
-			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-				sourceCursor, out var sourceSlot) ||
-				!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform,
-					destinationCursor, out var destinationSlot) ||
+			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				sourceCursor.Base, sourceCursor.Index, out var sourceSlot) ||
+				!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+					destinationCursor.Base, destinationCursor.Index, out var destinationSlot) ||
 				!MuiListPointerSlotCodec.TryRead(ref platform, sourceSlot,
 				out var sourceValue) ||
 				!MuiListPointerSlotCodec.Write(ref platform, destinationSlot,
@@ -13835,7 +15356,8 @@ public static class MuiListCore
 		for (var i = 0u; i <= column; i++)
 		{
 			cursor.Index = i;
-			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index,
 				out var slot) || !MuiListPointerSlotCodec.TryRead(ref platform, slot,
 				out var value)) return APTR.Null;
 			if (i == column || value.Value.IsNull)
@@ -13881,7 +15403,8 @@ public static class MuiListCore
 		while (count < MaximumArrayEntries)
 		{
 			cursor.Index = count;
-			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index,
 				out var slot) || !MuiListPointerSlotCodec.TryRead(ref platform, slot,
 				out var value)) break;
 			var text = value.Value;
@@ -14034,7 +15557,8 @@ public static class MuiListCore
 		var cursor = default(MuiListSlotCursor);
 		cursor.Base = array;
 		cursor.Index = index;
-		return MuiListSlotCursorCodec.TryGetEntry(ref platform, cursor,
+		return MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index,
 			out var address) && MuiListSlotCodec.TryRead(ref platform, address,
 			out var value)
 			? value.Entry : APTR.Null;
@@ -14047,7 +15571,8 @@ public static class MuiListCore
 		var cursor = default(MuiListSlotCursor);
 		cursor.Base = array;
 		cursor.Index = index;
-		return MuiListSlotCursorCodec.TryGetEntry(ref platform, cursor,
+		return MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index,
 			out var address) && MuiListSlotCodec.TryRead(ref platform, address,
 			out var value)
 			? value.Flags : 0;
@@ -14061,7 +15586,8 @@ public static class MuiListCore
 		var cursor = default(MuiListSlotCursor);
 		cursor.Base = array;
 		cursor.Index = index;
-		if (!MuiListSlotCursorCodec.TryGetEntry(ref platform, cursor,
+		if (!MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index,
 			out var slot)) return;
 		var value = default(MuiListSlotState);
 		value.Entry = entry;
@@ -14077,7 +15603,8 @@ public static class MuiListCore
 		var cursor = default(MuiListSlotCursor);
 		cursor.Base = array;
 		cursor.Index = index;
-		return MuiListSlotCursorCodec.TryGetEntry(ref platform, cursor,
+		return MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index,
 			out var slot) && MuiListSlotCodec.Write(ref platform, slot, value);
 	}
 

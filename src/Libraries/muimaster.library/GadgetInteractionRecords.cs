@@ -143,23 +143,47 @@ internal static class MuiGadgetInteractionStateRecordMemoryCodec
 
 internal static class MuiGadgetInteractionStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
-		APTR address,
-		out MuiGadgetInteractionStateRecord value)
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGadgetInteractionStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		return MuiGadgetInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) &&
-			MuiGadgetInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out value.InputMode) &&
-			MuiGadgetInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 8, out value.Selected) &&
-			MuiGadgetInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 12, out value.Pressed) &&
-			MuiGadgetInteractionStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 16, out value.ShowSelState);
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGadgetInteractionStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.InputMode) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Selected) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Pressed) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.ShowSelState) &&
+			MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGadgetInteractionStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGadgetInteractionStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.InputMode) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Selected) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Pressed) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ShowSelState) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGadgetInteractionStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiGadgetInteractionStateRecord value)
@@ -169,20 +193,9 @@ internal static class MuiGadgetInteractionStateRecordCodec
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiGadgetInteractionStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGadgetInteractionStateAdmission.Validate(value)) return false;
-		return MuiGadgetInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiGadgetInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 4, value.InputMode) &&
-			MuiGadgetInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 8, value.Selected) &&
-			MuiGadgetInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 12, value.Pressed) &&
-			MuiGadgetInteractionStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 16, value.ShowSelState);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGadgetInteractionStateAdmission.Validate(value) &&
+		WriteRecord(ref platform, address, value);
 }
 
 // InputMode is the documented four-value enum and the remaining fields are

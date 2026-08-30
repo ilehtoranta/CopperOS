@@ -128,16 +128,34 @@ internal static class MuiChoiceActiveStateRecordMemoryCodec
 
 internal static class MuiChoiceActiveStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiChoiceActiveStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		return MuiChoiceActiveStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiChoiceActiveStateField.Magic, out value.Magic) &&
-			MuiChoiceActiveStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiChoiceActiveStateField.Active, out value.Active);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiChoiceActiveStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Active)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiChoiceActiveStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiChoiceActiveStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Active) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiChoiceActiveStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiChoiceActiveStateRecord value)
@@ -149,12 +167,9 @@ internal static class MuiChoiceActiveStateRecordCodec
 		MuiChoiceActiveStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiChoiceActiveStateAdmission.ValidateRecord(value.Magic,
+		if (address.IsNull || !MuiChoiceActiveStateAdmission.ValidateRecord(value.Magic,
 			value.Active)) return false;
-		return MuiChoiceActiveStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiChoiceActiveStateField.Magic, value.Magic) &&
-			MuiChoiceActiveStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiChoiceActiveStateField.Active, value.Active);
+		return WriteRecord(ref platform, address, value);
 	}
 }
 

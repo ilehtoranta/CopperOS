@@ -11,6 +11,9 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>1591</NoWarn>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(CopperSharpSdkHasMuiLayoutPackets)' == 'true' or ('$(CopperOSUseLocalCopperSharp)' == 'true' and Exists('$(CopperSharp68kRoot)\Sdk.Amiga\MUIMaster\Structures.cs'))">
+    <DefineConstants>$(DefineConstants);COPPEROS_SDK_MUI_LAYOUT</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\..\CopperSharp68k\Sdk.Amiga\GuestMemory\IAmigaGuestMemory.cs"
              Link="GuestMemory\IAmigaGuestMemory.cs" />

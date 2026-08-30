@@ -161,21 +161,42 @@ internal static class MuiRegisterPolicyStateRecordMemoryCodec
 
 internal static class MuiRegisterPolicyStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// The guest record is the declaration-order tuple
+	// { Magic, Frame, Titles }.  Keep production exchange cursor-based so the
+	// semantic struct, rather than byte offsets, defines the ABI boundary.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiRegisterPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiRegisterPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) ||
-			!MuiRegisterPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out value.Frame) ||
-			!MuiRegisterPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 8, out var titles))
-			return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiRegisterPolicyStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Frame) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var titles)) return false;
 		value.Titles = APTR.FromPointer(titles);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiRegisterPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiRegisterPolicyStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Frame) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Titles.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiRegisterPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiRegisterPolicyStateRecord value)
@@ -189,11 +210,6 @@ internal static class MuiRegisterPolicyStateRecordCodec
 	{
 		if (!MuiRegisterPolicyStateAdmission.Validate(ref platform, value))
 			return false;
-		return MuiRegisterPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiRegisterPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 4, value.Frame) &&
-			MuiRegisterPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 8, value.Titles.Raw);
+		return WriteRecord(ref platform, address, value);
 	}
 }

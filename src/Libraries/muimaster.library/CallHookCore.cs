@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -139,12 +140,72 @@ internal static class MuiCallHookPacketFieldCursorCodec
 // MUIM_CallHook packet. The first element is part of the fixed envelope; later
 // elements are the optional variadic tail.
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiCallHookParameterRecord
+{
+	internal const uint Size = 4;
+	internal uint Value;
+}
+
+// Struct-first codec for one caller-owned CallHook parameter. The hook ABI
+// receives the address of this record; callers that need the scalar value can
+// use this codec without reaching through an anonymous ULONG offset.
+internal static class MuiCallHookParameterRecordCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiCallHookParameterRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiCallHookParameterRecord.Size)) return false;
+		value.Value = platform.ReadUInt32(address, 0);
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform,
+		APTR address, MuiCallHookParameterRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (address.IsNull || !platform.IsMapped(address,
+			MuiCallHookParameterRecord.Size)) return false;
+		platform.WriteUInt32(address, 0, value.Value);
+		return true;
+	}
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiCallHookParameterCursor
 {
-	internal const uint FirstOffset = 8;
-	internal const uint EntrySize = 4;
+	internal const uint FirstOffset = MuiCallHookMessage.Param1Offset;
+	internal const uint EntrySize = MuiCallHookParameterRecord.Size;
 	internal APTR Message;
 	internal uint Index;
+}
+
+// Struct-first adapter for the caller-owned parameter vector beginning at
+// Param1 in a MUIM_CallHook packet. The fixed packet record and selected
+// parameter slot must both be completely mapped before an address is exposed;
+// the variadic tail remains guest-owned storage.
+internal static class MuiCallHookParameterMemoryCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR message, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (message.IsNull || !platform.IsMapped(message,
+			MuiCallHookMessage.Size) || message.Raw > uint.MaxValue -
+			MuiCallHookMessage.Param1Offset) return false;
+		var baseAddress = message.Raw +
+			MuiCallHookMessage.Param1Offset;
+		if (index > (uint.MaxValue - baseAddress) /
+			MuiCallHookParameterRecord.Size) return false;
+		var offset = index * MuiCallHookParameterRecord.Size;
+		if (baseAddress > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(baseAddress + offset);
+		return platform.IsMapped(address,
+			MuiCallHookParameterRecord.Size);
+	}
 }
 
 internal static class MuiCallHookParameterCursorCodec
@@ -152,19 +213,8 @@ internal static class MuiCallHookParameterCursorCodec
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiCallHookParameterCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue -
-			MuiCallHookParameterCursor.FirstOffset) return false;
-		var baseAddress = APTR.FromPointer(cursor.Message.Raw +
-			MuiCallHookParameterCursor.FirstOffset);
-		if (cursor.Index > (uint.MaxValue - baseAddress.Raw) /
-			MuiCallHookParameterCursor.EntrySize) return false;
-		var offset = cursor.Index * MuiCallHookParameterCursor.EntrySize;
-		if (baseAddress.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(baseAddress.Raw + offset);
-		return platform.IsMapped(address, MuiCallHookParameterCursor.EntrySize);
-	}
+		=> MuiCallHookParameterMemoryCodec.TryGetEntry(ref platform,
+			cursor.Message, cursor.Index, out address);
 }
 
 // Central codec for the fixed CallHook envelope. The variadic tail remains
@@ -177,12 +227,8 @@ internal static class MuiCallHookMessageCodec
 	internal static bool TryGetFirstParameter<TPlatform>(
 		ref TPlatform platform, APTR message, out APTR parameter)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		var cursor = default(MuiCallHookParameterCursor);
-		cursor.Message = message;
-		return MuiCallHookParameterCursorCodec.TryGetEntry(ref platform,
-			cursor, out parameter);
-	}
+		=> MuiCallHookParameterMemoryCodec.TryGetEntry(ref platform, message, 0,
+			out parameter);
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiCallHookMethodMessage packet)
@@ -196,17 +242,21 @@ internal static class MuiCallHookMessageCodec
 		return true;
 	}
 
-	// Native qualification keeps method-header admission scalar while the
-	// dispatcher-facing overload above retains the named value-type record.
+	// Method admission remains scalar for callers that only need the selector,
+	// but it is read from the named method-header record in declaration order.
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCallHookMethodMessage.Size)) return false;
-		return MuiCallHookPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCallHookPacketField.MethodId, out methodId);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCallHookMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		methodId = rawMethodId;
+		return true;
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -218,12 +268,19 @@ internal static class MuiCallHookMessageCodec
 		if (!TryReadMethodIdValue(ref platform, message, out methodId) ||
 			methodId != Method || !platform.IsMapped(message,
 			MuiCallHookMessage.Size)) return false;
-		if (!MuiCallHookPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCallHookPacketField.Hook, out var rawHook) ||
-			!MuiCallHookPacketFieldCursorCodec.TryReadUInt32(ref platform, message,
-				MuiCallHookPacketField.Param1, out packet.Param1)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCallHookMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawHook) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var param1) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		if (rawMethodId != Method) return false;
 		packet.MethodId = methodId;
 		packet.Hook = APTR.FromPointer(rawHook);
+		packet.Param1 = param1;
 		return true;
 	}
 
@@ -231,14 +288,15 @@ internal static class MuiCallHookMessageCodec
 		APTR message, MuiCallHookMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCallHookMessage.Size)) return false;
-		return MuiCallHookPacketFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCallHookPacketField.MethodId, Method) &&
-			MuiCallHookPacketFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiCallHookPacketField.Hook, packet.Hook.Raw) &&
-			MuiCallHookPacketFieldCursorCodec.TryWriteUInt32(ref platform, message,
-				MuiCallHookPacketField.Param1, packet.Param1);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCallHookMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				Method) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Hook.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Param1)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 

@@ -38,6 +38,29 @@ public sealed class MuiListTitleArrayAdmissionTests
 	}
 
 	[Fact]
+	public void ListTitleArraySequentialRecordPreservesFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3B00);
+		var value = new MuiListCore.MuiListTitleArrayState
+		{
+			Magic = MuiListCore.MuiListTitleArrayState.Cookie,
+			Pointers = APTR.FromPointer(0x3B40),
+			Count = 0xFFFFFFFEu,
+		};
+		Assert.True(MuiListCore.MuiListTitleArrayStateCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiListCore.MuiListTitleArrayStateCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Pointers, decoded.Pointers);
+		Assert.Equal(value.Count, decoded.Count);
+		Assert.False(MuiListCore.MuiListTitleArrayStateCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FF5), out _));
+	}
+
+	[Fact]
 	public void MalformedListTitleArrayMagicRemainsStructuralButFailsClosed()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,

@@ -41,14 +41,9 @@ internal static class MuiPopSpecialistLayout
 	public const uint FlagSetupActive = 1u << 10;  // MUIM_Setup seen
 
 	// Owned block sizes.
-	public const uint HookMsgSize = 16;
+	public const uint HookMsgSize = MuiSpecialistHookMessage.Size;
 	public const uint AslStateSize = MuiAslServiceStateRecord.Size;
 	public const uint WindowSize = 16;     // opaque volatile window record
-
-	// Hook message scratch offsets.
-	public const int MsgMethod = 0;
-	public const int MsgParam1 = 4;
-	public const int MsgParam2 = 8;
 
 	// Bound on the NULL-terminated Poplist source array traversal.
 	public const int MaximumArray = 1024;
@@ -130,7 +125,7 @@ internal struct MuiPopSpecialistRecordFieldCursor
 	internal MuiPopSpecialistRecordField Field;
 }
 
-internal static class MuiPopSpecialistRecordFieldCursorCodec
+internal static class MuiPopSpecialistRecordFieldMemoryCodec
 {
 	private static bool TryResolve(MuiPopSpecialistRecordField field,
 		out uint offset)
@@ -146,15 +141,15 @@ internal static class MuiPopSpecialistRecordFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiPopSpecialistRecordFieldCursor cursor, out APTR address)
+		APTR record, MuiPopSpecialistRecordField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, MuiPopSpecialistState.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiPopSpecialistState.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
+		address = APTR.FromPointer(record.Raw + offset);
 		return platform.IsMapped(address, 4);
 	}
 
@@ -163,10 +158,7 @@ internal static class MuiPopSpecialistRecordFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiPopSpecialistRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
 			return false;
 		value = platform.ReadUInt32(fieldAddress, 0);
 		return true;
@@ -176,19 +168,162 @@ internal static class MuiPopSpecialistRecordFieldCursorCodec
 		APTR address, MuiPopSpecialistRecordField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiPopSpecialistRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
 			return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
 		return true;
 	}
 }
 
+// Compatibility wrapper retained for callers that still construct the typed
+// Pop specialist field cursor. New code passes the record address and named
+// field directly to the struct-backed memory adapter above.
+internal static class MuiPopSpecialistRecordFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiPopSpecialistRecordFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiPopSpecialistRecordFieldMemoryCodec.TryGetAddress(ref platform,
+			cursor.Address, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiPopSpecialistRecordField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
+			address, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiPopSpecialistRecordField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
+			address, field, value);
+}
+
 internal static class MuiPopSpecialistStateCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiPopSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiPopSpecialistState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Class) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Flags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var stringChild) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var buttonChild) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var openHook) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var closeHook) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var popObject) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var objStrHook) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var strObjHook) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var windowHook) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var array) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var materializedArray) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.ArrayCount) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var startHook) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var stopHook) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.AslType) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.FontStyles) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var aslTags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var aslRequester) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var aslState) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var window) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var hookMsg) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Selected) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.NotifyAttribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.NotifyValue) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.NotifyCount) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		value.StringChild = APTR.FromPointer(stringChild);
+		value.ButtonChild = APTR.FromPointer(buttonChild);
+		value.OpenHook = APTR.FromPointer(openHook);
+		value.CloseHook = APTR.FromPointer(closeHook);
+		value.PopObject = APTR.FromPointer(popObject);
+		value.ObjStrHook = APTR.FromPointer(objStrHook);
+		value.StrObjHook = APTR.FromPointer(strObjHook);
+		value.WindowHook = APTR.FromPointer(windowHook);
+		value.Array = APTR.FromPointer(array);
+		value.MaterializedArray = APTR.FromPointer(materializedArray);
+		value.StartHook = APTR.FromPointer(startHook);
+		value.StopHook = APTR.FromPointer(stopHook);
+		value.AslTags = APTR.FromPointer(aslTags);
+		value.AslRequester = APTR.FromPointer(aslRequester);
+		value.AslState = APTR.FromPointer(aslState);
+		value.Window = APTR.FromPointer(window);
+		value.HookMsg = APTR.FromPointer(hookMsg);
+		return true;
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiPopSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiPopSpecialistState.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.Class) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.Flags) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.StringChild.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.ButtonChild.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.OpenHook.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.CloseHook.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.PopObject.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.ObjStrHook.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.StrObjHook.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.WindowHook.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.Array.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.MaterializedArray.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.ArrayCount) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.StartHook.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.StopHook.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.AslType) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.FontStyles) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.AslTags.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.AslRequester.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.AslState.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.Window.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.HookMsg.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.Selected) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.NotifyAttribute) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.NotifyValue) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value.NotifyCount) &&
+		MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiPopSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
+
+	// Legacy field-by-field adapter retained only for targeted diagnostics.
+	internal static bool TryReadLegacyStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiPopSpecialistState value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -196,64 +331,64 @@ internal static class MuiPopSpecialistStateCodec
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiPopSpecialistState.Size) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.Magic, out var magic))
 			return false;
 		value.Magic = magic;
-		if (!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiPopSpecialistRecordField.Class, out value.Class) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.Flags, out value.Flags) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.StringChild, out var stringChild) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.ButtonChild, out var buttonChild) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.OpenHook, out var openHook) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.CloseHook, out var closeHook) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.PopObject, out var popObject) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.ObjStrHook, out var objStrHook) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.StrObjHook, out var strObjHook) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.WindowHook, out var windowHook) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.Array, out var array) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.MaterializedArray,
 				out var materializedArray) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.ArrayCount, out value.ArrayCount) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.StartHook, out var startHook) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.StopHook, out var stopHook) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.AslType, out value.AslType) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.FontStyles, out value.FontStyles) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.AslTags, out var aslTags) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.AslRequester, out var aslRequester) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.AslState, out var aslState) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.Window, out var window) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.HookMsg, out var hookMsg) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.Selected, out value.Selected) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.NotifyAttribute,
 				out value.NotifyAttribute) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.NotifyValue,
 				out value.NotifyValue) ||
-			!MuiPopSpecialistRecordFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.NotifyCount,
 				out value.NotifyCount)) return false;
 		value.StringChild = APTR.FromPointer(stringChild);
@@ -287,76 +422,82 @@ internal static class MuiPopSpecialistStateCodec
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiPopSpecialistState value)
 		where TPlatform : struct, IMuiGuestMemory
+		=> WriteRecord(ref platform, address, value);
+
+	// Legacy field-by-field adapter retained only for targeted diagnostics.
+	internal static bool WriteLegacy<TPlatform>(ref TPlatform platform, APTR address,
+		MuiPopSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiPopSpecialistState.Size) || value.Magic !=
 			MuiPopSpecialistState.Cookie) return false;
-		return MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiPopSpecialistRecordField.Magic, value.Magic) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.Class, value.Class) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.Flags, value.Flags) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.StringChild,
 				value.StringChild.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.ButtonChild,
 				value.ButtonChild.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.OpenHook, value.OpenHook.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.CloseHook,
 				value.CloseHook.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.PopObject,
 				value.PopObject.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.ObjStrHook,
 				value.ObjStrHook.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.StrObjHook,
 				value.StrObjHook.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.WindowHook,
 				value.WindowHook.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.Array, value.Array.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.MaterializedArray,
 				value.MaterializedArray.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.ArrayCount, value.ArrayCount) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.StartHook,
 				value.StartHook.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.StopHook, value.StopHook.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.AslType, value.AslType) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.FontStyles, value.FontStyles) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.AslTags, value.AslTags.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.AslRequester,
 				value.AslRequester.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.AslState,
 				value.AslState.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.Window, value.Window.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.HookMsg, value.HookMsg.Raw) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.Selected, value.Selected) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.NotifyAttribute,
 				value.NotifyAttribute) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.NotifyValue,
 				value.NotifyValue) &&
-			MuiPopSpecialistRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiPopSpecialistRecordField.NotifyCount,
 				value.NotifyCount);
 	}
@@ -466,6 +607,7 @@ internal static class MuiPopSpecialistAdmission
 internal struct MuiPoplistArrayEntry
 {
 	internal const uint Size = 4;
+	internal const uint ValueOffset = 0;
 	internal APTR Value;
 }
 
@@ -481,17 +623,17 @@ internal struct MuiPoplistArrayEntryFieldCursor
 	internal MuiPoplistArrayEntryField Field;
 }
 
-internal static class MuiPoplistArrayEntryFieldCursorCodec
+internal static class MuiPoplistArrayEntryFieldMemoryCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiPoplistArrayEntryFieldCursor cursor, out APTR address)
+		APTR record, MuiPoplistArrayEntryField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (cursor.Field != MuiPoplistArrayEntryField.Value ||
-			cursor.Record.IsNull || !platform.IsMapped(cursor.Record,
+		if (field != MuiPoplistArrayEntryField.Value ||
+			record.IsNull || !platform.IsMapped(record,
 				MuiPoplistArrayEntry.Size)) return false;
-		address = cursor.Record;
+		address = APTR.FromPointer(record.Raw + MuiPoplistArrayEntry.ValueOffset);
 		return true;
 	}
 
@@ -500,10 +642,8 @@ internal static class MuiPoplistArrayEntryFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiPoplistArrayEntryFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -512,13 +652,35 @@ internal static class MuiPoplistArrayEntryFieldCursorCodec
 		APTR record, MuiPoplistArrayEntryField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiPoplistArrayEntryFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// Poplist array-entry field cursor. New code uses the direct named-record
+// adapter above.
+internal static class MuiPoplistArrayEntryFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiPoplistArrayEntryFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiPoplistArrayEntryFieldMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiPoplistArrayEntryField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiPoplistArrayEntryFieldMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiPoplistArrayEntryField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiPoplistArrayEntryFieldMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
 }
 
 internal static class MuiPoplistArrayEntryCodec
@@ -528,7 +690,7 @@ internal static class MuiPoplistArrayEntryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiPoplistArrayEntryFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiPoplistArrayEntryFieldMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiPoplistArrayEntryField.Value, out var pointer)) return false;
 		value.Value = APTR.FromPointer(pointer);
 		return true;
@@ -538,7 +700,7 @@ internal static class MuiPoplistArrayEntryCodec
 		MuiPoplistArrayEntry value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiPoplistArrayEntryFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiPoplistArrayEntryFieldMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiPoplistArrayEntryField.Value, value.Value.Raw);
 	}
 }
@@ -557,22 +719,33 @@ internal struct MuiPoplistArrayCursor
 	internal uint Index;
 }
 
+// Struct-first guest-memory adapter for caller-owned and materialized Poplist
+// pointer vectors. Every indexed slot is admitted as a complete named record;
+// the NULL terminator remains a consumer rule after this boundary.
+internal static class MuiPoplistArrayVectorMemoryCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (vector.IsNull || index >= MuiPoplistArrayCursor.MaximumEntries ||
+			index > (uint.MaxValue - vector.Raw) /
+			MuiPoplistArrayEntry.Size) return false;
+		var offset = index * MuiPoplistArrayEntry.Size;
+		if (vector.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(vector.Raw + offset);
+		return platform.IsMapped(address, MuiPoplistArrayEntry.Size);
+	}
+}
+
 internal static class MuiPoplistArrayCursorCodec
 {
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiPoplistArrayCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >=
-			MuiPoplistArrayCursor.MaximumEntries || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiPoplistArrayCursor.EntrySize) return false;
-		var offset = cursor.Index * MuiPoplistArrayCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
-		return platform.IsMapped(address, MuiPoplistArrayCursor.EntrySize);
-	}
+		=> MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, cursor.Base,
+			cursor.Index, out address);
 }
 
 // The Pop* class discriminator. The values are ordinal; the exact official
@@ -594,75 +767,28 @@ public static class MuiPopSpecialistCore
 	// ---- Classification ------------------------------------------------------
 
 	// Classify a guest C-string class id against the exact official names. The
-	// loader contract is case-sensitive, so the match is byte-exact against the
-	// documented "<Name>.mui" ids. Freestanding: the expected names are compared
-	// as ASCII byte literals with no managed strings, arrays or spans.
+	// loader contract is case-sensitive, so fixed identities are admitted through
+	// named packed records rather than consumer-side byte walks.
 	public static MuiPopSpecialistClass ClassifyName<TPlatform>(
 		ref TPlatform platform, APTR classId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (classId.IsNull) return MuiPopSpecialistClass.None;
-		var c0 = B(ref platform, classId, 0);
-		var c1 = B(ref platform, classId, 1);
-		var c2 = B(ref platform, classId, 2);
-		if (c0 != 'P' || c1 != 'o' || c2 != 'p') return MuiPopSpecialistClass.None;
-		var c3 = B(ref platform, classId, 3);
-
-		// Popstring.mui
-		if (c3 == 's' && B(ref platform, classId, 4) == 't' &&
-			B(ref platform, classId, 5) == 'r' &&
-			B(ref platform, classId, 6) == 'i' &&
-			B(ref platform, classId, 7) == 'n' &&
-			B(ref platform, classId, 8) == 'g' && Suffix(ref platform, classId, 9))
+		if (MuiPopSpecialistPopstringClassNameRecordCodec.TryMatch(ref platform, classId))
 			return MuiPopSpecialistClass.Popstring;
-		// Popobject.mui
-		if (c3 == 'o' && B(ref platform, classId, 4) == 'b' &&
-			B(ref platform, classId, 5) == 'j' &&
-			B(ref platform, classId, 6) == 'e' &&
-			B(ref platform, classId, 7) == 'c' &&
-			B(ref platform, classId, 8) == 't' && Suffix(ref platform, classId, 9))
+		if (MuiPopSpecialistPopobjectClassNameRecordCodec.TryMatch(ref platform, classId))
 			return MuiPopSpecialistClass.Popobject;
-		// Poplist.mui
-		if (c3 == 'l' && B(ref platform, classId, 4) == 'i' &&
-			B(ref platform, classId, 5) == 's' &&
-			B(ref platform, classId, 6) == 't' && Suffix(ref platform, classId, 7))
+		if (MuiPopSpecialistPoplistClassNameRecordCodec.TryMatch(ref platform, classId))
 			return MuiPopSpecialistClass.Poplist;
-		// Popasl.mui
-		if (c3 == 'a' && B(ref platform, classId, 4) == 's' &&
-			B(ref platform, classId, 5) == 'l' && Suffix(ref platform, classId, 6))
+		if (MuiPopSpecialistPopaslClassNameRecordCodec.TryMatch(ref platform, classId))
 			return MuiPopSpecialistClass.Popasl;
-		// Popscreen.mui
-		if (c3 == 's' && B(ref platform, classId, 4) == 'c' &&
-			B(ref platform, classId, 5) == 'r' &&
-			B(ref platform, classId, 6) == 'e' &&
-			B(ref platform, classId, 7) == 'e' &&
-			B(ref platform, classId, 8) == 'n' && Suffix(ref platform, classId, 9))
+		if (MuiPopSpecialistPopscreenClassNameRecordCodec.TryMatch(ref platform, classId))
 			return MuiPopSpecialistClass.Popscreen;
-		// Popcolor.mui
-		if (c3 == 'c' && B(ref platform, classId, 4) == 'o' &&
-			B(ref platform, classId, 5) == 'l' &&
-			B(ref platform, classId, 6) == 'o' &&
-			B(ref platform, classId, 7) == 'r' && Suffix(ref platform, classId, 8))
+		if (MuiPopSpecialistPopcolorClassNameRecordCodec.TryMatch(ref platform, classId))
 			return MuiPopSpecialistClass.Popcolor;
-		// Poppen.mui
-		if (c3 == 'p' && B(ref platform, classId, 4) == 'e' &&
-			B(ref platform, classId, 5) == 'n' && Suffix(ref platform, classId, 6))
+		if (MuiPopSpecialistPoppenClassNameRecordCodec.TryMatch(ref platform, classId))
 			return MuiPopSpecialistClass.Poppen;
 		return MuiPopSpecialistClass.None;
 	}
-
-	private static int B<TPlatform>(ref TPlatform platform, APTR text, int index)
-		where TPlatform : struct, IMuiGuestMemory =>
-		platform.IsMapped(text, (uint)index + 1) ? platform.ReadUInt8(text, index)
-			: -1;
-
-	private static bool Suffix<TPlatform>(ref TPlatform platform, APTR text,
-		int offset) where TPlatform : struct, IMuiGuestMemory =>
-		B(ref platform, text, offset) == '.' &&
-		B(ref platform, text, offset + 1) == 'm' &&
-		B(ref platform, text, offset + 2) == 'u' &&
-		B(ref platform, text, offset + 3) == 'i' &&
-		B(ref platform, text, offset + 4) == 0;
 
 	// ---- Inheritance ---------------------------------------------------------
 
@@ -1089,10 +1215,8 @@ public static class MuiPopSpecialistCore
 		var count = 0;
 		while (count < MuiPopSpecialistLayout.MaximumArray)
 		{
-			var cursor = default(MuiPoplistArrayCursor);
-			cursor.Base = array;
-			cursor.Index = unchecked((uint)count);
-			if (!MuiPoplistArrayCursorCodec.TryGetEntry(ref platform, cursor,
+			if (!MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, array,
+				unchecked((uint)count),
 				out var address)) break;
 			if (!MuiPoplistArrayEntryCodec.TryRead(ref platform, address,
 				out var entry)) break;
@@ -1104,16 +1228,10 @@ public static class MuiPopSpecialistCore
 		if (block.IsNull) return false;
 		for (var index = 0; index < count; index++)
 		{
-			var sourceCursor = default(MuiPoplistArrayCursor);
-			sourceCursor.Base = array;
-			sourceCursor.Index = unchecked((uint)index);
-			var destinationCursor = default(MuiPoplistArrayCursor);
-			destinationCursor.Base = block;
-			destinationCursor.Index = unchecked((uint)index);
-			if (!MuiPoplistArrayCursorCodec.TryGetEntry(ref platform,
-				sourceCursor, out var source) ||
-				!MuiPoplistArrayCursorCodec.TryGetEntry(ref platform,
-					destinationCursor, out var destination))
+			if (!MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, array,
+				unchecked((uint)index), out var source) ||
+				!MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, block,
+					unchecked((uint)index), out var destination))
 			{
 				platform.Clear(block, (uint)(count + 1) *
 					MuiPoplistArrayEntry.Size);
@@ -1132,12 +1250,9 @@ public static class MuiPopSpecialistCore
 				return false;
 			}
 		}
-		var terminatorCursor = default(MuiPoplistArrayCursor);
-		terminatorCursor.Base = block;
-		terminatorCursor.Index = unchecked((uint)count);
 		var end = default(MuiPoplistArrayEntry);
-		if (!MuiPoplistArrayCursorCodec.TryGetEntry(ref platform,
-			terminatorCursor, out var terminator) ||
+		if (!MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, block,
+			unchecked((uint)count), out var terminator) ||
 			!MuiPoplistArrayEntryCodec.Write(ref platform, terminator, end))
 		{
 			platform.Clear(block, (uint)(count + 1) * MuiPoplistArrayEntry.Size);
@@ -1164,10 +1279,7 @@ public static class MuiPopSpecialistCore
 		if (index >= count) return false;
 		var block = state.MaterializedArray;
 		if (block.IsNull) return false;
-		var cursor = default(MuiPoplistArrayCursor);
-		cursor.Base = block;
-		cursor.Index = index;
-		if (!MuiPoplistArrayCursorCodec.TryGetEntry(ref platform, cursor,
+		if (!MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, block, index,
 			out var address)) return false;
 		if (!MuiPoplistArrayEntryCodec.TryRead(ref platform, address,
 			out var entry)) return false;
@@ -1525,11 +1637,13 @@ public static class MuiPopSpecialistCore
 		if (!MuiPopSpecialistStateCodec.TryRead(ref platform, instance,
 			out var state)) return;
 		var msg = state.HookMsg;
-		if (msg.IsNotNull && platform.IsMapped(msg, MuiPopSpecialistLayout.HookMsgSize))
+		if (msg.IsNotNull &&
+			MuiSpecialistHookMessageCodec.TryRead(ref platform, msg, out var hookMsg))
 		{
-			platform.WriteUInt32(msg, MuiPopSpecialistLayout.MsgMethod, methodId);
-			platform.WriteUInt32(msg, MuiPopSpecialistLayout.MsgParam1, param1);
-			platform.WriteUInt32(msg, MuiPopSpecialistLayout.MsgParam2, 0);
+			hookMsg.MethodId = methodId;
+			hookMsg.Param1 = param1;
+			hookMsg.Param2 = 0;
+			MuiSpecialistHookMessageCodec.Write(ref platform, msg, hookMsg);
 		}
 		platform.InvokeHook(hook, a2Object, msg);
 	}

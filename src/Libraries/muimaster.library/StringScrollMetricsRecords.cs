@@ -10,6 +10,7 @@ namespace CopperOS.MuiMaster;
 
 // Public semantic view of the MorphOS String.mui scroll metrics.  All values
 // are guest ULONGs; the record contains no managed text or host geometry.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringScrollMetricsState
 {
 	public uint Width;
@@ -163,51 +164,64 @@ internal static class MuiStringScrollMetricsStateRecordMemoryCodec
 
 internal static class MuiStringScrollMetricsStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiStringScrollMetricsStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiStringScrollMetricsStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic)) return false;
-		return MuiStringScrollMetricsStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out value.Width) &&
-			MuiStringScrollMetricsStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 8, out value.Height) &&
-			MuiStringScrollMetricsStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 12, out value.VisibleWidth) &&
-			MuiStringScrollMetricsStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 16, out value.VisibleHeight) &&
-			MuiStringScrollMetricsStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 20, out value.Left) &&
-			MuiStringScrollMetricsStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 24, out value.Top);
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringScrollMetricsStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Width) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Height) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.VisibleWidth) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.VisibleHeight) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Left) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Top) && MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringScrollMetricsStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringScrollMetricsStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> TryReadStructural(ref platform, address, out value) &&
+		=> TryReadRecord(ref platform, address, out value) &&
 		MuiStringScrollMetricsStateAdmission.Validate(value);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiStringScrollMetricsStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStringScrollMetricsStateAdmission.Validate(value) &&
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringScrollMetricsStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Width) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Height) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.VisibleWidth) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.VisibleHeight) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Left) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Top) && MuiGuestStructCursor.IsComplete(cursor);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringScrollMetricsStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiStringScrollMetricsStateAdmission.Validate(value)) return false;
-		return MuiStringScrollMetricsStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 0, value.Magic) &&
-			MuiStringScrollMetricsStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, 4, value.Width) &&
-			MuiStringScrollMetricsStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, 8, value.Height) &&
-			MuiStringScrollMetricsStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, 12, value.VisibleWidth) &&
-			MuiStringScrollMetricsStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, 16, value.VisibleHeight) &&
-			MuiStringScrollMetricsStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, 20, value.Left) &&
-			MuiStringScrollMetricsStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, 24, value.Top);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, value);
 }

@@ -76,6 +76,35 @@ public sealed class MuiImageRenderAdmissionTests
 	}
 
 	[Fact]
+	public void ImageRenderSequentialRecordPreservesPoliciesAndRejectsTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			State);
+		var address = APTR.FromPointer(0x3600);
+		var value = new MuiImageRenderStateRecord
+		{
+			Magic = MuiImageRenderStateRecord.Cookie,
+			ImageState = uint.MaxValue,
+			Selected = 1,
+			FreeHoriz = 0x80000000u,
+			FreeVert = uint.MaxValue,
+			ShowSelState = 1,
+		};
+		Assert.True(MuiImageRenderStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiImageRenderStateRecordCodec.TryReadRecord(ref platform,
+			address, out var actual));
+		Assert.Equal(value.Magic, actual.Magic);
+		Assert.Equal(value.ImageState, actual.ImageState);
+		Assert.Equal(value.Selected, actual.Selected);
+		Assert.Equal(value.FreeHoriz, actual.FreeHoriz);
+		Assert.Equal(value.FreeVert, actual.FreeVert);
+		Assert.Equal(value.ShowSelState, actual.ShowSelState);
+		Assert.False(MuiImageRenderStateRecordCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FFC), out _));
+	}
+
+	[Fact]
 	public void MalformedImageRenderFailsClosedBeforeRawRepairOrSet()
 	{
 		var platform = CreatePlatform(out var imageClass);

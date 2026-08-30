@@ -323,6 +323,11 @@ public static class MuiHeadlessObjectCore
 			DisposeObject(ref platform, state, obj);
 			return APTR.Null;
 		}
+		if (!MuiStoreCore.InitializeStorePool(ref platform, state, record))
+		{
+			DisposeObject(ref platform, state, obj);
+			return APTR.Null;
+		}
 		if (!MuiHeadlessObjectCodec.TryRead(ref platform, record,
 			out var initializedValue))
 		{
@@ -407,9 +412,12 @@ public static class MuiHeadlessObjectCore
 		// Close that opaque handle before the Dataspace records disappear.
 		if (!MuiAreaCustomFontCore.CloseRuntime(ref platform, state, obj))
 			return false;
-		FreeObjectAttributes(ref platform, record);
 		MuiNotifyCore.RemoveAll(ref platform, state, record);
-		MuiStoreCore.ClearAll(ref platform, record);
+		MuiStoreCore.ClearAll(ref platform, state, record);
+		// Store disposal may need the class-specific external pool attribute to
+		// release pooled records and payloads. Retire generic attributes only
+		// after the typed store lifetime has completed.
+		FreeObjectAttributes(ref platform, record);
 		if (!MuiHeadlessObjectCodec.TryRead(ref platform, record,
 			out objectValue)) return false;
 		var classRecord = objectValue.Class;
@@ -517,6 +525,11 @@ public static class MuiHeadlessObjectCore
 		value = 0;
 		var record = FindObject(ref platform, state, obj);
 		if (record.IsNull) return false;
+		// AutoLock/CopyKeys are MorphOS [I..] store policies. Keep them out of
+		// OM_GET once a concrete store class is known; unknown compatibility
+		// objects retain the generic raw-attribute behavior used by legacy callers.
+		if (MuiStorePolicyCore.IsGetterlessForKnownStore(attribute,
+			MuiCommonControlCore.Classify(ref platform, state, obj))) return false;
 		// A Listview owns a named List child. Resolve the public List attribute
 		// family from that typed child before consulting the parent's raw metadata;
 		// otherwise a stale compatibility scalar on the composite can mask the
@@ -660,6 +673,14 @@ public static class MuiHeadlessObjectCore
 		// attributes.
 		if (attribute == NoNotifyAttribute ||
 			attribute == NoNotifyMethodAttribute) return false;
+		if (MuiStorePolicyCore.IsPolicyAttribute(attribute))
+		{
+			if (!MuiStorePolicyCore.TryGetPolicyKind(attribute,
+				out var policy)) return false;
+			if (!MuiHeadlessObjectCodec.TryRead(ref platform, record,
+				out var policyObject) || !MuiStorePolicyCore.IsClassCompatible(
+				ref platform, state, policyObject.Boopsi, policy)) return false;
+		}
 		// Construction tags enter this generic BOOPSI setter directly, before
 		// class-aware interactive setters can validate caller-owned strings. Keep
 		// the public STRPTR admission rule at the shared ABI boundary so malformed
@@ -699,6 +720,9 @@ public static class MuiHeadlessObjectCore
 			return MuiListtreeCore.SetAttribute(ref platform, state,
 				listtreeObject.Boopsi, attribute, value, notify);
 		var handled = false;
+		if (MuiApplicationWindowCore.TrySet(ref platform, state, record, attribute,
+			value, notify, out handled) && handled) return true;
+		if (handled) return false;
 		if (MuiWindowPublicCore.TrySet(ref platform, state, record, attribute,
 			value, notify, out handled) && handled) return true;
 		if (handled) return false;
@@ -882,14 +906,15 @@ public static class MuiHeadlessObjectCore
 		while (cursor.Base.IsNotNull && visited++ <
 			MuiHeadlessLayout.MaximumTraversal)
 		{
-			if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
+			if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index,
 				out var current) || !MuiAslTagItemCodec.TryRead(ref platform, current,
 				out var item)) return false;
 			var tag = item.Tag;
 			if (tag == MuiAslTagListCore.TagDone) return true;
 			if (tag == MuiAslTagListCore.TagIgnore)
 			{
-				if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
+				if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
 					return false;
 				continue;
 			}
@@ -903,7 +928,7 @@ public static class MuiHeadlessObjectCore
 			if (tag == MuiAslTagListCore.TagSkip)
 			{
 				if (item.Data == uint.MaxValue ||
-					!MuiAslTagItemVectorCodec.TryAdvance(ref cursor,
+					!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor,
 						item.Data + 1u)) return false;
 				continue;
 			}
@@ -911,7 +936,7 @@ public static class MuiHeadlessObjectCore
 				item.Data != 0) noNotify = true;
 			if (tag == NoNotifyMethodAttribute)
 				noNotifyMethod = item.Data;
-			if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
+			if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
 				return false;
 		}
 		return cursor.Base.IsNull;
@@ -928,7 +953,8 @@ public static class MuiHeadlessObjectCore
 		while (cursor.Base.IsNotNull && visited++ <
 			MuiHeadlessLayout.MaximumTraversal)
 		{
-			if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
+			if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index,
 				out var current) || !MuiAslTagItemCodec.TryRead(ref platform, current,
 				out var item)) return false;
 			var tag = item.Tag;
@@ -936,7 +962,7 @@ public static class MuiHeadlessObjectCore
 			if (tag == MuiAslTagListCore.TagDone) return true;
 			if (tag == MuiAslTagListCore.TagIgnore)
 			{
-				if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
+				if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
 					return false;
 				continue;
 			}
@@ -950,20 +976,20 @@ public static class MuiHeadlessObjectCore
 			if (tag == MuiAslTagListCore.TagSkip)
 			{
 				if (data == uint.MaxValue ||
-					!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, data + 1))
+					!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, data + 1))
 					return false;
 				continue;
 			}
 			if (tag == NoNotifyAttribute || tag == NoNotifyMethodAttribute)
 			{
-				if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
+				if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
 					return false;
 				continue;
 			}
 			if (!SetRecordAttribute(ref platform, state, record, tag, data, notify,
 				routeCollectionRuntime))
 				return false;
-			if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
+			if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
 				return false;
 		}
 		return cursor.Base.IsNull;
@@ -1084,42 +1110,4 @@ public static class MuiHeadlessObjectCore
 		}
 	}
 
-	internal static bool Unlink<TPlatform>(ref TPlatform platform, APTR owner,
-		int headOffset, APTR target, int nextOffset)
-		where TPlatform : struct, IMuiHeadlessPlatform
-	{
-		var current = APTR.FromPointer(platform.ReadUInt32(owner, headOffset));
-		var previous = APTR.Null;
-		uint visited = 0;
-		while (current.IsNotNull && visited++ < MuiHeadlessLayout.MaximumTraversal)
-		{
-			if (current.Raw == target.Raw)
-			{
-				var next = platform.ReadUInt32(current, nextOffset);
-				if (previous.IsNull) platform.WriteUInt32(owner, headOffset, next);
-				else platform.WriteUInt32(previous, nextOffset, next);
-				return true;
-			}
-			previous = current;
-			current = APTR.FromPointer(platform.ReadUInt32(current, nextOffset));
-		}
-		return false;
-	}
-
-	internal static void FreeList<TPlatform>(ref TPlatform platform, APTR owner,
-		int headOffset, int nextOffset, uint size)
-		where TPlatform : struct, IMuiHeadlessPlatform
-	{
-		var current = APTR.FromPointer(platform.ReadUInt32(owner, headOffset));
-		platform.WriteUInt32(owner, headOffset, 0);
-		uint visited = 0;
-		while (current.IsNotNull && visited++ < MuiHeadlessLayout.MaximumTraversal)
-		{
-			if (!platform.IsMapped(current, size)) return;
-			var next = APTR.FromPointer(platform.ReadUInt32(current, nextOffset));
-			platform.Clear(current, size);
-			platform.Free(current, size);
-			current = next;
-		}
-	}
 }

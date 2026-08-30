@@ -110,27 +110,22 @@ internal static class MuiCollectionSurfaceMessageMemoryCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiCollectionSurfaceFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			!TryGetPacketSize(cursor.Packet, out var packetSize) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize))
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, MuiCollectionMethodMessage.FieldSize);
-	}
+		=> TryGetAddress(ref platform, cursor.Message, cursor.Packet,
+			cursor.Field, out address);
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCollectionSurfacePacketKind packet,
 		MuiCollectionSurfaceField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiCollectionSurfaceFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		return TryGetAddress(ref platform, cursor, out address);
+		address = APTR.Null;
+		if (!TryResolve(packet, field, out var offset) ||
+			!TryGetPacketSize(packet, out var packetSize) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, packetSize))
+			return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiCollectionMethodMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -139,11 +134,8 @@ internal static class MuiCollectionSurfaceMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiCollectionSurfaceFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -153,11 +145,8 @@ internal static class MuiCollectionSurfaceMessageMemoryCodec
 		MuiCollectionSurfaceField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiCollectionSurfaceFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -188,6 +177,155 @@ internal static class MuiCollectionSurfaceFieldCursorCodec
 			message, packet, field, value);
 }
 
+// Live collection-surface packets use declaration-order named structs. Signed
+// MuiKey is transported as its lossless ULONG representation.
+internal static class MuiCollectionSurfaceStructPacketCodec
+{
+	private static bool TryCreate<TPlatform>(ref TPlatform platform,
+		APTR message, uint size, out MuiGuestStructCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, message, size,
+			out cursor);
+
+	internal static bool TryReadLayout<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionLayoutMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiCollectionLayoutMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Left) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Top) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Width) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Height) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteLayout<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionLayoutMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionLayoutMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Left) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Top) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Width) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Height) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadAskMinMax<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionAskMinMaxMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiCollectionAskMinMaxMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Storage) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteAskMinMax<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionAskMinMaxMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionAskMinMaxMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Storage) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadDraw<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionDrawMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiCollectionDrawMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteDraw<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionDrawMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionDrawMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadHandleInput<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionHandleInputMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!TryCreate(ref platform, message, MuiCollectionHandleInputMessage.Size,
+			out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.IntuiMessage) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMuiKey) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		packet.MuiKey = unchecked((int)rawMuiKey);
+		return true;
+	}
+
+	internal static bool TryWriteHandleInput<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionHandleInputMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionHandleInputMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.IntuiMessage) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)packet.MuiKey)) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadAttribute<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionAttributeMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiCollectionAttributeMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Attribute) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Value) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteAttribute<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionAttributeMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionAttributeMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Attribute) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Value) && MuiGuestStructCursor.IsComplete(cursor);
+}
+
 internal static class MuiCollectionSurfaceMessageCodec
 {
 	internal const uint AskMinMax = 0x80423874u;
@@ -202,44 +340,22 @@ internal static class MuiCollectionSurfaceMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPacket(ref platform, message, MuiCollectionLayoutMessage.Size,
-			Layout)) return false;
-		packet.MethodId = Layout;
-		return MuiCollectionSurfaceFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionSurfacePacketKind.Layout,
-			MuiCollectionSurfaceField.Left, out packet.Left) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.Layout,
-				MuiCollectionSurfaceField.Top, out packet.Top) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.Layout,
-				MuiCollectionSurfaceField.Width, out packet.Width) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.Layout,
-				MuiCollectionSurfaceField.Height, out packet.Height);
+		return MuiCollectionSurfaceStructPacketCodec.TryReadLayout(ref platform,
+			message, out packet) && packet.MethodId == Layout;
 	}
 
 	internal static bool WriteLayout<TPlatform>(ref TPlatform platform,
 		APTR message, uint left, uint top, uint width, uint height)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionLayoutMessage.Size)) return false;
-		return MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionSurfacePacketKind.Layout,
-			MuiCollectionSurfaceField.MethodId, Layout) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.Layout,
-				MuiCollectionSurfaceField.Left, left) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.Layout,
-				MuiCollectionSurfaceField.Top, top) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.Layout,
-				MuiCollectionSurfaceField.Width, width) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.Layout,
-				MuiCollectionSurfaceField.Height, height);
+		var packet = default(MuiCollectionLayoutMessage);
+		packet.MethodId = Layout;
+		packet.Left = left;
+		packet.Top = top;
+		packet.Width = width;
+		packet.Height = height;
+		return MuiCollectionSurfaceStructPacketCodec.TryWriteLayout(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadAskMinMax<TPlatform>(ref TPlatform platform,
@@ -247,26 +363,19 @@ internal static class MuiCollectionSurfaceMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPacket(ref platform, message, MuiCollectionAskMinMaxMessage.Size,
-			AskMinMax)) return false;
-		packet.MethodId = AskMinMax;
-		return MuiCollectionSurfaceFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionSurfacePacketKind.AskMinMax,
-			MuiCollectionSurfaceField.Storage, out packet.Storage);
+		return MuiCollectionSurfaceStructPacketCodec.TryReadAskMinMax(ref platform,
+			message, out packet) && packet.MethodId == AskMinMax;
 	}
 
 	internal static bool WriteAskMinMax<TPlatform>(ref TPlatform platform,
 		APTR message, uint storage)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionAskMinMaxMessage.Size)) return false;
-		return MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionSurfacePacketKind.AskMinMax,
-			MuiCollectionSurfaceField.MethodId, AskMinMax) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.AskMinMax,
-				MuiCollectionSurfaceField.Storage, storage);
+		var packet = default(MuiCollectionAskMinMaxMessage);
+		packet.MethodId = AskMinMax;
+		packet.Storage = storage;
+		return MuiCollectionSurfaceStructPacketCodec.TryWriteAskMinMax(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadDraw<TPlatform>(ref TPlatform platform,
@@ -274,26 +383,19 @@ internal static class MuiCollectionSurfaceMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPacket(ref platform, message, MuiCollectionDrawMessage.Size,
-			Draw)) return false;
-		packet.MethodId = Draw;
-		return MuiCollectionSurfaceFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionSurfacePacketKind.Draw,
-			MuiCollectionSurfaceField.Flags, out packet.Flags);
+		return MuiCollectionSurfaceStructPacketCodec.TryReadDraw(ref platform,
+			message, out packet) && packet.MethodId == Draw;
 	}
 
 	internal static bool WriteDraw<TPlatform>(ref TPlatform platform,
 		APTR message, uint flags)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionDrawMessage.Size)) return false;
-		return MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionSurfacePacketKind.Draw,
-			MuiCollectionSurfaceField.MethodId, Draw) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.Draw,
-				MuiCollectionSurfaceField.Flags, flags);
+		var packet = default(MuiCollectionDrawMessage);
+		packet.MethodId = Draw;
+		packet.Flags = flags;
+		return MuiCollectionSurfaceStructPacketCodec.TryWriteDraw(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadHandleInput<TPlatform>(ref TPlatform platform,
@@ -301,34 +403,20 @@ internal static class MuiCollectionSurfaceMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPacket(ref platform, message,
-			MuiCollectionHandleInputMessage.Size, HandleInput)) return false;
-		packet.MethodId = HandleInput;
-		if (!MuiCollectionSurfaceFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionSurfacePacketKind.HandleInput,
-			MuiCollectionSurfaceField.IntuiMessage, out packet.IntuiMessage) ||
-			!MuiCollectionSurfaceFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.HandleInput,
-				MuiCollectionSurfaceField.MuiKey, out var rawMuiKey)) return false;
-		packet.MuiKey = unchecked((int)rawMuiKey);
-		return true;
+		return MuiCollectionSurfaceStructPacketCodec.TryReadHandleInput(
+			ref platform, message, out packet) && packet.MethodId == HandleInput;
 	}
 
 	internal static bool WriteHandleInput<TPlatform>(ref TPlatform platform,
 		APTR message, uint intuiMessage, int muiKey)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionHandleInputMessage.Size)) return false;
-		return MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionSurfacePacketKind.HandleInput,
-			MuiCollectionSurfaceField.MethodId, HandleInput) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.HandleInput,
-				MuiCollectionSurfaceField.IntuiMessage, intuiMessage) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.HandleInput,
-				MuiCollectionSurfaceField.MuiKey, unchecked((uint)muiKey));
+		var packet = default(MuiCollectionHandleInputMessage);
+		packet.MethodId = HandleInput;
+		packet.IntuiMessage = intuiMessage;
+		packet.MuiKey = muiKey;
+		return MuiCollectionSurfaceStructPacketCodec.TryWriteHandleInput(
+			ref platform, message, packet);
 	}
 
 	internal static bool TryReadAttribute<TPlatform>(ref TPlatform platform,
@@ -336,32 +424,22 @@ internal static class MuiCollectionSurfaceMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsAttributeMethod(method) || !IsPacket(ref platform, message,
-			MuiCollectionAttributeMessage.Size, method)) return false;
-		packet.MethodId = method;
-		return MuiCollectionSurfaceFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionSurfacePacketKind.Attribute,
-			MuiCollectionSurfaceField.Attribute, out packet.Attribute) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.Attribute,
-				MuiCollectionSurfaceField.Value, out packet.Value);
+		return IsAttributeMethod(method) &&
+			MuiCollectionSurfaceStructPacketCodec.TryReadAttribute(ref platform,
+				message, out packet) && packet.MethodId == method;
 	}
 
 	internal static bool WriteAttribute<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, uint attribute, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsAttributeMethod(method) || message.IsNull || !platform.IsMapped(
-			message, MuiCollectionAttributeMessage.Size)) return false;
-		return MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionSurfacePacketKind.Attribute,
-			MuiCollectionSurfaceField.MethodId, method) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.Attribute,
-				MuiCollectionSurfaceField.Attribute, attribute) &&
-			MuiCollectionSurfaceFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionSurfacePacketKind.Attribute,
-				MuiCollectionSurfaceField.Value, value);
+		if (!IsAttributeMethod(method)) return false;
+		var packet = default(MuiCollectionAttributeMessage);
+		packet.MethodId = method;
+		packet.Attribute = attribute;
+		packet.Value = value;
+		return MuiCollectionSurfaceStructPacketCodec.TryWriteAttribute(ref platform,
+			message, packet);
 	}
 
 	private static bool IsAttributeMethod(uint method) => method == Set ||

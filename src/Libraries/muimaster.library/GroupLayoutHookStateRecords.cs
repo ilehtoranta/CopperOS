@@ -140,18 +140,35 @@ internal static class MuiGroupLayoutHookStateRecordMemoryCodec
 
 internal static class MuiGroupLayoutHookStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiGroupLayoutHookStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiGroupLayoutHookStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupLayoutHookStateField.Magic, out value.Magic) ||
-			!MuiGroupLayoutHookStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupLayoutHookStateField.Hook, out var hook)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupLayoutHookStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var hook)) return false;
 		value.Hook = APTR.FromPointer(hook);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGroupLayoutHookStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupLayoutHookStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Hook.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGroupLayoutHookStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiGroupLayoutHookStateRecord value)
@@ -163,10 +180,8 @@ internal static class MuiGroupLayoutHookStateRecordCodec
 		MuiGroupLayoutHookStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGroupLayoutHookStateAdmission.Validate(value)) return false;
-		return MuiGroupLayoutHookStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupLayoutHookStateField.Magic, value.Magic) &&
-			MuiGroupLayoutHookStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiGroupLayoutHookStateField.Hook, value.Hook.Raw);
+		if (address.IsNull || !MuiGroupLayoutHookStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

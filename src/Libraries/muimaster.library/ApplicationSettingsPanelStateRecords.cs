@@ -95,9 +95,10 @@ internal static class MuiApplicationSettingsPanelStateFieldCursorCodec
 	}
 }
 
-// Fixed BuildSettingsPanel result state is read and written as a named value.
-// Keep packed guest positions in this ABI adapter; production consumers do not
-// select fields through the compatibility cursor.
+// Fixed BuildSettingsPanel result state is transferred as a named record.
+// Numeric guest positions are confined to the bounded ABI adapter; production
+// consumers exchange the declaration-order struct through the sequential
+// cursor below.
 internal static class MuiApplicationSettingsPanelStateRecordMemoryCodec
 {
 	private static bool TryResolve(MuiApplicationSettingsPanelStateField field,
@@ -161,28 +162,45 @@ internal static class MuiApplicationSettingsPanelStateRecordMemoryCodec
 
 internal static class MuiApplicationSettingsPanelStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationSettingsPanelStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationSettingsPanelStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiApplicationSettingsPanelStateField.Magic,
-			out var magic) ||
-			!MuiApplicationSettingsPanelStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationSettingsPanelStateField.Number,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationSettingsPanelStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.Number) ||
-			!MuiApplicationSettingsPanelStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationSettingsPanelStateField.Panel,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var panel) ||
-			!MuiApplicationSettingsPanelStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationSettingsPanelStateField.Requests,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.Requests)) return false;
-		value.Magic = magic;
 		value.Panel = APTR.FromPointer(panel);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationSettingsPanelStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationSettingsPanelStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Number) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Panel.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Requests) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationSettingsPanelStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationSettingsPanelStateRecord value)
@@ -194,21 +212,9 @@ internal static class MuiApplicationSettingsPanelStateRecordCodec
 		MuiApplicationSettingsPanelStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationSettingsPanelStateRecord.Size) ||
-			!MuiApplicationSettingsPanelStateAdmission.Validate(ref platform, value))
+		if (address.IsNull || !MuiApplicationSettingsPanelStateAdmission.Validate(
+			ref platform, value))
 			return false;
-		return MuiApplicationSettingsPanelStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationSettingsPanelStateField.Magic,
-			value.Magic) &&
-			MuiApplicationSettingsPanelStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationSettingsPanelStateField.Number,
-				value.Number) &&
-			MuiApplicationSettingsPanelStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationSettingsPanelStateField.Panel,
-				value.Panel.Raw) &&
-			MuiApplicationSettingsPanelStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationSettingsPanelStateField.Requests,
-				value.Requests);
+		return WriteRecord(ref platform, address, value);
 	}
 }

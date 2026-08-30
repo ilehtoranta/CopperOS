@@ -260,7 +260,7 @@ internal static class MuiDataspaceMessageCodec
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+		return MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiDataspacePacketKind.Method, MuiDataspaceField.MethodId, out methodId);
 	}
 
@@ -293,14 +293,14 @@ internal static class MuiDataspaceMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiDataspaceAddMessage.Size,
 			AddMethod)) return false;
-		if (!MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+		if (!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiDataspacePacketKind.Add, MuiDataspaceField.MethodId,
 			out packet.MethodId) ||
-			!MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiDataspacePacketKind.Add, MuiDataspaceField.Data, out var rawData) ||
-			!MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiDataspacePacketKind.Add, MuiDataspaceField.Length, out var rawLength) ||
-			!MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiDataspacePacketKind.Add, MuiDataspaceField.Id, out packet.Id))
 			return false;
 		packet.Data = APTR.FromPointer(rawData);
@@ -315,10 +315,10 @@ internal static class MuiDataspaceMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiDataspaceFindMessage.Size,
 			FindMethod)) return false;
-		return MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+		return MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiDataspacePacketKind.Find, MuiDataspaceField.MethodId,
 			out packet.MethodId) &&
-			MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiDataspacePacketKind.Find, MuiDataspaceField.Id, out packet.Id);
 	}
 
@@ -329,12 +329,12 @@ internal static class MuiDataspaceMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiDataspaceGetMessage.Size,
 			GetMethod)) return false;
-		if (!MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+		if (!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiDataspacePacketKind.Get, MuiDataspaceField.MethodId,
 			out packet.MethodId) ||
-			!MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiDataspacePacketKind.Get, MuiDataspaceField.Id, out packet.Id) ||
-			!MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+			!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiDataspacePacketKind.Get, MuiDataspaceField.SizeStorage,
 				out var rawStorage)) return false;
 		packet.SizeStorage = APTR.FromPointer(rawStorage);
@@ -348,10 +348,10 @@ internal static class MuiDataspaceMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiDataspaceMergeMessage.Size,
 			MergeMethod)) return false;
-		return MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+		return MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiDataspacePacketKind.Merge, MuiDataspaceField.MethodId,
 			out packet.MethodId) &&
-			MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiDataspacePacketKind.Merge, MuiDataspaceField.Dataspace,
 				out var rawDataspace) && SetDataspace(out packet.Dataspace, rawDataspace);
 	}
@@ -363,10 +363,10 @@ internal static class MuiDataspaceMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiDataspaceRemoveMessage.Size,
 			RemoveMethod)) return false;
-		return MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+		return MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiDataspacePacketKind.Remove, MuiDataspaceField.MethodId,
 			out packet.MethodId) &&
-			MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiDataspacePacketKind.Remove, MuiDataspaceField.Id, out packet.Id);
 	}
 
@@ -377,7 +377,7 @@ internal static class MuiDataspaceMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiDataspaceClearMessage.Size,
 			ClearMethod)) return false;
-		return MuiDataspaceFieldCursorCodec.TryReadUInt32(ref platform, message,
+		return MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
 			MuiDataspacePacketKind.Clear, MuiDataspaceField.MethodId,
 			out packet.MethodId);
 	}
@@ -388,14 +388,14 @@ internal static class MuiDataspaceMessageCodec
 	{
 		if (!IsMapped(ref platform, message, MuiDataspaceAddMessage.Size))
 			return false;
-		return MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		return MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiDataspacePacketKind.Add, MuiDataspaceField.MethodId, AddMethod) &&
-			MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiDataspacePacketKind.Add, MuiDataspaceField.Data, packet.Data.Raw) &&
-				MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 					MuiDataspacePacketKind.Add, MuiDataspaceField.Length,
 					unchecked((uint)packet.Length)) &&
-					MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+					MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 						MuiDataspacePacketKind.Add, MuiDataspaceField.Id, packet.Id);
 	}
 
@@ -405,9 +405,9 @@ internal static class MuiDataspaceMessageCodec
 	{
 		if (!IsMapped(ref platform, message, MuiDataspaceFindMessage.Size))
 			return false;
-		return MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		return MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiDataspacePacketKind.Find, MuiDataspaceField.MethodId, FindMethod) &&
-			MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiDataspacePacketKind.Find, MuiDataspaceField.Id, packet.Id);
 	}
 
@@ -417,11 +417,11 @@ internal static class MuiDataspaceMessageCodec
 	{
 		if (!IsMapped(ref platform, message, MuiDataspaceGetMessage.Size))
 			return false;
-		return MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		return MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiDataspacePacketKind.Get, MuiDataspaceField.MethodId, GetMethod) &&
-			MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiDataspacePacketKind.Get, MuiDataspaceField.Id, packet.Id) &&
-				MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 					MuiDataspacePacketKind.Get, MuiDataspaceField.SizeStorage,
 					packet.SizeStorage.Raw);
 	}
@@ -432,9 +432,9 @@ internal static class MuiDataspaceMessageCodec
 	{
 		if (!IsMapped(ref platform, message, MuiDataspaceMergeMessage.Size))
 			return false;
-		return MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		return MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiDataspacePacketKind.Merge, MuiDataspaceField.MethodId, MergeMethod) &&
-			MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiDataspacePacketKind.Merge, MuiDataspaceField.Dataspace,
 				packet.Dataspace.Raw);
 	}
@@ -445,9 +445,9 @@ internal static class MuiDataspaceMessageCodec
 	{
 		if (!IsMapped(ref platform, message, MuiDataspaceRemoveMessage.Size))
 			return false;
-		return MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		return MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiDataspacePacketKind.Remove, MuiDataspaceField.MethodId, RemoveMethod) &&
-			MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiDataspacePacketKind.Remove, MuiDataspaceField.Id, packet.Id);
 	}
 
@@ -457,7 +457,7 @@ internal static class MuiDataspaceMessageCodec
 	{
 		if (!IsMapped(ref platform, message, MuiDataspaceClearMessage.Size))
 			return false;
-		return MuiDataspaceFieldCursorCodec.TryWriteUInt32(ref platform, message,
+		return MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 			MuiDataspacePacketKind.Clear, MuiDataspaceField.MethodId, ClearMethod);
 	}
 

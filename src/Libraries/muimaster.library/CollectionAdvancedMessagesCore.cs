@@ -218,27 +218,22 @@ internal static class MuiCollectionAdvancedMessageMemoryCodec
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiCollectionAdvancedFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			!TryGetPacketSize(cursor.Packet, out var packetSize) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Message, packetSize))
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, MuiCollectionMethodMessage.FieldSize);
-	}
+		=> TryGetAddress(ref platform, cursor.Message, cursor.Packet,
+			cursor.Field, out address);
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCollectionAdvancedPacketKind packet,
 		MuiCollectionAdvancedField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiCollectionAdvancedFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		return TryGetAddress(ref platform, cursor, out address);
+		address = APTR.Null;
+		if (!TryResolve(packet, field, out var offset) ||
+			!TryGetPacketSize(packet, out var packetSize) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, packetSize))
+			return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiCollectionMethodMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -247,11 +242,8 @@ internal static class MuiCollectionAdvancedMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiCollectionAdvancedFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -261,11 +253,8 @@ internal static class MuiCollectionAdvancedMessageMemoryCodec
 		MuiCollectionAdvancedField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiCollectionAdvancedFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -294,6 +283,222 @@ internal static class MuiCollectionAdvancedFieldCursorCodec
 			message, packet, field, value);
 }
 
+// Live List advanced packets are exchanged as declaration-order named
+// structs. The field/offset adapter above is retained for compatibility and
+// malformed-packet diagnostics only.
+internal static class MuiCollectionAdvancedStructPacketCodec
+{
+	private static bool TryCreate<TPlatform>(ref TPlatform platform,
+		APTR message, uint size, out MuiGuestStructCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, message, size,
+			out cursor);
+
+	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiCollectionMethodMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteMethod<TPlatform>(ref TPlatform platform,
+		APTR message, uint method)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionMethodMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, method) &&
+		MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadInsertSingle<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionInsertSingleMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message,
+			MuiCollectionInsertSingleMessage.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Entry) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Position) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteInsertSingle<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionInsertSingleMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionInsertSingleMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Entry) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Position) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadInsert<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionInsertMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiCollectionInsertMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Entries) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Count) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Position) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteInsert<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionInsertMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionInsertMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Entries) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Count) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Position) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadPosition<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionPositionMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiCollectionPositionMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Position) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWritePosition<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionPositionMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionPositionMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Position) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadRedraw<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionRedrawMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiCollectionRedrawMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Position) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Entry) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteRedraw<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionRedrawMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionRedrawMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Position) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Entry) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadPointer<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionPointerMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiCollectionPointerMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Pointer) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWritePointer<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionPointerMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionPointerMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Pointer) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadPair<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionPairMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiCollectionPairMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.First) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Second) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWritePair<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionPairMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionPairMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.First) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Second) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadCreateImage<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionCreateImageMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message,
+			MuiCollectionCreateImageMessage.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Image) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteCreateImage<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCollectionCreateImageMessage packet)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryCreate(ref platform, message, MuiCollectionCreateImageMessage.Size,
+			out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.MethodId) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Image) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			packet.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+}
+
 internal static class MuiCollectionAdvancedMessageCodec
 {
 	internal const uint InsertSingle = 0x804254D5u;
@@ -313,9 +518,11 @@ internal static class MuiCollectionAdvancedMessageCodec
 		APTR message, out uint method)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(
-			ref platform, message, MuiCollectionAdvancedPacketKind.Method,
-			MuiCollectionAdvancedField.MethodId, out method);
+		method = 0;
+		if (!MuiCollectionAdvancedStructPacketCodec.TryReadMethod(ref platform,
+			message, out var packet)) return false;
+		method = packet.MethodId;
+		return true;
 	}
 
 	// Keep the public packet seam as a named collection method record. Native
@@ -336,9 +543,8 @@ internal static class MuiCollectionAdvancedMessageCodec
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(
-			ref platform, message, MuiCollectionAdvancedPacketKind.Method,
-			MuiCollectionAdvancedField.MethodId, method);
+		return MuiCollectionAdvancedStructPacketCodec.TryWriteMethod(ref platform,
+			message, method);
 	}
 
 	internal static bool TryReadInsertSingle<TPlatform>(
@@ -347,34 +553,20 @@ internal static class MuiCollectionAdvancedMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionInsertSingleMessage.Size) ||
-			!TryReadMethodIdValue(ref platform, message, out var method) ||
-			method != InsertSingle) return false;
-		packet.MethodId = method;
-		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.InsertSingle,
-			MuiCollectionAdvancedField.Entry, out packet.Entry) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.InsertSingle,
-				MuiCollectionAdvancedField.Position, out packet.Position);
+		return MuiCollectionAdvancedStructPacketCodec.TryReadInsertSingle(
+			ref platform, message, out packet) && packet.MethodId == InsertSingle;
 	}
 
 	internal static bool WriteInsertSingle<TPlatform>(ref TPlatform platform,
 		APTR message, uint entry, uint position)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionInsertSingleMessage.Size)) return false;
-		return MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.InsertSingle,
-			MuiCollectionAdvancedField.MethodId, InsertSingle) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.InsertSingle,
-				MuiCollectionAdvancedField.Entry, entry) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.InsertSingle,
-				MuiCollectionAdvancedField.Position, position);
+		var packet = default(MuiCollectionInsertSingleMessage);
+		packet.MethodId = InsertSingle;
+		packet.Entry = entry;
+		packet.Position = position;
+		return MuiCollectionAdvancedStructPacketCodec.TryWriteInsertSingle(
+			ref platform, message, packet);
 	}
 
 	internal static bool TryReadInsert<TPlatform>(ref TPlatform platform,
@@ -382,40 +574,21 @@ internal static class MuiCollectionAdvancedMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionInsertMessage.Size) ||
-			!TryReadMethodIdValue(ref platform, message, out var method) ||
-			method != Insert) return false;
-		packet.MethodId = method;
-		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.Insert,
-			MuiCollectionAdvancedField.Entries, out packet.Entries) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.Insert,
-				MuiCollectionAdvancedField.Count, out packet.Count) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.Insert,
-				MuiCollectionAdvancedField.Position, out packet.Position);
+		return MuiCollectionAdvancedStructPacketCodec.TryReadInsert(ref platform,
+			message, out packet) && packet.MethodId == Insert;
 	}
 
 	internal static bool WriteInsert<TPlatform>(ref TPlatform platform,
 		APTR message, uint entries, uint count, uint position)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionInsertMessage.Size)) return false;
-		return MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.Insert,
-			MuiCollectionAdvancedField.MethodId, Insert) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.Insert,
-				MuiCollectionAdvancedField.Entries, entries) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.Insert,
-				MuiCollectionAdvancedField.Count, count) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.Insert,
-				MuiCollectionAdvancedField.Position, position);
+		var packet = default(MuiCollectionInsertMessage);
+		packet.MethodId = Insert;
+		packet.Entries = entries;
+		packet.Count = count;
+		packet.Position = position;
+		return MuiCollectionAdvancedStructPacketCodec.TryWriteInsert(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadPosition<TPlatform>(ref TPlatform platform,
@@ -423,29 +596,21 @@ internal static class MuiCollectionAdvancedMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionPositionMessage.Size) || !IsPositionMethod(method) ||
-			!TryReadMethodIdValue(ref platform, message, out var header) ||
-			header != method) return false;
-		packet.MethodId = header;
-		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.Position,
-			MuiCollectionAdvancedField.Position, out packet.Position);
+		return IsPositionMethod(method) &&
+			MuiCollectionAdvancedStructPacketCodec.TryReadPosition(ref platform,
+				message, out packet) && packet.MethodId == method;
 	}
 
 	internal static bool WritePosition<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, uint position)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionPositionMessage.Size) || !IsPositionMethod(method))
-			return false;
-		return MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.Position,
-			MuiCollectionAdvancedField.MethodId, method) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.Position,
-			MuiCollectionAdvancedField.Position, position);
+		if (!IsPositionMethod(method)) return false;
+		var packet = default(MuiCollectionPositionMessage);
+		packet.MethodId = method;
+		packet.Position = position;
+		return MuiCollectionAdvancedStructPacketCodec.TryWritePosition(
+			ref platform, message, packet);
 	}
 
 	internal static bool TryReadRedraw<TPlatform>(ref TPlatform platform,
@@ -453,34 +618,20 @@ internal static class MuiCollectionAdvancedMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionRedrawMessage.Size) ||
-			!TryReadMethodIdValue(ref platform, message, out var method) ||
-			method != Redraw) return false;
-		packet.MethodId = method;
-		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.Redraw,
-			MuiCollectionAdvancedField.Position, out packet.Position) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.Redraw,
-				MuiCollectionAdvancedField.Entry, out packet.Entry);
+		return MuiCollectionAdvancedStructPacketCodec.TryReadRedraw(ref platform,
+			message, out packet) && packet.MethodId == Redraw;
 	}
 
 	internal static bool WriteRedraw<TPlatform>(ref TPlatform platform,
 		APTR message, uint position, uint entry)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionRedrawMessage.Size)) return false;
-		return MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.Redraw,
-			MuiCollectionAdvancedField.MethodId, Redraw) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.Redraw,
-				MuiCollectionAdvancedField.Position, position) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.Redraw,
-				MuiCollectionAdvancedField.Entry, entry);
+		var packet = default(MuiCollectionRedrawMessage);
+		packet.MethodId = Redraw;
+		packet.Position = position;
+		packet.Entry = entry;
+		return MuiCollectionAdvancedStructPacketCodec.TryWriteRedraw(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadPointer<TPlatform>(ref TPlatform platform,
@@ -488,29 +639,21 @@ internal static class MuiCollectionAdvancedMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionPointerMessage.Size) || !IsPointerMethod(method) ||
-			!TryReadMethodIdValue(ref platform, message, out var header) ||
-			header != method) return false;
-		packet.MethodId = header;
-		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.Pointer,
-			MuiCollectionAdvancedField.Pointer, out packet.Pointer);
+		return IsPointerMethod(method) &&
+			MuiCollectionAdvancedStructPacketCodec.TryReadPointer(ref platform,
+				message, out packet) && packet.MethodId == method;
 	}
 
 	internal static bool WritePointer<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, uint pointer)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionPointerMessage.Size) || !IsPointerMethod(method))
-			return false;
-		return MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.Pointer,
-			MuiCollectionAdvancedField.MethodId, method) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.Pointer,
-				MuiCollectionAdvancedField.Pointer, pointer);
+		if (!IsPointerMethod(method)) return false;
+		var packet = default(MuiCollectionPointerMessage);
+		packet.MethodId = method;
+		packet.Pointer = pointer;
+		return MuiCollectionAdvancedStructPacketCodec.TryWritePointer(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadPair<TPlatform>(ref TPlatform platform,
@@ -518,34 +661,22 @@ internal static class MuiCollectionAdvancedMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionPairMessage.Size) || !IsPairMethod(method) ||
-			!TryReadMethodIdValue(ref platform, message, out var header) ||
-			header != method) return false;
-		packet.MethodId = header;
-		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.Pair,
-			MuiCollectionAdvancedField.First, out packet.First) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.Pair,
-				MuiCollectionAdvancedField.Second, out packet.Second);
+		return IsPairMethod(method) &&
+			MuiCollectionAdvancedStructPacketCodec.TryReadPair(ref platform,
+				message, out packet) && packet.MethodId == method;
 	}
 
 	internal static bool WritePair<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, uint first, uint second)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionPairMessage.Size) || !IsPairMethod(method)) return false;
-		return MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.Pair,
-			MuiCollectionAdvancedField.MethodId, method) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.Pair,
-				MuiCollectionAdvancedField.First, first) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.Pair,
-				MuiCollectionAdvancedField.Second, second);
+		if (!IsPairMethod(method)) return false;
+		var packet = default(MuiCollectionPairMessage);
+		packet.MethodId = method;
+		packet.First = first;
+		packet.Second = second;
+		return MuiCollectionAdvancedStructPacketCodec.TryWritePair(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadCreateImage<TPlatform>(ref TPlatform platform,
@@ -553,34 +684,20 @@ internal static class MuiCollectionAdvancedMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionCreateImageMessage.Size) ||
-			!TryReadMethodIdValue(ref platform, message, out var method) ||
-			method != CreateImage) return false;
-		packet.MethodId = method;
-		return MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.CreateImage,
-			MuiCollectionAdvancedField.Image, out packet.Image) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.CreateImage,
-				MuiCollectionAdvancedField.Flags, out packet.Flags);
+		return MuiCollectionAdvancedStructPacketCodec.TryReadCreateImage(
+			ref platform, message, out packet) && packet.MethodId == CreateImage;
 	}
 
 	internal static bool WriteCreateImage<TPlatform>(ref TPlatform platform,
 		APTR message, uint image, uint flags)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiCollectionCreateImageMessage.Size)) return false;
-		return MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiCollectionAdvancedPacketKind.CreateImage,
-			MuiCollectionAdvancedField.MethodId, CreateImage) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.CreateImage,
-				MuiCollectionAdvancedField.Image, image) &&
-			MuiCollectionAdvancedFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiCollectionAdvancedPacketKind.CreateImage,
-				MuiCollectionAdvancedField.Flags, flags);
+		var packet = default(MuiCollectionCreateImageMessage);
+		packet.MethodId = CreateImage;
+		packet.Image = image;
+		packet.Flags = flags;
+		return MuiCollectionAdvancedStructPacketCodec.TryWriteCreateImage(
+			ref platform, message, packet);
 	}
 
 	private static bool IsPositionMethod(uint method) => method == Remove ||

@@ -220,7 +220,7 @@ internal static class MuiMenuSpecialistMessageCodec
 		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiMenuSpecialistMethodMessage.Size)) return false;
-		return MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiMenuSpecialistPacketKind.Method,
 			MuiMenuSpecialistField.MethodId, out methodId);
 	}
@@ -241,7 +241,7 @@ internal static class MuiMenuSpecialistMessageCodec
 	{
 		if (!IsMethod(method) || message.IsNull || !platform.IsMapped(message,
 			MuiMenuSpecialistMethodMessage.Size)) return false;
-		return MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiMenuSpecialistPacketKind.Method,
 			MuiMenuSpecialistField.MethodId, method);
 	}
@@ -253,13 +253,13 @@ internal static class MuiMenuSpecialistMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiMenuSpecialistGetMessage.Size,
 			OmGet)) return false;
-		return MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiMenuSpecialistPacketKind.Get,
 			MuiMenuSpecialistField.MethodId, out packet.MethodId) &&
-			MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+			MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiMenuSpecialistPacketKind.Get,
 				MuiMenuSpecialistField.Attribute, out packet.Attribute) &&
-				MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+				MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 					message, MuiMenuSpecialistPacketKind.Get,
 					MuiMenuSpecialistField.Storage, out packet.Storage);
 	}
@@ -270,13 +270,13 @@ internal static class MuiMenuSpecialistMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiMenuSpecialistGetMessage.Size)) return false;
-		return MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiMenuSpecialistPacketKind.Get,
 			MuiMenuSpecialistField.MethodId, OmGet) &&
-			MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiMenuSpecialistPacketKind.Get,
 				MuiMenuSpecialistField.Attribute, attribute) &&
-				MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+				MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 					message, MuiMenuSpecialistPacketKind.Get,
 					MuiMenuSpecialistField.Storage, storage);
 	}
@@ -288,13 +288,13 @@ internal static class MuiMenuSpecialistMessageCodec
 		packet = default;
 		if (!IsSetMethod(method) || !IsPacket(ref platform, message,
 			MuiMenuSpecialistSetMessage.Size, method)) return false;
-		return MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiMenuSpecialistPacketKind.Set,
 			MuiMenuSpecialistField.MethodId, out packet.MethodId) &&
-			MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+			MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiMenuSpecialistPacketKind.Set,
 				MuiMenuSpecialistField.Attribute, out packet.Attribute) &&
-				MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+				MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 					message, MuiMenuSpecialistPacketKind.Set,
 					MuiMenuSpecialistField.Value, out packet.Value);
 	}
@@ -305,13 +305,13 @@ internal static class MuiMenuSpecialistMessageCodec
 	{
 		if (!IsSetMethod(method) || message.IsNull || !platform.IsMapped(
 			message, MuiMenuSpecialistSetMessage.Size)) return false;
-		return MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiMenuSpecialistPacketKind.Set,
 			MuiMenuSpecialistField.MethodId, method) &&
-			MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiMenuSpecialistPacketKind.Set,
 				MuiMenuSpecialistField.Attribute, attribute) &&
-				MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+				MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 					message, MuiMenuSpecialistPacketKind.Set,
 					MuiMenuSpecialistField.Value, value);
 	}
@@ -323,10 +323,10 @@ internal static class MuiMenuSpecialistMessageCodec
 		packet = default;
 		if (!IsPointerMethod(method) || !IsPacket(ref platform, message,
 			MuiMenuSpecialistPointerMessage.Size, method)) return false;
-		return MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiMenuSpecialistPacketKind.Pointer,
 			MuiMenuSpecialistField.MethodId, out packet.MethodId) &&
-			MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+			MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiMenuSpecialistPacketKind.Pointer,
 				MuiMenuSpecialistField.ObjectPointer, out packet.ObjectPointer);
 	}
@@ -337,10 +337,10 @@ internal static class MuiMenuSpecialistMessageCodec
 	{
 		if (!IsPointerMethod(method) || message.IsNull || !platform.IsMapped(
 			message, MuiMenuSpecialistPointerMessage.Size)) return false;
-		return MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiMenuSpecialistPacketKind.Pointer,
 			MuiMenuSpecialistField.MethodId, method) &&
-			MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiMenuSpecialistPacketKind.Pointer,
 				MuiMenuSpecialistField.ObjectPointer, objectPointer);
 	}
@@ -352,13 +352,13 @@ internal static class MuiMenuSpecialistMessageCodec
 		packet = default;
 		if (!IsPairMethod(method) || !IsPacket(ref platform, message,
 			MuiMenuSpecialistPairMessage.Size, method)) return false;
-		return MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiMenuSpecialistPacketKind.Pair,
 			MuiMenuSpecialistField.MethodId, out packet.MethodId) &&
-			MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+			MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiMenuSpecialistPacketKind.Pair,
 				MuiMenuSpecialistField.First, out packet.First) &&
-				MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+				MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 					message, MuiMenuSpecialistPacketKind.Pair,
 					MuiMenuSpecialistField.Second, out packet.Second);
 	}
@@ -369,13 +369,13 @@ internal static class MuiMenuSpecialistMessageCodec
 	{
 		if (!IsPairMethod(method) || message.IsNull || !platform.IsMapped(
 			message, MuiMenuSpecialistPairMessage.Size)) return false;
-		return MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiMenuSpecialistPacketKind.Pair,
 			MuiMenuSpecialistField.MethodId, method) &&
-			MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiMenuSpecialistPacketKind.Pair,
 				MuiMenuSpecialistField.First, first) &&
-				MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+				MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 					message, MuiMenuSpecialistPacketKind.Pair,
 					MuiMenuSpecialistField.Second, second);
 	}
@@ -387,16 +387,16 @@ internal static class MuiMenuSpecialistMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiMenuSpecialistPopupMessage.Size,
 			MuiMenuAttributes.Menustrip_Popup)) return false;
-		return MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiMenuSpecialistPacketKind.Popup,
 			MuiMenuSpecialistField.MethodId, out packet.MethodId) &&
-			MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+			MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiMenuSpecialistPacketKind.Popup,
 				MuiMenuSpecialistField.Window, out packet.Window) &&
-				MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+				MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 					message, MuiMenuSpecialistPacketKind.Popup,
 					MuiMenuSpecialistField.X, out packet.X) &&
-					MuiMenuSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+					MuiMenuSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 						message, MuiMenuSpecialistPacketKind.Popup,
 						MuiMenuSpecialistField.Y, out packet.Y);
 	}
@@ -407,16 +407,16 @@ internal static class MuiMenuSpecialistMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiMenuSpecialistPopupMessage.Size)) return false;
-		return MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiMenuSpecialistPacketKind.Popup,
 			MuiMenuSpecialistField.MethodId, MuiMenuAttributes.Menustrip_Popup) &&
-			MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiMenuSpecialistPacketKind.Popup,
 				MuiMenuSpecialistField.Window, window) &&
-				MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+				MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 					message, MuiMenuSpecialistPacketKind.Popup,
 					MuiMenuSpecialistField.X, x) &&
-					MuiMenuSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+					MuiMenuSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 						message, MuiMenuSpecialistPacketKind.Popup,
 						MuiMenuSpecialistField.Y, y);
 	}

@@ -180,27 +180,54 @@ internal static class MuiGroupLayoutPolicyStateRecordMemoryCodec
 
 internal static class MuiGroupLayoutPolicyStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiGroupLayoutPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiGroupLayoutPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.Magic, out value.Magic) ||
-			!MuiGroupLayoutPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.Horizontal, out value.Horizontal) ||
-			!MuiGroupLayoutPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.HorizontalSpacing, out value.HorizontalSpacing) ||
-			!MuiGroupLayoutPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.VerticalSpacing, out value.VerticalSpacing) ||
-			!MuiGroupLayoutPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.SameWidth, out value.SameWidth) ||
-			!MuiGroupLayoutPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.SameHeight, out value.SameHeight) ||
-			!MuiGroupLayoutPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.PageMode, out value.PageMode)) return false;
-		return true;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupLayoutPolicyStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Horizontal) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.HorizontalSpacing) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.VerticalSpacing) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.SameWidth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.SameHeight) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.PageMode)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGroupLayoutPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupLayoutPolicyStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Horizontal) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.HorizontalSpacing) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.VerticalSpacing) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SameWidth) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SameHeight) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.PageMode) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGroupLayoutPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiGroupLayoutPolicyStateRecord value)
@@ -212,20 +239,8 @@ internal static class MuiGroupLayoutPolicyStateRecordCodec
 		MuiGroupLayoutPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGroupLayoutPolicyStateAdmission.Validate(value)) return false;
-		return MuiGroupLayoutPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.Magic, value.Magic) &&
-			MuiGroupLayoutPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.Horizontal, value.Horizontal) &&
-			MuiGroupLayoutPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.HorizontalSpacing, value.HorizontalSpacing) &&
-			MuiGroupLayoutPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.VerticalSpacing, value.VerticalSpacing) &&
-			MuiGroupLayoutPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.SameWidth, value.SameWidth) &&
-			MuiGroupLayoutPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.SameHeight, value.SameHeight) &&
-			MuiGroupLayoutPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupLayoutPolicyField.PageMode, value.PageMode);
+		if (address.IsNull || !MuiGroupLayoutPolicyStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

@@ -154,25 +154,54 @@ internal static class MuiNumericStateRecordMemoryCodec
 
 internal static class MuiNumericStateRecordCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiNumericStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiNumericStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Minimum) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Maximum) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Value) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Default) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reverse) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiNumericStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiNumericStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Minimum) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Maximum) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Value) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Default) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reverse) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiNumericStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		return MuiNumericStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiNumericStateField.Magic, out value.Magic) &&
-			MuiNumericStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiNumericStateField.Minimum, out value.Minimum) &&
-			MuiNumericStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiNumericStateField.Maximum, out value.Maximum) &&
-			MuiNumericStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiNumericStateField.Value, out value.Value) &&
-			MuiNumericStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiNumericStateField.Default, out value.Default) &&
-			MuiNumericStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiNumericStateField.Reverse, out value.Reverse);
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiNumericStateRecord value)
@@ -184,19 +213,8 @@ internal static class MuiNumericStateRecordCodec
 		MuiNumericStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiNumericStateAdmission.Validate(value)) return false;
-		return MuiNumericStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiNumericStateField.Magic, value.Magic) &&
-			MuiNumericStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiNumericStateField.Minimum, value.Minimum) &&
-			MuiNumericStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiNumericStateField.Maximum, value.Maximum) &&
-			MuiNumericStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiNumericStateField.Value, value.Value) &&
-			MuiNumericStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiNumericStateField.Default, value.Default) &&
-			MuiNumericStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiNumericStateField.Reverse, value.Reverse);
+		return MuiNumericStateAdmission.Validate(value) &&
+			WriteRecord(ref platform, address, value);
 	}
 }
 

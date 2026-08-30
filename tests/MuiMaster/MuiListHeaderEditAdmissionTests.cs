@@ -84,4 +84,69 @@ public sealed class MuiListHeaderEditAdmissionTests
 		Assert.False(MuiListCore.MuiListEditStateCodec.TryRead(ref platform,
 			editAddress, out _));
 	}
+
+	[Fact]
+	public void EditRecordSequentialCodecPreservesSignedLongsPointersAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2B00);
+		var value = new MuiListCore.MuiListEditState
+		{
+			Magic = 0x4C454449u,
+			Row = -123456,
+			Column = int.MinValue + 7,
+			Entry = APTR.FromPointer(uint.MaxValue),
+			EditObject = APTR.FromPointer(0x01020304u),
+			Flags = 0xAABBCCDDu,
+		};
+
+		Assert.True(MuiListCore.MuiListEditStateCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiListCore.MuiListEditStateCodec.TryReadRecord(ref platform,
+			address, out var read));
+		Assert.Equal(value.Magic, read.Magic);
+		Assert.Equal(value.Row, read.Row);
+		Assert.Equal(value.Column, read.Column);
+		Assert.Equal(value.Entry, read.Entry);
+		Assert.Equal(value.EditObject, read.EditObject);
+		Assert.Equal(value.Flags, read.Flags);
+
+		var crossingEnd = APTR.FromPointer(0x30FE9);
+		Assert.False(MuiListCore.MuiListEditStateCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiListCore.MuiListEditStateCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
+
+	[Fact]
+	public void ListHeaderSequentialCodecPreservesPointersAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2B80);
+		var value = new MuiListHeaderState
+		{
+			Magic = MuiListHeaderState.Cookie,
+			Index = APTR.FromPointer(uint.MaxValue),
+			Capacity = 0x10203040u,
+			Count = 0xAABBCCDDu,
+			Images = APTR.FromPointer(0x01020304u),
+		};
+
+		Assert.True(MuiListHeaderCodec.WriteRecord(ref platform, address, value));
+		Assert.True(MuiListHeaderCodec.TryReadRecord(ref platform, address,
+			out var read));
+		Assert.Equal(value.Magic, read.Magic);
+		Assert.Equal(value.Index, read.Index);
+		Assert.Equal(value.Capacity, read.Capacity);
+		Assert.Equal(value.Count, read.Count);
+		Assert.Equal(value.Images, read.Images);
+
+		var crossingEnd = APTR.FromPointer(0x30FED);
+		Assert.False(MuiListHeaderCodec.WriteRecord(ref platform, crossingEnd,
+			value));
+		Assert.False(MuiListHeaderCodec.TryReadRecord(ref platform, crossingEnd,
+			out _));
+	}
 }

@@ -11,6 +11,7 @@ namespace CopperOS.MuiMaster;
 // Caller-owned String.mui edit-hook state. The Hook pointer is a guest
 // struct Hook and LonelyEditHook is a MorphOS BOOL; keeping them together
 // avoids positional fields in a private String instance record.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringEditHookState
 {
 	public APTR EditHook;
@@ -21,6 +22,7 @@ public struct MuiStringEditHookState
 // owning screen/window from the MUI object; the guest hook never receives a
 // host UI object or a managed callback. InputEvent remains the caller-owned
 // Intuition message supplied to the edit hook.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringEditBeepRequest
 {
 	public APTR Object;
@@ -34,6 +36,7 @@ public struct MuiStringEditBeepRequest
 // selection has been applied. When it declines, the core queues the event in
 // the owning Window's named guest record. Window and MuiKey are named context
 // from the current MUI dispatch, allowing either path without offset guesses.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringEditReuseRequest
 {
 	public APTR Object;
@@ -42,6 +45,58 @@ public struct MuiStringEditReuseRequest
 	public int MuiKey;
 	public ushort Code;
 	public uint Accepted;
+}
+
+// Fixed ULONG command payload passed as A1 to a String.mui edit hook. The
+// numeric wire position is confined to this bounded adapter; callback code
+// exchanges the named command record instead of a scalar offset.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiStringEditCommandRecord
+{
+	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint CommandOffset = 0;
+	internal uint Command;
+}
+
+internal static class MuiStringEditCommandCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (record.IsNull || record.Raw > uint.MaxValue -
+			MuiStringEditCommandRecord.CommandOffset || !platform.IsMapped(record,
+			MuiStringEditCommandRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw +
+			MuiStringEditCommandRecord.CommandOffset);
+		return platform.IsMapped(address, MuiStringEditCommandRecord.FieldSize);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiStringEditCommandRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, address, out var fieldAddress))
+			return false;
+		platform.WriteUInt32(fieldAddress,
+			unchecked((int)MuiStringEditCommandRecord.CommandOffset),
+			record.Command);
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiStringEditCommandRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		record = default;
+		if (!TryGetAddress(ref platform, address, out var fieldAddress))
+			return false;
+		record.Command = platform.ReadUInt32(fieldAddress,
+			unchecked((int)MuiStringEditCommandRecord.CommandOffset));
+		return true;
+	}
 }
 
 // Fixed guest SGWork record passed to MUIA_String_EditHook. The fields mirror
@@ -53,6 +108,21 @@ public struct MuiStringEditReuseRequest
 internal struct MuiStringEditWorkRecord
 {
 	internal const uint Size = 44;
+	internal const uint LongFieldSize = 4;
+	internal const uint WordFieldSize = 2;
+	internal const uint GadgetOffset = 0;
+	internal const uint StringInfoOffset = 4;
+	internal const uint WorkBufferOffset = 8;
+	internal const uint PrevBufferOffset = 12;
+	internal const uint ModesOffset = 16;
+	internal const uint InputEventOffset = 20;
+	internal const uint CodeOffset = 24;
+	internal const uint BufferPosOffset = 26;
+	internal const uint NumCharsOffset = 28;
+	internal const uint ActionsOffset = 30;
+	internal const uint LongIntOffset = 34;
+	internal const uint GadgetInfoOffset = 38;
+	internal const uint EditOpOffset = 42;
 	internal APTR Gadget;
 	internal APTR StringInfo;
 	internal APTR WorkBuffer;
@@ -92,46 +162,51 @@ internal struct MuiStringEditRecordFieldCursor
 	internal MuiStringEditRecordField Field;
 }
 
-internal static class MuiStringEditRecordFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed Intuition SGWork record.
+// Named field sizes/positions live with the record; this bounded seam admits
+// the complete record before exposing a field address.
+internal static class MuiStringEditWorkRecordMemoryCodec
 {
 	private static bool TryResolve(MuiStringEditRecordField field,
 		out uint offset, out uint fieldSize)
 	{
 		offset = field switch
 		{
-			MuiStringEditRecordField.Gadget => 0,
-			MuiStringEditRecordField.StringInfo => 4,
-			MuiStringEditRecordField.WorkBuffer => 8,
-			MuiStringEditRecordField.PrevBuffer => 12,
-			MuiStringEditRecordField.Modes => 16,
-			MuiStringEditRecordField.InputEvent => 20,
-			MuiStringEditRecordField.Code => 24,
-			MuiStringEditRecordField.BufferPos => 26,
-			MuiStringEditRecordField.NumChars => 28,
-			MuiStringEditRecordField.Actions => 30,
-			MuiStringEditRecordField.LongInt => 34,
-			MuiStringEditRecordField.GadgetInfo => 38,
-			MuiStringEditRecordField.EditOp => 42,
+			MuiStringEditRecordField.Gadget => MuiStringEditWorkRecord.GadgetOffset,
+			MuiStringEditRecordField.StringInfo => MuiStringEditWorkRecord.StringInfoOffset,
+			MuiStringEditRecordField.WorkBuffer => MuiStringEditWorkRecord.WorkBufferOffset,
+			MuiStringEditRecordField.PrevBuffer => MuiStringEditWorkRecord.PrevBufferOffset,
+			MuiStringEditRecordField.Modes => MuiStringEditWorkRecord.ModesOffset,
+			MuiStringEditRecordField.InputEvent => MuiStringEditWorkRecord.InputEventOffset,
+			MuiStringEditRecordField.Code => MuiStringEditWorkRecord.CodeOffset,
+			MuiStringEditRecordField.BufferPos => MuiStringEditWorkRecord.BufferPosOffset,
+			MuiStringEditRecordField.NumChars => MuiStringEditWorkRecord.NumCharsOffset,
+			MuiStringEditRecordField.Actions => MuiStringEditWorkRecord.ActionsOffset,
+			MuiStringEditRecordField.LongInt => MuiStringEditWorkRecord.LongIntOffset,
+			MuiStringEditRecordField.GadgetInfo => MuiStringEditWorkRecord.GadgetInfoOffset,
+			MuiStringEditRecordField.EditOp => MuiStringEditWorkRecord.EditOpOffset,
 			_ => uint.MaxValue,
 		};
 		fieldSize = field == MuiStringEditRecordField.Code ||
 			field == MuiStringEditRecordField.BufferPos ||
 			field == MuiStringEditRecordField.NumChars ||
-			field == MuiStringEditRecordField.EditOp ? 2u : 4u;
+			field == MuiStringEditRecordField.EditOp ?
+			MuiStringEditWorkRecord.WordFieldSize :
+			MuiStringEditWorkRecord.LongFieldSize;
 		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiStringEditRecordFieldCursor cursor, out APTR address,
+		APTR record, MuiStringEditRecordField field, out APTR address,
 		out uint fieldSize) where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
 		fieldSize = 0;
-		if (!TryResolve(cursor.Field, out var offset, out fieldSize) ||
-			cursor.Address.IsNull || cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, MuiStringEditWorkRecord.Size))
+		if (!TryResolve(field, out var offset, out fieldSize) ||
+			record.IsNull || record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiStringEditWorkRecord.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
+		address = APTR.FromPointer(record.Raw + offset);
 		return platform.IsMapped(address, fieldSize);
 	}
 
@@ -140,11 +215,9 @@ internal static class MuiStringEditRecordFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiStringEditRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress,
-			out var fieldSize) || fieldSize != 4) return false;
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress,
+			out var fieldSize) || fieldSize != MuiStringEditWorkRecord.LongFieldSize)
+			return false;
 		value = platform.ReadUInt32(fieldAddress, 0);
 		return true;
 	}
@@ -153,11 +226,9 @@ internal static class MuiStringEditRecordFieldCursorCodec
 		APTR address, MuiStringEditRecordField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiStringEditRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress,
-			out var fieldSize) || fieldSize != 4) return false;
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress,
+			out var fieldSize) || fieldSize != MuiStringEditWorkRecord.LongFieldSize)
+			return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
 		return true;
 	}
@@ -167,11 +238,9 @@ internal static class MuiStringEditRecordFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiStringEditRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress,
-			out var fieldSize) || fieldSize != 2) return false;
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress,
+			out var fieldSize) || fieldSize != MuiStringEditWorkRecord.WordFieldSize)
+			return false;
 		value = platform.ReadUInt16(fieldAddress, 0);
 		return true;
 	}
@@ -180,14 +249,46 @@ internal static class MuiStringEditRecordFieldCursorCodec
 		APTR address, MuiStringEditRecordField field, ushort value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiStringEditRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress,
-			out var fieldSize) || fieldSize != 2) return false;
+		if (!TryGetAddress(ref platform, address, field, out var fieldAddress,
+			out var fieldSize) || fieldSize != MuiStringEditWorkRecord.WordFieldSize)
+			return false;
 		platform.WriteUInt16(fieldAddress, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for existing typed cursor diagnostics.
+internal static class MuiStringEditRecordFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringEditRecordFieldCursor cursor, out APTR address,
+		out uint fieldSize) where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringEditWorkRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Address, cursor.Field, out address, out fieldSize);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStringEditRecordField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform, address,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStringEditRecordField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			field, value);
+
+	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStringEditRecordField field, out ushort value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringEditWorkRecordMemoryCodec.TryReadUInt16(ref platform, address,
+			field, out value);
+
+	internal static bool TryWriteUInt16<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStringEditRecordField field, ushort value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringEditWorkRecordMemoryCodec.TryWriteUInt16(ref platform, address,
+			field, value);
 }
 
 internal static class MuiStringEditWorkCodec
@@ -208,38 +309,38 @@ internal static class MuiStringEditWorkCodec
 		record = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiStringEditWorkRecord.Size)) return false;
-		if (!MuiStringEditRecordFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiStringEditRecordField.Gadget, out var gadget) ||
-			!MuiStringEditRecordFieldCursorCodec.TryReadUInt32(ref platform,
+				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiStringEditRecordField.StringInfo,
 				out var stringInfo) ||
-			!MuiStringEditRecordFieldCursorCodec.TryReadUInt32(ref platform,
+				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiStringEditRecordField.WorkBuffer,
 				out var workBuffer) ||
-			!MuiStringEditRecordFieldCursorCodec.TryReadUInt32(ref platform,
+				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiStringEditRecordField.PrevBuffer,
 				out var prevBuffer) ||
-			!MuiStringEditRecordFieldCursorCodec.TryReadUInt32(ref platform,
+				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiStringEditRecordField.Modes, out record.Modes) ||
-			!MuiStringEditRecordFieldCursorCodec.TryReadUInt32(ref platform,
+				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiStringEditRecordField.InputEvent,
 				out var inputEvent) ||
-			!MuiStringEditRecordFieldCursorCodec.TryReadUInt16(ref platform,
+				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt16(ref platform,
 				address, MuiStringEditRecordField.Code, out record.Code) ||
-			!MuiStringEditRecordFieldCursorCodec.TryReadUInt16(ref platform,
+				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt16(ref platform,
 				address, MuiStringEditRecordField.BufferPos,
 				out var bufferPos) ||
-			!MuiStringEditRecordFieldCursorCodec.TryReadUInt16(ref platform,
+				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt16(ref platform,
 				address, MuiStringEditRecordField.NumChars,
 				out var numChars) ||
-			!MuiStringEditRecordFieldCursorCodec.TryReadUInt32(ref platform,
+				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiStringEditRecordField.Actions, out record.Actions) ||
-			!MuiStringEditRecordFieldCursorCodec.TryReadUInt32(ref platform,
+				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiStringEditRecordField.LongInt, out var longInt) ||
-			!MuiStringEditRecordFieldCursorCodec.TryReadUInt32(ref platform,
+				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
 				address, MuiStringEditRecordField.GadgetInfo,
 				out var gadgetInfo) ||
-			!MuiStringEditRecordFieldCursorCodec.TryReadUInt16(ref platform,
+				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt16(ref platform,
 				address, MuiStringEditRecordField.EditOp, out record.EditOp))
 			return false;
 		record.Gadget = APTR.FromPointer(gadget);
@@ -260,39 +361,39 @@ internal static class MuiStringEditWorkCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiStringEditWorkRecord.Size)) return false;
-		return MuiStringEditRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiStringEditRecordField.Gadget, record.Gadget.Raw) &&
-			MuiStringEditRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiStringEditRecordField.StringInfo,
 				record.StringInfo.Raw) &&
-			MuiStringEditRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiStringEditRecordField.WorkBuffer,
 				record.WorkBuffer.Raw) &&
-			MuiStringEditRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiStringEditRecordField.PrevBuffer,
 				record.PrevBuffer.Raw) &&
-			MuiStringEditRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiStringEditRecordField.Modes, record.Modes) &&
-			MuiStringEditRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiStringEditRecordField.InputEvent,
 				record.InputEvent.Raw) &&
-			MuiStringEditRecordFieldCursorCodec.TryWriteUInt16(ref platform,
+			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt16(ref platform,
 				address, MuiStringEditRecordField.Code, record.Code) &&
-			MuiStringEditRecordFieldCursorCodec.TryWriteUInt16(ref platform,
+			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt16(ref platform,
 				address, MuiStringEditRecordField.BufferPos,
 				unchecked((ushort)record.BufferPos)) &&
-			MuiStringEditRecordFieldCursorCodec.TryWriteUInt16(ref platform,
+			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt16(ref platform,
 				address, MuiStringEditRecordField.NumChars,
 				unchecked((ushort)record.NumChars)) &&
-			MuiStringEditRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiStringEditRecordField.Actions, record.Actions) &&
-			MuiStringEditRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiStringEditRecordField.LongInt,
 				unchecked((uint)record.LongInt)) &&
-			MuiStringEditRecordFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
 				address, MuiStringEditRecordField.GadgetInfo,
 				record.GadgetInfo.Raw) &&
-			MuiStringEditRecordFieldCursorCodec.TryWriteUInt16(ref platform,
+			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt16(ref platform,
 				address, MuiStringEditRecordField.EditOp, record.EditOp);
 	}
 }

@@ -259,34 +259,53 @@ internal static class MuiVirtgroupInputRecordMemoryCodec
 
 internal static class MuiVirtgroupDisplayStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
-		APTR address,
-		out MuiVirtgroupDisplayStateRecord value)
+	// Declaration-order display rectangle: Magic, signed Left/Top, then
+	// Width/Height. Signed LONGs travel as raw ULONG bit patterns.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiVirtgroupDisplayStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Display, MuiVirtgroupInputField.Magic,
-			out var magic) ||
-			!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Display, MuiVirtgroupInputField.Left,
-			out var left) ||
-			!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Display, MuiVirtgroupInputField.Top,
-			out var top) ||
-			!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Display, MuiVirtgroupInputField.Width,
-			out var width) ||
-			!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Display, MuiVirtgroupInputField.Height,
-			out var height)) return false;
-		value.Magic = magic;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiVirtgroupDisplayStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var left) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var top) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var width) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var height)) return false;
 		value.Left = unchecked((int)left);
 		value.Top = unchecked((int)top);
 		value.Width = unchecked((int)width);
 		value.Height = unchecked((int)height);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiVirtgroupDisplayStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiVirtgroupDisplayStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Left)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Top)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Width)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Height)) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiVirtgroupDisplayStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiVirtgroupDisplayStateRecord value)
@@ -299,64 +318,74 @@ internal static class MuiVirtgroupDisplayStateRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiVirtgroupDisplayStateAdmission.Validate(value)) return false;
-		return MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiVirtgroupInputRecordKind.Display,
-			MuiVirtgroupInputField.Magic, value.Magic) &&
-			MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Display, MuiVirtgroupInputField.Left,
-			unchecked((uint)value.Left)) &&
-			MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Display, MuiVirtgroupInputField.Top,
-			unchecked((uint)value.Top)) &&
-			MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Display, MuiVirtgroupInputField.Width,
-			unchecked((uint)value.Width)) &&
-			MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Display, MuiVirtgroupInputField.Height,
-			unchecked((uint)value.Height));
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
 internal static class MuiVirtgroupPointerStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
-		APTR address,
-		out MuiVirtgroupPointerStateRecord value)
+	// Declaration-order pointer-drag record: magic/flags followed by the six
+	// signed coordinates. The cursor keeps this transient record typed and
+	// bounded without retaining managed state.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiVirtgroupPointerStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.Magic,
-			out value.Magic) ||
-			!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.Flags,
-			out value.Flags) ||
-			!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.StartX,
-			out var startX) ||
-			!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.StartY,
-			out var startY) ||
-			!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.StartLeft,
-			out var startLeft) ||
-			!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.StartTop,
-			out var startTop) ||
-			!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.LastX,
-			out var lastX) ||
-			!MuiVirtgroupInputRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.LastY,
-			out var lastY)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiVirtgroupPointerStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Flags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var startX) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var startY) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var startLeft) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var startTop) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var lastX) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var lastY)) return false;
 		value.StartX = unchecked((int)startX);
 		value.StartY = unchecked((int)startY);
 		value.StartLeft = unchecked((int)startLeft);
 		value.StartTop = unchecked((int)startTop);
 		value.LastX = unchecked((int)lastX);
 		value.LastY = unchecked((int)lastY);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiVirtgroupPointerStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiVirtgroupPointerStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Flags) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.StartX)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.StartY)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.StartLeft)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.StartTop)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.LastX)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.LastY)) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiVirtgroupPointerStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiVirtgroupPointerStateRecord value)
@@ -369,29 +398,6 @@ internal static class MuiVirtgroupPointerStateRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiVirtgroupPointerStateAdmission.Validate(value)) return false;
-		return MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiVirtgroupInputRecordKind.Pointer,
-			MuiVirtgroupInputField.Magic, value.Magic) &&
-			MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.Flags,
-			value.Flags) &&
-			MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.StartX,
-			unchecked((uint)value.StartX)) &&
-			MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.StartY,
-			unchecked((uint)value.StartY)) &&
-			MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.StartLeft,
-			unchecked((uint)value.StartLeft)) &&
-			MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.StartTop,
-			unchecked((uint)value.StartTop)) &&
-			MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.LastX,
-			unchecked((uint)value.LastX)) &&
-			MuiVirtgroupInputRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiVirtgroupInputRecordKind.Pointer, MuiVirtgroupInputField.LastY,
-			unchecked((uint)value.LastY));
+		return WriteRecord(ref platform, address, value);
 	}
 }

@@ -90,6 +90,39 @@ public sealed class MuiAslServiceTests
 	}
 
 	[Fact]
+	public void AslRecordMemoryAdapterOwnsStructBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var state = APTR.FromPointer(0x1C00);
+		var lease = APTR.FromPointer(0x1D00);
+
+		Assert.True(MuiAslRecordMemoryCodec.TryGetAddress(ref platform, state,
+			MuiAslRecordKind.State, MuiAslRecordField.Generation, out var generation,
+			out var generationSize));
+		Assert.Equal(APTR.FromPointer(0x1C08), generation);
+		Assert.Equal(MuiAslServiceStateRecord.FieldSize, generationSize);
+		Assert.True(MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, state,
+			MuiAslRecordKind.State, MuiAslRecordField.Generation, 9));
+		Assert.True(MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, state,
+			MuiAslRecordKind.State, MuiAslRecordField.Generation, out var version));
+		Assert.Equal(9u, version);
+
+		Assert.True(MuiAslRecordMemoryCodec.TryGetAddress(ref platform, lease,
+			MuiAslRecordKind.Lease, MuiAslRecordField.Tags, out var tags,
+			out var tagsSize));
+		Assert.Equal(APTR.FromPointer(0x1D0C), tags);
+		Assert.Equal(MuiAslRequestLeaseRecord.FieldSize, tagsSize);
+		Assert.False(MuiAslRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20FF8), MuiAslRecordKind.Lease,
+			MuiAslRecordField.Tags, out _, out _));
+		Assert.False(MuiAslRecordMemoryCodec.TryGetAddress(ref platform, state,
+			(MuiAslRecordKind)255, MuiAslRecordField.Generation, out _, out _));
+		Assert.False(MuiAslRecordMemoryCodec.TryGetAddress(ref platform, state,
+			MuiAslRecordKind.State, (MuiAslRecordField)255, out _, out _));
+	}
+
+	[Fact]
 	public void TagControlItemsFollowMoreSkipAndIgnoreSemantics()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -237,5 +270,57 @@ public sealed class MuiAslServiceTests
 		cursor.Field = MuiAslTagItemField.Tag;
 		Assert.False(MuiAslTagItemFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void AslTagItemMemoryAdapterOwnsStructBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var record = APTR.FromPointer(0x1900);
+		Assert.True(MuiAslTagItemMessageMemoryCodec.TryGetAddress(ref platform,
+			record, MuiAslTagItemField.Data, out var dataAddress));
+		Assert.Equal(record.Raw + MuiAslTagItemRecord.DataOffset,
+			dataAddress.Raw);
+		Assert.True(MuiAslTagItemMessageMemoryCodec.TryWrite(ref platform, record,
+			MuiAslTagItemField.Tag, 0x80030001u));
+		Assert.True(MuiAslTagItemMessageMemoryCodec.TryRead(ref platform, record,
+			MuiAslTagItemField.Tag, out var tag));
+		Assert.Equal(0x80030001u, tag);
+		Assert.False(MuiAslTagItemMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20FFC), MuiAslTagItemField.Data, out _));
+		Assert.False(MuiAslTagItemMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x1901), MuiAslTagItemField.Tag, out _));
+		Assert.False(MuiAslTagItemMessageMemoryCodec.TryGetAddress(ref platform,
+			record, (MuiAslTagItemField)255, out _));
+		Assert.False(MuiAslTagItemMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiAslTagItemField.Data, out _));
+	}
+
+	[Fact]
+	public void AslTagItemVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var vector = APTR.FromPointer(0x1800);
+		Assert.True(MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, 2, out var address));
+		Assert.Equal(APTR.FromPointer(0x1810), address);
+		var position = new MuiAslTagItemCursor
+		{
+			Base = vector,
+			Index = 2,
+		};
+		Assert.True(MuiAslTagItemVectorMemoryCodec.TryAdvance(ref position, 3));
+		Assert.Equal(5u, position.Index);
+		Assert.False(MuiAslTagItemVectorMemoryCodec.TryAdvance(ref position, 0));
+		position.Index = uint.MaxValue;
+		Assert.False(MuiAslTagItemVectorMemoryCodec.TryAdvance(ref position, 1));
+		Assert.False(MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0x20FFC), 0, out _));
+		Assert.False(MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0xFFFFFFF0), 4, out _));
+		Assert.False(MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.Null, 0, out _));
 	}
 }

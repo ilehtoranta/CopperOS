@@ -90,6 +90,31 @@ public sealed class MuiBalanceBitmapAdmissionTests
 	}
 
 	[Fact]
+	public void BalancePolicySequentialRecordPreservesOpaqueLongAndBounds()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x16A0);
+		var value = new MuiBalancePolicyStateRecord
+		{
+			Magic = MuiBalancePolicyStateRecord.Cookie,
+			Quiet = uint.MaxValue,
+		};
+
+		Assert.True(MuiBalancePolicyStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiBalancePolicyStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Quiet, decoded.Quiet);
+
+		var crossingEnd = APTR.FromPointer(0x20FFF);
+		Assert.False(MuiBalancePolicyStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiBalancePolicyStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
+
+	[Fact]
 	public void BitmapSourceAndRemappedRecordsUseDedicatedStructAdapters()
 	{
 		var platform = CreatePlatform();
@@ -138,6 +163,56 @@ public sealed class MuiBalanceBitmapAdmissionTests
 			ref platform, APTR.Null, 0, out _));
 		Assert.False(MuiBitmapRemappedStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiBitmapRemappedStateField.Magic, out _));
+	}
+
+	[Fact]
+	public void BitmapSourceSequentialRecordPreservesPointerAndBounds()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x16C0);
+		var value = new MuiBitmapSourceStateRecord
+		{
+			Magic = MuiBitmapSourceStateRecord.Cookie,
+			Source = APTR.FromPointer(0xFEEDBEEF),
+		};
+
+		Assert.True(MuiBitmapSourceStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiBitmapSourceStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Source, decoded.Source);
+
+		var crossingEnd = APTR.FromPointer(0x20FFF);
+		Assert.False(MuiBitmapSourceStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiBitmapSourceStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
+
+	[Fact]
+	public void BitmapRemappedSequentialRecordPreservesPointerAndBounds()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x16E0);
+		var value = new MuiBitmapRemappedStateRecord
+		{
+			Magic = MuiBitmapRemappedStateRecord.Cookie,
+			Remapped = APTR.FromPointer(0xCAFEBABE),
+		};
+
+		Assert.True(MuiBitmapRemappedStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiBitmapRemappedStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Remapped, decoded.Remapped);
+
+		var crossingEnd = APTR.FromPointer(0x20FFF);
+		Assert.False(MuiBitmapRemappedStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiBitmapRemappedStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
 	}
 
 	[Fact]

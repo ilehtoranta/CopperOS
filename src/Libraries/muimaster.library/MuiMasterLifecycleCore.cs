@@ -9,8 +9,6 @@ namespace CopperOS.MuiMaster;
 
 public static class MuiMasterLifecycleCore
 {
-	private const int PrivateRootClassRegistry = 0;
-
 	public static bool Create<TPlatform>(ref TPlatform platform, APTR privateRoot,
 		APTR headlessState) where TPlatform : struct, IMuiHeadlessPlatform
 	{
@@ -18,10 +16,9 @@ public static class MuiMasterLifecycleCore
 			!platform.IsMapped(privateRoot, MuiMasterPrivateRoot.Size) ||
 			!MuiHeadlessObjectCore.Initialize(ref platform, headlessState))
 			return false;
-		platform.Clear(privateRoot, MuiMasterPrivateRoot.Size);
-		platform.WriteUInt32(privateRoot, PrivateRootClassRegistry,
-			headlessState.Raw);
-		return true;
+		var root = default(MuiMasterPrivateRoot);
+		root.ClassRegistry = headlessState.Raw;
+		return MuiMasterPrivateRootCodec.Write(ref platform, privateRoot, root);
 	}
 
 	public static bool Dispose<TPlatform>(ref TPlatform platform,
@@ -29,8 +26,9 @@ public static class MuiMasterLifecycleCore
 	{
 		if (privateRoot.IsNull ||
 			!platform.IsMapped(privateRoot, MuiMasterPrivateRoot.Size)) return false;
-		var state = APTR.FromPointer(platform.ReadUInt32(privateRoot,
-			PrivateRootClassRegistry));
+		if (!MuiMasterPrivateRootCodec.TryRead(ref platform, privateRoot,
+			out var root)) return false;
+		var state = APTR.FromPointer(root.ClassRegistry);
 		if (state.IsNull || !MuiHeadlessStateCodec.TryRead(ref platform, state,
 			out _))
 			return false;

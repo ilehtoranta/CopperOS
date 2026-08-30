@@ -48,4 +48,34 @@ public sealed class MuiApplicationSetConfigItemStateStructAdapterTests
 			ref platform, APTR.Null, MuiApplicationSetConfigItemStateField.Item,
 			out _));
 	}
+
+	[Fact]
+	public void ApplicationSetConfigItemSequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x35C0);
+		var value = new MuiApplicationSetConfigItemStateRecord
+		{
+			Magic = MuiApplicationSetConfigItemStateRecord.Cookie,
+			Item = uint.MaxValue,
+			Data = APTR.FromPointer(uint.MaxValue),
+			Requests = 0xA5A5A5A5u,
+		};
+
+		Assert.True(MuiApplicationSetConfigItemStateRecordCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiApplicationSetConfigItemStateRecordCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Item, decoded.Item);
+		Assert.Equal(value.Data, decoded.Data);
+		Assert.Equal(value.Requests, decoded.Requests);
+
+		var crossingEnd = APTR.FromPointer(0x30FF1);
+		Assert.False(MuiApplicationSetConfigItemStateRecordCodec.WriteRecord(
+			ref platform, crossingEnd, value));
+		Assert.False(MuiApplicationSetConfigItemStateRecordCodec.TryReadRecord(
+			ref platform, crossingEnd, out _));
+	}
 }

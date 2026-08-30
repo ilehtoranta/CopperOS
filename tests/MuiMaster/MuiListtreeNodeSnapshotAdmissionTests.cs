@@ -95,4 +95,58 @@ public sealed class MuiListtreeNodeSnapshotAdmissionTests
 		Assert.False(MuiListtreeCore.MuiListtreeDisplaySnapshotStateCodec.TryRead(
 			ref platform, snapshotAddress, out _));
 	}
+
+	[Fact]
+	public void ListtreeDisplaySnapshotMemoryAdapterUsesNamedStructFields()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x1C00);
+		Assert.True(MuiListtreeCore.MuiListtreeDisplaySnapshotMemoryCodec
+			.TryWriteUInt32(ref platform, address,
+				MuiListtreeCore.MuiListtreeDisplaySnapshotField.Columns, 4));
+		Assert.True(MuiListtreeCore.MuiListtreeDisplaySnapshotMemoryCodec
+			.TryReadUInt32(ref platform, address,
+				MuiListtreeCore.MuiListtreeDisplaySnapshotField.Columns,
+				out var columns));
+		Assert.Equal(4u, columns);
+		Assert.True(MuiListtreeCore.MuiListtreeDisplaySnapshotMemoryCodec
+			.TryGetAddress(ref platform, address,
+				MuiListtreeCore.MuiListtreeDisplaySnapshotField.DisplayFlags,
+				out var flagsAddress));
+		Assert.Equal(0x1C10u, flagsAddress.Raw);
+		Assert.False(MuiListtreeCore.MuiListtreeDisplaySnapshotMemoryCodec
+			.TryGetAddress(ref platform, address,
+				(MuiListtreeCore.MuiListtreeDisplaySnapshotField)255, out _));
+	}
+
+	[Fact]
+	public void ListtreeNodeMemoryAdapterUsesNamedStructFields()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x1D80);
+		Assert.True(MuiListtreeCore.MuiListtreeNodeMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListtreeCore.MuiListtreeNodeField.ChildCount,
+			3));
+		Assert.True(MuiListtreeCore.MuiListtreeNodeMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiListtreeCore.MuiListtreeNodeField.ChildCount,
+			out var childCount));
+		Assert.Equal(3u, childCount);
+		Assert.True(MuiListtreeCore.MuiListtreeNodeMemoryCodec.TryWriteUInt16(
+			ref platform, address, MuiListtreeCore.MuiListtreeNodeField.Flags,
+			0x12));
+		Assert.True(MuiListtreeCore.MuiListtreeNodeMemoryCodec.TryReadUInt16(
+			ref platform, address, MuiListtreeCore.MuiListtreeNodeField.Flags,
+			out var flags));
+		Assert.Equal((ushort)0x12, flags);
+		Assert.True(MuiListtreeCore.MuiListtreeNodeMemoryCodec.TryGetAddress(
+			ref platform, address, MuiListtreeCore.MuiListtreeNodeField.Reserved1,
+			out var reservedAddress, out var fieldSize));
+		Assert.Equal(0x1DBCu, reservedAddress.Raw);
+		Assert.Equal(4u, fieldSize);
+		Assert.False(MuiListtreeCore.MuiListtreeNodeMemoryCodec.TryGetAddress(
+			ref platform, address,
+			(MuiListtreeCore.MuiListtreeNodeField)255, out _, out _));
+	}
 }

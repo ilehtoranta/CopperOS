@@ -15,6 +15,9 @@ namespace CopperOS.MuiMaster;
 public struct MuiStringInteger64Value
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint HighOffset = 0;
+	public const uint LowOffset = 4;
 	public uint High;
 	public uint Low;
 }
@@ -32,31 +35,34 @@ internal struct MuiStringInteger64FieldCursor
 	internal MuiStringInteger64Field Field;
 }
 
-internal static class MuiStringInteger64FieldCursorCodec
+// Struct-first guest-memory adapter for the MorphOS QUAD record. Arithmetic
+// and semantic code use the named High/Low fields; this bounded seam owns the
+// packed guest translation and rejects incomplete records.
+internal static class MuiStringInteger64ValueMemoryCodec
 {
 	private static bool TryResolve(MuiStringInteger64Field field,
 		out uint offset)
 	{
 		offset = field switch
 		{
-			MuiStringInteger64Field.High => 0,
-			MuiStringInteger64Field.Low => 4,
+			MuiStringInteger64Field.High => MuiStringInteger64Value.HighOffset,
+			MuiStringInteger64Field.Low => MuiStringInteger64Value.LowOffset,
 			_ => uint.MaxValue,
 		};
 		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiStringInteger64FieldCursor cursor, out APTR address)
+		APTR record, MuiStringInteger64Field field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiStringInteger64Value.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiStringInteger64Value.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiStringInteger64Value.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -64,10 +70,7 @@ internal static class MuiStringInteger64FieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiStringInteger64FieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -76,18 +79,38 @@ internal static class MuiStringInteger64FieldCursorCodec
 		APTR record, MuiStringInteger64Field field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiStringInteger64FieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
+// Compatibility wrapper retained for existing typed cursor diagnostics.
+internal static class MuiStringInteger64FieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringInteger64FieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringInteger64ValueMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringInteger64Field field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringInteger64ValueMemoryCodec.TryReadUInt32(ref platform, record, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringInteger64Field field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringInteger64ValueMemoryCodec.TryWriteUInt32(ref platform, record, field,
+			value);
+}
+
 // The String attribute itself is a caller-facing pointer to the QUAD record.
 // The live pointer is retained in this named state record after the value has
 // been copied into the object's guest dataspace.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringInteger64State
 {
 	public APTR Value;
@@ -116,9 +139,9 @@ internal static class MuiStringInteger64Codec
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiStringInteger64Value.Size)) return false;
-		if (!MuiStringInteger64FieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiStringInteger64ValueMemoryCodec.TryReadUInt32(ref platform,
 			address, MuiStringInteger64Field.High, out value.High) ||
-			!MuiStringInteger64FieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiStringInteger64ValueMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiStringInteger64Field.Low, out value.Low)) return false;
 		return true;
 	}
@@ -129,9 +152,9 @@ internal static class MuiStringInteger64Codec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiStringInteger64Value.Size)) return false;
-		return MuiStringInteger64FieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiStringInteger64ValueMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiStringInteger64Field.High, value.High) &&
-			MuiStringInteger64FieldCursorCodec.TryWriteUInt32(ref platform, address,
+			MuiStringInteger64ValueMemoryCodec.TryWriteUInt32(ref platform, address,
 				MuiStringInteger64Field.Low, value.Low);
 	}
 

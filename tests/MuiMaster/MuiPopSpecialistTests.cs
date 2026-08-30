@@ -56,6 +56,23 @@ public sealed class MuiPopSpecialistTests
 	}
 
 	[Fact]
+	public void PoplistArrayEntryMemoryAdapterUsesNamedPointerField()
+	{
+		var p = NewPlatform();
+		var address = APTR.FromPointer(0x2E00u);
+		Assert.True(MuiPoplistArrayEntryFieldMemoryCodec.TryWriteUInt32(ref p,
+			address, MuiPoplistArrayEntryField.Value, 0x2F00u));
+		Assert.True(MuiPoplistArrayEntryFieldMemoryCodec.TryReadUInt32(ref p,
+			address, MuiPoplistArrayEntryField.Value, out var value));
+		Assert.Equal(0x2F00u, value);
+		Assert.False(MuiPoplistArrayEntryFieldMemoryCodec.TryGetAddress(ref p,
+			APTR.FromPointer(0xFFFFFFF0u), MuiPoplistArrayEntryField.Value,
+			out _));
+		Assert.False(MuiPoplistArrayEntryFieldMemoryCodec.TryGetAddress(ref p,
+			address, (MuiPoplistArrayEntryField)0xFF, out _));
+	}
+
+	[Fact]
 	public void PoplistArrayCursorUsesNamedEntryBoundary()
 	{
 		var p = NewPlatform();
@@ -73,6 +90,25 @@ public sealed class MuiPopSpecialistTests
 		cursor.Index = 1;
 		Assert.False(MuiPoplistArrayCursorCodec.TryGetEntry(ref p, cursor,
 			out _));
+	}
+
+	[Fact]
+	public void PoplistArrayVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var p = NewPlatform();
+		var vector = APTR.FromPointer(0x2400);
+		Assert.True(MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref p, vector, 1,
+			out var address));
+		Assert.Equal(APTR.FromPointer(0x2404), address);
+		Assert.True(MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref p, vector,
+			MuiPoplistArrayCursor.MaximumEntries - 1, out address));
+		Assert.Equal(APTR.FromPointer(0x3400), address);
+		Assert.False(MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref p, vector,
+			MuiPoplistArrayCursor.MaximumEntries, out _));
+		Assert.False(MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref p,
+			APTR.FromPointer(0x40FFC), 1, out _));
+		Assert.False(MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref p,
+			APTR.FromPointer(0xFFFFFFFC), 1, out _));
 	}
 
 	[Fact]
@@ -131,6 +167,23 @@ public sealed class MuiPopSpecialistTests
 		cursor.Address = APTR.FromPointer(0xFFFFFFF0u);
 		Assert.False(MuiPopSpecialistRecordFieldCursorCodec.TryGetAddress(ref p,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void PopSpecialistStateFieldMemoryCodecUsesNamedRecordFields()
+	{
+		var p = NewPlatform();
+		var address = APTR.FromPointer(0x3000);
+		Assert.True(MuiPopSpecialistRecordFieldMemoryCodec.TryWriteUInt32(ref p,
+			address, MuiPopSpecialistRecordField.NotifyCount, 7));
+		Assert.True(MuiPopSpecialistRecordFieldMemoryCodec.TryReadUInt32(ref p,
+			address, MuiPopSpecialistRecordField.NotifyCount, out var count));
+		Assert.Equal(7u, count);
+		Assert.True(MuiPopSpecialistRecordFieldMemoryCodec.TryGetAddress(ref p,
+			address, MuiPopSpecialistRecordField.ArrayCount, out var fieldAddress));
+		Assert.Equal(address.Raw + 52u, fieldAddress.Raw);
+		Assert.False(MuiPopSpecialistRecordFieldMemoryCodec.TryGetAddress(ref p,
+			address, (MuiPopSpecialistRecordField)0xFF, out _));
 	}
 
 	[Fact]
@@ -365,6 +418,11 @@ public sealed class MuiPopSpecialistTests
 		Assert.Equal(OpenHook.Raw, p.LastHookBase.Raw);
 		Assert.Equal(Instance.Raw, p.LastHookA2.Raw);
 		Assert.True(p.LastHookA1.IsNotNull);       // A1 = message scratch
+		Assert.True(MuiSpecialistHookMessageCodec.TryRead(ref p, p.LastHookA1,
+			out var hookMessage));
+		Assert.Equal(MuiPopAttributes.Popstring_Open, hookMessage.MethodId);
+		Assert.Equal(0u, hookMessage.Param1);
+		Assert.Equal(0u, hookMessage.Param2);
 		Assert.True(MuiPopSpecialistCore.IsOpen(ref p, Instance));
 	}
 

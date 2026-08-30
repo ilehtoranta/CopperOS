@@ -491,13 +491,141 @@ public sealed class MuiMenuSpecialistTests
 		Assert.True(MuiMenuSpecialistCore.TriggerItem(ref p, State, item));
 		Assert.True(MuiMenuSpecialistCore.GetAttribute(ref p, State, item,
 			MuiMenuAttributes.Menuitem_Checked, out var c1) && c1 == 1);
-		Assert.Equal(item.Raw, MuiMenuSpecialistCore.Trigger(ref p, State, item));
+		var triggerPointer = MuiMenuSpecialistCore.Trigger(ref p, State, item);
+		Assert.NotEqual(item.Raw, triggerPointer);
+		Assert.True(MuiMenuItemMemoryCodec.TryRead(ref p,
+			APTR.FromPointer(triggerPointer), out var triggerRecord));
+		Assert.True((triggerRecord.Flags & MenuItemFlags.CheckIt) != 0);
+		Assert.True((triggerRecord.Flags & MenuItemFlags.MenuToggle) != 0);
+		Assert.True((triggerRecord.Flags & MenuItemFlags.Checked) != 0);
+		Assert.True((triggerRecord.Flags & MenuItemFlags.Enabled) != 0);
 		Assert.True(MuiMenuSpecialistCore.GetAttribute(ref p, State, item,
-			MuiMenuAttributes.Menuitem_Trigger, out var trig) && trig == item.Raw);
+			MuiMenuAttributes.Menuitem_Trigger, out var trig) &&
+			trig == triggerPointer);
 		// A second trigger toggles it back off.
 		Assert.True(MuiMenuSpecialistCore.TriggerItem(ref p, State, item));
+		Assert.Equal(triggerPointer, MuiMenuSpecialistCore.Trigger(ref p, State,
+			item));
 		Assert.True(MuiMenuSpecialistCore.GetAttribute(ref p, State, item,
 			MuiMenuAttributes.Menuitem_Checked, out var c2) && c2 == 0);
+	}
+
+	[Fact]
+	public void TriggerProjectionCarriesCommandAndExclusionState()
+	{
+		var p = NewPlatform();
+		var item = Item(ref p);
+		p.WriteCString(TitleA, "Open");
+		p.WriteCString(Shortcut, "O");
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Title, TitleA.Raw, true, false, out _));
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Shortcut, Shortcut.Raw, true, false, out _));
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Checkit, 1, true, false, out _));
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Toggle, 1, true, false, out _));
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Exclude, 0x12, true, false, out _));
+		Assert.True(MuiMenuSpecialistCore.TriggerItem(ref p, State, item));
+
+		var address = APTR.FromPointer(MuiMenuSpecialistCore.Trigger(ref p,
+			State, item));
+		Assert.True(MuiMenuItemMemoryCodec.TryRead(ref p, address,
+			out var record));
+		Assert.True((record.Flags & MenuItemFlags.ItemText) != 0);
+		Assert.True((record.Flags & MenuItemFlags.CommandSequence) != 0);
+		Assert.Equal((sbyte)'O', record.Command);
+		Assert.Equal(0x12, record.MutualExclude);
+		Assert.Equal(record.ItemFill, record.SelectFill);
+		Assert.True(MuiIntuiTextMemoryCodec.TryRead(ref p, record.ItemFill,
+			out var textRecord));
+		Assert.Equal(DrawMode.Jam1, textRecord.DrawMode);
+		Assert.Equal(address.Raw + MenuItem.Size, record.ItemFill.Raw);
+		Assert.Equal(address.Raw + MuiMenuItemTriggerStoragePrefix.Size,
+			textRecord.Text.Raw);
+		Assert.True(CStringCodec.TryReadLength(ref p, textRecord.Text.Address,
+			MuiMenuItemTriggerStorageCodec.StringCapacity, out var textLength));
+		Assert.Equal(4u, textLength);
+
+		// Once published, runtime changes refresh the same guest projection.
+		p.WriteCString(TitleB, "Close");
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Title, TitleB.Raw, false, false, out _));
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Checked, 0, false, false, out _));
+		Assert.True(MuiMenuItemMemoryCodec.TryRead(ref p, address,
+			out var refreshed));
+		Assert.True((refreshed.Flags & MenuItemFlags.Checked) == 0);
+		Assert.True(MuiIntuiTextMemoryCodec.TryRead(ref p, refreshed.ItemFill,
+			out var refreshedText));
+		Assert.True(CStringCodec.TryReadLength(ref p, refreshedText.Text.Address,
+			MuiMenuItemTriggerStorageCodec.StringCapacity, out var refreshedLength));
+		Assert.Equal(5u, refreshedLength);
+	}
+
+	[Fact]
+	public void TriggerProjectionDoesNotExposeCommandStringAsSingleKey()
+	{
+		var p = NewPlatform();
+		var item = Item(ref p);
+		p.WriteCString(Shortcut, "shift alt q");
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Shortcut, Shortcut.Raw, true, false, out _));
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_CommandString, 1, true, false, out _));
+		Assert.True(MuiMenuSpecialistCore.TriggerItem(ref p, State, item));
+
+		var address = APTR.FromPointer(MuiMenuSpecialistCore.Trigger(ref p,
+			State, item));
+		Assert.True(MuiMenuItemMemoryCodec.TryRead(ref p, address,
+			out var record));
+		Assert.Equal((sbyte)0, record.Command);
+		Assert.Equal(MenuItemFlags.None,
+			record.Flags & MenuItemFlags.CommandSequence);
+
+		// Clearing CommandString at runtime refreshes the same record.  A
+		// one-character shortcut is then represented by COMMSEQ and Command.
+		p.WriteCString(Shortcut, "Q");
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_Shortcut, Shortcut.Raw, false, false, out _));
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, item,
+			MuiMenuAttributes.Menuitem_CommandString, 0, false, false, out _));
+		Assert.True(MuiMenuItemMemoryCodec.TryRead(ref p, address,
+			out var refreshed));
+		Assert.NotEqual(MenuItemFlags.None,
+			refreshed.Flags & MenuItemFlags.CommandSequence);
+		Assert.Equal((sbyte)'Q', refreshed.Command);
+	}
+
+	[Fact]
+	public void TriggerProjectionOwnershipFollowsMenuitemLifetime()
+	{
+		var p = NewPlatform();
+		var item = Item(ref p);
+		Assert.True(MuiMenuSpecialistCore.TriggerItem(ref p, State, item));
+		var owned = APTR.FromPointer(MuiMenuSpecialistCore.Trigger(ref p, State,
+			item));
+		Assert.True(p.IsMapped(owned, MuiMenuItemTriggerStorageCodec.Size));
+		var freeBeforeOwnedDispose = p.FreeCount;
+		Assert.True(MuiMenuSpecialistCore.Dispose(ref p, State, item));
+		var ownedDisposeFrees = p.FreeCount - freeBeforeOwnedDispose;
+
+		var borrowedStorage = MuiHeadlessMemory.Allocate(ref p,
+			MuiMenuItemTriggerStorageCodec.Size);
+		Assert.True(borrowedStorage.IsNotNull);
+		var second = Item(ref p);
+		Assert.True(MuiMenuSpecialistCore.SetAttribute(ref p, State, second,
+			MuiMenuAttributes.Menuitem_Trigger, borrowedStorage.Raw, false, false,
+			out _));
+		var freeBeforeBorrowedDispose = p.FreeCount;
+		Assert.True(MuiMenuSpecialistCore.Dispose(ref p, State, second));
+		var borrowedDisposeFrees = p.FreeCount - freeBeforeBorrowedDispose;
+		Assert.Equal(ownedDisposeFrees, borrowedDisposeFrees + 1);
+		Assert.True(p.IsMapped(borrowedStorage,
+			MuiMenuItemTriggerStorageCodec.Size));
+		p.Clear(borrowedStorage, MuiMenuItemTriggerStorageCodec.Size);
+		p.Free(borrowedStorage, MuiMenuItemTriggerStorageCodec.Size);
 	}
 
 	[Fact]

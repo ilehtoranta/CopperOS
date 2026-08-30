@@ -20,17 +20,24 @@ public sealed class MuiWindowEventHandlerTests
 		platform.WriteUInt32(handler, 20, 4);
 		platform.WriteUInt32(eventMessage, 0, 0x90000001);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0,
-			MuiApplicationDispatcher.WindowAddEventHandlerMethod);
-		platform.WriteUInt32(packet, 4, handler.Raw);
+		Assert.True(MuiWindowEventHandlerMessageCodec.Write(ref platform, packet,
+			new MuiWindowEventHandlerMessage
+			{
+				MethodId = MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+				Handler = handler.Raw,
+			}));
 		Assert.Equal(1u, MuiApplicationDispatcher.DispatchWindowEventHandler(
 			ref platform, State, window, packet));
 		Assert.Equal(1u, MuiApplicationWindowCore.DispatchWindowEvent(
 			ref platform, State, window, eventMessage, 4));
 		Assert.Equal(target, platform.LastDispatchObject);
 
-		platform.WriteUInt32(packet, 0,
-			MuiApplicationDispatcher.WindowRemoveEventHandlerMethod);
+		Assert.True(MuiWindowEventHandlerMessageCodec.Write(ref platform, packet,
+			new MuiWindowEventHandlerMessage
+			{
+				MethodId = MuiApplicationDispatcher.WindowRemoveEventHandlerMethod,
+				Handler = handler.Raw,
+			}));
 		Assert.Equal(1u, MuiApplicationDispatcher.DispatchWindowEventHandler(
 			ref platform, State, window, packet));
 		Assert.Equal(0u, MuiApplicationWindowCore.DispatchWindowEvent(
@@ -73,9 +80,21 @@ public sealed class MuiWindowEventHandlerTests
 	{
 		var platform = CreatePlatform(out _);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0,
-			MuiApplicationDispatcher.WindowAddEventHandlerMethod);
-		platform.WriteUInt32(packet, 4, 0x1300);
+		Assert.True(MuiWindowEventHandlerMessageCodec.Write(ref platform, packet,
+			new MuiWindowEventHandlerMessage
+			{
+				MethodId = MuiApplicationDispatcher.WindowAddEventHandlerMethod,
+				Handler = 0x1300,
+			}));
+		Assert.True(MuiWindowEventHandlerPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, packet, MuiWindowEventHandlerPacketKind.Add,
+			MuiWindowEventHandlerPacketField.Handler, out var handlerAddress));
+		Assert.Equal(packet.Raw + MuiWindowEventHandlerMessage.HandlerOffset,
+			handlerAddress.Raw);
+		Assert.True(MuiWindowEventHandlerPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, packet, MuiWindowEventHandlerPacketKind.Add,
+			MuiWindowEventHandlerPacketField.Handler, out var directHandler));
+		Assert.Equal(0x1300u, directHandler);
 		var request = new MuiApplicationMenuPacketCodec.MenuPacketAddress
 		{
 			Address = packet,
@@ -92,6 +111,8 @@ public sealed class MuiWindowEventHandlerTests
 		platform.WriteUInt32(packet, 0, 0xDEADBEEFu);
 		Assert.False(MuiApplicationMenuPacketCodec.TryReadWindowEventHandler(
 			ref platform, ref request, out _));
+		Assert.False(MuiWindowEventHandlerMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
 	}
 
 	[Fact]

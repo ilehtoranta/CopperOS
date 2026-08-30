@@ -48,4 +48,27 @@ public sealed class MuiListInsertPositionAdmissionTests
 			address, out var storage));
 		Assert.Equal(0u, storage.Magic);
 	}
+
+	[Fact]
+	public void ListInsertPositionSequentialRecordPreservesSignedResultAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x32C0);
+		var value = new MuiListCore.MuiListInsertPositionState
+		{
+			Magic = MuiListCore.MuiListInsertPositionState.Cookie,
+			Position = 0xFFFFFFFFu,
+		};
+
+		Assert.True(MuiListCore.MuiListInsertPositionStateCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiListCore.MuiListInsertPositionStateCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Position, decoded.Position);
+
+		Assert.False(MuiListCore.MuiListInsertPositionStateCodec.TryReadRecord(
+			ref platform, APTR.FromPointer(0x30FF9), out _));
+	}
 }

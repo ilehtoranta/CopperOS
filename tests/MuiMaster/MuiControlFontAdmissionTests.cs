@@ -72,6 +72,33 @@ public sealed class MuiControlFontAdmissionTests
 	}
 
 	[Fact]
+	public void ControlFontSequentialRecordPreservesPresenceAndPointerBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1BE0);
+		var value = new MuiControlFontStateRecord
+		{
+			Magic = MuiControlFontStateRecord.Cookie,
+			Present = 1,
+			Font = APTR.FromPointer(0xFEEDBEEF),
+		};
+
+		Assert.True(MuiControlFontStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiControlFontStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Present, decoded.Present);
+		Assert.Equal(value.Font, decoded.Font);
+
+		var crossingEnd = APTR.FromPointer(0x40FFF);
+		Assert.False(MuiControlFontStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiControlFontStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
+
+	[Fact]
 	public void MalformedControlFontFailsClosedBeforeRawRepairOrSet()
 	{
 		var platform = CreatePlatform(out var textClass);

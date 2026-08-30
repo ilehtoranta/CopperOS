@@ -16,6 +16,9 @@ namespace CopperOS.MuiMaster;
 internal struct MuiStringSpellCheckingStateRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint EnabledOffset = 4;
 	internal const uint Cookie = 0x4D535043u; // 'MSPC'
 
 	internal uint Magic;
@@ -50,53 +53,26 @@ internal struct MuiStringSpellCheckingStateFieldCursor
 
 internal static class MuiStringSpellCheckingStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiStringSpellCheckingStateField field,
-		out uint offset)
-	{
-		offset = field switch
-		{
-			MuiStringSpellCheckingStateField.Magic => 0,
-			MuiStringSpellCheckingStateField.Enabled => 4,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiStringSpellCheckingStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-				cursor.Record, MuiStringSpellCheckingStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
-	}
+		=> MuiStringSpellCheckingStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiStringSpellCheckingStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiStringSpellCheckingStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiStringSpellCheckingStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, record, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiStringSpellCheckingStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiStringSpellCheckingStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		return MuiStringSpellCheckingStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, record, field, value);
 	}
 }
 
@@ -106,33 +82,49 @@ internal static class MuiStringSpellCheckingStateFieldCursorCodec
 // diagnostics.
 internal static class MuiStringSpellCheckingStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiStringSpellCheckingStateField field,
+		out uint offset)
+	{
+		switch (field)
+		{
+			case MuiStringSpellCheckingStateField.Magic:
+				offset = MuiStringSpellCheckingStateRecord.MagicOffset;
+				return true;
+			case MuiStringSpellCheckingStateField.Enabled:
+				offset = MuiStringSpellCheckingStateRecord.EnabledOffset;
+				return true;
+		}
+		offset = 0;
+		return false;
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		APTR record, uint offset, out APTR address)
+		APTR record, MuiStringSpellCheckingStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiStringSpellCheckingStateRecord.Size - 4 ||
+		if (!TryResolve(field, out var offset) || record.IsNull ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiStringSpellCheckingStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiStringSpellCheckingStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
-		APTR record, uint offset, out uint value)
+		APTR record, MuiStringSpellCheckingStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
-		APTR record, uint offset, uint value)
+		APTR record, MuiStringSpellCheckingStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, offset, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -140,31 +132,44 @@ internal static class MuiStringSpellCheckingStateRecordMemoryCodec
 
 internal static class MuiStringSpellCheckingStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiStringSpellCheckingStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		return MuiStringSpellCheckingStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 0, out value.Magic) &&
-			MuiStringSpellCheckingStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, 4, out value.Enabled);
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringSpellCheckingStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Enabled) && MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringSpellCheckingStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringSpellCheckingStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> TryReadStructural(ref platform, address, out value) &&
+		=> TryReadRecord(ref platform, address, out value) &&
 		MuiStringSpellCheckingStateAdmission.Validate(value);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiStringSpellCheckingStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStringSpellCheckingStateAdmission.Validate(value) &&
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringSpellCheckingStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Enabled) && MuiGuestStructCursor.IsComplete(cursor);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringSpellCheckingStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiStringSpellCheckingStateAdmission.Validate(value)) return false;
-		return MuiStringSpellCheckingStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 0, value.Magic) &&
-			MuiStringSpellCheckingStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, 4, value.Enabled);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, value);
 }

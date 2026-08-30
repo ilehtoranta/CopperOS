@@ -10,6 +10,19 @@ public sealed class MuiAreaContextMenuTests
 	[Fact]
 	public void ContextMenuPacketsUseNamedMorphosFields()
 	{
+		Assert.Equal(28, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiContextMenuAddSample>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiContextMenuAddSample>(nameof(MuiContextMenuAddSample.Object)).ToInt32());
+		Assert.Equal(16, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiContextMenuAddSample>(nameof(MuiContextMenuAddSample.MouseXPointer)).ToInt32());
+		Assert.Equal(24, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiContextMenuAddSample>(nameof(MuiContextMenuAddSample.Result)).ToInt32());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiContextMenuChoiceSample>());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiContextMenuChoiceSample>(nameof(MuiContextMenuChoiceSample.Item)).ToInt32());
+
 		var platform = CreatePlatform(out _);
 		var packet = APTR.FromPointer(0x1800);
 		var menu = APTR.FromPointer(0x1900);
@@ -147,6 +160,27 @@ public sealed class MuiAreaContextMenuTests
 	}
 
 	[Fact]
+	public void ContextMenuBuildReturnsStaticMenuAndNullWhenUnset()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var packet = APTR.FromPointer(0x2100);
+		Assert.True(MuiAreaContextMenuMessageCodec.WriteBuild(ref platform,
+			packet, 12, 18));
+		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			obj, packet));
+
+		var menu = APTR.FromPointer(0x2200);
+		Assert.True(MuiAreaContextMenuPacketCore.Set(ref platform, State, obj,
+			menu));
+		Assert.Equal(menu.Raw, MuiCommonControlDispatcher.Dispatch(ref platform,
+			State, obj, packet));
+		Assert.Equal(menu.Raw, MuiLayoutDispatcher.Dispatch(ref platform, State,
+			obj, packet));
+	}
+
+	[Fact]
 	public void ContextMenuAddUsesProviderAndChoiceCanBeConsumed()
 	{
 		var platform = CreatePlatform(out var areaClass);
@@ -248,6 +282,32 @@ public sealed class MuiAreaContextMenuTests
 		Assert.Equal(allocationsBefore, platform.AllocationCount);
 		Assert.Equal(block, MuiStoreCore.DataspaceFind(ref platform, State, obj,
 			MuiAreaContextMenuCore.StateKey));
+		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, obj,
+			MuiCommonControlCore.ContextMenu, out var raw));
+		Assert.Equal(menu.Raw, raw);
+	}
+
+	[Fact]
+	public void ContextMenuBuildFailsClosedForMalformedTypedState()
+	{
+		var platform = CreatePlatform(out var areaClass);
+		var obj = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			areaClass, APTR.Null);
+		var menu = APTR.FromPointer(0x2300);
+		Assert.True(MuiAreaContextMenuPacketCore.Set(ref platform, State, obj,
+			menu));
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, obj,
+			MuiAreaContextMenuCore.StateKey);
+		Assert.True(block.IsNotNull);
+		Assert.True(MuiAreaContextMenuStateFieldCursorCodec.TryWriteUInt32(
+			ref platform, block, MuiAreaContextMenuStateField.Generation, 0));
+		var packet = APTR.FromPointer(0x2400);
+		Assert.True(MuiAreaContextMenuMessageCodec.WriteBuild(ref platform,
+			packet, 1, 2));
+		Assert.Equal(0u, MuiCommonControlDispatcher.Dispatch(ref platform, State,
+			obj, packet));
+		Assert.Equal(0u, MuiLayoutDispatcher.Dispatch(ref platform, State, obj,
+			packet));
 		Assert.True(MuiHeadlessObjectCore.GetRawAttribute(ref platform, State, obj,
 			MuiCommonControlCore.ContextMenu, out var raw));
 		Assert.Equal(menu.Raw, raw);

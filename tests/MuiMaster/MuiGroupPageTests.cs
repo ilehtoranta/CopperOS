@@ -142,6 +142,29 @@ public sealed class MuiGroupPageTests
 	}
 
 	[Fact]
+	public void PageStateSequentialRecordRoundTripsAndRejectsTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var record = APTR.FromPointer(0x1200);
+		Assert.True(MuiGroupPageCore.WritePageRecord(ref platform, record, 2, 7,
+			unchecked((uint)MuiGroupPageCore.ActiveNext)));
+		Assert.True(MuiGroupPageStateCodec.TryReadRecord(ref platform, record,
+			out var value));
+		Assert.Equal(MuiGroupPageState.Magic, value.Cookie);
+		Assert.Equal(2u, value.Active);
+		Assert.Equal(7u, value.Changes);
+		Assert.Equal(MuiGroupPageCore.ActiveNext, unchecked((int)value.LastSelector));
+
+		var truncated = APTR.FromPointer(0x20FFC);
+		Assert.False(MuiGroupPageStateCodec.TryReadRecord(ref platform,
+			truncated, out _));
+		platform.WriteUInt32(record, 0, 0);
+		Assert.False(MuiGroupPageStateCodec.TryRead(ref platform, record,
+			out _));
+	}
+
+	[Fact]
 	public void PageMinimumUsesLargestChildMinimumAndSmallestChildMaximum()
 	{
 		var platform = CreatePageGroup(out var group, out var children);

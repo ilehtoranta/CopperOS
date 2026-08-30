@@ -95,9 +95,10 @@ internal static class MuiApplicationWindowRelationshipStateFieldCursorCodec
 	}
 }
 
-// Fixed Application_Window relationship state is read and written as a named
-// value. Keep packed guest positions in this ABI adapter; production consumers
-// do not select fields through the compatibility cursor.
+// Fixed Application_Window relationship state is transferred as a named
+// record. Numeric guest positions are confined to the bounded ABI adapter;
+// production consumers exchange the declaration-order struct through the
+// sequential cursor below.
 internal static class MuiApplicationWindowRelationshipStateRecordMemoryCodec
 {
 	private static bool TryResolve(
@@ -161,27 +162,41 @@ internal static class MuiApplicationWindowRelationshipStateRecordMemoryCodec
 
 internal static class MuiApplicationWindowRelationshipStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationWindowRelationshipStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address,
-			MuiApplicationWindowRelationshipStateField.Magic, out var magic) ||
-			!MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationWindowRelationshipStateField.LastWindow,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationWindowRelationshipStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var lastWindow) ||
-			!MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiApplicationWindowRelationshipStateField.AddedCount,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.AddedCount)) return false;
-		value.Magic = magic;
 		value.LastWindow = APTR.FromPointer(lastWindow);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationWindowRelationshipStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationWindowRelationshipStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.LastWindow.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.AddedCount) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationWindowRelationshipStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationWindowRelationshipStateRecord value)
@@ -194,20 +209,8 @@ internal static class MuiApplicationWindowRelationshipStateRecordCodec
 		MuiApplicationWindowRelationshipStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationWindowRelationshipStateRecord.Size) ||
-			!MuiApplicationWindowRelationshipStateAdmission.Validate(ref platform,
-				value)) return false;
-		return MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiApplicationWindowRelationshipStateField.Magic, value.Magic) &&
-			MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationWindowRelationshipStateField.LastWindow,
-				value.LastWindow.Raw) &&
-			MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationWindowRelationshipStateField.AddedCount,
-				value.AddedCount);
+		if (address.IsNull || !MuiApplicationWindowRelationshipStateAdmission
+			.Validate(ref platform, value)) return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

@@ -149,21 +149,40 @@ internal static class MuiAreaShortHelpStateRecordMemoryCodec
 
 internal static class MuiAreaShortHelpStateRecordCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaShortHelpStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaShortHelpStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var text) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Generation)) return false;
+		value.Text = APTR.FromPointer(text);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaShortHelpStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaShortHelpStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Text.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Generation) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiAreaShortHelpStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (!MuiAreaShortHelpStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaShortHelpStateField.Magic, out value.Magic) ||
-			!MuiAreaShortHelpStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaShortHelpStateField.Text, out var text) ||
-			!MuiAreaShortHelpStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaShortHelpStateField.Generation, out value.Generation)) return false;
-		value.Text = APTR.FromPointer(text);
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAreaShortHelpStateRecord value)
@@ -175,15 +194,8 @@ internal static class MuiAreaShortHelpStateRecordCodec
 		MuiAreaShortHelpStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaShortHelpStateRecord.Size) || value.Magic !=
-			MuiAreaShortHelpStateRecord.Cookie ||
-			!MuiAreaShortHelpStateAdmission.Validate(value)) return false;
-		return MuiAreaShortHelpStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiAreaShortHelpStateField.Magic, value.Magic) &&
-			MuiAreaShortHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaShortHelpStateField.Text, value.Text.Raw) &&
-			MuiAreaShortHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaShortHelpStateField.Generation, value.Generation);
+		if (address.IsNull || !MuiAreaShortHelpStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

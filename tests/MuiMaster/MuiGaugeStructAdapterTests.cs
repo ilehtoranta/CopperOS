@@ -37,4 +37,31 @@ public sealed class MuiGaugeStructAdapterTests
 		Assert.False(MuiGaugeStateRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiGaugeStateField.Magic, out _));
 	}
+
+	[Fact]
+	public void GaugeSequentialRecordPreservesProgressAndRejectsTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3600);
+		var expected = new MuiGaugeStateRecord
+		{
+			Magic = MuiGaugeStateRecord.Cookie,
+			Maximum = 100,
+			Current = 17,
+			Divide = 3,
+			Horizontal = 1,
+		};
+		Assert.True(MuiGaugeStateRecordCodec.WriteRecord(ref platform, address,
+			expected));
+		Assert.True(MuiGaugeStateRecordCodec.TryReadRecord(ref platform, address,
+			out var actual));
+		Assert.Equal(expected.Magic, actual.Magic);
+		Assert.Equal(expected.Maximum, actual.Maximum);
+		Assert.Equal(expected.Current, actual.Current);
+		Assert.Equal(expected.Divide, actual.Divide);
+		Assert.Equal(expected.Horizontal, actual.Horizontal);
+		Assert.False(MuiGaugeStateRecordCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FFC), out _));
+	}
 }

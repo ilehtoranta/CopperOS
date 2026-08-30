@@ -77,6 +77,29 @@ public sealed class MuiImageFontMatchStringAdmissionTests
 	}
 
 	[Fact]
+	public void ImageFontMatchStringSequentialRecordPreservesPointerAndRejectsTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			State);
+		var address = APTR.FromPointer(0x3600);
+		var value = new MuiImageFontMatchStringStateRecord
+		{
+			Magic = MuiImageFontMatchStringStateRecord.Cookie,
+			Present = 1,
+			MatchString = APTR.FromPointer(0x2A00),
+		};
+		Assert.True(MuiImageFontMatchStringStateRecordCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiImageFontMatchStringStateRecordCodec.TryReadRecord(
+			ref platform, address, out var actual));
+		Assert.Equal(value.Magic, actual.Magic);
+		Assert.Equal(value.Present, actual.Present);
+		Assert.Equal(value.MatchString, actual.MatchString);
+		Assert.False(MuiImageFontMatchStringStateRecordCodec.TryReadRecord(
+			ref platform, APTR.FromPointer(0x30FFC), out _));
+	}
+
+	[Fact]
 	public void MalformedImageFontMatchStringFailsClosedBeforeRawRepairOrSet()
 	{
 		var platform = CreatePlatform(out var imageClass, out var matchString);

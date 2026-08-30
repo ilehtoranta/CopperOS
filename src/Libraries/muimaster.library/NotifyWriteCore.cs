@@ -16,6 +16,8 @@ namespace CopperOS.MuiMaster;
 internal struct MuiNotifyWriteMethodMessage
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
 
@@ -23,6 +25,10 @@ internal struct MuiNotifyWriteMethodMessage
 internal struct MuiWriteLongMessage
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint ValueOffset = 4;
+	internal const uint MemoryOffset = 8;
 	internal uint MethodId;
 	internal uint Value;
 	internal APTR Memory;
@@ -32,9 +38,113 @@ internal struct MuiWriteLongMessage
 internal struct MuiWriteStringMessage
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint StringOffset = 4;
+	internal const uint MemoryOffset = 8;
 	internal uint MethodId;
 	internal APTR String;
 	internal APTR Memory;
+}
+
+internal static class MuiNotifyWriteMethodMessageCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiNotifyWriteMethodMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		uint methodId;
+		if (!MuiNotifyWritePacketMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiNotifyWritePacketKind.WriteLong,
+			MuiNotifyWritePacketField.MethodId,
+			MuiNotifyWriteMethodMessage.Size, out methodId)) return false;
+		value.MethodId = methodId;
+		return true;
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiNotifyWriteMethodMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiNotifyWritePacketMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiNotifyWritePacketKind.WriteLong,
+			MuiNotifyWritePacketField.MethodId,
+			MuiNotifyWriteMethodMessage.Size, value.MethodId);
+	}
+}
+
+internal static class MuiWriteLongMessageCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiWriteLongMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWriteLongMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Value) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMemory)) return false;
+		value.Memory = APTR.FromPointer(rawMemory);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiWriteLongMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWriteLongMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Value) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Memory.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+internal static class MuiWriteStringMessageCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiWriteStringMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWriteStringMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawString) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMemory)) return false;
+		value.String = APTR.FromPointer(rawString);
+		value.Memory = APTR.FromPointer(rawMemory);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiWriteStringMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWriteStringMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.String.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Memory.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
 }
 
 internal enum MuiNotifyWritePacketKind : byte
@@ -61,63 +171,91 @@ internal struct MuiNotifyWritePacketFieldCursor
 
 internal static class MuiNotifyWritePacketFieldCursorCodec
 {
-	private static bool TryResolve(MuiNotifyWritePacketKind packet,
-		MuiNotifyWritePacketField field, out uint offset)
-	{
-		switch (packet)
-		{
-			case MuiNotifyWritePacketKind.WriteLong:
-				if (field == MuiNotifyWritePacketField.MethodId) { offset = 0; return true; }
-				if (field == MuiNotifyWritePacketField.Value) { offset = 4; return true; }
-				if (field == MuiNotifyWritePacketField.Memory) { offset = 8; return true; }
-				break;
-			case MuiNotifyWritePacketKind.WriteString:
-				if (field == MuiNotifyWritePacketField.MethodId) { offset = 0; return true; }
-				if (field == MuiNotifyWritePacketField.String) { offset = 4; return true; }
-				if (field == MuiNotifyWritePacketField.Memory) { offset = 8; return true; }
-				break;
-		}
-		offset = 0;
-		return false;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiNotifyWritePacketFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
-	}
+		=> MuiNotifyWritePacketMemoryCodec.TryGetAddress(ref platform,
+			cursor.Message, cursor.Packet, cursor.Field,
+			MuiNotifyWritePacketMemoryCodec.FullSize(cursor.Packet), out address);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiNotifyWritePacketKind packet,
 		MuiNotifyWritePacketField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
+		=> MuiNotifyWritePacketMemoryCodec.TryReadUInt32(ref platform, message,
+			packet, field, MuiNotifyWritePacketMemoryCodec.FullSize(packet),
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiNotifyWritePacketKind packet,
+		MuiNotifyWritePacketField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiNotifyWritePacketMemoryCodec.TryWriteUInt32(ref platform, message,
+			packet, field, MuiNotifyWritePacketMemoryCodec.FullSize(packet),
+			value);
+}
+
+// Struct-first guest-memory adapter for both fixed Notify write envelopes.
+// The packet kind selects the corresponding named record and size; callers
+// only receive validated field addresses inside a complete admitted packet.
+internal static class MuiNotifyWritePacketMemoryCodec
+{
+	internal static uint FullSize(MuiNotifyWritePacketKind packet) =>
+		packet == MuiNotifyWritePacketKind.WriteLong ? MuiWriteLongMessage.Size :
+		packet == MuiNotifyWritePacketKind.WriteString ? MuiWriteStringMessage.Size :
+		0;
+
+	private static bool TryResolve(MuiNotifyWritePacketKind packet,
+		MuiNotifyWritePacketField field, out uint offset)
+	{
+		offset = packet == MuiNotifyWritePacketKind.WriteLong ?
+			field == MuiNotifyWritePacketField.MethodId ? MuiWriteLongMessage.MethodIdOffset :
+			field == MuiNotifyWritePacketField.Value ? MuiWriteLongMessage.ValueOffset :
+			field == MuiNotifyWritePacketField.Memory ? MuiWriteLongMessage.MemoryOffset :
+			uint.MaxValue :
+			packet == MuiNotifyWritePacketKind.WriteString ?
+			field == MuiNotifyWritePacketField.MethodId ? MuiWriteStringMessage.MethodIdOffset :
+			field == MuiNotifyWritePacketField.String ? MuiWriteStringMessage.StringOffset :
+			field == MuiNotifyWritePacketField.Memory ? MuiWriteStringMessage.MemoryOffset :
+			uint.MaxValue : uint.MaxValue;
+		return offset != uint.MaxValue;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR message, MuiNotifyWritePacketKind packet,
+		MuiNotifyWritePacketField field, uint availableSize, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		var size = FullSize(packet);
+		if (size == 0 || !TryResolve(packet, field, out var offset) ||
+			message.IsNull || availableSize < offset || availableSize - offset <
+			MuiNotifyWriteMethodMessage.FieldSize ||
+			message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, availableSize)) return false;
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiNotifyWriteMethodMessage.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiNotifyWritePacketKind packet,
+		MuiNotifyWritePacketField field, uint availableSize, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiNotifyWritePacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field, availableSize,
+			out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR message, MuiNotifyWritePacketKind packet,
-		MuiNotifyWritePacketField field, uint value)
+		MuiNotifyWritePacketField field, uint availableSize, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiNotifyWritePacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field, availableSize,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -130,16 +268,26 @@ internal static class MuiNotifyWriteMessageCodec
 	internal const uint WriteLongMethod = 0x80428D86;
 	internal const uint WriteStringMethod = 0x80424BF4;
 
-	// Selector admission remains a scalar ABI seam; Notify consumers continue
-	// to receive the named fixed-width method-header record.
+	// Selector admission remains a scalar ABI seam; callers that need the
+	// complete header use the named method-header record below.
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiNotifyWritePacketFieldCursorCodec.TryReadUInt32(ref platform,
+		methodId = 0;
+		if (message.IsNotNull && platform.IsMapped(message,
+			MuiWriteLongMessage.Size) &&
+			MuiWriteLongMessageCodec.TryRead(ref platform, message,
+				out var completeLong))
+		{
+			methodId = completeLong.MethodId;
+			return true;
+		}
+		return MuiNotifyWritePacketMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiNotifyWritePacketKind.WriteLong,
-			MuiNotifyWritePacketField.MethodId, out methodId);
+			MuiNotifyWritePacketField.MethodId, MuiNotifyWriteMethodMessage.Size,
+			out methodId);
 	}
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
@@ -147,9 +295,11 @@ internal static class MuiNotifyWriteMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiNotifyWriteMethodMessage.Size)) return false;
-		return TryReadMethodIdValue(ref platform, message, out packet.MethodId);
+		uint methodId;
+		if (!TryReadMethodIdValue(ref platform, message, out methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
 	}
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
@@ -166,17 +316,12 @@ internal static class MuiNotifyWriteMessageCodec
 		APTR message, out MuiWriteLongMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!IsPacket(ref platform, message, MuiWriteLongMessage.Size,
-			WriteLongMethod)) return false;
-		if (!MuiNotifyWritePacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiNotifyWritePacketKind.WriteLong,
-			MuiNotifyWritePacketField.Value, out packet.Value) ||
-			!MuiNotifyWritePacketFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiNotifyWritePacketKind.WriteLong,
-				MuiNotifyWritePacketField.Memory, out var rawMemory)) return false;
-		packet.MethodId = WriteLongMethod;
-		packet.Memory = APTR.FromPointer(rawMemory);
+		if (!MuiWriteLongMessageCodec.TryRead(ref platform, message,
+			out packet) || packet.MethodId != WriteLongMethod)
+		{
+			packet = default;
+			return false;
+		}
 		return true;
 	}
 
@@ -184,18 +329,12 @@ internal static class MuiNotifyWriteMessageCodec
 		APTR message, out MuiWriteStringMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!IsPacket(ref platform, message, MuiWriteStringMessage.Size,
-			WriteStringMethod)) return false;
-		if (!MuiNotifyWritePacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiNotifyWritePacketKind.WriteString,
-			MuiNotifyWritePacketField.String, out var rawString) ||
-			!MuiNotifyWritePacketFieldCursorCodec.TryReadUInt32(ref platform,
-				message, MuiNotifyWritePacketKind.WriteString,
-				MuiNotifyWritePacketField.Memory, out var rawMemory)) return false;
-		packet.MethodId = WriteStringMethod;
-		packet.String = APTR.FromPointer(rawString);
-		packet.Memory = APTR.FromPointer(rawMemory);
+		if (!MuiWriteStringMessageCodec.TryRead(ref platform, message,
+			out packet) || packet.MethodId != WriteStringMethod)
+		{
+			packet = default;
+			return false;
+		}
 		return true;
 	}
 
@@ -203,45 +342,18 @@ internal static class MuiNotifyWriteMessageCodec
 		APTR message, MuiWriteLongMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsMapped(ref platform, message, MuiWriteLongMessage.Size))
-			return false;
-		return MuiNotifyWritePacketFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiNotifyWritePacketKind.WriteLong,
-			MuiNotifyWritePacketField.MethodId, WriteLongMethod) &&
-			MuiNotifyWritePacketFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiNotifyWritePacketKind.WriteLong,
-				MuiNotifyWritePacketField.Value, packet.Value) &&
-			MuiNotifyWritePacketFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiNotifyWritePacketKind.WriteLong,
-				MuiNotifyWritePacketField.Memory, packet.Memory.Raw);
+		if (packet.MethodId != WriteLongMethod) return false;
+		return MuiWriteLongMessageCodec.Write(ref platform, message, packet);
 	}
 
 	internal static bool TryWriteWriteString<TPlatform>(ref TPlatform platform,
 		APTR message, MuiWriteStringMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsMapped(ref platform, message, MuiWriteStringMessage.Size))
-			return false;
-		return MuiNotifyWritePacketFieldCursorCodec.TryWriteUInt32(ref platform,
-			message, MuiNotifyWritePacketKind.WriteString,
-			MuiNotifyWritePacketField.MethodId, WriteStringMethod) &&
-			MuiNotifyWritePacketFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiNotifyWritePacketKind.WriteString,
-				MuiNotifyWritePacketField.String, packet.String.Raw) &&
-			MuiNotifyWritePacketFieldCursorCodec.TryWriteUInt32(ref platform,
-				message, MuiNotifyWritePacketKind.WriteString,
-				MuiNotifyWritePacketField.Memory, packet.Memory.Raw);
+		if (packet.MethodId != WriteStringMethod) return false;
+		return MuiWriteStringMessageCodec.Write(ref platform, message, packet);
 	}
 
-	private static bool IsPacket<TPlatform>(ref TPlatform platform,
-		APTR message, uint size, uint method)
-		where TPlatform : struct, IMuiGuestMemory =>
-		TryReadMethodId(ref platform, message, out var header) &&
-		header.MethodId == method && IsMapped(ref platform, message, size);
-
-	private static bool IsMapped<TPlatform>(ref TPlatform platform,
-		APTR message, uint size) where TPlatform : struct, IMuiGuestMemory =>
-		message.IsNotNull && platform.IsMapped(message, size);
 }
 
 public static class MuiNotifyWriteCore
@@ -291,17 +403,13 @@ public static class MuiNotifyWriteCore
 	public static uint DispatchRecord<TPlatform>(ref TPlatform platform,
 		APTR message) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiNotifyWriteMessageCodec.TryReadMethod(ref platform, message,
-			out var method)) return 0;
-		switch (method)
-		{
-			case WriteLongMethod:
-				return TryReadWriteLong(ref platform, message, out var writeLong) ?
-					writeLong.Memory.Raw : 0;
-			case WriteStringMethod:
-				return TryReadWriteString(ref platform, message, out var writeString) ?
-					writeString.Memory.Raw : 0;
-		}
+		// The focused freestanding seam can admit either complete record without
+		// a separate selector call; the live dispatcher still selects by method
+		// ID before invoking the corresponding typed reader.
+		if (TryReadWriteLong(ref platform, message, out var writeLong))
+			return writeLong.Memory.Raw;
+		if (TryReadWriteString(ref platform, message, out var writeString))
+			return writeString.Memory.Raw;
 		return 0;
 	}
 

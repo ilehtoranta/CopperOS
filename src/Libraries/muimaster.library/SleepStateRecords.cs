@@ -149,23 +149,43 @@ internal static class MuiSleepStateRecordMemoryCodec
 
 internal static class MuiSleepStateRecordCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiSleepStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiSleepStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Depth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.SavedDisabled) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Request)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiSleepStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiSleepStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Depth) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SavedDisabled) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Request) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiSleepStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (!MuiSleepStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiSleepStateField.Magic, out var magic) ||
-			!MuiSleepStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiSleepStateField.Depth, out value.Depth) ||
-			!MuiSleepStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiSleepStateField.SavedDisabled, out value.SavedDisabled) ||
-			!MuiSleepStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiSleepStateField.Request, out value.Request)) return false;
-		value.Magic = magic;
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiSleepStateRecord value)
@@ -177,16 +197,8 @@ internal static class MuiSleepStateRecordCodec
 		MuiSleepStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiSleepStateRecord.Size) || !MuiSleepStateAdmission.Validate(value))
+		if (address.IsNull || !MuiSleepStateAdmission.Validate(value))
 			return false;
-		return MuiSleepStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiSleepStateField.Magic, value.Magic) &&
-			MuiSleepStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiSleepStateField.Depth, value.Depth) &&
-			MuiSleepStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiSleepStateField.SavedDisabled, value.SavedDisabled) &&
-			MuiSleepStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiSleepStateField.Request, value.Request);
+		return WriteRecord(ref platform, address, value);
 	}
 }

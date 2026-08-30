@@ -35,4 +35,30 @@ public sealed class MuiChoiceEntriesStructAdapterTests
 		Assert.False(MuiChoiceEntriesStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiChoiceEntriesStateField.Magic, out _));
 	}
+
+	[Fact]
+	public void ChoiceEntriesSequentialRecordPreservesPointerAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3580);
+		var value = new MuiChoiceEntriesStateRecord
+		{
+			Magic = MuiChoiceEntriesStateRecord.Cookie,
+			Entries = APTR.FromPointer(0xFEEDBEEF),
+		};
+
+		Assert.True(MuiChoiceEntriesStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiChoiceEntriesStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Entries, decoded.Entries);
+
+		var crossingEnd = APTR.FromPointer(0x30FFD);
+		Assert.False(MuiChoiceEntriesStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiChoiceEntriesStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
 }

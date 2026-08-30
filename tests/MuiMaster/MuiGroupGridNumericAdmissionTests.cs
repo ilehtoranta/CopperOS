@@ -56,6 +56,68 @@ public sealed class MuiGroupGridNumericAdmissionTests
 	}
 
 	[Fact]
+	public void GroupGridStateSequentialRecordPreservesSignedPolicyBits()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1500);
+		var expected = new MuiGroupGridStateRecord
+		{
+			Magic = MuiGroupGridStateRecord.Cookie,
+			Columns = 3,
+			Rows = 2,
+			HorizontalSpacing = unchecked((uint)-4),
+			VerticalSpacing = 6,
+			SameWidth = 1,
+			SameHeight = 0,
+			HorizontalCenter = 1,
+			VerticalCenter = 2,
+		};
+		Assert.True(MuiGroupGridStateRecordCodec.WriteRecord(ref platform,
+			address, expected));
+		Assert.True(MuiGroupGridStateRecordCodec.TryReadRecord(ref platform,
+			address, out var actual));
+		Assert.Equal(expected.Magic, actual.Magic);
+		Assert.Equal(expected.Columns, actual.Columns);
+		Assert.Equal(expected.Rows, actual.Rows);
+		Assert.Equal(expected.HorizontalSpacing, actual.HorizontalSpacing);
+		Assert.Equal(expected.VerticalSpacing, actual.VerticalSpacing);
+		Assert.Equal(expected.SameWidth, actual.SameWidth);
+		Assert.Equal(expected.SameHeight, actual.SameHeight);
+		Assert.Equal(expected.HorizontalCenter, actual.HorizontalCenter);
+		Assert.Equal(expected.VerticalCenter, actual.VerticalCenter);
+		Assert.False(MuiGroupGridStateRecordCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x20FFC), out _));
+	}
+
+	[Fact]
+	public void NumericStateSequentialRecordPreservesSignedRangeBits()
+	{
+		var platform = CreatePlatform();
+		var address = APTR.FromPointer(0x1550);
+		var expected = new MuiNumericStateRecord
+		{
+			Magic = MuiNumericStateRecord.Cookie,
+			Minimum = unchecked((uint)-10),
+			Maximum = 100,
+			Value = 35,
+			Default = 50,
+			Reverse = 1,
+		};
+		Assert.True(MuiNumericStateRecordCodec.WriteRecord(ref platform,
+			address, expected));
+		Assert.True(MuiNumericStateRecordCodec.TryReadRecord(ref platform,
+			address, out var actual));
+		Assert.Equal(expected.Magic, actual.Magic);
+		Assert.Equal(expected.Minimum, actual.Minimum);
+		Assert.Equal(expected.Maximum, actual.Maximum);
+		Assert.Equal(expected.Value, actual.Value);
+		Assert.Equal(expected.Default, actual.Default);
+		Assert.Equal(expected.Reverse, actual.Reverse);
+		Assert.False(MuiNumericStateRecordCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x20FFC), out _));
+	}
+
+	[Fact]
 	public void MalformedGroupGridAndNumericMagicRemainStructuralButFailClosed()
 	{
 		var platform = CreatePlatform();

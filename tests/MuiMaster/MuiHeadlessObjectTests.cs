@@ -85,13 +85,51 @@ public sealed class MuiHeadlessObjectTests
 	}
 
 	[Fact]
+	public void NewMenuVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var vector = APTR.FromPointer(0x1200);
+		Assert.Equal(20u, MuiNewMenuRecord.Size);
+		Assert.True(MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform, vector,
+			255, out var address));
+		Assert.Equal(APTR.FromPointer(0x25EC), address);
+		Assert.False(MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform, vector,
+			MuiNewMenuCursor.MaximumEntries, out _));
+		Assert.False(MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0x20FF0), 0, out _));
+		Assert.False(MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0xFFFFFFFF), 1, out _));
+	}
+
+	[Fact]
 	public void MakeObjectAndNewMenuFieldsUseNamedBoundaries()
 	{
+		Assert.Equal(16, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiMakeObjectParameterRecord>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiMakeObjectParameterRecord>(nameof(
+			MuiMakeObjectParameterRecord.First)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiMakeObjectParameterRecord>(nameof(
+			MuiMakeObjectParameterRecord.Second)).ToInt32());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiMakeObjectParameterRecord>(nameof(
+			MuiMakeObjectParameterRecord.Third)).ToInt32());
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiMakeObjectParameterRecord>(nameof(
+			MuiMakeObjectParameterRecord.Fourth)).ToInt32());
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
 			State);
 		var parameters = APTR.FromPointer(0x1300);
 		platform.WriteUInt32(parameters, 0, 0x11111111u);
 		platform.WriteUInt32(parameters, 4, 0x22222222u);
+		Assert.True(MuiMakeObjectParameterMemoryCodec.TryGetAddress(ref platform,
+			parameters, MuiMakeObjectParameterField.Second, 8, out var directAddress));
+		Assert.Equal(APTR.FromPointer(0x1304), directAddress);
+		Assert.True(MuiMakeObjectParameterMemoryCodec.TryReadUInt32(ref platform,
+			parameters, MuiMakeObjectParameterField.Second, 8, out var directSecond));
+		Assert.Equal(0x22222222u, directSecond);
 		var parameterCursor = new MuiMakeObjectParameterFieldCursor
 		{
 			Base = parameters,
@@ -114,6 +152,16 @@ public sealed class MuiHeadlessObjectTests
 		platform.WriteUInt16(menu, 10, 0x55AA);
 		platform.WriteUInt32(menu, 12, 0x01020304u);
 		platform.WriteUInt32(menu, 16, 0xAABBCCDDu);
+		Assert.True(MuiNewMenuRecordMemoryCodec.TryGetAddress(ref platform, menu,
+			MuiNewMenuField.Flags, out var directMenuAddress, out var directSize));
+		Assert.Equal(APTR.FromPointer(0x140A), directMenuAddress);
+		Assert.Equal(2u, directSize);
+		Assert.True(MuiNewMenuRecordMemoryCodec.TryReadUInt32(ref platform, menu,
+			MuiNewMenuField.Label, out var directLabel));
+		Assert.Equal(0x12345678u, directLabel);
+		Assert.True(MuiNewMenuRecordMemoryCodec.TryReadUInt16(ref platform, menu,
+			MuiNewMenuField.Flags, out var directFlags));
+		Assert.Equal((ushort)0x55AA, directFlags);
 		var menuCursor = new MuiNewMenuFieldCursor
 		{
 			Record = menu,
@@ -230,7 +278,9 @@ public sealed class MuiHeadlessObjectTests
 		platform.WriteCString(externalName, "external.mcc");
 		platform.WriteUInt32(foreignClass, 0, 0xC1A55EED);
 		Assert.True(MuiMasterLifecycleCore.Create(ref platform, privateRoot, State));
-		Assert.Equal(State.Raw, platform.ReadUInt32(privateRoot, 0));
+		Assert.True(MuiMasterPrivateRootCodec.TryRead(ref platform, privateRoot,
+			out var createdRoot));
+		Assert.Equal(State.Raw, createdRoot.ClassRegistry);
 
 		var builtin = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
 			State, builtinName, APTR.Null, 8, APTR.FromPointer(0xD001));
@@ -244,7 +294,9 @@ public sealed class MuiHeadlessObjectTests
 			builtin, APTR.Null).IsNotNull);
 
 		Assert.True(MuiMasterLifecycleCore.Dispose(ref platform, privateRoot));
-		Assert.Equal(0u, platform.ReadUInt32(privateRoot, 0));
+		Assert.True(MuiMasterPrivateRootCodec.TryRead(ref platform, privateRoot,
+			out var disposedRoot));
+		Assert.Equal(0u, disposedRoot.ClassRegistry);
 		Assert.Equal(0u, platform.ReadUInt32(State, 0));
 		Assert.Equal(0xC1A55EEDu, platform.ReadUInt32(foreignClass, 0));
 	}

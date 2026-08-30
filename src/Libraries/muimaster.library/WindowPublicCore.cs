@@ -4,6 +4,7 @@
 */
 
 using Amiga;
+using System.Runtime.InteropServices;
 
 namespace CopperOS.MuiMaster;
 
@@ -15,6 +16,7 @@ public static class MuiWindowPublicCore
 	// Creation-time alternate geometry is carried across the native boundary as
 	// one named value record. Keeping the four LONGs together avoids positional
 	// packet offsets while preserving the caller's signed 32-bit values.
+	[StructLayout(LayoutKind.Sequential, Pack = 2)]
 	public struct MuiWindowAlternateGeometry
 	{
 		public int Height;
@@ -25,6 +27,7 @@ public static class MuiWindowPublicCore
 
 	// Creation-time primary geometry is kept separate from the alternate
 	// zoomed geometry because MorphOS exposes the two records independently.
+	[StructLayout(LayoutKind.Sequential, Pack = 2)]
 	public struct MuiWindowGeometry
 	{
 		public int Height;

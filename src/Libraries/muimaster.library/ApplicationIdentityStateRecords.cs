@@ -180,43 +180,65 @@ internal static class MuiApplicationIdentityStateRecordMemoryCodec
 
 internal static class MuiApplicationIdentityStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// Application identity is a fixed seven-ULONG pointer record. Exchange all
+	// fields sequentially as one named struct; C-string admission stays in the
+	// dedicated validation layer.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationIdentityStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationIdentityStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiApplicationIdentityStateField.Magic,
-			out var magic) ||
-			!MuiApplicationIdentityStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationIdentityStateField.Author,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationIdentityStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var author) ||
-			!MuiApplicationIdentityStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationIdentityStateField.Base,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var @base) ||
-			!MuiApplicationIdentityStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationIdentityStateField.Copyright,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var copyright) ||
-			!MuiApplicationIdentityStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationIdentityStateField.Description,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var description) ||
-			!MuiApplicationIdentityStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationIdentityStateField.Title,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var title) ||
-			!MuiApplicationIdentityStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationIdentityStateField.Version,
-				out var version))
-			return false;
-		value.Magic = magic;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var version)) return false;
 		value.Author = APTR.FromPointer(author);
 		value.Base = APTR.FromPointer(@base);
 		value.Copyright = APTR.FromPointer(copyright);
 		value.Description = APTR.FromPointer(description);
 		value.Title = APTR.FromPointer(title);
 		value.Version = APTR.FromPointer(version);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationIdentityStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationIdentityStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Author.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Base.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Copyright.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Description.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Title.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Version.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationIdentityStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationIdentityStateRecord value)
@@ -232,26 +254,6 @@ internal static class MuiApplicationIdentityStateRecordCodec
 			MuiApplicationIdentityStateRecord.Size) ||
 			!MuiApplicationIdentityStateAdmission.Validate(ref platform, value))
 			return false;
-		return MuiApplicationIdentityStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationIdentityStateField.Magic,
-			value.Magic) &&
-			MuiApplicationIdentityStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationIdentityStateField.Author,
-				value.Author.Raw) &&
-			MuiApplicationIdentityStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationIdentityStateField.Base,
-				value.Base.Raw) &&
-			MuiApplicationIdentityStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationIdentityStateField.Copyright,
-				value.Copyright.Raw) &&
-			MuiApplicationIdentityStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiApplicationIdentityStateField.Description, value.Description.Raw) &&
-			MuiApplicationIdentityStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationIdentityStateField.Title,
-				value.Title.Raw) &&
-			MuiApplicationIdentityStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationIdentityStateField.Version,
-				value.Version.Raw);
+		return WriteRecord(ref platform, address, value);
 	}
 }

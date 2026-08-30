@@ -14,6 +14,10 @@ public sealed class MuiAreaResizeTests
 		var packet = APTR.FromPointer(0x1200);
 		Assert.True(MuiAreaResizeMessageCodec.WriteInit(ref platform, packet,
 			0xA5A5));
+		Assert.True(MuiAreaResizeMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiAreaResizeMessageField.Flags, out var flagsAddress));
+		Assert.Equal(packet.Raw + MuiAreaInitResizeMessage.FlagsOffset,
+			flagsAddress.Raw);
 		Assert.True(MuiAreaResizeMessageCodec.TryReadInit(ref platform, packet,
 			out var init));
 		Assert.Equal(MuiAreaResizeMessageCodec.InitResize, init.MethodId);
@@ -46,6 +50,15 @@ public sealed class MuiAreaResizeTests
 		Assert.Equal(expected.Active, decoded.Active);
 		Assert.Equal(expected.Flags, decoded.Flags);
 		Assert.Equal(expected.Generation, decoded.Generation);
+		Assert.True(MuiAreaResizeStateMemoryCodec.TryGetAddress(ref platform,
+			address, MuiAreaResizeStateField.Generation, out var generationAddress));
+		Assert.Equal(address.Raw + MuiAreaResizeStateRecord.GenerationOffset,
+			generationAddress.Raw);
+		Assert.True(MuiAreaResizeStateMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaResizeStateField.Flags, 0x55667788));
+		Assert.True(MuiAreaResizeStateMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiAreaResizeStateField.Flags, out var flags));
+		Assert.Equal(0x55667788u, flags);
 
 		var cursor = new MuiAreaResizeStateFieldCursor
 		{
@@ -54,12 +67,11 @@ public sealed class MuiAreaResizeTests
 		};
 		Assert.True(MuiAreaResizeStateFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out var fieldAddress));
-		Assert.Equal(address.Raw + 12, fieldAddress.Raw);
-		Assert.True(MuiAreaResizeStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiAreaResizeStateField.Flags, 0x55667788));
-		Assert.True(MuiAreaResizeStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiAreaResizeStateField.Flags, out var flags));
-		Assert.Equal(0x55667788u, flags);
+		Assert.Equal(address.Raw + MuiAreaResizeStateRecord.GenerationOffset,
+			fieldAddress.Raw);
+		Assert.False(MuiAreaResizeStateMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20FFFu), MuiAreaResizeStateField.Generation,
+			out _));
 		Assert.False(MuiAreaResizeStateRecordCodec.TryRead(ref platform,
 			APTR.FromPointer(0x20FFFu), out _));
 	}

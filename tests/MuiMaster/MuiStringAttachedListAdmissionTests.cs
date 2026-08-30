@@ -90,21 +90,23 @@ public sealed class MuiStringAttachedListAdmissionTests
 		Assert.True(MuiStringAttachedListStateRecordCodec.Write(ref platform,
 			recordAddress, value));
 		Assert.True(MuiStringAttachedListStateRecordMemoryCodec.TryGetAddress(
-			ref platform, recordAddress, 4, out var listviewAddress));
+			ref platform, recordAddress,
+			MuiStringAttachedListStateField.Listview, out var listviewAddress));
 		Assert.Equal(0x1D24u, listviewAddress.Raw);
 		Assert.True(MuiStringAttachedListStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, recordAddress, 4, out var listview));
+			ref platform, recordAddress, MuiStringAttachedListStateField.Listview,
+			out var listview));
 		Assert.Equal(0x1D80u, listview);
 		Assert.True(MuiStringAttachedListStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, recordAddress, 4, 0));
+			ref platform, recordAddress, MuiStringAttachedListStateField.Listview, 0));
 		Assert.True(MuiStringAttachedListStateRecordCodec.TryReadStructural(
 			ref platform, recordAddress, out var decoded));
 		Assert.True(decoded.Listview.IsNull);
 		Assert.False(MuiStringAttachedListStateRecordMemoryCodec.TryGetAddress(
-			ref platform, recordAddress, MuiStringAttachedListStateRecord.Size,
-			out _));
+			ref platform, recordAddress,
+			(MuiStringAttachedListStateField)255, out _));
 		Assert.False(MuiStringAttachedListStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, MuiStringAttachedListStateField.Magic, out _));
 		Assert.False(MuiStringAttachedListStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

@@ -17,7 +17,7 @@ public sealed class MuiAreaShortHelpMessageStructAdapterTests
 		check.MouseX = -12;
 		check.MouseY = 34;
 		Assert.True(MuiAreaShortHelpMessageCodec.WriteCheck(ref platform,
-			checkAddress, check.Help, check.MouseX, check.MouseY));
+			checkAddress, check));
 		Assert.True(MuiAreaShortHelpMessageMemoryCodec.TryReadUInt32(ref platform,
 			checkAddress, MuiAreaShortHelpPacketKind.Check,
 			MuiAreaShortHelpMessageField.MouseY, out var mouseY));
@@ -33,29 +33,27 @@ public sealed class MuiAreaShortHelpMessageStructAdapterTests
 		Assert.Equal(check.MouseY, decodedCheck.MouseY);
 
 		var createAddress = APTR.FromPointer(0x3040);
-		Assert.True(MuiAreaShortHelpMessageMemoryCodec.TryWriteUInt32(ref platform,
-			createAddress, MuiAreaShortHelpPacketKind.Create,
-			MuiAreaShortHelpMessageField.MethodId,
-			MuiAreaShortHelpMessageCodec.CreateShortHelp));
-		Assert.True(MuiAreaShortHelpMessageMemoryCodec.TryWriteUInt32(ref platform,
-			createAddress, MuiAreaShortHelpPacketKind.Create,
-			MuiAreaShortHelpMessageField.MouseX, unchecked((uint)-3)));
-		Assert.True(MuiAreaShortHelpMessageMemoryCodec.TryWriteUInt32(ref platform,
-			createAddress, MuiAreaShortHelpPacketKind.Create,
-			MuiAreaShortHelpMessageField.MouseY, 8));
+		var create = new MuiAreaCreateShortHelpMessage
+		{
+			MethodId = MuiAreaShortHelpMessageCodec.CreateShortHelp,
+			MouseX = -3,
+			MouseY = 8,
+		};
+		Assert.True(MuiAreaShortHelpMessageCodec.WriteCreate(ref platform,
+			createAddress, create));
 		Assert.True(MuiAreaShortHelpMessageCodec.TryReadCreate(ref platform,
 			createAddress, out var decodedCreate));
 		Assert.Equal(-3, decodedCreate.MouseX);
 		Assert.Equal(8, decodedCreate.MouseY);
 
 		var deleteAddress = APTR.FromPointer(0x3080);
-		Assert.True(MuiAreaShortHelpMessageMemoryCodec.TryWriteUInt32(ref platform,
-			deleteAddress, MuiAreaShortHelpPacketKind.Delete,
-			MuiAreaShortHelpMessageField.MethodId,
-			MuiAreaShortHelpMessageCodec.DeleteShortHelp));
-		Assert.True(MuiAreaShortHelpMessageMemoryCodec.TryWriteUInt32(ref platform,
-			deleteAddress, MuiAreaShortHelpPacketKind.Delete,
-			MuiAreaShortHelpMessageField.Help, 0x3500));
+		var delete = new MuiAreaDeleteShortHelpMessage
+		{
+			MethodId = MuiAreaShortHelpMessageCodec.DeleteShortHelp,
+			Help = APTR.FromPointer(0x3500),
+		};
+		Assert.True(MuiAreaShortHelpMessageCodec.WriteDelete(ref platform,
+			deleteAddress, delete));
 		Assert.True(MuiAreaShortHelpMessageCodec.TryReadDelete(ref platform,
 			deleteAddress, out var decodedDelete));
 		Assert.Equal(APTR.FromPointer(0x3500), decodedDelete.Help);

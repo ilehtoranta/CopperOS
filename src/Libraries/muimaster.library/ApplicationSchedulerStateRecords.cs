@@ -239,41 +239,61 @@ internal static class MuiApplicationSchedulerStateRecordMemoryCodec
 
 internal static class MuiApplicationSchedulerStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationSchedulerStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationSchedulerStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiApplicationSchedulerStateField.Magic,
-			out var magic) ||
-			!MuiApplicationSchedulerStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationSchedulerStateField.ReturnHead,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationSchedulerStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var returnHead) ||
-			!MuiApplicationSchedulerStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationSchedulerStateField.ReturnTail,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var returnTail) ||
-			!MuiApplicationSchedulerStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationSchedulerStateField.InputHandlers,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var inputHandlers) ||
-			!MuiApplicationSchedulerStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationSchedulerStateField.SignalMask,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.SignalMask) ||
-			!MuiApplicationSchedulerStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationSchedulerStateField.PushHead,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var pushHead) ||
-			!MuiApplicationSchedulerStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationSchedulerStateField.PushTail,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var pushTail)) return false;
-		value.Magic = magic;
 		value.ReturnHead = APTR.FromPointer(returnHead);
 		value.ReturnTail = APTR.FromPointer(returnTail);
 		value.InputHandlers = APTR.FromPointer(inputHandlers);
 		value.PushHead = APTR.FromPointer(pushHead);
 		value.PushTail = APTR.FromPointer(pushTail);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationSchedulerStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationSchedulerStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ReturnHead.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ReturnTail.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.InputHandlers.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SignalMask) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.PushHead.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.PushTail.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationSchedulerStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationSchedulerStateRecord value)
@@ -285,29 +305,9 @@ internal static class MuiApplicationSchedulerStateRecordCodec
 		MuiApplicationSchedulerStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiApplicationSchedulerStateAdmission.Validate(ref platform, value))
+		if (address.IsNull || !MuiApplicationSchedulerStateAdmission.Validate(
+			ref platform, value))
 			return false;
-		return MuiApplicationSchedulerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationSchedulerStateField.Magic,
-			value.Magic) &&
-			MuiApplicationSchedulerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationSchedulerStateField.ReturnHead,
-			value.ReturnHead.Raw) &&
-			MuiApplicationSchedulerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationSchedulerStateField.ReturnTail,
-			value.ReturnTail.Raw) &&
-			MuiApplicationSchedulerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiApplicationSchedulerStateField.InputHandlers,
-			value.InputHandlers.Raw) &&
-			MuiApplicationSchedulerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationSchedulerStateField.SignalMask,
-			value.SignalMask) &&
-			MuiApplicationSchedulerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationSchedulerStateField.PushHead,
-			value.PushHead.Raw) &&
-			MuiApplicationSchedulerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationSchedulerStateField.PushTail,
-			value.PushTail.Raw);
+		return WriteRecord(ref platform, address, value);
 	}
 }

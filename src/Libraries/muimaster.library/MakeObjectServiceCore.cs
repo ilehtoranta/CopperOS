@@ -11,9 +11,15 @@ namespace CopperOS.MuiMaster;
 // Host-side view of the variable MUI_MakeObjectA parameter prefix. The guest
 // vector is decoded once at this boundary; construction code consumes named
 // fields rather than repeating byte offsets.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiMakeObjectParameterRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint FirstOffset = 0;
+	internal const uint SecondOffset = 4;
+	internal const uint ThirdOffset = 8;
+	internal const uint FourthOffset = 12;
 
 	internal uint First;
 	internal uint Second;
@@ -38,40 +44,59 @@ internal struct MuiMakeObjectParameterFieldCursor
 
 internal static class MuiMakeObjectParameterFieldCursorCodec
 {
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMakeObjectParameterFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiMakeObjectParameterMemoryCodec.TryGetAddress(ref platform,
+			cursor.Base, cursor.Field, MuiMakeObjectParameterRecord.Size,
+			out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR parameters, MuiMakeObjectParameterField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiMakeObjectParameterMemoryCodec.TryReadUInt32(ref platform,
+			parameters, field, MuiMakeObjectParameterRecord.Size, out value);
+}
+
+// Struct-first guest-memory adapter for the variable MUI_MakeObjectA
+// parameter prefix. The caller supplies the admitted prefix length so a
+// short object form does not require bytes beyond its actual vector.
+internal static class MuiMakeObjectParameterMemoryCodec
+{
 	private static bool TryResolve(MuiMakeObjectParameterField field,
 		out uint offset)
 	{
 		offset = field switch
 		{
-			MuiMakeObjectParameterField.First => 0,
-			MuiMakeObjectParameterField.Second => 4,
-			MuiMakeObjectParameterField.Third => 8,
-			MuiMakeObjectParameterField.Fourth => 12,
+			MuiMakeObjectParameterField.First => MuiMakeObjectParameterRecord.FirstOffset,
+			MuiMakeObjectParameterField.Second => MuiMakeObjectParameterRecord.SecondOffset,
+			MuiMakeObjectParameterField.Third => MuiMakeObjectParameterRecord.ThirdOffset,
+			MuiMakeObjectParameterField.Fourth => MuiMakeObjectParameterRecord.FourthOffset,
 			_ => uint.MaxValue,
 		};
 		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiMakeObjectParameterFieldCursor cursor, out APTR address)
-		where TPlatform : struct, IMuiGuestMemory
+		APTR parameters, MuiMakeObjectParameterField field, uint availableBytes,
+		out APTR address) where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Base.IsNull ||
-			cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(field, out var offset) || parameters.IsNull ||
+			availableBytes < offset || availableBytes - offset <
+			MuiMakeObjectParameterRecord.FieldSize ||
+			parameters.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(parameters.Raw + offset);
+		return platform.IsMapped(address, MuiMakeObjectParameterRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
-		APTR parameters, MuiMakeObjectParameterField field, out uint value)
-		where TPlatform : struct, IMuiGuestMemory
+		APTR parameters, MuiMakeObjectParameterField field, uint availableBytes,
+		out uint value) where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiMakeObjectParameterFieldCursor);
-		cursor.Base = parameters;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, parameters, field, availableBytes,
+			out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -87,20 +112,24 @@ internal static class MuiMakeObjectParameterCodec
 		if (count == 0) return true;
 		if (parameters.IsNull || count > 4 ||
 			!platform.IsMapped(parameters, count * 4) ||
-			!MuiMakeObjectParameterFieldCursorCodec.TryReadUInt32(ref platform,
-				parameters, MuiMakeObjectParameterField.First, out record.First))
+			!MuiMakeObjectParameterMemoryCodec.TryReadUInt32(ref platform,
+				parameters, MuiMakeObjectParameterField.First, count *
+				MuiMakeObjectParameterRecord.FieldSize, out record.First))
 			return false;
 		if (count > 1 &&
-			!MuiMakeObjectParameterFieldCursorCodec.TryReadUInt32(ref platform,
-				parameters, MuiMakeObjectParameterField.Second, out record.Second))
+			!MuiMakeObjectParameterMemoryCodec.TryReadUInt32(ref platform,
+				parameters, MuiMakeObjectParameterField.Second, count *
+				MuiMakeObjectParameterRecord.FieldSize, out record.Second))
 			return false;
 		if (count > 2 &&
-			!MuiMakeObjectParameterFieldCursorCodec.TryReadUInt32(ref platform,
-				parameters, MuiMakeObjectParameterField.Third, out record.Third))
+			!MuiMakeObjectParameterMemoryCodec.TryReadUInt32(ref platform,
+				parameters, MuiMakeObjectParameterField.Third, count *
+				MuiMakeObjectParameterRecord.FieldSize, out record.Third))
 			return false;
 		if (count > 3 &&
-			!MuiMakeObjectParameterFieldCursorCodec.TryReadUInt32(ref platform,
-				parameters, MuiMakeObjectParameterField.Fourth, out record.Fourth))
+			!MuiMakeObjectParameterMemoryCodec.TryReadUInt32(ref platform,
+				parameters, MuiMakeObjectParameterField.Fourth, count *
+				MuiMakeObjectParameterRecord.FieldSize, out record.Fourth))
 			return false;
 		return true;
 	}
@@ -112,6 +141,16 @@ internal static class MuiMakeObjectParameterCodec
 internal struct MuiNewMenuRecord
 {
 	internal const uint Size = 20;
+	internal const uint ByteFieldSize = 1;
+	internal const uint WordFieldSize = 2;
+	internal const uint LongFieldSize = 4;
+	internal const uint TypeOffset = 0;
+	internal const uint PaddingOffset = 1;
+	internal const uint LabelOffset = 2;
+	internal const uint CommandKeyOffset = 6;
+	internal const uint FlagsOffset = 10;
+	internal const uint MutualExcludeOffset = 12;
+	internal const uint UserDataOffset = 16;
 	internal byte Type;
 	internal byte Padding;
 	internal uint Label;
@@ -141,36 +180,67 @@ internal struct MuiNewMenuFieldCursor
 
 internal static class MuiNewMenuFieldCursorCodec
 {
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiNewMenuFieldCursor cursor, out APTR address, out uint fieldSize)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiNewMenuRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address, out fieldSize);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiNewMenuField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiNewMenuRecordMemoryCodec.TryReadUInt32(ref platform, record, field,
+			out value);
+
+	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
+		APTR record, MuiNewMenuField field, out ushort value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiNewMenuRecordMemoryCodec.TryReadUInt16(ref platform, record, field,
+			out value);
+
+	internal static bool TryReadUInt8<TPlatform>(ref TPlatform platform,
+		APTR record, MuiNewMenuField field, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiNewMenuRecordMemoryCodec.TryReadUInt8(ref platform, record, field,
+			out value);
+}
+
+// Struct-first guest-memory adapter for one packed GadTools NewMenu record.
+// The named record owns the byte/word/long positions; this bounded adapter is
+// the only place that projects those positions into guest memory.
+internal static class MuiNewMenuRecordMemoryCodec
+{
 	private static bool TryResolve(MuiNewMenuField field, out uint offset,
-		out uint size)
+		out uint fieldSize)
 	{
 		offset = field switch
 		{
-			MuiNewMenuField.Type => 0,
-			MuiNewMenuField.Padding => 1,
-			MuiNewMenuField.Label => 2,
-			MuiNewMenuField.CommandKey => 6,
-			MuiNewMenuField.Flags => 10,
-			MuiNewMenuField.MutualExclude => 12,
-			MuiNewMenuField.UserData => 16,
+			MuiNewMenuField.Type => MuiNewMenuRecord.TypeOffset,
+			MuiNewMenuField.Padding => MuiNewMenuRecord.PaddingOffset,
+			MuiNewMenuField.Label => MuiNewMenuRecord.LabelOffset,
+			MuiNewMenuField.CommandKey => MuiNewMenuRecord.CommandKeyOffset,
+			MuiNewMenuField.Flags => MuiNewMenuRecord.FlagsOffset,
+			MuiNewMenuField.MutualExclude => MuiNewMenuRecord.MutualExcludeOffset,
+			MuiNewMenuField.UserData => MuiNewMenuRecord.UserDataOffset,
 			_ => uint.MaxValue,
 		};
-		size = field == MuiNewMenuField.Type ||
-			field == MuiNewMenuField.Padding ? 1u :
-			field == MuiNewMenuField.Flags ? 2u : 4u;
+		fieldSize = field == MuiNewMenuField.Type ||
+			field == MuiNewMenuField.Padding ? MuiNewMenuRecord.ByteFieldSize :
+			field == MuiNewMenuField.Flags ? MuiNewMenuRecord.WordFieldSize :
+			MuiNewMenuRecord.LongFieldSize;
 		return offset != uint.MaxValue;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiNewMenuFieldCursor cursor, out APTR address, out uint fieldSize)
-		where TPlatform : struct, IMuiGuestMemory
+		APTR record, MuiNewMenuField field, out APTR address,
+		out uint fieldSize) where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
 		fieldSize = 0;
-		if (!TryResolve(cursor.Field, out var offset, out fieldSize) ||
-			cursor.Record.IsNull || cursor.Record.Raw > uint.MaxValue - offset)
-			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
+		if (!TryResolve(field, out var offset, out fieldSize) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiNewMenuRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
 		return platform.IsMapped(address, fieldSize);
 	}
 
@@ -179,11 +249,9 @@ internal static class MuiNewMenuFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiNewMenuFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address,
-			out var fieldSize) || fieldSize != 4) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != MuiNewMenuRecord.LongFieldSize)
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -193,11 +261,9 @@ internal static class MuiNewMenuFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiNewMenuFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address,
-			out var fieldSize) || fieldSize != 2) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != MuiNewMenuRecord.WordFieldSize)
+			return false;
 		value = platform.ReadUInt16(address, 0);
 		return true;
 	}
@@ -207,11 +273,9 @@ internal static class MuiNewMenuFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiNewMenuFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address,
-			out var fieldSize) || fieldSize != 1) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address,
+			out var fieldSize) || fieldSize != MuiNewMenuRecord.ByteFieldSize)
+			return false;
 		value = platform.ReadUInt8(address, 0);
 		return true;
 	}
@@ -225,19 +289,19 @@ internal static class MuiNewMenuRecordCodec
 		record = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiNewMenuRecord.Size)) return false;
-		if (!MuiNewMenuFieldCursorCodec.TryReadUInt8(ref platform, address,
+		if (!MuiNewMenuRecordMemoryCodec.TryReadUInt8(ref platform, address,
 			MuiNewMenuField.Type, out record.Type) ||
-			!MuiNewMenuFieldCursorCodec.TryReadUInt8(ref platform, address,
+			!MuiNewMenuRecordMemoryCodec.TryReadUInt8(ref platform, address,
 				MuiNewMenuField.Padding, out record.Padding) ||
-			!MuiNewMenuFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiNewMenuRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiNewMenuField.Label, out record.Label) ||
-			!MuiNewMenuFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiNewMenuRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiNewMenuField.CommandKey, out record.CommandKey) ||
-			!MuiNewMenuFieldCursorCodec.TryReadUInt16(ref platform, address,
+			!MuiNewMenuRecordMemoryCodec.TryReadUInt16(ref platform, address,
 				MuiNewMenuField.Flags, out record.Flags) ||
-			!MuiNewMenuFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiNewMenuRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiNewMenuField.MutualExclude, out record.MutualExclude) ||
-			!MuiNewMenuFieldCursorCodec.TryReadUInt32(ref platform, address,
+			!MuiNewMenuRecordMemoryCodec.TryReadUInt32(ref platform, address,
 				MuiNewMenuField.UserData, out record.UserData)) return false;
 		return true;
 	}
@@ -252,23 +316,33 @@ internal struct MuiNewMenuCursor
 	internal uint Index;
 }
 
+// Struct-first guest-memory adapter for caller-owned NewMenu vectors.
+// Complete 20-byte records and the MorphOS 256-entry bound are admitted here;
+// the typed cursor remains a compatibility wrapper for existing callers.
+internal static class MuiNewMenuVectorMemoryCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (vector.IsNull || index >= MuiNewMenuCursor.MaximumEntries ||
+			index > (uint.MaxValue - vector.Raw) / MuiNewMenuRecord.Size) return false;
+		var offset = index * MuiNewMenuRecord.Size;
+		if (vector.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(vector.Raw + offset);
+		return platform.IsMapped(address, MuiNewMenuRecord.Size);
+	}
+}
+
 internal static class MuiNewMenuCursorCodec
 {
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiNewMenuCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >=
-			MuiNewMenuCursor.MaximumEntries || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiNewMenuCursor.EntrySize) return false;
-		var offset = cursor.Index * MuiNewMenuCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
-		return platform.IsMapped(address, MuiNewMenuCursor.EntrySize);
+		=> MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out address);
 	}
-}
 
 // Native-safe bounded implementation of the MorphOS MUI_MakeObjectA helper.
 // The parameter vector is not a TagItem list: each object type has its own
@@ -354,12 +428,6 @@ public static class MuiMakeObjectServiceCore
 	private const uint MUIImageBuiltinMax = 0x00000093;
 	private const uint MUIO_MenustripNMCommandKeyCheck = 1;
 	private const uint MUIO_MenuitemCopyStrings = 0x40000000;
-	private const uint NewMenuEnd = 0;
-	private const uint NewMenuTitle = 1;
-	private const uint NewMenuItem = 2;
-	private const uint NewMenuSub = 3;
-	private const uint NewMenuIgnore = 64;
-	private const uint NewMenuImage = 128;
 	private const uint NewMenuBarLabel = 0xFFFFFFFF;
 	private const uint NewMenuMenuDisabled = 0x0001;
 	private const uint NewMenuItemDisabled = 0x0010;
@@ -380,9 +448,8 @@ public static class MuiMakeObjectServiceCore
 	private const uint ClassMenustrip = 9;
 	private const uint ClassMenu = 10;
 	private const uint ClassMenuitem = 11;
-	private const uint ClassNameStorage = 24;
+	private const uint ClassNameStorage = MuiMakeObjectClassNameRecord.Size;
 	private const uint TagStorage = 88; // ten TagItems plus TAG_DONE
-	private const uint PreParseStorage = 4;
 	private const uint MaximumCString = 4096;
 
 	public static APTR MakeObjectA<TPlatform>(ref TPlatform platform, APTR state,
@@ -439,13 +506,21 @@ public static class MuiMakeObjectServiceCore
 		if (preParseKind != 0)
 		{
 			preParse = MuiHeadlessMemory.Allocate(ref platform,
-				PreParseStorage);
+				MuiMakeObjectPreParseRecord.Size);
 			if (preParse.IsNull)
 			{
 				ReleaseTemporary(ref platform, className, tags, preParse);
 				return APTR.Null;
 			}
-			WritePreParse(ref platform, preParse, preParseKind);
+			var preParseRecord = default(MuiMakeObjectPreParseRecord);
+			preParseRecord.Escape = 0x1B;
+			preParseRecord.Command = preParseKind == 1 ? (byte)'c' : (byte)'l';
+			if (!MuiMakeObjectPreParseRecordCodec.Write(ref platform, preParse,
+				preParseRecord))
+			{
+				ReleaseTemporary(ref platform, className, tags, preParse);
+				return APTR.Null;
+			}
 		}
 
 		if (!WriteClassName(ref platform, className, classKind) ||
@@ -585,158 +660,71 @@ public static class MuiMakeObjectServiceCore
 	private static bool WriteClassName<TPlatform>(ref TPlatform platform,
 		APTR address, uint classKind) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!platform.IsMapped(address, ClassNameStorage)) return false;
-		if (classKind == ClassText)
-			return WriteTextName(ref platform, address);
-		if (classKind == ClassRectangle)
-			return WriteRectangleName(ref platform, address);
-		if (classKind == ClassImage)
-			return WriteImageName(ref platform, address);
-		if (classKind == ClassCycle)
-			return WriteCycleName(ref platform, address);
-		if (classKind == ClassRadio)
-			return WriteRadioName(ref platform, address);
-		if (classKind == ClassSlider)
-			return WriteSliderName(ref platform, address);
-		if (classKind == ClassString)
-			return WriteStringName(ref platform, address);
-		if (classKind == ClassNumericbutton)
-			return WriteNumericbuttonName(ref platform, address);
-		if (classKind == ClassMenustrip)
-			return WriteMenustripName(ref platform, address);
-		if (classKind == ClassMenu)
-			return WriteMenuName(ref platform, address);
-		if (classKind == ClassMenuitem)
-			return WriteMenuitemName(ref platform, address);
-		return false;
-	}
-
-	private static bool WriteTextName<TPlatform>(ref TPlatform platform, APTR a)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		Write(ref platform, a, 0, (byte)'T'); Write(ref platform, a, 1, (byte)'e');
-		Write(ref platform, a, 2, (byte)'x'); Write(ref platform, a, 3, (byte)'t');
-		Write(ref platform, a, 4, (byte)'.'); Write(ref platform, a, 5, (byte)'m');
-		Write(ref platform, a, 6, (byte)'u'); Write(ref platform, a, 7, (byte)'i');
-		Write(ref platform, a, 8, 0); return true;
-	}
-
-	private static bool WriteRectangleName<TPlatform>(ref TPlatform platform, APTR a)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		Write(ref platform, a, 0, (byte)'R'); Write(ref platform, a, 1, (byte)'e');
-		Write(ref platform, a, 2, (byte)'c'); Write(ref platform, a, 3, (byte)'t');
-		Write(ref platform, a, 4, (byte)'a'); Write(ref platform, a, 5, (byte)'n');
-		Write(ref platform, a, 6, (byte)'g'); Write(ref platform, a, 7, (byte)'l');
-		Write(ref platform, a, 8, (byte)'e'); Write(ref platform, a, 9, (byte)'.');
-		Write(ref platform, a, 10, (byte)'m'); Write(ref platform, a, 11, (byte)'u');
-		Write(ref platform, a, 12, (byte)'i'); Write(ref platform, a, 13, 0);
-		return true;
-	}
-
-	private static bool WriteImageName<TPlatform>(ref TPlatform platform, APTR a)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		Write(ref platform, a, 0, (byte)'I'); Write(ref platform, a, 1, (byte)'m');
-		Write(ref platform, a, 2, (byte)'a'); Write(ref platform, a, 3, (byte)'g');
-		Write(ref platform, a, 4, (byte)'e'); Write(ref platform, a, 5, (byte)'.');
-		Write(ref platform, a, 6, (byte)'m'); Write(ref platform, a, 7, (byte)'u');
-		Write(ref platform, a, 8, (byte)'i'); Write(ref platform, a, 9, 0);
-		return true;
-	}
-
-	private static bool WriteCycleName<TPlatform>(ref TPlatform platform, APTR a)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		Write(ref platform, a, 0, (byte)'C'); Write(ref platform, a, 1, (byte)'y');
-		Write(ref platform, a, 2, (byte)'c'); Write(ref platform, a, 3, (byte)'l');
-		Write(ref platform, a, 4, (byte)'e'); Write(ref platform, a, 5, (byte)'.');
-		Write(ref platform, a, 6, (byte)'m'); Write(ref platform, a, 7, (byte)'u');
-		Write(ref platform, a, 8, (byte)'i'); Write(ref platform, a, 9, 0);
-		return true;
-	}
-
-	private static bool WriteRadioName<TPlatform>(ref TPlatform platform, APTR a)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		Write(ref platform, a, 0, (byte)'R'); Write(ref platform, a, 1, (byte)'a');
-		Write(ref platform, a, 2, (byte)'d'); Write(ref platform, a, 3, (byte)'i');
-		Write(ref platform, a, 4, (byte)'o'); Write(ref platform, a, 5, (byte)'.');
-		Write(ref platform, a, 6, (byte)'m'); Write(ref platform, a, 7, (byte)'u');
-		Write(ref platform, a, 8, (byte)'i'); Write(ref platform, a, 9, 0);
-		return true;
-	}
-
-	private static bool WriteSliderName<TPlatform>(ref TPlatform platform, APTR a)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		Write(ref platform, a, 0, (byte)'S'); Write(ref platform, a, 1, (byte)'l');
-		Write(ref platform, a, 2, (byte)'i'); Write(ref platform, a, 3, (byte)'d');
-		Write(ref platform, a, 4, (byte)'e'); Write(ref platform, a, 5, (byte)'r');
-		Write(ref platform, a, 6, (byte)'.'); Write(ref platform, a, 7, (byte)'m');
-		Write(ref platform, a, 8, (byte)'u'); Write(ref platform, a, 9, (byte)'i');
-		Write(ref platform, a, 10, 0); return true;
-	}
-
-	private static bool WriteStringName<TPlatform>(ref TPlatform platform, APTR a)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		Write(ref platform, a, 0, (byte)'S'); Write(ref platform, a, 1, (byte)'t');
-		Write(ref platform, a, 2, (byte)'r'); Write(ref platform, a, 3, (byte)'i');
-		Write(ref platform, a, 4, (byte)'n'); Write(ref platform, a, 5, (byte)'g');
-		Write(ref platform, a, 6, (byte)'.'); Write(ref platform, a, 7, (byte)'m');
-		Write(ref platform, a, 8, (byte)'u'); Write(ref platform, a, 9, (byte)'i');
-		Write(ref platform, a, 10, 0); return true;
-	}
-
-	private static bool WriteNumericbuttonName<TPlatform>(ref TPlatform platform,
-		APTR a) where TPlatform : struct, IMuiGuestMemory
-	{
-		Write(ref platform, a, 0, (byte)'N'); Write(ref platform, a, 1, (byte)'u');
-		Write(ref platform, a, 2, (byte)'m'); Write(ref platform, a, 3, (byte)'e');
-		Write(ref platform, a, 4, (byte)'r'); Write(ref platform, a, 5, (byte)'i');
-		Write(ref platform, a, 6, (byte)'c'); Write(ref platform, a, 7, (byte)'b');
-		Write(ref platform, a, 8, (byte)'u'); Write(ref platform, a, 9, (byte)'t');
-		Write(ref platform, a, 10, (byte)'t'); Write(ref platform, a, 11, (byte)'o');
-		Write(ref platform, a, 12, (byte)'n'); Write(ref platform, a, 13, (byte)'.');
-		Write(ref platform, a, 14, (byte)'m'); Write(ref platform, a, 15, (byte)'u');
-		Write(ref platform, a, 16, (byte)'i'); Write(ref platform, a, 17, 0);
-		return true;
-	}
-
-	private static bool WriteMenustripName<TPlatform>(ref TPlatform platform,
-		APTR a) where TPlatform : struct, IMuiGuestMemory
-	{
-		Write(ref platform, a, 0, (byte)'M'); Write(ref platform, a, 1, (byte)'e');
-		Write(ref platform, a, 2, (byte)'n'); Write(ref platform, a, 3, (byte)'u');
-		Write(ref platform, a, 4, (byte)'s'); Write(ref platform, a, 5, (byte)'t');
-		Write(ref platform, a, 6, (byte)'r'); Write(ref platform, a, 7, (byte)'i');
-		Write(ref platform, a, 8, (byte)'p'); Write(ref platform, a, 9, (byte)'.');
-		Write(ref platform, a, 10, (byte)'m'); Write(ref platform, a, 11, (byte)'u');
-		Write(ref platform, a, 12, (byte)'i'); Write(ref platform, a, 13, 0);
-		return true;
-	}
-
-	private static bool WriteMenuName<TPlatform>(ref TPlatform platform, APTR a)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		Write(ref platform, a, 0, (byte)'M'); Write(ref platform, a, 1, (byte)'e');
-		Write(ref platform, a, 2, (byte)'n'); Write(ref platform, a, 3, (byte)'u');
-		Write(ref platform, a, 4, (byte)'.'); Write(ref platform, a, 5, (byte)'m');
-		Write(ref platform, a, 6, (byte)'u'); Write(ref platform, a, 7, (byte)'i');
-		Write(ref platform, a, 8, 0); return true;
-	}
-
-	private static bool WriteMenuitemName<TPlatform>(ref TPlatform platform,
-		APTR a) where TPlatform : struct, IMuiGuestMemory
-	{
-		Write(ref platform, a, 0, (byte)'M'); Write(ref platform, a, 1, (byte)'e');
-		Write(ref platform, a, 2, (byte)'n'); Write(ref platform, a, 3, (byte)'u');
-		Write(ref platform, a, 4, (byte)'i'); Write(ref platform, a, 5, (byte)'t');
-		Write(ref platform, a, 6, (byte)'e'); Write(ref platform, a, 7, (byte)'m');
-		Write(ref platform, a, 8, (byte)'.'); Write(ref platform, a, 9, (byte)'m');
-		Write(ref platform, a, 10, (byte)'u'); Write(ref platform, a, 11, (byte)'i');
-		Write(ref platform, a, 12, 0); return true;
+		var value = default(MuiMakeObjectClassNameRecord);
+		switch (classKind)
+		{
+			case ClassText:
+				value.Word0 = 0x54657874; // Text
+				value.Word1 = 0x2E6D7569; // .mui
+				break;
+			case ClassRectangle:
+				value.Word0 = 0x52656374; // Rect
+				value.Word1 = 0x616E676C; // angl
+				value.Word2 = 0x652E6D75; // e.mu
+				value.Word3 = 0x69000000; // i\0
+				break;
+			case ClassImage:
+				value.Word0 = 0x496D6167; // Imag
+				value.Word1 = 0x652E6D75; // e.mu
+				value.Word2 = 0x69000000; // i\0
+				break;
+			case ClassCycle:
+				value.Word0 = 0x4379636C; // Cycl
+				value.Word1 = 0x652E6D75; // e.mu
+				value.Word2 = 0x69000000; // i\0
+				break;
+			case ClassRadio:
+				value.Word0 = 0x52616469; // Radi
+				value.Word1 = 0x6F2E6D75; // o.mu
+				value.Word2 = 0x69000000; // i\0
+				break;
+			case ClassSlider:
+				value.Word0 = 0x536C6964; // Slid
+				value.Word1 = 0x65722E6D; // er.m
+				value.Word2 = 0x75690000; // ui\0
+				break;
+			case ClassString:
+				value.Word0 = 0x53747269; // Stri
+				value.Word1 = 0x6E672E6D; // ng.m
+				value.Word2 = 0x75690000; // ui\0
+				break;
+			case ClassNumericbutton:
+				value.Word0 = 0x4E756D65; // Nume
+				value.Word1 = 0x72696362; // ricb
+				value.Word2 = 0x7574746F; // utto
+				value.Word3 = 0x6E2E6D75; // n.mu
+				value.Word4 = 0x69000000; // i\0
+				break;
+			case ClassMenustrip:
+				value.Word0 = 0x4D656E75; // Menu
+				value.Word1 = 0x73747269; // stri
+				value.Word2 = 0x702E6D75; // p.mu
+				value.Word3 = 0x69000000; // i\0
+				break;
+			case ClassMenu:
+				value.Word0 = 0x4D656E75; // Menu
+				value.Word1 = 0x2E6D7569; // .mui
+				break;
+			case ClassMenuitem:
+				value.Word0 = 0x4D656E75; // Menu
+				value.Word1 = 0x6974656D; // item
+				value.Word2 = 0x2E6D7569; // .mui
+				break;
+			default:
+				return false;
+		}
+		return MuiMakeObjectClassNameRecordCodec.WriteRecord(ref platform, address,
+			value);
 	}
 
 	private static bool WriteTags<TPlatform>(ref TPlatform platform, APTR tags,
@@ -890,7 +878,8 @@ public static class MuiMakeObjectServiceCore
 		var cursor = default(MuiAslTagItemCursor);
 		cursor.Base = tags;
 		cursor.Index = index;
-		if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
+		if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index,
 			out var address))
 		{
 			index++;
@@ -920,13 +909,10 @@ public static class MuiMakeObjectServiceCore
 
 		APTR menu = APTR.Null;
 		APTR menuItem = APTR.Null;
-		var menuCursor = default(MuiNewMenuCursor);
-		menuCursor.Base = APTR.FromPointer(newMenuRaw);
 		for (var index = 0u; index < MaximumMenuEntries; index++)
 		{
-			menuCursor.Index = index;
-			if (!MuiNewMenuCursorCodec.TryGetEntry(ref platform, menuCursor,
-				out var entry))
+			if (!MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform,
+				APTR.FromPointer(newMenuRaw), index, out var entry))
 			{
 				DisposeMenuTree(ref platform, state, strip);
 				return APTR.Null;
@@ -937,15 +923,30 @@ public static class MuiMakeObjectServiceCore
 				DisposeMenuTree(ref platform, state, strip);
 				return APTR.Null;
 			}
-			var entryType = menuRecord.Type;
+			if (!MuiNewMenuTypeRecordCodec.TryClassify(menuRecord.Type,
+				out var entryKind))
+			{
+				DisposeMenuTree(ref platform, state, strip);
+				return APTR.Null;
+			}
 			var label = menuRecord.Label;
 			var shortcut = menuRecord.CommandKey;
 			var menuFlags = menuRecord.Flags;
 			var mutualExclude = menuRecord.MutualExclude;
 			var userData = menuRecord.UserData;
-			if (entryType == NewMenuEnd) return strip;
-			if ((entryType & NewMenuIgnore) != 0) continue;
-			if (entryType == NewMenuTitle)
+			if (entryKind == MuiNewMenuEntryKind.End) return strip;
+			if (entryKind == MuiNewMenuEntryKind.Ignored) continue;
+			// MorphOS Menuitem.mui deliberately excludes GadTools image menus.
+			// Keep the rejection explicit and before any attempt to interpret the
+			// label as a text pointer.
+			if (entryKind == MuiNewMenuEntryKind.ImageItem ||
+				entryKind == MuiNewMenuEntryKind.ImageSub ||
+				entryKind == MuiNewMenuEntryKind.ImageUnsupported)
+			{
+				DisposeMenuTree(ref platform, state, strip);
+				return APTR.Null;
+			}
+			if (entryKind == MuiNewMenuEntryKind.Title)
 			{
 				var tags = MuiHeadlessMemory.Allocate(ref platform, TagStorage);
 				if (tags.IsNull)
@@ -1006,14 +1007,14 @@ public static class MuiMakeObjectServiceCore
 			var item = CreateRegisteredObject(ref platform, state, ClassMenuitem,
 				itemTags);
 			platform.Free(itemTags, TagStorage);
-			var parent = entryType == NewMenuSub ? menuItem : menu;
-		if (item.IsNull || parent.IsNull ||
-			!MuiFamilyCore.AddTail(ref platform, state, parent, item))
-		{
-			DisposeMenuTree(ref platform, state, strip);
-			return APTR.Null;
-		}
-		if (entryType == NewMenuItem) menuItem = item;
+			var parent = entryKind == MuiNewMenuEntryKind.Sub ? menuItem : menu;
+			if (item.IsNull || parent.IsNull ||
+				!MuiFamilyCore.AddTail(ref platform, state, parent, item))
+			{
+				DisposeMenuTree(ref platform, state, strip);
+				return APTR.Null;
+			}
+			if (entryKind == MuiNewMenuEntryKind.Item) menuItem = item;
 		}
 
 		DisposeMenuTree(ref platform, state, strip);
@@ -1081,33 +1082,36 @@ public static class MuiMakeObjectServiceCore
 			(flags & ~MUIO_MenustripNMCommandKeyCheck) != 0) return 1;
 		var haveMenu = false;
 		var haveItem = false;
-		var cursor = default(MuiNewMenuCursor);
-		cursor.Base = newMenu;
 		for (var index = 0u; index < MaximumMenuEntries; index++)
 		{
-			cursor.Index = index;
-			if (!MuiNewMenuCursorCodec.TryGetEntry(ref platform, cursor,
-				out var entry)) return 2;
+			if (!MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform,
+				newMenu, index, out var entry)) return 2;
 			if (!MuiNewMenuRecordCodec.TryRead(ref platform, entry,
 				out var menuRecord)) return 2;
 			var entryType = menuRecord.Type;
+			if (!MuiNewMenuTypeRecordCodec.TryClassify(entryType,
+				out var entryKind)) return 5;
 			var label = menuRecord.Label;
 			var shortcut = menuRecord.CommandKey;
-			if (entryType == NewMenuEnd) return 0;
-			if ((entryType & NewMenuIgnore) != 0) continue;
-			if ((entryType & NewMenuImage) != 0) return 3;
-			if (entryType == NewMenuTitle)
+			if (entryKind == MuiNewMenuEntryKind.End) return 0;
+			if (entryKind == MuiNewMenuEntryKind.Ignored) continue;
+			if (entryKind == MuiNewMenuEntryKind.ImageItem ||
+				entryKind == MuiNewMenuEntryKind.ImageSub ||
+				entryKind == MuiNewMenuEntryKind.ImageUnsupported) return 3;
+			if (entryKind == MuiNewMenuEntryKind.Title)
 			{
 				if (!ValidCString(ref platform, label)) return 4;
 				haveMenu = true;
 				haveItem = false;
 				continue;
 			}
-			if (entryType != NewMenuItem && entryType != NewMenuSub) return 5;
-			if (!haveMenu || entryType == NewMenuSub && !haveItem) return 6;
+			if (entryKind != MuiNewMenuEntryKind.Item &&
+				entryKind != MuiNewMenuEntryKind.Sub) return 5;
+			if (!haveMenu || entryKind == MuiNewMenuEntryKind.Sub && !haveItem)
+				return 6;
 			if (!ResolveMenuItemStrings(ref platform, label, shortcut, flags,
 				out _, out _)) return 7;
-			if (entryType == NewMenuItem) haveItem = true;
+			if (entryKind == MuiNewMenuEntryKind.Item) haveItem = true;
 		}
 		return 8;
 	}
@@ -1123,8 +1127,8 @@ public static class MuiMakeObjectServiceCore
 		if (!ValidCString(ref platform, rawLabel)) return false;
 		var labelAddress = APTR.FromPointer(rawLabel);
 		if ((flags & MUIO_MenustripNMCommandKeyCheck) != 0 &&
-			platform.IsMapped(labelAddress, 2) &&
-			platform.ReadUInt8(labelAddress, 1) == 0)
+			MuiMakeObjectMenuBarLabelRecordCodec.TryReadRecord(ref platform,
+				labelAddress, out var labelPrefix) && labelPrefix.Terminator == 0)
 		{
 			if (rawLabel > uint.MaxValue - 2) return false;
 			label = rawLabel + 2;
@@ -1144,7 +1148,8 @@ public static class MuiMakeObjectServiceCore
 		var cursor = default(MuiAslTagItemCursor);
 		cursor.Base = tags;
 		cursor.Index = index;
-		if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
+		if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index,
 			out var address)) return;
 		var item = default(MuiAslTagItemRecord);
 		item.Tag = MuiAslTagListCore.TagDone;
@@ -1171,12 +1176,11 @@ public static class MuiMakeObjectServiceCore
 		uint raw, bool requireEntry) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (raw == 0) return !requireEntry;
-		var cursor = default(MuiChoiceEntryCursor);
-		cursor.Base = APTR.FromPointer(raw);
+		var entries = APTR.FromPointer(raw);
 		for (var index = 0u; index < 4096; index++)
 		{
-			cursor.Index = index;
-			if (!MuiChoiceEntryCursorCodec.TryGetEntry(ref platform, cursor,
+			if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
+				entries, index,
 				out var slot)) return false;
 			if (!MuiChoiceEntryCodec.TryRead(ref platform, slot,
 				out var entry)) return false;
@@ -1209,23 +1213,12 @@ public static class MuiMakeObjectServiceCore
 		return 0;
 	}
 
-	private static void WritePreParse<TPlatform>(ref TPlatform platform, APTR a,
-		uint kind) where TPlatform : struct, IMuiGuestMemory
-	{
-		platform.WriteUInt8(a, 0, 0x1B);
-		platform.WriteUInt8(a, 1, kind == 1 ? (byte)'c' : (byte)'l');
-		platform.WriteUInt8(a, 2, 0);
-	}
-
-	private static void Write<TPlatform>(ref TPlatform platform, APTR a, int offset,
-		byte value) where TPlatform : struct, IMuiGuestMemory =>
-		platform.WriteUInt8(a, offset, value);
-
 	private static void ReleaseTemporary<TPlatform>(ref TPlatform platform,
 		APTR className, APTR tags, APTR preParse)
 		where TPlatform : struct, IMuiExecCapability
 	{
-		if (preParse.IsNotNull) platform.Free(preParse, PreParseStorage);
+		if (preParse.IsNotNull) platform.Free(preParse,
+			MuiMakeObjectPreParseRecord.Size);
 		if (tags.IsNotNull) platform.Free(tags, TagStorage);
 		if (className.IsNotNull) platform.Free(className, ClassNameStorage);
 	}

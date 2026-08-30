@@ -484,6 +484,41 @@ public sealed class MuiAreaLayoutTests
 	}
 
 	[Fact]
+	public void AreaGeometrySequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1B00);
+		var value = new MuiAreaGeometryStateRecord
+		{
+			Magic = MuiAreaGeometryStateRecord.Cookie,
+			Left = int.MinValue,
+			Top = int.MaxValue,
+			Width = -1,
+			Height = 0x01020304,
+			Right = int.MinValue,
+			Bottom = int.MaxValue,
+		};
+
+		Assert.True(MuiAreaGeometryStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaGeometryStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Left, decoded.Left);
+		Assert.Equal(value.Top, decoded.Top);
+		Assert.Equal(value.Width, decoded.Width);
+		Assert.Equal(value.Height, decoded.Height);
+		Assert.Equal(value.Right, decoded.Right);
+		Assert.Equal(value.Bottom, decoded.Bottom);
+
+		var crossingEnd = APTR.FromPointer(0x30FE5);
+		Assert.False(MuiAreaGeometryStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiAreaGeometryStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
+
+	[Fact]
 	public void AreaGeometryUsesNamedGuestRecordAndReconcilesPublicProjection()
 	{
 		var platform = CreatePlatform(out var cl);
@@ -515,6 +550,20 @@ public sealed class MuiAreaLayoutTests
 	[Fact]
 	public void MinMaxCodecUsesNamedFields()
 	{
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiMinMaxValues>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiMinMaxValues>(nameof(MuiMinMaxValues.MinWidth)).ToInt32());
+		Assert.Equal(2, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiMinMaxValues>(nameof(MuiMinMaxValues.MinHeight)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiMinMaxValues>(nameof(MuiMinMaxValues.MaxWidth)).ToInt32());
+		Assert.Equal(6, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiMinMaxValues>(nameof(MuiMinMaxValues.MaxHeight)).ToInt32());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiMinMaxValues>(nameof(MuiMinMaxValues.DefWidth)).ToInt32());
+		Assert.Equal(10, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiMinMaxValues>(nameof(MuiMinMaxValues.DefHeight)).ToInt32());
 		var platform = CreatePlatform(out _);
 		var address = APTR.FromPointer(0x1800);
 		var value = default(MuiMinMaxValues);
@@ -524,8 +573,8 @@ public sealed class MuiAreaLayoutTests
 		value.MaxHeight = 20000;
 		value.DefWidth = 640;
 		value.DefHeight = 480;
-		Assert.True(MuiMinMaxRecordCodec.Write(ref platform, address, value));
-		Assert.True(MuiMinMaxRecordCodec.TryRead(ref platform, address,
+		Assert.True(MuiMinMaxRecordCodec.WriteRecord(ref platform, address, value));
+		Assert.True(MuiMinMaxRecordCodec.TryReadRecord(ref platform, address,
 			out var decoded));
 		Assert.Equal(value.MinWidth, decoded.MinWidth);
 		Assert.Equal(value.MinHeight, decoded.MinHeight);
@@ -536,12 +585,10 @@ public sealed class MuiAreaLayoutTests
 	}
 
 	[Fact]
-	public void MinMaxFieldCursorUsesNamedSignedBoundary()
+	public void MinMaxMemoryAdapterUsesNamedSignedBoundary()
 	{
 		var platform = CreatePlatform(out _);
 		var record = APTR.FromPointer(0x1a00);
-		var cursor = default(MuiMinMaxFieldCursor);
-		cursor.Record = record;
 		var fields = new[]
 		{
 			MuiMinMaxField.MinWidth,
@@ -551,29 +598,43 @@ public sealed class MuiAreaLayoutTests
 			MuiMinMaxField.DefWidth,
 			MuiMinMaxField.DefHeight,
 		};
+		var offsets = new[]
+		{
+			MuiMinMaxValues.MinWidthOffset,
+			MuiMinMaxValues.MinHeightOffset,
+			MuiMinMaxValues.MaxWidthOffset,
+			MuiMinMaxValues.MaxHeightOffset,
+			MuiMinMaxValues.DefWidthOffset,
+			MuiMinMaxValues.DefHeightOffset,
+		};
 		for (var i = 0; i < fields.Length; i++)
 		{
-			cursor.Field = fields[i];
-			Assert.True(MuiMinMaxFieldCursorCodec.TryGetAddress(ref platform,
-				cursor, out var address));
-			Assert.Equal(record.Raw + (uint)(i * 2), address.Raw);
-			Assert.True(MuiMinMaxFieldCursorCodec.TryWrite(ref platform, record,
+			Assert.True(MuiMinMaxMemoryCodec.TryGetAddress(ref platform, record,
+				fields[i], out var address));
+			Assert.Equal(record.Raw + offsets[i], address.Raw);
+			Assert.True(MuiMinMaxMemoryCodec.TryWrite(ref platform, record,
 				fields[i], (short)(-10 + i)));
 		}
-		Assert.True(MuiMinMaxFieldCursorCodec.TryRead(ref platform, record,
+		Assert.True(MuiMinMaxMemoryCodec.TryRead(ref platform, record,
 			MuiMinMaxField.MaxHeight, out var maxHeight));
 		Assert.Equal((short)-7, maxHeight);
-		Assert.True(MuiMinMaxRecordCodec.TryRead(ref platform, record,
+		Assert.True(MuiMinMaxRecordCodec.TryReadRecord(ref platform, record,
 			out var decoded));
 		Assert.Equal((short)-10, decoded.MinWidth);
 		Assert.Equal((short)-5, decoded.DefHeight);
-		cursor.Field = (MuiMinMaxField)255;
-		Assert.False(MuiMinMaxFieldCursorCodec.TryGetAddress(ref platform, cursor,
-			out _));
-		cursor.Record = APTR.FromPointer(0xfffffff0u);
-		cursor.Field = MuiMinMaxField.DefHeight;
-		Assert.False(MuiMinMaxFieldCursorCodec.TryGetAddress(ref platform, cursor,
-			out _));
+		var cursor = new MuiMinMaxFieldCursor
+		{
+			Record = record,
+			Field = MuiMinMaxField.DefHeight,
+		};
+		Assert.True(MuiMinMaxFieldCursorCodec.TryGetAddress(ref platform, cursor,
+			out var compatibilityAddress));
+		Assert.Equal(record.Raw + MuiMinMaxValues.DefHeightOffset,
+			compatibilityAddress.Raw);
+		Assert.False(MuiMinMaxMemoryCodec.TryGetAddress(ref platform, record,
+			(MuiMinMaxField)255, out _));
+		Assert.False(MuiMinMaxMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0xfffffff0u), MuiMinMaxField.DefHeight, out _));
 	}
 
 	[Fact]
@@ -1016,6 +1077,44 @@ public sealed class MuiAreaLayoutTests
 		Assert.Equal(2u, platform.MuiTextDimensionApplyCount);
 		Assert.Equal(multilineText,
 			platform.LastMuiTextDimensionRequest.Text);
+	}
+
+	[Fact]
+	public void PlatformTextCapabilityRecordsUseNamedPackedLayouts()
+	{
+		Assert.Equal(20, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiImageSpec>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiImageSpec>(nameof(MuiImageSpec.Kind)).ToInt32());
+		Assert.Equal(16, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiImageSpec>(nameof(MuiImageSpec.Blue)).ToInt32());
+
+		Assert.Equal(56, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiTextColorResolutionRequest>());
+		Assert.Equal(20, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiTextColorResolutionRequest>(nameof(MuiTextColorResolutionRequest.CustomFontSpec)).ToInt32());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiTextColorRenderRequest>());
+		Assert.Equal(48, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiCustomFontRenderRequest>());
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontRenderRequest>(nameof(MuiCustomFontRenderRequest.Spec)).ToInt32());
+		Assert.Equal(20, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiTextStyleRenderRequest>());
+		Assert.Equal(24, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiTextInlineColorRenderRequest>());
+		Assert.Equal(48, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiTextInlineImageRenderRequest>());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiTextInlineImageRenderRequest>(nameof(MuiTextInlineImageRenderRequest.Spec)).ToInt32());
+		Assert.Equal(52, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiTextMethodRenderRequest>());
+		Assert.Equal(44, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiTextMethodRenderRequest>(nameof(MuiTextMethodRenderRequest.Unicode)).ToInt32());
+		Assert.Equal(44, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiTextDimensionRequest>());
+		Assert.Equal(32, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiTextDimensionRequest>(nameof(MuiTextDimensionRequest.Width)).ToInt32());
 	}
 
 	[Fact]

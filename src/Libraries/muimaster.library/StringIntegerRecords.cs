@@ -11,6 +11,7 @@ namespace CopperOS.MuiMaster;
 // Public semantic view of MUIA_String_Integer.  The guest attribute remains a
 // ULONG ABI value, while consumers can use the signed value without a managed
 // numeric object or a private String offset.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringIntegerState
 {
 	public int Value;
@@ -139,33 +140,46 @@ internal static class MuiStringIntegerStateRecordMemoryCodec
 
 internal static class MuiStringIntegerStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiStringIntegerStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiStringIntegerStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiStringIntegerStateField.Magic, out value.Magic) ||
-			!MuiStringIntegerStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiStringIntegerStateField.Value, out var raw)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringIntegerStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var raw) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.Value = unchecked((int)raw);
 		return true;
 	}
 
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringIntegerStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringIntegerStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> TryReadStructural(ref platform, address, out value) &&
+		=> TryReadRecord(ref platform, address, out value) &&
 		MuiStringIntegerStateAdmission.Validate(value);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiStringIntegerStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStringIntegerStateAdmission.Validate(value) &&
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringIntegerStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Value)) && MuiGuestStructCursor.IsComplete(cursor);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringIntegerStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiStringIntegerStateAdmission.Validate(value)) return false;
-		return MuiStringIntegerStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiStringIntegerStateField.Magic, value.Magic) &&
-			MuiStringIntegerStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiStringIntegerStateField.Value, unchecked((uint)value.Value));
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, value);
 }

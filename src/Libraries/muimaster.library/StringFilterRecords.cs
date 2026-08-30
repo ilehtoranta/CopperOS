@@ -143,38 +143,52 @@ internal static class MuiStringFilterStateRecordMemoryCodec
 
 internal static class MuiStringFilterStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiStringFilterStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiStringFilterStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) ||
-			!MuiStringFilterStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out var accept) ||
-			!MuiStringFilterStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 8, out var reject)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringFilterStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var accept) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var reject) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
 		value.Accept = APTR.FromPointer(accept);
 		value.Reject = APTR.FromPointer(reject);
 		return true;
 	}
 
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringFilterStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringFilterStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> TryReadStructural(ref platform, address, out value) &&
+		=> TryReadRecord(ref platform, address, out value) &&
 		MuiStringFilterStateAdmission.Validate(value);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiStringFilterStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStringFilterStateAdmission.Validate(value) &&
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringFilterStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Accept.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Reject.Raw) && MuiGuestStructCursor.IsComplete(cursor);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringFilterStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiStringFilterStateAdmission.Validate(value)) return false;
-		return MuiStringFilterStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiStringFilterStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 4, value.Accept.Raw) &&
-			MuiStringFilterStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 8, value.Reject.Raw);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, value);
 }

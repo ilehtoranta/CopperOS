@@ -99,6 +99,42 @@ public sealed class MuiGroupChildrenTests
 	}
 
 	[Fact]
+	public void ChildListStateSequentialRecordRoundTripsAndRejectsInvalidBounds()
+	{
+		var platform = CreateClasses(out _, out _);
+		var record = APTR.FromPointer(0x1A00);
+		var input = new MuiGroupChildListStateInput
+		{
+			Group = APTR.FromPointer(0x1300),
+			List = APTR.FromPointer(0x1400),
+			Entries = APTR.FromPointer(0x1500),
+			Count = 2,
+			Capacity = 3,
+			Mutation = 5,
+			Generation = 9,
+		};
+		Assert.True(MuiGroupChildrenCore.WriteChildListStateRecord(ref platform,
+			record, input));
+		Assert.True(MuiGroupChildListStateCodec.TryReadRecord(ref platform,
+			record, out var value));
+		Assert.Equal(MuiGroupChildListState.Magic, value.Cookie);
+		Assert.Equal(input.Group, value.Group);
+		Assert.Equal(input.List, value.List);
+		Assert.Equal(input.Entries, value.Entries);
+		Assert.Equal(input.Count, value.Count);
+		Assert.Equal(input.Capacity, value.Capacity);
+		Assert.Equal(input.Mutation, value.Mutation);
+		Assert.Equal(input.Generation, value.Generation);
+
+		input.Capacity = 1;
+		Assert.False(MuiGroupChildrenCore.WriteChildListStateRecord(ref platform,
+			record, input));
+		var truncated = APTR.FromPointer(0x20FFC);
+		Assert.False(MuiGroupChildListStateCodec.TryReadRecord(ref platform,
+			truncated, out _));
+	}
+
+	[Fact]
 	public void NullChildTagFailsAndDisposesPreviouslyAdoptedChildren()
 	{
 		var platform = CreateClasses(out var groupClass, out var areaClass);
@@ -164,6 +200,28 @@ public sealed class MuiGroupChildrenTests
 		var freesBefore = platform.FreeCount;
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, group));
 		Assert.True(platform.FreeCount > freesBefore);
+	}
+
+	[Fact]
+	public void ForwardStateSequentialRecordRoundTripsAndRejectsTruncation()
+	{
+		var platform = CreateClasses(out _, out _);
+		var record = APTR.FromPointer(0x1200);
+		Assert.True(MuiGroupChildrenCore.WriteForwardRecord(ref platform, record,
+			1, 1, 7));
+		Assert.True(MuiGroupForwardStateCodec.TryReadRecord(ref platform, record,
+			out var value));
+		Assert.Equal(MuiGroupForwardState.Magic, value.Cookie);
+		Assert.Equal(1u, value.Forward);
+		Assert.Equal(1u, value.ForwardDepth);
+		Assert.Equal(7u, value.ForwardCount);
+
+		var truncated = APTR.FromPointer(0x20FFC);
+		Assert.False(MuiGroupForwardStateCodec.TryReadRecord(ref platform,
+			truncated, out _));
+		platform.WriteUInt32(record, 4, 2);
+		Assert.False(MuiGroupForwardStateCodec.TryRead(ref platform, record,
+			out _));
 	}
 
 	[Fact]
@@ -284,6 +342,32 @@ public sealed class MuiGroupChildrenTests
 	}
 
 	[Fact]
+	public void GroupExecListSequentialRecordPreservesPackedByteTail()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var record = APTR.FromPointer(0x1600);
+		var value = new MuiGroupExecListRecord
+		{
+			Head = APTR.FromPointer(0x1700),
+			Tail = APTR.FromPointer(0x1800),
+			TailPred = APTR.FromPointer(0x1900),
+			Type = NodeType.Unknown,
+			Padding = 0xA5,
+		};
+		Assert.True(MuiGroupExecListCodec.WriteRecord(ref platform, record, value));
+		Assert.True(MuiGroupExecListCodec.TryReadRecord(ref platform, record,
+			out var decoded));
+		Assert.Equal(value.Head, decoded.Head);
+		Assert.Equal(value.Tail, decoded.Tail);
+		Assert.Equal(value.TailPred, decoded.TailPred);
+		Assert.Equal(value.Type, decoded.Type);
+		Assert.Equal(value.Padding, decoded.Padding);
+		Assert.False(MuiGroupExecListCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x20FFC), out _));
+	}
+
+	[Fact]
 	public void GroupRecordFieldCursorUsesSemanticKindsAndWidths()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -344,6 +428,53 @@ public sealed class MuiGroupChildrenTests
 		cursor.Index = 0;
 		Assert.False(MuiGroupChildListEntryVectorCodec.TryGetEntry(ref platform,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void GroupChildListEntryVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var vector = APTR.FromPointer(0x1800);
+		Assert.True(MuiGroupChildListEntryVectorMemoryCodec.TryGetEntry(
+			ref platform, vector, 2, out var address));
+		Assert.Equal(APTR.FromPointer(0x1820), address);
+		Assert.False(MuiGroupChildListEntryVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0x20FF1), 0, out _));
+		Assert.False(MuiGroupChildListEntryVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0xFFFFFFF0), 2, out _));
+		Assert.False(MuiGroupChildListEntryVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.Null, 0, out _));
+	}
+
+	[Fact]
+	public void ChildListEntrySequentialRecordRoundTripsAndRejectsBadMarker()
+	{
+		var platform = CreateClasses(out _, out _);
+		var record = APTR.FromPointer(0x1A00);
+		var value = new MuiGroupChildListEntry
+		{
+			Next = APTR.FromPointer(0x1300),
+			Previous = APTR.FromPointer(0x1400),
+			Object = APTR.FromPointer(0x1500),
+			Reserved = APTR.FromPointer(MuiGroupChildListEntry.ProjectionMagic),
+		};
+		Assert.True(MuiGroupChildListEntryCodec.WriteRecord(ref platform, record,
+			value));
+		Assert.True(MuiGroupChildListEntryCodec.TryReadRecord(ref platform, record,
+			out var decoded));
+		Assert.Equal(value.Next, decoded.Next);
+		Assert.Equal(value.Previous, decoded.Previous);
+		Assert.Equal(value.Object, decoded.Object);
+		Assert.Equal(value.Reserved, decoded.Reserved);
+		Assert.True(MuiGroupChildListEntryCodec.TryRead(ref platform, record,
+			out _));
+
+		platform.WriteUInt32(record, 12, 0);
+		Assert.False(MuiGroupChildListEntryCodec.TryRead(ref platform, record,
+			out _));
+		Assert.False(MuiGroupChildListEntryCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x20FFC), out _));
 	}
 
 	[Fact]

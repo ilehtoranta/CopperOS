@@ -240,6 +240,12 @@ public sealed class MuiCommonControlClassTests
 		expected.TopEdge = 4;
 		expected.Width = 24;
 		expected.Height = 20;
+		Assert.True(MuiImageGeometryMemoryCodec.TryGetAddress(ref platform,
+			address, MuiImageGeometryField.Height, out var heightAddress));
+		Assert.Equal(address.Raw + MuiImageGeometryState.HeightOffset,
+			heightAddress.Raw);
+		Assert.True(MuiImageGeometryMemoryCodec.TryWriteUInt16(ref platform,
+			address, MuiImageGeometryField.LeftEdge, unchecked((ushort)-3)));
 		Assert.True(MuiImageGeometryCodec.Write(ref platform, address, expected));
 		Assert.True(MuiImageGeometryCodec.TryRead(ref platform, address,
 			out var actual));
@@ -249,6 +255,8 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal(expected.Height, actual.Height);
 		Assert.False(MuiImageGeometryCodec.TryRead(ref platform, APTR.Null,
 			out _));
+		Assert.False(MuiImageGeometryMemoryCodec.TryReadUInt16(ref platform,
+			APTR.FromPointer(0x40FFC), MuiImageGeometryField.Height, out _));
 	}
 
 	[Fact]
@@ -8360,6 +8368,8 @@ public sealed class MuiCommonControlClassTests
 		Assert.Equal("hooked", ReadCString(ref platform, APTR.FromPointer(
 			Get(ref platform, stringObj, StringContents))));
 		Assert.Equal(1u, platform.HookInvokeCount);
+		Assert.Equal(MuiStringEditWorkCodec.CommandKey,
+			platform.LastStringEditCommand);
 		Assert.NotEqual(APTR.Null, platform.LastHookA2);
 		Assert.NotEqual(APTR.Null, platform.LastHookA1);
 
@@ -8673,6 +8683,25 @@ public sealed class MuiCommonControlClassTests
 	[Fact]
 	public void StringEditHookBeepUsesNamedPlatformRequest()
 	{
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringEditBeepRequest>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringEditBeepRequest>(nameof(MuiStringEditBeepRequest.Object)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringEditBeepRequest>(nameof(MuiStringEditBeepRequest.InputEvent)).ToInt32());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringEditBeepRequest>(nameof(MuiStringEditBeepRequest.Accepted)).ToInt32());
+		Assert.Equal(22, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringEditReuseRequest>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringEditReuseRequest>(nameof(MuiStringEditReuseRequest.Object)).ToInt32());
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringEditReuseRequest>(nameof(MuiStringEditReuseRequest.MuiKey)).ToInt32());
+		Assert.Equal(16, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringEditReuseRequest>(nameof(MuiStringEditReuseRequest.Code)).ToInt32());
+		Assert.Equal(18, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringEditReuseRequest>(nameof(MuiStringEditReuseRequest.Accepted)).ToInt32());
+
 		var platform = NewPlatform();
 		var stringClass = Register(ref platform, 0x11E0, "String.mui");
 		var source = APTR.FromPointer(0x3800);

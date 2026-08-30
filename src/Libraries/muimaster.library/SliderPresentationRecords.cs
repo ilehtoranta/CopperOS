@@ -130,37 +130,62 @@ internal static class MuiSliderPresentationStateRecordMemoryCodec
 
 internal static class MuiSliderPresentationStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// Production access is sequential and struct-shaped. The field-address
+	// adapters above remain available for compatibility diagnostics only.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiSliderPresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiSliderPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiSliderPresentationStateField.Magic, out value.Magic)) return false;
-		return MuiSliderPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiSliderPresentationStateField.Horizontal,
-			out value.Horizontal) &&
-			MuiSliderPresentationStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiSliderPresentationStateField.Quiet, out value.Quiet);
+		if ((address.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiSliderPresentationStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var horizontal) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var quiet) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		value.Magic = magic;
+		value.Horizontal = horizontal;
+		value.Quiet = quiet;
+		return true;
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiSliderPresentationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiSliderPresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory =>
-		TryReadStructural(ref platform, address, out value) &&
+		TryReadRecord(ref platform, address, out value) &&
 		MuiSliderPresentationStateAdmission.Validate(value);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiSliderPresentationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if ((address.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiSliderPresentationStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Horizontal) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Quiet)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiSliderPresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiSliderPresentationStateAdmission.Validate(value)) return false;
-		return MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiSliderPresentationStateField.Magic, value.Magic) &&
-			MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiSliderPresentationStateField.Horizontal, value.Horizontal) &&
-			MuiSliderPresentationStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiSliderPresentationStateField.Quiet, value.Quiet);
+		return WriteRecord(ref platform, address, value);
 	}
 }
 

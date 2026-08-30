@@ -66,6 +66,15 @@ internal static class MuiColorSpecialistLayout
 internal struct MuiColorPenSpecRecord
 {
 	internal const uint Size = MuiColorSpecialistLayout.SpecSize;
+	internal const uint FieldSize = 4;
+	internal const uint KindOffset = 0;
+	internal const uint ScalarOffset = 4;
+	internal const uint RedOffset = 8;
+	internal const uint GreenOffset = 12;
+	internal const uint BlueOffset = 16;
+	internal const uint Reserved0Offset = 20;
+	internal const uint Reserved1Offset = 24;
+	internal const uint Reserved2Offset = 28;
 
 	internal uint Kind;
 	internal uint Scalar;
@@ -120,78 +129,99 @@ internal struct MuiColorRecordFieldCursor
 	internal MuiColorRecordField Field;
 }
 
-internal static class MuiColorRecordFieldCursorCodec
+internal static class MuiColorRecordMemoryCodec
 {
 	private static bool TryResolve(MuiColorRecordKind record,
 		MuiColorRecordField field, out uint offset, out uint size)
 	{
 		offset = 0;
 		size = 0;
-		switch (record)
+		if (record == MuiColorRecordKind.PenSpec)
 		{
-			case MuiColorRecordKind.PenSpec:
-				size = MuiColorPenSpecRecord.Size;
-				offset = field switch
-				{
-					MuiColorRecordField.Kind => 0,
-					MuiColorRecordField.Scalar => 4,
-					MuiColorRecordField.Red => 8,
-					MuiColorRecordField.Green => 12,
-					MuiColorRecordField.Blue => 16,
-					MuiColorRecordField.Reserved0 => 20,
-					MuiColorRecordField.Reserved1 => 24,
-					MuiColorRecordField.Reserved2 => 28,
-					_ => uint.MaxValue,
-				};
-				break;
-			case MuiColorRecordKind.State:
-				size = MuiColorSpecialistState.Size;
-				offset = field switch
-				{
-					MuiColorRecordField.Magic => 0,
-					MuiColorRecordField.Class => 4,
-					MuiColorRecordField.Flags => 8,
-					MuiColorRecordField.RenderInfo => 12,
-					MuiColorRecordField.DrawState => 16,
-					MuiColorRecordField.Pen => 20,
-					MuiColorRecordField.SpecBlock => 24,
-					MuiColorRecordField.RgbBlock => 28,
-					MuiColorRecordField.Reference => 32,
-					MuiColorRecordField.ModeID => 36,
-					MuiColorRecordField.Alpha => 40,
-					MuiColorRecordField.Entries => 44,
-					MuiColorRecordField.Names => 48,
-					MuiColorRecordField.NotifyAttribute => 52,
-					MuiColorRecordField.NotifyValue => 56,
-					MuiColorRecordField.NotifyCount => 60,
-					_ => uint.MaxValue,
-				};
-				break;
-			case MuiColorRecordKind.Rgb:
-				size = MuiColorRgbRecord.Size;
-				offset = field switch
-				{
-					MuiColorRecordField.Red => 0,
-					MuiColorRecordField.Green => 4,
-					MuiColorRecordField.Blue => 8,
-					_ => uint.MaxValue,
-				};
-				break;
+			size = MuiColorPenSpecRecord.Size;
+			if (field == MuiColorRecordField.Kind)
+				offset = MuiColorPenSpecRecord.KindOffset;
+			else if (field == MuiColorRecordField.Scalar)
+				offset = MuiColorPenSpecRecord.ScalarOffset;
+			else if (field == MuiColorRecordField.Red)
+				offset = MuiColorPenSpecRecord.RedOffset;
+			else if (field == MuiColorRecordField.Green)
+				offset = MuiColorPenSpecRecord.GreenOffset;
+			else if (field == MuiColorRecordField.Blue)
+				offset = MuiColorPenSpecRecord.BlueOffset;
+			else if (field == MuiColorRecordField.Reserved0)
+				offset = MuiColorPenSpecRecord.Reserved0Offset;
+			else if (field == MuiColorRecordField.Reserved1)
+				offset = MuiColorPenSpecRecord.Reserved1Offset;
+			else if (field == MuiColorRecordField.Reserved2)
+				offset = MuiColorPenSpecRecord.Reserved2Offset;
+			else return false;
+			return true;
 		}
-		return offset != uint.MaxValue;
+		if (record == MuiColorRecordKind.State)
+		{
+			size = MuiColorSpecialistState.Size;
+			if (field == MuiColorRecordField.Magic)
+				offset = MuiColorSpecialistState.MagicOffset;
+			else if (field == MuiColorRecordField.Class)
+				offset = MuiColorSpecialistState.ClassOffset;
+			else if (field == MuiColorRecordField.Flags)
+				offset = MuiColorSpecialistState.FlagsOffset;
+			else if (field == MuiColorRecordField.RenderInfo)
+				offset = MuiColorSpecialistState.RenderInfoOffset;
+			else if (field == MuiColorRecordField.DrawState)
+				offset = MuiColorSpecialistState.DrawStateOffset;
+			else if (field == MuiColorRecordField.Pen)
+				offset = MuiColorSpecialistState.PenOffset;
+			else if (field == MuiColorRecordField.SpecBlock)
+				offset = MuiColorSpecialistState.SpecBlockOffset;
+			else if (field == MuiColorRecordField.RgbBlock)
+				offset = MuiColorSpecialistState.RgbBlockOffset;
+			else if (field == MuiColorRecordField.Reference)
+				offset = MuiColorSpecialistState.ReferenceOffset;
+			else if (field == MuiColorRecordField.ModeID)
+				offset = MuiColorSpecialistState.ModeIDOffset;
+			else if (field == MuiColorRecordField.Alpha)
+				offset = MuiColorSpecialistState.AlphaOffset;
+			else if (field == MuiColorRecordField.Entries)
+				offset = MuiColorSpecialistState.EntriesOffset;
+			else if (field == MuiColorRecordField.Names)
+				offset = MuiColorSpecialistState.NamesOffset;
+			else if (field == MuiColorRecordField.NotifyAttribute)
+				offset = MuiColorSpecialistState.NotifyAttributeOffset;
+			else if (field == MuiColorRecordField.NotifyValue)
+				offset = MuiColorSpecialistState.NotifyValueOffset;
+			else if (field == MuiColorRecordField.NotifyCount)
+				offset = MuiColorSpecialistState.NotifyCountOffset;
+			else return false;
+			return true;
+		}
+		if (record == MuiColorRecordKind.Rgb)
+		{
+			size = MuiColorRgbRecord.Size;
+			if (field == MuiColorRecordField.Red)
+				offset = MuiColorRgbRecord.RedOffset;
+			else if (field == MuiColorRecordField.Green)
+				offset = MuiColorRgbRecord.GreenOffset;
+			else if (field == MuiColorRecordField.Blue)
+				offset = MuiColorRgbRecord.BlueOffset;
+			else return false;
+			return true;
+		}
+		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiColorRecordFieldCursor cursor, out APTR address)
+		APTR recordAddress, MuiColorRecordKind record,
+		MuiColorRecordField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Record, cursor.Field, out var offset,
-			out var size) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, size)) return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(record, field, out var offset, out var size) ||
+			recordAddress.IsNull || recordAddress.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(recordAddress, size)) return false;
+		address = APTR.FromPointer(recordAddress.Raw + offset);
+		return platform.IsMapped(address, MuiColorPenSpecRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -199,11 +229,8 @@ internal static class MuiColorRecordFieldCursorCodec
 		out uint value) where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiColorRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, address, record, field,
+			out var fieldAddress))
 			return false;
 		value = platform.ReadUInt32(fieldAddress, 0);
 		return true;
@@ -213,81 +240,106 @@ internal static class MuiColorRecordFieldCursorCodec
 		APTR address, MuiColorRecordKind record, MuiColorRecordField field,
 		uint value) where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiColorRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, address, record, field,
+			out var fieldAddress))
 			return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
 		return true;
 	}
 }
 
+// Compatibility wrapper retained for callers that still construct the typed
+// color record cursor. Live specialist serialization uses the direct adapter.
+internal static class MuiColorRecordFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiColorRecordFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiColorRecordMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiColorRecordKind record, MuiColorRecordField field,
+		out uint value) where TPlatform : struct, IMuiGuestMemory =>
+		MuiColorRecordMemoryCodec.TryReadUInt32(ref platform, address, record,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiColorRecordKind record, MuiColorRecordField field,
+		uint value) where TPlatform : struct, IMuiGuestMemory =>
+		MuiColorRecordMemoryCodec.TryWriteUInt32(ref platform, address, record,
+			field, value);
+}
+
 internal static class MuiColorPenSpecCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	// Production access is sequential and struct-shaped. The field-address
+	// adapter remains available only for compatibility diagnostics.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiColorPenSpecRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiColorPenSpecRecord.Size)) return false;
-		return MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiColorRecordKind.PenSpec, MuiColorRecordField.Kind,
-			out value.Kind) &&
-			MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Scalar,
-				out value.Scalar) &&
-			MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Red,
-				out value.Red) &&
-			MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Green,
-				out value.Green) &&
-			MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Blue,
-				out value.Blue) &&
-			MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Reserved0,
-				out value.Reserved0) &&
-			MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Reserved1,
-				out value.Reserved1) &&
-			MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Reserved2,
-				out value.Reserved2);
+		if ((address.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiColorPenSpecRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Kind) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Scalar) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Red) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Green) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Blue) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved0) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved1) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved2) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiColorPenSpecRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiColorPenSpecRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if ((address.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiColorPenSpecRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Kind) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Scalar) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Red) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Green) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Blue) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved0) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved1) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved2)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiColorPenSpecRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiColorPenSpecRecord.Size)) return false;
-		return MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiColorRecordKind.PenSpec, MuiColorRecordField.Kind,
-			value.Kind) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Scalar,
-				value.Scalar) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Red, value.Red) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Green,
-				value.Green) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Blue, value.Blue) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Reserved0,
-				value.Reserved0) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Reserved1,
-				value.Reserved1) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.PenSpec, MuiColorRecordField.Reserved2,
-				value.Reserved2);
-	}
+		=> WriteRecord(ref platform, address, value);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -295,6 +347,23 @@ internal struct MuiColorSpecialistState
 {
 	internal const uint Size = MuiColorSpecialistLayout.InstanceSize;
 	internal const uint Cookie = MuiColorSpecialistLayout.Magic;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint ClassOffset = 4;
+	internal const uint FlagsOffset = 8;
+	internal const uint RenderInfoOffset = 12;
+	internal const uint DrawStateOffset = 16;
+	internal const uint PenOffset = 20;
+	internal const uint SpecBlockOffset = 24;
+	internal const uint RgbBlockOffset = 28;
+	internal const uint ReferenceOffset = 32;
+	internal const uint ModeIDOffset = 36;
+	internal const uint AlphaOffset = 40;
+	internal const uint EntriesOffset = 44;
+	internal const uint NamesOffset = 48;
+	internal const uint NotifyAttributeOffset = 52;
+	internal const uint NotifyValueOffset = 56;
+	internal const uint NotifyCountOffset = 60;
 
 	internal uint Magic;
 	internal uint Class;
@@ -316,70 +385,74 @@ internal struct MuiColorSpecialistState
 
 internal static class MuiColorSpecialistStateCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// Production access is sequential and struct-shaped. The field-address
+	// adapter remains available only for compatibility diagnostics.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiColorSpecialistState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiColorSpecialistState.Size) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Magic,
-				out var magic))
-			return false;
-		value.Magic = magic;
-		if (!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-			MuiColorRecordKind.State, MuiColorRecordField.Class, out value.Class) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Flags, out value.Flags) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.RenderInfo,
+		if ((address.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiColorSpecialistState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var @class) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var flags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var renderInfo) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.DrawState,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var drawState) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Pen, out value.Pen) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.SpecBlock,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var pen) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var specBlock) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.RgbBlock,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var rgbBlock) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Reference,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var reference) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.ModeID,
-				out value.ModeID) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Alpha,
-				out value.Alpha) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Entries,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var modeId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var alpha) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var entries) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Names,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var names) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.NotifyAttribute,
-				out value.NotifyAttribute) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.NotifyValue,
-				out value.NotifyValue) ||
-			!MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.NotifyCount,
-				out value.NotifyCount)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var notifyAttribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var notifyValue) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var notifyCount) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value.Magic = magic;
+		value.Class = @class;
+		value.Flags = flags;
 		value.RenderInfo = APTR.FromPointer(renderInfo);
 		value.DrawState = APTR.FromPointer(drawState);
+		value.Pen = pen;
 		value.SpecBlock = APTR.FromPointer(specBlock);
 		value.RgbBlock = APTR.FromPointer(rgbBlock);
 		value.Reference = APTR.FromPointer(reference);
+		value.ModeID = modeId;
+		value.Alpha = alpha;
 		value.Entries = APTR.FromPointer(entries);
 		value.Names = APTR.FromPointer(names);
+		value.NotifyAttribute = notifyAttribute;
+		value.NotifyValue = notifyValue;
+		value.NotifyCount = notifyCount;
 		return true;
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiColorSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiColorSpecialistState value)
@@ -392,54 +465,49 @@ internal static class MuiColorSpecialistStateCodec
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiColorSpecialistState value)
 		where TPlatform : struct, IMuiGuestMemory
+		=> value.Magic == MuiColorSpecialistState.Cookie &&
+			WriteRecord(ref platform, address, value);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform, APTR address,
+		MuiColorSpecialistState value)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiColorSpecialistState.Size) || value.Magic !=
-			MuiColorSpecialistState.Cookie) return false;
-		return MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiColorRecordKind.State, MuiColorRecordField.Magic, value.Magic) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Class, value.Class) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Flags, value.Flags) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.RenderInfo,
-				value.RenderInfo.Raw) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.DrawState,
-				value.DrawState.Raw) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Pen, value.Pen) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.SpecBlock,
-				value.SpecBlock.Raw) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.RgbBlock,
-				value.RgbBlock.Raw) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Reference,
-				value.Reference.Raw) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.ModeID,
-				value.ModeID) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Alpha,
-				value.Alpha) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Entries,
-				value.Entries.Raw) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.Names,
-				value.Names.Raw) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.NotifyAttribute,
-				value.NotifyAttribute) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.NotifyValue,
-				value.NotifyValue) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.State, MuiColorRecordField.NotifyCount,
-				value.NotifyCount);
+		if ((address.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiColorSpecialistState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Class) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RenderInfo.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.DrawState.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Pen) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.SpecBlock.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RgbBlock.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reference.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ModeID) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Alpha) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Entries.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Names.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.NotifyAttribute) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.NotifyValue) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.NotifyCount)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -532,6 +600,10 @@ internal static class MuiColorSpecialistStateAdmission
 internal struct MuiColorRgbRecord
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint RedOffset = 0;
+	internal const uint GreenOffset = 4;
+	internal const uint BlueOffset = 8;
 	internal uint Red;
 	internal uint Green;
 	internal uint Blue;
@@ -539,34 +611,53 @@ internal struct MuiColorRgbRecord
 
 internal static class MuiColorRgbCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+	// Production access is sequential and struct-shaped. The field-address
+	// adapter remains available only for compatibility diagnostics.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
 		out MuiColorRgbRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiColorRgbRecord.Size)) return false;
-		return MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-			MuiColorRecordKind.Rgb, MuiColorRecordField.Red, out record.Red) &&
-			MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.Rgb, MuiColorRecordField.Green, out record.Green) &&
-			MuiColorRecordFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiColorRecordKind.Rgb, MuiColorRecordField.Blue, out record.Blue);
+		if ((address.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiColorRgbRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Red) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Green) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Blue) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiColorRgbRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out record);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiColorRgbRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if ((address.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiColorRgbRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Red) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Green) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Blue)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiColorRgbRecord record)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiColorRgbRecord.Size)) return false;
-		return MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-			MuiColorRecordKind.Rgb, MuiColorRecordField.Red, record.Red) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.Rgb, MuiColorRecordField.Green, record.Green) &&
-			MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiColorRecordKind.Rgb, MuiColorRecordField.Blue, record.Blue);
-	}
+		=> WriteRecord(ref platform, address, record);
 }
 
 // The MG09 pen/color specialist family. Every entry point works over a validated
@@ -592,89 +683,25 @@ public static class MuiColorSpecialistCore
 	// ---- Classification ------------------------------------------------------
 
 	// Classify a guest C-string class id against the exact official names. The
-	// loader contract is case-sensitive, so the match is byte-exact. This is
-	// freestanding: the expected names are compared as ASCII byte literals with
-	// no managed strings, arrays or spans.
+	// loader contract is case-sensitive, so the match is byte-exact. Each
+	// official fixed-length identity is decoded through its named packed record;
+	// no managed strings, arrays or spans are involved.
 	public static MuiColorSpecialistClass ClassifyName<TPlatform>(
 		ref TPlatform platform, APTR classId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (classId.IsNull) return MuiColorSpecialistClass.None;
-		// Pendisplay.mui
-		if (B(ref platform, classId, 0) == 'P' &&
-			B(ref platform, classId, 1) == 'e' &&
-			B(ref platform, classId, 2) == 'n' &&
-			B(ref platform, classId, 3) == 'd' &&
-			B(ref platform, classId, 4) == 'i' &&
-			B(ref platform, classId, 5) == 's' &&
-			B(ref platform, classId, 6) == 'p' &&
-			B(ref platform, classId, 7) == 'l' &&
-			B(ref platform, classId, 8) == 'a' &&
-			B(ref platform, classId, 9) == 'y' && Suffix(ref platform, classId, 10))
-			return MuiColorSpecialistClass.Pendisplay;
-		// Colorfield.mui
-		if (B(ref platform, classId, 0) == 'C' &&
-			B(ref platform, classId, 1) == 'o' &&
-			B(ref platform, classId, 2) == 'l' &&
-			B(ref platform, classId, 3) == 'o' &&
-			B(ref platform, classId, 4) == 'r' &&
-			B(ref platform, classId, 5) == 'f' &&
-			B(ref platform, classId, 6) == 'i' &&
-			B(ref platform, classId, 7) == 'e' &&
-			B(ref platform, classId, 8) == 'l' &&
-			B(ref platform, classId, 9) == 'd' && Suffix(ref platform, classId, 10))
-			return MuiColorSpecialistClass.Colorfield;
-		// Coloradjust.mui
-		if (B(ref platform, classId, 0) == 'C' &&
-			B(ref platform, classId, 1) == 'o' &&
-			B(ref platform, classId, 2) == 'l' &&
-			B(ref platform, classId, 3) == 'o' &&
-			B(ref platform, classId, 4) == 'r' &&
-			B(ref platform, classId, 5) == 'a' &&
-			B(ref platform, classId, 6) == 'd' &&
-			B(ref platform, classId, 7) == 'j' &&
-			B(ref platform, classId, 8) == 'u' &&
-			B(ref platform, classId, 9) == 's' &&
-			B(ref platform, classId, 10) == 't' && Suffix(ref platform, classId, 11))
-			return MuiColorSpecialistClass.Coloradjust;
-		// Palette.mui
-		if (B(ref platform, classId, 0) == 'P' &&
-			B(ref platform, classId, 1) == 'a' &&
-			B(ref platform, classId, 2) == 'l' &&
-			B(ref platform, classId, 3) == 'e' &&
-			B(ref platform, classId, 4) == 't' &&
-			B(ref platform, classId, 5) == 't' &&
-			B(ref platform, classId, 6) == 'e' && Suffix(ref platform, classId, 7))
-			return MuiColorSpecialistClass.Palette;
-		// Penadjust.mui
-		if (B(ref platform, classId, 0) == 'P' &&
-			B(ref platform, classId, 1) == 'e' &&
-			B(ref platform, classId, 2) == 'n' &&
-			B(ref platform, classId, 3) == 'a' &&
-			B(ref platform, classId, 4) == 'd' &&
-			B(ref platform, classId, 5) == 'j' &&
-			B(ref platform, classId, 6) == 'u' &&
-			B(ref platform, classId, 7) == 's' &&
-			B(ref platform, classId, 8) == 't' && Suffix(ref platform, classId, 9))
-			return MuiColorSpecialistClass.Penadjust;
+		if (MuiColorSpecialistPendisplayClassNameRecordCodec.TryMatch(
+			ref platform, classId)) return MuiColorSpecialistClass.Pendisplay;
+		if (MuiColorSpecialistColorfieldClassNameRecordCodec.TryMatch(
+			ref platform, classId)) return MuiColorSpecialistClass.Colorfield;
+		if (MuiColorSpecialistColoradjustClassNameRecordCodec.TryMatch(
+			ref platform, classId)) return MuiColorSpecialistClass.Coloradjust;
+		if (MuiColorSpecialistPaletteClassNameRecordCodec.TryMatch(
+			ref platform, classId)) return MuiColorSpecialistClass.Palette;
+		if (MuiColorSpecialistPenadjustClassNameRecordCodec.TryMatch(
+			ref platform, classId)) return MuiColorSpecialistClass.Penadjust;
 		return MuiColorSpecialistClass.None;
 	}
-
-	// Read a class-id byte with a bounds check; an unmapped byte yields -1 so a
-	// truncated or unmapped id never matches.
-	private static int B<TPlatform>(ref TPlatform platform, APTR text, int index)
-		where TPlatform : struct, IMuiGuestMemory =>
-		platform.IsMapped(text, (uint)index + 1) ? platform.ReadUInt8(text, index)
-			: -1;
-
-	// The shared ".mui" suffix followed by a NUL terminator at `offset`.
-	private static bool Suffix<TPlatform>(ref TPlatform platform, APTR text,
-		int offset) where TPlatform : struct, IMuiGuestMemory =>
-		B(ref platform, text, offset) == '.' &&
-		B(ref platform, text, offset + 1) == 'm' &&
-		B(ref platform, text, offset + 2) == 'u' &&
-		B(ref platform, text, offset + 3) == 'i' &&
-		B(ref platform, text, offset + 4) == 0;
 
 	// Palette is obsolete but explicitly supported: it is fully initialized and
 	// operative, never a placeholder. This reports the documented disposition.

@@ -4,12 +4,14 @@
 */
 
 using Amiga;
+using System.Runtime.InteropServices;
 
 namespace CopperOS.MuiMaster;
 
 // Native context-menu provider requests.  Menu strips and menu items remain
 // opaque guest objects.  The core validates the owning Area and optional LONG
 // output pointers, while native menu ownership stays with the provider.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiContextMenuAddSample
 {
 	public APTR Object;
@@ -21,6 +23,7 @@ public struct MuiContextMenuAddSample
 	public uint Result;
 }
 
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiContextMenuChoiceSample
 {
 	public APTR Object;
@@ -158,6 +161,17 @@ internal static class MuiAreaContextMenuCore
 
 public static class MuiAreaContextMenuPacketCore
 {
+	// MUIM_ContextMenuBuild reaches Area as the static-menu fallback.  Keep
+	// the result as the named guest pointer held by the typed Area state;
+	// callers convert it to the ABI scalar only at the dispatcher boundary.
+	public static APTR Build<TPlatform>(ref TPlatform platform, APTR state,
+		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		if (!MuiAreaContextMenuCore.TryReadState(ref platform, state, obj,
+			out var value)) return APTR.Null;
+		return value.MenuStrip;
+	}
+
 	public static bool Set<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, APTR menuStrip) where TPlatform : struct, IMuiLayoutPlatform =>
 		MuiCommonControlCore.SetControlAttribute(ref platform, state, obj,

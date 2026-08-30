@@ -69,6 +69,27 @@ public sealed class MuiGaugeInfoTextAdmissionTests
 	}
 
 	[Fact]
+	public void GaugeInfoTextSequentialRecordPreservesPointerAndRejectsTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x8000,
+			State);
+		var address = APTR.FromPointer(0x1C00);
+		var value = new MuiGaugeInfoTextStateRecord
+		{
+			Magic = MuiGaugeInfoTextStateRecord.Cookie,
+			InfoText = APTR.FromPointer(0x2A00),
+		};
+		Assert.True(MuiGaugeInfoTextStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiGaugeInfoTextStateRecordCodec.TryReadRecord(ref platform,
+			address, out var actual));
+		Assert.Equal(value.Magic, actual.Magic);
+		Assert.Equal(value.InfoText, actual.InfoText);
+		Assert.False(MuiGaugeInfoTextStateRecordCodec.TryReadRecord(ref platform,
+			APTR.FromPointer(0x30FFC), out _));
+	}
+
+	[Fact]
 	public void MalformedGaugeInfoTextFailsClosedBeforeRawRepairOrSet()
 	{
 		var platform = CreatePlatform(out var gaugeClass, out var source);

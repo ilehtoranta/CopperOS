@@ -21,6 +21,7 @@ public sealed class MuiHeadlessDispatcherTests
 	private const uint MUIM_Datamap_Get = 0x8042C2BA;
 	private const uint MUIM_Objectmap_Set = 0x80421EC5;
 	private const uint MUIM_Objectmap_Find = 0x80426506;
+	private const uint MUIM_Objectmap_Remove = 0x8042F649;
 	private const uint MUIM_Semaphore_Attempt = 0x80426CE2;
 	private const uint MUIM_Semaphore_Release = 0x80421F2D;
 	private const uint MUIA_Datamap_AutoLock = 0x8042FBE4;
@@ -63,6 +64,13 @@ public sealed class MuiHeadlessDispatcherTests
 		platform.WriteUInt32(packet, 4, tags.Raw);
 		platform.WriteUInt32(packet, 8, gadgetInfo.Raw);
 		platform.WriteUInt32(packet, 12, 1u);
+		Assert.True(MuiHeadlessOmUpdateMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiHeadlessOmUpdateField.Flags, out var flagsAddress));
+		Assert.Equal(packet.Raw + MuiHeadlessOmUpdateMessage.FlagsOffset,
+			flagsAddress.Raw);
+		Assert.True(MuiHeadlessOmUpdateMessageMemoryCodec.TryReadUInt32(ref platform,
+			packet, MuiHeadlessOmUpdateField.Flags, out var directFlags));
+		Assert.Equal(1u, directFlags);
 
 		Assert.True(MuiHeadlessOmUpdateMessageCodec.TryRead(ref platform,
 			packet, out var update));
@@ -72,6 +80,44 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.Equal(1u, update.Flags);
 		Assert.False(MuiHeadlessOmUpdateMessageCodec.TryRead(ref platform,
 			APTR.FromPointer(0x20FF8), out _));
+	}
+
+	[Fact]
+	public void OmSetAndUpdateCodecsRoundTripNamedStructFields()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var setAddress = APTR.FromPointer(0x1500);
+		var set = default(MuiHeadlessOmSetMessage);
+		set.Attributes = APTR.FromPointer(0x1600);
+		set.GadgetInfo = APTR.FromPointer(0x1700);
+		Assert.True(MuiHeadlessOmSetMessageMemoryCodec.TryGetAddress(ref platform,
+			setAddress, MuiHeadlessOmSetField.Attributes, out var attributesAddress));
+		Assert.Equal(setAddress.Raw + MuiHeadlessOmSetMessage.AttributesOffset,
+			attributesAddress.Raw);
+		Assert.True(MuiHeadlessOmSetMessageCodec.TryWrite(ref platform, setAddress,
+			set));
+		Assert.True(MuiHeadlessOmSetMessageCodec.TryRead(ref platform, setAddress,
+			out var readSet));
+		Assert.Equal(MuiHeadlessOmSetMessageCodec.Method, readSet.MethodId);
+		Assert.Equal(set.Attributes, readSet.Attributes);
+		Assert.Equal(set.GadgetInfo, readSet.GadgetInfo);
+
+		var updateAddress = APTR.FromPointer(0x1800);
+		var update = default(MuiHeadlessOmUpdateMessage);
+		update.Attributes = APTR.FromPointer(0x1900);
+		update.GadgetInfo = APTR.FromPointer(0x1A00);
+		update.Flags = 0xA5A5u;
+		Assert.True(MuiHeadlessOmUpdateMessageCodec.TryWrite(ref platform,
+			updateAddress, update));
+		Assert.True(MuiHeadlessOmUpdateMessageCodec.TryRead(ref platform,
+			updateAddress, out var readUpdate));
+		Assert.Equal(MuiHeadlessOmUpdateMessageCodec.Method, readUpdate.MethodId);
+		Assert.Equal(update.Attributes, readUpdate.Attributes);
+		Assert.Equal(update.GadgetInfo, readUpdate.GadgetInfo);
+		Assert.Equal(update.Flags, readUpdate.Flags);
+		Assert.False(MuiHeadlessOmUpdateMessageCodec.TryWrite(ref platform,
+			APTR.FromPointer(0x20FF8), update));
 	}
 
 	[Fact]
@@ -147,18 +193,18 @@ public sealed class MuiHeadlessDispatcherTests
 
 		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State, family,
 			MUIA_Objectmap_CopyKeys, 1, false));
-		var references = platform.ReadUInt32(child, 4);
-		WritePacket(ref platform, packet, MUIM_Objectmap_Set, child.Raw, child.Raw,
+		var objectKey = APTR.FromPointer(0x1380);
+		platform.WriteCString(objectKey, "child");
+		WritePacket(ref platform, packet, MUIM_Objectmap_Set, child.Raw, objectKey.Raw,
 			0);
 		Assert.Equal(1u, MuiHeadlessDispatcher.Dispatch(ref platform, State,
 			family, packet));
-		Assert.Equal(references + 1, platform.ReadUInt32(child, 4));
-		WritePacket(ref platform, packet, MUIM_Objectmap_Find, child.Raw, 0, 0);
+		WritePacket(ref platform, packet, MUIM_Objectmap_Find, objectKey.Raw, 0, 0);
 		Assert.Equal(child.Raw, MuiHeadlessDispatcher.Dispatch(ref platform, State,
 			family, packet));
-		Assert.True(MuiStoreCore.ObjectmapRemove(ref platform, State, family,
-			child));
-		Assert.Equal(references, platform.ReadUInt32(child, 4));
+		WritePacket(ref platform, packet, MUIM_Objectmap_Remove, objectKey.Raw, 0, 0);
+		Assert.Equal(child.Raw, MuiHeadlessDispatcher.Dispatch(ref platform, State,
+			family, packet));
 
 		WritePacket(ref platform, packet, MUIM_Semaphore_Attempt, 0, 0, 0);
 		Assert.Equal(1u, MuiHeadlessDispatcher.Dispatch(ref platform, State,
@@ -204,12 +250,16 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.Equal(0xAABBCCDDu,
 			platform.ReadUInt32(APTR.FromPointer(returned), 0));
 		Assert.True(MuiDataspaceMessageCore.WriteAddRecord(ref platform, packet,
-			data, 4, 23));
+			data, 4, 19));
+		Assert.Equal(1u, MuiHeadlessDispatcher.DispatchDataspace(ref platform,
+			State, source, packet));
+		Assert.True(MuiDataspaceMessageCore.WriteAddRecord(ref platform, packet,
+			data, 4, 29));
 		Assert.Equal(1u, MuiHeadlessDispatcher.DispatchDataspace(ref platform,
 			State, source, packet));
 		Assert.True(MuiDataspaceMessageCore.WriteMergeRecord(ref platform, packet,
 			source));
-		Assert.Equal(1u, MuiHeadlessDispatcher.DispatchDataspace(ref platform,
+		Assert.Equal(2u, MuiHeadlessDispatcher.DispatchDataspace(ref platform,
 			State, obj, packet));
 		Assert.True(MuiDataspaceMessageCore.WriteRemoveRecord(ref platform, packet,
 			19));
@@ -331,6 +381,8 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiDataspaceMessageCore.TryReadAdd(ref platform, packet,
 			out var add));
 		Assert.Equal(MuiDataspaceMessageCore.AddMethod, add.MethodId);
+		Assert.Equal(data.Raw, add.Data.Raw);
+		Assert.Equal(4, add.Length);
 		Assert.Equal(7u, add.Id);
 
 		Assert.True(MuiDataspaceMessageCore.WriteFindRecord(ref platform, packet,
@@ -340,6 +392,36 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiDataspaceMessageCore.TryReadFind(ref platform, packet,
 			out var find));
 		Assert.Equal(MuiDataspaceMessageCore.FindMethod, find.MethodId);
+		Assert.Equal(7u, find.Id);
+
+		var sizeStorage = APTR.FromPointer(0x1400);
+		Assert.True(MuiDataspaceMessageCore.WriteGetRecord(ref platform, packet,
+			7, sizeStorage));
+		Assert.True(MuiDataspaceMessageCore.TryReadGet(ref platform, packet,
+			out var get));
+		Assert.Equal(MuiDataspaceMessageCore.GetMethod, get.MethodId);
+		Assert.Equal(7u, get.Id);
+		Assert.Equal(sizeStorage.Raw, get.SizeStorage.Raw);
+
+		var source = APTR.FromPointer(0x1500);
+		Assert.True(MuiDataspaceMessageCore.WriteMergeRecord(ref platform, packet,
+			source));
+		Assert.True(MuiDataspaceMessageCore.TryReadMerge(ref platform, packet,
+			out var merge));
+		Assert.Equal(MuiDataspaceMessageCore.MergeMethod, merge.MethodId);
+		Assert.Equal(source.Raw, merge.Dataspace.Raw);
+
+		Assert.True(MuiDataspaceMessageCore.WriteRemoveRecord(ref platform, packet,
+			7));
+		Assert.True(MuiDataspaceMessageCore.TryReadRemove(ref platform, packet,
+			out var remove));
+		Assert.Equal(MuiDataspaceMessageCore.RemoveMethod, remove.MethodId);
+		Assert.Equal(7u, remove.Id);
+
+		Assert.True(MuiDataspaceMessageCore.WriteClearRecord(ref platform, packet));
+		Assert.True(MuiDataspaceMessageCodec.TryReadClear(ref platform, packet,
+			out var clear));
+		Assert.Equal(MuiDataspaceMessageCore.ClearMethod, clear.MethodId);
 	}
 
 	[Fact]
@@ -534,6 +616,123 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void StoreRecordMemoryAdapterOwnsCompleteStructBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var record = APTR.FromPointer(0x1800);
+		Assert.True(MuiStoreRecordMemoryCodec.TryGetAddress(ref platform, record,
+			MuiStoreRecordField.Generation, out var generation));
+		Assert.Equal(APTR.FromPointer(0x1814), generation);
+		Assert.True(MuiStoreRecordMemoryCodec.TryWrite(ref platform, record,
+			MuiStoreRecordField.Length, 12));
+		Assert.True(MuiStoreRecordMemoryCodec.TryRead(ref platform, record,
+			MuiStoreRecordField.Length, out var length));
+		Assert.Equal(12u, length);
+		Assert.False(MuiStoreRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20FF0), MuiStoreRecordField.Generation, out _));
+		Assert.False(MuiStoreRecordMemoryCodec.TryGetAddress(ref platform,
+			record, (MuiStoreRecordField)255, out _));
+	}
+
+	[Fact]
+	public void StoreMessageMemoryAdapterOwnsPacketStructBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var message = APTR.FromPointer(0x1800);
+		Assert.True(MuiStoreMessageMemoryCodec.TryGetAddress(ref platform,
+			message, MuiStorePacketKind.DatamapSet, MuiStoreField.Length,
+			out var length));
+		Assert.Equal(APTR.FromPointer(0x1808), length);
+		Assert.True(MuiStoreMessageMemoryCodec.TryWriteUInt32(ref platform, message,
+			MuiStorePacketKind.DatamapSet, MuiStoreField.Length, 12));
+		Assert.True(MuiStoreMessageMemoryCodec.TryReadUInt32(ref platform, message,
+			MuiStorePacketKind.DatamapSet, MuiStoreField.Length, out var value));
+		Assert.Equal(12u, value);
+		Assert.True(MuiStoreMessageMemoryCodec.TryGetAddress(ref platform, message,
+			MuiStorePacketKind.ObjectmapSet, MuiStoreField.Key, out var key));
+		Assert.Equal(APTR.FromPointer(0x1808), key);
+		Assert.False(MuiStoreMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20FFC), MuiStorePacketKind.DatamapGet,
+			MuiStoreField.SizeStorage, out _));
+		Assert.False(MuiStoreMessageMemoryCodec.TryGetAddress(ref platform,
+			message, (MuiStorePacketKind)255, MuiStoreField.MethodId, out _));
+		Assert.False(MuiStoreMessageMemoryCodec.TryGetAddress(ref platform,
+			message, MuiStorePacketKind.DatamapSet, (MuiStoreField)255,
+			out _));
+	}
+
+	[Fact]
+	public void StorePacketCodecsRoundTripNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var message = APTR.FromPointer(0x1800);
+		var set = default(MuiDatamapSetMessage);
+		set.MethodId = MuiStoreMessageCore.DatamapSetMethod;
+		set.Data = APTR.FromPointer(0x1900);
+		set.Length = -7;
+		set.Key = APTR.FromPointer(0x1A00);
+		Assert.True(MuiStorePacketCodec.WriteDatamapSet(ref platform, message,
+			set));
+		Assert.True(MuiStorePacketCodec.TryReadDatamapSet(ref platform, message,
+			out var setRead));
+		Assert.Equal(set.MethodId, setRead.MethodId);
+		Assert.Equal(set.Data, setRead.Data);
+		Assert.Equal(set.Length, setRead.Length);
+		Assert.Equal(set.Key, setRead.Key);
+
+		var get = default(MuiDatamapGetMessage);
+		get.MethodId = MuiStoreMessageCore.DatamapGetMethod;
+		get.Key = set.Key;
+		get.SizeStorage = APTR.FromPointer(0x1B00);
+		Assert.True(MuiStorePacketCodec.WriteDatamapGet(ref platform, message,
+			get));
+		Assert.True(MuiStorePacketCodec.TryReadDatamapGet(ref platform, message,
+			out var getRead));
+		Assert.Equal(get.Key, getRead.Key);
+		Assert.Equal(get.SizeStorage, getRead.SizeStorage);
+
+		var counter = default(MuiStoreCounterMessage);
+		counter.MethodId = MuiStoreMessageCore.DatamapIterateMethod;
+		counter.Counter = APTR.FromPointer(0x1C00);
+		Assert.True(MuiStorePacketCodec.WriteCounter(ref platform, message,
+			counter));
+		Assert.True(MuiStorePacketCodec.TryReadCounter(ref platform, message,
+			out var counterRead));
+		Assert.Equal(counter.Counter, counterRead.Counter);
+
+		var key = default(MuiStoreKeyMessage);
+		key.MethodId = MuiStoreMessageCore.DatamapFindMethod;
+		key.Key = set.Key;
+		Assert.True(MuiStorePacketCodec.WriteKey(ref platform, message, key));
+		Assert.True(MuiStorePacketCodec.TryReadKey(ref platform, message,
+			out var keyRead));
+		Assert.Equal(key.Key, keyRead.Key);
+
+		var objectSet = default(MuiObjectmapSetMessage);
+		objectSet.MethodId = MuiStoreMessageCore.ObjectmapSetMethod;
+		objectSet.Object = APTR.FromPointer(0x1D00);
+		objectSet.Key = APTR.FromPointer(0x1E00);
+		Assert.True(MuiStorePacketCodec.WriteObjectmapSet(ref platform, message,
+			objectSet));
+		Assert.True(MuiStorePacketCodec.TryReadObjectmapSet(ref platform, message,
+			out var objectSetRead));
+		Assert.Equal(objectSet.Object, objectSetRead.Object);
+		Assert.Equal(objectSet.Key, objectSetRead.Key);
+
+		var clear = default(MuiStoreClearMessage);
+		clear.MethodId = MuiStoreMessageCore.DatamapClearMethod;
+		Assert.True(MuiStorePacketCodec.WriteClear(ref platform, message, clear));
+		Assert.True(MuiStorePacketCodec.TryReadClear(ref platform, message,
+			out var clearRead));
+		Assert.Equal(clear.MethodId, clearRead.MethodId);
+		Assert.False(MuiStorePacketCodec.TryReadDatamapSet(ref platform,
+			APTR.FromPointer(0x20FF8), out _));
+	}
+
+	[Fact]
 	public void HeadlessStateFieldCursorUsesNamedBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -630,6 +829,32 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void HeadlessClassMemoryAdapterOwnsMixedWidthStructBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var record = APTR.FromPointer(0x1d00);
+		Assert.True(MuiHeadlessClassMemoryCodec.TryGetAddress(ref platform, record,
+			MuiHeadlessClassField.Flags, out var flags));
+		Assert.Equal(record.Raw + MuiHeadlessClassRecord.FlagsOffset,
+			flags.Raw);
+		Assert.True(MuiHeadlessClassMemoryCodec.TryWriteUInt16(ref platform,
+			record, MuiHeadlessClassField.InstanceSize, 96));
+		Assert.True(MuiHeadlessClassMemoryCodec.TryReadUInt16(ref platform, record,
+			MuiHeadlessClassField.InstanceSize, out var instanceSize));
+		Assert.Equal((ushort)96, instanceSize);
+		Assert.True(MuiHeadlessClassMemoryCodec.TryWriteUInt32(ref platform, record,
+			MuiHeadlessClassField.ObjectCount, 7));
+		Assert.True(MuiHeadlessClassMemoryCodec.TryReadUInt32(ref platform, record,
+			MuiHeadlessClassField.ObjectCount, out var objectCount));
+		Assert.Equal(7u, objectCount);
+		Assert.False(MuiHeadlessClassMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20ff0), MuiHeadlessClassField.Flags, out _));
+		Assert.False(MuiHeadlessClassMemoryCodec.TryGetAddress(ref platform, record,
+			(MuiHeadlessClassField)255, out _));
+	}
+
+	[Fact]
 	public void HeadlessObjectFieldCursorUsesNamedBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -684,6 +909,27 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void HeadlessObjectMemoryAdapterOwnsCompleteStructBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var record = APTR.FromPointer(0x2100);
+		Assert.True(MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform,
+			record, MuiHeadlessObjectField.UserData, out var userData));
+		Assert.Equal(record.Raw + MuiHeadlessObjectRecord.UserDataOffset,
+			userData.Raw);
+		Assert.True(MuiHeadlessObjectMemoryCodec.TryWrite(ref platform, record,
+			MuiHeadlessObjectField.Generation, 5));
+		Assert.True(MuiHeadlessObjectMemoryCodec.TryRead(ref platform, record,
+			MuiHeadlessObjectField.Generation, out var generation));
+		Assert.Equal(5u, generation);
+		Assert.False(MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20fc1), MuiHeadlessObjectField.UserData, out _));
+		Assert.False(MuiHeadlessObjectMemoryCodec.TryGetAddress(ref platform, record,
+			(MuiHeadlessObjectField)255, out _));
+	}
+
+	[Fact]
 	public void HeadlessAttributeFieldCursorUsesNamedBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -722,6 +968,28 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void HeadlessAttributeMemoryAdapterOwnsCompleteStructBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var record = APTR.FromPointer(0x2500);
+		Assert.True(MuiHeadlessAttributeMemoryCodec.TryGetAddress(ref platform,
+			record, MuiHeadlessAttributeField.Generation, out var generation));
+		Assert.Equal(record.Raw + MuiHeadlessAttributeRecord.GenerationOffset,
+			generation.Raw);
+		Assert.True(MuiHeadlessAttributeMemoryCodec.TryWrite(ref platform, record,
+			MuiHeadlessAttributeField.Value, 0x12345678));
+		Assert.True(MuiHeadlessAttributeMemoryCodec.TryRead(ref platform, record,
+			MuiHeadlessAttributeField.Value, out var value));
+		Assert.Equal(0x12345678u, value);
+		Assert.False(MuiHeadlessAttributeMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20ff1), MuiHeadlessAttributeField.Generation,
+			out _));
+		Assert.False(MuiHeadlessAttributeMemoryCodec.TryGetAddress(ref platform,
+			record, (MuiHeadlessAttributeField)255, out _));
+	}
+
+	[Fact]
 	public void HeadlessChildFieldCursorUsesNamedBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -757,6 +1025,26 @@ public sealed class MuiHeadlessDispatcherTests
 		cursor.Field = MuiHeadlessChildField.Owner;
 		Assert.False(MuiHeadlessChildFieldCursorCodec.TryGetAddress(ref platform,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void HeadlessChildMemoryAdapterOwnsCompleteStructBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var record = APTR.FromPointer(0x2900);
+		Assert.True(MuiHeadlessChildMemoryCodec.TryGetAddress(ref platform, record,
+			MuiHeadlessChildField.Owner, out var owner));
+		Assert.Equal(record.Raw + MuiHeadlessChildRecord.OwnerOffset, owner.Raw);
+		Assert.True(MuiHeadlessChildMemoryCodec.TryWrite(ref platform, record,
+			MuiHeadlessChildField.Object, 0x12345678));
+		Assert.True(MuiHeadlessChildMemoryCodec.TryRead(ref platform, record,
+			MuiHeadlessChildField.Object, out var obj));
+		Assert.Equal(0x12345678u, obj);
+		Assert.False(MuiHeadlessChildMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20ff1), MuiHeadlessChildField.Owner, out _));
+		Assert.False(MuiHeadlessChildMemoryCodec.TryGetAddress(ref platform, record,
+			(MuiHeadlessChildField)255, out _));
 	}
 
 	[Fact]
@@ -810,6 +1098,45 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void HeadlessNotificationMemoryAdapterOwnsCompleteHeaderBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var record = APTR.FromPointer(0x2d00);
+		Assert.True(MuiHeadlessNotificationMemoryCodec.TryGetAddress(
+			ref platform, record, MuiHeadlessNotificationField.Reserved,
+			out var reserved));
+		Assert.Equal(record.Raw + MuiHeadlessNotificationRecord.ReservedOffset,
+			reserved.Raw);
+		Assert.True(MuiHeadlessNotificationMemoryCodec.TryWrite(ref platform,
+			record, MuiHeadlessNotificationField.Sequence, 9));
+		Assert.True(MuiHeadlessNotificationMemoryCodec.TryRead(ref platform,
+			record, MuiHeadlessNotificationField.Sequence, out var sequence));
+		Assert.Equal(9u, sequence);
+		Assert.False(MuiHeadlessNotificationMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20fe1), MuiHeadlessNotificationField.Reserved,
+			out _));
+		Assert.False(MuiHeadlessNotificationMemoryCodec.TryGetAddress(ref platform,
+			record, (MuiHeadlessNotificationField)255, out _));
+	}
+
+	[Fact]
+	public void HeadlessNotificationPayloadMemoryAdapterOwnsRangeBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var record = APTR.FromPointer(0x2e00);
+		Assert.True(MuiHeadlessNotificationPayloadMemoryCodec.TryGetAddress(
+			ref platform, record, 4, out var payload));
+		Assert.Equal(record.Raw + MuiHeadlessNotificationRecord.Size,
+			payload.Raw);
+		Assert.False(MuiHeadlessNotificationPayloadMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0x20fe1), 4, out _));
+		Assert.False(MuiHeadlessNotificationPayloadMemoryCodec.TryGetAddress(
+			ref platform, record, uint.MaxValue, out _));
+	}
+
+	[Fact]
 	public void StorePacketsUseNamedRecordsAcrossTheLiveDispatcher()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -833,8 +1160,10 @@ public sealed class MuiHeadlessDispatcherTests
 		var data = APTR.FromPointer(0x1300);
 		var size = APTR.FromPointer(0x1320);
 		var key = APTR.FromPointer(0x1340);
+		var objectmapKey = APTR.FromPointer(0x1380);
 		platform.WriteUInt32(data, 0, 0x11223344);
 		platform.WriteCString(key, "named-key");
+		platform.WriteCString(objectmapKey, "object-key");
 		Assert.True(MuiStoreMessageCore.WriteDatamapSetRecord(ref platform,
 			packet, data, 4, key));
 		Assert.Equal(1u, MuiHeadlessDispatcher.Dispatch(ref platform, State,
@@ -865,17 +1194,17 @@ public sealed class MuiHeadlessDispatcherTests
 			store, packet));
 
 		Assert.True(MuiStoreMessageCore.WriteObjectmapSetRecord(ref platform,
-			packet, objectKey, objectKey));
+			packet, objectKey, objectmapKey));
 		Assert.Equal(1u, MuiHeadlessDispatcher.Dispatch(ref platform, State,
 			store, packet));
 		Assert.True(MuiStoreMessageCore.WriteObjectmapKeyRecord(ref platform,
-			packet, MuiStoreMessageCore.ObjectmapFindMethod, objectKey));
+			packet, MuiStoreMessageCore.ObjectmapFindMethod, objectmapKey));
 		Assert.Equal(objectKey.Raw, MuiHeadlessDispatcher.Dispatch(ref platform,
 			State, store, packet));
 		Assert.True(MuiStoreMessageCore.WriteObjectmapKeyRecord(ref platform,
-			packet, MuiStoreMessageCore.ObjectmapRemoveMethod, objectKey));
-		Assert.Equal(1u, MuiHeadlessDispatcher.Dispatch(ref platform, State,
-			store, packet));
+			packet, MuiStoreMessageCore.ObjectmapRemoveMethod, objectmapKey));
+		Assert.Equal(objectKey.Raw, MuiHeadlessDispatcher.Dispatch(ref platform,
+			State, store, packet));
 		Assert.True(MuiStoreMessageCore.WriteObjectmapClearRecord(ref platform,
 			packet));
 		Assert.Equal(0u, MuiHeadlessDispatcher.Dispatch(ref platform, State,
@@ -1166,6 +1495,25 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void DataspaceIffTransferMemoryAdapterUsesNamedChunkBoundary()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		Assert.True(MuiDataspaceIffTransferMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x1800u), 4, 4, out var address));
+		Assert.Equal(APTR.FromPointer(0x1804u), address);
+		Assert.True(MuiDataspaceIffTransferMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20FFCu), 0, 4, out address));
+		Assert.Equal(APTR.FromPointer(0x20FFCu), address);
+		Assert.False(MuiDataspaceIffTransferMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20FFCu), 0, 5, out _));
+		Assert.False(MuiDataspaceIffTransferMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0xFFFFFFF0u), 0, 4, out _));
+		Assert.False(MuiDataspaceIffTransferMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, 0, 1, out _));
+	}
+
+	[Fact]
 	public void DataspaceIffWriteMessageFieldCursorUsesNamedBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -1252,6 +1600,7 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiDataspaceIffMessageCore.TryReadReadIff(ref platform,
 			packet, out var read));
 		Assert.Equal(MuiDataspaceIffMessageCore.ReadIffMethod, read.MethodId);
+		Assert.Equal(0x1300u, read.Handle.Raw);
 
 		Assert.True(MuiDataspaceIffMessageCore.WriteWriteIffRecord(ref platform,
 			packet, APTR.FromPointer(0x1300), 1, 2));
@@ -1260,6 +1609,9 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiDataspaceIffMessageCore.TryReadWriteIff(ref platform,
 			packet, out var write));
 		Assert.Equal(MuiDataspaceIffMessageCore.WriteIffMethod, write.MethodId);
+		Assert.Equal(0x1300u, write.Handle.Raw);
+		Assert.Equal(1u, write.Type);
+		Assert.Equal(2u, write.Id);
 	}
 
 	[Fact]
@@ -1321,8 +1673,73 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiNotifyWriteMessageCodec.TryReadMethodIdValue(ref platform,
 			packet, out var methodId));
 		Assert.Equal(MuiNotifyWriteCore.WriteLongMethod, methodId);
+		Assert.True(MuiNotifyWritePacketMemoryCodec.TryReadUInt32(ref platform,
+			packet, MuiNotifyWritePacketKind.WriteLong,
+			MuiNotifyWritePacketField.MethodId, MuiNotifyWriteMethodMessage.Size,
+			out var directMethodId));
+		Assert.Equal(MuiNotifyWriteCore.WriteLongMethod, directMethodId);
 		Assert.False(MuiNotifyWriteMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
+	}
+
+	[Fact]
+	public void NotifyWriteFixedCodecsUseCompleteNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1200);
+		var header = new MuiNotifyWriteMethodMessage
+		{
+			MethodId = MuiNotifyWriteCore.WriteLongMethod,
+		};
+		Assert.True(MuiNotifyWriteMethodMessageCodec.Write(ref platform, packet,
+			header));
+		Assert.True(MuiNotifyWriteMethodMessageCodec.TryRead(ref platform, packet,
+			out var readHeader));
+		Assert.Equal(header.MethodId, readHeader.MethodId);
+		Assert.False(MuiNotifyWriteMethodMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		var writeLong = new MuiWriteLongMessage
+		{
+			MethodId = MuiNotifyWriteCore.WriteLongMethod,
+			Value = 0xAABBCCDD,
+			Memory = APTR.FromPointer(0x1300),
+		};
+		Assert.True(MuiWriteLongMessageCodec.Write(ref platform, packet,
+			writeLong));
+		Assert.True(MuiWriteLongMessageCodec.TryRead(ref platform, packet,
+			out var readLong));
+		Assert.Equal(writeLong.MethodId, readLong.MethodId);
+		Assert.Equal(writeLong.Value, readLong.Value);
+		Assert.Equal(writeLong.Memory, readLong.Memory);
+		Assert.True(MuiNotifyWriteMessageCodec.TryReadWriteLong(ref platform,
+			packet, out var admittedLong));
+		Assert.Equal(writeLong.Value, admittedLong.Value);
+
+		var writeString = new MuiWriteStringMessage
+		{
+			MethodId = MuiNotifyWriteCore.WriteStringMethod,
+			String = APTR.FromPointer(0x1400),
+			Memory = APTR.FromPointer(0x1500),
+		};
+		Assert.True(MuiWriteStringMessageCodec.Write(ref platform, packet,
+			writeString));
+		Assert.True(MuiWriteStringMessageCodec.TryRead(ref platform, packet,
+			out var readString));
+		Assert.Equal(writeString.MethodId, readString.MethodId);
+		Assert.Equal(writeString.String, readString.String);
+		Assert.Equal(writeString.Memory, readString.Memory);
+		Assert.True(MuiNotifyWriteMessageCodec.TryReadWriteString(ref platform,
+			packet, out var admittedString));
+		Assert.Equal(writeString.Memory, admittedString.Memory);
+
+		Assert.False(MuiNotifyWriteMessageCodec.TryReadWriteLong(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiWriteStringMessageCodec.Write(ref platform,
+			APTR.FromPointer(0x20FFFu), writeString));
+		writeLong.MethodId = MuiNotifyWriteCore.WriteStringMethod;
+		Assert.False(MuiNotifyWriteMessageCodec.TryWriteWriteLong(ref platform,
+			packet, writeLong));
 	}
 
 	[Fact]
@@ -1354,6 +1771,18 @@ public sealed class MuiHeadlessDispatcherTests
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
 			State);
 		var packet = APTR.FromPointer(0x1200);
+		Assert.True(MuiNotifyWritePacketMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiNotifyWritePacketKind.WriteLong,
+			MuiNotifyWritePacketField.Value, MuiWriteLongMessage.Size,
+			out var directValueAddress));
+		Assert.Equal(packet.Raw + MuiWriteLongMessage.ValueOffset,
+			directValueAddress.Raw);
+		Assert.True(MuiNotifyWritePacketMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiNotifyWritePacketKind.WriteString,
+			MuiNotifyWritePacketField.String, MuiWriteStringMessage.Size,
+			out var directStringAddress));
+		Assert.Equal(packet.Raw + MuiWriteStringMessage.StringOffset,
+			directStringAddress.Raw);
 		var cursor = default(MuiNotifyWritePacketFieldCursor);
 		cursor.Message = packet;
 		cursor.Packet = MuiNotifyWritePacketKind.WriteLong;
@@ -1564,6 +1993,36 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void NotifySetAsStringFixedCodecUsesCompleteNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1200);
+		var expected = new MuiSetAsStringMessage
+		{
+			MethodId = MuiNotifySetAsStringCore.Method,
+			Attribute = 0x8042AAAA,
+			Format = APTR.FromPointer(0x1400),
+			Value = 42,
+		};
+		Assert.True(MuiSetAsStringMessageCodec.TryWrite(ref platform, packet,
+			expected));
+		Assert.True(MuiSetAsStringMessageCodec.TryRead(ref platform, packet,
+			out var actual));
+		Assert.Equal(expected.MethodId, actual.MethodId);
+		Assert.Equal(expected.Attribute, actual.Attribute);
+		Assert.Equal(expected.Format, actual.Format);
+		Assert.Equal(expected.Value, actual.Value);
+		Assert.False(MuiSetAsStringMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiSetAsStringMessageCodec.TryWrite(ref platform,
+			APTR.FromPointer(0x20FFFu), expected));
+		expected.MethodId = 0;
+		Assert.False(MuiSetAsStringMessageCodec.TryWrite(ref platform, packet,
+			expected));
+	}
+
+	[Fact]
 	public void NotifySetAsStringMethodHeaderUsesNamedField()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -1574,6 +2033,10 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiSetAsStringMessageCodec.TryReadMethodId(ref platform,
 			packet, out var header));
 		Assert.Equal(MuiNotifySetAsStringCore.Method, header.MethodId);
+		Assert.True(MuiSetAsStringMessageMemoryCodec.TryReadUInt32(ref platform,
+			packet, MuiSetAsStringPacketField.MethodId,
+			MuiSetAsStringMethodMessage.Size, out var directMethod));
+		Assert.Equal(MuiNotifySetAsStringCore.Method, directMethod);
 		Assert.False(MuiSetAsStringMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -1585,6 +2048,11 @@ public sealed class MuiHeadlessDispatcherTests
 			State);
 		var message = APTR.FromPointer(0x1800);
 
+		Assert.True(MuiSetAsStringMessageMemoryCodec.TryGetAddress(ref platform,
+			message, MuiSetAsStringPacketField.Value, MuiSetAsStringMessage.Size,
+			out var directValueAddress));
+		Assert.Equal(message.Raw + MuiSetAsStringMessage.ValueOffset,
+			directValueAddress.Raw);
 		Assert.True(MuiSetAsStringMessageCodec.TryGetParameters(ref platform,
 			message, out var parameters));
 		Assert.Equal(APTR.FromPointer(0x180C), parameters);
@@ -1615,6 +2083,11 @@ public sealed class MuiHeadlessDispatcherTests
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
 			State);
 		var packet = APTR.FromPointer(0x1200);
+		Assert.True(MuiSetAsStringMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiSetAsStringPacketField.Attribute,
+			MuiSetAsStringMessage.Size, out var directAddress));
+		Assert.Equal(packet.Raw + MuiSetAsStringMessage.AttributeOffset,
+			directAddress.Raw);
 		var cursor = default(MuiSetAsStringPacketFieldCursor);
 		cursor.Message = packet;
 		cursor.Field = MuiSetAsStringPacketField.MethodId;
@@ -1816,6 +2289,41 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void CallHookParameterMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1400);
+
+		Assert.True(MuiCallHookParameterMemoryCodec.TryGetEntry(ref platform,
+			packet, 1, out var address));
+		Assert.Equal(APTR.FromPointer(0x140C), address);
+		Assert.False(MuiCallHookParameterMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0x20FF8), 0, out _));
+		Assert.False(MuiCallHookParameterMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0xFFFFFFF0), 0, out _));
+	}
+
+	[Fact]
+	public void CallHookParameterRecordUsesNamedStructCodec()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var address = APTR.FromPointer(0x140C);
+		var value = new MuiCallHookParameterRecord { Value = 0xCAFEBABEu };
+
+		Assert.True(MuiCallHookParameterRecordCodec.Write(ref platform, address,
+			value));
+		Assert.True(MuiCallHookParameterRecordCodec.TryRead(ref platform, address,
+			out var roundTrip));
+		Assert.Equal(value.Value, roundTrip.Value);
+		Assert.False(MuiCallHookParameterRecordCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFF), out _));
+		Assert.False(MuiCallHookParameterRecordCodec.Write(ref platform,
+			APTR.Null, value));
+	}
+
+	[Fact]
 	public void CallHookMethodHeaderUsesNamedField()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -1989,6 +2497,31 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void UpdateConfigPacketFieldMemoryAdapterUsesNamedRecordOffsets()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var message = APTR.FromPointer(0x1500);
+		Assert.True(MuiUpdateConfigPacketFieldMemoryCodec.TryWriteUInt32(
+			ref platform, message, MuiUpdateConfigPacketField.CfgId,
+			0x8042BEEFu));
+		Assert.True(MuiUpdateConfigPacketFieldMemoryCodec.TryReadUInt32(
+			ref platform, message, MuiUpdateConfigPacketField.CfgId,
+			out var cfgId));
+		Assert.Equal(0x8042BEEFu, cfgId);
+		Assert.True(MuiUpdateConfigPacketFieldMemoryCodec.TryGetAddress(
+			ref platform, message, MuiUpdateConfigPacketField.RedrawCount,
+			out var redrawAddress));
+		Assert.Equal(message.Raw + MuiUpdateConfigMessage.RedrawCountOffset,
+			redrawAddress.Raw);
+		Assert.False(MuiUpdateConfigPacketFieldMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0xFFFFFFF0u),
+			MuiUpdateConfigPacketField.MethodId, out _));
+		Assert.False(MuiUpdateConfigPacketFieldMemoryCodec.TryGetAddress(
+			ref platform, message, (MuiUpdateConfigPacketField)0xFF, out _));
+	}
+
+	[Fact]
 	public void UpdateConfigObjectSlotCodecUsesNamedPointer()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -2021,6 +2554,36 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void UpdateConfigTableSlotsUseDirectNamedAdapters()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var objectAddress = APTR.FromPointer(0x1500);
+		Assert.True(MuiUpdateConfigObjectSlotFieldMemoryCodec.TryWriteUInt32(
+			ref platform, objectAddress,
+			MuiUpdateConfigObjectSlotField.Object, 0x1A00u));
+		Assert.True(MuiUpdateConfigObjectSlotFieldMemoryCodec.TryReadUInt32(
+			ref platform, objectAddress,
+			MuiUpdateConfigObjectSlotField.Object, out var objectValue));
+		Assert.Equal(0x1A00u, objectValue);
+
+		var flagAddress = APTR.FromPointer(0x1800);
+		Assert.True(MuiUpdateConfigFlagSlotFieldMemoryCodec.TryWriteUInt8(
+			ref platform, flagAddress, MuiUpdateConfigFlagSlotField.Value, 0xA5));
+		Assert.True(MuiUpdateConfigFlagSlotFieldMemoryCodec.TryReadUInt8(
+			ref platform, flagAddress, MuiUpdateConfigFlagSlotField.Value,
+			out var flagValue));
+		Assert.Equal((byte)0xA5, flagValue);
+
+		Assert.False(MuiUpdateConfigObjectSlotFieldMemoryCodec.TryGetAddress(
+			ref platform, APTR.FromPointer(0xFFFFFFF0u),
+			MuiUpdateConfigObjectSlotField.Object, out _));
+		Assert.False(MuiUpdateConfigFlagSlotFieldMemoryCodec.TryGetAddress(
+			ref platform, flagAddress, (MuiUpdateConfigFlagSlotField)0xFF,
+			out _));
+	}
+
+	[Fact]
 	public void UpdateConfigTableCursorsUseNamedEntryBoundaries()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -2048,6 +2611,46 @@ public sealed class MuiHeadlessDispatcherTests
 		flagCursor.Index = 1;
 		Assert.False(MuiUpdateConfigFlagCursorCodec.TryGetEntry(ref platform,
 			flagCursor, out _));
+	}
+
+	[Fact]
+	public void UpdateConfigTableVectorMemoryAdaptersOwnNamedRecordBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var objectVector = APTR.FromPointer(0x1500);
+		Assert.True(MuiUpdateConfigObjectVectorMemoryCodec.TryGetEntry(
+			ref platform, objectVector, 63, out var objectAddress));
+		Assert.Equal(APTR.FromPointer(0x15FC), objectAddress);
+		var expectedObject = new MuiUpdateConfigObjectSlot
+		{
+			Object = APTR.FromPointer(0x1A00)
+		};
+		Assert.True(MuiUpdateConfigObjectSlotCodec.Write(ref platform,
+			objectAddress, expectedObject));
+		Assert.True(MuiUpdateConfigObjectSlotCodec.TryRead(ref platform,
+			objectAddress, out var actualObject));
+		Assert.Equal(expectedObject.Object, actualObject.Object);
+		Assert.False(MuiUpdateConfigObjectVectorMemoryCodec.TryGetEntry(
+			ref platform, objectVector, MuiUpdateConfigObjectCursor.MaximumEntries,
+			out _));
+
+		var flagVector = APTR.FromPointer(0x1800);
+		Assert.True(MuiUpdateConfigFlagVectorMemoryCodec.TryGetEntry(ref platform,
+			flagVector, 63, out var flagAddress));
+		Assert.Equal(APTR.FromPointer(0x183F), flagAddress);
+		var expectedFlag = new MuiUpdateConfigFlagSlot { Value = 0xA5 };
+		Assert.True(MuiUpdateConfigFlagSlotCodec.Write(ref platform, flagAddress,
+			expectedFlag));
+		Assert.True(MuiUpdateConfigFlagSlotCodec.TryRead(ref platform, flagAddress,
+			out var actualFlag));
+		Assert.Equal(expectedFlag.Value, actualFlag.Value);
+		Assert.False(MuiUpdateConfigFlagVectorMemoryCodec.TryGetEntry(ref platform,
+			flagVector, MuiUpdateConfigFlagCursor.MaximumEntries, out _));
+		Assert.False(MuiUpdateConfigFlagVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0x21000), 0, out _));
+		Assert.False(MuiUpdateConfigObjectVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0xFFFFFFF0), 4, out _));
 	}
 
 	[Fact]
@@ -2696,7 +3299,7 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
-	public void FamilyGetChildPacketFieldCursorUsesNamedSignedBoundary()
+	public void FamilyGetChildPacketMemoryAdapterUsesNamedSignedBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
 			State);
@@ -2704,36 +3307,36 @@ public sealed class MuiHeadlessDispatcherTests
 		var cursor = default(MuiFamilyGetChildPacketFieldCursor);
 		cursor.Message = packet;
 		cursor.Field = MuiFamilyGetChildPacketField.MethodId;
-		Assert.True(MuiFamilyGetChildPacketFieldCursorCodec.TryGetAddress(
-			ref platform, cursor, out var address));
+		Assert.True(MuiFamilyGetChildMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiFamilyGetChildPacketField.MethodId, out var address));
 		Assert.Equal(packet.Raw, address.Raw);
-		cursor.Field = MuiFamilyGetChildPacketField.Number;
-		Assert.True(MuiFamilyGetChildPacketFieldCursorCodec.TryGetAddress(
-			ref platform, cursor, out address));
+		Assert.True(MuiFamilyGetChildMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiFamilyGetChildPacketField.Number, out address));
 		Assert.Equal(packet.Raw + 4, address.Raw);
-		cursor.Field = MuiFamilyGetChildPacketField.Reference;
-		Assert.True(MuiFamilyGetChildPacketFieldCursorCodec.TryGetAddress(
-			ref platform, cursor, out address));
+		Assert.True(MuiFamilyGetChildMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiFamilyGetChildPacketField.Reference, out address));
 		Assert.Equal(packet.Raw + 8, address.Raw);
 
-		Assert.True(MuiFamilyGetChildPacketFieldCursorCodec.TryWriteUInt32(
+		Assert.True(MuiFamilyGetChildMessageMemoryCodec.TryWriteUInt32(
 			ref platform, packet, MuiFamilyGetChildPacketField.Number,
 			unchecked((uint)-3)));
-		Assert.True(MuiFamilyGetChildPacketFieldCursorCodec.TryReadUInt32(
+		Assert.True(MuiFamilyGetChildMessageMemoryCodec.TryReadUInt32(
 			ref platform, packet, MuiFamilyGetChildPacketField.Number,
 			out var number));
 		Assert.Equal(unchecked((uint)-3), number);
-		Assert.True(MuiFamilyGetChildPacketFieldCursorCodec.TryWriteUInt32(
+		Assert.True(MuiFamilyGetChildMessageMemoryCodec.TryWriteUInt32(
 			ref platform, packet, MuiFamilyGetChildPacketField.Reference, 0x1500));
-		Assert.True(MuiFamilyGetChildPacketFieldCursorCodec.TryReadUInt32(
+		Assert.True(MuiFamilyGetChildMessageMemoryCodec.TryReadUInt32(
 			ref platform, packet, MuiFamilyGetChildPacketField.Reference,
 			out var reference));
 		Assert.Equal(0x1500u, reference);
 
-		cursor.Message = APTR.FromPointer(0xfffffff0u);
 		cursor.Field = MuiFamilyGetChildPacketField.Reference;
-		Assert.False(MuiFamilyGetChildPacketFieldCursorCodec.TryGetAddress(
+		Assert.True(MuiFamilyGetChildPacketFieldCursorCodec.TryGetAddress(
 			ref platform, cursor, out _));
+		Assert.False(MuiFamilyGetChildMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0xfffffff0u), MuiFamilyGetChildPacketField.Reference,
+			out _));
 	}
 
 	[Fact]
@@ -2803,11 +3406,21 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
-	public void FamilyDoChildMethodsPacketFieldCursorUsesNamedMethodBoundary()
+	public void FamilyDoChildMethodsPacketMemoryAdapterUsesNamedMethodBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
 			State);
 		var packet = APTR.FromPointer(0x1200);
+		Assert.True(MuiFamilyDoChildMethodsMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiFamilyDoChildMethodsPacketField.MethodId, out var directAddress));
+		Assert.Equal(packet.Raw, directAddress.Raw);
+		Assert.True(MuiFamilyDoChildMethodsMessageMemoryCodec.TryWriteUInt32(
+			ref platform, packet, MuiFamilyDoChildMethodsPacketField.MethodId,
+			0x80429A3Cu));
+		Assert.True(MuiFamilyDoChildMethodsMessageMemoryCodec.TryReadUInt32(
+			ref platform, packet, MuiFamilyDoChildMethodsPacketField.MethodId,
+			out var directMethod));
+		Assert.Equal(0x80429A3Cu, directMethod);
 		var cursor = default(MuiFamilyDoChildMethodsPacketFieldCursor);
 		cursor.Message = packet;
 		cursor.Field = MuiFamilyDoChildMethodsPacketField.MethodId;
@@ -3045,6 +3658,42 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void GroupChangeSequentialRecordsRoundTripAndRejectTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1200);
+		Assert.True(MuiGroupChangeCore.WriteInitChangeRecord(ref platform,
+			packet));
+		Assert.True(MuiGroupChangeMessageCodec.TryReadRecord(ref platform,
+			packet, out var change));
+		Assert.Equal(MuiGroupChangeCore.InitChangeMethod, change.MethodId);
+
+		Assert.True(MuiGroupChangeCore.WriteExitChange2Record(ref platform,
+			packet, 0xA5));
+		Assert.True(MuiGroupExitChange2MessageCodec.TryReadRecord(ref platform,
+			packet, out var exit2));
+		Assert.Equal(MuiGroupChangeCore.ExitChange2Method, exit2.MethodId);
+		Assert.Equal(0xA5u, exit2.Flags);
+
+		var state = APTR.FromPointer(0x1300);
+		Assert.True(MuiGroupChangeCore.WriteChangeRecord(ref platform, state,
+			2, 0xA5, 1));
+		Assert.True(MuiGroupChangeStateCodec.TryReadRecord(ref platform, state,
+			out var value));
+		Assert.Equal(MuiGroupChangeState.Magic, value.Cookie);
+		Assert.Equal(2u, value.Depth);
+		Assert.Equal(0xA5u, value.ExitFlags);
+		Assert.Equal(1u, value.ExitRequests);
+
+		var truncated = APTR.FromPointer(0x20FFC);
+		Assert.False(MuiGroupExitChange2MessageCodec.TryReadRecord(ref platform,
+			truncated, out _));
+		Assert.False(MuiGroupChangeStateCodec.TryReadRecord(ref platform,
+			truncated, out _));
+	}
+
+	[Fact]
 	public void GroupOrderingMethodHeaderUsesNamedField()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -3060,6 +3709,44 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.Equal(MuiGroupOperationsCore.SortMethod, methodId);
 		Assert.False(MuiGroupOrderingMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
+	}
+
+	[Fact]
+	public void GroupOrderingSequentialRecordsRoundTripAndRejectTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1200);
+		var child = APTR.FromPointer(0x1300);
+		Assert.True(MuiGroupOperationsCore.WriteMoveMemberRecord(ref platform,
+			packet, child, -2));
+		Assert.True(MuiGroupOrderingMessageCodec.TryReadMoveMemberRecord(
+			ref platform, packet, out var move));
+		Assert.Equal(MuiGroupOperationsCore.MoveMemberMethod, move.MethodId);
+		Assert.Equal(child.Raw, move.Object);
+		Assert.Equal(-2, move.Position);
+
+		var after = APTR.FromPointer(0x1400);
+		var objects = APTR.FromPointer(0x1500);
+		Assert.True(MuiGroupOperationsCore.WriteReorderRecord(ref platform,
+			packet, after, objects));
+		Assert.True(MuiGroupOrderingMessageCodec.TryReadReorderRecord(ref platform,
+			packet, out var reorder));
+		Assert.Equal(after.Raw, reorder.After);
+		Assert.Equal(objects.Raw, reorder.Objects);
+
+		Assert.True(MuiGroupOperationsCore.WriteSortRecord(ref platform, packet,
+			objects));
+		Assert.True(MuiGroupOrderingMessageCodec.TryReadSortRecord(ref platform,
+			packet, out var sort));
+		Assert.Equal(MuiGroupOperationsCore.SortMethod, sort.MethodId);
+		Assert.Equal(objects.Raw, sort.Objects);
+
+		var truncated = APTR.FromPointer(0x20FFC);
+		Assert.False(MuiGroupOrderingMessageCodec.TryReadMoveMemberRecord(
+			ref platform, truncated, out _));
+		Assert.False(MuiGroupOrderingMessageCodec.TryReadSortRecord(ref platform,
+			truncated, out _));
 	}
 
 	[Fact]
@@ -3606,8 +4293,11 @@ public sealed class MuiHeadlessDispatcherTests
 			dataspace, 0xA003));
 		Assert.Equal(4, MuiStoreCore.DataspaceLength(ref platform, State,
 			dataspace, 0xA004));
-		Assert.Equal(91u, platform.ReadUInt32(MuiStoreCore.DataspaceFind(
-			ref platform, State, dataspace, 0xA004), 0));
+		var persistedScalar = default(MuiGuestUlongStorage);
+		Assert.True(MuiGuestUlongStorageCodec.TryRead(ref platform,
+			MuiStoreCore.DataspaceFind(ref platform, State, dataspace, 0xA004),
+			out persistedScalar));
+		Assert.Equal(91u, persistedScalar.Value);
 
 		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State,
 			stringObject, MUIA_String_Contents, text.Raw, false));
@@ -3676,8 +4366,11 @@ public sealed class MuiHeadlessDispatcherTests
 			numericObject, 0x8042AE3A, 99, false));
 		Assert.True(MuiApplicationPersistenceCore.Export(ref platform, State,
 			application, incoming));
-		Assert.Equal(99u, platform.ReadUInt32(MuiStoreCore.DataspaceFind(
-			ref platform, State, incoming, 0xB001), 0));
+		var persistedScalar = default(MuiGuestUlongStorage);
+		Assert.True(MuiGuestUlongStorageCodec.TryRead(ref platform,
+			MuiStoreCore.DataspaceFind(ref platform, State, incoming, 0xB001),
+			out persistedScalar));
+		Assert.Equal(99u, persistedScalar.Value);
 
 		Assert.True(MuiHeadlessObjectCore.SetAttribute(ref platform, State,
 			numericObject, 0x8042AE3A, 7, false));
@@ -3761,6 +4454,54 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void ApplicationPersistenceFrameMemoryAdapterOwnsStructBounds()
+	{
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiApplicationPersistenceFrameState>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiApplicationPersistenceFrameState>(nameof(
+			MuiApplicationPersistenceFrameState.Object)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiApplicationPersistenceFrameState>(nameof(
+			MuiApplicationPersistenceFrameState.NextChild)).ToInt32());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiApplicationPersistenceFrameState>(nameof(
+			MuiApplicationPersistenceFrameState.VisitMarker)).ToInt32());
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var frame = APTR.FromPointer(0x1800);
+		Assert.True(MuiApplicationPersistenceFrameMemoryCodec.TryGetAddress(
+			ref platform, frame, MuiApplicationPersistenceFrameField.VisitMarker,
+			out var markerField));
+		Assert.Equal(APTR.FromPointer(0x1808), markerField);
+		Assert.True(MuiApplicationPersistenceFrameMemoryCodec.TryWrite(ref platform,
+			frame, MuiApplicationPersistenceFrameField.NextChild, 4));
+		Assert.True(MuiApplicationPersistenceFrameMemoryCodec.TryRead(ref platform,
+			frame, MuiApplicationPersistenceFrameField.NextChild, out var nextChild));
+		Assert.Equal(4u, nextChild);
+		Assert.False(MuiApplicationPersistenceFrameMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x20FF5), MuiApplicationPersistenceFrameField.Object,
+			out _));
+		Assert.False(MuiApplicationPersistenceFrameMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiApplicationPersistenceFrameField.VisitMarker, out _));
+		Assert.False(MuiApplicationPersistenceFrameMemoryCodec.TryGetAddress(ref platform,
+			frame, (MuiApplicationPersistenceFrameField)255, out _));
+		var value = new MuiApplicationPersistenceFrameState
+		{
+			Object = APTR.FromPointer(0x1A00),
+			NextChild = 7,
+			VisitMarker = 11,
+		};
+		Assert.True(MuiApplicationPersistenceFrameStateCodec.Write(ref platform,
+			frame, value));
+		Assert.True(MuiApplicationPersistenceFrameStateCodec.TryRead(ref platform,
+			frame, out var decoded));
+		Assert.Equal(value.Object, decoded.Object);
+		Assert.Equal(value.NextChild, decoded.NextChild);
+		Assert.Equal(value.VisitMarker, decoded.VisitMarker);
+	}
+
+	[Fact]
 	public void ApplicationPersistenceFrameAddressUsesNamedDepthBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -3770,6 +4511,11 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiApplicationPersistenceFrameCodec.TryGetFrame(ref platform,
 			stack, 2, out var frame));
 		Assert.Equal(APTR.FromPointer(0x180C), frame);
+		Assert.True(MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetFrame(
+			ref platform, stack, 2, out var directFrame));
+		Assert.Equal(frame, directFrame);
+		Assert.False(MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetFrame(
+			ref platform, stack, 0, out _));
 		Assert.False(MuiApplicationPersistenceFrameCodec.TryGetFrame(ref platform,
 			stack, 0, out _));
 		Assert.False(MuiApplicationPersistenceFrameCodec.TryGetFrame(ref platform,
@@ -3795,6 +4541,24 @@ public sealed class MuiHeadlessDispatcherTests
 		cursor.Index = 1;
 		Assert.False(MuiApplicationPersistenceFrameCursorCodec.TryGetEntry(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationPersistenceFrameVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var stack = APTR.FromPointer(0x1800);
+		Assert.True(MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetEntry(
+			ref platform, stack, 2, out var address));
+		Assert.Equal(APTR.FromPointer(0x1818), address);
+		Assert.False(MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetEntry(
+			ref platform, stack,
+			MuiApplicationPersistenceFrameCursor.MaximumEntries, out _));
+		Assert.False(MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0x20FF5), 0, out _));
+		Assert.False(MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0xFFFFFFF0), 2, out _));
 	}
 
 	private static void WritePacket(ref MuiHeadlessTestPlatform platform,

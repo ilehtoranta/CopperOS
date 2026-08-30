@@ -162,25 +162,51 @@ internal static class MuiWindowEventStateRecordMemoryCodec
 
 internal static class MuiWindowEventStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
-		APTR address,
-		out MuiWindowEventStateRecord value)
+	// Sequential named-struct path used by Window event dispatch. Cookie, the
+	// close BOOL, and two opaque capabilities are exchanged in declaration
+	// order; numeric positions remain confined to the compatibility adapter.
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiWindowEventStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWindowEventStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.CloseRequest) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.InputEvent.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.MouseObject.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiWindowEventStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiWindowEventStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out var magic) ||
-			!MuiWindowEventStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 4, out value.CloseRequest) ||
-			!MuiWindowEventStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 8, out var inputEvent) ||
-			!MuiWindowEventStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 12, out var mouseObject)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWindowEventStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var closeRequest) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var inputEvent) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var mouseObject) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.Magic = magic;
+		value.CloseRequest = closeRequest;
 		value.InputEvent = APTR.FromPointer(inputEvent);
 		value.MouseObject = APTR.FromPointer(mouseObject);
 		return true;
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiWindowEventStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiWindowEventStateRecord value)
@@ -193,13 +219,6 @@ internal static class MuiWindowEventStateRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiWindowEventStateAdmission.Validate(ref platform, value)) return false;
-		return MuiWindowEventStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiWindowEventStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 4, value.CloseRequest) &&
-			MuiWindowEventStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 8, value.InputEvent.Raw) &&
-			MuiWindowEventStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 12, value.MouseObject.Raw);
+		return WriteRecord(ref platform, address, value);
 	}
 }

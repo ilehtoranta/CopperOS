@@ -210,63 +210,141 @@ internal static class MuiWindowOpenPolicyStateRecordMemoryCodec
 
 internal static class MuiWindowOpenPolicyStateRecordCodec
 {
+	// Sequential named-struct path used by the OpenWindow policy boundary.
+	// Signed geometry and canonical BOOL fields are exchanged in declaration
+	// order; numeric positions remain confined to the compatibility adapter.
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiWindowOpenPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWindowOpenPolicyStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.AlternateHeight)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.AlternateWidth)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.AlternateLeftEdge)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.AlternateTopEdge)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Height)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Width)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.LeftEdge)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.TopEdge)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.CloseGadget) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.DepthGadget) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.DragBar) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SizeGadget) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SizeRight) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.AppWindow) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Backdrop) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Borderless) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.PanelWindow) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.TabletMessages) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.UseBottomBorderScroller) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.UseLeftBorderScroller) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.UseRightBorderScroller) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiWindowOpenPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWindowOpenPolicyStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var alternateHeight) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var alternateWidth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var alternateLeftEdge) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var alternateTopEdge) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var height) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var width) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var leftEdge) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var topEdge) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var closeGadget) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var depthGadget) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var dragBar) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var sizeGadget) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var sizeRight) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var appWindow) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var backdrop) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var borderless) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var panelWindow) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var tabletMessages) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var useBottomBorderScroller) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var useLeftBorderScroller) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var useRightBorderScroller) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value.Magic = magic;
+		value.AlternateHeight = unchecked((int)alternateHeight);
+		value.AlternateWidth = unchecked((int)alternateWidth);
+		value.AlternateLeftEdge = unchecked((int)alternateLeftEdge);
+		value.AlternateTopEdge = unchecked((int)alternateTopEdge);
+		value.Height = unchecked((int)height);
+		value.Width = unchecked((int)width);
+		value.LeftEdge = unchecked((int)leftEdge);
+		value.TopEdge = unchecked((int)topEdge);
+		value.CloseGadget = closeGadget;
+		value.DepthGadget = depthGadget;
+		value.DragBar = dragBar;
+		value.SizeGadget = sizeGadget;
+		value.SizeRight = sizeRight;
+		value.AppWindow = appWindow;
+		value.Backdrop = backdrop;
+		value.Borderless = borderless;
+		value.PanelWindow = panelWindow;
+		value.TabletMessages = tabletMessages;
+		value.UseBottomBorderScroller = useBottomBorderScroller;
+		value.UseLeftBorderScroller = useLeftBorderScroller;
+		value.UseRightBorderScroller = useRightBorderScroller;
+		return true;
+	}
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiWindowOpenPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiWindowOpenPolicyStateRecord.Size) ||
-			!TryRead(ref platform, address,
-				MuiWindowOpenPolicyStateField.Magic, out var magic)) return false;
-		value.Magic = magic;
-		if (!TryReadSigned(ref platform, address,
-			MuiWindowOpenPolicyStateField.AlternateHeight, out value.AlternateHeight) ||
-			!TryReadSigned(ref platform, address,
-				MuiWindowOpenPolicyStateField.AlternateWidth, out value.AlternateWidth) ||
-			!TryReadSigned(ref platform, address,
-				MuiWindowOpenPolicyStateField.AlternateLeftEdge, out value.AlternateLeftEdge) ||
-			!TryReadSigned(ref platform, address,
-				MuiWindowOpenPolicyStateField.AlternateTopEdge, out value.AlternateTopEdge) ||
-			!TryReadSigned(ref platform, address,
-				MuiWindowOpenPolicyStateField.Height, out value.Height) ||
-			!TryReadSigned(ref platform, address,
-				MuiWindowOpenPolicyStateField.Width, out value.Width) ||
-			!TryReadSigned(ref platform, address,
-				MuiWindowOpenPolicyStateField.LeftEdge, out value.LeftEdge) ||
-			!TryReadSigned(ref platform, address,
-				MuiWindowOpenPolicyStateField.TopEdge, out value.TopEdge)) return false;
-		return TryRead(ref platform, address,
-			MuiWindowOpenPolicyStateField.CloseGadget, out value.CloseGadget) &&
-			TryRead(ref platform, address, MuiWindowOpenPolicyStateField.DepthGadget,
-				out value.DepthGadget) &&
-			TryRead(ref platform, address, MuiWindowOpenPolicyStateField.DragBar,
-				out value.DragBar) &&
-			TryRead(ref platform, address, MuiWindowOpenPolicyStateField.SizeGadget,
-				out value.SizeGadget) &&
-			TryRead(ref platform, address, MuiWindowOpenPolicyStateField.SizeRight,
-				out value.SizeRight) &&
-			TryRead(ref platform, address, MuiWindowOpenPolicyStateField.AppWindow,
-				out value.AppWindow) &&
-			TryRead(ref platform, address, MuiWindowOpenPolicyStateField.Backdrop,
-				out value.Backdrop) &&
-			TryRead(ref platform, address, MuiWindowOpenPolicyStateField.Borderless,
-				out value.Borderless) &&
-			TryRead(ref platform, address, MuiWindowOpenPolicyStateField.PanelWindow,
-				out value.PanelWindow) &&
-			TryRead(ref platform, address, MuiWindowOpenPolicyStateField.TabletMessages,
-				out value.TabletMessages) &&
-			TryRead(ref platform, address,
-				MuiWindowOpenPolicyStateField.UseBottomBorderScroller,
-				out value.UseBottomBorderScroller) &&
-			TryRead(ref platform, address,
-				MuiWindowOpenPolicyStateField.UseLeftBorderScroller,
-				out value.UseLeftBorderScroller) &&
-			TryRead(ref platform, address,
-				MuiWindowOpenPolicyStateField.UseRightBorderScroller,
-				out value.UseRightBorderScroller);
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiWindowOpenPolicyStateRecord value)
@@ -300,53 +378,7 @@ internal static class MuiWindowOpenPolicyStateRecordCodec
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiWindowOpenPolicyStateRecord.Size) ||
 			!MuiWindowOpenPolicyStateAdmission.Validate(value)) return false;
-		return Write(ref platform, address, MuiWindowOpenPolicyStateField.Magic,
-			value.Magic) &&
-			WriteSigned(ref platform, address,
-				MuiWindowOpenPolicyStateField.AlternateHeight, value.AlternateHeight) &&
-			WriteSigned(ref platform, address,
-				MuiWindowOpenPolicyStateField.AlternateWidth, value.AlternateWidth) &&
-			WriteSigned(ref platform, address,
-				MuiWindowOpenPolicyStateField.AlternateLeftEdge, value.AlternateLeftEdge) &&
-			WriteSigned(ref platform, address,
-				MuiWindowOpenPolicyStateField.AlternateTopEdge, value.AlternateTopEdge) &&
-			WriteSigned(ref platform, address, MuiWindowOpenPolicyStateField.Height,
-				value.Height) &&
-			WriteSigned(ref platform, address, MuiWindowOpenPolicyStateField.Width,
-				value.Width) &&
-			WriteSigned(ref platform, address, MuiWindowOpenPolicyStateField.LeftEdge,
-				value.LeftEdge) &&
-			WriteSigned(ref platform, address, MuiWindowOpenPolicyStateField.TopEdge,
-				value.TopEdge) &&
-			Write(ref platform, address, MuiWindowOpenPolicyStateField.CloseGadget,
-				value.CloseGadget) &&
-			Write(ref platform, address, MuiWindowOpenPolicyStateField.DepthGadget,
-				value.DepthGadget) &&
-			Write(ref platform, address, MuiWindowOpenPolicyStateField.DragBar,
-				value.DragBar) &&
-			Write(ref platform, address, MuiWindowOpenPolicyStateField.SizeGadget,
-				value.SizeGadget) &&
-			Write(ref platform, address, MuiWindowOpenPolicyStateField.SizeRight,
-				value.SizeRight) &&
-			Write(ref platform, address, MuiWindowOpenPolicyStateField.AppWindow,
-				value.AppWindow) &&
-			Write(ref platform, address, MuiWindowOpenPolicyStateField.Backdrop,
-				value.Backdrop) &&
-			Write(ref platform, address, MuiWindowOpenPolicyStateField.Borderless,
-				value.Borderless) &&
-			Write(ref platform, address, MuiWindowOpenPolicyStateField.PanelWindow,
-				value.PanelWindow) &&
-			Write(ref platform, address, MuiWindowOpenPolicyStateField.TabletMessages,
-				value.TabletMessages) &&
-			Write(ref platform, address,
-				MuiWindowOpenPolicyStateField.UseBottomBorderScroller,
-				value.UseBottomBorderScroller) &&
-			Write(ref platform, address,
-				MuiWindowOpenPolicyStateField.UseLeftBorderScroller,
-				value.UseLeftBorderScroller) &&
-			Write(ref platform, address,
-				MuiWindowOpenPolicyStateField.UseRightBorderScroller,
-				value.UseRightBorderScroller);
+		return WriteRecord(ref platform, address, value);
 	}
 
 	private static bool Write<TPlatform>(ref TPlatform platform, APTR address,

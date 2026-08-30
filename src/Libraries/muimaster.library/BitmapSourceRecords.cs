@@ -131,18 +131,35 @@ internal static class MuiBitmapSourceStateRecordMemoryCodec
 
 internal static class MuiBitmapSourceStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiBitmapSourceStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiBitmapSourceStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) ||
-			!MuiBitmapSourceStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out var source)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiBitmapSourceStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var source)) return false;
 		value.Source = APTR.FromPointer(source);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiBitmapSourceStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiBitmapSourceStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Source.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiBitmapSourceStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiBitmapSourceStateRecord value)
@@ -154,11 +171,9 @@ internal static class MuiBitmapSourceStateRecordCodec
 		MuiBitmapSourceStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiBitmapSourceStateAdmission.Validate(ref platform, value)) return false;
-		return MuiBitmapSourceStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiBitmapSourceStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 4, value.Source.Raw);
+		if (address.IsNull || !MuiBitmapSourceStateAdmission.Validate(ref platform,
+			value)) return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 

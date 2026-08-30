@@ -237,6 +237,34 @@ public sealed class MuiDirlistVolumelistTests
 	}
 
 	[Fact]
+	public void DirlistMessageAdapterOwnsStructBounds()
+	{
+		var platform = CreatePlatform(out _, out _, out _);
+		var packet = APTR.FromPointer(0x2A00);
+		Assert.True(MuiDirlistMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiDirlistPacketKind.Set, MuiDirlistField.Attribute,
+			out var attributeAddress));
+		Assert.Equal(packet.Raw + MuiDirlistSetMessage.AttributeOffset,
+			attributeAddress.Raw);
+		Assert.True(MuiDirlistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiDirlistPacketKind.Set, MuiDirlistField.Value, 0xCAFEBABEu));
+		Assert.True(MuiDirlistMessageMemoryCodec.TryReadUInt32(ref platform,
+			packet, MuiDirlistPacketKind.Set, MuiDirlistField.Value,
+			out var value));
+		Assert.Equal(0xCAFEBABEu, value);
+		Assert.False(MuiDirlistMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x80FF9), MuiDirlistPacketKind.GetEntry,
+			MuiDirlistField.Storage, out _));
+		Assert.False(MuiDirlistMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiDirlistPacketKind.Protection, MuiDirlistField.Attribute,
+			out _));
+		Assert.False(MuiDirlistMessageMemoryCodec.TryGetAddress(ref platform,
+			packet, MuiDirlistPacketKind.Set, (MuiDirlistField)255, out _));
+		Assert.False(MuiDirlistMessageMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiDirlistPacketKind.Set, MuiDirlistField.Value, out _));
+	}
+
+	[Fact]
 	public void DirlistFixedWireCodecsUseNamedFields()
 	{
 		var platform = CreatePlatform(out _, out _, out _);
@@ -940,6 +968,13 @@ public sealed class MuiDirlistVolumelistTests
 	[Fact]
 	public void NamedDirlistByteTotalStateReadsAndWritesGuestQuad()
 	{
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiDirlistByteTotalState>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiDirlistByteTotalState>(nameof(MuiDirlistByteTotalState.High)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiDirlistByteTotalState>(nameof(MuiDirlistByteTotalState.Low)).ToInt32());
+
 		var platform = CreatePlatform(out _, out _, out _);
 		var storage = APTR.FromPointer(0x7500);
 		var expected = default(MuiDirlistByteTotalState);
@@ -1073,7 +1108,7 @@ public sealed class MuiDirlistVolumelistTests
 			MuiVolumelistCore.ModeStateKey);
 		Assert.True(MuiVolumelistCore.MuiVolumelistModeStateRecordCodec
 			.TryReadStructural(ref platform, block, out var mode));
-		Assert.True(MuiVolumelistCore.MuiVolumelistModeFieldCursorCodec
+		Assert.True(MuiVolumelistCore.MuiVolumelistModeStateRecordMemoryCodec
 			.TryWriteUInt32(ref platform, block,
 				MuiVolumelistCore.MuiVolumelistModeField.ExampleMode, 2));
 

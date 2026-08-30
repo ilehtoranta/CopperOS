@@ -12,6 +12,7 @@ namespace CopperOS.MuiMaster;
 // public String attribute still points at the object-owned guest buffer; the
 // metric and pixel-scroll fields are private implementation values, but their
 // lifetime and invariants are expressed here rather than as positional fields.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringscrollState
 {
 	public APTR String;
@@ -29,6 +30,13 @@ internal struct MuiStringscrollStateRecord
 {
 	internal const uint Size = 24;
 	internal const uint Cookie = 0x53535354u; // 'SSST'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint StringOffset = 4;
+	internal const uint ContentWidthOffset = 8;
+	internal const uint ContentHeightOffset = 12;
+	internal const uint ScrollXOffset = 16;
+	internal const uint ScrollYOffset = 20;
 
 	internal uint Magic;
 	internal APTR String;
@@ -55,35 +63,41 @@ internal struct MuiStringscrollStateFieldCursor
 	internal MuiStringscrollStateField Field;
 }
 
-internal static class MuiStringscrollStateFieldCursorCodec
+internal static class MuiStringscrollStateMemoryCodec
 {
 	private static bool TryResolve(MuiStringscrollStateField field,
 		out uint offset)
 	{
 		switch (field)
 		{
-			case MuiStringscrollStateField.Magic: offset = 0; return true;
-			case MuiStringscrollStateField.String: offset = 4; return true;
-			case MuiStringscrollStateField.ContentWidth: offset = 8; return true;
-			case MuiStringscrollStateField.ContentHeight: offset = 12; return true;
-			case MuiStringscrollStateField.ScrollX: offset = 16; return true;
-			case MuiStringscrollStateField.ScrollY: offset = 20; return true;
+			case MuiStringscrollStateField.Magic:
+				offset = MuiStringscrollStateRecord.MagicOffset; return true;
+			case MuiStringscrollStateField.String:
+				offset = MuiStringscrollStateRecord.StringOffset; return true;
+			case MuiStringscrollStateField.ContentWidth:
+				offset = MuiStringscrollStateRecord.ContentWidthOffset; return true;
+			case MuiStringscrollStateField.ContentHeight:
+				offset = MuiStringscrollStateRecord.ContentHeightOffset; return true;
+			case MuiStringscrollStateField.ScrollX:
+				offset = MuiStringscrollStateRecord.ScrollXOffset; return true;
+			case MuiStringscrollStateField.ScrollY:
+				offset = MuiStringscrollStateRecord.ScrollYOffset; return true;
 		}
 		offset = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiStringscrollStateFieldCursor cursor, out APTR address)
+		APTR record, MuiStringscrollStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiStringscrollStateRecord.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiStringscrollStateRecord.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiStringscrollStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -91,10 +105,7 @@ internal static class MuiStringscrollStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiStringscrollStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -103,45 +114,85 @@ internal static class MuiStringscrollStateFieldCursorCodec
 		APTR record, MuiStringscrollStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiStringscrollStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
+// Kept as a source-compatible adapter for older tests and call sites. New
+// runtime code passes the record address and named field directly to the
+// struct-backed memory codec above.
+internal static class MuiStringscrollStateFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringscrollStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollStateMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollStateMemoryCodec.TryReadUInt32(ref platform, record, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollStateMemoryCodec.TryWriteUInt32(ref platform, record, field,
+			value);
+}
+
 internal static class MuiStringscrollStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
-		APTR address,
-		out MuiStringscrollStateRecord value)
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringscrollStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollStateRecord.Size) ||
-			!MuiStringscrollStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollStateField.Magic, out var magic))
-			return false;
-		value.Magic = magic;
-		if (!MuiStringscrollStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiStringscrollStateField.String, out var text) ||
-			!MuiStringscrollStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollStateField.ContentWidth,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var text) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.ContentWidth) ||
-			!MuiStringscrollStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollStateField.ContentHeight,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.ContentHeight) ||
-			!MuiStringscrollStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollStateField.ScrollX, out value.ScrollX) ||
-			!MuiStringscrollStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollStateField.ScrollY, out value.ScrollY))
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.ScrollX) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.ScrollY) || !MuiGuestStructCursor.IsComplete(cursor))
 			return false;
 		value.String = APTR.FromPointer(text);
 		return true;
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStringscrollStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.String.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ContentWidth) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ContentHeight) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ScrollX) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.ScrollY) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiStringscrollStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringscrollStateRecord value)
@@ -153,23 +204,9 @@ internal static class MuiStringscrollStateRecordCodec
 		MuiStringscrollStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollStateRecord.Size) || value.Magic !=
-			MuiStringscrollStateRecord.Cookie) return false;
-		return MuiStringscrollStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiStringscrollStateField.Magic, value.Magic) &&
-			MuiStringscrollStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollStateField.String, value.String.Raw) &&
-			MuiStringscrollStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollStateField.ContentWidth,
-				value.ContentWidth) &&
-			MuiStringscrollStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollStateField.ContentHeight,
-				value.ContentHeight) &&
-			MuiStringscrollStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollStateField.ScrollX, value.ScrollX) &&
-			MuiStringscrollStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollStateField.ScrollY, value.ScrollY);
+		if (address.IsNull || value.Magic != MuiStringscrollStateRecord.Cookie)
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
@@ -178,6 +215,7 @@ internal static class MuiStringscrollStateRecordCodec
 // initializer-only object pointers and live in the separate typed scrollbar
 // record below. Keeping the BOOL policy together prevents layout/input
 // consumers from silently disagreeing about a canonical value.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringscrollPolicyState
 {
 	public uint HorizBar;
@@ -199,6 +237,15 @@ internal struct MuiStringscrollPolicyRecord
 {
 	internal const uint Size = 32;
 	internal const uint Cookie = 0x5353504Cu; // 'SSPL'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint HorizBarOffset = 4;
+	internal const uint NoInputOffset = 8;
+	internal const uint SetMinOffset = 12;
+	internal const uint SetVMinOffset = 16;
+	internal const uint UseWinBorderOffset = 20;
+	internal const uint VertBarOffset = 24;
+	internal const uint VertScrollerOnlyOffset = 28;
 
 	internal uint Magic;
 	internal uint HorizBar;
@@ -229,37 +276,46 @@ internal struct MuiStringscrollPolicyFieldCursor
 	internal MuiStringscrollPolicyField Field;
 }
 
-internal static class MuiStringscrollPolicyFieldCursorCodec
+internal static class MuiStringscrollPolicyMemoryCodec
 {
 	private static bool TryResolve(MuiStringscrollPolicyField field,
 		out uint offset)
 	{
 		switch (field)
 		{
-			case MuiStringscrollPolicyField.Magic: offset = 0; return true;
-			case MuiStringscrollPolicyField.HorizBar: offset = 4; return true;
-			case MuiStringscrollPolicyField.NoInput: offset = 8; return true;
-			case MuiStringscrollPolicyField.SetMin: offset = 12; return true;
-			case MuiStringscrollPolicyField.SetVMin: offset = 16; return true;
-			case MuiStringscrollPolicyField.UseWinBorder: offset = 20; return true;
-			case MuiStringscrollPolicyField.VertBar: offset = 24; return true;
-			case MuiStringscrollPolicyField.VertScrollerOnly: offset = 28; return true;
+			case MuiStringscrollPolicyField.Magic:
+				offset = MuiStringscrollPolicyRecord.MagicOffset; return true;
+			case MuiStringscrollPolicyField.HorizBar:
+				offset = MuiStringscrollPolicyRecord.HorizBarOffset; return true;
+			case MuiStringscrollPolicyField.NoInput:
+				offset = MuiStringscrollPolicyRecord.NoInputOffset; return true;
+			case MuiStringscrollPolicyField.SetMin:
+				offset = MuiStringscrollPolicyRecord.SetMinOffset; return true;
+			case MuiStringscrollPolicyField.SetVMin:
+				offset = MuiStringscrollPolicyRecord.SetVMinOffset; return true;
+			case MuiStringscrollPolicyField.UseWinBorder:
+				offset = MuiStringscrollPolicyRecord.UseWinBorderOffset; return true;
+			case MuiStringscrollPolicyField.VertBar:
+				offset = MuiStringscrollPolicyRecord.VertBarOffset; return true;
+			case MuiStringscrollPolicyField.VertScrollerOnly:
+				offset = MuiStringscrollPolicyRecord.VertScrollerOnlyOffset;
+				return true;
 		}
 		offset = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiStringscrollPolicyFieldCursor cursor, out APTR address)
+		APTR record, MuiStringscrollPolicyField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiStringscrollPolicyRecord.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiStringscrollPolicyRecord.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiStringscrollPolicyRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -267,10 +323,7 @@ internal static class MuiStringscrollPolicyFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiStringscrollPolicyFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -279,48 +332,90 @@ internal static class MuiStringscrollPolicyFieldCursorCodec
 		APTR record, MuiStringscrollPolicyField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiStringscrollPolicyFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
+// Kept as a source-compatible adapter for older tests and call sites. New
+// runtime code passes the record address and named field directly to the
+// struct-backed memory codec above.
+internal static class MuiStringscrollPolicyFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringscrollPolicyFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollPolicyMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollPolicyField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollPolicyMemoryCodec.TryReadUInt32(ref platform, record, field,
+			out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollPolicyField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollPolicyMemoryCodec.TryWriteUInt32(ref platform, record, field,
+			value);
+}
+
 internal static class MuiStringscrollPolicyRecordCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringscrollPolicyRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollPolicyRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.HorizBar) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.NoInput) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.SetMin) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.SetVMin) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.UseWinBorder) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.VertBar) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.VertScrollerOnly) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStringscrollPolicyRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollPolicyRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.HorizBar) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.NoInput) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SetMin) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SetVMin) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.UseWinBorder) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.VertBar) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.VertScrollerOnly) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiStringscrollPolicyRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollPolicyRecord.Size) ||
-			!MuiStringscrollPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollPolicyField.Magic, out var magic))
-			return false;
-		value.Magic = magic;
-		if (!MuiStringscrollPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiStringscrollPolicyField.HorizBar, out value.HorizBar) ||
-			!MuiStringscrollPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollPolicyField.NoInput, out value.NoInput) ||
-			!MuiStringscrollPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollPolicyField.SetMin, out value.SetMin) ||
-			!MuiStringscrollPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollPolicyField.SetVMin, out value.SetVMin) ||
-			!MuiStringscrollPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollPolicyField.UseWinBorder,
-				out value.UseWinBorder) ||
-			!MuiStringscrollPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollPolicyField.VertBar, out value.VertBar) ||
-			!MuiStringscrollPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollPolicyField.VertScrollerOnly,
-				out value.VertScrollerOnly))
-			return false;
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringscrollPolicyRecord value)
@@ -332,27 +427,9 @@ internal static class MuiStringscrollPolicyRecordCodec
 		MuiStringscrollPolicyRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollPolicyRecord.Size) || value.Magic !=
-			MuiStringscrollPolicyRecord.Cookie) return false;
-		return MuiStringscrollPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiStringscrollPolicyField.Magic, value.Magic) &&
-			MuiStringscrollPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollPolicyField.HorizBar, value.HorizBar) &&
-			MuiStringscrollPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollPolicyField.NoInput, value.NoInput) &&
-			MuiStringscrollPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollPolicyField.SetMin, value.SetMin) &&
-			MuiStringscrollPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollPolicyField.SetVMin, value.SetVMin) &&
-			MuiStringscrollPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollPolicyField.UseWinBorder,
-				value.UseWinBorder) &&
-			MuiStringscrollPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollPolicyField.VertBar, value.VertBar) &&
-			MuiStringscrollPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollPolicyField.VertScrollerOnly,
-				value.VertScrollerOnly);
+		if (address.IsNull || value.Magic != MuiStringscrollPolicyRecord.Cookie)
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
@@ -377,6 +454,7 @@ internal static class MuiStringscrollPolicyValidation
 // scrollbar object pointers in MorphOS MUI. Keep those APTR values in their
 // own named guest-resident record; the policy record below continues to hold
 // normalized BOOL enable flags for layout and input decisions.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringscrollScrollbarState
 {
 	public APTR HorizBar;
@@ -388,6 +466,10 @@ internal struct MuiStringscrollScrollbarRecord
 {
 	internal const uint Size = 12;
 	internal const uint Cookie = 0x53534252u; // 'SSBR'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint HorizBarOffset = 4;
+	internal const uint VertBarOffset = 8;
 
 	internal uint Magic;
 	internal APTR HorizBar;
@@ -408,32 +490,35 @@ internal struct MuiStringscrollScrollbarFieldCursor
 	internal MuiStringscrollScrollbarField Field;
 }
 
-internal static class MuiStringscrollScrollbarFieldCursorCodec
+internal static class MuiStringscrollScrollbarMemoryCodec
 {
 	private static bool TryResolve(MuiStringscrollScrollbarField field,
 		out uint offset)
 	{
 		switch (field)
 		{
-			case MuiStringscrollScrollbarField.Magic: offset = 0; return true;
-			case MuiStringscrollScrollbarField.HorizBar: offset = 4; return true;
-			case MuiStringscrollScrollbarField.VertBar: offset = 8; return true;
+			case MuiStringscrollScrollbarField.Magic:
+				offset = MuiStringscrollScrollbarRecord.MagicOffset; return true;
+			case MuiStringscrollScrollbarField.HorizBar:
+				offset = MuiStringscrollScrollbarRecord.HorizBarOffset; return true;
+			case MuiStringscrollScrollbarField.VertBar:
+				offset = MuiStringscrollScrollbarRecord.VertBarOffset; return true;
 		}
 		offset = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiStringscrollScrollbarFieldCursor cursor, out APTR address)
+		APTR record, MuiStringscrollScrollbarField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiStringscrollScrollbarRecord.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiStringscrollScrollbarRecord.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiStringscrollScrollbarRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -441,10 +526,7 @@ internal static class MuiStringscrollScrollbarFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiStringscrollScrollbarFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -453,38 +535,74 @@ internal static class MuiStringscrollScrollbarFieldCursorCodec
 		APTR record, MuiStringscrollScrollbarField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiStringscrollScrollbarFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
+// Kept as a source-compatible adapter for older tests and call sites. New
+// runtime code passes the record address and named field directly to the
+// struct-backed memory codec above.
+internal static class MuiStringscrollScrollbarFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringscrollScrollbarFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollScrollbarMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollScrollbarField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollScrollbarMemoryCodec.TryReadUInt32(ref platform, record,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollScrollbarField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollScrollbarMemoryCodec.TryWriteUInt32(ref platform, record,
+			field, value);
+}
+
 internal static class MuiStringscrollScrollbarRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
-		APTR address,
-		out MuiStringscrollScrollbarRecord value)
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringscrollScrollbarRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollScrollbarRecord.Size) ||
-			!MuiStringscrollScrollbarFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollScrollbarField.Magic, out var magic))
-			return false;
-		value.Magic = magic;
-		if (!MuiStringscrollScrollbarFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiStringscrollScrollbarField.HorizBar, out var horizBar) ||
-			!MuiStringscrollScrollbarFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollScrollbarField.VertBar, out var vertBar))
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollScrollbarRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var horizBar) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var vertBar) || !MuiGuestStructCursor.IsComplete(cursor))
 			return false;
 		value.HorizBar = APTR.FromPointer(horizBar);
 		value.VertBar = APTR.FromPointer(vertBar);
 		return true;
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStringscrollScrollbarRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollScrollbarRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.HorizBar.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.VertBar.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiStringscrollScrollbarRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringscrollScrollbarRecord value)
@@ -496,23 +614,16 @@ internal static class MuiStringscrollScrollbarRecordCodec
 		MuiStringscrollScrollbarRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollScrollbarRecord.Size) || value.Magic !=
-			MuiStringscrollScrollbarRecord.Cookie) return false;
-		return MuiStringscrollScrollbarFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiStringscrollScrollbarField.Magic, value.Magic) &&
-			MuiStringscrollScrollbarFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollScrollbarField.HorizBar,
-				value.HorizBar.Raw) &&
-			MuiStringscrollScrollbarFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollScrollbarField.VertBar,
-				value.VertBar.Raw);
+		if (address.IsNull || value.Magic != MuiStringscrollScrollbarRecord.Cookie)
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
 // The optional child scrollbar objects are kept in a separate named record.
 // Supplied MorphOS scrollbar pointers are caller-owned; automatically-created
 // children are marked in OwnedMask and retired by Stringscroll cleanup.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringscrollCompositionState
 {
 	public APTR Horizontal;
@@ -528,6 +639,13 @@ internal struct MuiStringscrollCompositionRecord
 {
 	internal const uint Size = 24;
 	internal const uint Cookie = 0x53534350u; // 'SSCP'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint HorizontalOffset = 4;
+	internal const uint VerticalOffset = 8;
+	internal const uint OwnedMaskOffset = 12;
+	internal const uint LastHorizontalFirstOffset = 16;
+	internal const uint LastVerticalFirstOffset = 20;
 
 	internal uint Magic;
 	internal APTR Horizontal;
@@ -554,35 +672,43 @@ internal struct MuiStringscrollCompositionFieldCursor
 	internal MuiStringscrollCompositionField Field;
 }
 
-internal static class MuiStringscrollCompositionFieldCursorCodec
+internal static class MuiStringscrollCompositionMemoryCodec
 {
 	private static bool TryResolve(MuiStringscrollCompositionField field,
 		out uint offset)
 	{
 		switch (field)
 		{
-			case MuiStringscrollCompositionField.Magic: offset = 0; return true;
-			case MuiStringscrollCompositionField.Horizontal: offset = 4; return true;
-			case MuiStringscrollCompositionField.Vertical: offset = 8; return true;
-			case MuiStringscrollCompositionField.OwnedMask: offset = 12; return true;
-			case MuiStringscrollCompositionField.LastHorizontalFirst: offset = 16; return true;
-			case MuiStringscrollCompositionField.LastVerticalFirst: offset = 20; return true;
+			case MuiStringscrollCompositionField.Magic:
+				offset = MuiStringscrollCompositionRecord.MagicOffset; return true;
+			case MuiStringscrollCompositionField.Horizontal:
+				offset = MuiStringscrollCompositionRecord.HorizontalOffset; return true;
+			case MuiStringscrollCompositionField.Vertical:
+				offset = MuiStringscrollCompositionRecord.VerticalOffset; return true;
+			case MuiStringscrollCompositionField.OwnedMask:
+				offset = MuiStringscrollCompositionRecord.OwnedMaskOffset; return true;
+			case MuiStringscrollCompositionField.LastHorizontalFirst:
+				offset = MuiStringscrollCompositionRecord.LastHorizontalFirstOffset;
+				return true;
+			case MuiStringscrollCompositionField.LastVerticalFirst:
+				offset = MuiStringscrollCompositionRecord.LastVerticalFirstOffset;
+				return true;
 		}
 		offset = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiStringscrollCompositionFieldCursor cursor, out APTR address)
+		APTR record, MuiStringscrollCompositionField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiStringscrollCompositionRecord.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiStringscrollCompositionRecord.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiStringscrollCompositionRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -590,10 +716,7 @@ internal static class MuiStringscrollCompositionFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiStringscrollCompositionFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -602,47 +725,86 @@ internal static class MuiStringscrollCompositionFieldCursorCodec
 		APTR record, MuiStringscrollCompositionField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiStringscrollCompositionFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
+// Kept as a source-compatible adapter for older tests and call sites. New
+// runtime code passes the record address and named field directly to the
+// struct-backed memory codec above.
+internal static class MuiStringscrollCompositionFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringscrollCompositionFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollCompositionMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollCompositionField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollCompositionMemoryCodec.TryReadUInt32(ref platform, record,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollCompositionField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollCompositionMemoryCodec.TryWriteUInt32(ref platform, record,
+			field, value);
+}
+
 internal static class MuiStringscrollCompositionRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
-		APTR address,
-		out MuiStringscrollCompositionRecord value)
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringscrollCompositionRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollCompositionRecord.Size) ||
-			!MuiStringscrollCompositionFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollCompositionField.Magic, out var magic))
-			return false;
-		value.Magic = magic;
-		if (!MuiStringscrollCompositionFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiStringscrollCompositionField.Horizontal,
-			out var horizontal) ||
-			!MuiStringscrollCompositionFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollCompositionField.Vertical, out var vertical) ||
-			!MuiStringscrollCompositionFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollCompositionField.OwnedMask,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollCompositionRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var horizontal) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var vertical) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.OwnedMask) ||
-			!MuiStringscrollCompositionFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollCompositionField.LastHorizontalFirst,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.LastHorizontalFirst) ||
-			!MuiStringscrollCompositionFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollCompositionField.LastVerticalFirst,
-				out value.LastVerticalFirst)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.LastVerticalFirst) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
 		value.Horizontal = APTR.FromPointer(horizontal);
 		value.Vertical = APTR.FromPointer(vertical);
 		return true;
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStringscrollCompositionRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollCompositionRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Horizontal.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Vertical.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.OwnedMask) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.LastHorizontalFirst) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.LastVerticalFirst) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiStringscrollCompositionRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringscrollCompositionRecord value)
@@ -654,32 +816,16 @@ internal static class MuiStringscrollCompositionRecordCodec
 		MuiStringscrollCompositionRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollCompositionRecord.Size) || value.Magic !=
-			MuiStringscrollCompositionRecord.Cookie) return false;
-		return MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiStringscrollCompositionField.Magic, value.Magic) &&
-			MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollCompositionField.Horizontal,
-				value.Horizontal.Raw) &&
-			MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollCompositionField.Vertical,
-				value.Vertical.Raw) &&
-			MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollCompositionField.OwnedMask,
-				value.OwnedMask) &&
-			MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollCompositionField.LastHorizontalFirst,
-				value.LastHorizontalFirst) &&
-			MuiStringscrollCompositionFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollCompositionField.LastVerticalFirst,
-				value.LastVerticalFirst);
+		if (address.IsNull || value.Magic != MuiStringscrollCompositionRecord.Cookie)
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
 // Area geometry is consumed by scrolling, bar reservation, and drawing. Keep
 // the signed LONG semantics in one named record so those paths cannot drift
 // by reading the public Area attributes independently.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringscrollLayoutState
 {
 	public int Left;
@@ -696,6 +842,12 @@ internal struct MuiStringscrollLayoutStateRecord
 {
 	internal const uint Size = 20;
 	internal const uint Cookie = 0x534c5954u; // 'SLYT'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint LeftOffset = 4;
+	internal const uint TopOffset = 8;
+	internal const uint WidthOffset = 12;
+	internal const uint HeightOffset = 16;
 
 	internal uint Magic;
 	internal int Left;
@@ -720,34 +872,39 @@ internal struct MuiStringscrollLayoutStateFieldCursor
 	internal MuiStringscrollLayoutStateField Field;
 }
 
-internal static class MuiStringscrollLayoutStateFieldCursorCodec
+internal static class MuiStringscrollLayoutStateMemoryCodec
 {
 	private static bool TryResolve(MuiStringscrollLayoutStateField field,
 		out uint offset)
 	{
 		switch (field)
 		{
-			case MuiStringscrollLayoutStateField.Magic: offset = 0; return true;
-			case MuiStringscrollLayoutStateField.Left: offset = 4; return true;
-			case MuiStringscrollLayoutStateField.Top: offset = 8; return true;
-			case MuiStringscrollLayoutStateField.Width: offset = 12; return true;
-			case MuiStringscrollLayoutStateField.Height: offset = 16; return true;
+			case MuiStringscrollLayoutStateField.Magic:
+				offset = MuiStringscrollLayoutStateRecord.MagicOffset; return true;
+			case MuiStringscrollLayoutStateField.Left:
+				offset = MuiStringscrollLayoutStateRecord.LeftOffset; return true;
+			case MuiStringscrollLayoutStateField.Top:
+				offset = MuiStringscrollLayoutStateRecord.TopOffset; return true;
+			case MuiStringscrollLayoutStateField.Width:
+				offset = MuiStringscrollLayoutStateRecord.WidthOffset; return true;
+			case MuiStringscrollLayoutStateField.Height:
+				offset = MuiStringscrollLayoutStateRecord.HeightOffset; return true;
 		}
 		offset = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiStringscrollLayoutStateFieldCursor cursor, out APTR address)
+		APTR record, MuiStringscrollLayoutStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiStringscrollLayoutStateRecord.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiStringscrollLayoutStateRecord.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiStringscrollLayoutStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -755,10 +912,7 @@ internal static class MuiStringscrollLayoutStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiStringscrollLayoutStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -767,10 +921,7 @@ internal static class MuiStringscrollLayoutStateFieldCursorCodec
 		APTR record, MuiStringscrollLayoutStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiStringscrollLayoutStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -792,31 +943,90 @@ internal static class MuiStringscrollLayoutStateFieldCursorCodec
 		TryWriteUInt32(ref platform, record, field, unchecked((uint)value));
 }
 
+// Kept as a source-compatible adapter for older tests and call sites. New
+// runtime code passes the record address and named field directly to the
+// struct-backed memory codec above.
+internal static class MuiStringscrollLayoutStateFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringscrollLayoutStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollLayoutStateMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollLayoutStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollLayoutStateMemoryCodec.TryReadUInt32(ref platform, record,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollLayoutStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollLayoutStateMemoryCodec.TryWriteUInt32(ref platform, record,
+			field, value);
+
+	internal static bool TryReadInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollLayoutStateField field, out int value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollLayoutStateMemoryCodec.TryReadInt32(ref platform, record,
+			field, out value);
+
+	internal static bool TryWriteInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollLayoutStateField field, int value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollLayoutStateMemoryCodec.TryWriteInt32(ref platform, record,
+			field, value);
+}
+
 internal static class MuiStringscrollLayoutStateRecordCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringscrollLayoutStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollLayoutStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var left) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var top) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var width) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var height) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		value.Left = unchecked((int)left);
+		value.Top = unchecked((int)top);
+		value.Width = unchecked((int)width);
+		value.Height = unchecked((int)height);
+		return true;
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStringscrollLayoutStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollLayoutStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Left)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Top)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Width)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.Height)) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiStringscrollLayoutStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollLayoutStateRecord.Size) ||
-			!MuiStringscrollLayoutStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollLayoutStateField.Magic, out var magic))
-			return false;
-		value.Magic = magic;
-		if (!MuiStringscrollLayoutStateFieldCursorCodec.TryReadInt32(ref platform,
-			address, MuiStringscrollLayoutStateField.Left, out value.Left) ||
-			!MuiStringscrollLayoutStateFieldCursorCodec.TryReadInt32(ref platform,
-			address, MuiStringscrollLayoutStateField.Top, out value.Top) ||
-			!MuiStringscrollLayoutStateFieldCursorCodec.TryReadInt32(ref platform,
-			address, MuiStringscrollLayoutStateField.Width, out value.Width) ||
-			!MuiStringscrollLayoutStateFieldCursorCodec.TryReadInt32(ref platform,
-			address, MuiStringscrollLayoutStateField.Height, out value.Height))
-			return false;
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringscrollLayoutStateRecord value)
@@ -828,25 +1038,16 @@ internal static class MuiStringscrollLayoutStateRecordCodec
 		MuiStringscrollLayoutStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollLayoutStateRecord.Size) || value.Magic !=
-			MuiStringscrollLayoutStateRecord.Cookie) return false;
-		return MuiStringscrollLayoutStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiStringscrollLayoutStateField.Magic, value.Magic) &&
-			MuiStringscrollLayoutStateFieldCursorCodec.TryWriteInt32(ref platform,
-			address, MuiStringscrollLayoutStateField.Left, value.Left) &&
-			MuiStringscrollLayoutStateFieldCursorCodec.TryWriteInt32(ref platform,
-			address, MuiStringscrollLayoutStateField.Top, value.Top) &&
-			MuiStringscrollLayoutStateFieldCursorCodec.TryWriteInt32(ref platform,
-			address, MuiStringscrollLayoutStateField.Width, value.Width) &&
-			MuiStringscrollLayoutStateFieldCursorCodec.TryWriteInt32(ref platform,
-			address, MuiStringscrollLayoutStateField.Height, value.Height);
+		if (address.IsNull || value.Magic != MuiStringscrollLayoutStateRecord.Cookie)
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
 // RenderInfo and Font are the two guest pointers needed by Stringscroll's
 // drawing path. The rastport is decoded from the named MUI_RenderInfo record;
 // callers never need to know its ABI field position.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringscrollRenderState
 {
 	public APTR RenderInfo;
@@ -862,6 +1063,11 @@ internal struct MuiStringscrollRenderStateRecord
 {
 	internal const uint Size = 16;
 	internal const uint Cookie = 0x53525452u; // 'SRTR'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint RenderInfoOffset = 4;
+	internal const uint RastPortOffset = 8;
+	internal const uint FontOffset = 12;
 
 	internal uint Magic;
 	internal APTR RenderInfo;
@@ -884,33 +1090,39 @@ internal struct MuiStringscrollRenderStateFieldCursor
 	internal MuiStringscrollRenderStateField Field;
 }
 
-internal static class MuiStringscrollRenderStateFieldCursorCodec
+internal static class MuiStringscrollRenderStateMemoryCodec
 {
 	private static bool TryResolve(MuiStringscrollRenderStateField field,
 		out uint offset)
 	{
 		switch (field)
 		{
-			case MuiStringscrollRenderStateField.Magic: offset = 0; return true;
-			case MuiStringscrollRenderStateField.RenderInfo: offset = 4; return true;
-			case MuiStringscrollRenderStateField.RastPort: offset = 8; return true;
-			case MuiStringscrollRenderStateField.Font: offset = 12; return true;
+			case MuiStringscrollRenderStateField.Magic:
+				offset = MuiStringscrollRenderStateRecord.MagicOffset; return true;
+			case MuiStringscrollRenderStateField.RenderInfo:
+				offset = MuiStringscrollRenderStateRecord.RenderInfoOffset;
+				return true;
+			case MuiStringscrollRenderStateField.RastPort:
+				offset = MuiStringscrollRenderStateRecord.RastPortOffset;
+				return true;
+			case MuiStringscrollRenderStateField.Font:
+				offset = MuiStringscrollRenderStateRecord.FontOffset; return true;
 		}
 		offset = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiStringscrollRenderStateFieldCursor cursor, out APTR address)
+		APTR record, MuiStringscrollRenderStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiStringscrollRenderStateRecord.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiStringscrollRenderStateRecord.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiStringscrollRenderStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -918,10 +1130,7 @@ internal static class MuiStringscrollRenderStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiStringscrollRenderStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -930,41 +1139,79 @@ internal static class MuiStringscrollRenderStateFieldCursorCodec
 		APTR record, MuiStringscrollRenderStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiStringscrollRenderStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
+// Kept as a source-compatible adapter for older tests and call sites. New
+// runtime code passes the record address and named field directly to the
+// struct-backed memory codec above.
+internal static class MuiStringscrollRenderStateFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringscrollRenderStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollRenderStateMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollRenderStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollRenderStateMemoryCodec.TryReadUInt32(ref platform, record,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollRenderStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollRenderStateMemoryCodec.TryWriteUInt32(ref platform, record,
+			field, value);
+}
+
 internal static class MuiStringscrollRenderStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
-		APTR address,
-		out MuiStringscrollRenderStateRecord value)
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringscrollRenderStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollRenderStateRecord.Size) ||
-			!MuiStringscrollRenderStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollRenderStateField.Magic, out var magic))
-			return false;
-		value.Magic = magic;
-		if (!MuiStringscrollRenderStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiStringscrollRenderStateField.RenderInfo, out var renderInfo) ||
-			!MuiStringscrollRenderStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiStringscrollRenderStateField.RastPort, out var rastPort) ||
-			!MuiStringscrollRenderStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiStringscrollRenderStateField.Font, out var font))
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollRenderStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var renderInfo) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rastPort) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var font) || !MuiGuestStructCursor.IsComplete(cursor))
 			return false;
 		value.RenderInfo = APTR.FromPointer(renderInfo);
 		value.RastPort = APTR.FromPointer(rastPort);
 		value.Font = APTR.FromPointer(font);
 		return true;
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStringscrollRenderStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollRenderStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.RenderInfo.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.RastPort.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Font.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiStringscrollRenderStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringscrollRenderStateRecord value)
@@ -976,25 +1223,16 @@ internal static class MuiStringscrollRenderStateRecordCodec
 		MuiStringscrollRenderStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollRenderStateRecord.Size) || value.Magic !=
-			MuiStringscrollRenderStateRecord.Cookie) return false;
-		return MuiStringscrollRenderStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiStringscrollRenderStateField.Magic, value.Magic) &&
-			MuiStringscrollRenderStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiStringscrollRenderStateField.RenderInfo,
-			value.RenderInfo.Raw) &&
-			MuiStringscrollRenderStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollRenderStateField.RastPort,
-				value.RastPort.Raw) &&
-			MuiStringscrollRenderStateFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiStringscrollRenderStateField.Font, value.Font.Raw);
+		if (address.IsNull || value.Magic != MuiStringscrollRenderStateRecord.Cookie)
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
 // Derived viewport state is shared by recompute, scrolling, keyboard paging,
 // and drawing. BOOL-like visibility fields stay canonical ULONGs at this
 // boundary, while dimensions retain signed host-side geometry semantics.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiStringscrollViewportState
 {
 	public int ViewportWidth;
@@ -1013,6 +1251,14 @@ internal struct MuiStringscrollViewportStateRecord
 {
 	internal const uint Size = 28;
 	internal const uint Cookie = 0x53565054u; // 'SVPT'
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint ViewportWidthOffset = 4;
+	internal const uint ViewportHeightOffset = 8;
+	internal const uint HorizontalVisibleOffset = 12;
+	internal const uint VerticalVisibleOffset = 16;
+	internal const uint MaxScrollXOffset = 20;
+	internal const uint MaxScrollYOffset = 24;
 
 	internal uint Magic;
 	internal int ViewportWidth;
@@ -1041,36 +1287,49 @@ internal struct MuiStringscrollViewportStateFieldCursor
 	internal MuiStringscrollViewportStateField Field;
 }
 
-internal static class MuiStringscrollViewportStateFieldCursorCodec
+internal static class MuiStringscrollViewportStateMemoryCodec
 {
 	private static bool TryResolve(MuiStringscrollViewportStateField field,
 		out uint offset)
 	{
 		switch (field)
 		{
-			case MuiStringscrollViewportStateField.Magic: offset = 0; return true;
-			case MuiStringscrollViewportStateField.ViewportWidth: offset = 4; return true;
-			case MuiStringscrollViewportStateField.ViewportHeight: offset = 8; return true;
-			case MuiStringscrollViewportStateField.HorizontalVisible: offset = 12; return true;
-			case MuiStringscrollViewportStateField.VerticalVisible: offset = 16; return true;
-			case MuiStringscrollViewportStateField.MaxScrollX: offset = 20; return true;
-			case MuiStringscrollViewportStateField.MaxScrollY: offset = 24; return true;
+			case MuiStringscrollViewportStateField.Magic:
+				offset = MuiStringscrollViewportStateRecord.MagicOffset; return true;
+			case MuiStringscrollViewportStateField.ViewportWidth:
+				offset = MuiStringscrollViewportStateRecord.ViewportWidthOffset;
+				return true;
+			case MuiStringscrollViewportStateField.ViewportHeight:
+				offset = MuiStringscrollViewportStateRecord.ViewportHeightOffset;
+				return true;
+			case MuiStringscrollViewportStateField.HorizontalVisible:
+				offset = MuiStringscrollViewportStateRecord.HorizontalVisibleOffset;
+				return true;
+			case MuiStringscrollViewportStateField.VerticalVisible:
+				offset = MuiStringscrollViewportStateRecord.VerticalVisibleOffset;
+				return true;
+			case MuiStringscrollViewportStateField.MaxScrollX:
+				offset = MuiStringscrollViewportStateRecord.MaxScrollXOffset;
+				return true;
+			case MuiStringscrollViewportStateField.MaxScrollY:
+				offset = MuiStringscrollViewportStateRecord.MaxScrollYOffset;
+				return true;
 		}
 		offset = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiStringscrollViewportStateFieldCursor cursor, out APTR address)
+		APTR record, MuiStringscrollViewportStateField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiStringscrollViewportStateRecord.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiStringscrollViewportStateRecord.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiStringscrollViewportStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -1078,10 +1337,7 @@ internal static class MuiStringscrollViewportStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiStringscrollViewportStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -1090,10 +1346,7 @@ internal static class MuiStringscrollViewportStateFieldCursorCodec
 		APTR record, MuiStringscrollViewportStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiStringscrollViewportStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
@@ -1115,41 +1368,96 @@ internal static class MuiStringscrollViewportStateFieldCursorCodec
 		TryWriteUInt32(ref platform, record, field, unchecked((uint)value));
 }
 
+// Kept as a source-compatible adapter for older tests and call sites. New
+// runtime code passes the record address and named field directly to the
+// struct-backed memory codec above.
+internal static class MuiStringscrollViewportStateFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringscrollViewportStateFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollViewportStateMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollViewportStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollViewportStateMemoryCodec.TryReadUInt32(ref platform, record,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollViewportStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollViewportStateMemoryCodec.TryWriteUInt32(ref platform, record,
+			field, value);
+
+	internal static bool TryReadInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollViewportStateField field, out int value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollViewportStateMemoryCodec.TryReadInt32(ref platform, record,
+			field, out value);
+
+	internal static bool TryWriteInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringscrollViewportStateField field, int value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiStringscrollViewportStateMemoryCodec.TryWriteInt32(ref platform, record,
+			field, value);
+}
+
 internal static class MuiStringscrollViewportStateRecordCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringscrollViewportStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollViewportStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var viewportWidth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var viewportHeight) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.HorizontalVisible) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.VerticalVisible) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MaxScrollX) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MaxScrollY) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		value.ViewportWidth = unchecked((int)viewportWidth);
+		value.ViewportHeight = unchecked((int)viewportHeight);
+		return true;
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStringscrollViewportStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollViewportStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.ViewportWidth)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.ViewportHeight)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.HorizontalVisible) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.VerticalVisible) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.MaxScrollX) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.MaxScrollY) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiStringscrollViewportStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollViewportStateRecord.Size) ||
-			!MuiStringscrollViewportStateFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiStringscrollViewportStateField.Magic, out var magic))
-			return false;
-		value.Magic = magic;
-		if (!MuiStringscrollViewportStateFieldCursorCodec.TryReadInt32(ref platform,
-			address, MuiStringscrollViewportStateField.ViewportWidth,
-			out value.ViewportWidth) ||
-			!MuiStringscrollViewportStateFieldCursorCodec.TryReadInt32(ref platform,
-			address, MuiStringscrollViewportStateField.ViewportHeight,
-			out value.ViewportHeight) ||
-			!MuiStringscrollViewportStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiStringscrollViewportStateField.HorizontalVisible,
-			out value.HorizontalVisible) ||
-			!MuiStringscrollViewportStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiStringscrollViewportStateField.VerticalVisible,
-			out value.VerticalVisible) ||
-			!MuiStringscrollViewportStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiStringscrollViewportStateField.MaxScrollX,
-			out value.MaxScrollX) ||
-			!MuiStringscrollViewportStateFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiStringscrollViewportStateField.MaxScrollY,
-			out value.MaxScrollY))
-			return false;
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringscrollViewportStateRecord value)
@@ -1161,29 +1469,9 @@ internal static class MuiStringscrollViewportStateRecordCodec
 		MuiStringscrollViewportStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringscrollViewportStateRecord.Size) || value.Magic !=
-			MuiStringscrollViewportStateRecord.Cookie) return false;
-		return MuiStringscrollViewportStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiStringscrollViewportStateField.Magic, value.Magic) &&
-			MuiStringscrollViewportStateFieldCursorCodec.TryWriteInt32(ref platform,
-			address, MuiStringscrollViewportStateField.ViewportWidth,
-			value.ViewportWidth) &&
-			MuiStringscrollViewportStateFieldCursorCodec.TryWriteInt32(ref platform,
-			address, MuiStringscrollViewportStateField.ViewportHeight,
-			value.ViewportHeight) &&
-			MuiStringscrollViewportStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiStringscrollViewportStateField.HorizontalVisible,
-			value.HorizontalVisible) &&
-			MuiStringscrollViewportStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiStringscrollViewportStateField.VerticalVisible,
-			value.VerticalVisible) &&
-			MuiStringscrollViewportStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiStringscrollViewportStateField.MaxScrollX,
-			value.MaxScrollX) &&
-			MuiStringscrollViewportStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiStringscrollViewportStateField.MaxScrollY,
-			value.MaxScrollY);
+		if (address.IsNull || value.Magic != MuiStringscrollViewportStateRecord.Cookie)
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
@@ -1367,7 +1655,8 @@ public static class MuiStringscrollCore
 		uint visited = 0;
 		while (cursor.Base.IsNotNull && visited++ < MuiAslTagListCore.MaximumSteps)
 		{
-			if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
+			if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
+				cursor.Base, cursor.Index,
 				out var current) || !MuiAslTagItemCodec.TryRead(ref platform, current,
 				out var item)) return false;
 			if (item.Tag == MuiAslTagListCore.TagDone) return true;
@@ -1381,7 +1670,7 @@ public static class MuiStringscrollCore
 			if (item.Tag == MuiAslTagListCore.TagSkip)
 			{
 				if (item.Data == uint.MaxValue ||
-					!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, item.Data + 1))
+					!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, item.Data + 1))
 					return false;
 				continue;
 			}
@@ -1390,7 +1679,7 @@ public static class MuiStringscrollCore
 				value = APTR.FromPointer(item.Data);
 				return true;
 			}
-		if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1)) return false;
+		if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1)) return false;
 		}
 		return tags.IsNull;
 	}
@@ -3275,26 +3564,26 @@ public static class MuiStringscrollCore
 	private static APTR FindScrollbarClass<TPlatform>(ref TPlatform platform,
 		APTR state) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		var name = MuiHeadlessMemory.Allocate(ref platform, 14);
+		var name = MuiHeadlessMemory.Allocate(ref platform,
+			MuiStringscrollScrollbarClassNameRecord.Size);
 		if (name.IsNull) return APTR.Null;
-		platform.WriteUInt8(name, 0, (byte)'s');
-		platform.WriteUInt8(name, 1, (byte)'c');
-		platform.WriteUInt8(name, 2, (byte)'r');
-		platform.WriteUInt8(name, 3, (byte)'o');
-		platform.WriteUInt8(name, 4, (byte)'l');
-		platform.WriteUInt8(name, 5, (byte)'l');
-		platform.WriteUInt8(name, 6, (byte)'b');
-		platform.WriteUInt8(name, 7, (byte)'a');
-		platform.WriteUInt8(name, 8, (byte)'r');
-		platform.WriteUInt8(name, 9, (byte)'.');
-		platform.WriteUInt8(name, 10, (byte)'m');
-		platform.WriteUInt8(name, 11, (byte)'u');
-		platform.WriteUInt8(name, 12, (byte)'i');
-		platform.WriteUInt8(name, 13, 0);
+		var nameRecord = default(MuiStringscrollScrollbarClassNameRecord);
+		nameRecord.Word0 = 0x7363726F; // scro
+		nameRecord.Word1 = 0x6C6C6261; // llba
+		nameRecord.Word2 = 0x722E6D75; // r.mu
+		nameRecord.TailCharacter = (byte)'i';
+		nameRecord.Terminator = 0;
+		if (!MuiStringscrollScrollbarClassNameRecordCodec.WriteRecord(ref platform,
+			name, nameRecord))
+		{
+			platform.Clear(name, MuiStringscrollScrollbarClassNameRecord.Size);
+			platform.Free(name, MuiStringscrollScrollbarClassNameRecord.Size);
+			return APTR.Null;
+		}
 		var classRecord = MuiHeadlessObjectCore.FindClassByName(ref platform, state,
 			name);
-		platform.Clear(name, 14);
-		platform.Free(name, 14);
+		platform.Clear(name, MuiStringscrollScrollbarClassNameRecord.Size);
+		platform.Free(name, MuiStringscrollScrollbarClassNameRecord.Size);
 		return classRecord;
 	}
 
@@ -3304,15 +3593,28 @@ public static class MuiStringscrollCore
 	{
 		var classRecord = FindScrollbarClass(ref platform, state);
 		if (classRecord.IsNull) return APTR.Null;
-		var tags = MuiHeadlessMemory.Allocate(ref platform, 12);
+		const uint automaticScrollbarTagBytes = MuiAslTagItemRecord.Size * 2;
+		var tags = MuiHeadlessMemory.Allocate(ref platform,
+			automaticScrollbarTagBytes);
 		if (tags.IsNull) return APTR.Null;
-		platform.WriteUInt32(tags, 0, MuiCommonControlCore.GroupHoriz);
-		platform.WriteUInt32(tags, 4, horizontal ? 1u : 0u);
-		platform.WriteUInt32(tags, 8, 0);
+		var groupTag = default(MuiAslTagItemRecord);
+		groupTag.Tag = MuiCommonControlCore.GroupHoriz;
+		groupTag.Data = horizontal ? 1u : 0u;
+		var doneTag = default(MuiAslTagItemRecord);
+		doneTag.Tag = MuiAslTagListCore.TagDone;
+		if (!MuiAslTagItemCodec.Write(ref platform, tags, groupTag) ||
+			!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform, tags, 1,
+				out var doneAddress) ||
+			!MuiAslTagItemCodec.Write(ref platform, doneAddress, doneTag))
+		{
+			platform.Clear(tags, automaticScrollbarTagBytes);
+			platform.Free(tags, automaticScrollbarTagBytes);
+			return APTR.Null;
+		}
 		var child = MuiCommonControlCore.CreateControl(ref platform, state,
 			classRecord, tags);
-		platform.Clear(tags, 12);
-		platform.Free(tags, 12);
+		platform.Clear(tags, automaticScrollbarTagBytes);
+		platform.Free(tags, automaticScrollbarTagBytes);
 		return child;
 	}
 

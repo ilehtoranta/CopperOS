@@ -6,6 +6,47 @@ namespace CopperOS.MuiMaster.Tests;
 public sealed class MuiStringscrollLayoutAdmissionTests
 {
 	[Fact]
+	public void StringscrollProjectionsUseNamedPackedLayouts()
+	{
+		Assert.Equal(20, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringscrollState>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringscrollState>(nameof(MuiStringscrollState.String)).ToInt32());
+		Assert.Equal(16, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringscrollState>(nameof(MuiStringscrollState.ScrollY)).ToInt32());
+
+		Assert.Equal(28, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringscrollPolicyState>());
+		Assert.Equal(24, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringscrollPolicyState>(nameof(MuiStringscrollPolicyState.VertScrollerOnly)).ToInt32());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringscrollScrollbarState>());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringscrollScrollbarState>(nameof(MuiStringscrollScrollbarState.VertBar)).ToInt32());
+
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringscrollCompositionState>());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringscrollCompositionState>(nameof(MuiStringscrollCompositionState.OwnedMask)).ToInt32());
+		Assert.Equal(16, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringscrollLayoutState>());
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringscrollLayoutState>(nameof(MuiStringscrollLayoutState.Height)).ToInt32());
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringscrollRenderState>());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringscrollRenderState>(nameof(MuiStringscrollRenderState.Font)).ToInt32());
+		Assert.Equal(24, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringscrollViewportState>());
+		Assert.Equal(20, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringscrollViewportState>(nameof(MuiStringscrollViewportState.MaxScrollY)).ToInt32());
+		Assert.Equal(24, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringScrollMetricsState>());
+		Assert.Equal(20, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringScrollMetricsState>(nameof(MuiStringScrollMetricsState.Top)).ToInt32());
+	}
+
+	[Fact]
 	public void StringscrollLayoutRenderAndViewportRoundTrip()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

@@ -41,51 +41,67 @@ internal struct MuiDirlistFieldCursor
 	internal MuiDirlistField Field;
 }
 
-internal static class MuiDirlistFieldCursorCodec
+// Struct-first guest-memory adapter for the fixed Dirlist packet family.
+// Header probing admits the 4-byte method record; operation fields require
+// their complete named packet record before being accessed.
+internal static class MuiDirlistMessageMemoryCodec
 {
 	private static bool TryResolve(MuiDirlistPacketKind packet,
-		MuiDirlistField field, out uint offset)
+		MuiDirlistField field, out uint offset, out uint packetSize)
 	{
+		packetSize = 0;
 		switch (packet)
 		{
 			case MuiDirlistPacketKind.Method:
-				if (field == MuiDirlistField.MethodId) { offset = 0; return true; }
+				if (field == MuiDirlistField.MethodId)
+				{
+					offset = MuiDirlistMethodMessage.MethodIdOffset;
+					packetSize = MuiDirlistMethodMessage.Size;
+					return true;
+				}
 				break;
 			case MuiDirlistPacketKind.Set:
-				if (field == MuiDirlistField.MethodId) { offset = 0; return true; }
-				if (field == MuiDirlistField.Attribute) { offset = 4; return true; }
-				if (field == MuiDirlistField.Value) { offset = 8; return true; }
+				packetSize = MuiDirlistSetMessage.Size;
+				if (field == MuiDirlistField.MethodId) { offset = MuiDirlistSetMessage.MethodIdOffset; return true; }
+				if (field == MuiDirlistField.Attribute) { offset = MuiDirlistSetMessage.AttributeOffset; return true; }
+				if (field == MuiDirlistField.Value) { offset = MuiDirlistSetMessage.ValueOffset; return true; }
 				break;
 			case MuiDirlistPacketKind.Rename:
-				if (field == MuiDirlistField.MethodId) { offset = 0; return true; }
-				if (field == MuiDirlistField.Entry) { offset = 4; return true; }
-				if (field == MuiDirlistField.Name) { offset = 8; return true; }
+				packetSize = MuiDirlistRenameMessage.Size;
+				if (field == MuiDirlistField.MethodId) { offset = MuiDirlistRenameMessage.MethodIdOffset; return true; }
+				if (field == MuiDirlistField.Entry) { offset = MuiDirlistRenameMessage.EntryOffset; return true; }
+				if (field == MuiDirlistField.Name) { offset = MuiDirlistRenameMessage.NameOffset; return true; }
 				break;
 			case MuiDirlistPacketKind.Protection:
-				if (field == MuiDirlistField.MethodId) { offset = 0; return true; }
-				if (field == MuiDirlistField.Entry) { offset = 4; return true; }
-				if (field == MuiDirlistField.Protection) { offset = 8; return true; }
+				packetSize = MuiDirlistProtectionMessage.Size;
+				if (field == MuiDirlistField.MethodId) { offset = MuiDirlistProtectionMessage.MethodIdOffset; return true; }
+				if (field == MuiDirlistField.Entry) { offset = MuiDirlistProtectionMessage.EntryOffset; return true; }
+				if (field == MuiDirlistField.Protection) { offset = MuiDirlistProtectionMessage.ProtectionOffset; return true; }
 				break;
 			case MuiDirlistPacketKind.GetEntry:
-				if (field == MuiDirlistField.MethodId) { offset = 0; return true; }
-				if (field == MuiDirlistField.Position) { offset = 4; return true; }
-				if (field == MuiDirlistField.Storage) { offset = 8; return true; }
+				packetSize = MuiDirlistGetEntryMessage.Size;
+				if (field == MuiDirlistField.MethodId) { offset = MuiDirlistGetEntryMessage.MethodIdOffset; return true; }
+				if (field == MuiDirlistField.Position) { offset = MuiDirlistGetEntryMessage.PositionOffset; return true; }
+				if (field == MuiDirlistField.Storage) { offset = MuiDirlistGetEntryMessage.StorageOffset; return true; }
 				break;
 		}
 		offset = 0;
+		packetSize = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiDirlistFieldCursor cursor, out APTR address)
+		APTR message, MuiDirlistPacketKind packet, MuiDirlistField field,
+		out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset)
+		if (!TryResolve(packet, field, out var offset, out var packetSize) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, packetSize))
 			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(message.Raw + offset);
+		return platform.IsMapped(address, MuiDirlistMethodMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -94,11 +110,8 @@ internal static class MuiDirlistFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiDirlistFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -108,14 +121,36 @@ internal static class MuiDirlistFieldCursorCodec
 		uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiDirlistFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that construct the typed field
+// cursor; live packet handling routes through the named-record adapter above.
+internal static class MuiDirlistFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiDirlistFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDirlistMessageMemoryCodec.TryGetAddress(ref platform, cursor.Message,
+			cursor.Packet, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDirlistPacketKind packet, MuiDirlistField field,
+		out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDirlistMessageMemoryCodec.TryReadUInt32(ref platform, message, packet,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDirlistPacketKind packet, MuiDirlistField field,
+		uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiDirlistMessageMemoryCodec.TryWriteUInt32(ref platform, message, packet,
+			field, value);
 }
 
 // The packet records below are the public MorphOS operation boundary.  Keep
@@ -168,14 +203,16 @@ internal static class MuiDirlistMethodMessageCodec
 	{
 		packet = default;
 		return MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiDirlistMethodMessage.Size, 0, out packet.MethodId);
+			MuiDirlistMethodMessage.Size, MuiDirlistMethodMessage.MethodIdOffset,
+			out packet.MethodId);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiDirlistMethodMessage.Size, 0, method);
+			MuiDirlistMethodMessage.Size, MuiDirlistMethodMessage.MethodIdOffset,
+			method);
 }
 
 internal static class MuiDirlistSetMessageCodec
@@ -186,11 +223,14 @@ internal static class MuiDirlistSetMessageCodec
 	{
 		packet = default;
 		return MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiDirlistSetMessage.Size, 0, out packet.MethodId) &&
+			MuiDirlistSetMessage.Size, MuiDirlistSetMessage.MethodIdOffset,
+			out packet.MethodId) &&
 			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDirlistSetMessage.Size, 4, out packet.Attribute) &&
+				MuiDirlistSetMessage.Size, MuiDirlistSetMessage.AttributeOffset,
+				out packet.Attribute) &&
 			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDirlistSetMessage.Size, 8, out packet.Value);
+				MuiDirlistSetMessage.Size, MuiDirlistSetMessage.ValueOffset,
+				out packet.Value);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
@@ -198,11 +238,14 @@ internal static class MuiDirlistSetMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		return MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiDirlistSetMessage.Size, 0, packet.MethodId) &&
+			MuiDirlistSetMessage.Size, MuiDirlistSetMessage.MethodIdOffset,
+			packet.MethodId) &&
 			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistSetMessage.Size, 4, packet.Attribute) &&
+				MuiDirlistSetMessage.Size, MuiDirlistSetMessage.AttributeOffset,
+				packet.Attribute) &&
 			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistSetMessage.Size, 8, packet.Value);
+				MuiDirlistSetMessage.Size, MuiDirlistSetMessage.ValueOffset,
+				packet.Value);
 	}
 }
 
@@ -214,11 +257,14 @@ internal static class MuiDirlistRenameMessageCodec
 	{
 		packet = default;
 		return MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiDirlistRenameMessage.Size, 0, out packet.MethodId) &&
+			MuiDirlistRenameMessage.Size, MuiDirlistRenameMessage.MethodIdOffset,
+			out packet.MethodId) &&
 			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDirlistRenameMessage.Size, 4, out packet.Entry) &&
+				MuiDirlistRenameMessage.Size, MuiDirlistRenameMessage.EntryOffset,
+				out packet.Entry) &&
 			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDirlistRenameMessage.Size, 8, out packet.Name);
+				MuiDirlistRenameMessage.Size, MuiDirlistRenameMessage.NameOffset,
+				out packet.Name);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
@@ -226,11 +272,14 @@ internal static class MuiDirlistRenameMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		return MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiDirlistRenameMessage.Size, 0, packet.MethodId) &&
+			MuiDirlistRenameMessage.Size, MuiDirlistRenameMessage.MethodIdOffset,
+			packet.MethodId) &&
 			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistRenameMessage.Size, 4, packet.Entry) &&
+				MuiDirlistRenameMessage.Size, MuiDirlistRenameMessage.EntryOffset,
+				packet.Entry) &&
 			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistRenameMessage.Size, 8, packet.Name);
+				MuiDirlistRenameMessage.Size, MuiDirlistRenameMessage.NameOffset,
+				packet.Name);
 	}
 }
 
@@ -242,11 +291,14 @@ internal static class MuiDirlistProtectionMessageCodec
 	{
 		packet = default;
 		return MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiDirlistProtectionMessage.Size, 0, out packet.MethodId) &&
+			MuiDirlistProtectionMessage.Size,
+				MuiDirlistProtectionMessage.MethodIdOffset, out packet.MethodId) &&
 			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDirlistProtectionMessage.Size, 4, out packet.Entry) &&
+				MuiDirlistProtectionMessage.Size,
+				MuiDirlistProtectionMessage.EntryOffset, out packet.Entry) &&
 			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDirlistProtectionMessage.Size, 8, out packet.Protection);
+				MuiDirlistProtectionMessage.Size,
+				MuiDirlistProtectionMessage.ProtectionOffset, out packet.Protection);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
@@ -254,11 +306,14 @@ internal static class MuiDirlistProtectionMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		return MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiDirlistProtectionMessage.Size, 0, packet.MethodId) &&
+			MuiDirlistProtectionMessage.Size,
+			MuiDirlistProtectionMessage.MethodIdOffset, packet.MethodId) &&
 			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistProtectionMessage.Size, 4, packet.Entry) &&
+				MuiDirlistProtectionMessage.Size,
+				MuiDirlistProtectionMessage.EntryOffset, packet.Entry) &&
 			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistProtectionMessage.Size, 8, packet.Protection);
+				MuiDirlistProtectionMessage.Size,
+				MuiDirlistProtectionMessage.ProtectionOffset, packet.Protection);
 	}
 }
 
@@ -270,11 +325,14 @@ internal static class MuiDirlistGetEntryMessageCodec
 	{
 		packet = default;
 		return MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiDirlistGetEntryMessage.Size, 0, out packet.MethodId) &&
+			MuiDirlistGetEntryMessage.Size,
+			MuiDirlistGetEntryMessage.MethodIdOffset, out packet.MethodId) &&
 			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDirlistGetEntryMessage.Size, 4, out packet.Position) &&
+				MuiDirlistGetEntryMessage.Size,
+				MuiDirlistGetEntryMessage.PositionOffset, out packet.Position) &&
 			MuiDirlistPacketMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDirlistGetEntryMessage.Size, 8, out packet.Storage);
+				MuiDirlistGetEntryMessage.Size,
+				MuiDirlistGetEntryMessage.StorageOffset, out packet.Storage);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
@@ -282,11 +340,14 @@ internal static class MuiDirlistGetEntryMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		return MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiDirlistGetEntryMessage.Size, 0, packet.MethodId) &&
+			MuiDirlistGetEntryMessage.Size,
+			MuiDirlistGetEntryMessage.MethodIdOffset, packet.MethodId) &&
 			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistGetEntryMessage.Size, 4, packet.Position) &&
+				MuiDirlistGetEntryMessage.Size,
+				MuiDirlistGetEntryMessage.PositionOffset, packet.Position) &&
 			MuiDirlistPacketMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiDirlistGetEntryMessage.Size, 8, packet.Storage);
+				MuiDirlistGetEntryMessage.Size,
+				MuiDirlistGetEntryMessage.StorageOffset, packet.Storage);
 	}
 }
 

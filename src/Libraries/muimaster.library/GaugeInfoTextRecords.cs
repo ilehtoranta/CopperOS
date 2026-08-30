@@ -150,33 +150,46 @@ internal static class MuiGaugeInfoTextStateRecordMemoryCodec
 
 internal static class MuiGaugeInfoTextStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiGaugeInfoTextStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiGaugeInfoTextStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) ||
-			!MuiGaugeInfoTextStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out var infoText)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGaugeInfoTextStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var infoText)) return false;
 		value.InfoText = APTR.FromPointer(infoText);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGaugeInfoTextStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGaugeInfoTextStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.InfoText.Raw) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGaugeInfoTextStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiGaugeInfoTextStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
-		=> TryReadStructural(ref platform, address, out value) &&
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
 		MuiGaugeInfoTextStateAdmission.Validate(value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiGaugeInfoTextStateRecord value)
-	where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGaugeInfoTextStateAdmission.Validate(value)) return false;
-		return MuiGaugeInfoTextStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 0, value.Magic) &&
-			MuiGaugeInfoTextStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, 4, value.InfoText.Raw);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGaugeInfoTextStateAdmission.Validate(value) &&
+		WriteRecord(ref platform, address, value);
 }

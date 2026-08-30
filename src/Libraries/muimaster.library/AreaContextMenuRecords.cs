@@ -159,25 +159,45 @@ internal static class MuiAreaContextMenuStateRecordMemoryCodec
 
 internal static class MuiAreaContextMenuStateRecordCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaContextMenuStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaContextMenuStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var menuStrip) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var trigger) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Generation)) return false;
+		value.MenuStrip = APTR.FromPointer(menuStrip);
+		value.Trigger = APTR.FromPointer(trigger);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaContextMenuStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaContextMenuStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.MenuStrip.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Trigger.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Generation) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiAreaContextMenuStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (!MuiAreaContextMenuStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAreaContextMenuStateField.Magic, out value.Magic) ||
-			!MuiAreaContextMenuStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaContextMenuStateField.MenuStrip, out var menuStrip) ||
-			!MuiAreaContextMenuStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaContextMenuStateField.Trigger, out var trigger) ||
-			!MuiAreaContextMenuStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiAreaContextMenuStateField.Generation, out value.Generation))
-			return false;
-		value.MenuStrip = APTR.FromPointer(menuStrip);
-		value.Trigger = APTR.FromPointer(trigger);
-		return true;
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAreaContextMenuStateRecord value)
@@ -189,17 +209,8 @@ internal static class MuiAreaContextMenuStateRecordCodec
 		MuiAreaContextMenuStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaContextMenuStateRecord.Size) || value.Magic !=
-			MuiAreaContextMenuStateRecord.Cookie ||
-			!MuiAreaContextMenuStateAdmission.Validate(value)) return false;
-		return MuiAreaContextMenuStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiAreaContextMenuStateField.Magic, value.Magic) &&
-			MuiAreaContextMenuStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaContextMenuStateField.MenuStrip, value.MenuStrip.Raw) &&
-			MuiAreaContextMenuStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaContextMenuStateField.Trigger, value.Trigger.Raw) &&
-			MuiAreaContextMenuStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaContextMenuStateField.Generation, value.Generation);
+		if (address.IsNull || !MuiAreaContextMenuStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }

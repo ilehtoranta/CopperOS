@@ -218,6 +218,7 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 	public APTR LastDisplaySecondTextAfterHook;
 	public uint StringEditHookResult;
 	public uint StringEditHookActions;
+	public uint LastStringEditCommand;
 	public bool StringEditReuseAcceptsEvent;
 	public bool StringEditReuseSwitchesActions;
 	public uint StringEditReuseNextActions;
@@ -594,6 +595,7 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 		LastConstructFlags = 0;
 		StringEditHookResult = 1;
 		StringEditHookActions = MuiStringEditWorkCodec.ActionUse;
+		LastStringEditCommand = 0;
 		StringEditReuseAcceptsEvent = false;
 		StringEditReuseSwitchesActions = false;
 		StringEditReuseNextActions = MuiStringEditWorkCodec.ActionUse;
@@ -1047,6 +1049,9 @@ internal struct MuiHeadlessTestPlatform : IMuiApplicationPlatform,
 				}
 				return 0;
 			case HookEntryStringEdit:
+				LastStringEditCommand = MuiStringEditCommandCodec.TryRead(ref this,
+					messageAddress, out var stringEditCommand) ?
+					stringEditCommand.Command : 0;
 				if (!MuiStringEditWorkCodec.TryRead(ref this, objectAddress,
 					out var stringEdit)) return 0;
 				LastStringEditBufferPos = stringEdit.BufferPos;

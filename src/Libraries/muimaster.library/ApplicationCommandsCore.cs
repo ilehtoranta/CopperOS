@@ -158,28 +158,31 @@ internal static class MuiApplicationCommandRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiApplicationCommandField.Name, out var rawName) ||
-			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationCommandField.Template, out var rawTemplate) ||
-			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationCommandField.Hook, out var rawHook)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationCommandRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawName) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawTemplate) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawParameters) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawHook) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawReserved0) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawReserved1) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawReserved2) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawReserved3) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawReserved4) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.Name = APTR.FromPointer(rawName);
 		value.Template = APTR.FromPointer(rawTemplate);
-		value.Hook = APTR.FromPointer(rawHook);
-		if (!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiApplicationCommandField.Parameters, out var rawParameters) ||
-			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationCommandField.Reserved0, out var rawReserved0) ||
-			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationCommandField.Reserved1, out var rawReserved1) ||
-			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationCommandField.Reserved2, out var rawReserved2) ||
-			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationCommandField.Reserved3, out var rawReserved3) ||
-			!MuiApplicationCommandRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiApplicationCommandField.Reserved4, out var rawReserved4)) return false;
 		value.Parameters = unchecked((int)rawParameters);
+		value.Hook = APTR.FromPointer(rawHook);
 		value.Reserved0 = unchecked((int)rawReserved0);
 		value.Reserved1 = unchecked((int)rawReserved1);
 		value.Reserved2 = unchecked((int)rawReserved2);
@@ -192,30 +195,27 @@ internal static class MuiApplicationCommandRecordCodec
 		MuiApplicationCommandRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiApplicationCommandField.Name, value.Name.Raw) &&
-			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationCommandField.Template, value.Template.Raw) &&
-			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationCommandField.Parameters,
-				unchecked((uint)value.Parameters)) &&
-			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationCommandField.Hook, value.Hook.Raw) &&
-			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationCommandField.Reserved0,
-				unchecked((uint)value.Reserved0)) &&
-			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationCommandField.Reserved1,
-				unchecked((uint)value.Reserved1)) &&
-			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationCommandField.Reserved2,
-				unchecked((uint)value.Reserved2)) &&
-			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationCommandField.Reserved3,
-				unchecked((uint)value.Reserved3)) &&
-			MuiApplicationCommandRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiApplicationCommandField.Reserved4,
-				unchecked((uint)value.Reserved4));
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationCommandRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Name.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Template.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Parameters)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Hook.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Reserved0)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Reserved1)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Reserved2)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Reserved3)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Reserved4))) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -353,12 +353,11 @@ public static class MuiApplicationCommandsCore
 		APTR table) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (table.IsNull) return true;
-		var cursor = default(MuiApplicationCommandTableCursor);
-		cursor.Base = table;
-		while (cursor.Index < MuiHeadlessLayout.MaximumTraversal)
+		var index = 0u;
+		while (index < MuiHeadlessLayout.MaximumTraversal)
 		{
-			if (!MuiApplicationCommandTableCodec.TryGetEntry(ref platform, cursor,
-				out var address)) return false;
+			if (!MuiApplicationCommandTableMemoryCodec.TryGetEntry(ref platform,
+				table, index, out var address)) return false;
 			if (!MuiApplicationCommandRecordCodec.TryRead(ref platform, address,
 				out var command)) return false;
 			// A NULL name terminates the caller-owned command table.  The
@@ -370,7 +369,7 @@ public static class MuiApplicationCommandsCore
 				command.Template.Raw != MagicTemplate &&
 				!CStringCodec.TryReadLength(ref platform, command.Template,
 					MaximumStringLength, out _)) return false;
-			cursor.Index++;
+			index++;
 		}
 		return false;
 	}
@@ -412,20 +411,32 @@ internal static class MuiApplicationCommandTableCodec
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiApplicationCommandTableCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiApplicationCommandTableCursor.EntrySize) return false;
-		var offset = cursor.Index *
-			MuiApplicationCommandTableCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
-		return platform.IsMapped(address,
-			MuiApplicationCommandTableCursor.EntrySize);
-	}
+		=> MuiApplicationCommandTableMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out address);
 
 	internal static bool TryValidate<TPlatform>(ref TPlatform platform, APTR table)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiApplicationCommandsCore.TryValidate(ref platform, table);
+}
+
+// Struct-first guest-memory adapter for the caller-owned NULL-terminated
+// MUI_Command table. The entry index and fixed record size are kept together
+// so arithmetic and complete-entry admission stay in one bounded boundary.
+internal static class MuiApplicationCommandTableMemoryCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR table, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (table.IsNull || index >
+			(uint.MaxValue - table.Raw) /
+			MuiApplicationCommandTableCursor.EntrySize) return false;
+		var offset = index *
+			MuiApplicationCommandTableCursor.EntrySize;
+		if (table.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(table.Raw + offset);
+		return platform.IsMapped(address,
+			MuiApplicationCommandTableCursor.EntrySize);
+	}
 }

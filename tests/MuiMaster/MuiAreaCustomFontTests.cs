@@ -196,6 +196,27 @@ public sealed class MuiAreaCustomFontTests
 	[Fact]
 	public void CustomFontSpecParsesNamedFamilySizeStylesAndColors()
 	{
+		Assert.Equal(36, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiCustomFontSpec>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontSpec>(nameof(MuiCustomFontSpec.Source)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontSpec>(nameof(MuiCustomFontSpec.Family)).ToInt32());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontSpec>(nameof(MuiCustomFontSpec.FamilyLength)).ToInt32());
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontSpec>(nameof(MuiCustomFontSpec.Size)).ToInt32());
+		Assert.Equal(16, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontSpec>(nameof(MuiCustomFontSpec.SizeMode)).ToInt32());
+		Assert.Equal(20, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontSpec>(nameof(MuiCustomFontSpec.StyleFlags)).ToInt32());
+		Assert.Equal(24, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontSpec>(nameof(MuiCustomFontSpec.TextColor)).ToInt32());
+		Assert.Equal(28, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontSpec>(nameof(MuiCustomFontSpec.OutlineColor)).ToInt32());
+		Assert.Equal(32, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontSpec>(nameof(MuiCustomFontSpec.ValueFlags)).ToInt32());
+
 		var platform = CreatePlatform(out _);
 		var spec = APTR.FromPointer(0x1700);
 		platform.WriteCString(spec, "Noto Sans UI/+10/o/Cff0000/c112233");
@@ -404,6 +425,23 @@ public sealed class MuiAreaCustomFontTests
 	[Fact]
 	public void CustomFontOpensOnSetupAndClosesOnCleanup()
 	{
+		Assert.Equal(48, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiCustomFontOpenRequest>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontOpenRequest>(nameof(MuiCustomFontOpenRequest.Object)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontOpenRequest>(nameof(MuiCustomFontOpenRequest.BaseFont)).ToInt32());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontOpenRequest>(nameof(MuiCustomFontOpenRequest.Spec)).ToInt32());
+		Assert.Equal(44, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontOpenRequest>(nameof(MuiCustomFontOpenRequest.Result)).ToInt32());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiCustomFontMetrics>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontMetrics>(nameof(MuiCustomFontMetrics.GlyphWidth)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiCustomFontMetrics>(nameof(MuiCustomFontMetrics.Height)).ToInt32());
+
 		var platform = CreatePlatform(out var areaClass);
 		var spec = APTR.FromPointer(0x1F00);
 		platform.WriteCString(spec, "Noto Sans UI/+10/o");
@@ -753,8 +791,13 @@ public sealed class MuiAreaCustomFontTests
 		var platform = CreatePlatform(out _);
 		var message = APTR.FromPointer(0x2C00);
 		var spec = APTR.FromPointer(0x2D00);
+		var openPacket = new MuiAreaOpenCustomFontMessage
+		{
+			MethodId = MuiAreaCustomFontMessageCodec.OpenCustomFont,
+			Spec = spec,
+		};
 		Assert.True(MuiAreaCustomFontMessageCodec.WriteOpen(ref platform, message,
-			spec));
+			openPacket));
 		Assert.True(MuiAreaCustomFontMessageCodec.TryReadOpen(ref platform,
 			message, out var open));
 		Assert.Equal(MuiAreaCustomFontMessageCodec.OpenCustomFont,

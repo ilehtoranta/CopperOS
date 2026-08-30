@@ -4,6 +4,7 @@
 */
 
 using Amiga;
+using System.Runtime.InteropServices;
 
 namespace CopperOS.MuiMaster;
 
@@ -11,6 +12,7 @@ namespace CopperOS.MuiMaster;
 // family is a span into the caller-owned guest string; no managed substring is
 // created. Size/color presence is carried separately from the values so a
 // later native font capability can apply the exact requested overrides.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiCustomFontSpec
 {
 	public APTR Source;

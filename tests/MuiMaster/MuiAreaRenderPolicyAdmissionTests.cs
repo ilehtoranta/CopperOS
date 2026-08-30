@@ -85,6 +85,46 @@ public sealed class MuiAreaRenderPolicyAdmissionTests
 		Assert.Equal(2u, preserved);
 	}
 
+	[Fact]
+	public void RenderPolicySequentialRecordPreservesMixedFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			State);
+		var address = APTR.FromPointer(0x3EC0);
+		var value = new MuiAreaRenderPolicyStateRecord
+		{
+			Magic = MuiAreaRenderPolicyStateRecord.Cookie,
+			FillArea = uint.MaxValue,
+			Background = 0x01020304u,
+			Frame = uint.MaxValue,
+			Font = 0xCAFEBABEu,
+			FrameVisible = 0xA5A5A5A5u,
+			FramePhantomHoriz = 0x55667788u,
+			FrameTitle = APTR.FromPointer(0xFEEDBEEF),
+			FrameDynamic = 0x11223344u,
+		};
+
+		Assert.True(MuiAreaRenderPolicyStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaRenderPolicyStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.FillArea, decoded.FillArea);
+		Assert.Equal(value.Background, decoded.Background);
+		Assert.Equal(value.Frame, decoded.Frame);
+		Assert.Equal(value.Font, decoded.Font);
+		Assert.Equal(value.FrameVisible, decoded.FrameVisible);
+		Assert.Equal(value.FramePhantomHoriz, decoded.FramePhantomHoriz);
+		Assert.Equal(value.FrameTitle, decoded.FrameTitle);
+		Assert.Equal(value.FrameDynamic, decoded.FrameDynamic);
+
+		var crossingEnd = APTR.FromPointer(0x30FDD);
+		Assert.False(MuiAreaRenderPolicyStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiAreaRenderPolicyStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
+
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR areaClass)
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

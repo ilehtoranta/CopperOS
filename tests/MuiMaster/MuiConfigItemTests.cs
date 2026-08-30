@@ -22,6 +22,8 @@ public sealed class MuiConfigItemTests
 		Assert.Equal(expected.Value, actual.Value);
 		Assert.False(MuiNotifyConfigStorageCodec.TryRead(ref platform,
 			APTR.Null, out _));
+		Assert.False(MuiNotifyConfigStorageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
 	}
 
 	[Fact]

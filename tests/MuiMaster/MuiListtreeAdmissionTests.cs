@@ -121,6 +121,121 @@ public sealed class MuiListtreeAdmissionTests
 	}
 
 	[Fact]
+	public void ListtreeHookPoolMemoryAdapterUsesNamedStructFields()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x16C0);
+		Assert.True(MuiListtreeCore.MuiListtreeHookPoolMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiListtreeCore.MuiListtreeHookPoolField.PuddleSize, 2048));
+		Assert.True(MuiListtreeCore.MuiListtreeHookPoolMemoryCodec.TryReadUInt32(
+			ref platform, address,
+			MuiListtreeCore.MuiListtreeHookPoolField.PuddleSize,
+			out var puddleSize));
+		Assert.Equal(2048u, puddleSize);
+		Assert.True(MuiListtreeCore.MuiListtreeHookPoolMemoryCodec.TryGetAddress(
+			ref platform, address,
+			MuiListtreeCore.MuiListtreeHookPoolField.Owned,
+			out var ownedAddress));
+		Assert.Equal(0x16D4u, ownedAddress.Raw);
+		Assert.False(MuiListtreeCore.MuiListtreeHookPoolMemoryCodec.TryGetAddress(
+			ref platform, address,
+			(MuiListtreeCore.MuiListtreeHookPoolField)255, out _));
+	}
+
+	[Fact]
+	public void ListtreeClickMemoryAdapterUsesNamedStructFields()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x16F0);
+		Assert.True(MuiListtreeCore.MuiListtreeClickStateMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListtreeCore.MuiListtreeClickStateField.Clicks,
+			2));
+		Assert.True(MuiListtreeCore.MuiListtreeClickStateMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiListtreeCore.MuiListtreeClickStateField.Clicks,
+			out var clicks));
+		Assert.Equal(2u, clicks);
+		Assert.True(MuiListtreeCore.MuiListtreeClickStateMemoryCodec.TryGetAddress(
+			ref platform, address,
+			MuiListtreeCore.MuiListtreeClickStateField.DoubleClick,
+			out var doubleClickAddress));
+		Assert.Equal(0x1708u, doubleClickAddress.Raw);
+		Assert.False(MuiListtreeCore.MuiListtreeClickStateMemoryCodec.TryGetAddress(
+			ref platform, address,
+			(MuiListtreeCore.MuiListtreeClickStateField)255, out _));
+	}
+
+	[Fact]
+	public void ListtreeClickColumnMemoryAdapterUsesNamedStructFields()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x1720);
+		Assert.True(MuiListtreeCore.MuiListtreeClickColumnMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiListtreeCore.MuiListtreeClickColumnField.LastColumn, 5));
+		Assert.True(MuiListtreeCore.MuiListtreeClickColumnMemoryCodec.TryReadUInt32(
+			ref platform, address,
+			MuiListtreeCore.MuiListtreeClickColumnField.LastColumn,
+			out var lastColumn));
+		Assert.Equal(5u, lastColumn);
+		Assert.True(MuiListtreeCore.MuiListtreeClickColumnMemoryCodec.TryGetAddress(
+			ref platform, address, MuiListtreeCore.MuiListtreeClickColumnField.Valid,
+			out var validAddress));
+		Assert.Equal(0x1728u, validAddress.Raw);
+		Assert.False(MuiListtreeCore.MuiListtreeClickColumnMemoryCodec.TryGetAddress(
+			ref platform, address,
+			(MuiListtreeCore.MuiListtreeClickColumnField)255, out _));
+	}
+
+	[Fact]
+	public void ListtreeSurfaceMemoryAdapterUsesNamedStructFields()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x1730);
+		Assert.True(MuiListtreeCore.MuiListtreeSurfaceMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListtreeCore.MuiListtreeSurfaceField.Width,
+			320));
+		Assert.True(MuiListtreeCore.MuiListtreeSurfaceMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiListtreeCore.MuiListtreeSurfaceField.Width,
+			out var width));
+		Assert.Equal(320u, width);
+		Assert.True(MuiListtreeCore.MuiListtreeSurfaceMemoryCodec.TryGetAddress(
+			ref platform, address,
+			MuiListtreeCore.MuiListtreeSurfaceField.FirstVisible,
+			out var firstVisibleAddress));
+		Assert.Equal(0x1748u, firstVisibleAddress.Raw);
+		Assert.False(MuiListtreeCore.MuiListtreeSurfaceMemoryCodec.TryGetAddress(
+			ref platform, address,
+			(MuiListtreeCore.MuiListtreeSurfaceField)255, out _));
+	}
+
+	[Fact]
+	public void ListtreeLifecycleMemoryAdapterUsesNamedStructFields()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x1760);
+		Assert.True(MuiListtreeCore.MuiListtreeLifecycleMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiListtreeCore.MuiListtreeLifecycleField.Setup,
+			1));
+		Assert.True(MuiListtreeCore.MuiListtreeLifecycleMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiListtreeCore.MuiListtreeLifecycleField.Setup,
+			out var setup));
+		Assert.Equal(1u, setup);
+		Assert.True(MuiListtreeCore.MuiListtreeLifecycleMemoryCodec.TryGetAddress(
+			ref platform, address, MuiListtreeCore.MuiListtreeLifecycleField.Shown,
+			out var shownAddress));
+		Assert.Equal(0x176Cu, shownAddress.Raw);
+		Assert.False(MuiListtreeCore.MuiListtreeLifecycleMemoryCodec.TryGetAddress(
+			ref platform, address,
+			(MuiListtreeCore.MuiListtreeLifecycleField)255, out _));
+	}
+
+	[Fact]
 	public void ListtreeClickColumnSurfaceAndLifecycleRoundTripThroughStructs()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

@@ -149,17 +149,36 @@ internal static class MuiSelectgroupActiveStateRecordMemoryCodec
 
 internal static class MuiSelectgroupActiveStateRecordCodec
 {
+	// Declaration-order guest record: { Magic, Active }.  Production exchange
+	// stays on the named record through the bounded sequential cursor.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiSelectgroupActiveStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiSelectgroupActiveStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Active) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiSelectgroupActiveStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiSelectgroupActiveStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Active) && MuiGuestStructCursor.IsComplete(cursor);
+
 	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiSelectgroupActiveStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		return MuiSelectgroupActiveStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiSelectgroupActiveStateField.Magic, out value.Magic) &&
-			MuiSelectgroupActiveStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiSelectgroupActiveStateField.Active, out value.Active);
-	}
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiSelectgroupActiveStateRecord value)
@@ -172,11 +191,6 @@ internal static class MuiSelectgroupActiveStateRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiSelectgroupActiveStateAdmission.Validate(value)) return false;
-		return MuiSelectgroupActiveStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiSelectgroupActiveStateField.Magic,
-			value.Magic) &&
-			MuiSelectgroupActiveStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiSelectgroupActiveStateField.Active,
-			value.Active);
+		return WriteRecord(ref platform, address, value);
 	}
 }

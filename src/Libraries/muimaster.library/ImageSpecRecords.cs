@@ -168,43 +168,57 @@ internal static class MuiImageSpecStateRecordMemoryCodec
 
 internal static class MuiImageSpecStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiImageSpecStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		return MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) &&
-			MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out value.Present) &&
-			MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 8, out value.Raw) &&
-			MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 12, out value.BuiltinPresent) &&
-			MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 16, out value.Builtin);
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiImageSpecStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Present) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Raw) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.BuiltinPresent) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Builtin) &&
+			MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiImageSpecStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiImageSpecStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Present) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.BuiltinPresent) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Builtin) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiImageSpecStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiImageSpecStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
-		=> TryReadStructural(ref platform, address, out value) &&
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, address, out value) &&
 		MuiImageSpecStateAdmission.Validate(ref platform, value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiImageSpecStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiImageSpecStateAdmission.Validate(ref platform, value)) return false;
-		return MuiImageSpecStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiImageSpecStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			4, value.Present) &&
-			MuiImageSpecStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			8, value.Raw) &&
-			MuiImageSpecStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			12, value.BuiltinPresent) &&
-			MuiImageSpecStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			16, value.Builtin);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiImageSpecStateAdmission.Validate(ref platform, value) &&
+		WriteRecord(ref platform, address, value);
 }

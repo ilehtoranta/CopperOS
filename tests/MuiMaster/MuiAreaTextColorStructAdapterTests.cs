@@ -37,4 +37,34 @@ public sealed class MuiAreaTextColorStructAdapterTests
 		Assert.False(MuiAreaTextColorStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}
+
+	[Fact]
+	public void AreaTextColorSequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x35C0);
+		var value = new MuiAreaTextColorStateRecord
+		{
+			Magic = MuiAreaTextColorStateRecord.Cookie,
+			Color = 0x00FFFFFFu,
+			Active = uint.MaxValue,
+			Generation = uint.MaxValue,
+		};
+
+		Assert.True(MuiAreaTextColorStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaTextColorStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Color, decoded.Color);
+		Assert.Equal(value.Active, decoded.Active);
+		Assert.Equal(value.Generation, decoded.Generation);
+
+		var crossingEnd = APTR.FromPointer(0x30FF1);
+		Assert.False(MuiAreaTextColorStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiAreaTextColorStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
 }

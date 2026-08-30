@@ -221,7 +221,7 @@ internal static class MuiColorSpecialistMessageCodec
 		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiColorSpecialistMethodMessage.Size)) return false;
-		return MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Method,
 			MuiColorSpecialistField.MethodId, out methodId);
 	}
@@ -253,7 +253,7 @@ internal static class MuiColorSpecialistMessageCodec
 	{
 		if (!IsMethod(method) || message.IsNull || !platform.IsMapped(message,
 			MuiColorSpecialistMethodMessage.Size)) return false;
-		return MuiColorSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Method,
 			MuiColorSpecialistField.MethodId, method);
 	}
@@ -267,10 +267,10 @@ internal static class MuiColorSpecialistMessageCodec
 			OmGet)) return false;
 		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
 		packet.MethodId = methodId;
-		return MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Get,
 			MuiColorSpecialistField.Attribute, out packet.Attribute) &&
-			MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+			MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiColorSpecialistPacketKind.Get,
 				MuiColorSpecialistField.Storage, out packet.Storage);
 	}
@@ -281,13 +281,13 @@ internal static class MuiColorSpecialistMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiColorSpecialistGetMessage.Size)) return false;
-		return MuiColorSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Get,
 			MuiColorSpecialistField.MethodId, OmGet) &&
-			MuiColorSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiColorSpecialistPacketKind.Get,
 				MuiColorSpecialistField.Attribute, attribute) &&
-			MuiColorSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiColorSpecialistPacketKind.Get,
 				MuiColorSpecialistField.Storage, storage);
 	}
@@ -301,10 +301,10 @@ internal static class MuiColorSpecialistMessageCodec
 			MuiColorSpecialistSetMessage.Size, method)) return false;
 		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
 		packet.MethodId = methodId;
-		return MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Set,
 			MuiColorSpecialistField.Attribute, out packet.Attribute) &&
-			MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+			MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiColorSpecialistPacketKind.Set,
 				MuiColorSpecialistField.Value, out packet.Value);
 	}
@@ -315,13 +315,13 @@ internal static class MuiColorSpecialistMessageCodec
 	{
 		if (!IsSetMethod(method) || message.IsNull || !platform.IsMapped(
 			message, MuiColorSpecialistSetMessage.Size)) return false;
-		return MuiColorSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Set,
 			MuiColorSpecialistField.MethodId, method) &&
-			MuiColorSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiColorSpecialistPacketKind.Set,
 				MuiColorSpecialistField.Attribute, attribute) &&
-			MuiColorSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiColorSpecialistPacketKind.Set,
 				MuiColorSpecialistField.Value, value);
 	}
@@ -335,7 +335,7 @@ internal static class MuiColorSpecialistMessageCodec
 			MuiColorSpecialistPointerMessage.Size, method)) return false;
 		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
 		packet.MethodId = methodId;
-		return MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Pointer,
 			MuiColorSpecialistField.Pointer, out packet.Pointer);
 	}
@@ -346,10 +346,10 @@ internal static class MuiColorSpecialistMessageCodec
 	{
 		if (!IsPointerMethod(method) || message.IsNull || !platform.IsMapped(
 			message, MuiColorSpecialistPointerMessage.Size)) return false;
-		return MuiColorSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Pointer,
 			MuiColorSpecialistField.MethodId, method) &&
-			MuiColorSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiColorSpecialistPacketKind.Pointer,
 				MuiColorSpecialistField.Pointer, pointer);
 	}
@@ -363,13 +363,13 @@ internal static class MuiColorSpecialistMessageCodec
 			SetRGB)) return false;
 		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
 		packet.MethodId = methodId;
-		return MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Rgb,
 			MuiColorSpecialistField.Red, out packet.Red) &&
-			MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+			MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiColorSpecialistPacketKind.Rgb,
 				MuiColorSpecialistField.Green, out packet.Green) &&
-				MuiColorSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+				MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 					message, MuiColorSpecialistPacketKind.Rgb,
 					MuiColorSpecialistField.Blue, out packet.Blue);
 	}
@@ -380,16 +380,16 @@ internal static class MuiColorSpecialistMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiColorSpecialistRgbMessage.Size)) return false;
-		return MuiColorSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiColorSpecialistPacketKind.Rgb,
 			MuiColorSpecialistField.MethodId, SetRGB) &&
-			MuiColorSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiColorSpecialistPacketKind.Rgb,
 				MuiColorSpecialistField.Red, red) &&
-				MuiColorSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+				MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 					message, MuiColorSpecialistPacketKind.Rgb,
 					MuiColorSpecialistField.Green, green) &&
-					MuiColorSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+					MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 						message, MuiColorSpecialistPacketKind.Rgb,
 						MuiColorSpecialistField.Blue, blue);
 	}

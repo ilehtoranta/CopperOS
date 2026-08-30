@@ -169,45 +169,58 @@ internal static class MuiScrollgroupBorderScrollerStateRecordMemoryCodec
 
 internal static class MuiScrollgroupBorderScrollerStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// Declaration-order guest record: magic, Window, border policy flags, and
+	// the reserved ULONG. APTR transport is kept at this named-struct cursor
+	// boundary; the field adapter is retained only for diagnostics.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiScrollgroupBorderScrollerStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiScrollgroupBorderScrollerStateField.Magic,
-			out var magic) ||
-			!MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiScrollgroupBorderScrollerStateField.Window,
-			out var window) ||
-			!MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address,
-			MuiScrollgroupBorderScrollerStateField.UseWindowBorder,
-			out var useWindowBorder) ||
-			!MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address,
-			MuiScrollgroupBorderScrollerStateField.HorizontalRequested,
-			out var horizontalRequested) ||
-			!MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address,
-			MuiScrollgroupBorderScrollerStateField.VerticalRequested,
-			out var verticalRequested) ||
-			!MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiScrollgroupBorderScrollerStateField.Applied,
-			out var applied) ||
-			!MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiScrollgroupBorderScrollerStateField.Reserved,
-			out var reserved))
-			return false;
-		value.Magic = magic;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiScrollgroupBorderScrollerStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var window) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.UseWindowBorder) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.HorizontalRequested) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.VerticalRequested) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Applied) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved)) return false;
 		value.Window = APTR.FromPointer(window);
-		value.UseWindowBorder = useWindowBorder;
-		value.HorizontalRequested = horizontalRequested;
-		value.VerticalRequested = verticalRequested;
-		value.Applied = applied;
-		value.Reserved = reserved;
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiScrollgroupBorderScrollerStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiScrollgroupBorderScrollerStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Window.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.UseWindowBorder) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.HorizontalRequested) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.VerticalRequested) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Applied) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Reserved) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiScrollgroupBorderScrollerStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiScrollgroupBorderScrollerStateRecord value)
@@ -221,29 +234,6 @@ internal static class MuiScrollgroupBorderScrollerStateRecordCodec
 	{
 		if (!MuiScrollgroupBorderScrollerStateAdmission.Validate(ref platform,
 			value)) return false;
-		return MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiScrollgroupBorderScrollerStateField.Magic,
-			value.Magic) &&
-			MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiScrollgroupBorderScrollerStateField.Window,
-			value.Window.Raw) &&
-			MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiScrollgroupBorderScrollerStateField.UseWindowBorder,
-			value.UseWindowBorder) &&
-			MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiScrollgroupBorderScrollerStateField.HorizontalRequested,
-			value.HorizontalRequested) &&
-			MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiScrollgroupBorderScrollerStateField.VerticalRequested,
-			value.VerticalRequested) &&
-			MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiScrollgroupBorderScrollerStateField.Applied,
-			value.Applied) &&
-			MuiScrollgroupBorderScrollerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiScrollgroupBorderScrollerStateField.Reserved,
-			value.Reserved);
+		return WriteRecord(ref platform, address, value);
 	}
 }

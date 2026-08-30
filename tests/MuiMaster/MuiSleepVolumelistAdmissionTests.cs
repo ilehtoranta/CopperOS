@@ -75,7 +75,7 @@ public sealed class MuiSleepVolumelistAdmissionTests
 			}));
 		Assert.True(MuiSleepStateFieldCursorCodec.TryWriteUInt32(ref platform,
 			sleepAddress, MuiSleepStateField.Magic, 0));
-		Assert.True(MuiVolumelistCore.MuiVolumelistModeFieldCursorCodec
+		Assert.True(MuiVolumelistCore.MuiVolumelistModeStateRecordMemoryCodec
 			.TryWriteUInt32(ref platform, volumeAddress,
 				MuiVolumelistCore.MuiVolumelistModeField.Magic, 0));
 		Assert.True(MuiSleepStateRecordCodec.TryReadStructural(ref platform,

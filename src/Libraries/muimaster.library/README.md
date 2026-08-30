@@ -1,5 +1,4470 @@
 # muimaster.library
 
+## Struct-first ABI policy
+
+MorphOS MUI records are represented as named packed C-like structs. Fixed
+records and vector elements are exchanged through those structs rather than
+through ad-hoc offsets. The only numeric wire positions permitted are inside
+the matching guest-memory adapter, where the complete record range is checked
+before a field is read or written. This keeps the 68k implementation
+exception-free, freestanding, and free of managed-runtime dependencies while
+preserving the MorphOS ABI.
+
+MG1849 migrates the shared collection-surface packet family to sequential
+named-struct codecs for layout, AskMinMax, draw, input, and attribute records.
+Package coverage is **2570/2570**, and the focused MC68000 closure passes
+(**4220-byte HUNK, 2995 instructions / 30486 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1848 migrates the fixed List record packet family to sequential named-struct
+codecs for entry/pool, display, compare, and test-position records. Package
+coverage is **2570/2570**, and the focused MC68000 closure passes (**4948-byte
+HUNK, 4009 instructions / 40828 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1847 migrates the fixed List advanced packet family to sequential
+named-struct codecs for insert, position, redraw, pointer, pair, and image
+records. Package coverage is **2570/2570**, and the focused MC68000 closure
+passes (**4836-byte HUNK, 3598 instructions / 36734 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1846 migrates the fixed List basic packet family to sequential named-struct
+codecs for GetEntry, Select, and method records. Package coverage is
+**2570/2570**, and the focused MC68000 closure passes (**2644-byte HUNK, 930
+instructions / 9628 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1845 migrates the fixed Listtree.mcc packet family to sequential
+named-struct codecs. Method, Set/Get, tree mutation, ordering, lookup,
+drop-mark, and test-position records use complete declaration-ordered bounds;
+package coverage is **2570/2570**, and the focused MC68000 closures pass. The
+overall MorphOS MUI goal remains open.
+
+MG1844 migrates the Pop* specialist sidecar state to a sequential
+named-struct codec. Class/flags, child and hook pointers, ASL and window
+state, selection, and notification fields use complete declaration-ordered
+bounds; package coverage is **2570/2570** and the MC68000 closure passes
+(**2640-byte HUNK, 729 instructions / 10974 cycles**). The overall MorphOS MUI
+goal remains open.
+
+MG1843 migrates the Process/Slave specialist sidecar record to a sequential
+named-struct codec. Class/state/task identity, owned-name pointer,
+scheduler/error bookkeeping, and notification fields use complete
+declaration-ordered bounds; package coverage is **2570/2570** and the MC68000
+closure passes (**4244-byte HUNK, 3216 instructions / 33340 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1842 and MG1841 migrate the complete Stringscroll record family to
+sequential named-struct codecs, including content/policy/composition,
+layout/render/viewport, and pointer-drag state. Package coverage is
+**2570/2570**; the MC68000 closures pass for the state, layout, and pointer
+surfaces (**9952/8004/4140-byte HUNKs**). The overall MorphOS MUI goal remains
+open.
+
+MG1822 migrates the Register.mui policy record to a sequential named-struct
+codec. Its magic, Frame BOOL, and Titles APTR are exchanged in declaration
+order with complete bounds; package coverage is **2570/2570** and the
+MC68000 closure passes (**1444-byte HUNK, 390 instructions / 4980 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1823 migrates the Selectgroup active-index record to a sequential
+named-struct codec. Magic and Active are exchanged in declaration order with
+complete bounds; package coverage is **2570/2570** and the MC68000 closure
+passes (**3512-byte HUNK, 1234 instructions / 12610 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1836 migrates the Menu specialist sidecar to a sequential named-struct
+codec. Class/change state, owned string pointers and sizes,
+trigger/notification fields, and the reserved word are exchanged in
+declaration order with complete bounds; package coverage is **2570/2570** and
+the MC68000 closure passes (**6752-byte HUNK, 6109 instructions / 61264
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1835 migrates the shared Misc specialist header to a sequential named-struct
+codec. Magic/class/flags and notification fields are exchanged in declaration
+order with complete bounds; package coverage is **2570/2570** and the
+MC68000 closure passes (**10256-byte HUNK, 3236 instructions / 32998 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1834 migrates the Listtree presentation record to a sequential named-struct
+codec. Format APTR, scalar presentation policy, and title/tree-column
+projections are exchanged in declaration order with complete bounds. Package
+coverage is **2570/2570**; native qualification remains pending for this
+increment, and the overall MorphOS MUI goal remains open.
+
+MG1833 migrates the ExternalWrapper header record to a sequential named-struct
+codec. Magic, class discriminator, and lifecycle flags are exchanged in
+declaration order with complete bounds; package coverage is **2570/2570**.
+Native qualification remains pending for this wrapper-header increment, and
+the overall MorphOS MUI goal remains open.
+
+MG1832 adds native qualification for the struct-first Store pool-state and
+iteration-state codecs. The MC68000 closure passes (**3580-byte HUNK, 2706
+instructions / 27976 cycles**) while package coverage remains **2570/2570**.
+The overall MorphOS MUI goal remains open.
+
+MG1831 migrates Store pool-state and iteration-state guest records to
+sequential named-struct codecs. Pool/counter APTRs, policy flags, kind, and
+magic are exchanged in declaration order with complete bounds. Package
+coverage is **2570/2570**; focused Store iteration coverage uses the typed
+codec directly. Native qualification remains pending for this state-only
+increment, and the overall MorphOS MUI goal remains open.
+
+MG1830 migrates Listview horizontal and vertical drag records to sequential
+named-struct codecs. Signed grab/start/last pointer values and drag flags are
+exchanged in declaration order with complete bounds; package coverage is
+**2570/2570** and the MC68000 closure passes (**8736-byte HUNK, 11308
+instructions / 113340 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1829 migrates the Listview horizontal scroller geometry record to a
+sequential named-struct codec. Track/thumb rectangles and content/view/scroll
+extents are exchanged in declaration order with complete bounds; signed
+coordinates retain their bit patterns. Package coverage is **2570/2570** and
+the MC68000 closure passes (**9268-byte HUNK, 12687 instructions / 123762
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1828 migrates the shared specialist hook message to a sequential named-struct
+codec. MethodId, Param1, Param2, and the reserved ULONG are exchanged in
+declaration order with complete bounds; package coverage is **2570/2570** and
+the MC68000 closure passes (**3456-byte HUNK, 1422 instructions / 14668
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1827 migrates the Virtgroup policy, display rectangle, and pointer-drag
+records to sequential named-struct codecs. Signed geometry, BOOL flags, and
+drag coordinates are exchanged in declaration order with complete bounds;
+package coverage is **2570/2570**. MC68000 closures pass: Virtgroup input
+(**4988-byte HUNK, 4100 instructions / 41164 cycles**) and policy
+(**3592-byte HUNK, 2100 instructions / 21248 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1826 migrates the Scrollgroup border-scroller record to a sequential
+named-struct codec. Its Window APTR, policy flags, and reserved ULONG are
+exchanged in declaration order with complete bounds; package coverage is
+**2570/2570** and the MC68000 closure passes (**3616-byte HUNK, 2107
+instructions / 21170 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1825 migrates the Scrollgroup policy record to a sequential named-struct
+codec. Its content/bar APTRs and policy BOOLs are exchanged in declaration
+order with complete bounds; package coverage is **2570/2570** and the
+MC68000 closure passes (**3824-byte HUNK, 2780 instructions / 27842 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1824 migrates the Scrollgroup viewport record to a sequential named-struct
+codec. Magic, viewport/content geometry, scroll extents/positions, and
+visibility BOOLs are exchanged in declaration order with complete bounds;
+package coverage is **2570/2570** and the MC68000 closure passes (**3972-byte
+HUNK, 3015 instructions / 30284 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1821 migrates the remaining String/Text fixed policy records—String
+presentation, scroll metrics, spell-checking, plus Text contents, copy,
+presentation, shortened, and Unicode—to sequential named-struct codecs. All
+pointer, signed/unsigned scalar, character, and BOOL fields are exchanged in
+declaration order with complete bounds. Package coverage is **2570/2570**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. MC68000 closures pass: String compact policy
+(**8288-byte HUNK, 5345 instructions / 54852 cycles**), Text policy
+(**5480-byte HUNK, 2249 instructions / 23186 cycles**), contents/copy
+(**5220-byte HUNK, 2227 instructions / 22828 cycles**), Text presentation
+(**4892-byte HUNK, 3055 instructions / 31924 cycles**), and compact String/Text
+policy (**7308-byte HUNK, 3377 instructions / 34262 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1820 migrates the remaining fixed String.mui policy records for attached
+Listview, cursor positions, edit-hook policy, filter hooks, integer state, and
+interaction flags to sequential named-struct codecs. Pointer, signed
+position, integer, and BOOL fields are exchanged in declaration order with
+complete bounds. Package coverage is **2570/2570**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The MC68000 closures pass: cursor/hook/filter (**7552-byte HUNK, 3917
+instructions / 40094 cycles**), interaction (**7364-byte HUNK, 5350
+instructions / 53258 cycles**), and integer (**3820-byte HUNK, 1285
+instructions / 13236 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1819 migrates the fixed String.mui `Acknowledge`, `Contents`, and
+`Placeholder` pointer records to sequential named-struct codecs. Their magic
+and APTR fields are exchanged in declaration order with complete bounds, and
+the combined typed native closure passes. Package coverage is **2570/2570**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The MC68000 native root passes (**6952-byte HUNK,
+3251 instructions / 33212 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1818 migrates the fixed 24-byte headless Store/Dataspace record to a
+sequential named-struct codec. Its APTR links and key/length/flags/generation
+ULONG fields are exchanged in declaration order with complete bounds. The
+MC68000 native adapter closure passes (**1720-byte HUNK, 583 instructions /
+5850 cycles**); package host coverage is **2570/2570**. The local-SDK host
+build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS, and the overall MorphOS MUI goal remains open.
+
+MG1817 migrates the fixed 32-byte headless notification header to a
+sequential named-struct codec. The linked APTRs, trigger fields, counters,
+flags, and reserved word are exchanged in declaration order with complete
+bounds. The freestanding native closure retains its bounded adapter seam;
+host tests exercise the typed codec. Package coverage is **2569/2569**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The MC68000 native root passes (**1976-byte HUNK,
+677 instructions / 6666 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1816 migrates the fixed 16-byte headless Family child-list node to a
+sequential named-struct codec. Its four APTR links are exchanged in
+declaration order with complete bounds. The MC68000 native adapter closure
+passes (**1844-byte HUNK, 675 instructions / 6652 cycles**); host coverage is
+**2569/2569** and the overall goal remains open.
+
+MG1815 migrates the fixed 16-byte headless attribute node to a sequential
+named-struct codec. Its APTR link and three ULONG fields are exchanged in
+declaration order with complete bounds. The MC68000 native adapter closure
+passes (**1864-byte HUNK, 675 instructions / 6652 cycles**); host coverage is
+**2569/2569** and the overall goal remains open.
+
+MG1814 migrates the fixed 64-byte headless object record to a sequential
+named-struct codec. Ten APTR links followed by six ULONG lifecycle/scalar
+fields are exchanged in declaration order with complete bounds. The
+freestanding compiler has an unstable ABI for this large value, so its native
+closure qualifies the bounded field adapter while the host path exercises the
+typed codec. Package coverage is **2566/2566**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The MC68000 native root passes (**2056-byte HUNK, 677 instructions / 6666
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1813 migrates the fixed 28-byte headless class registry entry to a
+sequential named-struct codec. APTR links, the explicit UWORD pair, and ULONG
+flags/count fields are exchanged in declaration order with complete bounds.
+The freestanding compiler has an unstable ABI for this mixed multiword value,
+so its native closure qualifies the bounded field adapter while the host path
+exercises the typed codec. Package coverage is **2565/2565**; the local-SDK
+host build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The MC68000 native root passes (**2828-byte HUNK, 2106
+instructions / 20468 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1812 migrates the canonical 32-byte headless state header to a sequential
+named-struct codec. APTR heads, counters, and the transient reserved field are
+exchanged in declaration order with complete bounds; the legacy field adapter
+remains only for compatibility diagnostics. Package coverage is **2564/2564**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The MC68000 native root passes (**3896-byte HUNK,
+3362 instructions / 33906 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1811 migrates the fixed 22-byte Intuition `InputEvent` record to a
+sequential named-struct codec for production reads and writes. Mixed byte,
+word, and LONG fields are exchanged in declaration order with complete
+bounds. The freestanding compiler currently rejects the multiword `InputEvent`
+value ABI, so its native closure qualifies the bounded field adapter while
+the host path exercises the typed codec. Package coverage is **2563/2563**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The MC68000 native root passes (**3424-byte HUNK,
+2457 instructions / 24114 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1810 migrates the fixed 88-byte Window OpenWindow policy snapshot to a
+sequential named-struct codec. Signed geometry, cookie, and all MorphOS BOOL
+policy fields are exchanged in declaration order with complete bounds. The
+legacy field adapter remains only for compatibility diagnostics. Package
+coverage is **2563/2563**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Window
+OpenWindow-policy native root passes on MC68000 (**4920-byte HUNK, 5846
+instructions / 59262 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1809 completes the Window control/focus/lifecycle struct-first sweep: the
+fixed 24-byte scalar control snapshot now uses a sequential named-struct codec
+alongside the focus and lifecycle records. Cookie, identifiers, opaque
+capabilities, and lifecycle projections are exchanged in declaration order
+with complete bounds; legacy field adapters remain only for compatibility
+diagnostics. Package coverage is **2563/2563**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The combined native root passes on MC68000 (**6568-byte HUNK, 4952
+instructions / 50300 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1808 migrates the fixed Window focus (12-byte) and lifecycle (20-byte) state
+records to sequential named-struct codecs. Cookies, opaque capabilities, and
+lifecycle projections are exchanged in declaration order with complete bounds.
+The legacy field adapters remain only for compatibility diagnostics. Package
+coverage is **2563/2563**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Window
+control/focus/lifecycle native root passes on MC68000 (**6588-byte HUNK, 4914
+instructions / 49296 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1807 migrates the fixed 16-byte Window event-state record to a sequential
+named-struct codec. Cookie, close BOOL, input-event pointer, and mouse-object
+pointer are exchanged in declaration order with complete bounds. The legacy
+field adapter remains only for compatibility diagnostics. Package coverage is
+**2563/2563**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Window event and reuse
+native root passes on MC68000 (**6364-byte HUNK, 3888 instructions / 39928
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1806 migrates the fixed 24-byte Window interaction snapshot to a sequential
+named-struct codec. Cookie, snapshot flags and requests, cycle-chain
+pointer/count, and cycle-chain requests are exchanged in declaration order
+with complete bounds. The legacy field adapter remains only for compatibility
+diagnostics. Package coverage is **2563/2563**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The Window interaction/presentation native root passes on MC68000 (**5760-byte
+HUNK, 3881 instructions / 39490 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1805 migrates the fixed 16-byte Window relationship snapshot to a sequential
+named-struct codec. Cookie and the three opaque relationship pointers are
+exchanged in declaration order with complete bounds. The legacy field adapter
+remains only for compatibility diagnostics. Package coverage is **2563/2563**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Window interaction/presentation native root
+passes on MC68000 (**6052-byte HUNK, 3848 instructions / 38602 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1804 migrates the fixed 20-byte Window presentation-state record to a
+sequential named-struct codec. Cookie and the four caller-owned APTR
+capabilities are exchanged in declaration order with complete bounds. The
+legacy field adapter remains only for compatibility diagnostics. Package
+coverage is **2563/2563**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Window
+interaction/presentation native root passes on MC68000 (**5660-byte HUNK,
+3756 instructions / 37652 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1803 migrates the fixed 24-byte Window visual/event state record to a
+sequential named-struct codec. Cookie, BOOL policy fields, opacity, and menu
+action are exchanged in declaration order with complete bounds. The legacy
+field adapter remains only for compatibility diagnostics. Package coverage is
+**2563/2563**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Window visual state native
+root passes on MC68000 (**4040-byte HUNK, 2599 instructions / 26638 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1802 migrates the fixed six-short MuiMinMaxValues layout payload to a
+sequential named-struct codec. Minimum, maximum, and default width/height
+values are exchanged in declaration order with complete bounds. The legacy
+field adapter remains only for compatibility diagnostics. Package coverage is
+**2563/2563**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The MinMax native root passes on
+MC68000 (**3352-byte HUNK, 2049 instructions / 21188 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1801 migrates the fixed 36-byte MUI_LayoutMsg hook packet to a sequential
+named-struct codec. Type, child pointer, six signed min/max dimensions, and
+four layout LONGs are exchanged in declaration order with complete bounds. The
+legacy mixed-width field adapter remains only for diagnostics and the native
+closure because the current native compiler rejects locals of the SDK's nested
+MUI_LayoutMsg type. Package coverage is **2563/2563**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The layout adapter native root passes on MC68000 (**1148-byte HUNK, 572
+instructions / 5750 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1800 migrates the stable IntuiMessage pointer and raw-key payloads used by
+Listview/Keyadjust to sequential named-struct codecs. The single
+envelope-prefix offset is confined to a bounded cursor adapter; class, code,
+qualifier, pointer, coordinates, and optional timestamps are exchanged as
+typed fields with complete bounds. Package coverage is **2563/2563**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Listview pointer root passes on MC68000
+(**5372-byte HUNK, 3926 instructions / 40122 cycles**) and the Keyadjust raw-key
+root passes (**4072-byte HUNK, 3128 instructions / 31762 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1799 migrates the fixed 32-byte Listview drag-state record to a sequential
+named-struct codec. Magic, signed row coordinates, and flags are exchanged in
+declaration order with complete bounds; the field-address adapter remains only
+for compatibility diagnostics. Package coverage is **2563/2563**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Listview drag-state native root passes on MC68000
+(**4060-byte HUNK, 4191 instructions / 42314 cycles**). The overall MorphOS MUI
+goal remains open.
+
+MG1798 migrates the fixed 12-byte MUI_RGBColor payload used by the Color
+Specialist family to a sequential named-struct codec. Red, green, and blue
+ULONG intensities are exchanged in declaration order with complete bounds; the
+field-address adapter remains only for compatibility diagnostics. Package
+coverage is **2563/2563**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The RGB native root
+passes on MC68000 (**2544-byte HUNK, 1046 instructions / 10792 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1797 migrates the fixed 32-byte MUI_PenSpec payload used by the Color
+Specialist family to a sequential named-struct codec. Kind, scalar, RGB
+intensities, and all reserved words are exchanged in declaration order with
+complete bounds; the field-address adapter remains only for compatibility
+diagnostics. Package coverage is **2563/2563**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The PenSpec native root passes on MC68000 (**2924-byte HUNK, 2124 instructions /
+21590 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1796 migrates the fixed 64-byte Color Specialist state record to a sequential
+named-struct codec. All sixteen ULONG fields, including opaque guest pointers,
+are exchanged in declaration order with complete bounds; the field-address
+adapter remains only for compatibility diagnostics. Package coverage is
+**2563/2563**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Color Specialist admission
+native root passes on MC68000 (**6476-byte HUNK, 7696 instructions / 77950
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1792 migrates the fixed 8-byte Scale.mui presentation state record to a
+sequential named-struct codec. Magic and the orientation BOOL are exchanged
+in declaration order with complete bounds; the legacy field-address adapter
+remains only for compatibility diagnostics. Package coverage is **2563/2563**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Scale presentation native root passes on MC68000
+(**2532-byte HUNK, 785 instructions / 8158 cycles**). The overall MorphOS MUI
+goal remains open.
+
+MG1790 migrates the fixed 12-byte Rectangle.mui bar-title state record to a
+sequential named-struct codec. Magic, presence, and title-pointer fields are
+exchanged in declaration order with complete bounds; the legacy field-address
+adapter remains only for compatibility diagnostics. Package coverage is
+**2563/2563**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Rectangle bar-title native
+root passes on MC68000 (**2624-byte HUNK, 1059 instructions / 10880 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1795 migrates the fixed 8-byte Levelmeter.mui label-state record to a
+sequential named-struct codec. Magic and the label pointer are exchanged in
+declaration order with complete bounds; the legacy field-address adapter
+remains only for compatibility diagnostics. Package coverage is **2563/2563**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Levelmeter label native root passes on MC68000
+(**2904-byte HUNK, 1194 instructions / 12384 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1794 migrates the fixed 8-byte Levelmeter.mui presentation state record to a
+sequential named-struct codec. Magic and the orientation BOOL are exchanged
+in declaration order with complete bounds; the legacy field-address adapter
+remains only for compatibility diagnostics. Package coverage is **2563/2563**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Levelmeter presentation native root passes on
+MC68000 (**2940-byte HUNK, 1196 instructions / 12406 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1793 migrates the fixed 12-byte Slider.mui presentation state record to a
+sequential named-struct codec. Magic, orientation, and quiet-display fields
+are exchanged in declaration order with complete bounds; the legacy
+field-address adapter remains only for compatibility diagnostics. Package
+coverage is **2563/2563**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Slider
+presentation native root passes on MC68000 (**2612-byte HUNK, 1001 instructions /
+10312 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1791 migrates the fixed 12-byte Rectangle.mui presentation state record to a
+sequential named-struct codec. Magic and both BOOL fields are exchanged in
+declaration order with complete bounds; the legacy field-address adapter
+remains only for compatibility diagnostics. Package coverage is **2563/2563**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Rectangle presentation native root passes on
+MC68000 (**2624-byte HUNK, 1001 instructions / 10312 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1789 migrates the fixed 8-byte Numeric.mui format-state record to a
+sequential named-struct codec. Magic and format-pointer fields are exchanged
+in declaration order with complete bounds; the legacy field-address adapter
+remains only for compatibility diagnostics. Package coverage is **2563/2563**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Numeric format native root passes on MC68000
+(**2528-byte HUNK, 843 instructions / 8726 cycles**). The overall MorphOS MUI
+goal remains open.
+
+MG1788 migrates the standard 8-byte ASL TagItem record codec to sequential
+named-struct access. Tag and Data ULONGs are exchanged in declaration order
+with complete bounds; vector traversal and TAG control semantics remain
+unchanged. Package coverage is **2563/2563**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The ASL
+TagItem native root passes on MC68000 (**1820-byte HUNK, 721 instructions /
+7200 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1787 migrates the mixed-width MenuItem and IntuiText trigger records to
+sequential named-struct codecs for production projection. All fixed fields,
+padding, pointers, signed edges, and flags are exchanged in declaration order
+with complete bounds; legacy field adapters remain only for compatibility and
+diagnostics. Package coverage is **2563/2563**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The MenuItem/IntuiText native root passes on MC68000 (**5708-byte HUNK, 5819
+instructions / 59454 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1786 migrates the one-byte NewMenu type prefix to a sequential named-struct
+adapter. Production classification now reads the type byte through the
+bounded cursor; MorphOS image/ignore classification remains unchanged. Package
+coverage is **2563/2563**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The NewMenu type
+native root passes its typed-byte/classification and bounds proof on MC68000
+(**2428-byte HUNK, 683 instructions / 6948 cycles**); host coverage exercises
+named-record materialization. The overall MorphOS MUI goal remains open.
+
+MG1785 migrates the fixed 4-byte MakeObject preparse scratch record's
+production read/write path to sequential named-struct access. Escape, command,
+terminator, and reserved bytes are exchanged in declaration order with
+complete bounds; the field-address adapter remains only for intentional
+per-byte diagnostics. Package coverage is **2563/2563**; the local-SDK host
+build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The MakeObject preparse native root passes on MC68000 (**3248-byte
+HUNK, 1537 instructions / 15976 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1784 migrates the fixed 8-byte Text PreParse state record's production
+structural read/write path to sequential named-struct access. The cookie and
+copied-string pointer are exchanged in declaration order with complete
+bounds; the field-address adapter remains only for intentional malformed-state
+diagnostics. Package coverage is **2563/2563**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The Text PreParse native root passes on MC68000 (**2688-byte HUNK, 966
+instructions / 10112 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1783 migrates the variable-length List PREPARSE prefix lookahead to a
+bounded sequential named packed record. Production parsing now consumes the
+two-byte ESC/* form and optional third byte in declaration order; length
+validation and malformed-range rejection remain unchanged. Package coverage
+is **2562/2562**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The List PREPARSE native root
+passes on MC68000 (**2224-byte HUNK, 1072 instructions / 11124 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1782 migrates the fixed ten-byte Dirlist `ExampleN:` volume-name record to a
+complete named packed record and sequential mixed-width codec. Production
+example-volume emission now exchanges two ULONG words and separator/terminator
+bytes in declaration order with exact record bounds; digit/colon semantics
+remain unchanged. Package coverage is **2562/2562**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The Dirlist example-name native root passes on MC68000 (**3412-byte HUNK, 1333
+instructions / 13882 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1781 migrates the fixed two-byte NewMenu command-key lookahead to a sequential
+named packed record. Production MakeObject and menu-item projection now
+exchange the character and terminator in declaration order with exact record
+bounds; variable C-string handling remains separate. Package coverage is
+**2561/2561**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The MakeObject lookahead native
+root passes on MC68000 (**1896-byte HUNK, 522 instructions / 5486 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1780 migrates the fixed 4-byte ClassService `mui/` loader prefix to a named
+packed record with a bounded codec and explicit production writer. Package
+coverage is **2560/2560**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The MC68000 native
+prefix root passes its sequential read and truncated-range proof (**1116-byte
+HUNK, 225 instructions / 2380 cycles**); host coverage exercises the writer.
+The overall MorphOS MUI goal remains open.
+
+MG1779 migrates the variable-length Misc specialist class-name family to a
+bounded sequential named-record codec. The 10-, 13-, 14-, 16-, and 21-byte
+identities now exchange typed ULONG and partial-byte fields in declaration
+order with exact supplied-size bounds; classification admission remains
+unchanged. Package coverage is **2559/2559**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+Misc-specialist native root passes on MC68000 (**6896-byte HUNK, 43237
+instructions / 441950 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1778 migrates the fixed Process/Slave specialist class identities to complete
+named packed records and sequential codecs. Production classification now
+exchanges the Process three-ULONG record and Slave two-ULONG/two-byte record in
+declaration order with exact bounds; admission remains unchanged. Package
+coverage is **2558/2558**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Process-specialist
+native root passes on MC68000 (**4364-byte HUNK, 2164 instructions / 22206
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1777 migrates the fixed 24-byte `MUI_MakeObjectA` class-name scratch record
+to a complete named packed record and sequential ULONG codec. Production
+class-name construction now exchanges all six ULONG fields in declaration order
+with exact record bounds; admission remains unchanged. Package coverage is
+**2557/2557**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The MakeObject class-name native
+root passes on MC68000 (**2724-byte HUNK, 1639 instructions / 16706 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1776 migrates Stringscroll's fixed 14-byte `scrollbar.mui` lookup payload to
+a complete named packed record and sequential mixed-width codec. The production
+automatic-scrollbar lookup now exchanges three ULONG words and two trailing
+bytes in declaration order with exact record bounds; admission remains
+unchanged. Package coverage is **2556/2556**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+Stringscroll class-name native root passes on MC68000 (**3280-byte HUNK, 1500
+instructions / 15456 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1775 migrates the fixed 14-byte Color specialist Penadjust class-name record
+to a complete named packed record and sequential mixed-width codec. Production
+Penadjust classification now exchanges three ULONG words and two trailing bytes
+in declaration order with exact record bounds; admission remains unchanged.
+Package coverage is **2555/2555**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Color-specialist
+native root passes on MC68000 (**7952-byte HUNK, 6540 instructions / 66940
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1774 migrates the fixed 12-byte Color specialist Palette class-name record to
+a complete named packed record and sequential codec. Production Palette
+classification now exchanges all three ULONG words in declaration order with
+exact record bounds; admission remains unchanged. Package coverage is
+**2554/2554**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Color-specialist native root
+passes on MC68000 (**7780-byte HUNK, 5470 instructions / 56236 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1773 migrates the fixed 16-byte Color specialist Coloradjust class-name record
+to a complete named packed record and sequential codec. Production Coloradjust
+classification now exchanges all four ULONG words in declaration order with
+exact record bounds; admission remains unchanged. Package coverage is
+**2553/2553**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Color-specialist native root
+passes on MC68000 (**7656-byte HUNK, 4808 instructions / 49640 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1772 migrates the fixed 15-byte Color specialist Colorfield class-name record
+to a complete named packed record and sequential mixed-width codec. Production
+Colorfield classification now exchanges three ULONG words and three trailing
+bytes in declaration order with exact record bounds; admission remains
+unchanged. Package coverage is **2552/2552**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+Color-specialist native root passes on MC68000 (**7516-byte HUNK, 3956
+instructions / 41236 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1771 migrates the fixed 15-byte Color specialist Pendisplay class-name record
+to a complete named packed record and sequential mixed-width codec. Production
+Pendisplay classification now exchanges three ULONG words and three trailing
+bytes in declaration order with exact record bounds; admission remains
+unchanged. Package coverage is **2551/2551**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+Color-specialist native root passes on MC68000 (**7316-byte HUNK, 2682
+instructions / 28462 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1770 migrates the fixed 11-byte Poppen class-name record to a complete named
+packed record and sequential mixed-width codec. Production Poppen classification
+now exchanges two ULONG words and three trailing bytes in declaration order with
+exact record bounds; Poppen admission remains unchanged. Package coverage is
+**2550/2550**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Pop-specialist native root
+passes on MC68000 (**10084-byte HUNK, 9365 instructions / 96176 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1769 migrates the fixed 13-byte Popcolor class-name record to a complete
+named packed record and sequential codec. Production Popcolor classification
+now exchanges three ULONG words and a terminator byte in declaration order with
+exact record bounds; Popcolor admission remains unchanged. Package coverage is
+**2549/2549**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Pop-specialist native root
+passes on MC68000 (**9892-byte HUNK, 8248 instructions / 84826 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1768 migrates the fixed 14-byte Popscreen class-name record to a complete
+named packed record and sequential mixed-width codec. Production Popscreen
+classification now exchanges three ULONG words and trailing bytes in
+declaration order with exact record bounds; Popscreen admission remains
+unchanged. Package coverage is **2548/2548**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+Pop-specialist native root passes on MC68000 (**9732-byte HUNK, 7350 instructions
+/ 75824 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1767 migrates the fixed 11-byte Popasl class-name record to a complete named
+packed record and sequential mixed-width codec. Production Popasl
+classification now exchanges two ULONG words and three trailing bytes in
+declaration order with exact record bounds; Popasl admission remains
+unchanged. Package coverage is **2547/2547**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+Pop-specialist native root passes on MC68000 (**9544-byte HUNK, 6247
+instructions / 64744 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1766 migrates the fixed 12-byte Poplist class-name record to a complete named
+packed record and sequential codec. Production Poplist classification now
+exchanges all three ULONG words in declaration order with exact record bounds;
+Poplist admission remains unchanged. Package coverage is **2546/2546**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Pop-specialist native root passes on MC68000
+(**9352-byte HUNK, 5130 instructions / 53394 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1765 migrates the fixed 14-byte Popobject class-name record to a complete
+named packed record and sequential mixed-width codec. Production Popobject
+classification now exchanges three ULONG words and trailing bytes in
+declaration order with exact record bounds; Popobject admission remains
+unchanged. Package coverage is **2545/2545**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+Pop-specialist native root passes on MC68000 (**9220-byte HUNK, 4438 instructions
+/ 46458 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1764 migrates the fixed 14-byte Popstring class-name record to a complete
+named packed record and sequential mixed-width codec. Production Popstring
+classification now exchanges three ULONG words and trailing bytes in
+declaration order with exact record bounds; Popstring admission remains
+unchanged. Package coverage is **2544/2544**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+Pop-specialist native root passes on MC68000 (**9032-byte HUNK, 3335 instructions
+/ 35378 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1763 migrates the fixed Menu-specialist class-name records (Menu 9 bytes,
+Menustrip 14 bytes, Menuitem 13 bytes) to complete named packed records and
+sequential mixed-width codecs. Production menu-family classification now uses
+typed words and trailing bytes with exact bounds; class admission remains
+unchanged. Package coverage is **2543/2543**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+combined Menu-specialist class-name native root passes on MC68000 (**5504-byte
+HUNK, 3674 instructions / 37748 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1762 migrates the fixed 11-byte Boopsi and 10-byte Dtpic ExternalWrapper
+class-name records to complete named packed records and sequential mixed-width
+codecs. Production external-wrapper classification now uses typed words and
+trailing bytes with exact bounds; class admission remains unchanged. Package
+coverage is **2542/2542**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The combined
+ExternalWrapper class-name native root passes on MC68000 (**4592-byte HUNK,
+2770 instructions / 28574 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1761 migrates the fixed 11-byte Window class-name record to a complete named
+packed record and sequential mixed-width codec. Production Window identity now
+exchanges the two ULONG words and three trailing bytes in declaration order
+with exact record bounds; Window admission remains unchanged. Package coverage
+is **2541/2541**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Window class-name native root
+passes on MC68000 (**3256-byte HUNK, 1529 instructions / 15810 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1760 migrates the fixed 14-byte Virtgroup class-name record to a complete
+named packed record and sequential mixed-width codec. Production Virtgroup
+identity now exchanges the three ULONG words and trailing character bytes in
+declaration order with exact record bounds; Virtgroup admission remains
+unchanged. Package coverage is **2540/2540**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+Virtgroup class-name native root passes on MC68000 (**3248-byte HUNK, 1498
+instructions / 15436 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1759 migrates the fixed 16-byte Scrollgroup class-name record to a complete
+named packed record and sequential codec. Production Scrollgroup identity now
+exchanges all four ULONG words in declaration order with exact record bounds;
+Scrollgroup admission remains unchanged. Package coverage is **2539/2539**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Scrollgroup class-name native root passes on
+MC68000 (**2608-byte HUNK, 1230 instructions / 12628 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1758 migrates the fixed 16-byte Selectgroup class-name record to a complete
+named packed record and sequential codec. Production Selectgroup identity now
+exchanges all four ULONG words in declaration order with exact record bounds;
+Selectgroup admission remains unchanged. Package coverage is **2538/2538**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Selectgroup class-name native root passes on
+MC68000 (**2608-byte HUNK, 1230 instructions / 12628 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1757 migrates the fixed 13-byte Register class-name record to a complete
+named packed record and sequential mixed-width codec. Production Register
+identity now exchanges the three ULONG words and terminator byte in declaration
+order with exact record bounds; Register admission remains unchanged. Package
+coverage is **2537/2537**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Register
+class-name native root passes on MC68000 (**3152-byte HUNK, 1259 instructions /
+12978 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1756 migrates the fixed 13-byte Listtree class-name record to a complete
+named packed record and sequential mixed-width codec. Production Listtree
+identity now exchanges the three ULONG words and terminator byte in declaration
+order with exact record bounds; Listtree admission remains unchanged. Package
+coverage is **2536/2536**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Listtree
+class-name native root passes on MC68000 (**3152-byte HUNK, 1259 instructions /
+12978 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1755 migrates the fixed 10-byte Group class-name record to a complete named
+packed record and sequential mixed-width codec. Production group identity now
+exchanges the two ULONG words and trailing character bytes in declaration order
+with exact record bounds; group admission remains unchanged. Package coverage
+is **2535/2535**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Group class-name native root
+passes on MC68000 (**3292-byte HUNK, 1291 instructions / 13358 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1754 migrates the fixed 16-byte shared Help state record to a complete named
+packed record and sequential codec. Production help state now exchanges the
+node APTR, signed help line, and generation in declaration order while
+canonical state and live-owner admission remain unchanged. Package coverage is
+**2534/2534**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Help state native root passes
+on MC68000 (**3496-byte HUNK, 1796 instructions / 18234 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1753 migrates the fixed 12-byte ControlFont state record to a complete named
+packed record and sequential codec. Production state now exchanges the
+presence BOOL and optional TextFont APTR as typed fields while canonical
+presence and live-owner admission remain unchanged. Package coverage is
+**2533/2533**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The ControlFont native root
+passes on MC68000 (**3056-byte HUNK, 1445 instructions / 14966 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1752 migrates the fixed 16-byte Bodychunk format state record to a complete
+named packed record and sequential codec. Production state now exchanges the
+validation cookie and compression/depth/masking ULONGs as typed fields; format
+admission and live-owner checks remain unchanged. Package coverage is
+**2532/2532**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Bodychunk format native root
+passes on MC68000 (**3116-byte HUNK, 1739 instructions / 17884 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1751 migrates the fixed 28-byte Bitmap policy state record to a complete
+named packed record and sequential codec. Production state now exchanges all
+policy scalars, caller-owned table/color pointers, and the canonical
+`UseFriend` BOOL in declaration order; admission remains unchanged. Package
+coverage is **2531/2531**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Bitmap policy
+native root passes on MC68000 (**3516-byte HUNK, 2755 instructions / 28070
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1750 migrates the fixed 12-byte Bitmap geometry state record to a complete
+named packed record and sequential codec. Production state now exchanges the
+validation cookie and full-width `Width`/`Height` ULONGs as typed fields;
+geometry admission and live-owner checks remain unchanged. Package coverage is
+**2530/2530**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Bitmap geometry native root
+passes on MC68000 (**3012-byte HUNK, 1428 instructions / 14760 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1749 migrates the fixed 8-byte Bitmap remapped state record to a complete
+named packed record and sequential codec. Production state now exchanges the
+validation cookie and renderer-owned remapped APTR as typed fields; null/
+remapped admission and live-owner checks remain unchanged. Package coverage is
+**2529/2529**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The combined Bitmap
+source/remapped native root passes on MC68000 (**4264-byte HUNK, 2210
+instructions / 23056 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1748 migrates the fixed 8-byte Bitmap source state record to a complete named
+packed record and sequential codec. Production state now exchanges the
+validation cookie and caller-owned source APTR as typed fields; source
+admission and live-owner checks remain unchanged. Package coverage is
+**2528/2528**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Bitmap source/remapped native
+root passes on MC68000 (**4776-byte HUNK, 2230 instructions / 22830 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1747 migrates the fixed 8-byte Balance policy state record to a complete
+named packed record and sequential codec. Production state now exchanges the
+validation cookie and opaque `Quiet` LONG as typed fields while live-owner
+admission remains unchanged. Package coverage is **2527/2527**; the local-SDK
+host build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The Balance policy native root passes on MC68000 (**2920-byte HUNK,
+1113 instructions / 11634 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1746 migrates the fixed 8-byte Choice/Radio active-state record to a complete
+named packed record and sequential codec. Production state now exchanges the
+validation cookie and normalized active index as typed fields; selector
+admission and live-owner checks remain unchanged. Package coverage is
+**2526/2526**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Choice/Radio active-state
+native root passes on MC68000 (**3244-byte HUNK, 1143 instructions / 11698
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1745 migrates the fixed 8-byte Choice/Radio entries state record to a
+complete named packed record and sequential codec. Production state now
+exchanges the validation cookie and caller-owned entries APTR as typed fields;
+bounded vector admission and live-owner checks remain unchanged. Package
+coverage is **2525/2525**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Choice/Radio
+entries native root passes on MC68000 (**3280-byte HUNK, 1148 instructions /
+11782 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1744 migrates the fixed 28-byte Window event-reuse state record to a complete
+named packed record and sequential codec. Production dispatch context now
+exchanges context flags, event/input APTRs, event class, and signed `MuiKey` in
+declaration order; packet admission and live-owner checks remain unchanged.
+Package coverage is **2524/2524**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Window
+event-reuse native root passes on MC68000 (**3964-byte HUNK, 2340 instructions
+/ 23868 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1743 migrates the fixed 8-byte Group layout-hook state record to a complete
+named packed record and sequential codec. Production layout-hook state now
+exchanges the validation cookie and hook APTR as typed fields; initializer/live-
+owner admission remains unchanged. Package coverage is **2523/2523**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Group layout-hook native root passes on MC68000
+(**3292-byte HUNK, 1148 instructions / 11782 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1742 migrates the fixed 28-byte Group layout-policy state record to a
+complete named packed record and sequential codec. Production layout state now
+exchanges `Magic`, horizontal/vertical enablement and signed spacing,
+same-size flags, and `PageMode` as typed fields; canonical BOOL and spacing
+admission remain unchanged. Package coverage is **2523/2523**; the local-SDK
+host build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The Group layout-policy native root passes on MC68000 (**3552-byte
+HUNK, 2098 instructions / 21076 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1741 migrates the fixed 48-byte Area layout-policy state record to a complete
+named packed record and sequential codec. Production layout state now exchanges
+`Magic`, `ShowMe`, all fixed/max dimensions, inner borders, and
+horizontal/vertical weights as typed fields; canonical BOOL admission and
+live-owner checks remain unchanged. Package coverage is **2522/2522**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Area layout-policy native root passes on MC68000
+(**4000-byte HUNK, 4326 instructions / 44084 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1734 migrates the fixed 16-byte Area context-menu state record to a complete
+named packed record and sequential codec. Production state now exchanges
+`Magic`, `MenuStrip`, `Trigger`, and `Generation` as typed fields; opaque
+relationship APTRs and live-owner admission remain unchanged. Package coverage
+is **2515/2515**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Area context-menu native root
+passes on MC68000 (**2680-byte HUNK, 1718 instructions / 17602 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1719 migrates the fixed 16-byte Sleep state record to a complete named packed
+record and sequential codec. Production sleep state now exchanges `Magic`,
+`Depth`, `SavedDisabled`, and `Request` as typed fields while nesting/equality
+and canonical BOOL admission remain unchanged. Package coverage is
+**2500/2500**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Sleep native root passes on
+MC68000 (**3080-byte HUNK, 1745 instructions / 17958 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1720 migrates the fixed 16-byte Area activation state record to a complete
+named packed record and sequential codec. Production activation state now
+exchanges `Signature`, `Active`, `Flags`, and `Generation` as typed fields;
+canonical Active admission and live-object publication remain unchanged.
+Package coverage is **2501/2501**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Area activation
+native root passes on MC68000 (**2612-byte HUNK, 1699 instructions / 17314
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1718 migrates the fixed 14-byte Application Dataspace class-name scratch
+record to a complete named packed record and sequential mixed-width codec.
+Production scratch state now exchanges three ULONG words and two byte fields in
+declaration order without literal offsets; the exact packed layout and bounds
+handling remain unchanged. Package coverage is **2499/2499**; the local-SDK
+host build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The Application class-name native root passes on MC68000 (**3296-byte
+HUNK, 1498 instructions / 15436 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1717 migrates the fixed 8-byte Application UsedClasses state record to a
+complete named packed record and sequential codec. Production state now
+exchanges `Magic` and the caller-owned class-name vector pointer as typed
+fields while vector/string admission and malformed-state handling remain
+unchanged. Package coverage is **2498/2498**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+Application UsedClasses native root passes on MC68000 (**4584-byte HUNK, 1148
+instructions / 12074 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1716 migrates the fixed 12-byte Application text-state record to a complete
+named packed record and sequential codec. Production text state now exchanges
+`Magic`, `HelpFile`, and `IconifyTitle` as typed fields while caller-owned
+C-string admission and malformed-state handling remain unchanged. Package
+coverage is **2497/2497**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Application
+text-state native root passes on MC68000 (**2788-byte HUNK, 1071 instructions /
+11352 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1715 migrates the fixed 16-byte Application settings-panel state record to a
+complete named packed record and sequential codec. Production BuildSettingsPanel
+state now exchanges `Magic`, `Number`, `Panel`, and `Requests` as typed fields
+while panel capability admission and malformed-state handling remain unchanged.
+Package coverage is **2496/2496**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Application
+settings-panel native root passes on MC68000 (**2640-byte HUNK, 1201
+instructions / 12424 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1714 migrates the fixed 24-byte Application settings-persistence record to a
+complete named packed record and sequential codec. Production Save/Load state
+now exchanges `Magic`, `Operation`, `Name`, and all three request counters as
+typed fields while ENV/ENVARC sentinel handling, string admission, and
+malformed-state checks remain unchanged. Package coverage is **2495/2495**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Application settings-persistence native root
+passes on MC68000 (**3820-byte HUNK, 2385 instructions / 24452 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1713 migrates the fixed 16-byte Application SetConfigItem state record to a
+complete named packed record and sequential codec. Production configuration
+state now exchanges `Magic`, `Item`, `Data`, and `Requests` as typed fields
+while opaque payload admission and malformed-state handling remain unchanged.
+Package coverage is **2494/2494**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Application
+SetConfigItem native root passes on MC68000 (**2640-byte HUNK, 1201
+instructions / 12424 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1712 migrates the fixed 16-byte Application initializer policy record to a
+complete named packed record and sequential codec. Production policy now
+exchanges `Magic`, `UseRexx`, `UseCommodities`, and `UseScreenNotify` as typed
+fields while canonical BOOL admission and malformed-state handling remain
+unchanged. Package coverage is **2493/2493**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+Application policy native root passes on MC68000 (**2592-byte HUNK, 1193
+instructions / 12324 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1711 migrates the fixed 16-byte Application object-state record to a complete
+named packed record and sequential codec. Production object state now exchanges
+`Magic`, `DiskObject`, `DropObject`, and `Menustrip` as typed fields while
+caller-owned/live-object admission and malformed-state handling remain
+unchanged. Package coverage is **2492/2492**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+Application object-state native root passes on MC68000 (**2664-byte HUNK, 1213
+instructions / 12596 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1710 migrates the fixed 12-byte Application message-routing state record to a
+complete named packed record and sequential codec. Production routing state
+now exchanges `Magic`, `AppMessage`, and `WindowAppWindow` as typed fields
+while transient-message admission, owner checks, and malformed-state handling
+remain unchanged. Package coverage is **2491/2491**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The Application message-routing native root passes on MC68000 (**2564-byte
+HUNK, 990 instructions / 10308 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1709 migrates the fixed 28-byte Application scheduler state record to a
+complete named packed record and sequential codec. Production scheduler state
+now exchanges `Magic`, queue-head/tail pointers, `InputHandlers`, `SignalMask`,
+and push-queue pointers as typed fields while queue admission and malformed-
+state handling remain unchanged. Package coverage is **2490/2490**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Application scheduler native root passes on
+MC68000 (**3948-byte HUNK, 2565 instructions / 26156 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1721 migrates the fixed 8-byte Area weight state record to a complete named
+packed record and sequential codec. Production weight state now exchanges
+`Magic` and `Weight` as typed fields; opaque ULONG semantics and live-Area
+admission remain unchanged. Package coverage is **2502/2502**; the local-SDK
+host build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The Area weight native root passes on MC68000 (**2472-byte HUNK,
+1079 instructions / 11220 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1708 migrates the fixed 12-byte Application refresh/check state record to a
+complete named packed record and sequential codec. Production CheckRefresh
+telemetry now exchanges `Magic`, `Checks`, and `RefreshedWindows` as typed
+fields while owner admission and malformed-state handling remain unchanged.
+Package coverage is **2489/2489**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Application
+refresh-state native root passes on MC68000 (**2528-byte HUNK, 986
+instructions / 10248 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1707 migrates the fixed 12-byte Application_Window relationship state record
+to a complete named packed record and sequential codec. Production relationship
+state now exchanges `Magic`, `LastWindow`, and `AddedCount` as typed fields
+while pointer admission, parent/live-owner checks, and malformed-state handling
+remain unchanged. Package coverage is **2488/2488**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The Application_Window relationship native root passes on MC68000 (**2592-byte
+HUNK, 993 instructions / 10344 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1706 migrates the fixed 12-byte Application menu-state record to a complete
+named packed record and sequential codec. Production menu transport now
+exchanges `Magic`, `MenuAction`, and `MenuHelp` as typed fields; opaque
+UserData range, admission, and malformed-state handling remain unchanged.
+Package coverage is **2487/2487**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Application
+menu-state native root passes on MC68000 (**2528-byte HUNK, 986 instructions /
+10256 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1705 migrates the fixed 28-byte Application lifecycle state record to a
+complete named packed record and sequential codec. Production lifecycle policy
+now exchanges `Magic`, `Initialized`, `Iconified`, `Active`, `SingleTask`,
+`DoubleStart`, and `ForceQuit` as typed fields while BOOL admission, live-owner
+checks, and malformed-state handling remain unchanged. Package coverage is
+**2486/2486**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Application lifecycle-state
+native root passes on MC68000 (**3772-byte HUNK, 2808 instructions / 29026
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1704 migrates the fixed 28-byte Application identity state record to a
+complete named packed record and sequential codec. Production identity
+publication now exchanges `Magic` plus all six caller-owned string pointers
+(`Author`, `Base`, `Copyright`, `Description`, `Title`, `Version`) as typed
+fields while C-string admission, initializer-only semantics, and malformed-
+state handling remain unchanged. Package coverage is **2485/2485**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Application identity-state native root passes on
+MC68000 (**4616-byte HUNK, 3976 instructions / 39474 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1722 migrates the fixed 12-byte Area double-buffer state record to a complete
+named packed record and sequential codec. Production state now exchanges
+`Magic`, `Enabled`, and `Generation` as typed fields; canonical BOOL and
+nonzero-generation admission remain unchanged. Package coverage is
+**2503/2503**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Area double-buffer native
+root passes on MC68000 (**2560-byte HUNK, 1391 instructions / 14266 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1735 migrates the fixed 12-byte Area cycle-chain state record to a complete
+named packed record and sequential codec. Production state now exchanges
+`Magic`, signed `Value`, and `Generation` as typed fields with lossless LONG
+conversion; unrestricted policy semantics remain unchanged. Package coverage
+is **2516/2516**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Area cycle-chain native root
+passes on MC68000 (**2572-byte HUNK, 1398 instructions / 14402 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1723 migrates the fixed 12-byte Area floating state record to a complete
+named packed record and sequential codec. Production state now exchanges
+`Magic`, `Enabled`, and `Generation` as typed fields; canonical BOOL and
+nonzero-generation admission remain unchanged. Package coverage is
+**2504/2504**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Area floating native root
+passes on MC68000 (**2548-byte HUNK, 1391 instructions / 14266 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1703 migrates the fixed 32-byte Application help/presentation state record to
+a complete named packed record and sequential codec. Production AboutMUI/
+ShowHelp state now exchanges all eight fields (`Magic`, reference/help
+pointers, request counters, help strings, and `HelpLine`) as typed fields while
+pointer/string admission, live-object checks, and malformed-state handling
+remain unchanged. Package coverage is **2484/2484**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The Application help-state native root passes on MC68000 (**3924-byte HUNK,
+2170 instructions / 22648 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1702 migrates the fixed 20-byte Application OpenConfigWindow state record to
+a complete named packed record and sequential codec. Production
+configuration-window state now exchanges `Magic`, `Flags`, `ClassId`,
+`Requests`, and the preserved `Reserved` word as typed fields while class-id
+string admission, live-application checks, and malformed-state handling
+remain unchanged. Package coverage is **2483/2483**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The Application config-window state native root passes on MC68000 (**3940-byte
+HUNK, 2160 instructions / 22488 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1701 migrates the fixed 16-byte Application DefaultConfigItem state record
+to a complete named packed record and sequential codec. Production
+configuration state now exchanges `Magic`, `ConfigId`, `Value`, and `Requests`
+as typed fields while cookie admission, live-application checks, and
+malformed-state handling remain unchanged. Package coverage is **2482/2482**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Application DefaultConfig state native root
+passes on MC68000 (**3180-byte HUNK, 1278 instructions / 13414 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1700 migrates the fixed 8-byte Application command-state record to a complete
+named packed record and sequential codec. Production command-table state now
+exchanges `Magic` and the `Table` pointer as typed fields while command-table
+validation, NULL-table semantics, live-application admission, and malformed-
+state handling remain unchanged. Package coverage is **2481/2481**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Application command-state native root passes on
+MC68000 (**5532-byte HUNK, 2039 instructions / 21346 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1699 migrates the fixed 4-byte List owned-record header to a named packed
+record boundary. Production disposal now consumes the typed `Length` field
+through the bounded header adapter; this preserves complete record-range
+validation and native behavior while CopperSharp's direct one-ULONG
+scalar/APTR lowering remains unavailable. Package coverage is **2480/2480**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The existing owned-record-header native root passes
+on MC68000 (**1516-byte HUNK, 338 instructions / 3398 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1698 migrates the fixed 16-byte List image-handle record to a complete named
+packed record and sequential codec. Production image creation, chain
+traversal, and teardown now exchange `Magic`, `ImageObject`, `Flags`, and
+`Next` as typed fields while cookie admission, handle ownership, and
+malformed-state handling remain unchanged. Package coverage is **2479/2479**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated List image native root passes on
+MC68000 (**2636-byte HUNK, 1325 instructions / 13748 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1697 migrates the fixed 8-byte List index-slot record to a complete named
+packed record and sequential codec. Production slot access now exchanges the
+`Entry` pointer and `Flags` as typed fields while vector bounds, ownership
+flags, and malformed-slot handling remain unchanged. Package coverage is
+**2478/2478**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The dedicated List slot native
+root passes on MC68000 (**2464-byte HUNK, 896 instructions / 9386 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1736 migrates the fixed 24-byte Area presentation state record to a complete
+named packed record and sequential codec. Production state now exchanges
+`Magic`, `Disabled`, `ShowMe`, `Background`, `Frame`, and `CustomBackfill` as
+typed fields; BOOL admission and unrestricted selector semantics remain
+unchanged. Package coverage is **2517/2517**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The Area
+presentation native root passes on MC68000 (**2776-byte HUNK, 2314
+instructions / 23392 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1724 migrates the fixed 12-byte Area disappearance-policy record to a
+complete named packed record and sequential codec. Production policy now
+exchanges `Magic`, `HorizDisappear`, and `VertDisappear` as typed fields with
+lossless signed LONG conversion; admission remains unchanged. Package coverage
+is **2505/2505**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Area disappearance-policy
+native root passes on MC68000 (**2604-byte HUNK, 1405 instructions / 14534
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1696 migrates the fixed 20-byte List header record to a complete named
+packed record and sequential codec. Production List header admission and
+publication now exchange `Magic`, `Index`, `Capacity`, `Count`, and `Images`
+as typed fields while capacity/index bounds, cookie admission, and teardown
+recovery remain unchanged. Package coverage is **2477/2477**; the local-SDK
+host build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The existing List edit-admission native root passes on MC68000
+(**6212-byte HUNK, 5925 instructions / 60146 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1695 migrates the fixed 24-byte List edit-state record to a complete named
+packed record and sequential codec. Production edit-session state now
+exchanges `Magic`, signed `Row` and `Column`, `Entry`, `EditObject`, and
+`Flags` as typed fields while cookie admission, lifecycle cleanup, and
+malformed-state handling remain unchanged. Package coverage is **2476/2476**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The existing List edit-admission native root passes
+on MC68000 (**5996-byte HUNK, 6356 instructions / 63368 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1676 migrates the fixed 12-byte List FORMAT descriptor-table state to a
+complete named packed record and sequential codec. Production table admission
+and publication now exchange `Magic`, `Columns`, and the descriptor-vector
+`Values` pointer as typed fields while descriptor count/vector bounds
+validation remains unchanged. Package coverage is **2457/2457**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The existing FORMAT metrics native root passes on
+MC68000 (**8292-byte HUNK, 8578 instructions / 85674 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1677 migrates the fixed 16-byte List column-metrics owner state to a
+complete named packed record and sequential codec. Production metrics
+admission and publication now exchange `Magic`, `Width`, `Columns`, and the
+metric-vector `Values` pointer as typed fields while vector bounds and teardown
+validation remain unchanged. Package coverage is **2458/2458**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The existing FORMAT metrics native root passes on
+MC68000 (**8500-byte HUNK, 8306 instructions / 83940 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1678 migrates the fixed 4-byte List column-metric vector element to a named
+packed record and sequential codec. Production measured-width reads and
+writes now exchange the `Value` field through the typed record boundary while
+vector index/range validation remains in its guarded adapter. Package coverage
+is **2459/2459**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The dedicated column-metric
+vector native root passes on MC68000 (**1136-byte HUNK, 986 instructions /
+8958 cycles**); direct one-ULONG native calls remain excluded because of the
+known compiler scalar/APTR lowering limitation. The overall MorphOS MUI goal
+remains open.
+
+MG1679 migrates the fixed 8-byte List column-geometry vector element to a
+named packed record and sequential codec. Production geometry reads and
+writes now exchange `Offset` and `Width` as typed fields while the bounded
+vector adapter continues to own index and complete-record checks. Package
+coverage is **2460/2460**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The existing column
+layout native root passes on MC68000 (**4604-byte HUNK, 3744 instructions /
+37422 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1680 migrates the fixed 16-byte List column-layout owner state to a complete
+named packed record and sequential codec. Production layout admission and
+publication now exchange `Magic`, `Width`, `Columns`, and the geometry-vector
+`Values` pointer as typed fields while strict range and teardown validation
+remain unchanged. Package coverage is **2461/2461**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The existing column-layout native root passes on MC68000 (**4800-byte HUNK,
+3452 instructions / 35416 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1681 migrates the fixed 16-byte List column-order owner state to a complete
+named packed record and sequential codec. Production order metadata now
+exchanges `Magic`, `Count`, the byte-vector `Values` pointer, and `Reserved`
+as typed fields while permutation validation and owned-vector teardown remain
+unchanged. Package coverage is **2462/2462**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+existing column-order native root passes on MC68000 (**4200-byte HUNK, 3109
+instructions / 31464 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1682 migrates the fixed 36-byte List column-visibility mask to a complete
+named packed record and sequential codec. Production hide/show state now
+exchanges `Magic` and all eight mask words as typed fields while cookie
+admission and 256-column visibility semantics remain unchanged. Package
+coverage is **2463/2463**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The existing
+column-visibility native root passes on MC68000 (**4396-byte HUNK, 5487
+instructions / 54626 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1683 migrates the fixed 32-byte List viewport state to a complete named
+packed record and sequential codec. Production viewport metrics now exchange
+`Magic`, `TopPixel`, `VisiblePixel`, `TotalPixel`, `First`, `LineHeight`,
+`Visible`, and `DropMark` as typed fields while cookie admission, viewport
+bounds, and drop-mark normalization remain unchanged. Package coverage is
+**2464/2464**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The existing List viewport native
+root passes on MC68000 (**4264-byte HUNK, 4989 instructions / 49742 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1737 migrates the fixed 28-byte Area geometry state record to a complete
+named packed record and sequential codec. Production geometry now exchanges
+`Magic`, signed coordinates/extents, and signed edges as typed fields with
+lossless LONG conversion; geometric admission remains unchanged. Package
+coverage is **2518/2518**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Area geometry
+native root passes on MC68000 (**2920-byte HUNK, 2664 instructions / 27216
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1725 migrates the fixed 12-byte Area double-click state record to a complete
+named packed record and sequential codec. Production state now exchanges
+`Magic`, signed `Value`, and `Generation` as typed fields with lossless LONG
+conversion; getter-only signal admission remains unchanged. Package coverage
+is **2506/2506**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Area double-click native root
+passes on MC68000 (**2580-byte HUNK, 1398 instructions / 14402 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1684 migrates the fixed 16-byte List interaction-policy state to a complete
+named packed record and sequential codec. Production input, multi-select, and
+scroller-position policy now exchange `Magic`, `Input`, `MultiSelect`, and
+`ScrollerPos` as typed fields while construction-time normalization, cookie
+admission, and malformed-state handling remain unchanged. Package coverage is
+**2465/2465**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The existing List
+interaction/click native root passes on MC68000 (**5872-byte HUNK, 7398
+instructions / 72842 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1685 migrates the fixed 24-byte List click-state record to a complete named
+packed record and sequential codec. Production click-column, double-click,
+repeat-click, click-count, and default-column state now exchange `Magic`,
+`ClickColumn`, `DoubleClick`, `AgainClick`, `Clicks`, and `DefClickColumn` as
+typed fields; BOOL canonicalization, cookie admission, and malformed-state
+handling remain unchanged. Package coverage is **2466/2466**; the local-SDK
+host build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The existing List interaction/click native root passes on MC68000
+(**6108-byte HUNK, 6666 instructions / 66948 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1686 migrates the fixed 24-byte List hook-policy state to a complete named
+packed record and sequential codec. Production construct, destruct, display,
+compare, and multi-select hook pointers now exchange `Magic`, `ConstructHook`,
+`DestructHook`, `DisplayHook`, `CompareHook`, and `MultiTestHook` as typed
+fields while pointer admission, cookie validation, and teardown behavior remain
+unchanged. Package coverage is **2467/2467**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+existing List hook/sort native root passes on MC68000 (**5728-byte HUNK, 6329
+instructions / 62630 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1687 migrates the fixed 12-byte List sort-state record to a complete named
+packed record and sequential codec. Production selected-column and title-click
+state now exchange `Magic`, `SortColumn`, and `TitleClick` as typed fields
+while sort-column bounds, cookie validation, and malformed-state handling
+remain unchanged. Package coverage is **2468/2468**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The existing List hook/sort native root passes on MC68000 (**5928-byte HUNK,
+6157 instructions / 61980 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1688 migrates the fixed 48-byte List presentation-policy state to a complete
+named packed record and sequential codec. Production editing, quiet, sizing,
+stripe, drop-mark, drag, visibility, and line-height policy now exchange all
+twelve fields (`Magic`, `Editable`, `Quiet`, `AdjustHeight`, `AdjustWidth`,
+`Stripes`, `ShowDropMarks`, `DragSortable`, `DragType`, `AutoVisible`,
+`AutoLineHeight`, and `MinLineHeight`) as typed values while policy
+normalization, cookie admission, and malformed-state handling remain
+unchanged. Package coverage is **2469/2469**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+existing List presentation native root passes on MC68000 (**4680-byte HUNK,
+7023 instructions / 69784 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1689 migrates the fixed 20-byte List pool-policy state to a complete named
+packed record and sequential codec. Production pool handle, puddle size,
+threshold size, and ownership flag now exchange `Magic`, `Pool`, `PuddleSize`,
+`ThresholdSize`, and `UsesExternalPool` as typed fields while BOOL
+canonicalization, pool ownership, cookie admission, and teardown behavior
+remain unchanged. Package coverage is **2470/2470**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The existing List pool/insert native root passes on MC68000 (**4132-byte HUNK,
+1752 instructions / 17930 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1690 migrates the fixed 12-byte List redraw state to a complete named packed
+record and sequential codec. Production dirty-state and request coalescing now
+exchange `Magic`, `Dirty`, and `Requests` as typed fields while redraw
+admission, saturation behavior, cookie validation, and malformed-state handling
+remain unchanged. Package coverage is **2471/2471**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The existing List redraw native root passes on MC68000 (**3720-byte HUNK, 2381
+instructions / 24178 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1691 migrates the fixed 12-byte List active-row state to a complete named
+packed record and sequential codec. Production active-row presence and index
+now exchange `Magic`, `HasActive`, and `Active` as typed fields while BOOL
+canonicalization, empty-list semantics, cookie validation, and malformed-state
+handling remain unchanged. Package coverage is **2472/2472**; the local-SDK
+host build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The existing List active native root passes on MC68000 (**3756-byte
+HUNK, 2389 instructions / 24268 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1692 migrates the fixed 8-byte List insert-position result to a complete
+named packed record and sequential codec. Production getter-only publication
+now exchanges the cookie and signed LONG position as typed fields while
+insertion-result bounds, cookie validation, and malformed-state handling remain
+unchanged. Package coverage is **2473/2473**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+existing List insert-position native root passes on MC68000 (**3704-byte HUNK,
+1867 instructions / 19134 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1693 migrates the fixed 8-byte Listview owner-state record to a complete
+named packed record and sequential codec. Production child-owner association
+now exchanges `Magic` and the `Owner` pointer as typed fields while ownership
+admission, cookie validation, and clear/teardown behavior remain unchanged.
+Package coverage is **2474/2474**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The existing List
+core native root passes on MC68000 (**7748-byte HUNK, 8410 instructions /
+82796 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1694 migrates the fixed 28-byte Listview horizontal-scroller state to a
+complete named packed record and sequential codec. Production scroller policy,
+content/view widths, visibility, scroll position, and maximum range now
+exchange `Magic`, `Policy`, `ContentWidth`, `ViewWidth`, `Visible`, `ScrollX`,
+and `MaxScrollX` as typed fields while range validation, cookie admission, and
+malformed-state handling remain unchanged. Package coverage is **2475/2475**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The existing Listview core native root passes on
+MC68000 (**10252-byte HUNK, 16620 instructions / 157460 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1666 migrates the fixed 12-byte `MUIM_List_TestPos` mixed-width result to a
+complete named packed record and sequential codec. Production List hit testing
+now exchanges signed LONG/WORD fields and flags as typed values with exact 68k
+widths. Package coverage is **2448/2448**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+dedicated List.TestPos native root passes on MC68000 (**3332-byte HUNK, 1546
+instructions / 16130 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1665 migrates the fixed 2-byte Keyadjust translated-text scratch record to a
+named packed record with a bounded sequential byte codec. Production keyadjust
+input now exchanges the character and NUL terminator as typed fields while
+retaining complete-range checks. Package coverage is **2447/2447**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Keyadjust text native root passes on
+MC68000 (**3324-byte HUNK, 1083 instructions / 11386 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1664 migrates the fixed 2-byte Image.Spec kind/separator prefix to a named
+packed record with a bounded sequential byte codec. Production prefix parsing
+now consumes typed fields before variable payload handling, preserving the
+existing wire bytes and complete-range checks. Package coverage is **2446/2446**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Image.Spec prefix native root passes on
+MC68000 (**2708-byte HUNK, 1181 instructions / 12342 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1663 migrates the fixed 20-byte Image.Spec state record to a complete named
+packed record and sequential codec. Production Image.Spec reads and writes now
+use typed fields while preserving union presence bits, builtin values, and
+bounded string-pointer admission. Package coverage is **2445/2445**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Image.Spec native root passes on
+MC68000 (**3532-byte HUNK, 2137 instructions / 22282 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1662 migrates the fixed 24-byte Image render policy state record to a
+complete named packed record and sequential codec. Production Image render
+reads and writes now use typed fields while preserving full-width policy bits
+and existing selection/free-axis semantics. Package coverage is **2444/2444**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Image render native root passes on
+MC68000 (**3532-byte HUNK, 2413 instructions / 25036 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1661 migrates the fixed 16-byte Image.FontMatch scalar state record to a
+complete named packed record and sequential codec. Production FontMatch reads
+and writes now use typed fields while preserving full-width ULONG bit patterns.
+Package coverage is **2443/2443**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The dedicated Image
+FontMatch native root passes on MC68000 (**3332-byte HUNK, 1784 instructions /
+18578 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1660 migrates the fixed 12-byte Image.FontMatchString state record to a
+complete named packed record and sequential codec. Production FontMatchString
+reads and writes now use typed fields while preserving presence BOOL admission
+and opaque caller-owned string pointers. Package coverage is **2442/2442**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Image FontMatchString native root passes
+on MC68000 (**3328-byte HUNK, 1499 instructions / 15648 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1659 migrates the fixed 8-byte Image.OldImage pointer state record to a
+complete named packed record and sequential codec. Production Image.OldImage
+reads and writes now use typed fields while preserving opaque graphics Image
+APTR bits and mapped-pointer admission. Package coverage is **2441/2441**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Image OldImage native root passes on
+MC68000 (**3248-byte HUNK, 1238 instructions / 13058 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1658 migrates the fixed 20-byte Gadget interaction state record to a complete
+named packed record and sequential codec. Production interaction reads and
+writes now use typed fields while preserving the bounded `InputMode` enum and
+canonical MorphOS BOOL fields. Package coverage is **2440/2440**; the local-SDK
+host build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The dedicated Gadget interaction native root passes on MC68000
+(**3504-byte HUNK, 2133 instructions / 22094 cycles**). The overall MorphOS MUI
+goal remains open.
+
+MG1657 migrates the fixed 8-byte Gadget.Gadget pointer state record to a
+complete named packed record and sequential codec. Production Gadget.Gadget
+reads and writes now use typed fields while preserving opaque APTR bits and
+mapped-pointer admission. Package coverage is **2439/2439**; the local-SDK
+host build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The dedicated Gadget.Gadget native root passes on MC68000
+(**3240-byte HUNK, 1238 instructions / 13058 cycles**). The overall MorphOS MUI
+goal remains open.
+
+MG1656 migrates the fixed 8-byte Gauge.InfoText state record to a complete
+named packed record and sequential codec. Production InfoText reads and writes
+now use typed fields while preserving opaque APTR pointer bits and bounded live
+string admission. Package coverage is **2438/2438**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The dedicated Gauge InfoText native root passes on MC68000 (**3140-byte HUNK,
+1166 instructions / 12310 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1655 migrates the fixed 8-byte Gauge.InfoRate state record to a complete
+named packed record and sequential codec. Production InfoRate reads and writes
+now use typed fields while preserving signed LONG bit patterns. Package
+coverage is **2437/2437**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The dedicated Gauge
+InfoRate native root passes on MC68000 (**3132-byte HUNK, 1163 instructions /
+12294 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1654 migrates the fixed 20-byte Gauge progress state record to a complete
+named packed record and sequential codec. Production Gauge reads and writes now
+use typed fields while preserving full-width progress values and strict
+MorphOS BOOL admission for `Horizontal`. Package coverage is **2436/2436**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Gauge state native root passes on
+MC68000 (**3400-byte HUNK, 2113 instructions / 21914 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1641 migrates the fixed Area `DragEvent` packet to a complete named packed
+record and sequential codec, alongside the previously migrated DragBegin,
+DoDrag, DragDrop, DragQuery, DragFinish, DragReport, and drag-image records.
+Production DragEvent consumers now use typed fields; the remaining drag
+variants retain bounded compatibility adapters for later slices. Package
+coverage is **2423/2423**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The dedicated Area
+drag native root passes on MC68000 (**12036-byte HUNK, 10293 instructions /
+105350 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1642 migrates the fixed Group change method packets and the 16-byte Group
+change sidecar state to complete named packed records and sequential codecs.
+Production Group change reads and writes now use typed fields; the legacy
+field-address adapter remains only for compatibility and diagnostic callers.
+Package coverage is **2424/2424**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The dedicated Group
+change packet native root passes on MC68000 (**4028-byte HUNK, 1985
+instructions / 20420 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1643 migrates the fixed Group ordering `MoveMember`, `Reorder`, and `Sort`
+packets to complete named packed records and sequential codecs. Production
+ordering reads and writes now use typed fields; the legacy field-address
+adapter remains only for compatibility and diagnostic callers. Package
+coverage is **2425/2425**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The dedicated Group
+ordering native root passes on MC68000 (**6040-byte HUNK, 2696 instructions /
+27784 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1644 migrates the fixed Group `ActivePage` state record to a complete named
+packed record and sequential codec. Production page state reads and writes now
+use typed fields; the legacy field-address adapter remains only for
+compatibility and diagnostic callers. Package coverage is **2426/2426**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Group page native root passes on
+MC68000 (**3616-byte HUNK, 1985 instructions / 20668 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1645 migrates the fixed Group forwarding state record to a complete named
+packed record and sequential codec. Production forwarding state reads and
+writes now use typed fields; the legacy field-address adapter remains only for
+compatibility and diagnostic callers. Package coverage is **2427/2427**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Group forwarding native root passes on
+MC68000 (**2788-byte HUNK, 967 instructions / 10890 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1646 migrates the fixed 32-byte Group child-list state record to a complete
+named packed record and sequential codec. Production child-list state reads
+and writes now use typed fields, including APTR links and count/capacity
+metadata; pointer mapping and capacity validation are unchanged. Package
+coverage is **2428/2428**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The dedicated Group
+state native root passes on MC68000 (**6516-byte HUNK, 5309 instructions /
+57268 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1647 migrates the fixed 16-byte Group child-list projection entry to a
+complete named packed record and sequential codec. Production projection reads
+and writes now use typed APTR fields, while vector index arithmetic remains
+isolated in its bounded adapter. Package coverage is **2429/2429**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Group child-entry native root passes on
+MC68000 (**3236-byte HUNK, 2581 instructions / 25058 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1648 migrates the packed Exec `List` projection header to a complete named
+packed record and sequential codec. Production list reads and writes now use
+typed APTR and byte fields, preserving the 14-byte Exec layout and bounded
+guest mapping. Package coverage is **2430/2430**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The dedicated Group child-list native root passes on MC68000 (**5176-byte
+HUNK, 3934 instructions / 39780 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1649 migrates the fixed eight-ULONG Group grid specification to a complete
+named packed record and sequential codec. Production grid-spec reads and
+writes now use typed fields, preserving signed spacing/centering bit patterns
+and complete 32-byte bounds checks. Package coverage is **2431/2431**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Group grid native root passes on
+MC68000 (**3548-byte HUNK, 3209 instructions / 33064 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1650 migrates the sanitized 36-byte Group grid policy state record to a
+complete named packed record and sequential codec. Production policy reads and
+writes now use typed fields while preserving the existing magic, range, and
+signed-spacing admission rules. Package coverage is **2432/2432**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Group grid-state native root passes on
+MC68000 (**5004-byte HUNK, 2913 instructions / 30226 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1651 migrates the sanitized 24-byte Numeric policy state record to a complete
+named packed record and sequential codec. Production numeric reads and writes
+now use typed fields while preserving signed range bit patterns and strict BOOL
+admission. Package coverage is **2433/2433**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The
+combined grid/numeric native root passes on MC68000 (**7576-byte HUNK, 7935
+instructions / 81684 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1652 migrates the fixed 20-byte Prop policy state record to a complete named
+packed record and sequential codec. Production policy reads and writes now use
+typed fields while preserving signed `DeltaFactor`, BOOL fields, and
+`UseWinBorder` admission rules. Package coverage is **2434/2434**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Prop admission native root passes on MC68000
+(**6724-byte HUNK, 5210 instructions / 52938 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1653 migrates the fixed 16-byte Prop range state record to a complete named
+packed record and sequential codec. Production range reads and writes now use
+typed fields while preserving LONG range bits, clamping, and `First <= Entries -
+Visible` admission. Package coverage is **2435/2435**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The Prop admission native root passes on MC68000 (**6580-byte HUNK, 5316
+instructions / 55086 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1640 migrates the fixed Area `DragReport` packet to a complete named packed
+record and sequential codec, alongside the previously migrated DragBegin,
+DoDrag, DragDrop, DragQuery, DragFinish, and drag-image records. Production
+DragReport consumers now use typed fields; the remaining drag variants retain
+bounded compatibility adapters for later slices. Package coverage is
+**2423/2423**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The dedicated Area drag native
+root passes on MC68000 (**11460-byte HUNK, 9182 instructions / 94414 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1738 migrates the fixed 36-byte Area render-policy state record to a complete
+named packed record and sequential codec. Production policy now exchanges
+`Magic`, `FillArea`, `Background`, `Frame`, `Font`, `FrameVisible`,
+`FramePhantomHoriz`, `FrameTitle`, and `FrameDynamic` as typed fields; BOOL
+admission and opaque selector/APTR semantics remain unchanged. Package coverage
+is **2519/2519**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Area render-policy native root
+passes on MC68000 (**3776-byte HUNK, 3396 instructions / 34686 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1726 migrates the fixed 12-byte Area drag/drop policy record to a complete
+named packed record and sequential codec. Production policy now exchanges
+`Magic`, `Draggable`, and `Dropable` as typed fields; canonical BOOL admission
+remains unchanged. Package coverage is **2507/2507**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The Area drag-policy native root passes on MC68000 (**2552-byte HUNK, 1391
+instructions / 14266 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1667 migrates List scalar-storage and display-row ULONG slots to named
+`MuiListScalarStorageRecord` and `MuiListDisplayRowRecord` types with bounded
+codecs. Selection, NextSelected, and display-row publication now exchange
+typed values; the one-ULONG native ABI seam stays isolated in the shared
+guest adapter. Package coverage is **2449/2449**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The dedicated native root passes on MC68000 (**1248-byte HUNK, 336
+instructions / 3600 cycles**) for the bounded address contract, while host
+struct tests cover signed rows, full-width scalar bits, and truncation. The
+overall MorphOS MUI goal remains open.
+
+MG1668 migrates the fixed 12-byte `MUIA_List_TitleArray` metadata block to a
+complete named packed record and sequential codec. Title-array ownership and
+admission now exchange `Magic`, `Pointers`, and `Count` as typed fields while
+pointer-table validation remains bounded and failure-safe. Package coverage is
+**2450/2450**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The existing title-array native
+root passes on MC68000 (**4368-byte HUNK, 2681 instructions / 27194 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1739 migrates the fixed 12-byte Area short-help state record to a complete
+named packed record and sequential codec. Production state now exchanges
+`Magic`, `Text`, and `Generation` as typed fields; caller-owned OBString
+identity and live-owner admission remain unchanged. Package coverage is
+**2520/2520**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Area short-help native root
+passes on MC68000 (**2580-byte HUNK, 1401 instructions / 14418 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1727 migrates the fixed 12-byte Area timer state record to a complete named
+packed record and sequential codec. Production timer state now exchanges
+`Magic`, signed `Value`, and `Generation` as typed fields with lossless LONG
+conversion; getter-only signal admission remains unchanged. Package coverage
+is **2508/2508**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The Area timer native root passes
+on MC68000 (**2560-byte HUNK, 1398 instructions / 14402 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1639 migrates the fixed Area `DragFinish` packet to a complete named packed
+record and sequential codec, alongside the previously migrated DragBegin,
+DoDrag, DragDrop, DragQuery, and drag-image records. Production DragFinish
+consumers now use typed fields; the remaining drag variants retain bounded
+compatibility adapters for later slices. Package coverage is **2423/2423**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Area drag native root passes on MC68000
+(**10444-byte HUNK, 8294 instructions / 85502 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1638 migrates the fixed Area `DragQuery` packet to a complete named packed
+record and sequential codec, alongside the previously migrated DragBegin,
+DoDrag, DragDrop, and drag-image records. Production DragQuery consumers now
+use typed fields; the remaining drag variants retain bounded compatibility
+adapters for later slices. Package coverage is **2423/2423**; the local-SDK
+host build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The dedicated Area drag native root passes on MC68000 (**9672-byte
+HUNK, 8024 instructions / 82918 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1637 migrates the fixed Area `DragDrop` packet to a complete named packed
+record and sequential codec, alongside the previously migrated DragBegin,
+DoDrag, and drag-image records. Production DragDrop consumers now use typed
+fields; the remaining drag variants retain bounded compatibility adapters for
+later slices. Package coverage is **2423/2423**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The dedicated Area drag native root passes on MC68000 (**8956-byte HUNK, 7763
+instructions / 80388 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1636 migrates the fixed Area `DragBegin` packet to a complete named packed
+record and sequential codec, alongside the previously migrated DoDrag and
+drag-image records. Production DragBegin consumers now use typed fields; the
+remaining drag variants retain bounded compatibility adapters for later slices.
+Package coverage is **2423/2423**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The dedicated Area
+drag native root passes on MC68000 (**8080-byte HUNK, 7457 instructions /
+77556 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1635 migrates the fixed Area `DoDrag` packet, alongside the previously
+migrated drag-image Create/Delete records, to a complete named packed record
+and sequential codec. Production DoDrag consumers now use typed fields; the
+remaining drag variants retain bounded compatibility adapters for later slices.
+Package coverage is **2423/2423**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The dedicated Area
+drag native root passes on MC68000 (**7296-byte HUNK, 6819 instructions /
+71046 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1634 migrates the fixed Area drag-image Create and Delete packets to complete
+named packed records and sequential codecs. Production drag-image consumers
+now use typed records; the other drag variants retain their bounded
+compatibility adapters for later slices. Package coverage is **2423/2423**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated drag-image native root passes on
+MC68000 (**6496-byte HUNK, 6720 instructions / 70300 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1633 migrates the fixed Area ShortHelp Check, Create, and Delete packets to
+complete named packed records and sequential codecs. Production packet
+consumers now use typed records; method-only selector admission remains the
+scalar compatibility seam. Package coverage is **2423/2423**; the local-SDK
+host build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The dedicated ShortHelp native root passes on MC68000 (**5568-byte
+HUNK, 3186 instructions / 33104 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1632 migrates the fixed Area `initResize`/`exitResize` packets and lifecycle
+state record to complete named packed records. Production init/exit handling
+consumes typed packet/state fields; the one-LONG exit wire path uses a bounded
+sequential cursor only at the compiler-sensitive ABI edge. Package coverage is
+**2423/2423**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The dedicated Area resize native
+root passes on MC68000 (**3668-byte HUNK, 1313 instructions / 13554 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1740 migrates the fixed 16-byte Area fixed-text state record to a complete
+named packed record and sequential codec. Production state now exchanges
+`Magic`, `WidthText`, `HeightText`, and `Generation` as typed fields;
+caller-owned sample APTRs, initializer-only semantics, and live text admission
+remain unchanged. Package coverage is **2521/2521**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The Area fixed-text native root passes on MC68000 (**2632-byte HUNK, 1167
+instructions / 12020 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1728 migrates the fixed 12-byte Area control-character state record to a
+complete named packed record and sequential codec. Production state now
+exchanges `Magic`, `Character`, and `Generation` as typed fields; canonical
+low-byte admission remains unchanged. Package coverage is **2509/2509**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The Area control-character native root passes on
+MC68000 (**2564-byte HUNK, 1391 instructions / 14274 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1631 migrates the fixed custom-font `OpenCustomFont` and `CloseCustomFont`
+packets to complete bounded sequential named-struct codecs. Production
+open/close paths now consume typed records; method-only selector admission
+retains the scalar compatibility seam. Package coverage is **2423/2423**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated custom-font native root passes on
+MC68000 (**4068-byte HUNK, 1453 instructions / 14992 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1630 migrates the fixed Area activation packet shared by `MUIP_GoActive` and
+`MUIP_GoInactive` to a complete bounded sequential named-struct codec. Full
+activation reads/writes now use the struct; the method-only selector seam
+retains its scalar compatibility path. Package coverage is **2423/2423**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated Area activation native root passes on
+MC68000 (**3988-byte HUNK, 1503 instructions / 15236 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1629 migrates the fixed Area context-menu `Add`, `Build`, and `Choice`
+packets to complete bounded sequential named-struct codecs. Production
+dispatch now consumes typed records; the packet-kind adapter stays isolated to
+explicit compatibility access and bounds diagnostics. Package coverage is
+**2423/2423**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The dedicated Area context-menu
+native root passes on MC68000 (**5836-byte HUNK, 3447 instructions / 35004
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1628 migrates the fixed Area `CreateBubble` and `DeleteBubble` packets to
+complete bounded sequential named-struct codecs. Production dispatch now
+consumes those typed records; the packet-kind field adapter remains only for
+explicit compatibility access and bounds diagnostics. Package coverage is
+**2423/2423**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The dedicated Area Bubble native
+root passes on MC68000 (**3904-byte HUNK, 2337 instructions / 23618 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1729 migrates the fixed 16-byte Area text-color state record to a complete
+named packed record and sequential codec. Production state now exchanges
+`Magic`, `Color`, `Active`, and `Generation` as typed fields; packed RGB,
+canonical BOOL, and setup-generation admission remain unchanged. Package
+coverage is **2510/2510**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Area text-color
+native root passes on MC68000 (**2628-byte HUNK, 1699 instructions / 17318
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1627 migrates the caller-owned Workbench argument records embedded in
+`AppMessage` to complete bounded sequential named-struct codecs. AppMessage
+validation now decodes each lock/name pair through the struct codec; the
+bounded argument-vector traversal remains separate. Package coverage is
+**2423/2423**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The dedicated Workbench argument
+native root passes on MC68000 (**796-byte HUNK, 355 instructions / 3452
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1626 migrates the caller-owned `MUI_Command` records used by
+`MUIA_Application_Commands` to complete bounded sequential named-struct
+codecs. Command-table validation now decodes each fixed record through the
+struct codec; the NULL-terminated table boundary remains separate. Package
+coverage is **2423/2423**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The dedicated
+Application Command native root passes on MC68000 (**3044-byte HUNK, 2318
+instructions / 23672 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1625 migrates the `FindUData`, `GetUData`, and `SetUData` fixed records to
+complete bounded sequential named-struct codecs. Production readers now
+decode complete records before object-tree traversal; bounded traversal
+frame/vector adapters remain separate. Package coverage is **2423/2423**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated UserData native root passes on MC68000
+(**4520-byte HUNK, 2970 instructions / 30288 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1624 migrates the `SetAsString` fixed 16-byte header to a complete bounded
+sequential named-struct codec. Production formatting now decodes the full
+record before reaching its existing bounded variadic tail; method-only
+selector admission retains the scalar compatibility fallback. Package
+coverage is **2422/2422**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The dedicated
+SetAsString native root passes on MC68000 (**3644-byte HUNK, 1421 instructions
+/ 14566 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1623 migrates the `NotifyWrite` method, `WriteLong`, and `WriteString` fixed
+records to named sequential struct codecs. Production readers and writers now
+consume complete records; selector admission uses the named record when the
+complete packet is mapped and keeps its bounded scalar fallback for
+method-only headers. Package coverage is **2421/2421**; the local-SDK host
+build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. Dedicated native NotifyWrite roots pass on MC68000. The overall
+MorphOS MUI goal remains open.
+
+MG1622 migrates the `MultiSet` fixed four-field header and its named
+target-entry codec to bounded sequential struct cursors. Production MultiSet
+dispatch now decodes the complete header before walking the existing
+NULL-terminated bounded target vector. Package coverage is **2420/2420**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The focused `MiscAdmissionRoot` passes on MC68000
+(**9328-byte HUNK, 12060 instructions / 121810 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1621 migrates the `KillNotify`, `KillNotifyObject`, and `FindObject` fixed
+packet readers to bounded sequential named-struct codecs. Their production
+paths now decode complete records instead of field-offset reads; the explicit
+generic adapter remains only for field-level compatibility access. Package
+coverage is **2419/2419**; the local-SDK host build is currently blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1730 migrates the fixed 16-byte Area BuiltinFont state record to a complete
+named packed record and sequential codec. Production state now exchanges
+`Magic`, `Selector`, `Present`, and `Generation` as typed fields; opaque
+selector bits and canonical presence/generation admission remain unchanged.
+Package coverage is **2511/2511**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Area BuiltinFont
+native root passes on MC68000 (**2636-byte HUNK, 1699 instructions / 17318
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1620 migrates the `MUIM_Notify` fixed header, follow-value slot, and
+config-storage codecs to bounded sequential named-struct cursors. The
+production Notify reader now decodes the complete five-field record before the
+existing bounded follow-vector path; direct scalar offsets remain only in the
+explicit generic adapter. Package/local-SDK coverage remains **2418/2418**,
+and `MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060
+instructions / 121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1619 migrates the Notify method header and the `MUIM_Set`/`MUIM_NoNotifySet`
+packet readers and writer to bounded sequential named-struct codecs. The
+central Set path no longer uses direct field offsets; the generic adapter
+remains only for explicit compatibility access. Package/local-SDK coverage
+remains **2418/2418**, and `MiscAdmissionRoot` passes on MC68000 (**9328-byte
+HUNK, 12060 instructions / 121810 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1618 migrates the method-header and PushMethod parameter codecs to bounded
+sequential named-struct cursors. The common dispatch header and caller-owned
+parameter elements no longer use direct scalar offsets; their existing vector
+boundary adapters remain responsible only for address validation.
+Package/local-SDK coverage remains **2418/2418**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1731 migrates the fixed 16-byte Area CustomFont state record to a complete
+named packed record and sequential codec. Production state now exchanges
+`Magic`, `Spec`, `Present`, and `Generation` as typed fields; caller-owned APTR
+identity, explicit NULL semantics, and admission remain unchanged. Package
+coverage is **2512/2512**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The Area CustomFont
+native root passes on MC68000 (**2648-byte HUNK, 1709 instructions / 17462
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1617 migrates the production WindowSetCycleChain fixed header reader to a
+named packed struct codec. The complete header is decoded before bounded
+inline-vector traversal; the explicit adapter remains only for field-level
+compatibility access. Package/local-SDK coverage remains **2418/2418**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1616 migrates the production AddEventHandler and RemoveEventHandler window
+event-handler packet readers and writers to a named packed struct codec.
+Event-handler production access now decodes or writes the complete record
+instead of field-offset reads; the explicit adapter remains only for field-level
+compatibility access. Package/local-SDK coverage remains **2418/2418**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1615 migrates the production application/window menu packet readers
+(`ApplicationQuery`, `ApplicationSet`, `WindowQuery`, and `WindowSet`) to named
+packed struct codecs. Menu production access now decodes complete records
+instead of field-offset reads; the explicit adapter remains only for field-level
+compatibility access. Package/local-SDK coverage remains **2418/2418**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1614 migrates the production ConfigId, CheckRefresh, Loop, WindowMethod, and
+Snapshot application/window method readers to named packed struct codecs.
+Method production access now decodes complete records instead of field-offset
+reads; the explicit adapter remains only for field-level compatibility access.
+Package/local-SDK coverage remains **2418/2418**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1732 migrates the fixed 20-byte Area CustomFont runtime record to a complete
+named packed record and sequential codec. Production runtime state now
+exchanges `Magic`, `Font`, `Spec`, `Generation`, and `Active` as typed fields;
+opaque APTR handles, explicit inactive-state NULL semantics, and admission
+remain unchanged. Package coverage is **2513/2513**; the local-SDK host build
+remains blocked by pre-existing CopperSharp compiler errors outside CopperOS.
+The CustomFont runtime native root passes on MC68000 (**2780-byte HUNK, 2033
+instructions / 20794 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1613 migrates the production SetConfigItem, OpenConfigWindow,
+BuildSettingsPanel, and SettingsIo application-settings packet readers to
+named packed struct codecs. Settings production access now decodes complete
+records instead of field-offset reads; the explicit adapter remains only for
+field-level compatibility access. Package/local-SDK coverage remains
+**2418/2418**, and `MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK,
+12060 instructions / 121810 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1612 migrates the production ShowHelp and AboutMui presentation packet
+readers to named packed struct codecs. Presentation production access now
+decodes complete records instead of field-offset reads; the explicit adapter
+remains only for field-level compatibility access. Package/local-SDK coverage
+remains **2418/2418**, and `MiscAdmissionRoot` passes on MC68000 (**9328-byte
+HUNK, 12060 instructions / 121810 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1611 migrates the production application input packet family (ReturnId,
+Input, InputBuffered, and InputHandler) to named packed struct codecs.
+Selector-only reads now go through complete packet structs; the field-offset
+adapter remains only for explicit field-level compatibility access.
+Package/local-SDK coverage remains **2418/2418**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1733 migrates the fixed 16-byte Area font-selection state record to a
+complete named packed record and sequential codec. Production state now
+exchanges `Magic`, `Active`, `Source`, and `Generation` as typed fields;
+last-writer selection semantics, opaque source APTRs, and admission remain
+unchanged. Package coverage is **2514/2514**; the local-SDK host build remains
+blocked by pre-existing CopperSharp compiler errors outside CopperOS. The Area
+font-selection native root passes on MC68000 (**2660-byte HUNK, 1709
+instructions / 17458 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1610 migrates the production PushMethod and UnpushMethod queue packet
+readers/writers to named packed struct codecs. Queue packet production access
+now avoids field-offset lookups; the legacy adapter remains only for explicit
+field-level compatibility access. Package/local-SDK coverage is **2418/2418**,
+and `MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060
+instructions / 121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1609 migrates the production AppMessage node and full AppMessage codecs to a
+bounded sequential struct cursor. Named record codecs now consume declaration
+order without field-offset lookups; the legacy offset adapter remains only for
+explicit field-level compatibility access. Package/local-SDK coverage is
+**2418/2418**, and `MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK,
+12060 instructions / 121810 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1608 makes the complete Stringscroll state family and String scroll-metrics
+projection explicit sequential packed structs, with named host layout
+assertions. Package/local-SDK coverage remains **2417/2417**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1607 makes the remaining fixed-width String projections (`Contents`,
+`Placeholder`, `Integer`, `Integer64`, and `EditHook`) explicit sequential
+packed structs and adds named host layout assertions. Package/local-SDK
+coverage remains **2416/2416**, and `MiscAdmissionRoot` passes on MC68000
+(**9328-byte HUNK, 12060 instructions / 121810 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1606 makes the MorphOS context-menu and Keyadjust input provider samples
+explicit sequential packed structs and adds focused host layout assertions.
+Package/local-SDK coverage is now **2416/2416**, and `MiscAdmissionRoot` passes
+on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1669 migrates the fixed 8-byte `MUIA_List_Title` state record to a complete
+named packed record and sequential codec. Title-state admission and
+publication now exchange `Magic` and `Value` as typed fields while
+sentinel/string validation remains unchanged. Package coverage is
+**2451/2451**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The combined title policy native
+root passes on MC68000 (**8216-byte HUNK, 6991 instructions / 68486 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1670 migrates the fixed 8-byte `MUIA_List_SelectChange` signal state to a
+complete named packed record and sequential codec. Selection-signal admission
+and publication now exchange `Magic` and `Value` as typed fields while
+canonical BOOL normalization remains unchanged. Package coverage is
+**2452/2452**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The combined title policy native
+root passes on MC68000 (**8420-byte HUNK, 6987 instructions / 69332 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1671 migrates the fixed 16-byte List FORMAT policy record to a complete
+named packed record and sequential codec. FORMAT admission and publication
+now exchange `Magic`, nullable `Format`, `MaxColumns`, and `Columns` as typed
+fields while column-limit and string validation remain unchanged. Package
+coverage is **2453/2453**; the local-SDK host build remains blocked by
+pre-existing CopperSharp compiler errors outside CopperOS. The combined title
+policy native root passes on MC68000 (**8636-byte HUNK, 6715 instructions /
+67598 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1605 makes the String EditHook Beep and Reuse provider requests explicit
+sequential packed structs and adds host assertions for the mixed-width Reuse
+layout. Package/local-SDK coverage remains **2415/2415**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1604 makes the String filter, interaction, presentation, spell-checking,
+acknowledgement, cursor, and attached-list records explicit sequential packed
+structs and adds focused host layout coverage. Package/local-SDK coverage is
+now **2415/2415**, and `MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK,
+12060 instructions / 121810 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1603 makes the double-buffer and backfill rendering capability requests
+explicit sequential packed structs and adds host layout coverage.
+Package/local-SDK coverage is now **2414/2414**, and `MiscAdmissionRoot` passes
+on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1602 makes the MorphOS text/color/image capability request records explicit
+sequential packed structs, including nested `MuiImageSpec`, and adds host
+layout coverage. Package/local-SDK coverage is now **2413/2413**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1601 makes `MuiCustomFontOpenRequest` and `MuiCustomFontMetrics` explicit
+sequential packed structs and adds host assertions for their 48-byte request
+and 8-byte metrics layouts. Package/local-SDK coverage remains **2412/2412**,
+and `MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060
+instructions / 121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1600 makes `MuiCustomFontSpec` an explicit sequential packed struct and adds
+host assertions for its 36-byte pointer/scalar layout and named field
+positions. Package/local-SDK coverage remains **2412/2412**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1599 makes the Window alternate and primary geometry value records explicit
+sequential packed structs and adds host assertions for their 16-byte
+four-LONG layouts and named field positions. Package/local-SDK coverage
+remains **2412/2412**, and `MiscAdmissionRoot` passes on MC68000
+(**9328-byte HUNK, 12060 instructions / 121810 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1598 makes `MuiDirlistByteTotalState` an explicit sequential packed struct
+and adds host assertions for its 8-byte MorphOS QUAD layout and named High/Low
+positions. Package/local-SDK coverage remains **2412/2412**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1597 makes `MuiMinMaxValues` an explicit sequential packed struct and adds
+host assertions for its 12-byte six-short MorphOS layout and named field
+positions. Package/local-SDK coverage remains **2412/2412**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1596 makes `MuiMakeObjectParameterRecord` an explicit sequential packed
+struct and adds host assertions for its 16-byte MorphOS parameter-prefix
+layout and named field positions. Package/local-SDK coverage remains
+**2412/2412**, and `MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK,
+12060 instructions / 121810 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1595 routes Application PushMethod parameter-tail copies through the named
+`MuiApplicationPushMethodParameter` struct codec and a bounded standalone
+vector adapter. Package/local-SDK coverage remains **2412/2412**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1594 makes `MuiApplicationPersistenceFrameState` an explicit sequential
+packed struct and adds host assertions for its 12-byte MorphOS layout and
+named field positions. Package/local-SDK coverage remains **2412/2412**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1593 routes Application Save/Load persistence frame reads and writes through
+the canonical `MuiApplicationPersistenceFrameStateCodec` for the named packed
+frame struct. Live persistence traversal no longer calls the compatibility
+frame codec for record access. Package/local-SDK coverage remains
+**2412/2412**, and `MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK,
+12060 instructions / 121810 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1592 routes Application Save/Load persistence frame-stack lookups through
+the direct `MuiApplicationPersistenceFrameVectorMemoryCodec`. The
+depth-to-frame adapter owns the bounded stack-entry boundary, and live
+persistence walkers no longer call the compatibility frame lookup.
+Package/local-SDK coverage remains **2412/2412**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1672 migrates the fixed 8-byte `MUIA_Font` List policy state to a complete
+named packed record and sequential codec. Font admission and publication now
+exchange `Magic` and the borrowed `Font` APTR as typed fields while
+mapped-pointer validation remains unchanged. Package coverage is **2454/2454**;
+the local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The combined title policy native root passes on
+MC68000 (**8832-byte HUNK, 6715 instructions / 68456 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1591 routes Application UsedClasses vector validation through the direct
+`MuiApplicationUsedClassesVectorMemoryCodec`. UsedClasses admission and
+application setter paths now validate named
+`MuiApplicationUsedClassesVectorEntry` records directly; the compatibility
+validator remains available for older callers. Package/local-SDK coverage
+remains **2412/2412**, and `MiscAdmissionRoot` passes on MC68000 (**9328-byte
+HUNK, 12060 instructions / 121810 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1590 routes ASL TagItem cursor advancement through the direct
+`MuiAslTagItemVectorMemoryCodec`. The ASL tag walker, `HeadlessObjectCore`, and
+Stringscroll initializer walker now use the struct-backed bounded position
+adapter; the compatibility vector wrapper remains available for older callers.
+Package/local-SDK coverage remains **2412/2412**, and `MiscAdmissionRoot` passes
+on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1589 routes Family reorder/sort vector consumers through the named
+`MuiFamilyMutationVectorEntry` struct codec. `FamilyCore`,
+`GroupOperationsCore`, and Family projection paths use the direct vector-memory
+adapter and entry codec; the compatibility vector wrapper remains available
+for older callers. Package/local-SDK coverage is now **2412/2412**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1587 routes all live List pointer-slot consumers through the direct
+`MuiListPointerSlotVectorMemoryCodec`, passing named vector base/index values
+through display, title-array, string-array, and editing paths. The typed cursor
+remains available only for compatibility. Package/local-SDK coverage remains
+**2410/2410**, and `MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK,
+12060 instructions / 121810 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1588 routes the caller-owned List ColumnOrder BYTE* permutation through the
+named `MuiListColumnOrderByteRecord` and `MuiListColumnOrderByteCodec`.
+Display lookup, equality, validation, copy, cleanup, and publication use the
+record codec; vector index arithmetic remains in its bounded adapter.
+Package/local-SDK coverage is **2411/2411**, and `MiscAdmissionRoot` passes on
+MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1586 routes the Listtree getter's caller-owned ULONG storage write through
+the existing `MuiGuestUlongStorageMemoryCodec`, removing the last live storage
+field cursor call from that dispatcher. Package/local-SDK coverage remains
+**2410/2410**, and `MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK,
+12060 instructions / 121810 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1585 routes Poplist pointer-slot reads and writes through the direct
+`MuiPoplistArrayEntryFieldMemoryCodec`. The named entry record owns the slot
+field, bounded guest mapping remains in the adapter, and the cursor wrapper
+remains available only for compatibility. Package/local-SDK coverage is now
+**2410/2410**, and `MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK,
+12060 instructions / 121810 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1584 routes Choice/Radio entry-vector consumers through the direct
+`MuiChoiceEntryVectorMemoryCodec`. State admission and object construction use
+the named vector base and index with bounded validation; the cursor wrapper
+remains available only for compatibility. Package/local-SDK coverage remains
+**2409/2409**, and `MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK,
+12060 instructions / 121810 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1583 routes ApplicationWindow node inline-payload resolution through the
+direct `MuiApplicationWindowNodePayloadMemoryCodec`. The named node record owns
+the payload boundary, and bounded byte-count, overflow, and mapping checks stay
+inside the adapter; the typed payload cursor remains available only for
+compatibility. Package/local-SDK coverage is **2409/2409**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1582 routes Dataspace-IFF exact chunk read/write address resolution through
+the direct `MuiDataspaceIffTransferMemoryCodec`. Bounded base/offset arithmetic
+and transfer-range mapping remain inside the adapter; the typed transfer cursor
+remains available only for compatibility. Package/local-SDK coverage is
+**2408/2408**, and `MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK,
+12060 instructions / 121810 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1581 routes application-settings exact read/write address resolution through
+the direct `MuiApplicationSettingsTransferMemoryCodec`. Bounded base/offset
+arithmetic and transfer-range mapping remain inside the adapter; the typed
+transfer cursor remains available only for compatibility. Package/local-SDK
+coverage is **2407/2407**, and `MiscAdmissionRoot` passes on MC68000
+(**9328-byte HUNK, 12060 instructions / 121810 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1580 routes live `MUIM_UpdateConfig` object-pointer and byte-flag table slots
+through direct named-record adapters
+(`MuiUpdateConfigObjectSlotFieldMemoryCodec` and
+`MuiUpdateConfigFlagSlotFieldMemoryCodec`). Bounded vector adapters remain the
+table boundaries; compatibility cursor wrappers remain available for older
+callers. Package/local-SDK coverage is **2406/2406**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1673 migrates the four-byte List TitleArray pointer slot to the named
+`MuiListPointerSlotRecord` sequential codec. Title tables and display arrays
+now exchange borrowed string APTRs through the typed slot record while vector
+bounds and ownership rules remain unchanged. Package coverage remains
+**2454/2454**; the local-SDK host build remains blocked by pre-existing
+CopperSharp compiler errors outside CopperOS. The dedicated ListTitleArray
+native root passes on MC68000 (**4180-byte HUNK, 2753 instructions / 28022
+cycles**); the broader collection closure still has the known compiler
+register-allocation limitation. The overall MorphOS MUI goal remains open.
+
+MG1579 routes live `MUIM_UpdateConfig` fixed packet fields through direct
+`MuiUpdateConfigPacketFieldMemoryCodec` access. The named
+`MuiUpdateConfigMessage` and `MuiUpdateConfigMethodMessage` own their field
+positions; inline redraw tables remain on bounded vector adapters.
+Package/local-SDK coverage is **2405/2405**, and `MiscAdmissionRoot` passes on
+MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1578 routes the generated Process method-header writer and dispatch
+argument-slot codec through direct named-record adapters
+(`MuiProcessMethodMessageHeaderMemoryCodec` and
+`MuiProcessDispatchArgumentSlotFieldMemoryCodec`). Direct header/slot access is
+cursor-free while compatibility wrappers remain available for older callers.
+Package/local-SDK coverage is **2404/2404**, and `MiscAdmissionRoot` passes on
+MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1577 routes live Process/Slave specialist sidecar record fields through the
+direct `MuiProcessRecordFieldMemoryCodec`. Named offsets are owned by
+`MuiProcessSpecialistRecord` and `MuiProcessDispatchPacketHeader`; structural
+reads and writes are cursor-free while the compatibility cursor remains
+available for older callers. Package/local-SDK coverage is **2403/2403**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1576 routes all live Process/Slave specialist message packets (Method, Get,
+Set, Signal, Error, and Dispatch) through the named packed records and direct
+`MuiProcessSpecialistMessageMemoryCodec` calls. Direct message serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is **2402/2402**, and `MiscAdmissionRoot` passes on
+MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1575 routes the public Notify `FollowParameters` and `MultiSetVector` helpers
+through the named inline-vector memory adapters rather than constructing
+compatibility cursors. The adapters own bounded vector arithmetic and complete
+packet/slot mapping checks; compatibility wrappers remain for older callers.
+Package/local-SDK coverage is **2401/2401**, and `MiscAdmissionRoot` passes on
+MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1574 routes Notify packet records (Notify, KillNotify, KillNotifyObject, Set,
+MultiSet, and FindObject) through named packed structs and direct
+`MuiNotifyPacketFieldMemoryCodec` access. Direct packet decoding and writing
+are cursor-free; the compatibility cursor remains available for older callers.
+The adapter validates complete packet spans before exposing fields.
+Package/local-SDK coverage is **2400/2400**, and `MiscAdmissionRoot` passes on
+MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1573 routes all live Misc specialist message packets (Method, Lifecycle, Get,
+Set, Pointer, Pair, HandleInput, and RegisterGadget) through the named packed
+records and direct `MuiMiscSpecialistMessageMemoryCodec`. Direct message
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage remains **2399/2399**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1572 routes all live ExternalWrapper message packets (Update, Get, Set,
+Method, RenderInfo, AskMinMax, and Layout) through the named packed records
+and direct `MuiExternalWrapperMessageMemoryCodec`. Direct message
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage remains **2399/2399**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1571 introduces the named `MuiExternalBoopsiWorkBuffer` layout record and
+routes InlineTagList/InlineResult resolution through direct
+`MuiExternalWorkRegionMemoryCodec` access. Direct work-buffer access is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2399/2399**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1674 migrates the one-byte List ColumnOrder entry to the named
+`MuiListColumnOrderByteRecord` sequential codec. Column permutation vectors now
+exchange typed byte records while bounded indexing and duplicate/order
+validation remain unchanged. Package coverage is **2455/2455**; the local-SDK
+host build remains blocked by pre-existing CopperSharp compiler errors outside
+CopperOS. The dedicated ColumnOrder byte native root passes on MC68000
+(**3308-byte HUNK, 1207 instructions / 11048 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1675 migrates the fixed 40-byte List FORMAT descriptor to the named
+`MuiListFormatDescriptor` sequential codec. Parsing and publication now
+exchange all ten ULONG fields, including borrowed PREPARSE pointers and owned
+decoded-storage metadata, in declaration order; descriptor-table bounds and
+ownership validation remain unchanged. Package coverage is **2456/2456**; the
+local-SDK host build remains blocked by pre-existing CopperSharp compiler
+errors outside CopperOS. The dedicated FORMAT descriptor native root passes on
+MC68000 (**4840-byte HUNK, 3714 instructions / 36728 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1570 routes the ExternalWrapper Boopsi packet fields (OpSet, OpGet, Render,
+TagItem, and Result) through their named packed records and direct
+`MuiExternalBoopsiPacketFieldMemoryCodec`. Direct packet serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2398/2398**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1569 routes the ExternalWrapper Dtpic layout-result fields (Width and Height)
+through the named `MuiExternalDtpicLayoutResult` and direct
+`MuiExternalDtpicLayoutFieldMemoryCodec`. Direct result decoding is cursor-free;
+the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2397/2397**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1568 routes the ExternalWrapper RenderInfo fields (Screen, Window, DrawInfo,
+and RastPort) through the named `MuiExternalRenderInfoRecord` and direct
+`MuiExternalRenderInfoFieldMemoryCodec`. Direct field serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2396/2396**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1567 routes the ExternalWrapper header fields (Magic, Class, and Flags)
+through the named `MuiExternalWrapperHeader` and direct
+`MuiExternalWrapperHeaderFieldMemoryCodec`. Structural and live field
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage is now **2395/2395**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1566 routes the ExternalWrapper RastPort slot through the named
+`MuiExternalRastPortSlot` and direct
+`MuiExternalRastPortSlotFieldMemoryCodec`. Direct field serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2394/2394**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1565 routes the ExternalWrapper DisplayEnvironment fields (Window, Screen,
+and DrawInfo) through the named `MuiExternalDisplayEnvironmentRecord` and
+direct `MuiExternalDisplayEnvironmentFieldMemoryCodec`. Direct field
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage is now **2393/2393**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The package fallback layout packet definitions yield to
+equivalent local SDK structs during local qualification. The overall MorphOS
+MUI goal remains open.
+
+MG1564 routes the ExternalWrapper notification state fields (Attribute, Value,
+and Count) through the named `MuiExternalNotificationState` and direct
+`MuiExternalNotificationFieldMemoryCodec`. Direct field serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2392/2392**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1563 routes the ExternalWrapper Dtpic state fields (CallerName, OwnedName,
+OwnedNameSize, PictureObject, Alpha, MinWidth, MinHeight, PicWidth, and
+PicHeight) through the named `MuiExternalDtpicState` and direct
+`MuiExternalDtpicFieldMemoryCodec`. Direct field serialization is cursor-free;
+the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2391/2391**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1562 routes the ExternalWrapper scratch state fields (RememberBuffer,
+RememberCount, and WorkBuffer) through the named `MuiExternalScratchState`
+and direct `MuiExternalScratchFieldMemoryCodec`. Direct field serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2390/2390**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1561 routes the Pop specialist instance record fields (class, flags, child
+pointers, hooks, array state, ASL state, window state, hook message, selection,
+and notification values) through the named `MuiPopSpecialistState` and direct
+`MuiPopSpecialistRecordFieldMemoryCodec`. Direct field serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2389/2389**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1560 routes the ExternalWrapper Boopsi resource fields (PrivateClass,
+ClassId, OpenedClass, BoopsiObject, and CreationTags) through the named
+`MuiExternalBoopsiResourceState` and
+`MuiExternalBoopsiResourceFieldMemoryCodec`. Direct field serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2388/2388**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1559 routes the ExternalWrapper Boopsi geometry fields (MinWidth, MinHeight,
+MaxWidth, MaxHeight, TagWindow, TagScreen, and TagDrawInfo) through the named
+`MuiExternalBoopsiGeometryState` and
+`MuiExternalBoopsiGeometryFieldMemoryCodec`. Direct field serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2387/2387**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1558 routes the ExternalWrapper shared state regions (Boopsi resources and
+geometry, display environment, scratch, Dtpic, notification, and RastPort)
+through named region selection and `MuiExternalStateMemoryCodec`. Direct
+region resolution is cursor-free; the compatibility cursor remains available
+for older callers. Package/local-SDK coverage is now **2386/2386**, and
+`MiscAdmissionRoot` passes on MC68000 (**9328-byte HUNK, 12060 instructions /
+121810 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1557 routes the Misc specialist owned-string slots (Key, ArgTemplate,
+ArgContents, FilepanelDrawer, FilepanelFile, FilepanelPattern,
+FilepanelAcceptPattern, and FilepanelRejectPattern) through named field
+selection and `MuiMiscOwnedStringMemoryCodec`. Direct slot resolution is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2385/2385**, and `MiscAdmissionRoot`
+passes on MC68000 (**9328-byte HUNK, 12060 instructions / 121810 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1556 routes the Misc specialist instance regions (Keyadjust, Title,
+Filepanel, Mccprefs, Scrmodelist, Window/Panel, Protection, and Fontdisplay)
+through named region selection and `MuiMiscStateMemoryCodec`. Direct region
+resolution is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage is now **2384/2384**, and
+`MiscAdmissionRoot` passes on MC68000 (**9392-byte HUNK, 12212 instructions /
+123842 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1555 routes the MiscSpecialist header, Keyadjust, Title, Filepanel, owned
+string, Mccprefs, Scrmodelist, Window/Panel, Fontdisplay, page, registry, and
+row records through `MuiMiscRecordMemoryCodec`. Direct live serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2383/2383**, and `MiscAdmissionRoot`
+passes on MC68000 (**9588-byte HUNK, 12280 instructions / 124826 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1554 routes the Menustrip/Menu/Menuitem specialist method, get, set,
+pointer, pair, and popup packets through named packet structs and
+`MuiMenuSpecialistMessageMemoryCodec`. Direct packet serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage remains **2382/2382**, and
+`MenuSpecialistMessageCodecRoot` passes on MC68000 (**6396-byte HUNK, 7213
+instructions / 70260 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1553 routes the CollectionRecord EntryPool, Display, Compare, and TestPos
+packets through named packet structs and `MuiCollectionRecordMessageMemoryCodec`.
+Direct packet serialization is cursor-free; the compatibility cursor remains
+available for older callers. Package/local-SDK coverage is now **2382/2382**,
+and `CollectionRecordMessageStructRecordCodecRoot` passes on MC68000
+(**2888-byte HUNK, 3852 instructions / 36352 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1552 routes the Stringscroll derived viewport record through named `Magic`,
+`ViewportWidth`, `ViewportHeight`, `HorizontalVisible`, `VerticalVisible`,
+`MaxScrollX`, and `MaxScrollY` fields and
+`MuiStringscrollViewportStateMemoryCodec`, including typed Int32 accessors.
+Direct viewport serialization is cursor-free; the compatibility cursor remains
+available for older callers. Package/local-SDK coverage is now **2381/2381**,
+and `StringscrollLayoutAdmissionRoot` passes on MC68000 (**7848-byte HUNK,
+10599 instructions / 101836 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1551 routes the Stringscroll render-context record through named `Magic`,
+`RenderInfo`, `RastPort`, and `Font` fields and
+`MuiStringscrollRenderStateMemoryCodec`. Direct render-state serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2380/2380**, and
+`StringscrollLayoutAdmissionRoot` passes on MC68000 (**7840-byte HUNK, 11114
+instructions / 110208 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1550 routes the signed Stringscroll layout record through named `Magic`,
+`Left`, `Top`, `Width`, and `Height` fields and
+`MuiStringscrollLayoutStateMemoryCodec`, including typed Int32 accessors.
+Direct layout serialization is cursor-free; the compatibility cursor remains
+available for older callers. Package/local-SDK coverage is now **2379/2379**,
+and `StringscrollLayoutAdmissionRoot` passes on MC68000 (**7832-byte HUNK,
+11416 instructions / 115100 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1549 routes the Stringscroll composition/ownership record through named
+`Magic`, `Horizontal`, `Vertical`, `OwnedMask`, `LastHorizontalFirst`, and
+`LastVerticalFirst` fields and `MuiStringscrollCompositionMemoryCodec`.
+Direct composition serialization is cursor-free; the compatibility cursor
+remains available for older callers. Package/local-SDK coverage is now
+**2378/2378**, and `StringscrollAdmissionRoot` passes on MC68000
+(**9272-byte HUNK, 14660 instructions / 140270 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1548 routes the Stringscroll scrollbar-pointer record through named `Magic`,
+`HorizBar`, and `VertBar` fields and `MuiStringscrollScrollbarMemoryCodec`.
+Direct scrollbar serialization is cursor-free; the compatibility cursor
+remains available for older callers. Package/local-SDK coverage is now
+**2377/2377**, and `StringscrollAdmissionRoot` passes on MC68000
+(**9264-byte HUNK, 15104 instructions / 147482 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1547 routes the Stringscroll policy record through named `Magic`,
+`HorizBar`, `NoInput`, `SetMin`, `SetVMin`, `UseWinBorder`, `VertBar`, and
+`VertScrollerOnly` fields and `MuiStringscrollPolicyMemoryCodec`. Direct
+policy serialization is cursor-free; the compatibility cursor remains
+available for older callers. Package/local-SDK coverage is now **2376/2376**,
+and `StringscrollAdmissionRoot` passes on MC68000 (**9252-byte HUNK, 15335
+instructions / 151214 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1546 routes the Stringscroll content/scroll state record through named
+`Magic`, `String`, `ContentWidth`, `ContentHeight`, `ScrollX`, and `ScrollY`
+fields and `MuiStringscrollStateMemoryCodec`. Direct state serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2375/2375**, and
+`StringscrollAdmissionRoot` passes on MC68000 (**9240-byte HUNK, 15921
+instructions / 160746 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1532 routes List column-metrics state and measured-column value records
+through named fields and `MuiListColumnMetricsMemoryCodec`/
+`MuiListColumnMetricMemoryCodec`. Direct serialization is cursor-free; the
+compatibility cursors remain available for older callers. Package/local-SDK
+coverage is now **2361/2361**, and `ListFormatMetricsAdmissionRoot` passes on
+MC68000 (**7644-byte HUNK, 9375 instructions / 90204 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1533 routes List pointer-slot records and caller-owned record headers through
+named fields and `MuiListPointerSlotMemoryCodec`/
+`MuiListOwnedRecordHeaderMemoryCodec`. Direct serialization is cursor-free; the
+compatibility cursors remain available for older callers. Package/local-SDK
+coverage is now **2362/2362**. `ListPointerSlotCodecRoot` passes on MC68000
+(**2576-byte HUNK, 2191 instructions / 20094 cycles**) and
+`ListOwnedRecordHeaderCodecRoot` passes (**1520-byte HUNK, 344 instructions /
+3430 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1515 routes the fixed List index slot through named Entry and Flags fields
+and `MuiListSlotMemoryCodec`. Direct slot serialization is cursor-free; the
+compatibility cursor remains available for older callers. Package/local-SDK
+coverage is now **2344/2344**, and `ListSlotMemoryAdapterAdmissionRoot`
+passes on MC68000 (**1996-byte HUNK, 708 instructions / 6930 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1516 routes the List title-array state through named Magic, Pointers, and
+Count fields and `MuiListTitleArrayStateMemoryCodec`. Direct title-array
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage is now **2345/2345**, and
+`ListTitleArrayAdmissionRoot` passes on MC68000 (**3368-byte HUNK, 2894
+instructions / 27884 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1514 routes the multiplexed List state adapter through named fields from its
+fixed MorphOS records. Direct state access is cursor-free; the compatibility
+cursor remains available for older callers. Package/local-SDK coverage is now
+**2343/2343**, and `ListStateMemoryAdapterAdmissionRoot` passes on MC68000
+(**3844-byte HUNK, 786 instructions / 8000 cycles**). The overall MorphOS MUI
+goal remains open.
+
+MG1513 routes the four-field List column-order state through named fields and
+`MuiListColumnOrderStateMemoryCodec`. Live order-state serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage remains **2342/2342**, and
+`ListColumnOrderAdmissionRoot` passes on MC68000 (**3144-byte HUNK, 3526
+instructions / 33872 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1512 routes the nine-field List column-visibility record through named
+fields and `MuiListColumnVisibilityStateMemoryCodec`. Live visibility-state
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage remains **2342/2342**, and
+`ListColumnVisibilityAdmissionRoot` passes on MC68000 (**3296-byte HUNK, 6962
+instructions / 66254 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1511 routes the four-field List column-layout record through named fields
+and `MuiListColumnLayoutMemoryCodec`. Live layout serialization is cursor-free;
+the compatibility cursor remains available for older callers. Package/local-
+SDK coverage remains **2342/2342**, and `ListColumnLayoutAdmissionRoot` passes
+on MC68000 (**4088-byte HUNK, 3826 instructions / 37032 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1534 routes the Listtree header state through named fields and
+`MuiListtreeHeaderMemoryCodec`. Direct header serialization is cursor-free; the
+compatibility cursor remains available for older callers. Package/local-SDK
+coverage is now **2363/2363**, and `ListtreeHeaderPresentationAdmissionRoot`
+passes on MC68000 (**5664-byte HUNK, 11994 instructions / 113476 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1535 routes the Listtree FORMAT geometry record through named fields and
+`MuiListtreeColumnGeometryMemoryCodec`. Direct geometry serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2364/2364**, and
+`ListtreeColumnGeometryVectorStructCodecRoot` passes on MC68000 (**3396-byte
+HUNK, 3635 instructions / 33880 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1536 routes the Listtree display snapshot state through named fields and
+`MuiListtreeDisplaySnapshotMemoryCodec`. Direct snapshot serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2365/2365**, and
+`ListtreeNodeSnapshotAdmissionRoot` passes on MC68000 (**6604-byte HUNK,
+16074 instructions / 166414 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1537 routes the Listtree policy state through named fields and
+`MuiListtreePolicyMemoryCodec`. Direct policy and hook serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2366/2366**, and
+`ListtreePolicyHookPoolClickAdmissionRoot` passes on MC68000 (**7528-byte
+HUNK, 16794 instructions / 166862 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1538 routes the Listtree hook-pool state through named fields and
+`MuiListtreeHookPoolMemoryCodec`. Direct pool/ownership serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2367/2367**, and
+`ListtreePolicyHookPoolClickAdmissionRoot` passes on MC68000 (**7520-byte
+HUNK, 16350 instructions / 159650 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1539 routes the Listtree click state through named fields and
+`MuiListtreeClickStateMemoryCodec`. Direct click serialization is cursor-free;
+the compatibility cursor remains available for older callers. Package/local-
+SDK coverage is now **2368/2368**, and `ListtreePolicyHookPoolClickAdmissionRoot`
+passes on MC68000 (**7500-byte HUNK, 15835 instructions / 151278 cycles**).
+The overall MorphOS MUI goal remains open.
+
+MG1510 routes the two-field List column-geometry record through named fields
+and `MuiListColumnGeometryMemoryCodec`. Live column-geometry serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage remains **2342/2342**, and
+`ListColumnLayoutAdmissionRoot` passes on MC68000 (**4104-byte HUNK, 4128
+instructions / 41924 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1509 routes the six-field List edit-state record through named fields and
+`MuiListEditMemoryCodec`. Live edit-state serialization is cursor-free; the
+compatibility cursor remains available for older callers. Package/local-SDK
+coverage remains **2342/2342**, and `ListCoreAdmissionRoot` passes on MC68000
+(**6708-byte HUNK, 8667 instructions / 82882 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1508 routes the four-field List image-chain record through named fields and
+`MuiListImageMemoryCodec`. Live image-state serialization is cursor-free; the
+compatibility cursor remains available for older callers. Package/local-SDK
+coverage remains **2342/2342**, and `ListCoreAdmissionRoot` passes on MC68000
+(**6708-byte HUNK, 8667 instructions / 82882 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1507 routes the seven-field List horizontal-scroller policy record through
+named fields and `MuiListHScrollerStateMemoryCodec`. Live policy-state
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage remains **2342/2342**, and
+`ListCoreAdmissionRoot` passes on MC68000 (**6708-byte HUNK, 8969 instructions /
+87774 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1506 routes the two-field Listview owner sidecar through named fields and
+`MuiListviewOwnerStateMemoryCodec`. Live ownership-state serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage remains **2342/2342**, and `ListCoreAdmissionRoot`
+passes on MC68000 (**6700-byte HUNK, 9484 instructions / 96146 cycles**). The
+overall MorphOS MUI goal remains open.
+
+MG1517 routes the List title state through named Magic and Value fields and
+`MuiListTitleStateMemoryCodec`. Direct title-state serialization is cursor-free;
+the compatibility cursor remains available for older callers. Package/local-
+SDK coverage is now **2346/2346**, and `ListTitlePolicyAdmissionRoot` passes on
+MC68000 (**7224-byte HUNK, 7754 instructions / 77912 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1505 routes the five-field List header record through named fields and
+`MuiListHeaderMemoryCodec`. Live header serialization is cursor-free; the
+compatibility cursor remains available for older callers. Package/local-SDK
+coverage remains **2342/2342**, and `ListHeaderEditAdmissionRoot` passes on
+MC68000 (**4964-byte HUNK, 7536 instructions / 75528 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1504 routes the seven-field Area geometry record through named fields and
+`MuiAreaGeometryStateRecordMemoryCodec`. Live geometry serialization is
+cursor-free and typed; numeric-offset overloads remain only for bounded
+compatibility diagnostics. Package/local-SDK coverage remains **2342/2342**,
+and `AreaGeometryStateRecordCodecRoot` passes on MC68000 (**3920-byte HUNK,
+3928 instructions / 38118 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1503 routes the two-field Listview external scroller connection sidecar
+through named fields and
+`MuiListviewExternalScrollerConnectionMemoryCodec`. Live connection-state
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage remains **2342/2342**, and
+`ListviewCoreAdmissionRoot` passes on MC68000 (**10260-byte HUNK, 16923
+instructions / 157864 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1502 routes the five-field Listview scroller projection through named fields
+and `MuiListviewScrollerMemoryCodec`. Live scroller-state serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage remains **2342/2342**, and
+`ListviewCoreAdmissionRoot` passes on MC68000 (**10260-byte HUNK, 16923
+instructions / 157864 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1501 routes the three-field Listview RenderInfo state through named fields
+and `MuiListviewRenderMemoryCodec`. Live render-state serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage remains **2342/2342**, and
+`ListviewCoreAdmissionRoot` passes on MC68000 (**10260-byte HUNK, 16923
+instructions / 157864 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1500 routes the nine-field Listview layout record through named fields and
+`MuiListviewLayoutMemoryCodec`. Live layout-state serialization is cursor-free;
+the compatibility cursor remains available for older callers. Package/local-
+SDK coverage remains **2342/2342**, and `ListviewCoreAdmissionRoot` passes on
+MC68000 (**10260-byte HUNK, 16923 instructions / 157864 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1499 routes the two-field Listview selection-signal record through named
+fields and `MuiListviewSelectionSignalMemoryCodec`. Live selection-state
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage remains **2342/2342**, and
+`ListviewCoreAdmissionRoot` passes on MC68000 (**10360-byte HUNK, 17528
+instructions / 169364 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1498 routes the five-field Listview interaction-policy record through named
+fields and `MuiListviewInteractionPolicyMemoryCodec`. Live policy-state
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage remains **2342/2342**, and
+`ListviewCoreAdmissionRoot` passes on MC68000 (**10364-byte HUNK, 17725
+instructions / 172124 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1497 routes the Listview click-publication record through named fields and
+`MuiListviewClickStateMemoryCodec`. Live click-state serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage remains **2342/2342**, and
+`ListviewCoreAdmissionRoot` passes on MC68000 (**10508-byte HUNK, 18149
+instructions / 179054 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1496 routes the Listview child-state record through named fields and
+`MuiListviewChildStateMemoryCodec`. Live child-state serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage remains **2342/2342**, and
+`ListviewCoreAdmissionRoot` passes on MC68000 (**10540-byte HUNK, 18618
+instructions / 187052 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1495 routes the Color specialist Pendisplay pen-spec, specialist sidecar,
+and RGB records through named fields and `MuiColorRecordMemoryCodec`. Live
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage remains **2342/2342**, and
+`ColorAdmissionRoot` passes on MC68000 (**5712-byte HUNK, 12897 instructions /
+122176 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1494 routes the shared Dirlist byte-total, entry-header, scan-entry,
+sort/filter, and scan-state records through named fields and
+`MuiDirlistRecordMemoryCodec`. Live serialization is cursor-free; the
+compatibility cursor remains available for older callers. Package/local-SDK
+coverage remains **2342/2342**, and `DirlistStateAdmissionRoot` passes on
+MC68000 (**1216-byte HUNK, 361 instructions / 4910 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1493 routes the 52-byte Menu specialist sidecar record through named fields
+and `MuiMenuRecordMemoryCodec`. Live menu-state serialization is cursor-free;
+the compatibility cursor remains available for older callers and
+adapter-focused tests. Package/local-SDK coverage remains **2342/2342**, and
+`MenuAdmissionRoot` passes on MC68000 (**6628-byte HUNK, 9120 instructions /
+84504 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1492 routes the Listview horizontal scroller projection and horizontal/
+vertical drag-state records through named fields and direct bounded memory
+adapters. Live scroller/drag serialization is cursor-free; compatibility
+wrappers remain available for older callers. Package/local-SDK coverage remains
+**2342/2342**, and `ListviewHorizontalScrollerAdmissionRoot` passes on MC68000
+(**8716-byte HUNK, 16051 instructions / 148204 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1491 routes the 28-byte Listtree presentation-state record through named
+fields and `MuiListtreePresentationMemoryCodec`. Live presentation
+serialization is cursor-free; the compatibility cursor remains available for
+older callers and adapter-focused tests. Package/local-SDK coverage remains
+**2342/2342**, and `ListtreeHeaderPresentationAdmissionRoot` passes on MC68000
+(**5688-byte HUNK, 12864 instructions / 127648 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1490 routes the MorphOS Family mutation packets through named packed records
+and `MuiFamilyPacketMemoryCodec`. Live AddHead, AddTail, Remove, Insert,
+Transfer, and fixed Reorder/Sort header serialization is cursor-free; inline
+Reorder/Sort vector traversal and the two-pointer Family list record use
+separate bounded adapters. Package/local-SDK coverage remains **2342/2342**,
+and the focused `FamilyMutationMessageCodecRoot` passes on MC68000
+(**4184-byte HUNK, 2604 instructions / 25044 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1474 routes the 48-byte muimaster private root through the named
+`MuiMasterPrivateRoot` and direct record/field memory adapter. Live root
+serialization is cursor-free; the cursor overload remains available for older
+callers. Package/local-SDK coverage remains **2338/2338**; the overall MorphOS
+MUI goal remains open.
+
+MG1475 routes the 20-byte drawing service-state record through the named
+`MuiDrawingServiceStateRecord` and direct drawing-record memory adapter. Live
+state serialization is cursor-free; the other drawing record families remain
+separate bounded adapters and the compatibility cursor remains available for
+older callers. Package/local-SDK coverage remains **2338/2338**; the overall
+MorphOS MUI goal remains open.
+
+MG1476 routes the 16-byte drawing clip record through the named
+`MuiDrawingClipRecord` and direct drawing-record memory adapter. Live clip
+serialization is cursor-free; clip kind, layer, and token remain typed
+members, and the compatibility cursor remains available for older callers.
+Package/local-SDK coverage remains **2338/2338**; the overall MorphOS MUI goal
+remains open.
+
+MG1540 routes the Listtree click-column state through named fields and
+`MuiListtreeClickColumnMemoryCodec`. Direct column-history serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2369/2369**, and
+`ListtreeClickColumnSurfaceLifecycleAdmissionRoot` passes on MC68000
+(**6528-byte HUNK, 10067 instructions / 101958 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1477 routes the 16-byte drawing refresh record through the named
+`MuiDrawingRefreshRecord` and direct drawing-record memory adapter. Live
+refresh serialization is cursor-free; render-info, layer, and saved-flags
+remain typed members, and the compatibility cursor remains available for older
+callers. Package/local-SDK coverage remains **2339/2339**; the overall MorphOS
+MUI goal remains open.
+
+MG1478 routes the 12-byte drawing pen record through the named
+`MuiDrawingPenRecord` and direct drawing-record memory adapter. Live pen
+serialization is cursor-free; render-info, token, and next remain typed
+members, and the compatibility cursor remains available for older callers.
+Package/local-SDK coverage remains **2340/2340**; the overall MorphOS MUI goal
+remains open.
+
+MG1541 routes the Listtree surface state through named fields and
+`MuiListtreeSurfaceMemoryCodec`. Direct surface serialization is cursor-free;
+the compatibility cursor remains available for older callers. Package/local-
+SDK coverage is now **2370/2370**, and
+`ListtreeClickColumnSurfaceLifecycleAdmissionRoot` passes on MC68000
+(**6516-byte HUNK, 9552 instructions / 93586 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1479 routes the 28-byte drawing render-info record through the named
+`MuiDrawingRenderInfoRecord` and direct drawing-record memory adapter. Live
+render-info serialization is cursor-free; all seven pointer/flag members
+remain typed fields, and the compatibility cursor remains available for older
+callers. Package/local-SDK coverage remains **2341/2341**; the overall MorphOS
+MUI goal remains open.
+
+MG1480 routes the 4-byte drawing raster-port record through the named
+`MuiDrawingRasterPortRecord` and direct drawing-record memory adapter. Live
+layer resolution is cursor-free; the layer pointer remains a typed member, and
+the compatibility cursor remains available for older callers. Package/local-
+SDK coverage remains **2342/2342**; the overall MorphOS MUI goal remains open.
+
+MG1481 routes MorphOS color-specialist method, Get, Set, pointer, and RGB
+packets through their named packet structs and direct bounded message adapter.
+Live packet dispatch is cursor-free; packet kind and payload members remain
+typed, and the compatibility cursor remains available for older callers.
+Package/local-SDK coverage remains **2342/2342**; the overall MorphOS MUI goal
+remains open.
+
+MG1542 routes the Listtree lifecycle state through named fields and
+`MuiListtreeLifecycleMemoryCodec`. Direct lifecycle serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2371/2371**, and
+`ListtreeClickColumnSurfaceLifecycleAdmissionRoot` passes on MC68000
+(**6504-byte HUNK, 9250 instructions / 88694 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1482 routes MorphOS collection-basic GetEntry, Select, and method packets
+through named packet structs and the direct `(message, packet, field)` memory
+adapter. Live collection dispatch is cursor-free; position, storage, select,
+and method members remain typed, and the compatibility cursor remains available
+for older callers. Package/local-SDK coverage remains **2342/2342**; the
+overall MorphOS MUI goal remains open.
+
+MG1518 routes the List selection-signal state through named Magic and Value
+fields and `MuiListSelectionSignalStateMemoryCodec`. Direct selection-signal
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage is now **2347/2347**, and
+`ListTitlePolicyAdmissionRoot` passes on MC68000 (**7220-byte HUNK, 7594
+instructions / 75340 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1483 routes MorphOS collection-advanced InsertSingle, Insert, Position,
+Redraw, Pointer, Pair, CreateImage, and method packets through named packet
+structs and direct message adapters. Live advanced dispatch is cursor-free; all
+payload members remain typed, and the compatibility cursor remains available
+for older callers. Package/local-SDK coverage remains **2342/2342**; the
+overall MorphOS MUI goal remains open.
+
+MG1519 routes the List FORMAT policy state through named Magic, Format,
+MaxColumns, and Columns fields and `MuiListFormatPolicyStateMemoryCodec`.
+Direct FORMAT-policy serialization is cursor-free; the compatibility cursor
+remains available for older callers. Package/local-SDK coverage is now
+**2348/2348**, and `ListTitlePolicyAdmissionRoot` passes on MC68000
+(**7216-byte HUNK, 7292 instructions / 70448 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1520 routes the List font state through named Magic and Font fields and
+`MuiListFontStateMemoryCodec`. Direct font-state serialization is cursor-free;
+the compatibility cursor remains available for older callers. Package/local-
+SDK coverage is now **2349/2349**, and `ListTitlePolicyAdmissionRoot` passes on
+MC68000 (**7200-byte HUNK, 7132 instructions / 67876 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1521 routes the List redraw state through named Magic, Dirty, and Requests
+fields and `MuiListRedrawStateMemoryCodec`. Direct redraw-state serialization
+is cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2350/2350**, and
+`ListRedrawAdmissionRoot` passes on MC68000 (**2680-byte HUNK, 2601
+instructions / 24892 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1484 routes MorphOS collection-edit CreateEditObject, Edit, EditDone, and
+EndEdit packets through named packet structs and a direct message adapter. Live
+edit dispatch is cursor-free; signed row/column and edit-object members remain
+typed, and the compatibility cursor remains available for older callers.
+Package/local-SDK coverage remains **2342/2342**; the overall MorphOS MUI goal
+remains open.
+
+MG1543 routes the 64-byte Listtree node record through named fields and
+`MuiListtreeNodeMemoryCodec`, including typed 16-bit and 32-bit accessors.
+Direct node serialization is cursor-free; the compatibility cursor remains
+available for older callers. Package/local-SDK coverage is now **2372/2372**,
+and `ListtreeNodeSnapshotAdmissionRoot` passes on MC68000 (**6532-byte HUNK,
+15206 instructions / 150552 cycles**). The overall MorphOS MUI goal remains
+open.
+
+MG1544 routes the mixed-width Listtree TestPos result through named fields and
+`MuiListtreeTestPosMemoryCodec`, preserving typed 16-bit and 32-bit accessors.
+Direct TestPos serialization is cursor-free; the compatibility cursor remains
+available for older callers. Package/local-SDK coverage is now **2373/2373**,
+and `ListtreeDropMarkTestPosPacketCodecRoot` passes on MC68000 (**3776-byte
+HUNK, 1780 instructions / 17464 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1545 routes the Listtree display-column record through the named text field
+and `MuiListtreeDisplayColumnMemoryCodec`. Direct display-column serialization
+is cursor-free and no longer performs a raw word access. Package/local-SDK
+coverage is now **2374/2374**, and
+`ListtreeDisplayColumnVectorStructCodecRoot` passes on MC68000 (**1464-byte
+HUNK, 1684 instructions / 15034 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1485 routes MorphOS collection-surface Layout, AskMinMax, Draw, HandleInput,
+and attribute packets through named packet structs and direct message adapters.
+Live surface dispatch is cursor-free; geometry, input, and attribute members
+remain typed, and the compatibility cursor remains available for older callers.
+Package/local-SDK coverage remains **2342/2342**; the overall MorphOS MUI goal
+remains open.
+
+MG1486 routes the shared MorphOS common-control method, signed/numeric,
+stringify, HandleEvent, Get, attribute, and AskMinMax packets through named
+packet structs and the direct message-memory adapter. Live scalar/event
+dispatch is cursor-free; the four-byte method header uses a specialized
+complete-record adapter for `MuiCommonMethodMessage`, while the compatibility
+cursor remains available for older callers. Package/local-SDK coverage remains
+**2342/2342**; the overall MorphOS MUI goal remains open.
+
+MG1487 routes the shared MorphOS layout AskMinMax, Relayout, rectangle, text,
+render-info, flags, TextDimensions, and Layout packets through named packed
+records and the direct `MuiLayoutMessageMemoryCodec`. Live layout decoding is
+cursor-free, including the complete Layout record; named record constants own
+the fixed wire positions while the compatibility cursor and raw offset reader
+remain available only for older callers. Package/local-SDK coverage remains
+**2342/2342**; the overall MorphOS MUI goal remains open.
+
+MG1488 routes Group MoveMember, Reorder, and Sort packets through named packed
+records and `MuiGroupOrderingPacketMemoryCodec`. Live ordering serialization is
+cursor-free; each packet's complete span and fixed field positions are owned by
+the corresponding named struct, while the compatibility cursor remains
+available for older callers. Package/local-SDK coverage remains **2342/2342**;
+the overall MorphOS MUI goal remains open.
+
+MG1489 routes Group forward, child-list, child-entry, and Exec-list records
+through `MuiGroupRecordMemoryCodec`. Live state and projection serialization is
+cursor-free; the mixed-width Exec-list record names its LONG and byte fields
+and validates each bounded field size. The compatibility cursor remains
+available for older callers. Package/local-SDK coverage remains **2342/2342**;
+the overall MorphOS MUI goal remains open.
+
+MG1470 routes Application WindowList state and Exec-style entry records through
+the named `MuiApplicationWindowListState` and
+`MuiApplicationWindowListEntry` structs and their direct bounded memory
+adapters. Live state/entry parsing is cursor-free; vector indexing remains a
+separate bounded adapter and compatibility cursors remain available for older
+callers. Package/local-SDK coverage remains **2337/2337**; the overall MorphOS
+MUI goal remains open.
+
+MG1471 routes the five-LONG Application/Window queue node through the named
+`MuiApplicationWindowNodeRecord` and direct bounded memory adapter. Live node
+serialization is cursor-free; the inline packet payload remains separately
+bounded and the compatibility cursor remains available for older callers.
+Package host coverage is **2338/2338**; the overall MorphOS MUI goal remains
+open.
+
+MG1472 routes the six-LONG input-handler record through the named
+`MuiInputHandlerRecord` and direct bounded memory adapter. Live handler
+serialization is cursor-free; packet identity remains a typed member and the
+compatibility cursor remains available for older callers. Package/local-SDK
+coverage is **2338/2338**; the overall MorphOS MUI goal remains open.
+
+MG1473 routes the mixed-width event-handler node through the named
+`MuiEventHandlerNodeRecord` and direct bounded memory adapter. Live
+byte/word/long serialization is cursor-free; exact packed sizes remain
+adapter-owned and the compatibility cursor remains available for older
+callers. Package/local-SDK coverage is **2338/2338**; the overall MorphOS MUI
+goal remains open.
+
+MG1461 routes the fixed eight-byte Image geometry record through the named
+`MuiImageGeometryState` and bounded `MuiImageGeometryMemoryCodec`. Live image
+geometry serialization is cursor-free below the record adapter, with named
+signed edge and unsigned dimension fields. Package/local-SDK coverage remains
+**2337/2337**; the overall MorphOS MUI goal remains open.
+
+MG1465 routes Application/window ConfigID, CheckRefresh, Loop, WindowMethod,
+and Snapshot readers through named packet records and the direct bounded memory
+adapter. Live method parsing is cursor-free below the packet adapter; the
+compatibility cursor remains available for existing callers. Package/local-SDK
+coverage remains **2337/2337**; the overall MorphOS MUI goal remains open.
+
+MG1466 routes Application/Window menu query/set readers through named packet
+records and the direct bounded memory adapter. Live menu parsing is cursor-free
+below the packet adapter; the compatibility cursor remains available for
+existing callers. Package/local-SDK coverage remains **2337/2337**; the overall
+MorphOS MUI goal remains open.
+
+MG1522 routes the List active-row state through named Magic, HasActive, and
+Active fields and `MuiListActiveStateMemoryCodec`. Direct active-row
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage is now **2352/2352**, and
+`ListActiveAdmissionRoot` passes on MC68000 (**2704-byte HUNK, 2607
+instructions / 24946 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1523 routes the List viewport state through named pixel, row, line-height,
+visibility, and drop-mark fields and `MuiListViewportStateMemoryCodec`. Direct
+viewport serialization is cursor-free; the compatibility cursor remains
+available for older callers. Package/local-SDK coverage remains **2352/2352**,
+and `ListViewportAdmissionRoot` passes on MC68000 (**3180-byte HUNK, 6266
+instructions / 59672 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1467 routes Window AddEventHandler/RemoveEventHandler packet reads and
+writes through the named `MuiWindowEventHandlerMessage` and direct bounded
+memory adapter. Live registration parsing is cursor-free below the packet
+adapter; the compatibility cursor remains available for existing callers.
+Package/local-SDK coverage remains **2337/2337**; the overall MorphOS MUI goal
+remains open.
+
+MG1468 routes the Window SetCycleChain MethodID/FirstObject header through the
+named `MuiWindowCycleChainMessage` and direct bounded memory adapter. Live
+header parsing is cursor-free; inline object-vector traversal remains a
+separate bounded adapter. Package/local-SDK coverage remains **2337/2337**;
+the overall MorphOS MUI goal remains open.
+
+MG1469 routes the complete Exec AppMessage record through named mixed-width
+fields and the direct `MuiAppMessageRecordMemoryCodec`. Live AppMessage
+serialization is cursor-free below the record adapter; the Exec node prefix
+remains a separate named boundary. Package/local-SDK coverage remains
+**2337/2337**; the overall MorphOS MUI goal remains open.
+
+MG1464 routes Application SetConfigItem, OpenConfigWindow, BuildSettingsPanel,
+and SettingsIO readers through named packet records and the direct bounded
+memory adapter. Live settings parsing is cursor-free below the packet adapter;
+the compatibility cursor remains available for existing callers.
+Package/local-SDK coverage remains **2337/2337**; the overall MorphOS MUI goal
+remains open.
+
+MG1463 routes Application ShowHelp/AboutMUI presentation readers through named
+packet records and the direct bounded memory adapter. Live presentation parsing
+is cursor-free below the packet adapter; the compatibility cursor remains
+available for existing callers. Package/local-SDK coverage remains
+**2337/2337**; the overall MorphOS MUI goal remains open.
+
+MG1462 routes Application ReturnID/Input/InputBuffered/InputHandler and
+Push/Unpush packet readers through named records and direct bounded memory
+adapters. The PushMethod caller-owned parameter tail remains a separate
+bounded vector boundary; compatibility cursors are not below live parsing.
+Package/local-SDK coverage remains **2337/2337**; the overall MorphOS MUI goal
+remains open.
+
+MG1460 routes caller-owned Cycle/Radio choice entries through the named packed
+`MuiChoiceEntry` and bounded `MuiChoiceEntryMemoryCodec`. Live choice parsing
+is cursor-free below the record adapter; vector indexing remains bounded.
+Package/local-SDK coverage remains **2337/2337**. The overall MorphOS MUI goal
+remains open.
+
+MG1459 routes the Pop specialist method/Get/Set/Close packet family through
+named records and the bounded `MuiPopSpecialistMessageMemoryCodec`. Live Pop
+dispatch is cursor-free below the packet adapter; the legacy cursor remains
+only a compatibility adapter. Package/local-SDK coverage remains
+**2337/2337**. The overall MorphOS MUI goal remains open.
+
+MG1458 routes MorphOS Notify WriteLong and WriteString envelopes through named
+packed records and bounded `MuiNotifyWritePacketMemoryCodec`. Method,
+value/string, and destination extraction is cursor-free below the packet
+codecs; the legacy cursor remains only a compatibility adapter. Package/
+local-SDK coverage remains **2337/2337**. The overall MorphOS MUI goal remains
+open.
+
+MG1457 routes the MorphOS `MUIM_SetAsString` packet through the named packed
+`MuiSetAsStringMessage` and bounded `MuiSetAsStringMessageMemoryCodec`.
+Method/header and attribute/format/value extraction are cursor-free below the
+packet codec; the legacy cursor remains only a compatibility adapter.
+Package/local-SDK coverage remains **2337/2337**. The overall MorphOS MUI goal
+remains open.
+
+MG1456 routes the shared Pop*/Filepanel hook scratch packet through the named
+packed `MuiSpecialistHookMessage` and bounded
+`MuiSpecialistHookMessageRecordMemoryCodec`. Hook dispatch is cursor-free
+below the record codec; the legacy cursor remains only a compatibility
+adapter. Package/local-SDK coverage remains **2337/2337**. The overall
+MorphOS MUI goal remains open.
+
+MG1524 routes the List interaction policy through named Magic, Input,
+MultiSelect, and ScrollerPos fields and
+`MuiListInteractionPolicyStateMemoryCodec`. Direct interaction-policy
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage is now **2354/2354**, and
+`ListInteractionClickAdmissionRoot` passes on MC68000 (**4812-byte HUNK, 7904
+instructions / 75358 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1525 routes the List click state through named Magic, ClickColumn,
+DoubleClick, AgainClick, Clicks, and DefClickColumn fields and
+`MuiListClickStateMemoryCodec`. Direct click-state serialization is cursor-free;
+the compatibility cursor remains available for older callers. Package/local-
+SDK coverage remains **2354/2354**, and
+`ListInteractionClickAdmissionRoot` passes on MC68000 (**4812-byte HUNK, 7904
+instructions / 75358 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1455 routes fixed BOOPSI `OM_SET` and `OM_UPDATE` packets through named
+packed records and bounded memory adapters. Live attribute-list, GadgetInfo,
+and update-flag extraction is cursor-free below the packet codecs. Package/
+local-SDK coverage remains **2337/2337**. The overall MorphOS MUI goal remains
+open.
+
+MG1454 routes the shared headless method header through the named packed
+`MuiHeadlessMethodMessage` and bounded
+`MuiHeadlessMethodMessageRecordMemoryCodec`. Dispatcher extraction is
+cursor-free below the record codec; the legacy cursor remains only a
+compatibility adapter. Package/local-SDK coverage remains **2337/2337**. The
+overall MorphOS MUI goal remains open.
+
+MG1453 routes fixed GadTools NewMenu entries through the named packed
+`MuiNewMenuRecord` and bounded `MuiNewMenuRecordMemoryCodec`. Live MakeObject
+menu parsing is cursor-free below the record codec; the legacy cursor remains
+only a compatibility adapter. Package/local-SDK coverage remains
+**2337/2337**. The overall MorphOS MUI goal remains open.
+
+MG1452 routes the variable `MUI_MakeObjectA` parameter prefix through the
+named packed `MuiMakeObjectParameterRecord` and bounded
+`MuiMakeObjectParameterMemoryCodec`. Count-aware live reads are cursor-free;
+the legacy cursor remains only a compatibility adapter. Package/local-SDK
+coverage remains **2337/2337**. The overall MorphOS MUI goal remains open.
+
+MG1451 routes the live `MUIM_Family_DoChildMethods` packet through the named
+packed `MuiFamilyDoChildMethodsMessage` and bounded
+`MuiFamilyDoChildMethodsMessageMemoryCodec`. Method admission and forwarding
+are cursor-free below the packet codec; the legacy cursor remains only a
+compatibility adapter. Package/local-SDK coverage remains **2337/2337**. The
+overall MorphOS MUI goal remains open.
+
+MG1450 routes caller-owned requester ULONG slots through the named packed
+`MuiRequesterParameterSlot` record and bounded
+`MuiRequesterParameterSlotMemoryCodec`. Requester formatting is cursor-free
+below the slot codec; the legacy cursor remains only a compatibility adapter.
+Package/local-SDK coverage remains **2337/2337**. The overall MorphOS MUI goal
+remains open.
+
+MG1449 routes the Volumelist mode sidecar through the named packed
+`MuiVolumelistModeStateRecord` and bounded
+`MuiVolumelistModeStateRecordMemoryCodec`. The legacy field cursor remains
+only a compatibility adapter. Package/local-SDK coverage remains
+**2337/2337**. The overall MorphOS MUI goal remains open.
+
+MG1448 routes the Group grid specification through the named packed
+`MuiGroupGridSpec` record and bounded `MuiGroupGridSpecMemoryCodec`. The eight
+ULONG fields are owned by the struct; the legacy field cursor remains only a
+compatibility adapter. Package/local-SDK coverage remains **2337/2337**. The
+overall MorphOS MUI goal remains open.
+
+MG1430 moves live store-dispatch packet consumers to complete named packet
+structs through `MuiStorePacketCodec`. Method, clear, key, counter, Datamap
+Set/Get, and Objectmap Set packets use complete records; the legacy scalar
+cursor remains only for compatibility callers and selector admission. Focused
+packet coverage passes, and package/local-SDK coverage is **2336/2336**. The
+overall MorphOS MUI goal remains open.
+
+MG1431 routes live Dataspace and Dataspace-IFF packet consumers through their
+complete named records and bounded memory adapters. Legacy field cursors remain
+compatibility-only; IFF entry headers are serialized as complete named records,
+while the transfer cursor is limited to chunked byte streaming. Package and
+local-SDK coverage remains **2336/2336**. The overall MorphOS MUI goal remains
+open.
+
+MG1432 routes Area GoActive/GoInactive packet reads and writes through the
+complete named `MuiAreaActivationMessage` record and bounded memory codec. The
+field cursor remains compatibility-only. Package and local-SDK coverage
+remains **2336/2336**. The overall MorphOS MUI goal remains open.
+
+MG1433 routes Area custom-font Open/Close packet reads and writes through
+complete named `MuiAreaOpenCustomFontMessage` and
+`MuiAreaCloseCustomFontMessage` records and the bounded memory codec. Field
+cursors remain compatibility-only; struct-based writer overloads preserve
+complete packet shapes. Package and local-SDK coverage remains **2336/2336**.
+The overall MorphOS MUI goal remains open.
+
+MG1434 routes Area ShortHelp Check/Create/Delete packet reads and writes
+through complete named records and the bounded memory codec. Writers validate
+method IDs; field cursors remain compatibility-only. Package and local-SDK
+coverage remains **2336/2336**. The overall MorphOS MUI goal remains open.
+
+MG1435 routes Area drag method packet reads and writes through complete named
+records and the bounded memory codec. Struct-based overloads cover Begin,
+DoDrag, Create/DeleteDragImage, Drop, Event, Finish, Query, and Report; field
+cursors remain compatibility-only. Package and local-SDK coverage remains
+**2337/2337**. The overall MorphOS MUI goal remains open.
+
+MG1436 routes the fixed Area drag lifecycle state through the named
+`MuiAreaDragState` record and bounded memory codec. Live lifecycle code is
+cursor-free; the legacy cursor remains a compatibility adapter. Package and
+local-SDK coverage remains **2337/2337**. The overall MorphOS MUI goal remains
+open.
+
+MG1437 routes the fixed Floattext policy state through the named
+`MuiFloattextPolicyState` record and bounded memory codec. Live policy code is
+cursor-free; the legacy cursor remains a compatibility adapter. Package and
+local-SDK coverage remains **2337/2337**. The overall MorphOS MUI goal remains
+open.
+
+MG1438 routes Area `initResize`/`exitResize` packets and the fixed lifecycle
+state through named records and bounded memory codecs. Live packet and state
+code is cursor-free; legacy cursors remain compatibility adapters. Package and
+local-SDK coverage remains **2337/2337**. The overall MorphOS MUI goal remains
+open.
+
+MG1439 routes the shared fixed MinMax geometry record through the named
+`MuiMinMaxValues` struct and bounded memory codec. Live layout and listtree
+code is cursor-free; the legacy cursor remains a compatibility adapter. Package
+and local-SDK coverage remains **2337/2337**. The overall MorphOS MUI goal
+remains open.
+
+MG1440 routes the ASL TagItem record codec directly through the named
+`MuiAslTagItemRecord` memory adapter. The field cursor remains a compatibility
+adapter and vector traversal stays separate. Package and local-SDK coverage
+remains **2337/2337**. The overall MorphOS MUI goal remains open.
+
+MG1441 routes the CallHook packet codec directly through the named
+`MuiCallHookMessage` memory adapter. The method header and variadic parameter
+vector retain separate bounded record boundaries, while the field cursor
+remains compatibility-only. Package and local-SDK coverage remains
+**2337/2337**. The overall MorphOS MUI goal remains open.
+
+MG1442 routes the BoopsiQuery packet codec directly through the named
+`MuiBoopsiQueryMessage` memory adapter. Signed dimensions, pointers, and the
+method header retain named record boundaries while the field cursor remains
+compatibility-only. Package and local-SDK coverage remains **2337/2337**. The
+overall MorphOS MUI goal remains open.
+
+MG1443 makes the Error service state memory codec genuinely struct-first: it
+accepts records and named fields directly, the state codec is cursor-free, and
+the legacy cursor remains compatibility-only. Package and local-SDK coverage
+remains **2337/2337**. The overall MorphOS MUI goal remains open.
+
+MG1444 makes the Group ActivePage state memory codec genuinely struct-first:
+it accepts records and named fields directly, page-state serialization is
+cursor-free, and the legacy cursor remains compatibility-only. Package and
+local-SDK coverage remains **2337/2337**. The overall MorphOS MUI goal remains
+open.
+
+MG1445 makes Group change packets and bracket state struct-first. Method-only,
+`ExitChange2`, and state records use the named record-kind memory adapter
+directly; the typed cursor remains compatibility-only. Package and local-SDK
+coverage remains **2337/2337**. The overall MorphOS MUI goal remains open.
+
+MG1446 makes Family_GetChild packet decoding struct-first. The complete named
+packet and method-only header use the bounded memory adapter directly; the
+typed cursor remains compatibility-only. Package and local-SDK coverage
+remains **2337/2337**. The overall MorphOS MUI goal remains open.
+
+MG1447 makes Object persistence Export/Import packet decoding struct-first.
+The complete named method/dataspace envelope uses its bounded memory adapter
+directly; the typed cursor remains compatibility-only. Package and local-SDK
+coverage remains **2337/2337**. The overall MorphOS MUI goal remains open.
+
+MG1429 makes Datamap and Objectmap iteration continuation-safe when the
+current record is removed. The named guest-resident
+`MuiStoreIterationStateRecord` keeps current and successor records per
+caller-owned counter; Clear and object disposal release it. Focused coverage
+proves sorted alpha -> middle -> zulu continuation, and package/local-SDK
+coverage is **2335/2335**. The overall MorphOS MUI goal remains open.
+
+MG1426 gives recognized Dataspace, Datamap, and Objectmap instances a private
+Exec pool at construction when no external `MUIA_*_Pool` is supplied. The
+named guest-resident `MuiStorePoolStateRecord` carries the pool and ownership
+through disposal; supplied external pools remain caller-owned. Focused
+default-pool coverage is **2/2**; package and local-SDK coverage are
+**2332/2332**, and native-root build has **0 errors** with the existing
+SDK-overlap warnings.
+
+MG1427 aligns `MUIM_Dataspace_Merge` with MorphOS by returning the number of
+source entries added or replaced. `TryDataspaceMerge` keeps failure separate
+from the count, the boolean helper remains source-compatible, and both
+dispatchers use the count result through named store records.
+
+MG1428 keeps Datamap and Objectmap records in bounded MorphOS `strcmp` order.
+Their IterationKey methods report the key for the value most recently returned
+by Iterate without advancing the caller-owned counter, using the named store
+record chain.
+
+MG1425 applies MorphOS Objectmap ownership semantics to the named store
+records: replacement disposes the previous stored object, Remove transfers the
+object pointer to the caller, and Clear/object disposal release remaining
+entries. The live dispatcher returns the removed pointer; the boolean helper
+remains for existing source users. Objectmap CopyKeys copies MorphOS
+`CONST_STRPTR` keys into named storage, and lookup/iteration compare their
+string values. Focused Objectmap coverage is **3/3**;
+package and local-SDK host coverage are **2330/2330**, and native-root build
+has **0 errors** with the existing SDK-overlap warnings.
+
+MG1424 adds named `MuiStorePoolPolicyRecord` admission for the MorphOS
+Dataspace, Datamap, and Objectmap pool initializer attributes. Supplied
+external Exec pools back store records, copied keys, and data payloads, with
+allocator provenance retained for `FreePooled`; omitted pools use the existing
+allocator. The tags remain class-specific, initialization-only, and
+getterless. Package and local-SDK host coverage are **2327/2327**; native-root
+build has **0 errors** (41 existing SDK-overlap warnings).
+
+MG1423 adds named `MuiStoreMethodKind` classification for Dataspace, Datamap,
+and Objectmap packets. Known store objects reject packets for another store
+class at broad and focused dispatcher boundaries, while unknown compatibility
+objects retain the generic path. Package coverage is **2325/2325**; the
+overall goal remains open.
+
+MG1422 adds the named `MuiStorePolicyRecord` for Datamap/Objectmap AutoLock and
+CopyKeys policy. `Objectmap.mui` is recognized as a separate non-Area store
+class; known stores reject cross-class policy tags, and the `[I..]` policy
+attributes are protected from runtime Set/Get while store dispatch consumes
+the typed values. Package and local-SDK host coverage are **2324/2324**; the
+overall goal remains open.
+
+MG1421 recognizes `Datamap.mui` and adds the MorphOS V20
+`MUIA_Datamap_Count` getter-only projection. The count traverses named
+`MuiStoreRecord` values with bounded, fail-closed validation; pool ownership
+and undocumented Datamap.Get behavior remain outside this increment. Focused
+coverage is **4/4**; the overall goal remains open.
+
+MG1420 recognizes `Dataspace.mui` and adds the MorphOS V20
+`MUIA_Dataspace_Count` getter-only projection. The count traverses named
+`MuiStoreRecord` values with bounded, fail-closed validation and does not
+invent pool behavior. Focused coverage is **3/3**; the overall goal remains
+open.
+
+MG1419 adds MorphOS `MUIA_Gauge_InfoRate` as a dedicated signed-LONG state
+struct and bounded guest codec. Construction, Set/Get, and OM_GET preserve
+two's-complement values and reject malformed state; the attribute's timing
+meaning remains intentionally unspecified because MorphOS documents it as
+undocumented. Package host coverage is **2317/2317** and the overall goal
+remains open.
+
+MG1418 restores MorphOS's obsolete `MUIA_Application_Menu` compatibility alias
+over the typed `MUIA_Application_Menustrip` relationship. The alias dispatch
+path uses the existing `MuiApplicationObjectStateRecord`, validates and owns
+the live Menustrip family edge during initialization, rejects writes after
+application startup, and projects both getters from the same named record.
+Package host coverage is **2314/2314**; native ABI qualification and complete
+MorphOS differential parity remain progressive. The overall goal remains open.
+
+MG1383 removes unused raw-offset pointer helpers and generic linked-list
+routines from the dispatch/object cores. Active linked records continue to
+use named codecs; host coverage remains **2274/2274**, with existing
+freestanding qualification gates unchanged.
+
+MG1384 applies the policy to the fixed 48-byte `MuiMasterPrivateRoot`.
+`MuiMasterPrivateRootFieldCursorCodec` and `MuiMasterPrivateRootCodec` now
+own field and full-record access, and `MuiMasterLifecycleCore` no longer
+touches a literal root offset. Host coverage remains **2275/2275**. The
+focused freestanding `MasterPrivateRootStructCodecRoot` has **13 reachable
+methods** and zero framework features, managed allocation sites, and loops:
+MC68000 is a **3640-byte** HUNK
+with **2094 bytes of ROM code** and **52 bytes of ROM rodata**;
+MC68020/MC68040 are **3768/3772 bytes** with **2222/2226 bytes of ROM code**.
+The 12 relocations are generated internal switch edges only. The overall
+MorphOS MUI goal remains open.
+
+MG1526 routes the List hook policy through named Magic, ConstructHook,
+DestructHook, DisplayHook, CompareHook, and MultiTestHook fields and
+`MuiListHookPolicyStateMemoryCodec`. Direct hook-policy serialization is
+cursor-free; the compatibility cursor remains available for older callers.
+Package/local-SDK coverage is now **2356/2356**, and
+`ListHookSortAdmissionRoot` passes on MC68000 (**4668-byte HUNK, 7206
+instructions / 68784 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1527 routes the List sort state through named Magic, SortColumn, and
+TitleClick fields and `MuiListSortStateMemoryCodec`. Direct sort-state
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage remains **2356/2356**, and
+`ListHookSortAdmissionRoot` passes on MC68000 (**4668-byte HUNK, 7206
+instructions / 68784 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1385 applies the struct-first policy to the transient String `SGH_KEY`
+command word. `MuiStringEditCommandRecord` and its bounded codec now own the
+EditHook command allocation, write, clear, and free path; consumer code no
+longer writes a literal command offset. Host coverage is **2276/2276**. The
+focused freestanding `StringEditCommandStructCodecRoot` has **8 reachable
+methods** and zero framework features, managed allocation sites, loops, and
+relocations: MC68000 is a **1608-byte** HUNK with **812 bytes of ROM code** and
+**4 bytes of ROM rodata**; MC68020/MC68040 are **1604/1608 bytes** with
+**808/810 bytes of ROM code**. The overall MorphOS MUI goal remains open.
+
+MG1386 applies the same policy to the shared four-byte headless method
+selector. `MuiHeadlessMethodMessage` now has a named field cursor and complete
+record codec, and all headless dispatchers obtain MethodID through that
+struct-backed boundary. The bounded adapter validates complete record and
+field ranges. Host coverage is **2277/2277**. The focused freestanding
+`HeadlessMethodStructCodecRoot` has **14 reachable methods** and zero framework
+features, managed allocation sites, loops, and relocations: MC68000 is a
+**2760-byte** HUNK with **1156 bytes of ROM code** and **4 bytes of ROM rodata**;
+MC68020/MC68040 are **2752/2752** bytes with **1146/1148 bytes of ROM code**.
+The overall MorphOS MUI goal remains open.
+
+MG1387 applies the struct-first policy to object-persistence scalar payloads.
+Export allocation, dataspace sizing, and import reads now use the existing
+named `MuiGuestUlongStorage` record and codec rather than a consumer-side word
+offset. Host coverage remains **2277/2277**. The existing focused freestanding
+`GuestUlongStorageStructCodecRoot` has **8 reachable methods** and zero
+framework features, managed allocation sites, loops, and relocations: MC68000
+is a **1680-byte** HUNK with **858 bytes of ROM code** and **4 bytes of ROM
+rodata**; MC68020/MC68040 are **1676/1676** bytes with **854/856 bytes of ROM
+code**. The overall MorphOS MUI goal remains open.
+
+MG1388 applies the struct-first policy to the shared Pop*/Filepanel hook
+scratch packet. `MuiSpecialistHookMessage` and its bounded field/record codecs
+now own the 16-byte MethodID/parameter/reserved layout; Filepanel filtering and
+Pop hook invocation use struct read/modify/write and no longer issue
+consumer-side method or parameter offsets. Host coverage is **2278/2278**.
+The focused freestanding `SpecialistHookMessageStructCodecRoot` has **13
+reachable methods** and zero framework features, managed allocation sites,
+loops, and relocations: MC68000 is a **3000-byte** HUNK with **1530 bytes of
+ROM code** and **4 bytes of ROM rodata**; MC68020/MC68040 are **3032/3032**
+bytes with **1564/1564 bytes of ROM code**. The overall MorphOS MUI goal
+remains open.
+
+MG1389 applies the struct-first policy to temporary Application settings
+save/load and Dataspace-IFF write iteration counters. Allocation, reset, and
+cleanup now use the named `MuiStoreIterationCounter` size and codec rather than
+repeated scalar byte counts in those consumers. Host coverage remains
+**2278/2278**. The
+focused freestanding `StoreIterationCounterStructCodecRoot` has **8 reachable
+methods** and zero framework features, managed allocation sites, loops, and
+relocations: MC68000 is a **1692-byte** HUNK with **842 bytes of ROM code** and
+**4 bytes of ROM rodata**; MC68020/MC68040 are **1688/1688** bytes with
+**838/840 bytes of ROM code**. The overall MorphOS MUI goal remains open.
+
+MG1390 applies the struct-first policy to the transient two-byte Keyadjust text
+scratch payload. `MuiKeyadjustTextRecord` (`Character` plus NUL `Terminator`)
+and its bounded codec now own HandleInput allocation, write, clear, and free
+operations; consumer code no longer owns a literal byte offset. Host coverage
+is **2279/2279**. The focused freestanding `KeyadjustTextStructCodecRoot` has
+**11 reachable methods** and zero framework features, managed allocation sites,
+loops, and relocations: MC68000 is a **2476-byte** HUNK with **1334 bytes of
+ROM code** and **4 bytes of ROM rodata**; MC68020/MC68040 are **2484/2484**
+bytes with **1342/1342 bytes of ROM code**. The overall MorphOS MUI goal
+remains open.
+
+MG1391 applies the struct-first policy to the generated BOOPSI method-message
+prefix. `MuiProcessMethodMessageHeader` and its bounded codec now own the
+Process/Slave dispatch MethodID write before the inline argument vector is
+filled; consumer code no longer issues a literal header write. Host coverage
+is **2280/2280**. The focused freestanding
+`ProcessMethodMessageHeaderStructCodecRoot` has **8 reachable methods** and
+zero framework features, managed allocation sites, loops, and relocations:
+MC68000 is a **1732-byte** HUNK with **894 bytes of ROM code** and **4 bytes of
+ROM rodata**; MC68020/MC68040 are **1728/1728** bytes with **892/892 bytes of
+ROM code**. The overall MorphOS MUI goal remains open.
+
+MG1392 applies the struct-first policy to the fixed four-byte preparse
+control-string scratch payload emitted by `MUI_MakeObjectA`.
+`MuiMakeObjectPreParseRecord` and its bounded codec now own Button/label
+construction of Escape, Command, Terminator, and the reserved byte as a
+complete record. Host coverage is **2281/2281**. The focused freestanding
+`MakeObjectPreParseStructCodecRoot` has **11 reachable methods** and zero
+framework features, managed allocation sites, loops, and relocations: MC68000
+is a **2680-byte** HUNK with **1498 bytes of ROM code** and **4 bytes of ROM
+rodata**; MC68020/MC68040 are **2716/2716** bytes with **1534/1534 bytes of
+ROM code**. The overall MorphOS MUI goal remains open.
+
+MG1393 applies the struct-first policy to the fixed 24-byte class-name scratch
+payload emitted by `MUI_MakeObjectA`. `MuiMakeObjectClassNameRecord` and its
+bounded codec now own the Text, Rectangle, Image, Cycle, Radio, Slider,
+String, Numericbutton, Menustrip, Menu, and Menuitem names as complete
+longword records; the anonymous byte writer is removed. Host coverage is
+**2282/2282**. The focused freestanding
+`MakeObjectClassNameStructCodecRoot` has **11 reachable methods** and zero
+framework features, managed allocation sites, loops, and relocations: MC68000
+is a **2840-byte** HUNK with **1650 bytes of ROM code** and **4 bytes of ROM
+rodata**; MC68020/MC68040 are **2892/2892** bytes with **1654/1654 bytes of
+ROM code**. The overall MorphOS MUI goal remains open.
+
+MG1394 applies the struct-first policy to Stringscroll's fixed 14-byte
+`scrollbar.mui` lookup payload. `MuiStringscrollScrollbarClassNameRecord` and
+its bounded codec now own the exact three longwords, trailing `i`, and NUL as
+one complete packed record; the production path no longer uses literal byte
+positions. Host coverage is **2283/2283**. The focused freestanding
+`StringscrollClassNameStructCodecRoot` has **15 reachable methods** and zero
+framework features, managed allocation sites, loops, and relocations: MC68000
+is a **3728-byte** HUNK with **2012 bytes of ROM code** and **4 bytes of ROM
+rodata**; MC68020/MC68040 are **3768/3776** bytes with **2052/2060 bytes of
+ROM code**. The overall MorphOS MUI goal remains open.
+
+MG1395 applies the struct-first policy to Application settings' fixed 14-byte
+`Dataspace.mui` lookup payload. `MuiApplicationSettingsDataspaceClassNameRecord`
+and its complete bounded codec now own the exact bytes written and cleared by
+the production path; literal byte-position assembly has been removed. Host
+coverage is **2284/2284** in both package and local-SDK modes. The focused
+freestanding `ApplicationSettingsClassNameStructCodecRoot` has **9 reachable
+methods** and zero framework features, managed allocation sites, loops, and
+relocations: MC68000 is a **1920-byte** HUNK with **1032 bytes of ROM code**
+and **4 bytes of ROM rodata**; MC68020/MC68040 are **1960/1960** bytes with
+**1070/1070 bytes of ROM code**. Native execution returns **42** after 400
+instructions and 4400 cycles. The overall MorphOS MUI goal remains open.
+
+MG1396 applies the struct-first policy to `IsWindowObject`'s fixed eleven-byte
+`Window.mui` class identity. `MuiWindowClassNameRecord` and its bounded codec
+now validate the two longwords, two trailing characters, and NUL as one packed
+struct instead of individual production byte reads. Host coverage is
+**2285/2285** in both package and local-SDK modes. The focused freestanding
+`WindowClassNameStructCodecRoot` has **9 reachable methods** and zero framework
+features, managed allocation sites, loops, and relocations: MC68000 is a
+**1876-byte** HUNK with **1046 bytes of ROM code** and **4 bytes of ROM rodata**;
+MC68020/MC68040 are **1912/1912** bytes with **1084/1084 bytes of ROM code**.
+Native execution returns **42** after 416 instructions and 4500 cycles. The
+overall MorphOS MUI goal remains open.
+
+MG1397 applies the struct-first policy to `IsGroupName`'s fixed ten-byte
+`Group.mui` class identity. `MuiGroupClassNameRecord` and its bounded codec now
+validate the two longwords, trailing `i`, and NUL as one packed struct instead
+of individual production byte reads. Host coverage is **2286/2286** in both
+package and local-SDK modes. The focused freestanding
+`GroupClassNameStructCodecRoot` has **9 reachable methods** and zero framework
+features, managed allocation sites, loops, and relocations: MC68000 is a
+**1808-byte** HUNK with **980 bytes of ROM code** and **4 bytes of ROM rodata**;
+MC68020/MC68040 are **1832/1832** bytes with **1004/1004 bytes of ROM code**.
+Native execution returns **42** after 382 instructions and 4120 cycles. The
+overall MorphOS MUI goal remains open.
+
+MG1398 applies the struct-first policy to `NameIsListtree`'s fixed thirteen-byte
+`Listtree.mcc` class identity. `MuiListtreeClassNameRecord` and its bounded
+codec now validate the three longwords and NUL as one packed struct instead of
+individual production byte reads. Host coverage is **2287/2287** in both
+package and local-SDK modes. The focused freestanding
+`ListtreeClassNameStructCodecRoot` has **9 reachable methods** and zero
+framework features, managed allocation sites, loops, and relocations: MC68000
+is a **1804-byte** HUNK with **966 bytes of ROM code** and **4 bytes of ROM
+rodata**; MC68020/MC68040 are **1828/1828** bytes with **990/990 bytes of ROM
+code**. Native execution returns **42** after 366 instructions and 4020 cycles.
+The overall MorphOS MUI goal remains open.
+
+MG1399 applies the struct-first policy to `IsRegisterName`'s fixed thirteen-byte
+`Register.mui` class identity. `MuiRegisterClassNameRecord` and its bounded
+codec now validate the three longwords and NUL as one packed struct instead of
+individual production byte reads. Host coverage is **2288/2288** in both
+package and local-SDK modes. The focused freestanding
+`RegisterClassNameStructCodecRoot` has **9 reachable methods** and zero
+framework features, managed allocation sites, loops, and relocations: MC68000
+is a **1804-byte** HUNK with **966 bytes of ROM code** and **4 bytes of ROM
+rodata**; MC68020/MC68040 are **1828/1828** bytes with **990/990 bytes of ROM
+code**. Native execution returns **42** after 366 instructions and 4020 cycles.
+The overall MorphOS MUI goal remains open.
+
+MG1400 applies the struct-first policy to `IsSelectgroupName`'s fixed
+sixteen-byte `Selectgroup.mui` class identity. `MuiSelectgroupClassNameRecord`
+and its bounded codec now validate the four longwords, including the
+terminating NUL, as one packed struct instead of individual production byte
+reads. Host coverage is **2289/2289** in both package and local-SDK modes. The
+focused freestanding `SelectgroupClassNameStructCodecRoot` has **7 reachable
+methods** and zero framework features, managed allocation sites, loops, and
+relocations: MC68000 is a **1628-byte** HUNK with **930 bytes of ROM code** and
+**4 bytes of ROM rodata**; MC68020/MC68040 are **1652/1652** bytes with
+**954/954 bytes of ROM code**. Native execution returns **42** after 352
+instructions and 3924 cycles. The overall MorphOS MUI goal remains open.
+
+MG1401 applies the struct-first policy to `IsScrollgroupName`'s fixed
+sixteen-byte `Scrollgroup.mui` class identity. `MuiScrollgroupClassNameRecord`
+and its bounded codec now validate the four longwords, including the
+terminating NUL, as one packed struct instead of individual production byte
+reads. Host coverage is **2290/2290** in both package and local-SDK modes. The
+focused freestanding `ScrollgroupClassNameStructCodecRoot` has **7 reachable
+methods** and zero framework features, managed allocation sites, loops, and
+relocations: MC68000 is a **1628-byte** HUNK with **930 bytes of ROM code** and
+**4 bytes of ROM rodata**; MC68020/MC68040 are **1652/1652** bytes with
+**954/954 bytes of ROM code**. Native execution returns **42** after 352
+instructions and 3924 cycles. The overall MorphOS MUI goal remains open.
+
+MG1402 applies the struct-first policy to `IsVirtgroupName`'s fixed fourteen-byte
+`Virtgroup.mui` class identity. `MuiVirtgroupClassNameRecord` and its bounded
+codec now validate the three longwords, trailing `i`, and NUL as one packed
+struct instead of individual production byte reads. Host coverage is
+**2291/2291** in both package and local-SDK modes. The focused freestanding
+`VirtgroupClassNameStructCodecRoot` has **9 reachable methods** and zero
+framework features, managed allocation sites, loops, and relocations: MC68000
+is a **1872-byte** HUNK with **1032 bytes of ROM code** and **4 bytes of ROM
+rodata**; MC68020/MC68040 are **1912/1912** bytes with **1070/1070 bytes of ROM
+code**. Native execution returns **42** after 400 instructions and 4400 cycles.
+The overall MorphOS MUI goal remains open.
+
+MG1403 applies the struct-first policy to the deterministic Volumelist fixture's
+fixed ten-byte `ExampleN:` name. `MuiDirlistExampleVolumeNameRecord` and its
+bounded codec now own the complete `Exam`/`pleN`/separator/NUL payload, so the
+producer no longer issues ten anonymous byte writes. Host coverage is
+**2293/2293** in both package and local-SDK modes. The focused freestanding
+`DirlistExampleVolumeNameStructCodecRoot` has **10 reachable methods**, zero
+framework features, managed allocation sites, loops, and relocations. Its
+MC68000 HUNK is **2008 bytes** with **1080 bytes of ROM code** and **4 bytes of
+ROM rodata**; MC68020/MC68040 artifacts are **2032/2032** bytes with
+**1102/1102 bytes of ROM code**. Native execution returns **42** after 411
+instructions and 4534 cycles. The overall MorphOS MUI goal remains open.
+
+The remaining nonzero guest-byte offsets are intentionally limited to variable
+C-string payload parsing and suffix checks. The fixed Image Spec prefix, List
+PREPARSE control prefixes, and NewMenu label lookahead now use named records;
+the remaining variable data stays bounds-checked cursor parsing.
+
+MG1404 applies the struct-first policy to the five fixed Color-specialist class
+identities: `Pendisplay.mui`, `Colorfield.mui`, `Coloradjust.mui`, `Palette.mui`,
+and `Penadjust.mui`. Their exact lengths and terminators now use named packed
+records and bounded codecs rather than byte-by-byte consumer checks. Host
+coverage is **2294/2294** in both package and local-SDK modes. The focused
+freestanding `ColorSpecialistClassNameStructCodecRoot` has **22 reachable
+methods**, zero framework features, managed allocation sites, loops, and
+relocations. Its MC68000 HUNK is **5916 bytes** with **3194 bytes of ROM code**
+and **4 bytes of ROM rodata**; MC68020/MC68040 artifacts are **6068/6068** bytes
+with **3348/3348 bytes of ROM code**. Native execution returns **42** after
+1379 instructions and 15340 cycles. The overall MorphOS MUI goal remains open.
+
+MG1405 applies the struct-first policy to the fixed Process-specialist class
+identities `Process.mui` and `Slave.mui`. Their exact layouts and NUL
+terminators now use named packed records and bounded codecs instead of
+byte-by-byte consumer checks. Host coverage is **2295/2295** in both package
+and local-SDK modes. The focused freestanding
+`ProcessSpecialistClassNameStructCodecRoot` has **13 reachable methods**, zero
+framework features, managed allocation sites, loops, and relocations. Its
+MC68000 HUNK is **2888 bytes** with **1452 bytes of ROM code** and **4 bytes of
+ROM rodata**; MC68020/MC68040 artifacts are **2912/2912** bytes with
+**1474/1474 bytes of ROM code**. Native execution returns **42** after 596
+instructions and 6414 cycles. The overall MorphOS MUI goal remains open.
+
+MG1406 applies the struct-first policy to the fixed external-wrapper class
+identities `Boopsi.mui` and `Dtpic.mui`. Their exact layouts and NUL
+terminators now use named packed records and bounded codecs instead of
+byte-by-byte consumer checks. Host coverage is **2296/2296** in package mode;
+local-SDK mode remains blocked by the pre-existing duplicate
+`MUI_LayoutMsg`/`MUI_MinMax`/`MUI_LayoutDimensions` type errors. The focused
+freestanding `ExternalWrapperClassNameStructCodecRoot` has **13 reachable
+methods**, zero framework features, managed allocation sites, loops, and
+relocations. Its MC68000 HUNK is **3060 bytes** with **1634 bytes of ROM code**
+and **4 bytes of ROM rodata**; MC68020/MC68040 artifacts are **3104/3104**
+bytes with **1680/1680 bytes of ROM code**. Native execution returns **42**
+after 749 instructions and 8036 cycles. The overall MorphOS MUI goal remains
+open.
+
+MG1407 applies the struct-first policy to the fixed menu-specialist class
+identities `Menu.mui`, `Menustrip.mui`, and `Menuitem.mui`. Their exact layouts
+and NUL terminators now use named packed records and bounded codecs instead of
+byte-by-byte consumer checks. Host coverage is **2297/2297** in package mode;
+local-SDK mode remains blocked by the pre-existing duplicate
+`MUI_LayoutMsg`/`MUI_MinMax`/`MUI_LayoutDimensions` type errors. The focused
+freestanding `MenuSpecialistClassNameStructCodecRoot` has **16 reachable
+methods**, zero framework features, managed allocation sites, loops, and
+relocations. Its MC68000 HUNK is **3856 bytes** with **2022 bytes of ROM code**
+and **4 bytes of ROM rodata**; MC68020/MC68040 artifacts are **3928/3928**
+bytes with **2096/2096 bytes of ROM code**. Native execution returns **42**
+after 980 instructions and 10604 cycles. The overall MorphOS MUI goal remains
+open.
+
+MG1408 applies the struct-first policy to the seven fixed Pop-specialist class
+identities `Popstring.mui`, `Popobject.mui`, `Poplist.mui`, `Popasl.mui`,
+`Popscreen.mui`, `Popcolor.mui`, and `Poppen.mui`. Their exact layouts and NUL
+terminators now use named packed records and bounded codecs instead of
+byte-by-byte consumer checks. Host coverage is **2298/2298** in package mode;
+local-SDK mode remains blocked by the pre-existing duplicate
+`MUI_LayoutMsg`/`MUI_MinMax`/`MUI_LayoutDimensions` type errors. The focused
+freestanding `PopSpecialistClassNameStructCodecRoot` has **28 reachable
+methods**, zero framework features, managed allocation sites, loops, and
+relocations. Its MC68000 HUNK is **7648 bytes** with **4162 bytes of ROM code**
+and **4 bytes of ROM rodata**; MC68020/MC68040 artifacts are **7872/7872**
+bytes with **4388/4388 bytes of ROM code**. Native execution returns **42**
+after 2232 instructions and 24298 cycles. The overall MorphOS MUI goal remains
+open.
+
+MG1409 applies the struct-first policy to the ten fixed Misc-specialist class
+identities `Keyadjust.mui`, `Panel.mui`, `Filepanel.mui`, `Fontdisplay.mui`,
+`FSProtectionBits.mui`, `Scrmodelist.mui`, `Argstring.mui`, `Aboutmui.mui`,
+`Mccprefs.mui`, and `Title.mui`. A named packed class-name record and bounded
+length-aware codec validate exact 10/13/14/16/21-byte layouts and NUL
+terminators instead of byte-by-byte consumer checks. Host coverage is
+**2299/2299** in package mode; local-SDK mode remains blocked by the
+pre-existing duplicate `MUI_LayoutMsg`/`MUI_MinMax`/`MUI_LayoutDimensions`
+type errors. The focused freestanding
+`MiscSpecialistClassNameStructCodecRoot` has **11 reachable methods**, zero
+framework features, managed allocation sites, loops, and relocations. Its
+MC68000 HUNK is **5136 bytes** with **4032 bytes of ROM code** and **4 bytes of
+ROM rodata**; MC68020/MC68040 artifacts are **5280/5328** bytes with
+**4176/4224 bytes of ROM code**. Native execution returns **42** after 9016
+instructions and 102380 cycles. The overall MorphOS MUI goal remains open.
+
+MG1410 applies the struct-first policy to the fixed four-byte `mui/`
+ClassService loader prefix through the named packed
+`MuiClassServiceLibraryPrefixRecord` read/write codecs. The appended class ID
+remains variable C-string data and stays in cursor-based copy logic. Package
+host coverage is **2300/2300**; local-SDK mode remains blocked by the
+pre-existing duplicate `MUI_LayoutMsg`/`MUI_MinMax`/`MUI_LayoutDimensions`
+type errors. Native smoke qualification is deferred for this isolated
+32-bit immediate-write shape.
+
+MG1411 applies the same policy to the two-byte
+`MUIO_MenustripNMCommandKeyCheck` label lookahead through the named packed
+`MuiMakeObjectMenuBarLabelRecord`; variable C-string validation remains
+cursor-based. Package host coverage is **2301/2301**. No standalone native
+artifact is claimed for this parser-only increment.
+
+MG1412 applies the struct-first policy to the fixed two-byte
+`MUIA_Image_Spec` kind/separator prefix through `MuiImageSpecPrefixRecord`.
+MG1413 applies it to the two- and three-byte List FORMAT PREPARSE control
+prefixes through the length-aware `MuiListPreparsePrefixRecord`. Variable
+payload parsing remains cursor-based. Package host coverage is **2303/2303**;
+no standalone native artifacts are claimed for these parser-only increments.
+
+MG1414 adds a named `MuiNewMenuTypeRecord` boundary and typed entry
+classification for `MUIO_MenustripNM`. End, title, item, sub-item, ignored,
+and image entry kinds are classified once from the packed NewMenu prefix;
+MorphOS image menu entries remain explicitly rejected, matching
+`Menuitem.mui`'s documented contract. Package host coverage is **2304/2304**.
+The overall MorphOS MUI implementation goal remains open.
+
+MG1415 projects `MUIA_Menuitem_Trigger` through the SDK's packed
+`Amiga.MenuItem` struct. Trigger publication now returns an owned, stable
+guest record whose flags, command byte, and mutual-exclusion mask reflect the
+Menuitem attributes; externally set trigger pointers remain borrowed. ItemFill/
+SelectFill point to a named packed IntuiText record and bounded copied title
+string. Trigger records are released with the owning Menuitem; image fills
+remain outside this increment. Host coverage is **2308/2308**. The overall
+MorphOS MUI implementation goal remains open.
+
+MG1416 keeps MorphOS `MUIA_Menuitem_CommandString` shortcuts out of
+Intuition's single-byte `COMMSEQ` projection. The typed MenuItem projection
+now emits `CommandSequence` and `Command` only for a validated one-character
+shortcut; multi-key command strings remain display-only. Runtime changes still
+refresh the same owned record through the struct codec. Package host coverage
+is **2309/2309**; native ABI qualification and complete MorphOS differential
+parity remain progressive.
+
+MG1417 makes `MUIM_ContextMenuBuild` return the typed static
+`MUIA_ContextMenu` pointer, or NULL when unset. Common-control and layout
+dispatch now share the named Area context-menu state and fail closed for
+malformed records instead of returning the default-builder sentinel. Package
+host coverage is **2311/2311**; the overall MorphOS MUI implementation goal
+remains open.
+
+MG1382 applies the struct-first policy to the fixed 40-byte List FORMAT
+descriptor. Delta, Weight, MinWidth, MaxWidth, Column, Flags, PREPARSE,
+PREPARSE-length, private storage, and storage-length now use
+`MuiListFormatDescriptorFieldCursorCodec`; vector bounds and complete-record
+checks remain in the bounded adapter. Host coverage remains **2274/2274**.
+The focused freestanding `ListFormatDescriptorVectorStructCodecRoot` has zero
+framework features, managed allocation sites, and loops: MC68000 is a
+**3440-byte** HUNK with **2150 bytes of ROM code**, **44 bytes of ROM rodata**,
+and **12 reachable methods**, with only **10 generated internal switch-edge
+relocations**; MC68020/MC68040 are **3516/3524** bytes with **2226/2234 bytes
+of ROM code**. The overall MorphOS MUI goal remains open.
+
+MG1381 applies the same rule to the temporary Listtree FORMAT column-geometry
+record. Width, Delta, Weight, MinWidth, MaxWidth, and Flags are read and
+written through `MuiListtreeColumnGeometryFieldCursorCodec`; the vector
+adapter still owns complete-record and bound checks. Host coverage remains
+**2274/2274**. The focused freestanding
+`ListtreeColumnGeometryVectorStructCodecRoot` produces zero framework
+features, managed allocation sites, and relocations: MC68000 is a
+**3276-byte** HUNK with **1948 bytes of ROM code**, **4 bytes of ROM rodata**,
+and **13 reachable methods**; MC68020/MC68040 are **3304/3308** bytes with
+**1976/1980 bytes of ROM code**. The overall MorphOS MUI goal remains open.
+
+MG1380 applies the same rule to the fixed BOOPSI `OM_SET` and `OM_UPDATE`
+packets. Named field codecs own MethodID, attributes, gadget-info, and update
+flags, and bounded writers reject truncated guest records. Host coverage is
+**2274/2274**. The focused freestanding `HeadlessOmRecordCodecRoot` produces
+zero framework features, managed allocation sites, and relocations: MC68000
+is a **4108-byte** HUNK with **2258 bytes of ROM code**, **4 bytes of ROM
+rodata**, and **17 reachable methods**; MC68020/MC68040 are **4148/4148** bytes
+with **2300/2300 bytes of ROM code**. The overall MorphOS MUI goal remains
+open.
+
+MG1379 makes Stringscroll automatic-scrollbar construction struct-first as
+well: its internal tag list is written as two named `MuiAslTagItemRecord`
+values through `MuiAslTagItemCodec`, including the complete TAG_DONE record.
+The focused automatic-scrollbar test and host suite pass (**2273/2273**); the
+overall MorphOS MUI goal remains open.
+
+MG1378 adds a struct-first writer for the fixed Set and NoNotifySet packet used
+by follow notifications. `MuiNotifyPacketCodec` publishes a complete
+`MuiSetAttributeMessage`, and Listview external-scroller notifications use that
+named record instead of writing three packet offsets. Host coverage is
+**2273/2273**; the focused MC68000 closure returns **42** after **3679
+instructions / 39818 cycles** from a **4172-byte** HUNK with **2618 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **14 reachable methods**, with no
+relocations, loops, framework features, or managed allocations. MC68020/MC68040
+HUNK artifacts are **4232/4236** bytes with **2678/2682 bytes of ROM code**.
+The overall MorphOS MUI goal remains open.
+
+MG1377 represents each `MUIM_CallHook` variadic ULONG as the named packed
+`MuiCallHookParameterRecord`. Its codec owns scalar access, while the vector
+adapter takes its element width from that record and its first-element boundary
+from the named CallHook message field. Host coverage is **2272/2272**; the
+focused MC68000 closure returns **42** after **605 instructions / 5922 cycles**
+from a **1172-byte** HUNK with **758 bytes of ROM code**, **4 bytes of ROM
+rodata**, and **4 reachable methods**, with no relocations, loops, framework
+features, or managed allocations. MC68020/MC68040 HUNK artifacts are
+**1156/1156** bytes with **742/744** bytes of ROM code. The overall MorphOS MUI
+goal remains open.
+
+MG1376 moves Notify/MultiSet inline-vector address resolution behind the
+struct-first memory adapter. Host coverage is **2271/2271**. The focused
+MC68000 closure `NotifyInlineVectorStructCodecRoot` returns **42** after
+**1189 instructions / 10934 cycles** from a **1560-byte** HUNK with **988 bytes
+of ROM code**, **4 bytes of ROM rodata**, **6 reachable methods**, and no
+relocations, loops, framework features, or managed allocations. MC68020/MC68040
+HUNK artifacts are **1548/1548** bytes with **974/974** bytes of ROM code. The
+overall MorphOS MUI goal remains open.
+
+MG1375 moves the two inline UpdateConfig redraw tables to separate named
+struct-first memory adapters. Host coverage is **2271/2271**. The focused
+MC68000 closure `UpdateConfigTableVectorStructCodecRoot` returns **42** after
+**1036 instructions / 9548 cycles** from a **1496-byte** HUNK with **936 bytes
+of ROM code**, **4 bytes of ROM rodata**, **5 reachable methods**, and no
+relocations, loops, framework features, or managed allocations. MC68020/MC68040
+HUNK artifacts are **1460/1464** bytes with **900/904** bytes of ROM code. The
+overall MorphOS MUI goal remains open.
+
+MG1374 moves the Family reorder/sort object-pointer vector to a named
+struct-first memory adapter. Host coverage is **2270/2270**. The focused
+MC68000 closure `FamilyMutationVectorStructCodecRoot` returns **42** after
+**1365 instructions / 12312 cycles** from a **1448-byte** HUNK with **900 bytes
+of ROM code**, **4 bytes of ROM rodata**, **5 reachable methods**, and no
+relocations, loops, framework features, or managed allocations. MC68020/MC68040
+HUNK artifacts are **1432/1432** bytes with **884/884** bytes of ROM code. The
+overall MorphOS MUI goal remains open.
+
+MG1373 moves external-wrapper caller TagItem lists, the five-entry remember
+buffer, and inline BOOPSI TagItems to named struct-first memory adapters. Host
+coverage is **2269/2269**. Focused MC68000 closures return **42** after
+**1361/12328**, **1044/9610**, and **1360/12316** instructions/cycles from
+HUNKs **1464/1436/1476** with **914/884/922 bytes of ROM code**. Each has 4
+bytes of ROM rodata, 5 reachable methods, and no relocations, loops, framework
+features, or managed allocations. MC68020/MC68040 HUNK artifacts are
+**1444/1448**, **1424/1428**, and **1456/1460** bytes. The overall MorphOS MUI
+goal remains open.
+
+MG1372 moves the temporary Listtree FORMAT geometry vector to a named
+struct-first memory adapter. Host coverage is **2266/2266**. The focused
+MC68000 closure `ListtreeColumnGeometryVectorStructCodecRoot` returns **42**
+after **1658 instructions / 14896 cycles** from a **1508-byte** HUNK with
+**974 bytes of ROM code**, **4 bytes of ROM rodata**, **5 reachable methods**,
+and no relocations, loops, framework features, or managed allocations.
+MC68020/MC68040 HUNK artifacts are **1484/1484** bytes with **950/952** bytes
+of ROM code. The overall MorphOS MUI goal remains open.
+
+MG1371 moves the temporary Listtree DisplayHook column vector to a named
+struct-first memory adapter. Host coverage is **2266/2266**. The focused
+MC68000 closure `ListtreeDisplayColumnVectorStructCodecRoot` returns **42**
+after **1684 instructions / 15034 cycles** from a **1464-byte** HUNK with
+**936 bytes of ROM code**, **4 bytes of ROM rodata**, **5 reachable methods**,
+and no relocations, loops, framework features, or managed allocations.
+MC68020/MC68040 HUNK artifacts are **1448/1448** bytes with **920/920** bytes
+of ROM code. The overall MorphOS MUI goal remains open.
+
+MG1370 moves the caller-owned Filepanel row table to a named struct-first
+memory adapter. Host coverage is **2264/2264**. The focused MC68000 closure
+`FilepanelRowVectorStructCodecRoot` returns **42** after **1334 instructions /
+11982 cycles** from a **1256-byte** HUNK with **838 bytes of ROM code**, **4
+bytes of ROM rodata**, **4 reachable methods**, and no relocations, loops,
+framework features, or managed allocations. MC68020/MC68040 HUNK artifacts are
+**1240/1240** bytes with **822/824** bytes of ROM code. The overall MorphOS MUI
+goal remains open.
+
+MG1369 moves the private Scrmodelist mode table to a named struct-first memory
+adapter. Host coverage is **2263/2263**. The focused MC68000 closure
+`ScrmodelistModeVectorStructCodecRoot` returns **42** after **1335
+instructions / 11940 cycles** from a **1228-byte** HUNK with **808 bytes of ROM
+code**, **4 bytes of ROM rodata**, **4 reachable methods**, and no relocations,
+loops, framework features, or managed allocations. MC68020/MC68040 HUNK
+artifacts are **1216/1216** bytes with **794/794** bytes of ROM code. The
+overall MorphOS MUI goal remains open.
+
+MG1368 moves the caller-owned Mccprefs gadget registry to a named struct-first
+memory adapter. Host coverage is **2262/2262**. The focused MC68000 closure
+`MccprefsRegistryVectorStructCodecRoot` returns **42** after **1313
+instructions / 11838 cycles** from a **1268-byte** HUNK with **844 bytes of ROM
+code**, **4 bytes of ROM rodata**, **4 reachable methods**, and no relocations,
+loops, framework features, or managed allocations. MC68020/MC68040 HUNK
+artifacts are **1244/1248** bytes with **820/824** bytes of ROM code. The
+overall MorphOS MUI goal remains open.
+
+MG1367 moves Poplist caller-owned and materialized pointer vectors to a named
+struct-first memory adapter. Host coverage is **2261/2261**. The focused
+MC68000 closure `PoplistArrayVectorStructCodecRoot` returns **42** after
+**1335 instructions / 11940 cycles** from a **1224-byte** HUNK with **808 bytes
+of ROM code**, **4 bytes of ROM rodata**, **4 reachable methods**, and no
+relocations, loops, framework features, or managed allocations. MC68020/MC68040
+HUNK artifacts are **1212/1212** bytes with **794/794** bytes of ROM code. The
+overall MorphOS MUI goal remains open.
+
+MG1366 moves the bounded Title page-table vector to a named struct-first
+memory adapter. Host coverage is **2260/2260**. The focused MC68000 closure
+`TitlePageVectorStructCodecRoot` returns **42** after **1334 instructions /
+11990 cycles** from a **1252-byte** HUNK with **842 bytes of ROM code**, **4
+bytes of ROM rodata**, **4 reachable methods**, and no relocations, loops,
+framework features, or managed allocations. MC68020/MC68040 HUNK artifacts are
+**1236/1236** bytes with **826/828** bytes of ROM code. The overall MorphOS MUI
+goal remains open.
+
+MG1365 moves the bounded UserData family-traversal frame stack to a named
+struct-first memory adapter. Host coverage is **2259/2259**. The focused
+MC68000 closure `UserDataTraversalFrameVectorStructCodecRoot` returns **42**
+after **1332 instructions / 11926 cycles** from a **1244-byte** HUNK with
+**810 bytes of ROM code**, **4 bytes of ROM rodata**, and **4 reachable methods**.
+No relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1228/1228** bytes with **794/796** bytes
+of ROM code. The overall MorphOS MUI goal remains open.
+
+MG1364 moves caller-owned GadTools `NewMenu` vectors to a named struct-first
+memory adapter. Host coverage is **2258/2258**. The focused MC68000 closure
+`NewMenuVectorStructCodecRoot` returns **42** after **972 instructions / 8914
+cycles** from a **1188-byte** HUNK with **782 bytes of ROM code**, **4 bytes of
+ROM rodata**, and **4 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **1168/1168** bytes with **762/762** bytes of ROM code. The overall
+MorphOS MUI goal remains open.
+
+MG1528 routes the List presentation policy through named Editable, Quiet,
+sizing, stripe, drag, visibility, and line-height fields and
+`MuiListPresentationPolicyStateMemoryCodec`. Direct presentation-policy
+serialization is cursor-free; the compatibility cursor remains available for
+older callers. Package/local-SDK coverage is now **2357/2357**, and
+`ListPresentationAdmissionRoot` passes on MC68000 (**3564-byte HUNK, 9092
+instructions / 86506 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1363 moves caller-owned Cycle/Radio `STRPTR` entry vectors to a named
+struct-first memory adapter. Host coverage is **2257/2257**. The focused
+MC68000 closure `ChoiceEntryVectorStructCodecRoot` returns **42** after
+**1260 instructions / 11742 cycles** from a **2420-byte** HUNK with **1234
+bytes of ROM code**, **4 bytes of ROM rodata**, and **11 reachable methods**.
+No relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2400/2400** bytes with **1214/1214** bytes
+of ROM code. The overall MorphOS MUI goal remains open.
+
+MG1362 moves the caller-facing List `ColumnOrder` BYTE* permutation to a named
+byte-record memory adapter. Host coverage is **2256/2256**. The focused
+MC68000 closure `ListColumnOrderByteVectorStructCodecRoot` returns **42** after
+**1130 instructions / 10056 cycles** from a **1216-byte** HUNK with **804 bytes
+of ROM code**, **4 bytes of ROM rodata**, and **4 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1196/1196** bytes with **784/784** bytes
+of ROM code. The overall MorphOS MUI goal remains open.
+
+MG1361 moves internal List display, title, and string-array pointer-slot
+vectors to a named struct-first memory adapter. Host coverage is **2255/2255**.
+The focused MC68000 closure `ListPointerSlotVectorStructCodecRoot` returns
+**42** after **988 instructions / 8976 cycles** from a **1136-byte** HUNK with
+**732 bytes of ROM code**, **4 bytes of ROM rodata**, and **4 reachable methods**.
+No relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1124/1124** bytes with **718/718** bytes
+of ROM code. The overall MorphOS MUI goal remains open.
+
+MG1360 moves the fixed List FORMAT descriptor vector to a named struct-first
+memory adapter. Host coverage is **2254/2254**. The focused MC68000 closure
+`ListFormatDescriptorVectorStructCodecRoot` returns **42** after **957
+instructions / 8762 cycles** from a **1152-byte** HUNK with **738 bytes of ROM
+code**, **4 bytes of ROM rodata**, and **4 reachable methods**. No relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **1132/1132** bytes with **718/718** bytes of ROM code. The
+overall MorphOS MUI goal remains open.
+
+MG1359 moves the List measured-column vector to a named struct-first memory
+adapter. Host coverage is **2253/2253**. The focused MC68000 closure
+`ListColumnMetricVectorStructCodecRoot` returns **42** after **990
+instructions / 8990 cycles** from a **1136-byte** HUNK with **732 bytes of ROM
+code**, **4 bytes of ROM rodata**, and **4 reachable methods**. No relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **1124/1124** bytes with **718/718** bytes of ROM code. The
+overall MorphOS MUI goal remains open.
+
+MG1358 moves the List column-geometry `{offset,width}` vector to a named
+struct-first memory adapter. Host coverage is **2252/2252**. The focused
+MC68000 closure `ListColumnGeometryVectorStructCodecRoot` returns **42** after
+**989 instructions / 8980 cycles** from a **1140-byte** HUNK with **732 bytes
+of ROM code**, **4 bytes of ROM rodata**, and **4 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1128/1128** bytes with **718/718** bytes
+of ROM code. The overall MorphOS MUI goal remains open.
+
+MG1357 moves the private List entry/flag vector to a named struct-first memory
+adapter. Host coverage is **2251/2251**. The focused MC68000 closure
+`ListSlotVectorStructCodecRoot` returns **42** after **991 instructions /
+8998 cycles** from a **1124-byte** HUNK with **734 bytes of ROM code**, **4
+bytes of ROM rodata**, and **4 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **1108/1108** bytes with **720/720** bytes of ROM code. The
+overall MorphOS MUI goal remains open.
+
+MG1356 moves Process/Slave dispatch-packet and generated method-message
+argument vectors to named struct-first memory adapters. Host coverage is
+**2250/2250**. The focused MC68000 closure
+`ProcessArgumentVectorStructCodecRoot` returns **42** after **1177
+instructions / 10562 cycles** from a **1348-byte** HUNK with **926 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **4 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1328/1332** bytes with **908/910** bytes
+of ROM code. The overall MorphOS MUI goal remains open.
+
+MG1355 moves the caller-owned requester parameter vector to a named
+struct-first memory adapter. Host coverage is **2249/2249**. The focused
+MC68000 closure `RequesterParameterVectorStructCodecRoot` returns **42** after
+**992 instructions / 9004 cycles** from a **1160-byte** HUNK with **732 bytes
+of ROM code**, **4 bytes of ROM rodata**, and **4 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1148/1148** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1354 moves the caller-owned Group child-list projection vector to a named
+struct-first memory adapter. Host coverage is **2248/2248**. The focused
+MC68000 closure `GroupChildListVectorStructCodecRoot` returns **42** after
+**979 instructions / 8888 cycles** from a **1148-byte** HUNK with **724 bytes
+of ROM code**, **4 bytes of ROM rodata**, and **4 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1136/1136** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1353 moves caller-owned List pointer vectors to a named struct-first memory
+adapter. Host coverage is **2247/2247**. The focused MC68000 closure
+`ListPointerVectorStructCodecRoot` returns **42** after **994 instructions /
+9018 cycles** from a **1128-byte** HUNK with **732 bytes of ROM code**, **4
+bytes of ROM rodata**, and **4 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **1116/1116** bytes. The overall MorphOS MUI goal remains open.
+
+MG1352 moves the bounded application-persistence frame stack to a named
+struct-first memory adapter. Host coverage is **2246/2246**. The focused
+MC68000 closure `ApplicationPersistenceFrameVectorStructCodecRoot` returns
+**42** after **977 instructions / 8894 cycles** from a **1184-byte** HUNK with
+**738 bytes of ROM code**, **4 bytes of ROM rodata**, and **4 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **1164/1164** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1351 moves the caller-owned WindowList projection entry vector to a named
+struct-first memory adapter. Host coverage is **2245/2245**. The focused
+MC68000 closure `ApplicationWindowListEntryVectorStructCodecRoot` returns
+**42** after **985 instructions / 8930 cycles** from a **1168-byte** HUNK with
+**724 bytes of ROM code**, **4 bytes of ROM rodata**, and **4 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **1156/1156** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1350 moves the caller-owned UsedClasses class-name vector to a named
+struct-first memory adapter. Host coverage is **2244/2244**. The focused
+MC68000 closure `ApplicationUsedClassesVectorStructCodecRoot` returns **42**
+after **992 instructions / 8974 cycles** from a **1160-byte** HUNK with **722
+bytes of ROM code**, **4 bytes of ROM rodata**, and **4 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1144/1144** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1349 moves the shared ASL TagItem vector to a named struct-first memory
+adapter. Host coverage is **2243/2243**. The focused MC68000 closure
+`AslTagItemVectorStructCodecRoot` returns **42** after **989 instructions /
+8954 cycles** from a **1136-byte** HUNK with **724 bytes of ROM code**, **4
+bytes of ROM rodata**, and **4 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **1124/1124** bytes. The overall MorphOS MUI goal remains open.
+
+MG1348 moves the caller-owned AppMessage/Workbench argument vector to a named
+struct-first memory adapter. Host coverage is **2242/2242**. The focused
+MC68000 closure `WorkbenchArgumentVectorStructCodecRoot` returns **42** after
+**796 instructions / 7368 cycles** from a **1160-byte** HUNK with **734 bytes
+of ROM code**, **4 bytes of ROM rodata**, and **4 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1144/1144** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1347 moves the `MUIM_CallHook` parameter vector to a named struct-first memory
+adapter. Host coverage is **2241/2241**. The focused MC68000 closure
+`CallHookParameterStructCodecRoot` returns **42** after **605 instructions /
+5922 cycles** from a **1172-byte** HUNK with **758 bytes of ROM code**, **4 bytes
+of ROM rodata**, and **4 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **1156/1156** bytes. The overall MorphOS MUI goal remains open.
+
+MG1346 moves caller-owned Notify follow-value and MultiSet target vectors to
+named struct-first memory adapters. Host coverage is **2240/2240**. The focused
+MC68000 closure `NotifyTargetVectorStructCodecRoot` returns **42** after
+**1148 instructions / 10532 cycles** from a **1368-byte** HUNK with **812 bytes
+of ROM code**, **4 bytes of ROM rodata**, and **5 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1356/1356** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1345 moves the caller-owned CycleChain slot vector to a named struct-first
+memory adapter. Host coverage is **2238/2238**. The focused MC68000 closure
+`WindowCycleChainVectorStructCodecRoot` returns **42** after **797 instructions /
+7378 cycles** from a **1168-byte** HUNK with **734 bytes of ROM code**, **4 bytes
+of ROM rodata**, and **4 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **1152/1152** bytes. The overall MorphOS MUI goal remains open.
+
+MG1344 moves the Family Reorder/Sort inline object-vector boundary to a named
+struct-first memory adapter resolved from the packet struct. Host coverage is
+**2237/2237**. The focused MC68000 closure
+`FamilyInlineVectorStructCodecRoot` returns **42** after **1043 instructions /
+9716 cycles** from a **1380-byte** HUNK with **892 bytes of ROM code**, **4
+bytes of ROM rodata**, and **5 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **1364/1364** bytes. The overall MorphOS MUI goal remains open.
+
+MG1343 moves the Notify/MultiSet caller-owned inline ULONG-vector boundary to a
+named struct-first memory adapter. Host coverage is **2236/2236**. The focused
+MC68000 closure `NotifyInlineVectorStructCodecRoot` returns **42** after
+**1266 instructions / 12180 cycles** from a **1672-byte** HUNK with **1098
+bytes of ROM code**, **4 bytes of ROM rodata**, and **6 reachable methods**.
+No relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1656/1656** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1342 moves the `MUIM_Window_SetCycleChain` inline object-vector boundary to a
+named struct-first memory adapter. Host coverage is **2235/2235**. The focused
+MC68000 closure `WindowCycleChainInlineVectorStructCodecRoot` returns **42**
+after **592 instructions / 5806 cycles** from a **1208-byte** HUNK with **770
+bytes of ROM code**, **4 bytes of ROM rodata**, and **4 reachable methods**.
+No relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1192/1192** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1341 moves the `MUIM_Application_PushMethod` inline parameter vector to a
+named struct-first memory adapter. Host coverage is **2234/2234**. The focused
+MC68000 closure `ApplicationPushMethodParameterStructCodecRoot` returns
+**42** after **589 instructions / 5780 cycles** from a **1208-byte** HUNK with
+**768 bytes of ROM code**, **4 bytes of ROM rodata**, and **4 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **1192/1196** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1340 moves the caller-owned application-command table indexing boundary to a
+named struct-first memory adapter. Host coverage is **2233/2233**. The focused
+MC68000 closure `ApplicationCommandTableStructCodecRoot` returns **42** after
+**960 instructions / 8606 cycles** from a **1124-byte** HUNK with **700 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **4 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1104/1104** bytes. The overall MorphOS MUI
+goal remains open.
+
+MG1339 moves the variable notification-payload range to a named struct-first
+memory adapter. Host coverage is **2232/2232**. The focused MC68000 closure
+`HeadlessNotificationPayloadStructCodecRoot` returns **42** after **299
+instructions / 2992 cycles** from a **1128-byte** HUNK with **696 bytes of ROM
+code**, **4 bytes of ROM rodata**, and **4 reachable methods**. No relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **1128/1128** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1338 moves the 32-byte headless notification header to a named struct-first
+memory adapter. Host coverage is **2231/2231**. The focused MC68000 closure
+`HeadlessNotificationStructCodecRoot` returns **42** after **692 instructions /
+6686 cycles** from a **1980-byte** HUNK with **992 bytes of ROM code**, **36
+bytes of ROM rodata**, and **9 reachable methods**. The image has 8 switch
+relocations but no loops, framework features, or managed allocations. MC68020/
+MC68040 HUNK artifacts are **1972/1980** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1337 moves the 16-byte headless Family child-list record to a named
+struct-first memory adapter. Host coverage is **2230/2230**. The focused
+MC68000 closure `HeadlessChildStructCodecRoot` returns **42** after **690
+instructions / 6672 cycles** from a **1848-byte** HUNK with **976 bytes of ROM
+code**, **4 bytes of ROM rodata**, and **9 reachable methods**. No relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **1840/1848** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1336 moves the 16-byte headless attribute node to a named struct-first memory
+adapter. Host coverage is **2229/2229**. The focused MC68000 closure
+`HeadlessAttributeStructCodecRoot` returns **42** after **690 instructions /
+6672 cycles** from a **1868-byte** HUNK with **976 bytes of ROM code**, **4 bytes
+of ROM rodata**, and **9 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **1860/1868** bytes. The overall MorphOS MUI goal remains open.
+
+MG1335 moves the 64-byte headless object record to a named struct-first memory
+adapter. Host coverage is **2228/2228**. The focused MC68000 closure
+`HeadlessObjectStructCodecRoot` returns **42** after **692 instructions / 6686
+cycles** from a **2060-byte** HUNK with **1040 bytes of ROM code**, **68 bytes
+of ROM rodata**, and **9 reachable methods**. The image has 16 switch
+relocations but no loops, framework features, or managed allocations. MC68020/
+MC68040 HUNK artifacts are **2052/2060** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG1334 moves the 28-byte headless class registry entry to a named struct-first
+memory adapter. Host coverage is **2227/2227**. The focused MC68000 closure
+`HeadlessClassStructCodecRoot` returns **42** after **1200 instructions /
+11668 cycles** from a **2756-byte** HUNK with **1462 bytes of ROM code**, **4
+bytes of ROM rodata**, and **13 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **2732/2744** bytes. The overall MorphOS MUI goal remains open.
+
+MG1333 moves the canonical 32-byte headless state header to a named
+struct-first memory adapter. Host coverage is **2226/2226**. The focused
+MC68000 closure `HeadlessStateStructCodecRoot` returns **42** after **692
+instructions / 6678 cycles** from a **1940-byte** HUNK with **988 bytes of ROM
+code**, **36 bytes of ROM rodata**, and **9 reachable methods**. The image has
+8 switch relocations but no loops, framework features, or managed allocations.
+MC68020/MC68040 HUNK artifacts are **1936/1940** bytes. The overall MorphOS MUI
+goal remains open.
+
+MG1332 moves the shared caller-owned ULONG result slot to a named struct-first
+memory adapter. Host coverage is **2225/2225**. The focused MC68000 closure
+`GuestUlongStorageStructCodecRoot` returns **42** after **532 instructions /
+5248 cycles** from a **1680-byte** HUNK with **858 bytes of ROM code**, **4 bytes
+of ROM rodata**, and **8 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **1676/1676** bytes. The overall MorphOS MUI goal remains open.
+
+MG1331 moves the Store iteration-counter record to a named struct-first memory
+adapter. Host coverage is **2224/2224**. The focused MC68000 closure
+`StoreIterationCounterStructCodecRoot` returns **42** after **520 instructions /
+5104 cycles** from a **1692-byte** HUNK with **842 bytes of ROM code**, **4 bytes
+of ROM rodata**, and **8 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **1688/1688** bytes. The overall MorphOS MUI goal remains open.
+
+MG1330 moves the Store/Dataspace ownership record to a named struct-first
+memory adapter. Host coverage is **2223/2223**. The focused MC68000 closure
+`StoreRecordStructCodecRoot` returns **42** after **598 instructions / 5948
+cycles** from a **1732-byte** HUNK with **938 bytes of ROM code**, **4 bytes of
+ROM rodata**, and **8 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **1716/1728** bytes. The overall MorphOS MUI goal remains open.
+
+MG1329 moves the Datamap/Objectmap method packet family to named struct-first
+message adapters. Host coverage is **2222/2222**. The focused MC68000 closure
+`StoreMessageStructCodecRoot` returns **42** after **931 instructions / 9060
+cycles** from a **2264-byte** HUNK with **1378 bytes of ROM code**, **4 bytes of
+ROM rodata**, and **9 reachable methods**. No relocations, loops, framework
+features, or managed allocations are present. MC68020/MC68040 HUNK artifacts
+are **2248/2260** bytes. The overall MorphOS MUI goal remains open.
+
+MG1328 moves drawing-service state, clip, refresh, pen, render-info, and
+raster-port records to named struct-first memory adapters. Host coverage is
+**2221/2221**. The focused MC68000 closure `DrawingServiceStructCodecRoot`
+returns **42** after **1488 instructions / 14220 cycles** from a **2612-byte**
+HUNK with **1728 bytes of ROM code**, **4 bytes of ROM rodata**, and **9
+reachable methods**. No relocations, loops, framework features, or managed
+allocations are present. MC68020/MC68040 HUNK artifacts are **2576/2620** bytes.
+The overall MorphOS MUI goal remains open.
+
+MG1327 moves class-service state, class lease, and `MUI_CustomClass` records to
+named struct-first memory adapters. Host coverage is **2220/2220**. The focused
+MC68000 closure `ClassServiceStructCodecRoot` returns **42** after **1339
+instructions / 12878 cycles** from a **2440-byte** HUNK with **1462 bytes of ROM
+code**, **48 bytes of ROM rodata**, and **9 reachable methods**. No loops,
+framework features, or managed allocations are present; the image uses 11
+switch relocations. MC68020/MC68040 HUNK artifacts are **2412/2436** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1326 moves the synchronous requester service-state record to a named
+struct-first memory adapter. Host coverage is **2219/2219**. The focused
+MC68000 closure `RequesterServiceStateStructCodecRoot` returns **42** after
+**673 instructions / 6422 cycles** from a **1864-byte** HUNK with **938 bytes
+of ROM code**, **4 bytes of ROM rodata**, and **9 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **1856/1860** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1325 moves the ASL service-state and requester-lease records to named
+struct-first memory adapters. Host coverage is **2218/2218**. The focused
+MC68000 closure `AslRecordStructCodecRoot` returns **42** after **1046
+instructions / 10394 cycles** from a **2200-byte** HUNK with **1336 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **9 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2188/2208** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1324 moves the internal MUIS application-settings header and key/length
+records to named memory adapters. Host coverage is **2217/2217**. The focused
+MC68000 closure `ApplicationSettingsFileStructRecordCodecRoot` returns **42**
+after **1360 instructions / 12940 cycles** from a **2540-byte** HUNK with
+**1274 bytes of ROM code**, **4 bytes of ROM rodata**, and **11 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **2528/2536** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1323 moves the String edit-hook SGWork record to a named mixed-width memory
+MG1323 moves the String edit-hook SGWork record to a named mixed-width memory
+adapter. Host coverage is **2216/2216**. The focused MC68000 closure
+`StringEditWorkStructRecordCodecRoot` returns **42** after **1572 instructions
+/ 14982 cycles** from a **2924-byte** HUNK with **1574 bytes of ROM code**, **4
+bytes of ROM rodata**, and **13 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **2892/2928** bytes. The overall MorphOS MUI goal remains open.
+
+MG1322 moves Application Save/Load traversal frames to a named
+MG1322 moves Application Save/Load traversal frames to a named
+Object/NextChild/VisitMarker memory adapter. Host coverage is **2215/2215**.
+The focused MC68000 closure `ApplicationPersistenceFrameStructRecordCodecRoot`
+returns **42** after **968 instructions / 9390 cycles** from a **1872-byte**
+HUNK with **1008 bytes of ROM code**, **4 bytes of ROM rodata**, and **8
+reachable methods**. No relocations, loops, framework features, or managed
+allocations are present. MC68020/MC68040 HUNK artifacts are **1864/1872**
+bytes. The overall MorphOS MUI goal remains open.
+
+MG1321 moves the MorphOS `MUIA_String_Integer64` signed QUAD record to a named
+MG1321 moves the MorphOS `MUIA_String_Integer64` signed QUAD record to a named
+High/Low memory adapter. Host coverage is **2214/2214**. The focused MC68000
+closure `StringInteger64StructRecordCodecRoot` returns **42** after **865
+instructions / 8206 cycles** from a **1912-byte** HUNK with **988 bytes of ROM
+code**, **4 bytes of ROM rodata**, and **9 reachable methods**. No relocations,
+loops, framework features, or managed allocations are present. MC68020/MC68040
+HUNK artifacts are **1908/1912** bytes. The overall MorphOS MUI goal remains
+open.
+
+MG1320 moves caller-owned `MUIA_Application_UsedClasses` vector entries to a
+MG1320 moves caller-owned `MUIA_Application_UsedClasses` vector entries to a
+named record memory adapter. Host coverage is **2213/2213**. The focused
+MC68000 closure `ApplicationUsedClassesVectorEntryStructRecordCodecRoot`
+returns **42** after **561 instructions / 5562 cycles** from a **1780-byte**
+HUNK with **880 bytes of ROM code**, **4 bytes of ROM rodata**, and **8
+reachable methods**. No relocations, loops, framework features, or managed
+allocations are present. MC68020/MC68040 HUNK artifacts are **1776/1780**
+bytes. The overall MorphOS MUI goal remains open.
+
+MG1319 moves Notify UserData Find/Get/Set packets and traversal frames to named
+MG1319 moves Notify UserData Find/Get/Set packets and traversal frames to named
+record memory adapters. Host coverage is **2212/2212**. The focused MC68000
+closure `UserDataMessageStructRecordCodecRoot` returns **42** after **1087
+instructions / 10498 cycles** from a **2884-byte** HUNK with **1486 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **13 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2876/2880** bytes. The overall MorphOS
+MUI goal remains open.
+
+MG1318 moves String AttachedList and SpellChecking state records from numeric
+memory-field arguments to typed field adapters. Host coverage is **2211/2211**.
+The focused MC68000 closure `CompactStringTextRecordCodecRoot` returns **42**
+after **3222 instructions / 31232 cycles** from a **5484-byte** HUNK with
+**2582 bytes of ROM code**, **4 bytes of ROM rodata**, and **25 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **5544/5552** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1317 moves the standard ASL TagItem Tag/Data record to a named record
+memory adapter with complete aligned-record bounds. Host coverage is
+**2211/2211**. The focused MC68000 closure
+`AslTagItemStructRecordCodecRoot` returns **42** after **745 instructions /
+7240 cycles** from a **1828-byte** HUNK with **934 bytes of ROM code**, **4
+bytes of ROM rodata**, and **9 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **1824/1824** bytes. The overall MorphOS MUI goal remains open.
+
+MG1316 moves fixed Dirlist/Volumelist method, Set, Rename, Protection, and
+GetEntry packets to named semantic records backed by a bounded packet/field
+adapter. Host coverage is **2210/2210**. The focused MC68000 closure
+`DirlistMessageStructRecordCodecRoot` returns **42** after **1063 instructions
+/ 10344 cycles** from a **2196-byte** HUNK with **1304 bytes of ROM code**, **4
+bytes of ROM rodata**, and **9 reachable methods**. No relocations, loops,
+framework features, or managed allocations are present. MC68020/MC68040 HUNK
+artifacts are **2188/2192** bytes. The overall MorphOS MUI goal remains open.
+
+MG1315 moves process-local error-service magic, version, error, and sequence
+fields to a named record memory adapter. Host coverage is **2209/2209**. The
+focused MC68000 closure `ErrorServiceRecordStructCodecRoot` returns **42**
+after **1159 instructions / 11904 cycles** from a **2204-byte** HUNK with
+**1300 bytes of ROM code**, **4 bytes of ROM rodata**, and **9 reachable
+methods**. No relocations, loops, framework features, or managed allocations
+are present. MC68020/MC68040 HUNK artifacts are **2196/2204** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG1314 moves the fixed Dataspace ReadIFF and WriteIFF packets to named
+semantic records backed by bounded packet adapters. Host coverage is
+**2208/2208**. The focused MC68000 closure
+`DataspaceIffMessageStructRecordCodecRoot` returns **42** after **1305
+instructions / 12532 cycles** from a **2744-byte** HUNK with **1338 bytes of
+ROM code**, **4 bytes of ROM rodata**, and **13 reachable methods**. No
+relocations, loops, framework features, or managed allocations are present.
+MC68020/MC68040 HUNK artifacts are **2740/2740** bytes. The overall MorphOS
+MUI goal remains open.
+
 MG1313 moves the fixed Dataspace `Add`, `Find`, `Get`, `Merge`, `Remove`, and
 `Clear` packets to named semantic records backed by a bounded packet/field
 adapter. Host coverage is **2207/2207**. The focused MC68000 closure
@@ -128,6 +4593,22 @@ relocations**. No loops, framework features, or managed allocations are
 present. MC68020/MC68040 HUNK artifacts are **4704/4712** bytes. The overall
 MorphOS MUI goal remains open.
 
+MG1529 routes the List insertion-position state through named Magic and
+Position fields and `MuiListInsertPositionStateMemoryCodec`. Direct
+insertion-position serialization is cursor-free; the compatibility cursor
+remains available for older callers. Package/local-SDK coverage is now
+**2359/2359**, and `ListInsertPoolMemoryAdapterAdmissionRoot` passes on
+MC68000 (**3224-byte HUNK, 1970 instructions / 19218 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1530 routes the List pool policy through named Magic, Pool, PuddleSize,
+ThresholdSize, and UsesExternalPool fields and
+`MuiListPoolPolicyMemoryCodec`. Direct pool-policy serialization is cursor-free;
+the compatibility cursor remains available for older callers. Package/local-
+SDK coverage remains **2359/2359**, and
+`ListInsertPoolMemoryAdapterAdmissionRoot` passes on MC68000 (**3224-byte HUNK,
+1970 instructions / 19218 cycles**). The overall MorphOS MUI goal remains open.
+
 MG1300 moves fixed Listtree Method, Set, Get, and GetEntry messages to named
 semantic structs backed by a bounded packet/field adapter. Host coverage is
 **2194/2194**. The focused MC68000 closure
@@ -157,6 +4638,14 @@ bytes of ROM code**, **4 bytes of ROM rodata**, and **11 reachable methods**.
 No relocations, loops, framework features, or managed allocations are
 present. MC68020/MC68040 HUNK artifacts are **3324/3328** bytes. The overall
 MorphOS MUI goal remains open.
+
+MG1531 routes the FORMAT descriptor records and table state through named
+fields and `MuiListFormatDescriptorMemoryCodec` /
+`MuiListFormatDescriptorStateMemoryCodec`. Direct descriptor/table
+serialization is cursor-free; compatibility cursors remain available for
+older callers. Package/local-SDK coverage is now **2360/2360**, and
+`ListFormatMetricsAdmissionRoot` passes on MC68000 (**7704-byte HUNK, 9655
+instructions / 95024 cycles**). The overall MorphOS MUI goal remains open.
 
 MG1297 moves fixed List Construct/Destruct, Display, Compare, and TestPos
 messages to named semantic structs backed by a bounded packet/field adapter.
@@ -8918,11 +13407,18 @@ runtime Set is rejected before mutation or notification. Focused Menustrip
 coverage adds **1/1** fact; the complete host suite is **1306/1306** in
 both SDK modes. See the official [MorphOS Menustrip documentation](https://morphos-team.net/sdk/MUI/MUI_Menustrip.html).
 
-`MUIA_Menuitem_Trigger` now follows MorphOS `[.SG]`: initialization writes are
-rejected, while runtime Set/Get use the named `MuiMenuSpecialistState.Trigger`
-field and notify only when the token changes. Focused Menuitem coverage adds
-**1/1** fact; the complete host suite is **1307/1307** in both SDK modes. See
-the official [MorphOS Menuitem documentation](https://morphos-team.net/sdk/MUI/MUI_Menuitem.html).
+`MUIA_Menuitem_Trigger` now follows MorphOS `[.SG]` through the named packed
+`Amiga.MenuItem` projection: initialization writes are rejected, while runtime
+Set/Get preserve borrowed pointers and trigger publication returns an owned,
+stable guest record. Focused Menuitem coverage includes the struct round-trip;
+the complete package-mode host suite is **2308/2308**. See the official
+[MorphOS Menuitem documentation](https://morphos-team.net/sdk/MUI/MUI_Menuitem.html).
+
+`MUIA_Menuitem_CommandString` is kept distinct from Intuition's one-character
+`COMMSEQ` field. The typed trigger projection emits `CommandSequence` and
+`Command` only for a validated one-character shortcut; multi-key command
+strings remain display-only. The complete package-mode host suite is
+**2309/2309**.
 
 The Area registration is also exposed through the public named
 `MuiAreaEventHandlerStateInput` and `MuiAreaEventHandlerPacketCore` seam. This

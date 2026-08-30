@@ -42,6 +42,10 @@ public sealed class MuiApplicationCommandStructAdapterTests
 		Assert.Equal(value.Hook, decoded.Hook);
 		Assert.Equal(-7, decoded.Parameters);
 		Assert.Equal(0xCAFE, decoded.Reserved4);
+		Assert.False(MuiApplicationCommandRecordCodec.TryRead(ref platform,
+			APTR.FromPointer(0x30FF0), out _));
+		Assert.False(MuiApplicationCommandRecordCodec.Write(ref platform,
+			APTR.FromPointer(0x30FF0), value));
 		Assert.False(MuiApplicationCommandRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.FromPointer(0x30FF0), MuiApplicationCommandField.Name, out _));
 		Assert.False(MuiApplicationCommandRecordMemoryCodec.TryGetAddress(ref platform,

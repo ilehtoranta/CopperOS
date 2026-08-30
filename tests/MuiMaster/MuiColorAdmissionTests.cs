@@ -30,9 +30,9 @@ public sealed class MuiColorAdmissionTests
 			NotifyValue = 2,
 			NotifyCount = 3,
 		};
-		Assert.True(MuiColorSpecialistStateCodec.Write(ref platform, address,
+		Assert.True(MuiColorSpecialistStateCodec.WriteRecord(ref platform, address,
 			value));
-		Assert.True(MuiColorSpecialistStateCodec.TryRead(ref platform, address,
+		Assert.True(MuiColorSpecialistStateCodec.TryReadRecord(ref platform, address,
 			out var read));
 		Assert.Equal(value.Magic, read.Magic);
 		Assert.Equal(value.Class, read.Class);
@@ -56,11 +56,11 @@ public sealed class MuiColorAdmissionTests
 			SpecBlock = APTR.FromPointer(0x1800),
 			RgbBlock = APTR.FromPointer(0x1840),
 		};
-		Assert.True(MuiColorSpecialistStateCodec.Write(ref platform, address,
+		Assert.True(MuiColorSpecialistStateCodec.WriteRecord(ref platform, address,
 			value));
 		Assert.True(MuiColorRecordFieldCursorCodec.TryWriteUInt32(ref platform,
 			address, MuiColorRecordKind.State, MuiColorRecordField.Magic, 0));
-		Assert.True(MuiColorSpecialistStateCodec.TryReadStructural(ref platform,
+		Assert.True(MuiColorSpecialistStateCodec.TryReadRecord(ref platform,
 			address, out var structural));
 		Assert.Equal(0u, structural.Magic);
 		Assert.False(MuiColorSpecialistStateCodec.TryRead(ref platform, address,

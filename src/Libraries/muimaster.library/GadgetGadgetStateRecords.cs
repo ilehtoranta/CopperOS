@@ -144,20 +144,36 @@ internal static class MuiGadgetGadgetStateRecordMemoryCodec
 
 internal static class MuiGadgetGadgetStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
-		APTR address,
-		out MuiGadgetGadgetStateRecord value)
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGadgetGadgetStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiGadgetGadgetStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGadgetGadgetStateField.Magic, out value.Magic) ||
-			!MuiGadgetGadgetStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiGadgetGadgetStateField.Gadget,
-			out var gadget)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGadgetGadgetStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var gadget)) return false;
 		value.Gadget = APTR.FromPointer(gadget);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGadgetGadgetStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGadgetGadgetStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Gadget.Raw) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGadgetGadgetStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiGadgetGadgetStateRecord value)
@@ -167,12 +183,7 @@ internal static class MuiGadgetGadgetStateRecordCodec
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiGadgetGadgetStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGadgetGadgetStateAdmission.Validate(ref platform, value)) return false;
-		return MuiGadgetGadgetStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGadgetGadgetStateField.Magic, value.Magic) &&
-			MuiGadgetGadgetStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiGadgetGadgetStateField.Gadget, value.Gadget.Raw);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGadgetGadgetStateAdmission.Validate(ref platform, value) &&
+		WriteRecord(ref platform, address, value);
 }

@@ -28,6 +28,13 @@ public struct MuiFloattextState
 internal struct MuiFloattextPolicyState
 {
 	internal const uint Size = 24;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint TextOffset = 4;
+	internal const uint SkipCharsOffset = 8;
+	internal const uint TabSizeOffset = 12;
+	internal const uint JustifyOffset = 16;
+	internal const uint WidthOffset = 20;
 	internal const uint Cookie = 0x4654504Cu; // 'FTPL'
 
 	internal uint Magic;
@@ -55,35 +62,44 @@ internal struct MuiFloattextPolicyFieldCursor
 	internal MuiFloattextPolicyField Field;
 }
 
-internal static class MuiFloattextPolicyFieldCursorCodec
+// The fixed Floattext policy record owns its packed positions in this bounded
+// adapter. Live policy paths use it directly; the typed field cursor below is
+// retained only for compatibility callers and adapter-focused tests.
+internal static class MuiFloattextPolicyStateMemoryCodec
 {
 	private static bool TryResolve(MuiFloattextPolicyField field,
 		out uint offset)
 	{
 		switch (field)
 		{
-			case MuiFloattextPolicyField.Magic: offset = 0; return true;
-			case MuiFloattextPolicyField.Text: offset = 4; return true;
-			case MuiFloattextPolicyField.SkipChars: offset = 8; return true;
-			case MuiFloattextPolicyField.TabSize: offset = 12; return true;
-			case MuiFloattextPolicyField.Justify: offset = 16; return true;
-			case MuiFloattextPolicyField.Width: offset = 20; return true;
+			case MuiFloattextPolicyField.Magic:
+				offset = MuiFloattextPolicyState.MagicOffset; return true;
+			case MuiFloattextPolicyField.Text:
+				offset = MuiFloattextPolicyState.TextOffset; return true;
+			case MuiFloattextPolicyField.SkipChars:
+				offset = MuiFloattextPolicyState.SkipCharsOffset; return true;
+			case MuiFloattextPolicyField.TabSize:
+				offset = MuiFloattextPolicyState.TabSizeOffset; return true;
+			case MuiFloattextPolicyField.Justify:
+				offset = MuiFloattextPolicyState.JustifyOffset; return true;
+			case MuiFloattextPolicyField.Width:
+				offset = MuiFloattextPolicyState.WidthOffset; return true;
 		}
 		offset = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiFloattextPolicyFieldCursor cursor, out APTR address)
+		APTR record, MuiFloattextPolicyField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiFloattextPolicyState.Size))
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(record, MuiFloattextPolicyState.Size))
 			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiFloattextPolicyState.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -91,10 +107,8 @@ internal static class MuiFloattextPolicyFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiFloattextPolicyFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -103,70 +117,107 @@ internal static class MuiFloattextPolicyFieldCursorCodec
 		APTR record, MuiFloattextPolicyField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiFloattextPolicyFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, record, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
 }
 
+internal static class MuiFloattextPolicyFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiFloattextPolicyFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiFloattextPolicyStateMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiFloattextPolicyField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiFloattextPolicyStateMemoryCodec.TryReadUInt32(ref platform, record,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiFloattextPolicyField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiFloattextPolicyStateMemoryCodec.TryWriteUInt32(ref platform, record,
+			field, value);
+}
+
 internal static class MuiFloattextPolicyStateCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// Production access is sequential and struct-shaped. The field-address
+	// adapters above remain available for compatibility diagnostics only.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiFloattextPolicyState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiFloattextPolicyState.Size) ||
-			!MuiFloattextPolicyFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiFloattextPolicyField.Magic, out var magic))
+		if ((address.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiFloattextPolicyState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var text) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var skipChars) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var tabSize) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var justify) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var width) || !MuiGuestStructCursor.IsComplete(cursor))
 			return false;
 		value.Magic = magic;
-		if (!MuiFloattextPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiFloattextPolicyField.Text, out var text) ||
-			!MuiFloattextPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiFloattextPolicyField.SkipChars, out var skipChars) ||
-			!MuiFloattextPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiFloattextPolicyField.TabSize, out value.TabSize) ||
-			!MuiFloattextPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiFloattextPolicyField.Justify, out value.Justify) ||
-			!MuiFloattextPolicyFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiFloattextPolicyField.Width, out value.Width))
-			return false;
 		value.Text = APTR.FromPointer(text);
 		value.SkipChars = APTR.FromPointer(skipChars);
+		value.TabSize = tabSize;
+		value.Justify = justify;
+		value.Width = width;
 		return true;
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiFloattextPolicyState value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiFloattextPolicyState value)
 		where TPlatform : struct, IMuiGuestMemory =>
-		TryReadStructural(ref platform, address, out value) &&
+		TryReadRecord(ref platform, address, out value) &&
 		value.Magic == MuiFloattextPolicyState.Cookie;
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiFloattextPolicyState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if ((address.Raw & 1u) != 0 ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiFloattextPolicyState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Text.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.SkipChars.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.TabSize) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Justify) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Width)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiFloattextPolicyState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiFloattextPolicyState.Size) || value.Magic !=
-			MuiFloattextPolicyState.Cookie) return false;
-		return MuiFloattextPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiFloattextPolicyField.Magic, value.Magic) &&
-			MuiFloattextPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiFloattextPolicyField.Text, value.Text.Raw) &&
-			MuiFloattextPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiFloattextPolicyField.SkipChars, value.SkipChars.Raw) &&
-			MuiFloattextPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiFloattextPolicyField.TabSize, value.TabSize) &&
-			MuiFloattextPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiFloattextPolicyField.Justify,
-				value.Justify) &&
-			MuiFloattextPolicyFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiFloattextPolicyField.Width, value.Width);
+		return value.Magic == MuiFloattextPolicyState.Cookie &&
+			WriteRecord(ref platform, address, value);
 	}
 }
 

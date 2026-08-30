@@ -170,29 +170,64 @@ internal static class MuiStringscrollPointerStateRecordMemoryCodec
 
 internal static class MuiStringscrollPointerStateCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiStringscrollPointerState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiStringscrollPointerStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) ||
-			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 4, out value.Axis) ||
-			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadInt32(ref platform,
-				address, 8, out value.GrabOffset) ||
-			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadInt32(ref platform,
-				address, 12, out value.StartScroll) ||
-			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadInt32(ref platform,
-				address, 16, out value.StartX) ||
-			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadInt32(ref platform,
-				address, 20, out value.StartY) ||
-			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadInt32(ref platform,
-				address, 24, out value.LastPointer) ||
-			!MuiStringscrollPointerStateRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, 28, out value.Flags)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollPointerState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Axis) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var grabOffset) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var startScroll) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var startX) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var startY) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var lastPointer) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Flags) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		value.GrabOffset = unchecked((int)grabOffset);
+		value.StartScroll = unchecked((int)startScroll);
+		value.StartX = unchecked((int)startX);
+		value.StartY = unchecked((int)startY);
+		value.LastPointer = unchecked((int)lastPointer);
 		return true;
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStringscrollPointerState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringscrollPointerState.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Axis) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.GrabOffset)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.StartScroll)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.StartX)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.StartY)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			unchecked((uint)value.LastPointer)) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Flags) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringscrollPointerState value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringscrollPointerState value)
@@ -205,22 +240,5 @@ internal static class MuiStringscrollPointerStateCodec
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringscrollPointerState value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiStringscrollPointerStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 0, value.Magic) &&
-			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, 4, value.Axis) &&
-			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteInt32(
-				ref platform, address, 8, value.GrabOffset) &&
-			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteInt32(
-				ref platform, address, 12, value.StartScroll) &&
-			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteInt32(
-				ref platform, address, 16, value.StartX) &&
-			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteInt32(
-				ref platform, address, 20, value.StartY) &&
-			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteInt32(
-				ref platform, address, 24, value.LastPointer) &&
-			MuiStringscrollPointerStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, 28, value.Flags);
-	}
+		=> WriteRecord(ref platform, address, value);
 }

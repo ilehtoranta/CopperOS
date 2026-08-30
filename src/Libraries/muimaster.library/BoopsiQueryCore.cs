@@ -192,7 +192,7 @@ internal static class MuiBoopsiQueryMessageCodec
 		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiBoopsiQueryMethodMessage.Size)) return false;
-		return MuiBoopsiQueryPacketFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiBoopsiQueryPacketField.MethodId, out methodId);
 	}
 
@@ -207,27 +207,27 @@ internal static class MuiBoopsiQueryMessageCodec
 			!TryReadMethodIdValue(ref platform, message, out methodId) ||
 			methodId != MuiBoopsiQueryMessage.Method)
 			return false;
-		if (!MuiBoopsiQueryPacketFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiBoopsiQueryPacketField.Screen, out var rawScreen) ||
-			!MuiBoopsiQueryPacketFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.Flags, out record.Flags) ||
-			!MuiBoopsiQueryPacketFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.MinWidth, out var rawMinWidth) ||
-			!MuiBoopsiQueryPacketFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.MinHeight,
 				out var rawMinHeight) ||
-			!MuiBoopsiQueryPacketFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.MaxWidth, out var rawMaxWidth) ||
-			!MuiBoopsiQueryPacketFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.MaxHeight,
 				out var rawMaxHeight) ||
-			!MuiBoopsiQueryPacketFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.DefaultWidth,
 				out var rawDefaultWidth) ||
-			!MuiBoopsiQueryPacketFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.DefaultHeight,
 				out var rawDefaultHeight) ||
-			!MuiBoopsiQueryPacketFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.RenderInfo,
 				out var rawRenderInfo)) return false;
 		record.MethodId = methodId;
@@ -248,32 +248,32 @@ internal static class MuiBoopsiQueryMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiBoopsiQueryMessage.Size)) return false;
-		return MuiBoopsiQueryPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiBoopsiQueryPacketField.MethodId,
 			MuiBoopsiQueryMessage.Method) &&
-			MuiBoopsiQueryPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.Screen, record.Screen.Raw) &&
-			MuiBoopsiQueryPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.Flags, record.Flags) &&
-			MuiBoopsiQueryPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.MinWidth,
 				unchecked((uint)record.MinWidth)) &&
-			MuiBoopsiQueryPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.MinHeight,
 				unchecked((uint)record.MinHeight)) &&
-			MuiBoopsiQueryPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.MaxWidth,
 				unchecked((uint)record.MaxWidth)) &&
-			MuiBoopsiQueryPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.MaxHeight,
 				unchecked((uint)record.MaxHeight)) &&
-			MuiBoopsiQueryPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.DefaultWidth,
 				unchecked((uint)record.DefaultWidth)) &&
-			MuiBoopsiQueryPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.DefaultHeight,
 				unchecked((uint)record.DefaultHeight)) &&
-			MuiBoopsiQueryPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiBoopsiQueryPacketField.RenderInfo,
 				record.RenderInfo.Raw);
 	}

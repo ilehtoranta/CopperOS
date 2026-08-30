@@ -11,9 +11,14 @@ namespace CopperOS.MuiMaster;
 // Guest-resident depth-first traversal state for Application Save/Load. The
 // walker owns a bounded stack of these records; callers use the named fields
 // and never depend on the guest word offsets.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiApplicationPersistenceFrameState
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint ObjectOffset = 0;
+	internal const uint NextChildOffset = 4;
+	internal const uint VisitMarkerOffset = 8;
 
 	internal APTR Object;
 	internal uint NextChild;
@@ -34,32 +39,37 @@ internal struct MuiApplicationPersistenceFrameFieldCursor
 	internal MuiApplicationPersistenceFrameField Field;
 }
 
-internal static class MuiApplicationPersistenceFrameFieldCursorCodec
+// Struct-first guest-memory adapter for one persistence traversal frame. The
+// stack cursor selects records; this codec owns complete-frame admission and
+// named Object/NextChild/VisitMarker field translation.
+internal static class MuiApplicationPersistenceFrameMemoryCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiApplicationPersistenceFrameFieldCursor cursor, out APTR address)
+		APTR frame, MuiApplicationPersistenceFrameField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
 		uint offset;
-		switch (cursor.Field)
+		switch (field)
 		{
 			case MuiApplicationPersistenceFrameField.Object:
-				offset = 0;
+				offset = MuiApplicationPersistenceFrameState.ObjectOffset;
 				break;
 			case MuiApplicationPersistenceFrameField.NextChild:
-				offset = 4;
+				offset = MuiApplicationPersistenceFrameState.NextChildOffset;
 				break;
 			case MuiApplicationPersistenceFrameField.VisitMarker:
-				offset = 8;
+				offset = MuiApplicationPersistenceFrameState.VisitMarkerOffset;
 				break;
 			default:
 				return false;
 		}
-		if (cursor.Frame.IsNull || cursor.Frame.Raw >
-			uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Frame.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (frame.IsNull || frame.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(frame, MuiApplicationPersistenceFrameState.Size))
+			return false;
+		address = APTR.FromPointer(frame.Raw + offset);
+		return platform.IsMapped(address,
+			MuiApplicationPersistenceFrameState.FieldSize);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -67,10 +77,7 @@ internal static class MuiApplicationPersistenceFrameFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiApplicationPersistenceFrameFieldCursor);
-		cursor.Frame = frame;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, frame, field, out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -79,13 +86,32 @@ internal static class MuiApplicationPersistenceFrameFieldCursorCodec
 		APTR frame, MuiApplicationPersistenceFrameField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationPersistenceFrameFieldCursor);
-		cursor.Frame = frame;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, frame, field, out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for existing typed cursor diagnostics.
+internal static class MuiApplicationPersistenceFrameFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiApplicationPersistenceFrameFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationPersistenceFrameMemoryCodec.TryGetAddress(ref platform,
+			cursor.Frame, cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR frame, MuiApplicationPersistenceFrameField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationPersistenceFrameMemoryCodec.TryRead(ref platform, frame, field,
+			out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR frame, MuiApplicationPersistenceFrameField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationPersistenceFrameMemoryCodec.TryWrite(ref platform, frame, field,
+			value);
 }
 
 // Save/Load keeps its depth-first stack in guest memory. Represent the frame
@@ -105,36 +131,45 @@ internal static class MuiApplicationPersistenceFrameCursorCodec
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiApplicationPersistenceFrameCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >=
-			MuiApplicationPersistenceFrameCursor.MaximumEntries || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiApplicationPersistenceFrameCursor.EntrySize) return false;
-		var offset = cursor.Index *
-			MuiApplicationPersistenceFrameCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
-		return platform.IsMapped(address,
-			MuiApplicationPersistenceFrameCursor.EntrySize);
-	}
+		=> MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out address);
 }
 
-internal static class MuiApplicationPersistenceFrameCodec
+// Struct-first guest-memory adapter for the bounded persistence frame stack.
+// The complete named frame record is admitted before traversal code reads it;
+// the typed cursor above remains a compatibility wrapper.
+internal static class MuiApplicationPersistenceFrameVectorMemoryCodec
 {
 	internal static bool TryGetFrame<TPlatform>(ref TPlatform platform,
 		APTR stack, uint depth, out APTR frame)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		frame = APTR.Null;
-		if (stack.IsNull || depth == 0) return false;
-		var cursor = default(MuiApplicationPersistenceFrameCursor);
-		cursor.Base = stack;
-		cursor.Index = depth - 1;
-		return MuiApplicationPersistenceFrameCursorCodec.TryGetEntry(
-			ref platform, cursor, out frame);
+		return depth != 0 && TryGetEntry(ref platform, stack, depth - 1,
+			out frame);
 	}
 
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR stack, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (stack.IsNull || index >=
+			MuiApplicationPersistenceFrameCursor.MaximumEntries || index >
+			(uint.MaxValue - stack.Raw) /
+			MuiApplicationPersistenceFrameState.Size) return false;
+		var offset = index * MuiApplicationPersistenceFrameState.Size;
+		if (stack.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(stack.Raw + offset);
+		return platform.IsMapped(address, MuiApplicationPersistenceFrameState.Size);
+	}
+}
+
+// Canonical codec for the named persistence frame record.  Live Save/Load
+// traversal uses this value-type boundary; the historical codec below only
+// forwards for callers that still use its older name.
+internal static class MuiApplicationPersistenceFrameStateCodec
+{
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationPersistenceFrameState value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -142,14 +177,14 @@ internal static class MuiApplicationPersistenceFrameCodec
 		value = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiApplicationPersistenceFrameState.Size)) return false;
-		if (!MuiApplicationPersistenceFrameFieldCursorCodec.TryRead(ref platform,
+		if (!MuiApplicationPersistenceFrameMemoryCodec.TryRead(ref platform,
 			address, MuiApplicationPersistenceFrameField.Object, out var raw))
 			return false;
 		value.Object = APTR.FromPointer(raw);
-		return MuiApplicationPersistenceFrameFieldCursorCodec.TryRead(ref platform,
+		return MuiApplicationPersistenceFrameMemoryCodec.TryRead(ref platform,
 			address, MuiApplicationPersistenceFrameField.NextChild,
 			out value.NextChild) &&
-			MuiApplicationPersistenceFrameFieldCursorCodec.TryRead(ref platform,
+			MuiApplicationPersistenceFrameMemoryCodec.TryRead(ref platform,
 				address, MuiApplicationPersistenceFrameField.VisitMarker,
 				out value.VisitMarker);
 	}
@@ -160,15 +195,41 @@ internal static class MuiApplicationPersistenceFrameCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiApplicationPersistenceFrameState.Size)) return false;
-		return MuiApplicationPersistenceFrameFieldCursorCodec.TryWrite(ref platform,
+		return MuiApplicationPersistenceFrameMemoryCodec.TryWrite(ref platform,
 			address, MuiApplicationPersistenceFrameField.Object, value.Object.Raw) &&
-			MuiApplicationPersistenceFrameFieldCursorCodec.TryWrite(ref platform,
+			MuiApplicationPersistenceFrameMemoryCodec.TryWrite(ref platform,
 				address, MuiApplicationPersistenceFrameField.NextChild,
 				value.NextChild) &&
-			MuiApplicationPersistenceFrameFieldCursorCodec.TryWrite(ref platform,
+			MuiApplicationPersistenceFrameMemoryCodec.TryWrite(ref platform,
 				address, MuiApplicationPersistenceFrameField.VisitMarker,
-				value.VisitMarker);
+					value.VisitMarker);
 	}
+}
+
+// Compatibility wrapper retained for existing typed cursor diagnostics and
+// older persistence callers.
+internal static class MuiApplicationPersistenceFrameCodec
+{
+	internal static bool TryGetFrame<TPlatform>(ref TPlatform platform,
+		APTR stack, uint depth, out APTR frame)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		frame = APTR.Null;
+		if (stack.IsNull || depth == 0) return false;
+		return MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetFrame(ref platform,
+			stack, depth, out frame);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiApplicationPersistenceFrameState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationPersistenceFrameStateCodec.TryRead(ref platform, address,
+			out value);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiApplicationPersistenceFrameState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationPersistenceFrameStateCodec.Write(ref platform, address, value);
 }
 
 // Native-safe application-tree persistence walker for MorphOS MUI. The real
@@ -235,15 +296,15 @@ public static class MuiApplicationPersistenceCore
 		var rootFrame = default(MuiApplicationPersistenceFrameState);
 		rootFrame.Object = application;
 		rootFrame.NextChild = NotVisited;
-		if (!MuiApplicationPersistenceFrameCodec.Write(ref platform, stack,
+		if (!MuiApplicationPersistenceFrameStateCodec.Write(ref platform, stack,
 			rootFrame)) return Finish(ref platform, stack, stackBytes, false);
 
 		while (depth != 0)
 		{
-			if (!MuiApplicationPersistenceFrameCodec.TryGetFrame(ref platform,
+			if (!MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetFrame(ref platform,
 				stack, depth, out var frame))
 				return Finish(ref platform, stack, stackBytes, false);
-			if (!MuiApplicationPersistenceFrameCodec.TryRead(ref platform, frame,
+			if (!MuiApplicationPersistenceFrameStateCodec.TryRead(ref platform, frame,
 				out var frameState))
 				return Finish(ref platform, stack, stackBytes, false);
 			var current = frameState.Object;
@@ -259,7 +320,7 @@ public static class MuiApplicationPersistenceCore
 					return Finish(ref platform, stack, stackBytes, false);
 				frameState.NextChild = 0;
 				frameState.VisitMarker = visited;
-				if (!MuiApplicationPersistenceFrameCodec.Write(ref platform, frame,
+				if (!MuiApplicationPersistenceFrameStateCodec.Write(ref platform, frame,
 					frameState)) return Finish(ref platform, stack, stackBytes, false);
 				continue;
 			}
@@ -274,7 +335,7 @@ public static class MuiApplicationPersistenceCore
 			if (depth >= MaximumDepth)
 				return Finish(ref platform, stack, stackBytes, false);
 			frameState.NextChild = nextChild + 1;
-			if (!MuiApplicationPersistenceFrameCodec.Write(ref platform, frame,
+			if (!MuiApplicationPersistenceFrameStateCodec.Write(ref platform, frame,
 				frameState) || !WriteFrame(ref platform, stack, depth, child,
 				NotVisited)) return Finish(ref platform, stack, stackBytes, false);
 			depth++;
@@ -300,12 +361,12 @@ public static class MuiApplicationPersistenceCore
 		uint depth, APTR obj, uint nextChild)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiApplicationPersistenceFrameCodec.TryGetFrame(ref platform, stack,
+		if (!MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetFrame(ref platform, stack,
 			depth + 1, out var frame)) return false;
 		var value = default(MuiApplicationPersistenceFrameState);
 		value.Object = obj;
 		value.NextChild = nextChild;
-		return MuiApplicationPersistenceFrameCodec.Write(ref platform, frame,
+		return MuiApplicationPersistenceFrameStateCodec.Write(ref platform, frame,
 			value);
 	}
 

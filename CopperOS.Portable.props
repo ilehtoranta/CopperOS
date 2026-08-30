@@ -9,7 +9,7 @@
          CopperOS host tests isolated from unrelated sibling edits. -->
     <CopperOSUseLocalCopperSharp Condition="'$(CopperOSUseLocalCopperSharp)' == ''">false</CopperOSUseLocalCopperSharp>
     <CopperSharp68kRoot Condition="'$(CopperSharp68kRoot)' == ''">$(MSBuildThisFileDirectory)..\CopperSharp68k</CopperSharp68kRoot>
-    <CopperSharpSdkAmigaVersion Condition="'$(CopperSharpSdkAmigaVersion)' == ''">0.1.0-preview.1-g16</CopperSharpSdkAmigaVersion>
+    <CopperSharpSdkAmigaVersion Condition="'$(CopperSharpSdkAmigaVersion)' == ''">0.1.0-preview.1-g20</CopperSharpSdkAmigaVersion>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(CopperOSUseLocalCopperSharp)' == 'true' and Exists('$(CopperSharp68kRoot)\Sdk.Amiga\CopperSharp.Sdk.Amiga.csproj')">

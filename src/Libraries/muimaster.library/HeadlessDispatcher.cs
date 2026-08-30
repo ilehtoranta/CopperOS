@@ -65,8 +65,6 @@ public static class MuiHeadlessDispatcher
 	private const uint SemaphoreObtain = 0x804276F0;
 	private const uint SemaphoreObtainShared = 0x8042EA02;
 	private const uint SemaphoreRelease = 0x80421F2D;
-	private const uint DatamapAutoLockAttribute = 0x8042FBE4;
-	private const uint ObjectmapAutoLockAttribute = 0x8042E65F;
 
 	public static uint Dispatch<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, APTR message) where TPlatform : struct, IMuiHeadlessPlatform
@@ -74,12 +72,13 @@ public static class MuiHeadlessDispatcher
 		if (!MuiHeadlessMessageCodec.TryReadMethodId(ref platform, message,
 			out var methodHeader)) return 0;
 		var method = methodHeader.MethodId;
-		var lockAttribute = IsDatamapMethod(method) ? DatamapAutoLockAttribute :
-			(IsObjectmapMethod(method) ? ObjectmapAutoLockAttribute : 0u);
-		uint enabled;
-		var locked = lockAttribute != 0 &&
-			MuiHeadlessObjectCore.GetAttribute(ref platform, state, obj,
-				lockAttribute, out enabled) && enabled != 0;
+		if (!MuiStorePolicyCore.IsMethodClassCompatible(ref platform, state, obj,
+			MuiStorePolicyCore.ClassifyMethod(method))) return 0;
+		var policy = IsDatamapMethod(method) ? MuiStorePolicyKind.Datamap :
+			(IsObjectmapMethod(method) ? MuiStorePolicyKind.Objectmap :
+				MuiStorePolicyKind.None);
+		var locked = policy != MuiStorePolicyKind.None &&
+			MuiStorePolicyCore.AutoLockEnabled(ref platform, state, obj, policy);
 		if (locked && !MuiSemaphoreCore.Attempt(ref platform, state, obj)) return 0;
 		var result = DispatchCore(ref platform, state, obj, message, method);
 		if (locked && !MuiSemaphoreCore.Release(ref platform, state, obj)) return 0;
@@ -172,6 +171,8 @@ public static class MuiHeadlessDispatcher
 	{
 		if (!MuiHeadlessMessageCodec.TryReadMethodId(ref platform, message,
 			out var methodHeader)) return 0;
+		if (!MuiStorePolicyCore.IsMethodClassCompatible(ref platform, state, obj,
+			MuiStoreMethodKind.Dataspace)) return 0;
 		switch (methodHeader.MethodId)
 		{
 			case DataspaceAdd:
@@ -192,8 +193,8 @@ public static class MuiHeadlessDispatcher
 			case DataspaceMerge:
 				if (!MuiDataspaceMessageCore.TryReadMerge(ref platform, message,
 					out var merge)) return 0;
-				return MuiStoreCore.DataspaceMerge(ref platform, state, obj,
-					merge.Dataspace) ? 1u : 0u;
+				return MuiStoreCore.DataspaceMergeCount(ref platform, state, obj,
+					merge.Dataspace);
 			case DataspaceRemove:
 				if (!MuiDataspaceMessageCore.TryReadRemove(ref platform, message,
 					out var remove)) return 0;
@@ -424,8 +425,8 @@ public static class MuiHeadlessDispatcher
 			case DataspaceMerge:
 				if (!MuiDataspaceMessageCore.TryReadMerge(ref platform, message,
 					out var dataspaceMerge)) return 0;
-				return MuiStoreCore.DataspaceMerge(ref platform, state, obj,
-					dataspaceMerge.Dataspace) ? 1u : 0u;
+				return MuiStoreCore.DataspaceMergeCount(ref platform, state, obj,
+					dataspaceMerge.Dataspace);
 			case DataspaceRemove:
 				if (!MuiDataspaceMessageCore.TryReadRemove(ref platform, message,
 					out var dataspaceRemove)) return 0;
@@ -493,7 +494,4 @@ public static class MuiHeadlessDispatcher
 		method == ObjectmapIterate || method == ObjectmapIterationKey ||
 		method == ObjectmapRemove || method == ObjectmapSet;
 
-	private static APTR Pointer<TPlatform>(ref TPlatform platform, APTR packet,
-		int offset) where TPlatform : struct, IMuiHeadlessPlatform =>
-		APTR.FromPointer(platform.ReadUInt32(packet, offset));
 }

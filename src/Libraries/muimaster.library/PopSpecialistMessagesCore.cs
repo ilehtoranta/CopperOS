@@ -176,7 +176,7 @@ internal static class MuiPopSpecialistMessageCodec
 		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiPopSpecialistMethodMessage.Size)) return false;
-		return MuiPopSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiPopSpecialistPacketKind.Method,
 			MuiPopSpecialistField.MethodId, out methodId);
 	}
@@ -208,7 +208,7 @@ internal static class MuiPopSpecialistMessageCodec
 	{
 		if (!IsMethod(method) || message.IsNull || !platform.IsMapped(message,
 			MuiPopSpecialistMethodMessage.Size)) return false;
-		return MuiPopSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiPopSpecialistPacketKind.Method,
 			MuiPopSpecialistField.MethodId, method);
 	}
@@ -222,10 +222,10 @@ internal static class MuiPopSpecialistMessageCodec
 			OmGet)) return false;
 		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
 		packet.MethodId = methodId;
-		return MuiPopSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiPopSpecialistPacketKind.Get,
 			MuiPopSpecialistField.Attribute, out packet.Attribute) &&
-			MuiPopSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+			MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiPopSpecialistPacketKind.Get,
 				MuiPopSpecialistField.Storage, out packet.Storage);
 	}
@@ -236,13 +236,13 @@ internal static class MuiPopSpecialistMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiPopSpecialistGetMessage.Size)) return false;
-		return MuiPopSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiPopSpecialistPacketKind.Get,
 			MuiPopSpecialistField.MethodId, OmGet) &&
-			MuiPopSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiPopSpecialistPacketKind.Get,
 				MuiPopSpecialistField.Attribute, attribute) &&
-			MuiPopSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiPopSpecialistPacketKind.Get,
 				MuiPopSpecialistField.Storage, storage);
 	}
@@ -256,10 +256,10 @@ internal static class MuiPopSpecialistMessageCodec
 			MuiPopSpecialistSetMessage.Size, method)) return false;
 		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
 		packet.MethodId = methodId;
-		return MuiPopSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiPopSpecialistPacketKind.Set,
 			MuiPopSpecialistField.Attribute, out packet.Attribute) &&
-			MuiPopSpecialistFieldCursorCodec.TryReadUInt32(ref platform,
+			MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiPopSpecialistPacketKind.Set,
 				MuiPopSpecialistField.Value, out packet.Value);
 	}
@@ -270,13 +270,13 @@ internal static class MuiPopSpecialistMessageCodec
 	{
 		if (!IsSetMethod(method) || message.IsNull || !platform.IsMapped(
 			message, MuiPopSpecialistSetMessage.Size)) return false;
-		return MuiPopSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiPopSpecialistPacketKind.Set,
 			MuiPopSpecialistField.MethodId, method) &&
-			MuiPopSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiPopSpecialistPacketKind.Set,
 				MuiPopSpecialistField.Attribute, attribute) &&
-			MuiPopSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiPopSpecialistPacketKind.Set,
 				MuiPopSpecialistField.Value, value);
 	}
@@ -294,7 +294,7 @@ internal static class MuiPopSpecialistMessageCodec
 		// frame means result FALSE, while the documented second word is consumed
 		// when present.
 		if (platform.IsMapped(message, MuiPopSpecialistCloseMessage.Size))
-			MuiPopSpecialistFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiPopSpecialistMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiPopSpecialistPacketKind.Close, MuiPopSpecialistField.Result,
 				out packet.Result);
 		return true;
@@ -306,11 +306,11 @@ internal static class MuiPopSpecialistMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiPopSpecialistCloseMessage.Size)) return false;
-		return MuiPopSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiPopSpecialistPacketKind.Close,
 			MuiPopSpecialistField.MethodId,
 			MuiPopAttributes.Popstring_Close) &&
-			MuiPopSpecialistFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiPopSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiPopSpecialistPacketKind.Close,
 				MuiPopSpecialistField.Result, result);
 	}

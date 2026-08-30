@@ -105,6 +105,30 @@ public sealed class MuiTextPreParseAdmissionTests
 			APTR.Null, out _));
 	}
 
+	[Fact]
+	public void TextPreParseSequentialRecordPreservesFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var recordAddress = APTR.FromPointer(0x1E40);
+		var value = new MuiTextPreParseStateRecord
+		{
+			Magic = MuiTextPreParseStateRecord.Cookie,
+			PreParse = APTR.FromPointer(0x1EC0),
+		};
+
+		Assert.True(MuiTextPreParseStateRecordCodec.Write(ref platform,
+			recordAddress, value));
+		Assert.True(MuiTextPreParseStateRecordCodec.TryReadStructural(ref platform,
+			recordAddress, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.PreParse.Raw, decoded.PreParse.Raw);
+		Assert.False(MuiTextPreParseStateRecordCodec.Write(ref platform,
+			APTR.FromPointer(0x20FFB), value));
+		Assert.False(MuiTextPreParseStateRecordCodec.TryReadStructural(ref platform,
+			APTR.FromPointer(0x20FFB), out _));
+	}
+
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR textClass,
 		out APTR source)
 	{

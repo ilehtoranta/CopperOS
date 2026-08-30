@@ -83,6 +83,54 @@ public sealed class MuiListFormatMetricsAdmissionTests
 	}
 
 	[Fact]
+	public void ListFormatDescriptorStateSequentialRecordPreservesFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3A00);
+		var value = new MuiListCore.MuiListFormatDescriptorState
+		{
+			Magic = MuiListCore.MuiListFormatDescriptorState.Cookie,
+			Columns = 0xFFFFFFFEu,
+			Values = APTR.FromPointer(0xFFFFFFF0u),
+		};
+		Assert.True(MuiListCore.MuiListFormatDescriptorStateCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiListCore.MuiListFormatDescriptorStateCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Columns, decoded.Columns);
+		Assert.Equal(value.Values, decoded.Values);
+		Assert.False(MuiListCore.MuiListFormatDescriptorStateCodec.TryReadRecord(
+			ref platform, APTR.FromPointer(0x40FF5), out _));
+	}
+
+	[Fact]
+	public void ListColumnMetricsStateSequentialRecordPreservesFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3B00);
+		var value = new MuiListCore.MuiListColumnMetricsState
+		{
+			Magic = MuiListCore.MuiListColumnMetricsState.Cookie,
+			Width = 0xFFFFFFFEu,
+			Columns = 0xFFFFFFFDu,
+			Values = APTR.FromPointer(0xFFFFFFF0u),
+		};
+		Assert.True(MuiListCore.MuiListColumnMetricsStateCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiListCore.MuiListColumnMetricsStateCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Width, decoded.Width);
+		Assert.Equal(value.Columns, decoded.Columns);
+		Assert.Equal(value.Values, decoded.Values);
+		Assert.False(MuiListCore.MuiListColumnMetricsStateCodec.TryReadRecord(
+			ref platform, APTR.FromPointer(0x40FF5), out _));
+	}
+
+	[Fact]
 	public void MalformedListFormatAndMetricsMagicRemainStructuralButFailClosed()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x4000,

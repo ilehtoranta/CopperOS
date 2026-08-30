@@ -576,6 +576,28 @@ public sealed class MuiMiscSpecialistTests
 		Assert.Equal("shift a", ReadCString(ref p, APTR.FromPointer(stored)));
 	}
 
+	[Fact]
+	public void KeyadjustPlatformSamplesUseNamedPackedLayouts()
+	{
+		Assert.Equal(20, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiKeyadjustInputSample>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiKeyadjustInputSample>(nameof(MuiKeyadjustInputSample.IntuiMessage)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiKeyadjustInputSample>(nameof(MuiKeyadjustInputSample.MuiKey)).ToInt32());
+		Assert.Equal(16, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiKeyadjustInputSample>(nameof(MuiKeyadjustInputSample.MultiKey)).ToInt32());
+
+		Assert.Equal(16, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiKeyadjustTextInputSample>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiKeyadjustTextInputSample>(nameof(MuiKeyadjustTextInputSample.IntuiMessage)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiKeyadjustTextInputSample>(nameof(MuiKeyadjustTextInputSample.MuiKey)).ToInt32());
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiKeyadjustTextInputSample>(nameof(MuiKeyadjustTextInputSample.Available)).ToInt32());
+	}
+
 	// ---- Argstring -----------------------------------------------------------
 
 	[Fact]
@@ -832,6 +854,25 @@ public sealed class MuiMiscSpecialistTests
 	}
 
 	[Fact]
+	public void TitlePageVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var p = NewPlatform();
+		var vector = APTR.FromPointer(0x1800);
+		Assert.True(MuiTitlePageVectorMemoryCodec.TryGetEntry(ref p, vector, 1,
+			out var address));
+		Assert.Equal(APTR.FromPointer(0x1808), address);
+		Assert.True(MuiTitlePageVectorMemoryCodec.TryGetEntry(ref p, vector,
+			MuiTitlePageCursor.MaximumEntries - 1, out address));
+		Assert.Equal(APTR.FromPointer(0x19F8), address);
+		Assert.False(MuiTitlePageVectorMemoryCodec.TryGetEntry(ref p, vector,
+			MuiTitlePageCursor.MaximumEntries, out _));
+		Assert.False(MuiTitlePageVectorMemoryCodec.TryGetEntry(ref p,
+			APTR.FromPointer(0x40FF8), 1, out _));
+		Assert.False(MuiTitlePageVectorMemoryCodec.TryGetEntry(ref p,
+			APTR.FromPointer(0xFFFFFFF8), 1, out _));
+	}
+
+	[Fact]
 	public void TitleNewRejectedWhenNotNewable()
 	{
 		var p = NewPlatform();
@@ -920,6 +961,25 @@ public sealed class MuiMiscSpecialistTests
 			out _));
 	}
 
+	[Fact]
+	public void MccprefsRegistryVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var p = NewPlatform();
+		var vector = APTR.FromPointer(0x1800);
+		Assert.True(MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref p, vector,
+			1, out var address));
+		Assert.Equal(APTR.FromPointer(0x1818), address);
+		Assert.True(MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref p, vector,
+			MuiMccprefsRegistryCursor.MaximumEntries - 1, out address));
+		Assert.Equal(APTR.FromPointer(0x1DE8), address);
+		Assert.False(MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref p, vector,
+			MuiMccprefsRegistryCursor.MaximumEntries, out _));
+		Assert.False(MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref p,
+			APTR.FromPointer(0x40FE8), 1, out _));
+		Assert.False(MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref p,
+			APTR.FromPointer(0xFFFFFFE8), 1, out _));
+	}
+
 	// ---- Filepanel -----------------------------------------------------------
 
 	[Fact]
@@ -994,6 +1054,11 @@ public sealed class MuiMiscSpecialistTests
 		var kept = MuiMiscSpecialistCore.FilepanelFilter(ref p, Instance, Text);
 		Assert.Equal(before + 1, p.HookInvokeCount);
 		Assert.Equal(Instance.Raw, p.LastHookA2.Raw);   // A2 = object
+		Assert.True(MuiSpecialistHookMessageCodec.TryRead(ref p, p.LastHookA1,
+			out var hookMessage));
+		Assert.Equal(0u, hookMessage.MethodId);
+		Assert.Equal(Text.Raw, hookMessage.Param1);
+		Assert.Equal(0u, hookMessage.Param2);
 		Assert.NotEqual(0u, kept);
 	}
 
@@ -1050,6 +1115,25 @@ public sealed class MuiMiscSpecialistTests
 		cursor.Index = 1;
 		Assert.False(MuiFilepanelRowCursorCodec.TryGetEntry(ref p, cursor,
 			out _));
+	}
+
+	[Fact]
+	public void FilepanelRowVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var p = NewPlatform();
+		var vector = APTR.FromPointer(0x1800);
+		Assert.True(MuiFilepanelRowVectorMemoryCodec.TryGetEntry(ref p, vector,
+			1, out var address));
+		Assert.Equal(APTR.FromPointer(0x1808), address);
+		Assert.True(MuiFilepanelRowVectorMemoryCodec.TryGetEntry(ref p, vector,
+			MuiFilepanelRowCursor.MaximumEntries - 1, out address));
+		Assert.Equal(APTR.FromPointer(0x19F8), address);
+		Assert.False(MuiFilepanelRowVectorMemoryCodec.TryGetEntry(ref p, vector,
+			MuiFilepanelRowCursor.MaximumEntries, out _));
+		Assert.False(MuiFilepanelRowVectorMemoryCodec.TryGetEntry(ref p,
+			APTR.FromPointer(0x40FF8), 1, out _));
+		Assert.False(MuiFilepanelRowVectorMemoryCodec.TryGetEntry(ref p,
+			APTR.FromPointer(0xFFFFFFF8), 1, out _));
 	}
 
 	[Fact]
@@ -1135,6 +1219,25 @@ public sealed class MuiMiscSpecialistTests
 		cursor.Index = 1;
 		Assert.False(MuiScrmodelistModeCursorCodec.TryGetEntry(ref p, cursor,
 			out _));
+	}
+
+	[Fact]
+	public void ScrmodelistModeVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var p = NewPlatform();
+		var vector = APTR.FromPointer(0x1800);
+		Assert.True(MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref p, vector,
+			1, out var address));
+		Assert.Equal(APTR.FromPointer(0x1804), address);
+		Assert.True(MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref p, vector,
+			MuiScrmodelistModeCursor.MaximumEntries - 1, out address));
+		Assert.Equal(APTR.FromPointer(0x1BFC), address);
+		Assert.False(MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref p, vector,
+			MuiScrmodelistModeCursor.MaximumEntries, out _));
+		Assert.False(MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref p,
+			APTR.FromPointer(0x40FFC), 1, out _));
+		Assert.False(MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref p,
+			APTR.FromPointer(0xFFFFFFFC), 1, out _));
 	}
 
 	// ---- Disposal ------------------------------------------------------------

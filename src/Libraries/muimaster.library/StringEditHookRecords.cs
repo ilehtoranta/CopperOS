@@ -143,37 +143,51 @@ internal static class MuiStringEditHookStateRecordMemoryCodec
 
 internal static class MuiStringEditHookStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiStringEditHookStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiStringEditHookStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic) ||
-			!MuiStringEditHookStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out var hook) ||
-			!MuiStringEditHookStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 8, out value.LonelyEditHook)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringEditHookStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var hook) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.LonelyEditHook) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.EditHook = APTR.FromPointer(hook);
 		return true;
 	}
 
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringEditHookStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringEditHookStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> TryReadStructural(ref platform, address, out value) &&
+		=> TryReadRecord(ref platform, address, out value) &&
 		MuiStringEditHookStateAdmission.Validate(value);
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiStringEditHookStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStringEditHookStateAdmission.Validate(value) &&
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringEditHookStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.EditHook.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.LonelyEditHook) && MuiGuestStructCursor.IsComplete(cursor);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringEditHookStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiStringEditHookStateAdmission.Validate(value)) return false;
-		return MuiStringEditHookStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 0, value.Magic) &&
-			MuiStringEditHookStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, 4, value.EditHook.Raw) &&
-			MuiStringEditHookStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, 8, value.LonelyEditHook);
-	}
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, value);
 }

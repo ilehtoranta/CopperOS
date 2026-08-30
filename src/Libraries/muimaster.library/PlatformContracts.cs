@@ -5,6 +5,7 @@
 
 global using IMuiGuestMemory = Amiga.IAmigaGuestMemory;
 using Amiga;
+using System.Runtime.InteropServices;
 
 namespace CopperOS.MuiMaster;
 
@@ -65,6 +66,7 @@ public interface IMuiLayersCapability
 // rastport plus the temporary target origin. No managed bitmap or host object
 // crosses this boundary. A provider that returns false leaves the deterministic
 // direct-render path in place.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiDoubleBufferRenderRequest
 {
 	public APTR Object;
@@ -100,6 +102,7 @@ public interface IMuiDoubleBufferCapability
 // one wire shape for both MUIM_DrawBackground and MUIM_Backfill, but their
 // final word has different meaning; this value record keeps that distinction
 // explicit for providers without leaking packet offsets into rendering code.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiBackfillRenderRequest
 {
 	public const uint DrawBackground = 0;
@@ -149,6 +152,7 @@ public interface IMuiGraphicsCapability
 // fixed value record: the caller owns Object/BaseFont and the parsed spec;
 // the provider returns only an opaque APTR handle.  No managed font object or
 // host string crosses this boundary.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiCustomFontOpenRequest
 {
 	public APTR Object;
@@ -161,6 +165,7 @@ public struct MuiCustomFontOpenRequest
 // MUI core only needs the logical glyph advance and line height for layout;
 // rasterization, kerning, and glyph storage remain provider-owned.  Keeping
 // this as a value record avoids a managed font object or an ABI offset table.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiCustomFontMetrics
 {
 	public int GlyphWidth;
@@ -177,6 +182,7 @@ public interface IMuiCustomFontCapability
 // MorphOS MUIA_TextColor is a resolved 00RRGGBB value, not a pen number.
 // Keep the native lookup behind a small value-type request so the core never
 // needs a managed colour object or an anonymous platform-specific offset.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiTextColorResolutionRequest
 {
 	public APTR Object;
@@ -194,6 +200,7 @@ public struct MuiTextColorResolutionRequest
 // value as a named record; the provider decides how that value maps to its
 // native raster port.  It is deliberately separate from SetPen, whose value
 // is an Amiga pen selector rather than an RGB color.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiTextColorRenderRequest
 {
 	public APTR RastPort;
@@ -210,6 +217,7 @@ public interface IMuiTextColorCapability
 // provider font handle cross as named value fields so style, outline, glow,
 // and underline policy remain provider-owned without managed font state or an
 // anonymous offset table in the MUI core.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiCustomFontRenderRequest
 {
 	public APTR Object;
@@ -228,6 +236,7 @@ public interface IMuiCustomFontRenderCapability
 // the Present field distinguishes an explicit reset (`\33n`) from no style
 // directive. Leading preparse directives are projected as a value record;
 // per-glyph rasterization remains provider-owned.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiTextStyleRenderRequest
 {
 	public APTR Object;
@@ -253,6 +262,7 @@ public static class MuiTextInlineColorFlags
 	public const uint HasAlpha = 2u;
 }
 
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiTextInlineColorRenderRequest
 {
 	public APTR Object;
@@ -272,6 +282,7 @@ public interface IMuiTextInlineColorCapability
 // the existing named MuiImageSpec value before it crosses this seam; the
 // provider owns image lookup/rasterization and may use the supplied rectangle
 // as the text object's available placement area.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiTextInlineImageRenderRequest
 {
 	public APTR Object;
@@ -293,6 +304,7 @@ public interface IMuiTextInlineImageCapability
 // optional preparse pointer, Unicode policy, and rendering flags; keeping them
 // named here lets a provider apply MorphOS formatting policy before the
 // graphics Text call without a managed string or an anonymous offset table.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiTextMethodRenderRequest
 {
 	public APTR Object;
@@ -320,6 +332,7 @@ public interface IMuiTextMethodCapability
 // true to supply native metrics. The graphics TextWidth/TextHeight fallback
 // remains authoritative when the provider declines or leaves either result
 // invalid. All inputs and outputs are fixed-width value fields.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 public struct MuiTextDimensionRequest
 {
 	public APTR Object;

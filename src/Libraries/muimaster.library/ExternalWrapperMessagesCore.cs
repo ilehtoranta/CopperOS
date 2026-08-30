@@ -213,16 +213,16 @@ internal static class MuiExternalWrapperMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiExternalUpdateMessage.Size,
 			OmUpdate)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.Update,
 			MuiExternalWrapperField.MethodId, out packet.MethodId) &&
-			MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiExternalWrapperPacketKind.Update,
 				MuiExternalWrapperField.AttributeList, out packet.AttributeList) &&
-				MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform, message,
+				MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
 					MuiExternalWrapperPacketKind.Update,
 					MuiExternalWrapperField.GadgetInfo, out packet.GadgetInfo) &&
-					MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform, message,
+					MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
 						MuiExternalWrapperPacketKind.Update,
 						MuiExternalWrapperField.Flags, out packet.Flags);
 	}
@@ -233,16 +233,16 @@ internal static class MuiExternalWrapperMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiExternalUpdateMessage.Size)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.Update,
 			MuiExternalWrapperField.MethodId, OmUpdate) &&
-			MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiExternalWrapperPacketKind.Update,
 				MuiExternalWrapperField.AttributeList, attributeList) &&
-				MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 					MuiExternalWrapperPacketKind.Update,
 					MuiExternalWrapperField.GadgetInfo, gadgetInfo) &&
-					MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform, message,
+					MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 						MuiExternalWrapperPacketKind.Update,
 						MuiExternalWrapperField.Flags, flags);
 	}
@@ -254,13 +254,13 @@ internal static class MuiExternalWrapperMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiExternalGetMessage.Size,
 			OmGet)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.Get,
 			MuiExternalWrapperField.MethodId, out packet.MethodId) &&
-			MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiExternalWrapperPacketKind.Get, MuiExternalWrapperField.Attribute,
 				out packet.Attribute) &&
-				MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform, message,
+				MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
 					MuiExternalWrapperPacketKind.Get, MuiExternalWrapperField.Storage,
 					out packet.Storage);
 	}
@@ -271,13 +271,13 @@ internal static class MuiExternalWrapperMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiExternalGetMessage.Size)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.Get,
 			MuiExternalWrapperField.MethodId, OmGet) &&
-			MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiExternalWrapperPacketKind.Get, MuiExternalWrapperField.Attribute,
 				attribute) &&
-				MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 					MuiExternalWrapperPacketKind.Get, MuiExternalWrapperField.Storage,
 					storage);
 	}
@@ -289,13 +289,13 @@ internal static class MuiExternalWrapperMessageCodec
 		packet = default;
 		if (!IsSetMethod(method) || !IsPacket(ref platform, message,
 			MuiExternalSetMessage.Size, method)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.Set,
 			MuiExternalWrapperField.MethodId, out packet.MethodId) &&
-			MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiExternalWrapperPacketKind.Set, MuiExternalWrapperField.Attribute,
 				out packet.Attribute) &&
-				MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform, message,
+				MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
 					MuiExternalWrapperPacketKind.Set, MuiExternalWrapperField.Value,
 					out packet.Value);
 	}
@@ -306,13 +306,13 @@ internal static class MuiExternalWrapperMessageCodec
 	{
 		if (!IsSetMethod(method) || message.IsNull || !platform.IsMapped(
 			message, MuiExternalSetMessage.Size)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.Set,
 			MuiExternalWrapperField.MethodId, method) &&
-			MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiExternalWrapperPacketKind.Set, MuiExternalWrapperField.Attribute,
 				attribute) &&
-				MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 					MuiExternalWrapperPacketKind.Set, MuiExternalWrapperField.Value,
 					value);
 	}
@@ -352,7 +352,7 @@ internal static class MuiExternalWrapperMessageCodec
 		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiExternalMethodMessage.Size)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.Method,
 			MuiExternalWrapperField.MethodId, out methodId);
 	}
@@ -373,7 +373,7 @@ internal static class MuiExternalWrapperMessageCodec
 	{
 		if (!IsMethod(method) || message.IsNull || !platform.IsMapped(message,
 			MuiExternalMethodMessage.Size)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.Method,
 			MuiExternalWrapperField.MethodId, method);
 	}
@@ -385,10 +385,10 @@ internal static class MuiExternalWrapperMessageCodec
 		packet = default;
 		if (!IsRenderMethod(method) || !IsPacket(ref platform, message,
 			MuiExternalRenderInfoMessage.Size, method)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.RenderInfo,
 			MuiExternalWrapperField.MethodId, out packet.MethodId) &&
-			MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiExternalWrapperPacketKind.RenderInfo,
 				MuiExternalWrapperField.RenderInfo, out packet.RenderInfo);
 	}
@@ -399,10 +399,10 @@ internal static class MuiExternalWrapperMessageCodec
 	{
 		if (!IsRenderMethod(method) || message.IsNull || !platform.IsMapped(
 			message, MuiExternalRenderInfoMessage.Size)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.RenderInfo,
 			MuiExternalWrapperField.MethodId, method) &&
-			MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiExternalWrapperPacketKind.RenderInfo,
 				MuiExternalWrapperField.RenderInfo, renderInfo);
 	}
@@ -414,10 +414,10 @@ internal static class MuiExternalWrapperMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiExternalAskMinMaxMessage.Size,
 			AskMinMax)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.AskMinMax,
 			MuiExternalWrapperField.MethodId, out packet.MethodId) &&
-			MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiExternalWrapperPacketKind.AskMinMax,
 				MuiExternalWrapperField.Storage, out packet.Storage);
 	}
@@ -428,10 +428,10 @@ internal static class MuiExternalWrapperMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiExternalAskMinMaxMessage.Size)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.AskMinMax,
 			MuiExternalWrapperField.MethodId, AskMinMax) &&
-			MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiExternalWrapperPacketKind.AskMinMax,
 				MuiExternalWrapperField.Storage, storage);
 	}
@@ -443,19 +443,19 @@ internal static class MuiExternalWrapperMessageCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiExternalLayoutMessage.Size,
 			Layout)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.Layout,
 			MuiExternalWrapperField.MethodId, out packet.MethodId) &&
-			MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform, message,
+			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
 				MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Left,
 				out packet.Left) &&
-				MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform, message,
+				MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
 					MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Top,
 					out packet.Top) &&
-					MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform, message,
+					MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
 						MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Width,
 						out packet.Width) &&
-						MuiExternalWrapperFieldCursorCodec.TryReadUInt32(ref platform, message,
+						MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
 							MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Height,
 							out packet.Height);
 	}
@@ -466,16 +466,16 @@ internal static class MuiExternalWrapperMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiExternalLayoutMessage.Size)) return false;
-		return MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiExternalWrapperPacketKind.Layout,
 			MuiExternalWrapperField.MethodId, Layout) &&
-			MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform, message,
+			MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 				MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Left, left) &&
-				MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform, message,
+				MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 					MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Top, top) &&
-					MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform, message,
+					MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 						MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Width, width) &&
-						MuiExternalWrapperFieldCursorCodec.TryWriteUInt32(ref platform, message,
+						MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
 							MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Height, height);
 	}
 

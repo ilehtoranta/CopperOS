@@ -159,7 +159,7 @@ internal static class MuiGetConfigItemMessageCodec
 		methodId = 0;
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiGetConfigItemMethodMessage.Size)) return false;
-		return MuiGetConfigItemPacketFieldCursorCodec.TryReadUInt32(ref platform,
+		return MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiGetConfigItemPacketField.MethodId, out methodId);
 	}
 
@@ -173,9 +173,9 @@ internal static class MuiGetConfigItemMessageCodec
 			MuiGetConfigItemMessage.Size) ||
 			!TryReadMethodIdValue(ref platform, message, out methodId) ||
 			methodId != Method) return false;
-		if (!MuiGetConfigItemPacketFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiGetConfigItemPacketField.ConfigId, out packet.ConfigId) ||
-			!MuiGetConfigItemPacketFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiGetConfigItemPacketField.Storage,
 				out var rawStorage)) return false;
 		packet.MethodId = methodId;
@@ -189,11 +189,11 @@ internal static class MuiGetConfigItemMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiGetConfigItemMessage.Size)) return false;
-		return MuiGetConfigItemPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiGetConfigItemPacketField.MethodId, Method) &&
-			MuiGetConfigItemPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiGetConfigItemPacketField.ConfigId, packet.ConfigId) &&
-			MuiGetConfigItemPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiGetConfigItemPacketField.Storage,
 				packet.Storage.Raw);
 	}

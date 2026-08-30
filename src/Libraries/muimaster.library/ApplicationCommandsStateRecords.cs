@@ -141,23 +141,41 @@ internal static class MuiApplicationCommandsStateRecordMemoryCodec
 
 internal static class MuiApplicationCommandsStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	// Application command state is a fixed two-ULONG capability record. Keep
+	// production exchange in declaration order so the command table pointer is
+	// carried with its cookie as one named struct; the field adapter remains a
+	// bounded compatibility surface for targeted corruption tests.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiApplicationCommandsStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationCommandsStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiApplicationCommandsStateField.Magic,
-			out var magic) ||
-			!MuiApplicationCommandsStateRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiApplicationCommandsStateField.Table,
-				out var table))
-			return false;
-		value.Magic = magic;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationCommandsStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var table)) return false;
 		value.Table = APTR.FromPointer(table);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationCommandsStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationCommandsStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Table.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiApplicationCommandsStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationCommandsStateRecord value)
@@ -171,11 +189,6 @@ internal static class MuiApplicationCommandsStateRecordCodec
 	{
 		if (address.IsNull || !MuiApplicationCommandsStateAdmission.Validate(
 			ref platform, value)) return false;
-		return MuiApplicationCommandsStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiApplicationCommandsStateField.Magic,
-			value.Magic) &&
-			MuiApplicationCommandsStateRecordMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiApplicationCommandsStateField.Table,
-				value.Table.Raw);
+		return WriteRecord(ref platform, address, value);
 	}
 }

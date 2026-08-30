@@ -23,8 +23,8 @@ public sealed class MuiListviewDragStateAdmissionTests
 			Flags = MuiListviewDragState.ActiveFlag |
 				MuiListviewDragState.MovedFlag,
 		};
-		Assert.True(MuiListviewDragStateCodec.TryWrite(ref platform, address, value));
-		Assert.True(MuiListviewDragStateCodec.TryRead(ref platform, address,
+		Assert.True(MuiListviewDragStateCodec.WriteRecord(ref platform, address, value));
+		Assert.True(MuiListviewDragStateCodec.TryReadRecord(ref platform, address,
 			out var read));
 		Assert.Equal(value.Magic, read.Magic);
 		Assert.Equal(value.Source, read.Source);
@@ -51,10 +51,10 @@ public sealed class MuiListviewDragStateAdmissionTests
 			LastY = 13,
 			Flags = MuiListviewDragState.ActiveFlag,
 		};
-		Assert.True(MuiListviewDragStateCodec.TryWrite(ref platform, address, value));
+		Assert.True(MuiListviewDragStateCodec.WriteRecord(ref platform, address, value));
 		Assert.True(MuiListviewDragStateMemoryCodec.TryWriteUInt32(ref platform,
 			address, MuiListviewDragStateField.Magic, 0));
-		Assert.True(MuiListviewDragStateCodec.TryReadStructural(ref platform,
+		Assert.True(MuiListviewDragStateCodec.TryReadRecord(ref platform,
 			address, out var structural));
 		Assert.Equal(0u, structural.Magic);
 		Assert.Equal(value.Source, structural.Source);

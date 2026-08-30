@@ -68,7 +68,7 @@ public sealed class MuiWindowPresentationAdmissionTests
 			ScreenTitle = APTR.Null,
 			PublicScreen = APTR.Null,
 		};
-		Assert.True(MuiWindowPresentationStateRecordCodec.Write(ref platform,
+		Assert.True(MuiWindowPresentationStateRecordCodec.WriteRecord(ref platform,
 			address, value));
 		Assert.True(MuiWindowPresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, 16, out var publicScreen) && publicScreen.Raw ==

@@ -42,4 +42,32 @@ public sealed class MuiApplicationRefreshStructAdapterTests
 			ref platform, APTR.Null,
 			MuiApplicationRefreshStateField.Checks, out _));
 	}
+
+	[Fact]
+	public void ApplicationRefreshStateSequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x35C0);
+		var value = new MuiApplicationRefreshStateRecord
+		{
+			Magic = MuiApplicationRefreshStateRecord.Cookie,
+			Checks = uint.MaxValue,
+			RefreshedWindows = 0xA5A5A5A5u,
+		};
+
+		Assert.True(MuiApplicationRefreshStateRecordCodec.WriteRecord(
+			ref platform, address, value));
+		Assert.True(MuiApplicationRefreshStateRecordCodec.TryReadRecord(
+			ref platform, address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Checks, decoded.Checks);
+		Assert.Equal(value.RefreshedWindows, decoded.RefreshedWindows);
+
+		var crossingEnd = APTR.FromPointer(0x30FF5);
+		Assert.False(MuiApplicationRefreshStateRecordCodec.WriteRecord(
+			ref platform, crossingEnd, value));
+		Assert.False(MuiApplicationRefreshStateRecordCodec.TryReadRecord(
+			ref platform, crossingEnd, out _));
+	}
 }

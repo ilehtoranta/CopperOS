@@ -12,6 +12,8 @@ namespace CopperOS.MuiMaster;
 internal struct MuiDirlistMethodMessage
 {
 	public const uint Size = 4;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -19,6 +21,10 @@ internal struct MuiDirlistMethodMessage
 internal struct MuiDirlistSetMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint AttributeOffset = 4;
+	public const uint ValueOffset = 8;
 	public uint MethodId;
 	public uint Attribute;
 	public uint Value;
@@ -28,6 +34,10 @@ internal struct MuiDirlistSetMessage
 internal struct MuiDirlistRenameMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint EntryOffset = 4;
+	public const uint NameOffset = 8;
 	public uint MethodId;
 	public uint Entry;
 	public uint Name;
@@ -37,6 +47,10 @@ internal struct MuiDirlistRenameMessage
 internal struct MuiDirlistProtectionMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint EntryOffset = 4;
+	public const uint ProtectionOffset = 8;
 	public uint MethodId;
 	public uint Entry;
 	public uint Protection;
@@ -46,6 +60,10 @@ internal struct MuiDirlistProtectionMessage
 internal struct MuiDirlistGetEntryMessage
 {
 	public const uint Size = 12;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint PositionOffset = 4;
+	public const uint StorageOffset = 8;
 	public uint MethodId;
 	public uint Position;
 	public uint Storage;

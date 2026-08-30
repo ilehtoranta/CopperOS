@@ -186,30 +186,56 @@ internal static class MuiBitmapPolicyStateRecordMemoryCodec
 
 internal static class MuiBitmapPolicyStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		out MuiBitmapPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		return MuiBitmapPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.Magic, out value.Magic) &&
-			MuiBitmapPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.Alpha, out value.Alpha) &&
-			MuiBitmapPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.MappingTable,
-			out value.MappingTable) &&
-			MuiBitmapPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.Precision, out value.Precision) &&
-			MuiBitmapPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.SourceColors,
-			out value.SourceColors) &&
-			MuiBitmapPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.Transparent,
-			out value.Transparent) &&
-			MuiBitmapPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.UseFriend, out value.UseFriend);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiBitmapPolicyStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Alpha) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MappingTable) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Precision) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.SourceColors) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Transparent) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.UseFriend)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiBitmapPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiBitmapPolicyStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Alpha) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.MappingTable) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Precision) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.SourceColors) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Transparent) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.UseFriend) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		out MuiBitmapPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiBitmapPolicyStateRecord value)
@@ -221,21 +247,9 @@ internal static class MuiBitmapPolicyStateRecordCodec
 		MuiBitmapPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiBitmapPolicyStateAdmission.Validate(ref platform, value))
+		if (address.IsNull || !MuiBitmapPolicyStateAdmission.Validate(ref platform,
+			value))
 			return false;
-		return MuiBitmapPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.Magic, value.Magic) &&
-			MuiBitmapPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.Alpha, value.Alpha) &&
-			MuiBitmapPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.MappingTable, value.MappingTable) &&
-			MuiBitmapPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.Precision, value.Precision) &&
-			MuiBitmapPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.SourceColors, value.SourceColors) &&
-			MuiBitmapPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.Transparent, value.Transparent) &&
-			MuiBitmapPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiBitmapPolicyStateField.UseFriend, value.UseFriend);
+		return WriteRecord(ref platform, address, value);
 	}
 }

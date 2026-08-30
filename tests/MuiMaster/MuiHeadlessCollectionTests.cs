@@ -48,6 +48,52 @@ public sealed class MuiHeadlessCollectionTests
 	}
 
 	[Fact]
+	public void StoreIterationCounterMemoryAdapterOwnsStructBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var record = APTR.FromPointer(0x1200);
+		Assert.True(MuiStoreIterationCounterMemoryCodec.TryGetAddress(ref platform,
+			record, MuiStoreIterationCounterField.Ordinal, out var ordinal));
+		Assert.Equal(record, ordinal);
+		Assert.True(MuiStoreIterationCounterMemoryCodec.TryWriteUInt32(ref platform,
+			record, MuiStoreIterationCounterField.Ordinal, 9));
+		Assert.True(MuiStoreIterationCounterMemoryCodec.TryReadUInt32(ref platform,
+			record, MuiStoreIterationCounterField.Ordinal, out var value));
+		Assert.Equal(9u, value);
+		Assert.False(MuiStoreIterationCounterMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x30FFF), MuiStoreIterationCounterField.Ordinal,
+			out _));
+		Assert.False(MuiStoreIterationCounterMemoryCodec.TryGetAddress(ref platform,
+			record, (MuiStoreIterationCounterField)255, out _));
+	}
+
+	[Fact]
+	public void StoreIterationStateUsesNamedRecordCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1240);
+		var expected = default(MuiStoreIterationStateRecord);
+		expected.Next = APTR.FromPointer(0x1280);
+		expected.Counter = APTR.FromPointer(0x12C0);
+		expected.Current = APTR.FromPointer(0x1300);
+		expected.NextRecord = APTR.FromPointer(0x1340);
+		expected.Kind = 0x200;
+		expected.Magic = MuiStoreIterationStateRecord.MagicValue;
+		Assert.True(MuiStoreIterationStateCodec.WriteRecord(ref platform, address,
+			expected));
+		Assert.True(MuiStoreIterationStateCodec.TryReadRecord(ref platform, address,
+			out var actual));
+		Assert.Equal(expected.Next, actual.Next);
+		Assert.Equal(expected.Counter, actual.Counter);
+		Assert.Equal(expected.Current, actual.Current);
+		Assert.Equal(expected.NextRecord, actual.NextRecord);
+		Assert.Equal(expected.Kind, actual.Kind);
+		Assert.Equal(expected.Magic, actual.Magic);
+		Assert.False(MuiStoreIterationStateCodec.TryRead(ref platform,
+			APTR.FromPointer(0x40000), out _));
+	}
+
+	[Fact]
 	public void FamilyMutationVectorCodecUsesNamedObjectField()
 	{
 		var platform = CreatePlatform(out _);
@@ -61,6 +107,27 @@ public sealed class MuiHeadlessCollectionTests
 		Assert.Equal(expected.Object, actual.Object);
 		Assert.False(MuiFamilyMutationVectorCodec.TryRead(ref platform,
 			APTR.FromPointer(0x40000), out _));
+	}
+
+	[Fact]
+	public void FamilyMutationVectorEntryCodecUsesNamedStructBoundary()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1240);
+		var expected = new MuiFamilyMutationVectorEntry
+		{
+			Object = APTR.FromPointer(0x1880),
+		};
+
+		Assert.True(MuiFamilyMutationVectorEntryCodec.Write(ref platform, address,
+			expected));
+		Assert.True(MuiFamilyMutationVectorEntryCodec.TryRead(ref platform,
+			address, out var actual));
+		Assert.Equal(expected.Object, actual.Object);
+		Assert.False(MuiFamilyMutationVectorEntryCodec.TryRead(ref platform,
+			APTR.FromPointer(0x40000), out _));
+		Assert.False(MuiFamilyMutationVectorEntryCodec.Write(ref platform,
+			APTR.Null, expected));
 	}
 
 	[Fact]
@@ -101,6 +168,27 @@ public sealed class MuiHeadlessCollectionTests
 	}
 
 	[Fact]
+	public void FamilyInlineVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var message = APTR.FromPointer(0x1200);
+
+		Assert.True(MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform,
+			message, MuiFamilyReorderMessage.ArrayOffset, 2, out var address));
+		Assert.Equal(APTR.FromPointer(0x1210), address);
+		Assert.True(MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform,
+			message, MuiFamilySortMessage.ArrayOffset, 1, out address));
+		Assert.Equal(APTR.FromPointer(0x1208), address);
+		Assert.False(MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform,
+			message, 12, 0, out _));
+		Assert.False(MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0x30FFE), MuiFamilyReorderMessage.ArrayOffset, 0,
+			out _));
+		Assert.False(MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.Null, MuiFamilySortMessage.ArrayOffset, 0, out _));
+	}
+
+	[Fact]
 	public void FamilyMutationVectorCursorUsesNamedEntryBoundary()
 	{
 		var platform = CreatePlatform(out _);
@@ -117,6 +205,31 @@ public sealed class MuiHeadlessCollectionTests
 		cursor.Index = 0;
 		Assert.False(MuiFamilyMutationVectorCodec.TryGetEntry(ref platform,
 			cursor, out _));
+	}
+
+	[Fact]
+	public void FamilyMutationVectorMemoryAdapterOwnsNamedRecordBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var vector = APTR.FromPointer(0x1800);
+		Assert.True(MuiFamilyMutationVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, 2, out var address));
+		Assert.Equal(APTR.FromPointer(0x1808), address);
+		var expected = new MuiFamilyMutationVectorEntry
+		{
+			Object = APTR.FromPointer(0x1A00)
+		};
+		Assert.True(MuiFamilyMutationVectorCodec.Write(ref platform, address,
+			expected));
+		Assert.True(MuiFamilyMutationVectorCodec.TryRead(ref platform, address,
+			out var actual));
+		Assert.Equal(expected.Object, actual.Object);
+		Assert.False(MuiFamilyMutationVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, MuiFamilyMutationVectorCursor.MaximumEntries, out _));
+		Assert.False(MuiFamilyMutationVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0x40FFE), 0, out _));
+		Assert.False(MuiFamilyMutationVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0xFFFFFFF0), 4, out _));
 	}
 
 	[Fact]
@@ -193,20 +306,24 @@ public sealed class MuiHeadlessCollectionTests
 			data, 4, true));
 		Assert.Equal(0x55667788u, platform.ReadUInt32(
 			MuiStoreCore.DatamapFind(ref platform, State, store, keyCopy), 0));
+		var objectmapKey = APTR.FromPointer(0x13E0);
+		platform.WriteCString(objectmapKey, "object-key");
 		Assert.True(MuiStoreCore.ObjectmapSet(ref platform, State, store,
-			APTR.FromPointer(0xABC0), APTR.FromPointer(0xDEF0)));
+			objectmapKey, APTR.FromPointer(0xDEF0)));
 		Assert.Equal(APTR.FromPointer(0xDEF0), MuiStoreCore.ObjectmapFind(
-			ref platform, State, store, APTR.FromPointer(0xABC0)));
+			ref platform, State, store, objectmapKey));
 		var counter = APTR.FromPointer(0x13C0);
 		platform.WriteUInt32(counter, 0, 0);
-		Assert.Equal(APTR.FromPointer(0xABC0),
+		Assert.Equal(APTR.FromPointer(0xDEF0),
+			MuiStoreCore.ObjectmapIterate(ref platform, State, store, counter));
+		Assert.Equal(objectmapKey,
 			MuiStoreCore.ObjectmapIterationKey(ref platform, State, store,
 				counter));
 		Assert.True(MuiStoreCore.DataspaceRemove(ref platform, State, store, 7));
 		Assert.True(MuiStoreCore.DatamapRemove(ref platform, State, store,
 			keyCopy));
 		Assert.True(MuiStoreCore.ObjectmapRemove(ref platform, State, store,
-			APTR.FromPointer(0xABC0)));
+			objectmapKey));
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
 			store));
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,

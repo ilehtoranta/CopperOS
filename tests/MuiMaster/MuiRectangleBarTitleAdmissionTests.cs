@@ -54,7 +54,7 @@ public sealed class MuiRectangleBarTitleAdmissionTests
 		Assert.True(block.IsNotNull);
 		Assert.True(MuiRectangleBarTitleStateFieldCursorCodec.TryWriteUInt32(
 			ref platform, block, MuiRectangleBarTitleStateField.Present, 2));
-		Assert.True(MuiRectangleBarTitleStateRecordCodec.TryReadStructural(
+		Assert.True(MuiRectangleBarTitleStateRecordCodec.TryReadRecord(
 			ref platform, block, out var structural));
 		Assert.Equal(2u, structural.Present);
 		Assert.False(MuiRectangleBarTitleStateAdmission.Validate(structural));
@@ -91,7 +91,7 @@ public sealed class MuiRectangleBarTitleAdmissionTests
 			Present = 1,
 			Title = title,
 		};
-		Assert.True(MuiRectangleBarTitleStateRecordCodec.Write(ref platform, address,
+		Assert.True(MuiRectangleBarTitleStateRecordCodec.WriteRecord(ref platform, address,
 			record));
 		Assert.True(MuiRectangleBarTitleStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, 8, out var titleAddress));
@@ -101,14 +101,14 @@ public sealed class MuiRectangleBarTitleAdmissionTests
 		Assert.Equal(1u, present);
 		Assert.True(MuiRectangleBarTitleStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, 4, 0));
-		Assert.True(MuiRectangleBarTitleStateRecordCodec.TryReadStructural(ref platform,
+		Assert.True(MuiRectangleBarTitleStateRecordCodec.TryReadRecord(ref platform,
 			address, out var updated));
 		Assert.Equal(0u, updated.Present);
 		Assert.False(MuiRectangleBarTitleStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiRectangleBarTitleStateRecord.Size, out _));
 		Assert.False(MuiRectangleBarTitleStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, 0, out _));
-		Assert.False(MuiRectangleBarTitleStateRecordCodec.TryReadStructural(ref platform,
+		Assert.False(MuiRectangleBarTitleStateRecordCodec.TryReadRecord(ref platform,
 			APTR.Null, out _));
 	}
 

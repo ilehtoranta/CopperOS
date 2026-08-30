@@ -5,6 +5,50 @@ namespace CopperOS.MuiMaster.Tests;
 
 public sealed class MuiCommonControlTests
 {
+	[Fact]
+	public void StringStateRecordsUseNamedPackedLayouts()
+	{
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringFilterState>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringFilterState>(nameof(MuiStringFilterState.Accept)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringFilterState>(nameof(MuiStringFilterState.Reject)).ToInt32());
+
+		Assert.Equal(12, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringInteractionState>());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringInteractionState>(nameof(MuiStringInteractionState.Multiline)).ToInt32());
+		Assert.Equal(16, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringPresentationState>());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringSpellCheckingState>());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringAcknowledgeState>());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringCursorState>());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringCursorState>(nameof(MuiStringCursorState.DisplayPos)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringAttachedListState>());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringContentsState>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringContentsState>(nameof(MuiStringContentsState.Contents)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringPlaceholderState>());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringIntegerState>());
+		Assert.Equal(0, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringIntegerState>(nameof(MuiStringIntegerState.Value)).ToInt32());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringInteger64State>());
+		Assert.Equal(8, System.Runtime.InteropServices.Marshal.SizeOf<
+			MuiStringEditHookState>());
+		Assert.Equal(4, System.Runtime.InteropServices.Marshal.OffsetOf<
+			MuiStringEditHookState>(nameof(MuiStringEditHookState.LonelyEditHook)).ToInt32());
+	}
+
 	private static readonly APTR State = APTR.FromPointer(0x1000);
 
 	[Fact]
@@ -14,6 +58,11 @@ public sealed class MuiCommonControlTests
 		var address = APTR.FromPointer(0x1180);
 		var expected = default(MuiChoiceEntry);
 		expected.Text = APTR.FromPointer(0x1300);
+		Assert.True(MuiChoiceEntryMemoryCodec.TryGetAddress(ref platform, address,
+			MuiChoiceEntryField.Text, out var directAddress));
+		Assert.Equal(address.Raw + MuiChoiceEntry.TextOffset, directAddress.Raw);
+		Assert.True(MuiChoiceEntryMemoryCodec.TryWriteUInt32(ref platform, address,
+			MuiChoiceEntryField.Text, expected.Text.Raw));
 		Assert.True(MuiChoiceEntryCodec.Write(ref platform, address, expected));
 		Assert.True(MuiChoiceEntryCodec.TryRead(ref platform, address,
 			out var actual));
@@ -62,6 +111,23 @@ public sealed class MuiCommonControlTests
 		cursor.Index = 0;
 		Assert.False(MuiChoiceEntryCursorCodec.TryGetEntry(ref platform, cursor,
 			out _));
+	}
+
+	[Fact]
+	public void ChoiceEntryVectorMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var vector = APTR.FromPointer(0x1200);
+		Assert.Equal(4u, MuiChoiceEntry.Size);
+		Assert.True(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, 4095, out var address));
+		Assert.Equal(APTR.FromPointer(0x51FC), address);
+		Assert.False(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, MuiChoiceEntryCursor.MaximumEntries, out _));
+		Assert.False(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0x20FFE), 0, out _));
+		Assert.False(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0xFFFFFFFF), 1, out _));
 	}
 
 	[Fact]

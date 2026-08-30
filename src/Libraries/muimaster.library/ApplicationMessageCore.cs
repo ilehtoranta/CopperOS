@@ -488,56 +488,72 @@ internal static class MuiAppMessageRecordMemoryCodec
 
 internal static class MuiAppMessageNodeCodec
 {
+	internal static bool TryReadFields<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, out MuiAppMessageNodeState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+			out var rawSuccessor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawPredecessor) ||
+			!MuiGuestStructCursor.TryReadUInt8(ref platform, ref cursor,
+				out value.Type) ||
+			!MuiGuestStructCursor.TryReadUInt8(ref platform, ref cursor,
+				out var rawPriority) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawName) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawReplyPort) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out value.Length)) return false;
+		value.Successor = APTR.FromPointer(rawSuccessor);
+		value.Predecessor = APTR.FromPointer(rawPredecessor);
+		value.Priority = unchecked((sbyte)rawPriority);
+		value.Name = APTR.FromPointer(rawName);
+		value.ReplyPort = APTR.FromPointer(rawReplyPort);
+		return true;
+	}
+
+	internal static bool TryWriteFields<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiAppMessageNodeState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Successor.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Predecessor.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt8(ref platform, ref cursor,
+				value.Type) &&
+			MuiGuestStructCursor.TryWriteUInt8(ref platform, ref cursor,
+				unchecked((byte)value.Priority)) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Name.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ReplyPort.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				value.Length);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAppMessageNodeState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAppMessageNodeState.Size)) return false;
-		if (!MuiAppMessageNodeMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiAppMessageNodeField.Successor, out var rawSuccessor) ||
-			!MuiAppMessageNodeMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageNodeField.Predecessor, out var rawPredecessor) ||
-			!MuiAppMessageNodeMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageNodeField.Name, out var rawName) ||
-			!MuiAppMessageNodeMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageNodeField.ReplyPort, out var rawReplyPort)) return false;
-		value.Successor = APTR.FromPointer(rawSuccessor);
-		value.Predecessor = APTR.FromPointer(rawPredecessor);
-		value.Name = APTR.FromPointer(rawName);
-		value.ReplyPort = APTR.FromPointer(rawReplyPort);
-		if (!MuiAppMessageNodeMemoryCodec.TryReadUInt8(ref platform, address,
-			MuiAppMessageNodeField.Type, out value.Type) ||
-			!MuiAppMessageNodeMemoryCodec.TryReadUInt8(ref platform, address,
-				MuiAppMessageNodeField.Priority, out var rawPriority) ||
-			!MuiAppMessageNodeMemoryCodec.TryReadUInt16(ref platform, address,
-				MuiAppMessageNodeField.Length, out value.Length)) return false;
-		value.Priority = unchecked((sbyte)rawPriority);
-		return true;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAppMessageNodeState.Size, out var cursor) ||
+			!TryReadFields(ref platform, ref cursor, out value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAppMessageNodeState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAppMessageNodeState.Size)) return false;
-		return MuiAppMessageNodeMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiAppMessageNodeField.Successor, value.Successor.Raw) &&
-			MuiAppMessageNodeMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageNodeField.Predecessor, value.Predecessor.Raw) &&
-			MuiAppMessageNodeMemoryCodec.TryWriteUInt8(ref platform, address,
-				MuiAppMessageNodeField.Type, value.Type) &&
-			MuiAppMessageNodeMemoryCodec.TryWriteUInt8(ref platform, address,
-				MuiAppMessageNodeField.Priority,
-				unchecked((byte)value.Priority)) &&
-			MuiAppMessageNodeMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageNodeField.Name, value.Name.Raw) &&
-			MuiAppMessageNodeMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageNodeField.ReplyPort, value.ReplyPort.Raw) &&
-			MuiAppMessageNodeMemoryCodec.TryWriteUInt16(ref platform, address,
-				MuiAppMessageNodeField.Length, value.Length);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAppMessageNodeState.Size, out var cursor) ||
+			!TryWriteFields(ref platform, ref cursor, value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -650,8 +666,30 @@ internal static class MuiWorkbenchArgumentRecordMemoryCodec
 internal struct MuiWorkbenchArgumentVectorCursor
 {
 	internal const uint EntrySize = MuiWorkbenchArgumentRecord.Size;
+	internal const uint MaximumEntries = 65535;
 	internal APTR Base;
 	internal uint Index;
+}
+
+// Struct-first guest-memory adapter for the caller-owned AppMessage argument
+// vector. Each named argument record is exposed only within the MorphOS
+// argument-count bound and after complete record-range validation.
+internal static class MuiWorkbenchArgumentVectorMemoryCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (vector.IsNull || index >=
+			MuiWorkbenchArgumentVectorCursor.MaximumEntries || index >
+			(uint.MaxValue - vector.Raw) /
+			MuiWorkbenchArgumentRecord.Size) return false;
+		var offset = index * MuiWorkbenchArgumentRecord.Size;
+		if (vector.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(vector.Raw + offset);
+		return platform.IsMapped(address, MuiWorkbenchArgumentRecord.Size);
+	}
 }
 
 internal static class MuiWorkbenchArgumentVectorCodec
@@ -659,18 +697,8 @@ internal static class MuiWorkbenchArgumentVectorCodec
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiWorkbenchArgumentVectorCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiWorkbenchArgumentVectorCursor.EntrySize) return false;
-		var offset = cursor.Index *
-			MuiWorkbenchArgumentVectorCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
-		return platform.IsMapped(address,
-			MuiWorkbenchArgumentVectorCursor.EntrySize);
-	}
+		=> MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out address);
 }
 
 internal static class MuiWorkbenchArgumentRecordCodec
@@ -680,12 +708,13 @@ internal static class MuiWorkbenchArgumentRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiWorkbenchArgumentRecord.Size)) return false;
-		if (!MuiWorkbenchArgumentRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiWorkbenchArgumentField.Lock, out var rawLock) ||
-			!MuiWorkbenchArgumentRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiWorkbenchArgumentField.Name, out var rawName)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWorkbenchArgumentRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawLock) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawName) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.Lock = BPTR.FromRaw(rawLock);
 		value.Name = STRPTR.FromPointer(rawName);
 		return true;
@@ -695,64 +724,63 @@ internal static class MuiWorkbenchArgumentRecordCodec
 		MuiWorkbenchArgumentRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiWorkbenchArgumentRecord.Size)) return false;
-		return MuiWorkbenchArgumentRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiWorkbenchArgumentField.Lock, value.Lock.Raw) &&
-			MuiWorkbenchArgumentRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiWorkbenchArgumentField.Name, value.Name.Raw);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiWorkbenchArgumentRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Lock.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Name.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
 internal static class MuiAppMessageRecordCodec
 {
-	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
-		out MuiAppMessageRecord value)
+	internal static bool TryReadFields<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, out MuiAppMessageRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAppMessageRecord.Size)) return false;
-		if (!MuiAppMessageNodeCodec.TryRead(ref platform, address,
-			out value.Message)) return false;
-		if (!MuiAppMessageFieldCursorCodec.TryReadUInt16(ref platform, address,
-			MuiAppMessageField.Type, out value.Type) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.UserData, out value.UserData) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.Id, out value.Id) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.NumberOfArguments, out var rawArguments) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.ArgumentList, out var rawArgumentList) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt16(ref platform, address,
-				MuiAppMessageField.Version, out value.Version) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt16(ref platform, address,
-				MuiAppMessageField.Class, out value.Class) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt16(ref platform, address,
-				MuiAppMessageField.MouseX, out var rawMouseX) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt16(ref platform, address,
-				MuiAppMessageField.MouseY, out var rawMouseY) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.Seconds, out value.Seconds) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.Micros, out value.Micros) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.Reserved0, out value.Reserved0) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.Reserved1, out value.Reserved1) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.Reserved2, out value.Reserved2) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.Reserved3, out value.Reserved3) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.Reserved4, out value.Reserved4) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.Reserved5, out value.Reserved5) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.Reserved6, out value.Reserved6) ||
-			!MuiAppMessageFieldCursorCodec.TryReadUInt32(ref platform, address,
-				MuiAppMessageField.Reserved7, out value.Reserved7)) return false;
+		if (!MuiAppMessageNodeCodec.TryReadFields(ref platform, ref cursor,
+			out value.Message) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out value.Type) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.UserData) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Id) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawArguments) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawArgumentList) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out value.Version) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out value.Class) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var rawMouseX) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var rawMouseY) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Seconds) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Micros) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved0) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved1) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved2) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved3) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved4) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved5) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved6) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved7)) return false;
 		value.NumberOfArguments = unchecked((int)rawArguments);
 		value.ArgumentList = APTR.FromPointer(rawArgumentList);
 		value.MouseX = unchecked((short)rawMouseX);
@@ -760,53 +788,71 @@ internal static class MuiAppMessageRecordCodec
 		return true;
 	}
 
+	internal static bool TryWriteFields<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, MuiAppMessageRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiAppMessageNodeCodec.TryWriteFields(ref platform, ref cursor,
+			value.Message) &&
+			MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				value.Type) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.UserData) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Id) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.NumberOfArguments)) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ArgumentList.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				value.Version) &&
+			MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				value.Class) &&
+			MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				unchecked((ushort)value.MouseX)) &&
+			MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				unchecked((ushort)value.MouseY)) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Seconds) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Micros) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved0) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved1) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved2) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved3) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved4) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved5) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved6) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved7);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiAppMessageRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAppMessageRecord.Size, out var cursor) ||
+			!TryReadFields(ref platform, ref cursor, out value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAppMessageRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAppMessageRecord.Size)) return false;
-		if (!MuiAppMessageNodeCodec.Write(ref platform, address,
-			value.Message)) return false;
-		return MuiAppMessageFieldCursorCodec.TryWriteUInt16(ref platform, address,
-			MuiAppMessageField.Type, value.Type) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.UserData, value.UserData) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.Id, value.Id) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.NumberOfArguments,
-				unchecked((uint)value.NumberOfArguments)) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.ArgumentList, value.ArgumentList.Raw) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt16(ref platform, address,
-				MuiAppMessageField.Version, value.Version) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt16(ref platform, address,
-				MuiAppMessageField.Class, value.Class) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt16(ref platform, address,
-				MuiAppMessageField.MouseX, unchecked((ushort)value.MouseX)) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt16(ref platform, address,
-				MuiAppMessageField.MouseY, unchecked((ushort)value.MouseY)) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.Seconds, value.Seconds) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.Micros, value.Micros) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.Reserved0, value.Reserved0) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.Reserved1, value.Reserved1) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.Reserved2, value.Reserved2) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.Reserved3, value.Reserved3) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.Reserved4, value.Reserved4) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.Reserved5, value.Reserved5) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.Reserved6, value.Reserved6) &&
-			MuiAppMessageFieldCursorCodec.TryWriteUInt32(ref platform, address,
-				MuiAppMessageField.Reserved7, value.Reserved7);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAppMessageRecord.Size, out var cursor) ||
+			!TryWriteFields(ref platform, ref cursor, value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 }
@@ -1031,13 +1077,10 @@ public static class MuiApplicationMessageCore
 		var bytes = (uint)value.NumberOfArguments *
 			MuiWorkbenchArgumentRecord.Size;
 		if (!platform.IsMapped(value.ArgumentList, bytes)) return false;
-		var cursor = default(MuiWorkbenchArgumentVectorCursor);
-		cursor.Base = value.ArgumentList;
 		for (var index = 0u; index < (uint)value.NumberOfArguments; index++)
 		{
-			cursor.Index = index;
-			if (!MuiWorkbenchArgumentVectorCodec.TryGetEntry(ref platform, cursor,
-				out var address)) return false;
+			if (!MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(ref platform,
+				value.ArgumentList, index, out var address)) return false;
 			if (!MuiWorkbenchArgumentRecordCodec.TryRead(ref platform, address,
 				out var argument)) return false;
 			var name = APTR.FromPointer(argument.Name.Raw);
@@ -1111,17 +1154,12 @@ public static class MuiApplicationMessageCore
 			out var objectValue) || !MuiHeadlessClassCodec.TryRead(ref platform,
 			objectValue.Class, out var classValue)) return false;
 		var name = classValue.Name;
-		if (name.IsNull || !platform.IsMapped(name, 11)) return false;
-		if (platform.ReadUInt8(name, 0) != (byte)'W' ||
-			platform.ReadUInt8(name, 1) != (byte)'i' ||
-			platform.ReadUInt8(name, 2) != (byte)'n' ||
-			platform.ReadUInt8(name, 3) != (byte)'d' ||
-			platform.ReadUInt8(name, 4) != (byte)'o' ||
-			platform.ReadUInt8(name, 5) != (byte)'w' ||
-			platform.ReadUInt8(name, 6) != (byte)'.' ||
-			platform.ReadUInt8(name, 7) != (byte)'m' ||
-			platform.ReadUInt8(name, 8) != (byte)'u' ||
-			platform.ReadUInt8(name, 9) != (byte)'i') return false;
-		return platform.ReadUInt8(name, 10) == 0;
+		if (!MuiWindowClassNameRecordCodec.TryReadRecord(ref platform, name,
+			out var nameValue)) return false;
+		return nameValue.Word0 == 0x57696E64 && // Wind
+			nameValue.Word1 == 0x6F772E6D && // ow.m
+			nameValue.Character0 == (byte)'u' &&
+			nameValue.Character1 == (byte)'i' &&
+			nameValue.Terminator == 0;
 	}
 }

@@ -15,6 +15,8 @@ namespace CopperOS.MuiMaster;
 internal struct MuiFamilyMethodMessage
 {
 	internal const uint Size = 4;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
 
@@ -22,6 +24,9 @@ internal struct MuiFamilyMethodMessage
 internal struct MuiFamilyChildMessage
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint ObjectOffset = 4;
 	internal uint MethodId;
 	internal APTR Object;
 }
@@ -30,6 +35,10 @@ internal struct MuiFamilyChildMessage
 internal struct MuiFamilyInsertMessage
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint ObjectOffset = 4;
+	internal const uint PredecessorOffset = 8;
 	internal uint MethodId;
 	internal APTR Object;
 	internal APTR Predecessor;
@@ -39,6 +48,9 @@ internal struct MuiFamilyInsertMessage
 internal struct MuiFamilyTransferMessage
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint FamilyOffset = 4;
 	internal uint MethodId;
 	internal APTR Family;
 }
@@ -49,6 +61,9 @@ internal struct MuiFamilyReorderMessage
 	internal const uint HeaderSize = 8;
 	internal const uint MinimumSize = 12;
 	internal const uint ArrayOffset = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
+	internal const uint AfterOffset = 4;
 	internal uint MethodId;
 	internal APTR After;
 }
@@ -59,6 +74,8 @@ internal struct MuiFamilySortMessage
 	internal const uint HeaderSize = 4;
 	internal const uint MinimumSize = 8;
 	internal const uint ArrayOffset = 4;
+	internal const uint FieldSize = 4;
+	internal const uint MethodIdOffset = 0;
 	internal uint MethodId;
 }
 
@@ -89,48 +106,81 @@ internal struct MuiFamilyPacketFieldCursor
 	internal MuiFamilyPacketField Field;
 }
 
-internal static class MuiFamilyPacketFieldCursorCodec
+internal static class MuiFamilyPacketMemoryCodec
 {
 	private static bool TryResolve(MuiFamilyPacketKind packet,
-		MuiFamilyPacketField field, out uint offset)
+		MuiFamilyPacketField field, out uint offset, out uint packetSize)
 	{
-		switch (packet)
-		{
-			case MuiFamilyPacketKind.Method:
-			case MuiFamilyPacketKind.Sort:
-				if (field == MuiFamilyPacketField.MethodId) { offset = 0; return true; }
-				break;
-			case MuiFamilyPacketKind.Child:
-				if (field == MuiFamilyPacketField.MethodId) { offset = 0; return true; }
-				if (field == MuiFamilyPacketField.Object) { offset = 4; return true; }
-				break;
-			case MuiFamilyPacketKind.Insert:
-				if (field == MuiFamilyPacketField.MethodId) { offset = 0; return true; }
-				if (field == MuiFamilyPacketField.Object) { offset = 4; return true; }
-				if (field == MuiFamilyPacketField.Predecessor) { offset = 8; return true; }
-				break;
-			case MuiFamilyPacketKind.Transfer:
-				if (field == MuiFamilyPacketField.MethodId) { offset = 0; return true; }
-				if (field == MuiFamilyPacketField.Family) { offset = 4; return true; }
-				break;
-			case MuiFamilyPacketKind.Reorder:
-				if (field == MuiFamilyPacketField.MethodId) { offset = 0; return true; }
-				if (field == MuiFamilyPacketField.After) { offset = 4; return true; }
-				break;
-		}
 		offset = 0;
+		packetSize = 0;
+		if (packet == MuiFamilyPacketKind.Method ||
+			packet == MuiFamilyPacketKind.Sort)
+		{
+			if (field != MuiFamilyPacketField.MethodId) return false;
+			offset = packet == MuiFamilyPacketKind.Method
+				? MuiFamilyMethodMessage.MethodIdOffset
+				: MuiFamilySortMessage.MethodIdOffset;
+			packetSize = packet == MuiFamilyPacketKind.Method
+				? MuiFamilyMethodMessage.Size
+				: MuiFamilySortMessage.MinimumSize;
+			return true;
+		}
+		if (packet == MuiFamilyPacketKind.Child)
+		{
+			packetSize = MuiFamilyChildMessage.Size;
+			if (field == MuiFamilyPacketField.MethodId)
+				offset = MuiFamilyChildMessage.MethodIdOffset;
+			else if (field == MuiFamilyPacketField.Object)
+				offset = MuiFamilyChildMessage.ObjectOffset;
+			else return false;
+			return true;
+		}
+		if (packet == MuiFamilyPacketKind.Insert)
+		{
+			packetSize = MuiFamilyInsertMessage.Size;
+			if (field == MuiFamilyPacketField.MethodId)
+				offset = MuiFamilyInsertMessage.MethodIdOffset;
+			else if (field == MuiFamilyPacketField.Object)
+				offset = MuiFamilyInsertMessage.ObjectOffset;
+			else if (field == MuiFamilyPacketField.Predecessor)
+				offset = MuiFamilyInsertMessage.PredecessorOffset;
+			else return false;
+			return true;
+		}
+		if (packet == MuiFamilyPacketKind.Transfer)
+		{
+			packetSize = MuiFamilyTransferMessage.Size;
+			if (field == MuiFamilyPacketField.MethodId)
+				offset = MuiFamilyTransferMessage.MethodIdOffset;
+			else if (field == MuiFamilyPacketField.Family)
+				offset = MuiFamilyTransferMessage.FamilyOffset;
+			else return false;
+			return true;
+		}
+		if (packet == MuiFamilyPacketKind.Reorder)
+		{
+			packetSize = MuiFamilyReorderMessage.MinimumSize;
+			if (field == MuiFamilyPacketField.MethodId)
+				offset = MuiFamilyReorderMessage.MethodIdOffset;
+			else if (field == MuiFamilyPacketField.After)
+				offset = MuiFamilyReorderMessage.AfterOffset;
+			else return false;
+			return true;
+		}
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiFamilyPacketFieldCursor cursor, out APTR address)
+		APTR message, MuiFamilyPacketKind packet, MuiFamilyPacketField field,
+		out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Packet, cursor.Field, out var offset) ||
-			cursor.Message.IsNull || cursor.Message.Raw > uint.MaxValue - offset)
+		if (!TryResolve(packet, field, out var offset, out var packetSize) ||
+			message.IsNull || message.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(message, packetSize))
 			return false;
-		address = APTR.FromPointer(cursor.Message.Raw + offset);
+		address = APTR.FromPointer(message.Raw + offset);
 		return platform.IsMapped(address, 4);
 	}
 
@@ -140,11 +190,8 @@ internal static class MuiFamilyPacketFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiFamilyPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -154,14 +201,50 @@ internal static class MuiFamilyPacketFieldCursorCodec
 		uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiFamilyPacketFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, message, packet, field,
+			out var address)) return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+
+	// Keep method-header admission scalar in native lowering while the public
+	// decoder continues to expose the named method record.
+	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
+		APTR message, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (message.IsNull || !platform.IsMapped(message,
+			MuiFamilyMethodMessage.Size)) return false;
+		value = platform.ReadUInt32(message,
+			(int)MuiFamilyMethodMessage.MethodIdOffset);
+		return true;
+	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// Family packet cursor. Live mutation codecs use the direct memory adapter.
+internal static class MuiFamilyPacketFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiFamilyPacketFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiFamilyPacketMemoryCodec.TryGetAddress(ref platform, cursor.Message,
+			cursor.Packet, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiFamilyPacketKind packet, MuiFamilyPacketField field,
+		out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiFamilyPacketMemoryCodec.TryReadUInt32(ref platform, message, packet,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR message, MuiFamilyPacketKind packet, MuiFamilyPacketField field,
+		uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiFamilyPacketMemoryCodec.TryWriteUInt32(ref platform, message, packet,
+			field, value);
 }
 
 // Central codec for the fixed MorphOS Family mutation packet family. The
@@ -177,14 +260,8 @@ internal static class MuiFamilyMutationMessageCodec
 	internal static bool TryGetVectorEntry<TPlatform>(ref TPlatform platform,
 		APTR message, uint vectorOffset, uint index, out APTR entry)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		var cursor = default(MuiFamilyInlineVectorCursor);
-		cursor.Message = message;
-		cursor.ArrayOffset = vectorOffset;
-		cursor.Index = index;
-		return MuiFamilyInlineVectorCursorCodec.TryGetEntry(ref platform,
-			cursor, out entry);
-	}
+		=> MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform, message,
+			vectorOffset, index, out entry);
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiFamilyMethodMessage packet)
@@ -204,10 +281,7 @@ internal static class MuiFamilyMutationMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiFamilyMethodMessage.Size)) return false;
-		return MuiFamilyPacketFieldCursorCodec.TryReadUInt32(ref platform,
-			message, MuiFamilyPacketKind.Method, MuiFamilyPacketField.MethodId,
+		return MuiFamilyPacketMemoryCodec.TryReadMethodId(ref platform, message,
 			out methodId);
 	}
 
@@ -224,7 +298,7 @@ internal static class MuiFamilyMutationMessageCodec
 			!TryReadMethodIdValue(ref platform, message, out var methodId) ||
 			methodId != method) return false;
 		packet.MethodId = methodId;
-		if (!MuiFamilyPacketFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiFamilyPacketMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiFamilyPacketKind.Child, MuiFamilyPacketField.Object,
 			out var rawObject)) return false;
 		packet.Object = APTR.FromPointer(rawObject);
@@ -240,10 +314,10 @@ internal static class MuiFamilyMutationMessageCodec
 			(method != MuiFamilyMutationCore.AddHeadMethod &&
 				method != MuiFamilyMutationCore.AddTailMethod &&
 				method != MuiFamilyMutationCore.RemoveMethod)) return false;
-		return MuiFamilyPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiFamilyPacketMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiFamilyPacketKind.Child, MuiFamilyPacketField.MethodId,
 			method) &&
-			MuiFamilyPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiFamilyPacketMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiFamilyPacketKind.Child, MuiFamilyPacketField.Object,
 				child.Raw);
 	}
@@ -258,10 +332,10 @@ internal static class MuiFamilyMutationMessageCodec
 			!TryReadMethodIdValue(ref platform, message, out var methodId) ||
 			methodId != MuiFamilyMutationCore.InsertMethod)
 			return false;
-		if (!MuiFamilyPacketFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiFamilyPacketMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiFamilyPacketKind.Insert, MuiFamilyPacketField.Object,
 			out var rawObject) ||
-			!MuiFamilyPacketFieldCursorCodec.TryReadUInt32(ref platform,
+			!MuiFamilyPacketMemoryCodec.TryReadUInt32(ref platform,
 				message, MuiFamilyPacketKind.Insert,
 				MuiFamilyPacketField.Predecessor, out var rawPredecessor))
 			return false;
@@ -277,13 +351,13 @@ internal static class MuiFamilyMutationMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiFamilyInsertMessage.Size)) return false;
-		return MuiFamilyPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiFamilyPacketMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiFamilyPacketKind.Insert, MuiFamilyPacketField.MethodId,
 			MuiFamilyMutationCore.InsertMethod) &&
-			MuiFamilyPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiFamilyPacketMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiFamilyPacketKind.Insert, MuiFamilyPacketField.Object,
 				child.Raw) &&
-			MuiFamilyPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiFamilyPacketMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiFamilyPacketKind.Insert,
 				MuiFamilyPacketField.Predecessor, predecessor.Raw);
 	}
@@ -298,7 +372,7 @@ internal static class MuiFamilyMutationMessageCodec
 			!TryReadMethodIdValue(ref platform, message, out var methodId) ||
 			methodId != MuiFamilyMutationCore.TransferMethod)
 			return false;
-		if (!MuiFamilyPacketFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiFamilyPacketMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiFamilyPacketKind.Transfer, MuiFamilyPacketField.Family,
 			out var rawFamily)) return false;
 		packet.MethodId = methodId;
@@ -312,10 +386,10 @@ internal static class MuiFamilyMutationMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiFamilyTransferMessage.Size)) return false;
-		return MuiFamilyPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiFamilyPacketMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiFamilyPacketKind.Transfer,
 			MuiFamilyPacketField.MethodId, MuiFamilyMutationCore.TransferMethod) &&
-			MuiFamilyPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiFamilyPacketMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiFamilyPacketKind.Transfer, MuiFamilyPacketField.Family,
 				family.Raw);
 	}
@@ -331,7 +405,7 @@ internal static class MuiFamilyMutationMessageCodec
 			!TryReadMethodIdValue(ref platform, message, out var methodId) ||
 			methodId != MuiFamilyMutationCore.ReorderMethod)
 			return false;
-		if (!MuiFamilyPacketFieldCursorCodec.TryReadUInt32(ref platform,
+		if (!MuiFamilyPacketMemoryCodec.TryReadUInt32(ref platform,
 			message, MuiFamilyPacketKind.Reorder, MuiFamilyPacketField.After,
 			out var rawAfter)) return false;
 		packet.MethodId = methodId;
@@ -360,10 +434,10 @@ internal static class MuiFamilyMutationMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiFamilyReorderMessage.MinimumSize)) return false;
-		return MuiFamilyPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiFamilyPacketMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiFamilyPacketKind.Reorder, MuiFamilyPacketField.MethodId,
 			MuiFamilyMutationCore.ReorderMethod) &&
-			MuiFamilyPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+			MuiFamilyPacketMemoryCodec.TryWriteUInt32(ref platform,
 				message, MuiFamilyPacketKind.Reorder, MuiFamilyPacketField.After,
 				after.Raw);
 	}
@@ -373,7 +447,7 @@ internal static class MuiFamilyMutationMessageCodec
 	{
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiFamilySortMessage.MinimumSize)) return false;
-		return MuiFamilyPacketFieldCursorCodec.TryWriteUInt32(ref platform,
+		return MuiFamilyPacketMemoryCodec.TryWriteUInt32(ref platform,
 			message, MuiFamilyPacketKind.Sort, MuiFamilyPacketField.MethodId,
 			MuiFamilyMutationCore.SortMethod);
 	}
@@ -383,6 +457,9 @@ internal static class MuiFamilyMutationMessageCodec
 internal struct MuiFamilyMutationListRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint HeadOffset = 0;
+	internal const uint TailOffset = 4;
 	internal APTR Head;
 	internal APTR Tail;
 }
@@ -400,25 +477,36 @@ internal struct MuiFamilyMutationListFieldCursor
 	internal MuiFamilyMutationListField Field;
 }
 
-internal static class MuiFamilyMutationListFieldCursorCodec
+internal static class MuiFamilyMutationListMemoryCodec
 {
 	private static bool TryResolve(MuiFamilyMutationListField field,
-		out uint offset)
+		out uint offset, out uint recordSize)
 	{
-		if (field == MuiFamilyMutationListField.Head) { offset = 0; return true; }
-		if (field == MuiFamilyMutationListField.Tail) { offset = 4; return true; }
+		recordSize = MuiFamilyMutationListRecord.Size;
+		if (field == MuiFamilyMutationListField.Head)
+		{
+			offset = MuiFamilyMutationListRecord.HeadOffset;
+			return true;
+		}
+		if (field == MuiFamilyMutationListField.Tail)
+		{
+			offset = MuiFamilyMutationListRecord.TailOffset;
+			return true;
+		}
 		offset = 0;
+		recordSize = 0;
 		return false;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiFamilyMutationListFieldCursor cursor, out APTR address)
+		APTR list, MuiFamilyMutationListField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.List.IsNull ||
-			cursor.List.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.List.Raw + offset);
+		if (!TryResolve(field, out var offset, out var recordSize) ||
+			list.IsNull || list.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(list, recordSize)) return false;
+		address = APTR.FromPointer(list.Raw + offset);
 		return platform.IsMapped(address, 4);
 	}
 
@@ -427,10 +515,8 @@ internal static class MuiFamilyMutationListFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiFamilyMutationListFieldCursor);
-		cursor.List = list;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, list, field, out var address))
+			return false;
 		value = platform.ReadUInt32(address, 0);
 		return true;
 	}
@@ -439,13 +525,34 @@ internal static class MuiFamilyMutationListFieldCursorCodec
 		APTR list, MuiFamilyMutationListField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiFamilyMutationListFieldCursor);
-		cursor.List = list;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		if (!TryGetAddress(ref platform, list, field, out var address))
+			return false;
 		platform.WriteUInt32(address, 0, value);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that still construct the typed
+// Family list cursor. Live list serialization uses the direct memory adapter.
+internal static class MuiFamilyMutationListFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiFamilyMutationListFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiFamilyMutationListMemoryCodec.TryGetAddress(ref platform, cursor.List,
+			cursor.Field, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR list, MuiFamilyMutationListField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiFamilyMutationListMemoryCodec.TryRead(ref platform, list, field,
+			out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR list, MuiFamilyMutationListField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiFamilyMutationListMemoryCodec.TryWrite(ref platform, list, field,
+			value);
 }
 
 internal static class MuiFamilyMutationListCodec
@@ -457,9 +564,9 @@ internal static class MuiFamilyMutationListCodec
 		record = default;
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiFamilyMutationListRecord.Size)) return false;
-		if (!MuiFamilyMutationListFieldCursorCodec.TryRead(ref platform, address,
+		if (!MuiFamilyMutationListMemoryCodec.TryRead(ref platform, address,
 			MuiFamilyMutationListField.Head, out var rawHead) ||
-			!MuiFamilyMutationListFieldCursorCodec.TryRead(ref platform, address,
+			!MuiFamilyMutationListMemoryCodec.TryRead(ref platform, address,
 				MuiFamilyMutationListField.Tail, out var rawTail)) return false;
 		record.Head = APTR.FromPointer(rawHead);
 		record.Tail = APTR.FromPointer(rawTail);
@@ -472,9 +579,9 @@ internal static class MuiFamilyMutationListCodec
 	{
 		if (address.IsNull || !platform.IsMapped(address,
 			MuiFamilyMutationListRecord.Size)) return false;
-		return MuiFamilyMutationListFieldCursorCodec.TryWrite(ref platform, address,
+		return MuiFamilyMutationListMemoryCodec.TryWrite(ref platform, address,
 			MuiFamilyMutationListField.Head, record.Head.Raw) &&
-			MuiFamilyMutationListFieldCursorCodec.TryWrite(ref platform, address,
+			MuiFamilyMutationListMemoryCodec.TryWrite(ref platform, address,
 				MuiFamilyMutationListField.Tail, record.Tail.Raw);
 	}
 }
@@ -491,22 +598,53 @@ internal struct MuiFamilyInlineVectorCursor
 	internal uint Index;
 }
 
+// Struct-first adapter for the inline object vectors carried by the Family
+// Reorder and Sort packets. The packet header size is resolved from its named
+// struct, then the selected vector entry is range-checked; raw offsets never
+// escape this guest-memory boundary.
+internal static class MuiFamilyInlineVectorMemoryCodec
+{
+	private static bool TryResolve(uint vectorOffset, out uint packetSize)
+	{
+		if (vectorOffset == MuiFamilyReorderMessage.ArrayOffset)
+		{
+			packetSize = MuiFamilyReorderMessage.HeaderSize;
+			return true;
+		}
+		if (vectorOffset == MuiFamilySortMessage.ArrayOffset)
+		{
+			packetSize = MuiFamilySortMessage.HeaderSize;
+			return true;
+		}
+		packetSize = 0;
+		return false;
+	}
+
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR message, uint vectorOffset, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(vectorOffset, out var packetSize) || message.IsNull ||
+			!platform.IsMapped(message, packetSize) || message.Raw >
+			uint.MaxValue - vectorOffset) return false;
+		var vector = message.Raw + vectorOffset;
+		if (index > (uint.MaxValue - vector) /
+			MuiFamilyMutationVectorEntry.Size) return false;
+		var offset = index * MuiFamilyMutationVectorEntry.Size;
+		if (vector > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(vector + offset);
+		return platform.IsMapped(address, MuiFamilyMutationVectorEntry.Size);
+	}
+}
+
 internal static class MuiFamilyInlineVectorCursorCodec
 {
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiFamilyInlineVectorCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (cursor.Message.IsNull ||
-			cursor.Message.Raw > uint.MaxValue - cursor.ArrayOffset) return false;
-		var vector = APTR.FromPointer(cursor.Message.Raw + cursor.ArrayOffset);
-		var vectorCursor = default(MuiFamilyMutationVectorCursor);
-		vectorCursor.Base = vector;
-		vectorCursor.Index = cursor.Index;
-		return MuiFamilyMutationVectorCodec.TryGetEntry(ref platform,
-			vectorCursor, out address);
-	}
+		=> MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Message, cursor.ArrayOffset, cursor.Index, out address);
 }
 
 // A Family reorder/sort vector is an inline array of guest object pointers.
@@ -523,28 +661,37 @@ internal struct MuiFamilyMutationVectorEntry
 internal struct MuiFamilyMutationVectorCursor
 {
 	internal const uint EntrySize = MuiFamilyMutationVectorEntry.Size;
+	internal const uint MaximumEntries = 65535;
 	internal APTR Base;
 	internal uint Index;
 }
 
-internal static class MuiFamilyMutationVectorCodec
+// Struct-first guest-memory adapter for the NULL-terminated Family reorder
+// and sort vectors. The bounded index and complete four-byte object record
+// are admitted here; the cursor below is retained as a compatibility wrapper.
+internal static class MuiFamilyMutationVectorMemoryCodec
 {
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
-		MuiFamilyMutationVectorCursor cursor, out APTR address)
+		APTR vector, uint index, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (cursor.Base.IsNull || cursor.Index >
-			(uint.MaxValue - cursor.Base.Raw) /
-			MuiFamilyMutationVectorCursor.EntrySize) return false;
-		var offset = cursor.Index *
-			MuiFamilyMutationVectorCursor.EntrySize;
-		if (cursor.Base.Raw > uint.MaxValue - offset) return false;
-		address = APTR.FromPointer(cursor.Base.Raw + offset);
-		return platform.IsMapped(address,
-			MuiFamilyMutationVectorCursor.EntrySize);
+		if (vector.IsNull || index >= MuiFamilyMutationVectorCursor.MaximumEntries ||
+			index > (uint.MaxValue - vector.Raw) /
+			MuiFamilyMutationVectorEntry.Size) return false;
+		var offset = index * MuiFamilyMutationVectorEntry.Size;
+		if (vector.Raw > uint.MaxValue - offset) return false;
+		address = APTR.FromPointer(vector.Raw + offset);
+		return platform.IsMapped(address, MuiFamilyMutationVectorEntry.Size);
 	}
+}
 
+// Canonical codec for one named Family reorder/sort vector entry.  The
+// complete four-byte record is admitted before its Object member is decoded;
+// callers outside this ABI boundary pass the struct rather than a field
+// offset or compatibility cursor.
+internal static class MuiFamilyMutationVectorEntryCodec
+{
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiFamilyMutationVectorEntry record)
 		where TPlatform : struct, IMuiGuestMemory
@@ -565,6 +712,28 @@ internal static class MuiFamilyMutationVectorCodec
 		platform.WriteUInt32(address, 0, record.Object.Raw);
 		return true;
 	}
+}
+
+// Compatibility wrapper retained for callers that still model the vector as
+// a cursor.  New production paths use the named entry codec directly.
+internal static class MuiFamilyMutationVectorCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		MuiFamilyMutationVectorCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiFamilyMutationVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiFamilyMutationVectorEntry record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiFamilyMutationVectorEntryCodec.TryRead(ref platform, address,
+			out record);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform,
+		APTR address, MuiFamilyMutationVectorEntry record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiFamilyMutationVectorEntryCodec.Write(ref platform, address, record);
 }
 
 internal static class MuiFamilyMutationChildRecord
@@ -654,7 +823,7 @@ public static class MuiFamilyMutationCore
 			message, offset, index, out var entry)) return false;
 		var record = default(MuiFamilyMutationVectorEntry);
 		record.Object = value;
-		return MuiFamilyMutationVectorCodec.Write(ref platform, entry, record);
+		return MuiFamilyMutationVectorEntryCodec.Write(ref platform, entry, record);
 	}
 
 	public static uint Dispatch<TPlatform>(ref TPlatform platform, APTR state,
@@ -989,7 +1158,7 @@ public static class MuiFamilyMutationCore
 		{
 			if (!MuiFamilyMutationMessageCodec.TryGetVectorEntry(ref platform,
 				message, vectorOffset, index, out var entry)) return false;
-			if (!MuiFamilyMutationVectorCodec.TryRead(ref platform, entry,
+			if (!MuiFamilyMutationVectorEntryCodec.TryRead(ref platform, entry,
 				out var vectorEntry)) return false;
 			var objectAddress = vectorEntry.Object;
 			if (objectAddress.IsNull) return true;

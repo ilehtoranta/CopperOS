@@ -287,12 +287,9 @@ public static class MuiFamilyCore
 		var predecessor = after;
 		for (var index = 0u; index < MuiHeadlessLayout.MaximumTraversal; index++)
 		{
-			var cursor = default(MuiFamilyMutationVectorCursor);
-			cursor.Base = objects;
-			cursor.Index = index;
-			if (!MuiFamilyMutationVectorCodec.TryGetEntry(ref platform, cursor,
-				out var itemAddress)) return false;
-			if (!MuiFamilyMutationVectorCodec.TryRead(ref platform, itemAddress,
+			if (!MuiFamilyMutationVectorMemoryCodec.TryGetEntry(ref platform,
+				objects, index, out var itemAddress)) return false;
+			if (!MuiFamilyMutationVectorEntryCodec.TryRead(ref platform, itemAddress,
 				out var item)) return false;
 			var child = item.Object;
 			if (child.IsNull) return true;

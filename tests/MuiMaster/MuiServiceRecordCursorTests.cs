@@ -28,24 +28,41 @@ public sealed class MuiServiceRecordCursorTests
 	}
 
 	[Fact]
+	public void ErrorServiceMemoryAdapterOwnsStructBounds()
+	{
+		var platform = CreatePlatform();
+		var record = APTR.FromPointer(0x3000);
+		Assert.True(MuiErrorServiceStateMemoryCodec.TryGetAddress(ref platform,
+			record, MuiErrorServiceStateField.Sequence, out var address));
+		Assert.Equal(record.Raw + MuiErrorServiceStateRecord.SequenceOffset,
+			address.Raw);
+		Assert.True(MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform,
+			record, MuiErrorServiceStateField.Error, 0xFFFFFFFEu));
+		Assert.True(MuiErrorServiceStateMemoryCodec.TryReadUInt32(ref platform,
+			record, MuiErrorServiceStateField.Error, out var error));
+		Assert.Equal(0xFFFFFFFEu, error);
+		Assert.False(MuiErrorServiceStateMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x40FF9), MuiErrorServiceStateField.Sequence, out _));
+		Assert.False(MuiErrorServiceStateMemoryCodec.TryGetAddress(ref platform,
+			record, (MuiErrorServiceStateField)255, out _));
+		Assert.False(MuiErrorServiceStateMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiErrorServiceStateField.Error, out _));
+	}
+
+	[Fact]
 	public void GroupPageFieldsUseNamedRecordBoundary()
 	{
 		var platform = CreatePlatform();
 		var record = APTR.FromPointer(0x3100);
-		var cursor = new MuiGroupPageStateFieldCursor
-		{
-			Record = record,
-			Field = MuiGroupPageStateField.LastSelector,
-		};
-		Assert.True(MuiGroupPageStateFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out var address));
+		Assert.True(MuiGroupPageStateMemoryCodec.TryGetAddress(ref platform,
+			record, MuiGroupPageStateField.LastSelector, out var address));
 		Assert.Equal(APTR.FromPointer(0x310C), address);
-		Assert.True(MuiGroupPageStateFieldCursorCodec.TryWriteUInt32(ref platform,
+		Assert.True(MuiGroupPageStateMemoryCodec.TryWriteUInt32(ref platform,
 			record, MuiGroupPageStateField.Active, 2));
-		Assert.True(MuiGroupPageStateFieldCursorCodec.TryReadUInt32(ref platform,
+		Assert.True(MuiGroupPageStateMemoryCodec.TryReadUInt32(ref platform,
 			record, MuiGroupPageStateField.Active, out var active));
 		Assert.Equal(2u, active);
-		Assert.False(MuiGroupPageStateFieldCursorCodec.TryReadUInt32(ref platform,
+		Assert.False(MuiGroupPageStateMemoryCodec.TryReadUInt32(ref platform,
 			APTR.FromPointer(0xFFFFFFF0u), MuiGroupPageStateField.Changes, out _));
 	}
 
@@ -69,6 +86,58 @@ public sealed class MuiServiceRecordCursorTests
 		Assert.Equal(0x7FFFFFFFu, high);
 		Assert.False(MuiStringInteger64FieldCursorCodec.TryReadUInt32(ref platform,
 			record, unchecked((MuiStringInteger64Field)255), out _));
+	}
+
+	[Fact]
+	public void StringInteger64MemoryAdapterOwnsQuadRecordBounds()
+	{
+		var platform = CreatePlatform();
+		var record = APTR.FromPointer(0x3200);
+		Assert.True(MuiStringInteger64ValueMemoryCodec.TryGetAddress(ref platform,
+			record, MuiStringInteger64Field.Low, out var lowField));
+		Assert.Equal(APTR.FromPointer(0x3204), lowField);
+		Assert.True(MuiStringInteger64ValueMemoryCodec.TryWriteUInt32(ref platform,
+			record, MuiStringInteger64Field.High, 0x80000000u));
+		Assert.True(MuiStringInteger64ValueMemoryCodec.TryReadUInt32(ref platform,
+			record, MuiStringInteger64Field.High, out var high));
+		Assert.Equal(0x80000000u, high);
+		Assert.False(MuiStringInteger64ValueMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x40FFC), MuiStringInteger64Field.Low, out _));
+		Assert.False(MuiStringInteger64ValueMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiStringInteger64Field.High, out _));
+		Assert.False(MuiStringInteger64ValueMemoryCodec.TryGetAddress(ref platform,
+			record, unchecked((MuiStringInteger64Field)255), out _));
+	}
+
+	[Fact]
+	public void StringEditWorkMemoryAdapterOwnsMixedFieldRecordBounds()
+	{
+		var platform = CreatePlatform();
+		var record = APTR.FromPointer(0x3400);
+		Assert.True(MuiStringEditWorkRecordMemoryCodec.TryGetAddress(ref platform,
+			record, MuiStringEditRecordField.Actions, out var actionsField,
+			out var actionsSize));
+		Assert.Equal(APTR.FromPointer(0x341E), actionsField);
+		Assert.Equal(MuiStringEditWorkRecord.LongFieldSize, actionsSize);
+		Assert.True(MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, MuiStringEditRecordField.Actions, 0xAABBCCDD));
+		Assert.True(MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, MuiStringEditRecordField.Actions, out var actions));
+		Assert.Equal(0xAABBCCDDu, actions);
+		Assert.True(MuiStringEditWorkRecordMemoryCodec.TryWriteUInt16(ref platform,
+			record, MuiStringEditRecordField.EditOp, 7));
+		Assert.True(MuiStringEditWorkRecordMemoryCodec.TryReadUInt16(ref platform,
+			record, MuiStringEditRecordField.EditOp, out var editOp));
+		Assert.Equal((ushort)7, editOp);
+		Assert.False(MuiStringEditWorkRecordMemoryCodec.TryReadUInt16(ref platform,
+			record, MuiStringEditRecordField.Actions, out _));
+		Assert.False(MuiStringEditWorkRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.FromPointer(0x40FD5), MuiStringEditRecordField.Gadget, out _,
+			out _));
+		Assert.False(MuiStringEditWorkRecordMemoryCodec.TryGetAddress(ref platform,
+			APTR.Null, MuiStringEditRecordField.EditOp, out _, out _));
+		Assert.False(MuiStringEditWorkRecordMemoryCodec.TryGetAddress(ref platform,
+			record, (MuiStringEditRecordField)255, out _, out _));
 	}
 
 	[Fact]

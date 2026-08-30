@@ -129,19 +129,35 @@ internal static class MuiChoiceEntriesStateRecordMemoryCodec
 
 internal static class MuiChoiceEntriesStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiChoiceEntriesStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiChoiceEntriesStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiChoiceEntriesStateField.Magic, out var magic) ||
-			!MuiChoiceEntriesStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiChoiceEntriesStateField.Entries, out var entries)) return false;
-		value.Magic = magic;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiChoiceEntriesStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var entries)) return false;
 		value.Entries = APTR.FromPointer(entries);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiChoiceEntriesStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiChoiceEntriesStateRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Entries.Raw) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiChoiceEntriesStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiChoiceEntriesStateRecord value)
@@ -153,11 +169,9 @@ internal static class MuiChoiceEntriesStateRecordCodec
 		MuiChoiceEntriesStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiChoiceEntriesStateAdmission.Validate(ref platform, value)) return false;
-		return MuiChoiceEntriesStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiChoiceEntriesStateField.Magic, value.Magic) &&
-			MuiChoiceEntriesStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiChoiceEntriesStateField.Entries, value.Entries.Raw);
+		if (address.IsNull || !MuiChoiceEntriesStateAdmission.Validate(ref platform,
+			value)) return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
 
@@ -168,13 +182,11 @@ internal static class MuiChoiceEntriesStateAdmission
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (value.Entries.IsNull) return true;
-		var cursor = default(MuiChoiceEntryCursor);
-		cursor.Base = value.Entries;
 		for (var index = 0u; index < MuiChoiceEntryCursor.MaximumEntries;
 			index++)
 		{
-			cursor.Index = index;
-			if (!MuiChoiceEntryCursorCodec.TryGetEntry(ref platform, cursor,
+			if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
+				value.Entries, index,
 				out var slot) || !MuiChoiceEntryCodec.TryRead(ref platform, slot,
 				out var entry)) return false;
 			if (entry.Text.IsNull) return true;

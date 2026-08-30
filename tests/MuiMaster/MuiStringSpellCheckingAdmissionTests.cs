@@ -90,21 +90,24 @@ public sealed class MuiStringSpellCheckingAdmissionTests
 		Assert.True(MuiStringSpellCheckingStateRecordCodec.Write(ref platform,
 			recordAddress, value));
 		Assert.True(MuiStringSpellCheckingStateRecordMemoryCodec.TryGetAddress(
-			ref platform, recordAddress, 4, out var enabledAddress));
+			ref platform, recordAddress,
+			MuiStringSpellCheckingStateField.Enabled, out var enabledAddress));
 		Assert.Equal(0x1D44u, enabledAddress.Raw);
 		Assert.True(MuiStringSpellCheckingStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, recordAddress, 4, out var enabled));
+			ref platform, recordAddress,
+			MuiStringSpellCheckingStateField.Enabled, out var enabled));
 		Assert.Equal(1u, enabled);
 		Assert.True(MuiStringSpellCheckingStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, recordAddress, 4, 0));
+			ref platform, recordAddress, MuiStringSpellCheckingStateField.Enabled,
+			0));
 		Assert.True(MuiStringSpellCheckingStateRecordCodec.TryReadStructural(
 			ref platform, recordAddress, out var decoded));
 		Assert.Equal(0u, decoded.Enabled);
 		Assert.False(MuiStringSpellCheckingStateRecordMemoryCodec.TryGetAddress(
-			ref platform, recordAddress, MuiStringSpellCheckingStateRecord.Size,
-			out _));
+			ref platform, recordAddress,
+			(MuiStringSpellCheckingStateField)255, out _));
 		Assert.False(MuiStringSpellCheckingStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, MuiStringSpellCheckingStateField.Magic, out _));
 		Assert.False(MuiStringSpellCheckingStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

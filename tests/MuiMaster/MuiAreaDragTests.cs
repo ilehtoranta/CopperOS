@@ -133,23 +133,46 @@ public sealed class MuiAreaDragTests
 	{
 		var platform = CreatePlatform(out _);
 		var storage = APTR.FromPointer(0x1700);
+		Assert.True(MuiAreaDragStateMemoryCodec.TryGetAddress(ref platform,
+			storage, MuiAreaDragStateField.LastY, out var address));
+		Assert.Equal(APTR.FromPointer(0x1710), address);
+		Assert.True(MuiAreaDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			storage, MuiAreaDragStateField.LastY, unchecked((uint)-12)));
+		Assert.True(MuiAreaDragStateMemoryCodec.TryReadUInt32(ref platform,
+			storage, MuiAreaDragStateField.LastY, out var lastY));
+		Assert.Equal(-12, unchecked((int)lastY));
+
+		var value = new MuiAreaDragState
+		{
+			Magic = MuiAreaDragStateCodec.Cookie,
+			Source = 0x3400,
+			Target = 0x3500,
+			LastX = -4,
+			LastY = -12,
+			Qualifier = 3,
+			EventFlags = 5,
+			Flags = MuiAreaDragState.ActiveFlag,
+		};
+		MuiAreaDragStateCodec.Write(ref platform, storage, value);
+		Assert.True(MuiAreaDragStateCodec.TryRead(ref platform, storage,
+			out var decoded));
+		Assert.Equal(value.Source, decoded.Source);
+		Assert.Equal(value.LastX, decoded.LastX);
+		Assert.Equal(value.Flags, decoded.Flags);
+
+		Assert.False(MuiAreaDragStateMemoryCodec.TryReadUInt32(ref platform,
+			storage, unchecked((MuiAreaDragStateField)255), out _));
+		Assert.False(MuiAreaDragStateMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0xFFFFFFF0u), MuiAreaDragStateField.Flags, out _));
+
 		var cursor = new MuiAreaDragStateFieldCursor
 		{
 			Record = storage,
 			Field = MuiAreaDragStateField.LastY,
 		};
 		Assert.True(MuiAreaDragStateFieldCursorCodec.TryGetAddress(ref platform,
-			cursor, out var address));
+			cursor, out address));
 		Assert.Equal(APTR.FromPointer(0x1710), address);
-		Assert.True(MuiAreaDragStateFieldCursorCodec.TryWriteUInt32(ref platform,
-			storage, MuiAreaDragStateField.LastY, unchecked((uint)-12)));
-		Assert.True(MuiAreaDragStateFieldCursorCodec.TryReadUInt32(ref platform,
-			storage, MuiAreaDragStateField.LastY, out var lastY));
-		Assert.Equal(-12, unchecked((int)lastY));
-		Assert.False(MuiAreaDragStateFieldCursorCodec.TryReadUInt32(ref platform,
-			storage, unchecked((MuiAreaDragStateField)255), out _));
-		Assert.False(MuiAreaDragStateFieldCursorCodec.TryReadUInt32(ref platform,
-			APTR.FromPointer(0xFFFFFFF0u), MuiAreaDragStateField.Flags, out _));
 	}
 
 	[Fact]

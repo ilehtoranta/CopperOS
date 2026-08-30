@@ -12,9 +12,21 @@ public sealed class MuiApplicationInputTests
 	{
 		var platform = CreatePlatform(out _);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0,
-			MuiApplicationDispatcher.ApplicationReturnIdMethod);
-		platform.WriteUInt32(packet, 4, 77);
+		Assert.True(MuiApplicationReturnIdMessageCodec.Write(ref platform, packet,
+			new MuiApplicationReturnIdMessage
+			{
+				MethodId = MuiApplicationDispatcher.ApplicationReturnIdMethod,
+				ReturnId = 77,
+			}));
+		Assert.True(MuiApplicationInputPacketRecordMemoryCodec.TryGetAddress(
+			ref platform, packet, MuiApplicationInputPacketKind.ReturnId,
+			MuiApplicationInputPacketField.ReturnId, out var returnIdAddress));
+		Assert.Equal(packet.Raw + MuiApplicationReturnIdMessage.ReturnIdOffset,
+			returnIdAddress.Raw);
+		Assert.True(MuiApplicationInputPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, packet, MuiApplicationInputPacketKind.ReturnId,
+			MuiApplicationInputPacketField.ReturnId, out var directReturnId));
+		Assert.Equal(77u, directReturnId);
 		Assert.True(MuiApplicationInputPacketCodec.TryReadReturnId(ref platform,
 			packet, MuiApplicationDispatcher.ApplicationReturnIdMethod,
 			out var returnPacket));
@@ -24,8 +36,31 @@ public sealed class MuiApplicationInputTests
 			out var returnMethodId));
 		Assert.Equal(MuiApplicationDispatcher.ApplicationReturnIdMethod,
 			returnMethodId);
-		platform.WriteUInt32(packet, 0,
-			MuiApplicationDispatcher.ApplicationInputBufferedMethod);
+		Assert.True(MuiApplicationInputMessageCodec.Write(ref platform, packet,
+			new MuiApplicationInputMessage
+			{
+				MethodId = MuiApplicationDispatcher.ApplicationInputMethod,
+				SignalStorage = 0x2000,
+			}));
+		Assert.True(MuiApplicationInputPacketCodec.TryReadInput(ref platform,
+			packet, MuiApplicationDispatcher.ApplicationInputMethod,
+			out var input));
+		Assert.Equal(0x2000u, input.SignalStorage);
+		Assert.True(MuiApplicationInputHandlerMessageCodec.Write(ref platform,
+			packet, new MuiApplicationInputHandlerMessage
+			{
+				MethodId = MuiApplicationDispatcher.AddInputHandlerMethod,
+				Handler = 0x3000,
+			}));
+		Assert.True(MuiApplicationInputPacketCodec.TryReadInputHandler(
+			ref platform, packet, MuiApplicationDispatcher.AddInputHandlerMethod,
+			out var inputHandler));
+		Assert.Equal(0x3000u, inputHandler.Handler);
+		Assert.True(MuiApplicationInputBufferedMessageCodec.Write(ref platform,
+			packet, new MuiApplicationInputBufferedMessage
+			{
+				MethodId = MuiApplicationDispatcher.ApplicationInputBufferedMethod,
+			}));
 		Assert.True(MuiApplicationInputPacketCodec.TryReadInputBuffered(
 			ref platform, packet,
 			MuiApplicationDispatcher.ApplicationInputBufferedMethod,
@@ -36,6 +71,14 @@ public sealed class MuiApplicationInputTests
 		Assert.False(MuiApplicationInputPacketCodec.TryReadInputBuffered(
 			ref platform, packet,
 			MuiApplicationDispatcher.ApplicationInputBufferedMethod, out _));
+		Assert.False(MuiApplicationReturnIdMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFC), out _));
+		Assert.False(MuiApplicationInputMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFC), out _));
+		Assert.False(MuiApplicationInputBufferedMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFD), out _));
+		Assert.False(MuiApplicationInputHandlerMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFC), out _));
 	}
 
 	[Fact]

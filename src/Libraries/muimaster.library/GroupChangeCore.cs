@@ -12,6 +12,8 @@ namespace CopperOS.MuiMaster;
 internal struct MuiGroupChangeMessage
 {
 	public const uint Size = 4;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
 	public uint MethodId;
 }
 
@@ -19,6 +21,9 @@ internal struct MuiGroupChangeMessage
 internal struct MuiGroupExitChange2Message
 {
 	public const uint Size = 8;
+	public const uint FieldSize = 4;
+	public const uint MethodIdOffset = 0;
+	public const uint FlagsOffset = 4;
 	public uint MethodId;
 	public uint Flags;
 }
@@ -48,7 +53,10 @@ internal struct MuiGroupChangeRecordFieldCursor
 	internal MuiGroupChangeRecordField Field;
 }
 
-internal static class MuiGroupChangeRecordFieldCursorCodec
+// The fixed Group change packet and state records own their packed positions
+// in this bounded adapter. Live consumers use it directly; the typed cursor
+// remains only for compatibility callers and adapter-focused tests.
+internal static class MuiGroupChangeRecordMemoryCodec
 {
 	private static bool TryResolve(MuiGroupChangeRecordKind record,
 		MuiGroupChangeRecordField field, out uint offset, out uint size)
@@ -59,15 +67,18 @@ internal static class MuiGroupChangeRecordFieldCursorCodec
 		{
 			case MuiGroupChangeRecordKind.Message:
 				size = MuiGroupChangeMessage.Size;
-				offset = field == MuiGroupChangeRecordField.MethodId ? 0u :
+				offset = field == MuiGroupChangeRecordField.MethodId ?
+					MuiGroupChangeMessage.MethodIdOffset :
 					uint.MaxValue;
 				break;
 			case MuiGroupChangeRecordKind.ExitChange2:
 				size = MuiGroupExitChange2Message.Size;
 				offset = field switch
 				{
-					MuiGroupChangeRecordField.MethodId => 0,
-					MuiGroupChangeRecordField.Flags => 4,
+					MuiGroupChangeRecordField.MethodId =>
+						MuiGroupExitChange2Message.MethodIdOffset,
+					MuiGroupChangeRecordField.Flags =>
+						MuiGroupExitChange2Message.FlagsOffset,
 					_ => uint.MaxValue,
 				};
 				break;
@@ -75,10 +86,14 @@ internal static class MuiGroupChangeRecordFieldCursorCodec
 				size = MuiGroupChangeState.Size;
 				offset = field switch
 				{
-					MuiGroupChangeRecordField.Cookie => 0,
-					MuiGroupChangeRecordField.Depth => 4,
-					MuiGroupChangeRecordField.ExitFlags => 8,
-					MuiGroupChangeRecordField.ExitRequests => 12,
+					MuiGroupChangeRecordField.Cookie =>
+						MuiGroupChangeState.CookieOffset,
+					MuiGroupChangeRecordField.Depth =>
+						MuiGroupChangeState.DepthOffset,
+					MuiGroupChangeRecordField.ExitFlags =>
+						MuiGroupChangeState.ExitFlagsOffset,
+					MuiGroupChangeRecordField.ExitRequests =>
+						MuiGroupChangeState.ExitRequestsOffset,
 					_ => uint.MaxValue,
 				};
 				break;
@@ -87,16 +102,16 @@ internal static class MuiGroupChangeRecordFieldCursorCodec
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
-		MuiGroupChangeRecordFieldCursor cursor, out APTR address)
+		APTR recordAddress, MuiGroupChangeRecordKind record,
+		MuiGroupChangeRecordField field, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (!TryResolve(cursor.Record, cursor.Field, out var offset,
-			out var size) || cursor.Address.IsNull ||
-			cursor.Address.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Address, size)) return false;
-		address = APTR.FromPointer(cursor.Address.Raw + offset);
-		return platform.IsMapped(address, 4);
+		if (!TryResolve(record, field, out var offset, out var size) ||
+			recordAddress.IsNull || recordAddress.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(recordAddress, size)) return false;
+		address = APTR.FromPointer(recordAddress.Raw + offset);
+		return platform.IsMapped(address, MuiGroupChangeMessage.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -105,11 +120,8 @@ internal static class MuiGroupChangeRecordFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiGroupChangeRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, address, record, field,
+			out var fieldAddress))
 			return false;
 		value = platform.ReadUInt32(fieldAddress, 0);
 		return true;
@@ -120,28 +132,72 @@ internal static class MuiGroupChangeRecordFieldCursorCodec
 		MuiGroupChangeRecordField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiGroupChangeRecordFieldCursor);
-		cursor.Address = address;
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress))
+		if (!TryGetAddress(ref platform, address, record, field,
+			out var fieldAddress))
 			return false;
 		platform.WriteUInt32(fieldAddress, 0, value);
 		return true;
 	}
 }
 
+internal static class MuiGroupChangeRecordFieldCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiGroupChangeRecordFieldCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGroupChangeRecordMemoryCodec.TryGetAddress(ref platform, cursor.Address,
+			cursor.Record, cursor.Field, out address);
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGroupChangeRecordKind record,
+		MuiGroupChangeRecordField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGroupChangeRecordMemoryCodec.TryReadUInt32(ref platform, address, record,
+			field, out value);
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGroupChangeRecordKind record,
+		MuiGroupChangeRecordField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGroupChangeRecordMemoryCodec.TryWriteUInt32(ref platform, address,
+			record, field, value);
+}
+
 internal static class MuiGroupChangeMessageCodec
 {
+	// The complete method envelope is decoded in declaration order.  The
+	// scalar selector helper below remains only for method admission, where a
+	// four-byte header is all the caller is allowed to provide.
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGroupChangeMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupChangeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MethodId) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGroupChangeMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupChangeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiGroupChangeMessage value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryReadMethodIdValue(ref platform, address, out var methodId))
-			return false;
-		value.MethodId = methodId;
-		return true;
+		return TryReadRecord(ref platform, address, out value);
 	}
 
 	// Native selector admission stays scalar so compiler paths do not need to
@@ -152,21 +208,23 @@ internal static class MuiGroupChangeMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		methodId = 0;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGroupChangeMessage.Size)) return false;
-		return MuiGroupChangeRecordFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiGroupChangeRecordKind.Message,
-			MuiGroupChangeRecordField.MethodId, out methodId);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupChangeMessage.Size, out var cursor)) return false;
+		return MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+			out methodId) && MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		uint method) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGroupChangeMessage.Size)) return false;
-		return MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupChangeRecordKind.Message,
-			MuiGroupChangeRecordField.MethodId, method);
+		// A one-ULONG packet is passed as a scalar by the native compiler. Keep
+		// this ABI seam cursor-based while the named record codec remains the
+		// canonical multi-field/host representation.
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupChangeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, method))
+			return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -176,26 +234,49 @@ internal static class MuiGroupChangeMessageCodec
 		value = default;
 		if (method != MuiGroupChangeCore.InitChangeMethod &&
 			method != MuiGroupChangeCore.ExitChangeMethod ||
-			!TryReadMethodIdValue(ref platform, address, out var methodId) ||
-			methodId != method) return false;
-		value.MethodId = methodId;
+			!TryReadRecord(ref platform, address, out value) ||
+			value.MethodId != method) return false;
 		return true;
 	}
 }
 
 internal static class MuiGroupExitChange2MessageCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGroupExitChange2Message value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupExitChange2Message.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Flags) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGroupExitChange2Message value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupExitChange2Message.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		uint method, uint flags) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGroupExitChange2Message.Size)) return false;
-		return MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupChangeRecordKind.ExitChange2,
-			MuiGroupChangeRecordField.MethodId, method) &&
-			MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiGroupChangeRecordKind.ExitChange2,
-				MuiGroupChangeRecordField.Flags, flags);
+		var value = default(MuiGroupExitChange2Message);
+		value.MethodId = method;
+		value.Flags = flags;
+		return WriteRecord(ref platform, address, value);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -203,15 +284,9 @@ internal static class MuiGroupExitChange2MessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiGroupChangeMessageCodec.TryReadMethodIdValue(ref platform,
-			address, out var methodId) ||
-			methodId != method || !platform.IsMapped(address,
-			MuiGroupExitChange2Message.Size)) return false;
-		value.MethodId = methodId;
-		if (!MuiGroupChangeRecordFieldCursorCodec.TryReadUInt32(ref platform,
-			address, MuiGroupChangeRecordKind.ExitChange2,
-			MuiGroupChangeRecordField.Flags, out value.Flags)) return false;
-		return true;
+		return method == MuiGroupChangeCore.ExitChange2Method &&
+			TryReadRecord(ref platform, address, out value) &&
+			value.MethodId == method;
 	}
 }
 
@@ -237,6 +312,11 @@ internal struct MuiGroupChangeState
 {
 	public const uint Magic = 0x47524348; // "GRCH"
 	public const uint Size = 16;
+	public const uint FieldSize = 4;
+	public const uint CookieOffset = 0;
+	public const uint DepthOffset = 4;
+	public const uint ExitFlagsOffset = 8;
+	public const uint ExitRequestsOffset = 12;
 	public uint Cookie;
 	public uint Depth;
 	public uint ExitFlags;
@@ -255,24 +335,49 @@ internal static class MuiGroupChangeStateValidation
 
 internal static class MuiGroupChangeStateCodec
 {
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiGroupChangeState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupChangeState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Cookie) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Depth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.ExitFlags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.ExitRequests) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiGroupChangeState value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupChangeState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Cookie) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Depth) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ExitFlags) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ExitRequests)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiGroupChangeState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (address.IsNull || !MuiGroupChangeStateValidation.IsValidRecord(value) ||
-			!platform.IsMapped(address, MuiGroupChangeState.Size)) return false;
-		return MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-			address, MuiGroupChangeRecordKind.State,
-			MuiGroupChangeRecordField.Cookie, value.Cookie) &&
-			MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiGroupChangeRecordKind.State,
-				MuiGroupChangeRecordField.Depth, value.Depth) &&
-			MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiGroupChangeRecordKind.State,
-				MuiGroupChangeRecordField.ExitFlags, value.ExitFlags) &&
-			MuiGroupChangeRecordFieldCursorCodec.TryWriteUInt32(ref platform,
-				address, MuiGroupChangeRecordKind.State,
-				MuiGroupChangeRecordField.ExitRequests, value.ExitRequests);
+			!WriteRecord(ref platform, address, value)) return false;
+		return true;
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -280,24 +385,8 @@ internal static class MuiGroupChangeStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGroupChangeState.Size) ||
-			!MuiGroupChangeRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiGroupChangeRecordKind.State,
-				MuiGroupChangeRecordField.Cookie, out var cookie) ||
-			cookie != MuiGroupChangeState.Magic ||
-			!MuiGroupChangeRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiGroupChangeRecordKind.State,
-				MuiGroupChangeRecordField.Depth, out value.Depth) ||
-			!MuiGroupChangeRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiGroupChangeRecordKind.State,
-				MuiGroupChangeRecordField.ExitFlags, out value.ExitFlags) ||
-			!MuiGroupChangeRecordFieldCursorCodec.TryReadUInt32(ref platform,
-				address, MuiGroupChangeRecordKind.State,
-				MuiGroupChangeRecordField.ExitRequests,
-				out value.ExitRequests)) return false;
-		value.Cookie = cookie;
-		return MuiGroupChangeStateValidation.IsValidState(value);
+		return TryReadRecord(ref platform, address, out value) &&
+			MuiGroupChangeStateValidation.IsValidState(value);
 	}
 }
 
@@ -557,17 +646,11 @@ public static class MuiGroupChangeCore
 	private static bool IsGroupName<TPlatform>(ref TPlatform platform, APTR name)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (name.IsNull || !platform.IsMapped(name, 9)) return false;
-		return platform.ReadUInt8(name, 0) == (byte)'G' &&
-			platform.ReadUInt8(name, 1) == (byte)'r' &&
-			platform.ReadUInt8(name, 2) == (byte)'o' &&
-			platform.ReadUInt8(name, 3) == (byte)'u' &&
-			platform.ReadUInt8(name, 4) == (byte)'p' &&
-			platform.ReadUInt8(name, 5) == (byte)'.' &&
-			platform.ReadUInt8(name, 6) == (byte)'m' &&
-			platform.ReadUInt8(name, 7) == (byte)'u' &&
-			platform.ReadUInt8(name, 8) == (byte)'i' &&
-			platform.IsMapped(name, 10) && platform.ReadUInt8(name, 9) == 0;
+		if (!MuiGroupClassNameRecordCodec.TryRead(ref platform, name,
+			out var value)) return false;
+		return value.Word0 == 0x47726F75 && // Grou
+			value.Word1 == 0x702E6D75 && // p.mu
+			value.Character == (byte)'i' && value.Terminator == 0;
 	}
 
 	private static uint Read<TPlatform>(ref TPlatform platform, APTR state,

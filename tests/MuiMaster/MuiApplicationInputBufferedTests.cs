@@ -14,9 +14,22 @@ public sealed class MuiApplicationInputBufferedTests
 		const uint unpushMethod = 0x804211DDu;
 		var platform = CreatePlatform(out _);
 		var packet = APTR.FromPointer(0x1200);
-		platform.WriteUInt32(packet, 0, pushMethod);
-		platform.WriteUInt32(packet, 4, 0x1300);
-		platform.WriteUInt32(packet, 8, 2);
+		Assert.True(MuiApplicationPushMethodMessageCodec.Write(ref platform,
+			packet, new MuiApplicationPushMethodMessage
+			{
+				MethodId = pushMethod,
+				Destination = 0x1300,
+				Count = 2,
+			}));
+		Assert.True(MuiApplicationQueuePacketRecordMemoryCodec.TryGetAddress(
+			ref platform, packet, MuiApplicationQueuePacketKind.PushMethod,
+			MuiApplicationQueuePacketField.Count, out var countAddress));
+		Assert.Equal(packet.Raw + MuiApplicationPushMethodMessage.CountOffset,
+			countAddress.Raw);
+		Assert.True(MuiApplicationQueuePacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, packet, MuiApplicationQueuePacketKind.PushMethod,
+			MuiApplicationQueuePacketField.Count, out var directCount));
+		Assert.Equal(2u, directCount);
 		var pushRequest = new MuiApplicationQueuePacketCodec.QueuePacketAddress
 		{
 			Address = packet,
@@ -30,10 +43,14 @@ public sealed class MuiApplicationInputBufferedTests
 			ref platform, packet, MuiApplicationQueuePacketKind.PushMethod,
 			out var pushMethodId));
 		Assert.Equal(pushMethod, pushMethodId);
-		platform.WriteUInt32(packet, 0, unpushMethod);
-		platform.WriteUInt32(packet, 4, 0x1400);
-		platform.WriteUInt32(packet, 8, 0x90000001);
-		platform.WriteUInt32(packet, 12, 77);
+		Assert.True(MuiApplicationUnpushMethodMessageCodec.Write(ref platform,
+			packet, new MuiApplicationUnpushMethodMessage
+			{
+				MethodId = unpushMethod,
+				TargetObject = 0x1400,
+				MethodIdSelector = 0x90000001,
+				Method = 77,
+			}));
 		var unpushRequest = new MuiApplicationQueuePacketCodec.QueuePacketAddress
 		{
 			Address = packet,
@@ -46,6 +63,10 @@ public sealed class MuiApplicationInputBufferedTests
 		platform.WriteUInt32(packet, 0, 0xDEADBEEFu);
 		Assert.False(MuiApplicationQueuePacketCodec.TryReadUnpush(ref platform,
 			ref unpushRequest, out _));
+		Assert.False(MuiApplicationPushMethodMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFC), out _));
+		Assert.False(MuiApplicationUnpushMethodMessageCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFC), out _));
 	}
 
 	[Fact]
@@ -138,6 +159,50 @@ public sealed class MuiApplicationInputBufferedTests
 		cursor.Index = 0;
 		Assert.False(MuiApplicationPushMethodParameterCursorCodec.TryGetEntry(
 			ref platform, cursor, out _));
+	}
+
+	[Fact]
+	public void ApplicationPushMethodParameterMemoryAdapterOwnsEntryBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var message = APTR.FromPointer(0x1800);
+
+		Assert.True(MuiApplicationPushMethodParameterMemoryCodec.TryGetEntry(
+			ref platform, message, 2, out var address));
+		Assert.Equal(APTR.FromPointer(0x1814), address);
+		Assert.False(MuiApplicationPushMethodParameterMemoryCodec.TryGetEntry(
+			ref platform, message,
+			MuiApplicationPushMethodParameterCursor.MaximumEntries, out _));
+		Assert.False(MuiApplicationPushMethodParameterMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0x20FF4), 0, out _));
+		Assert.False(MuiApplicationPushMethodParameterMemoryCodec.TryGetEntry(
+			ref platform, APTR.FromPointer(0xFFFFFFF0), 0, out _));
+		var source = APTR.FromPointer(0x1900);
+		var destination = APTR.FromPointer(0x1A00);
+		Assert.True(MuiApplicationPushMethodParameterMemoryCodec.TryGetStandaloneEntry(
+			ref platform, source, 1, out var sourceSecond));
+		Assert.True(MuiApplicationPushMethodParameterMemoryCodec.TryGetStandaloneEntry(
+			ref platform, destination, 1, out var destinationSecond));
+		Assert.True(MuiApplicationPushMethodParameterCodec.Write(ref platform,
+			source, new MuiApplicationPushMethodParameter { Value = 0x12345678 }));
+		Assert.True(MuiApplicationPushMethodParameterCodec.Write(ref platform,
+			sourceSecond,
+			new MuiApplicationPushMethodParameter { Value = 0xABCDEF01 }));
+		Assert.True(MuiApplicationPushMethodParameterMemoryCodec.TryCopy(ref platform,
+			source, destination, 2));
+		Assert.True(MuiApplicationPushMethodParameterCodec.TryRead(ref platform,
+			destination, out var first));
+		Assert.Equal(0x12345678u, first.Value);
+		Assert.True(MuiApplicationPushMethodParameterCodec.TryRead(ref platform,
+			destinationSecond, out var second));
+		Assert.Equal(0xABCDEF01u, second.Value);
+		Assert.False(MuiApplicationPushMethodParameterMemoryCodec.TryCopy(
+			ref platform, source, destination, 0));
+		Assert.False(MuiApplicationPushMethodParameterCodec.TryRead(ref platform,
+			APTR.FromPointer(0x21000), out _));
+		Assert.False(MuiApplicationPushMethodParameterCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
 	}
 
 	[Fact]

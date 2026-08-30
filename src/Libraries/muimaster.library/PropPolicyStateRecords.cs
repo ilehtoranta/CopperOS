@@ -142,21 +142,50 @@ internal static class MuiPropPolicyStateRecordMemoryCodec
 
 internal static class MuiPropPolicyStateRecordCodec
 {
-	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiPropPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 0, out value.Magic)) return false;
-		return MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out value.Horizontal) &&
-			MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				8, out value.DeltaFactor) &&
-			MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				12, out value.Slider) &&
-			MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				16, out value.UseWinBorder);
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiPropPolicyStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Horizontal) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.DeltaFactor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Slider) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.UseWinBorder) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiPropPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiPropPolicyStateRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Horizontal) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.DeltaFactor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Slider) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.UseWinBorder) &&
+			MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiPropPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return TryReadRecord(ref platform, address, out value);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -169,17 +198,8 @@ internal static class MuiPropPolicyStateRecordCodec
 		MuiPropPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiPropPolicyStateAdmission.Validate(value)) return false;
-		return MuiPropPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, value.Magic) &&
-			MuiPropPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			4, value.Horizontal) &&
-			MuiPropPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			8, value.DeltaFactor) &&
-			MuiPropPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			12, value.Slider) &&
-			MuiPropPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			16, value.UseWinBorder);
+		return MuiPropPolicyStateAdmission.Validate(value) &&
+			WriteRecord(ref platform, address, value);
 	}
 }
 

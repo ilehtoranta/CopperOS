@@ -70,6 +70,35 @@ public sealed class MuiBodychunkFormatAdmissionTests
 	}
 
 	[Fact]
+	public void BodychunkFormatSequentialRecordPreservesValuesAndBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1C20);
+		var value = new MuiBodychunkFormatStateRecord
+		{
+			Magic = MuiBodychunkFormatStateRecord.Cookie,
+			Compression = uint.MaxValue,
+			Depth = 0xCAFEBABEu,
+			Masking = 0x12345678u,
+		};
+
+		Assert.True(MuiBodychunkFormatStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiBodychunkFormatStateRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Compression, decoded.Compression);
+		Assert.Equal(value.Depth, decoded.Depth);
+		Assert.Equal(value.Masking, decoded.Masking);
+
+		var crossingEnd = APTR.FromPointer(0x40FFF);
+		Assert.False(MuiBodychunkFormatStateRecordCodec.WriteRecord(ref platform,
+			crossingEnd, value));
+		Assert.False(MuiBodychunkFormatStateRecordCodec.TryReadRecord(ref platform,
+			crossingEnd, out _));
+	}
+
+	[Fact]
 	public void MalformedBodychunkFormatFailsClosedBeforeRawRepairOrSet()
 	{
 		var platform = CreatePlatform(out var bodyClass);

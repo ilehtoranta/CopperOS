@@ -321,7 +321,7 @@ public static class MuiListtreeDispatcher
 				packet.Attribute, out value)) return 0;
 			var storage = APTR.FromPointer(packet.Storage);
 			if (storage.IsNotNull)
-				MuiGuestUlongStorageFieldCursorCodec.TryWrite(ref platform, storage,
+				MuiGuestUlongStorageMemoryCodec.TryWrite(ref platform, storage,
 					MuiGuestUlongStorageField.Value, value);
 			return 1;
 		}

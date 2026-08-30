@@ -199,30 +199,48 @@ public static class MuiAreaCustomFontRuntimeRecordMemoryCodec
 
 public static class MuiAreaCustomFontRuntimeRecordCodec
 {
-	public static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+	public static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiAreaCustomFontRuntimeRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiAreaCustomFontRuntimeRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiAreaCustomFontRuntimeField.Magic,
-			out value.Magic) ||
-			!MuiAreaCustomFontRuntimeRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiAreaCustomFontRuntimeField.Font,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaCustomFontRuntimeRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var font) ||
-			!MuiAreaCustomFontRuntimeRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiAreaCustomFontRuntimeField.Spec,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var spec) ||
-			!MuiAreaCustomFontRuntimeRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiAreaCustomFontRuntimeField.Generation,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.Generation) ||
-			!MuiAreaCustomFontRuntimeRecordMemoryCodec.TryReadUInt32(
-				ref platform, address, MuiAreaCustomFontRuntimeField.Active,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.Active)) return false;
 		value.Font = APTR.FromPointer(font);
 		value.Spec = APTR.FromPointer(spec);
-		return true;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	public static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaCustomFontRuntimeRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaCustomFontRuntimeRecord.Size, out var cursor) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Magic) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Font.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Spec.Raw) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Generation) &&
+		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			value.Active) && MuiGuestStructCursor.IsComplete(cursor);
+
+	public static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaCustomFontRuntimeRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadRecord(ref platform, address, out value);
 
 	public static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAreaCustomFontRuntimeRecord value)
@@ -236,20 +254,8 @@ public static class MuiAreaCustomFontRuntimeRecordCodec
 		MuiAreaCustomFontRuntimeRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaCustomFontRuntimeRecord.Size) ||
-			!MuiAreaCustomFontRuntimeStateAdmission.Validate(value)) return false;
-		return MuiAreaCustomFontRuntimeRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiAreaCustomFontRuntimeField.Magic,
-			value.Magic) &&
-			MuiAreaCustomFontRuntimeRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaCustomFontRuntimeField.Font, value.Font.Raw) &&
-			MuiAreaCustomFontRuntimeRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaCustomFontRuntimeField.Spec, value.Spec.Raw) &&
-			MuiAreaCustomFontRuntimeRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaCustomFontRuntimeField.Generation,
-				value.Generation) &&
-			MuiAreaCustomFontRuntimeRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiAreaCustomFontRuntimeField.Active, value.Active);
+		if (address.IsNull || !MuiAreaCustomFontRuntimeStateAdmission.Validate(value))
+			return false;
+		return WriteRecord(ref platform, address, value);
 	}
 }
