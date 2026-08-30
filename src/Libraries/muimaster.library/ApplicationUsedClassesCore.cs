@@ -105,37 +105,157 @@ internal static class MuiApplicationUsedClassesVectorEntryFieldCursorCodec
 			record, field, value);
 }
 
-internal static class MuiApplicationUsedClassesVectorEntryCodec
+// Sequential codec for one complete caller-owned UsedClasses vector element.
+// The element is a single MorphOS STRPTR/ULONG slot; byte-preserving access
+// retains the full 32-bit pointer range on the freestanding generic path.
+internal static class MuiApplicationUsedClassesVectorEntryStructCodec
 {
+	private static bool TryReadPointer<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		APTR firstAddress;
+		APTR secondAddress;
+		APTR thirdAddress;
+		APTR fourthAddress;
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
+			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
+			ref platform, ref cursor, 1, out thirdAddress) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
+				out fourthAddress)) return false;
+		byte first;
+		byte second;
+		byte third;
+		byte fourth;
+		first = platform.ReadUInt8(firstAddress, 0);
+		second = platform.ReadUInt8(secondAddress, 0);
+		third = platform.ReadUInt8(thirdAddress, 0);
+		fourth = platform.ReadUInt8(fourthAddress, 0);
+		value = ((uint)first << 24) | ((uint)second << 16) |
+			((uint)third << 8) | fourth;
+		return true;
+	}
+
+	private static bool TryWritePointer<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		APTR firstAddress;
+		APTR secondAddress;
+		APTR thirdAddress;
+		APTR fourthAddress;
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
+			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
+			ref platform, ref cursor, 1, out thirdAddress) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
+				out fourthAddress)) return false;
+		platform.WriteUInt8(firstAddress, 0, (byte)(value >> 24));
+		platform.WriteUInt8(secondAddress, 0, (byte)(value >> 16));
+		platform.WriteUInt8(thirdAddress, 0, (byte)(value >> 8));
+		platform.WriteUInt8(fourthAddress, 0, (byte)value);
+		return true;
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiApplicationUsedClassesVectorEntry value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiApplicationUsedClassesVectorEntryMemoryCodec.TryReadUInt32(
-			ref platform, address,
-			MuiApplicationUsedClassesVectorEntryField.Name, out var name)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationUsedClassesVectorEntry.Size, out var cursor) ||
+			!TryReadPointer(ref platform, ref cursor, out var name) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.Name = APTR.FromPointer(name);
 		return true;
 	}
 
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiApplicationUsedClassesVectorEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationUsedClassesVectorEntry.Size, out var cursor) ||
+			!TryWritePointer(ref platform, ref cursor, value.Name.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+internal static class MuiApplicationUsedClassesVectorEntryCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiApplicationUsedClassesVectorEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiApplicationUsedClassesVectorEntryStructCodec.TryRead(ref platform,
+			address, out value);
+
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		APTR address, MuiApplicationUsedClassesVectorEntry value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiApplicationUsedClassesVectorEntryMemoryCodec.TryWriteUInt32(
-			ref platform, address,
-			MuiApplicationUsedClassesVectorEntryField.Name, value.Name.Raw);
-	}
+		=> MuiApplicationUsedClassesVectorEntryStructCodec.Write(ref platform,
+			address, value);
 }
 
 internal static class MuiApplicationUsedClassesVectorCodec
 {
+	// The one-field scalar projection keeps the freestanding compiler's
+	// nested out-record lowering out of the validator while retaining the
+	// named field adapter and complete entry admission.
+	internal static bool TryReadName<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out uint rawName)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		rawName = 0;
+		if (!MuiApplicationUsedClassesVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, index, out var address)) return false;
+		return MuiApplicationUsedClassesVectorEntryMemoryCodec.TryReadUInt32(
+			ref platform, address,
+			MuiApplicationUsedClassesVectorEntryField.Name, out rawName);
+	}
+
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiApplicationUsedClassesVectorCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiApplicationUsedClassesVectorMemoryCodec.TryGetEntry(ref platform,
 			cursor.Base, cursor.Index, out address);
+
+	// Complete named-record bridge for indexed consumers. Slot arithmetic and
+	// complete-entry mapping remain owned by the bounded memory adapter.
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index,
+		out MuiApplicationUsedClassesVectorEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadName(ref platform, vector, index, out var rawName))
+		{
+			value = default;
+			return false;
+		}
+		value.Name = APTR.FromPointer(rawName);
+		return true;
+	}
+
+	internal static bool TryWriteName<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, uint rawName)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiApplicationUsedClassesVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, index, out var address)) return false;
+		return MuiApplicationUsedClassesVectorEntryMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiApplicationUsedClassesVectorEntryField.Name, rawName);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index,
+		MuiApplicationUsedClassesVectorEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return TryWriteName(ref platform, vector, index, value.Name.Raw);
+	}
 
 	internal static bool TryValidate<TPlatform>(ref TPlatform platform,
 		APTR vector) where TPlatform : struct, IMuiGuestMemory
@@ -173,11 +293,9 @@ internal static class MuiApplicationUsedClassesVectorMemoryCodec
 		cursor.Base = vector;
 		while (cursor.Index < MuiHeadlessLayout.MaximumTraversal)
 		{
-			if (!TryGetEntry(ref platform, cursor.Base, cursor.Index,
-				out var slot)) return false;
-			if (!MuiApplicationUsedClassesVectorEntryCodec.TryRead(ref platform,
-				slot, out var entryValue)) return false;
-			var entry = entryValue.Name;
+			if (!MuiApplicationUsedClassesVectorCodec.TryReadName(ref platform,
+				cursor.Base, cursor.Index, out var rawEntry)) return false;
+			var entry = APTR.FromPointer(rawEntry);
 			if (entry.IsNull) return true;
 			if (!CStringCodec.TryReadLength(ref platform, entry, 65536,
 				out _)) return false;

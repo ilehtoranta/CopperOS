@@ -240,25 +240,271 @@ internal static class MuiStoreMessageCodec
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiStoreMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiStorePacketKind.Method, MuiStoreField.MethodId, out methodId);
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiStoreMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiStoreMethodMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiStorePacketCodec.TryReadMethod(ref platform, message,
-			out packet);
+		packet = default;
+		if (!MuiStorePacketSequentialStructCodec.TryReadMethodIdValue(
+			ref platform, message, out var methodId)) return false;
+		packet.MethodId = methodId;
+		return true;
 	}
 }
 
-// Complete named packet codecs used by the live store dispatcher. Numeric
-// wire positions stay inside MuiStoreMessageMemoryCodec; consumers exchange
-// the packed records as values instead of carrying scalar field cursors.
-internal static class MuiStorePacketCodec
+// Sequential codecs for the complete MorphOS Datamap/Objectmap packet family.
+// Every packet is consumed as one declaration-ordered named struct; byte-
+// preserving ULONG helpers retain method IDs and pointers with bit 31 set.
+internal static class MuiStorePacketSequentialStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	private static bool TryReadUlong<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+			out value);
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	private static bool TryWriteUlong<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value);
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiStoreMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiStoreMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	internal static bool WriteMethod<TPlatform>(ref TPlatform platform,
+		APTR message, MuiStoreMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiStoreMethodMessage.Size, out var cursor) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.MethodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadClear<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiStoreClearMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiStoreClearMessage.Size, out var cursor) ||
+			!TryReadUlong(ref platform, ref cursor, out var methodId) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadClearMethodIdValue<TPlatform>(
+		ref TPlatform platform, APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiStoreClearMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteClear<TPlatform>(ref TPlatform platform,
+		APTR message, MuiStoreClearMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteClearMethodIdValue(ref platform, message, packet.MethodId);
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryWriteClearMethodIdValue<TPlatform>(
+		ref TPlatform platform, APTR message, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiStoreClearMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadKey<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiStoreKeyMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiStoreKeyMessage.Size, out var cursor) ||
+			!TryReadUlong(ref platform, ref cursor, out var methodId) ||
+			!TryReadUlong(ref platform, ref cursor, out var key) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		packet.MethodId = methodId;
+		packet.Key = APTR.FromPointer(key);
+		return true;
+	}
+
+	internal static bool WriteKey<TPlatform>(ref TPlatform platform,
+		APTR message, MuiStoreKeyMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiStoreKeyMessage.Size, out var cursor) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.MethodId) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.Key.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadCounter<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiStoreCounterMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiStoreCounterMessage.Size, out var cursor) ||
+			!TryReadUlong(ref platform, ref cursor, out var methodId) ||
+			!TryReadUlong(ref platform, ref cursor, out var counter) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		packet.MethodId = methodId;
+		packet.Counter = APTR.FromPointer(counter);
+		return true;
+	}
+
+	internal static bool WriteCounter<TPlatform>(ref TPlatform platform,
+		APTR message, MuiStoreCounterMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiStoreCounterMessage.Size, out var cursor) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.MethodId) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.Counter.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadDatamapSet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDatamapSetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDatamapSetMessage.Size, out var cursor) ||
+			!TryReadUlong(ref platform, ref cursor, out var methodId) ||
+			!TryReadUlong(ref platform, ref cursor, out var data) ||
+			!TryReadUlong(ref platform, ref cursor, out var length) ||
+			!TryReadUlong(ref platform, ref cursor, out var key) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		packet.MethodId = methodId;
+		packet.Data = APTR.FromPointer(data);
+		packet.Length = unchecked((int)length);
+		packet.Key = APTR.FromPointer(key);
+		return true;
+	}
+
+	internal static bool WriteDatamapSet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDatamapSetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDatamapSetMessage.Size, out var cursor) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.MethodId) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.Data.Raw) ||
+			!TryWriteUlong(ref platform, ref cursor,
+				unchecked((uint)packet.Length)) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.Key.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadDatamapGet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDatamapGetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDatamapGetMessage.Size, out var cursor) ||
+			!TryReadUlong(ref platform, ref cursor, out var methodId) ||
+			!TryReadUlong(ref platform, ref cursor, out var key) ||
+			!TryReadUlong(ref platform, ref cursor, out var storage) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		packet.MethodId = methodId;
+		packet.Key = APTR.FromPointer(key);
+		packet.SizeStorage = APTR.FromPointer(storage);
+		return true;
+	}
+
+	internal static bool WriteDatamapGet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDatamapGetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDatamapGetMessage.Size, out var cursor) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.MethodId) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.Key.Raw) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.SizeStorage.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadObjectmapSet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiObjectmapSetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiObjectmapSetMessage.Size, out var cursor) ||
+			!TryReadUlong(ref platform, ref cursor, out var methodId) ||
+			!TryReadUlong(ref platform, ref cursor, out var obj) ||
+			!TryReadUlong(ref platform, ref cursor, out var key) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		packet.MethodId = methodId;
+		packet.Object = APTR.FromPointer(obj);
+		packet.Key = APTR.FromPointer(key);
+		return true;
+	}
+
+	internal static bool WriteObjectmapSet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiObjectmapSetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiObjectmapSetMessage.Size, out var cursor) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.MethodId) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.Object.Raw) ||
+			!TryWriteUlong(ref platform, ref cursor, packet.Key.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+// Compatibility packet adapter retained for legacy offset-focused diagnostics.
+// Production callers use MuiStorePacketCodec below, which delegates to the
+// sequential named-struct implementation above.
+internal static class MuiStorePacketOffsetCodec
 {
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiStoreMethodMessage packet)
@@ -484,6 +730,96 @@ internal static class MuiStorePacketCodec
 	}
 }
 
+// Public packet-facing name retained for the store dispatcher and existing
+// callers. All production packet reads and writes are routed through the
+// declaration-ordered sequential struct codec.
+internal static class MuiStorePacketCodec
+{
+	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiStoreMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.TryReadMethod(ref platform,
+			message, out packet);
+
+	internal static bool WriteMethod<TPlatform>(ref TPlatform platform,
+		APTR message, MuiStoreMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.WriteMethod(ref platform,
+			message, packet);
+
+	internal static bool TryReadClear<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiStoreClearMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.TryReadClear(ref platform,
+			message, out packet);
+
+	internal static bool WriteClear<TPlatform>(ref TPlatform platform,
+		APTR message, MuiStoreClearMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.WriteClear(ref platform,
+			message, packet);
+
+	internal static bool TryReadKey<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiStoreKeyMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.TryReadKey(ref platform,
+			message, out packet);
+
+	internal static bool WriteKey<TPlatform>(ref TPlatform platform,
+		APTR message, MuiStoreKeyMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.WriteKey(ref platform,
+			message, packet);
+
+	internal static bool TryReadCounter<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiStoreCounterMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.TryReadCounter(ref platform,
+			message, out packet);
+
+	internal static bool WriteCounter<TPlatform>(ref TPlatform platform,
+		APTR message, MuiStoreCounterMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.WriteCounter(ref platform,
+			message, packet);
+
+	internal static bool TryReadDatamapSet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDatamapSetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.TryReadDatamapSet(ref platform,
+			message, out packet);
+
+	internal static bool WriteDatamapSet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDatamapSetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.WriteDatamapSet(ref platform,
+			message, packet);
+
+	internal static bool TryReadDatamapGet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDatamapGetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.TryReadDatamapGet(ref platform,
+			message, out packet);
+
+	internal static bool WriteDatamapGet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDatamapGetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.WriteDatamapGet(ref platform,
+			message, packet);
+
+	internal static bool TryReadObjectmapSet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiObjectmapSetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.TryReadObjectmapSet(ref platform,
+			message, out packet);
+
+	internal static bool WriteObjectmapSet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiObjectmapSetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiStorePacketSequentialStructCodec.WriteObjectmapSet(ref platform,
+			message, packet);
+}
+
 // Struct-first codecs for the MorphOS Datamap/Objectmap method families.
 // These records contain only guest pointers and fixed-width scalars; no
 // managed key/value representation crosses the ABI boundary.
@@ -511,9 +847,8 @@ public static class MuiStoreMessageCore
 		APTR obj, APTR message)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiStoreMessageCodec.TryReadMethodId(ref platform, message,
-			out var methodHeader)) return 0;
-		var method = methodHeader.MethodId;
+		if (!MuiStoreMessageCodec.TryReadMethodIdValue(ref platform, message,
+			out var method)) return 0;
 		if (!MuiStorePolicyCore.IsMethodClassCompatible(ref platform, state, obj,
 			MuiStorePolicyCore.ClassifyMethod(method))) return 0;
 		switch (method)
@@ -594,9 +929,8 @@ public static class MuiStoreMessageCore
 		APTR message)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiStoreMessageCodec.TryReadMethodId(ref platform, message,
-			out var methodHeader)) return 0;
-		var method = methodHeader.MethodId;
+		if (!MuiStoreMessageCodec.TryReadMethodIdValue(ref platform, message,
+			out var method)) return 0;
 		if (method == DatamapSetMethod)
 		{
 			if (!TryReadDatamapSet(ref platform, message, out var set)) return 0;
@@ -725,11 +1059,8 @@ public static class MuiStoreMessageCore
 
 	private static bool WriteClearRecord<TPlatform>(ref TPlatform platform,
 		APTR message, uint method) where TPlatform : struct, IMuiGuestMemory
-	{
-		var packet = default(MuiStoreClearMessage);
-		packet.MethodId = method;
-		return MuiStorePacketCodec.WriteClear(ref platform, message, packet);
-	}
+		=> MuiStorePacketSequentialStructCodec.TryWriteClearMethodIdValue(
+			ref platform, message, method);
 
 	private static bool TryReadDatamapSet<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDatamapSetMessage packet)
@@ -783,10 +1114,10 @@ public static class MuiStoreMessageCore
 	private static bool TryReadClear<TPlatform>(ref TPlatform platform,
 		APTR message, uint method) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (method != DatamapClearMethod && method != ObjectmapClearMethod ||
-			!MuiStorePacketCodec.TryReadClear(ref platform, message,
-				out var packet) || packet.MethodId != method) return false;
-		return true;
+		if (method != DatamapClearMethod && method != ObjectmapClearMethod)
+			return false;
+		return MuiStorePacketSequentialStructCodec.TryReadClearMethodIdValue(
+			ref platform, message, out var methodId) && methodId == method;
 	}
 
 	private static bool AttributeEnabled<TPlatform>(ref TPlatform platform,

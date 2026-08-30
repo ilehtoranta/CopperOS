@@ -154,26 +154,30 @@ internal static class MuiAslRecordFieldCursorCodec
 		APTR record, MuiAslRecordKind kind, MuiAslRecordField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, record, kind, field,
-			value);
+		value);
 }
 
-internal static class MuiAslServiceStateCodec
+// Sequential codecs for the complete ASL records.  The field cursor above is
+// retained for compatibility and diagnostics, but live state publication and
+// consumption use declaration-ordered named members through this bounded
+// cursor so the record shape remains explicit at the API boundary.
+internal static class MuiAslServiceStateStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAslServiceStateRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAslServiceStateRecord.Size)) return false;
-		if (!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiAslRecordKind.State, MuiAslRecordField.Magic, out record.Magic) ||
-			!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiAslRecordKind.State, MuiAslRecordField.Head, out var head) ||
-			!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiAslRecordKind.State, MuiAslRecordField.Generation,
-				out record.Generation)) return false;
-		record.Head = APTR.FromPointer(head);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAslServiceStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawHead) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Generation) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		record.Head = APTR.FromPointer(rawHead);
 		return true;
 	}
 
@@ -181,16 +185,30 @@ internal static class MuiAslServiceStateCodec
 		MuiAslServiceStateRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAslServiceStateRecord.Size)) return false;
-		return MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiAslRecordKind.State, MuiAslRecordField.Magic, record.Magic) &&
-			MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiAslRecordKind.State, MuiAslRecordField.Head, record.Head.Raw) &&
-			MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiAslRecordKind.State, MuiAslRecordField.Generation,
-				record.Generation);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAslServiceStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Head.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Generation)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+}
+
+internal static class MuiAslServiceStateCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiAslServiceStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAslServiceStateStructCodec.TryRead(ref platform, address,
+			out record);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiAslServiceStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAslServiceStateStructCodec.Write(ref platform, address, record);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -208,28 +226,27 @@ internal struct MuiAslRequestLeaseRecord
 	internal APTR Tags;
 }
 
-internal static class MuiAslRequestLeaseCodec
+internal static class MuiAslRequestLeaseStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiAslRequestLeaseRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAslRequestLeaseRecord.Size)) return false;
-		if (!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiAslRecordKind.Lease, MuiAslRecordField.Next, out var next) ||
-			!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiAslRecordKind.Lease, MuiAslRecordField.Requester,
-				out var requester) ||
-			!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiAslRecordKind.Lease, MuiAslRecordField.Type, out record.Type) ||
-			!MuiAslRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiAslRecordKind.Lease, MuiAslRecordField.Tags, out var tags))
-			return false;
-		record.Next = APTR.FromPointer(next);
-		record.Requester = APTR.FromPointer(requester);
-		record.Tags = APTR.FromPointer(tags);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAslRequestLeaseRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawNext) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawRequester) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Type) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawTags) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		record.Next = APTR.FromPointer(rawNext);
+		record.Requester = APTR.FromPointer(rawRequester);
+		record.Tags = APTR.FromPointer(rawTags);
 		return true;
 	}
 
@@ -237,18 +254,32 @@ internal static class MuiAslRequestLeaseCodec
 		MuiAslRequestLeaseRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAslRequestLeaseRecord.Size)) return false;
-		return MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiAslRecordKind.Lease, MuiAslRecordField.Next, record.Next.Raw) &&
-			MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiAslRecordKind.Lease, MuiAslRecordField.Requester,
-				record.Requester.Raw) &&
-			MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiAslRecordKind.Lease, MuiAslRecordField.Type, record.Type) &&
-			MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiAslRecordKind.Lease, MuiAslRecordField.Tags, record.Tags.Raw);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAslRequestLeaseRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Next.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Requester.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Type) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Tags.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+}
+
+internal static class MuiAslRequestLeaseCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiAslRequestLeaseRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAslRequestLeaseStructCodec.TryRead(ref platform, address,
+			out record);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiAslRequestLeaseRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAslRequestLeaseStructCodec.Write(ref platform, address, record);
 }
 
 // Structural codecs deliberately preserve the complete ABI record surface,

@@ -323,4 +323,34 @@ public sealed class MuiAslServiceTests
 		Assert.False(MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
 			APTR.Null, 0, out _));
 	}
+
+	[Fact]
+	public void AslTagItemVectorCodecExchangesCompleteNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var vector = APTR.FromPointer(0x1A00);
+		var expected = new MuiAslTagItemRecord
+		{
+			Tag = 0xF00DCAFEu,
+			Data = 0x87654321u,
+		};
+
+		Assert.True(MuiAslTagItemVectorCodec.TryWrite(ref platform, vector, 0,
+			expected));
+		Assert.True(MuiAslTagItemVectorCodec.TryRead(ref platform, vector, 0,
+			out var actual));
+		Assert.Equal(expected.Tag, actual.Tag);
+		Assert.Equal(expected.Data, actual.Data);
+		var cursor = new MuiAslTagItemCursor { Base = vector, Index = 0 };
+		Assert.True(MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
+			out var cursorValue));
+		Assert.Equal(expected.Data, cursorValue.Data);
+		Assert.False(MuiAslTagItemVectorCodec.TryRead(ref platform, vector,
+			uint.MaxValue, out _));
+		Assert.False(MuiAslTagItemVectorCodec.TryWrite(ref platform,
+			APTR.FromPointer(0x20FFC), 0, expected));
+		Assert.False(MuiAslTagItemVectorCodec.TryRead(ref platform,
+			APTR.FromPointer(0xFFFFFFFF), 1, out _));
+	}
 }

@@ -41,6 +41,35 @@ public sealed class MuiListtreeVectorStructAdapterTests
 	}
 
 	[Fact]
+	public void DisplayColumnVectorBridgeUsesNamedTextRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x5000,
+			APTR.FromPointer(0x1000));
+		var vector = APTR.FromPointer(0x2400);
+		var expected = new MuiListtreeCore.MuiListtreeDisplayColumnRecord
+		{
+			Text = APTR.FromPointer(0xFEDCBA98u),
+		};
+
+		Assert.True(MuiListtreeCore.MuiListtreeDisplayColumnVectorCodec.TryWrite(
+			ref platform, vector, 2, expected));
+		Assert.True(MuiListtreeCore.MuiListtreeDisplayColumnVectorCodec.TryRead(
+			ref platform, vector, 2, out var decoded));
+		Assert.Equal(expected.Text.Raw, decoded.Text.Raw);
+		Assert.True(MuiListtreeCore.MuiListtreeDisplayColumnVectorCodec
+			.TryWriteTextValue(ref platform, vector, 3, 0x80000001u));
+		Assert.True(MuiListtreeCore.MuiListtreeDisplayColumnVectorCodec
+			.TryReadTextValue(ref platform, vector, 3, out var rawText));
+		Assert.Equal(0x80000001u, rawText);
+		Assert.False(MuiListtreeCore.MuiListtreeDisplayColumnVectorCodec
+			.TryReadTextValue(ref platform, vector,
+				MuiListtreeCore.MuiListtreeDisplayColumnCursor.MaximumEntries, out _));
+		Assert.False(MuiListtreeCore.MuiListtreeDisplayColumnVectorCodec
+			.TryWriteTextValue(ref platform, APTR.FromPointer(0xFFFFFFFE), 1,
+				expected.Text.Raw));
+	}
+
+	[Fact]
 	public void DisplayColumnMemoryAdapterUsesNamedTextField()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x5000,
@@ -117,6 +146,39 @@ public sealed class MuiListtreeVectorStructAdapterTests
 			.TryGetEntry(ref platform, APTR.FromPointer(0x40FFE), 0, out _));
 		Assert.False(MuiListtreeCore.MuiListtreeColumnGeometryVectorMemoryCodec
 			.TryGetEntry(ref platform, APTR.FromPointer(0xFFFFFFF0), 1, out _));
+	}
+
+	[Fact]
+	public void ColumnGeometryVectorBridgeUsesNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x5000,
+			APTR.FromPointer(0x1000));
+		var vector = APTR.FromPointer(0x2400);
+		var expected = new MuiListtreeCore.MuiListtreeColumnGeometryRecord
+		{
+			Width = 0xFEDCBA98u,
+			Delta = 4,
+			Weight = 100,
+			MinWidth = 16,
+			MaxWidth = 0x80000001u,
+			Flags = MuiListtreeCore.MuiListtreeColumnGeometryRecord.MaxContent,
+		};
+
+		Assert.True(MuiListtreeCore.MuiListtreeColumnGeometryVectorCodec.TryWrite(
+			ref platform, vector, 2, expected));
+		Assert.True(MuiListtreeCore.MuiListtreeColumnGeometryVectorCodec.TryRead(
+			ref platform, vector, 2, out var decoded));
+		Assert.Equal(expected.Width, decoded.Width);
+		Assert.Equal(expected.Delta, decoded.Delta);
+		Assert.Equal(expected.Weight, decoded.Weight);
+		Assert.Equal(expected.MinWidth, decoded.MinWidth);
+		Assert.Equal(expected.MaxWidth, decoded.MaxWidth);
+		Assert.Equal(expected.Flags, decoded.Flags);
+		Assert.False(MuiListtreeCore.MuiListtreeColumnGeometryVectorCodec.TryRead(
+			ref platform, vector,
+			MuiListtreeCore.MuiListtreeColumnGeometryCursor.MaximumEntries, out _));
+		Assert.False(MuiListtreeCore.MuiListtreeColumnGeometryVectorCodec.TryWrite(
+			ref platform, APTR.FromPointer(0xFFFFFFF0), 1, expected));
 	}
 
 	[Fact]

@@ -3,6 +3,7 @@
 - SPDX-License-Identifier: MIT
 */
 
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Amiga;
 
@@ -182,53 +183,48 @@ internal static class MuiExternalBoopsiGeometryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryAddress(ref platform, instance, out _)) return false;
-		return MuiExternalBoopsiGeometryFieldMemoryCodec.TryRead(ref platform,
-			instance, MuiExternalBoopsiGeometryField.MinWidth, out value.MinWidth) &&
-			MuiExternalBoopsiGeometryFieldMemoryCodec.TryRead(ref platform,
-				instance, MuiExternalBoopsiGeometryField.MinHeight,
-				out value.MinHeight) &&
-			MuiExternalBoopsiGeometryFieldMemoryCodec.TryRead(ref platform,
-				instance, MuiExternalBoopsiGeometryField.MaxWidth,
-				out value.MaxWidth) &&
-			MuiExternalBoopsiGeometryFieldMemoryCodec.TryRead(ref platform,
-				instance, MuiExternalBoopsiGeometryField.MaxHeight,
-				out value.MaxHeight) &&
-			MuiExternalBoopsiGeometryFieldMemoryCodec.TryRead(ref platform,
-				instance, MuiExternalBoopsiGeometryField.TagWindow,
-				out value.TagWindow) &&
-			MuiExternalBoopsiGeometryFieldMemoryCodec.TryRead(ref platform,
-				instance, MuiExternalBoopsiGeometryField.TagScreen,
-				out value.TagScreen) &&
-			MuiExternalBoopsiGeometryFieldMemoryCodec.TryRead(ref platform,
-				instance, MuiExternalBoopsiGeometryField.TagDrawInfo,
-				out value.TagDrawInfo);
+		if (!TryAddress(ref platform, instance, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiExternalBoopsiGeometryState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MinWidth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MinHeight) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MaxWidth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MaxHeight) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.TagWindow) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.TagScreen) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.TagDrawInfo)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		APTR instance, MuiExternalBoopsiGeometryState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryAddress(ref platform, instance, out _)) return false;
-		return MuiExternalBoopsiGeometryFieldMemoryCodec.TryWrite(ref platform,
-			instance, MuiExternalBoopsiGeometryField.MinWidth, value.MinWidth) &&
-			MuiExternalBoopsiGeometryFieldMemoryCodec.TryWrite(ref platform,
-				instance, MuiExternalBoopsiGeometryField.MinHeight,
-				value.MinHeight) &&
-			MuiExternalBoopsiGeometryFieldMemoryCodec.TryWrite(ref platform,
-				instance, MuiExternalBoopsiGeometryField.MaxWidth, value.MaxWidth) &&
-			MuiExternalBoopsiGeometryFieldMemoryCodec.TryWrite(ref platform,
-				instance, MuiExternalBoopsiGeometryField.MaxHeight,
-				value.MaxHeight) &&
-			MuiExternalBoopsiGeometryFieldMemoryCodec.TryWrite(ref platform,
-				instance, MuiExternalBoopsiGeometryField.TagWindow,
-				value.TagWindow) &&
-			MuiExternalBoopsiGeometryFieldMemoryCodec.TryWrite(ref platform,
-				instance, MuiExternalBoopsiGeometryField.TagScreen,
-				value.TagScreen) &&
-			MuiExternalBoopsiGeometryFieldMemoryCodec.TryWrite(ref platform,
-				instance, MuiExternalBoopsiGeometryField.TagDrawInfo,
-				value.TagDrawInfo);
+		if (!TryAddress(ref platform, instance, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiExternalBoopsiGeometryState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MinWidth) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MinHeight) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MaxWidth) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MaxHeight) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.TagWindow) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.TagScreen) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.TagDrawInfo)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -369,43 +365,45 @@ internal static class MuiExternalBoopsiResourceCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryAddress(ref platform, instance, out _)) return false;
-		return MuiExternalBoopsiResourceFieldMemoryCodec.TryRead(ref platform,
-			instance, MuiExternalBoopsiResourceField.PrivateClass,
-			out value.PrivateClass) &&
-			MuiExternalBoopsiResourceFieldMemoryCodec.TryRead(ref platform,
-				instance, MuiExternalBoopsiResourceField.ClassId,
-				out value.ClassId) &&
-			MuiExternalBoopsiResourceFieldMemoryCodec.TryRead(ref platform,
-				instance, MuiExternalBoopsiResourceField.OpenedClass,
-				out value.OpenedClass) &&
-			MuiExternalBoopsiResourceFieldMemoryCodec.TryRead(ref platform,
-				instance, MuiExternalBoopsiResourceField.BoopsiObject,
-				out value.BoopsiObject) &&
-			MuiExternalBoopsiResourceFieldMemoryCodec.TryRead(ref platform,
-				instance, MuiExternalBoopsiResourceField.CreationTags,
-				out value.CreationTags);
+		if (!TryAddress(ref platform, instance, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiExternalBoopsiResourceState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var privateClass) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var classId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var openedClass) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var boopsiObject) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var creationTags)) return false;
+		value.PrivateClass = APTR.FromPointer(privateClass);
+		value.ClassId = APTR.FromPointer(classId);
+		value.OpenedClass = APTR.FromPointer(openedClass);
+		value.BoopsiObject = APTR.FromPointer(boopsiObject);
+		value.CreationTags = APTR.FromPointer(creationTags);
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		APTR instance, MuiExternalBoopsiResourceState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryAddress(ref platform, instance, out _)) return false;
-		return MuiExternalBoopsiResourceFieldMemoryCodec.TryWrite(ref platform,
-			instance, MuiExternalBoopsiResourceField.PrivateClass,
-			value.PrivateClass) &&
-			MuiExternalBoopsiResourceFieldMemoryCodec.TryWrite(ref platform,
-				instance, MuiExternalBoopsiResourceField.ClassId, value.ClassId) &&
-			MuiExternalBoopsiResourceFieldMemoryCodec.TryWrite(ref platform,
-				instance, MuiExternalBoopsiResourceField.OpenedClass,
-				value.OpenedClass) &&
-			MuiExternalBoopsiResourceFieldMemoryCodec.TryWrite(ref platform,
-				instance, MuiExternalBoopsiResourceField.BoopsiObject,
-				value.BoopsiObject) &&
-			MuiExternalBoopsiResourceFieldMemoryCodec.TryWrite(ref platform,
-				instance, MuiExternalBoopsiResourceField.CreationTags,
-				value.CreationTags);
+		if (!TryAddress(ref platform, instance, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiExternalBoopsiResourceState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PrivateClass.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ClassId.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.OpenedClass.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.BoopsiObject.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.CreationTags.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -537,30 +535,34 @@ internal static class MuiExternalScratchStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryAddress(ref platform, instance, out _)) return false;
-		uint raw;
-		if (!MuiExternalScratchFieldMemoryCodec.TryRead(ref platform, instance,
-			MuiExternalScratchField.RememberBuffer, out raw)) return false;
-		value.RememberBuffer = APTR.FromPointer(raw);
-		if (!MuiExternalScratchFieldMemoryCodec.TryRead(ref platform, instance,
-			MuiExternalScratchField.RememberCount, out value.RememberCount) ||
-			!MuiExternalScratchFieldMemoryCodec.TryRead(ref platform, instance,
-				MuiExternalScratchField.WorkBuffer, out raw)) return false;
-		value.WorkBuffer = APTR.FromPointer(raw);
-		return true;
+		if (!TryAddress(ref platform, instance, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiExternalScratchState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rememberBuffer) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.RememberCount) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var workBuffer)) return false;
+		value.RememberBuffer = APTR.FromPointer(rememberBuffer);
+		value.WorkBuffer = APTR.FromPointer(workBuffer);
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		APTR instance, MuiExternalScratchState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryAddress(ref platform, instance, out _)) return false;
-		return MuiExternalScratchFieldMemoryCodec.TryWrite(ref platform, instance,
-			MuiExternalScratchField.RememberBuffer, value.RememberBuffer.Raw) &&
-			MuiExternalScratchFieldMemoryCodec.TryWrite(ref platform, instance,
-				MuiExternalScratchField.RememberCount, value.RememberCount) &&
-			MuiExternalScratchFieldMemoryCodec.TryWrite(ref platform, instance,
-				MuiExternalScratchField.WorkBuffer, value.WorkBuffer.Raw);
+		if (!TryAddress(ref platform, instance, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiExternalScratchState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RememberBuffer.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RememberCount) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.WorkBuffer.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -690,54 +692,59 @@ internal static class MuiExternalDtpicStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryAddress(ref platform, instance, out _)) return false;
-		uint raw;
-		if (!MuiExternalDtpicFieldMemoryCodec.TryRead(ref platform, instance,
-			MuiExternalDtpicField.CallerName, out raw)) return false;
-		value.CallerName = APTR.FromPointer(raw);
-		if (!MuiExternalDtpicFieldMemoryCodec.TryRead(ref platform, instance,
-			MuiExternalDtpicField.OwnedName, out raw)) return false;
-		value.OwnedName = APTR.FromPointer(raw);
-		if (!MuiExternalDtpicFieldMemoryCodec.TryRead(ref platform, instance,
-			MuiExternalDtpicField.OwnedNameSize, out value.OwnedNameSize) ||
-			!MuiExternalDtpicFieldMemoryCodec.TryRead(ref platform, instance,
-				MuiExternalDtpicField.PictureObject, out raw)) return false;
-		value.PictureObject = APTR.FromPointer(raw);
-		return MuiExternalDtpicFieldMemoryCodec.TryRead(ref platform, instance,
-			MuiExternalDtpicField.Alpha, out value.Alpha) &&
-			MuiExternalDtpicFieldMemoryCodec.TryRead(ref platform, instance,
-				MuiExternalDtpicField.MinWidth, out value.MinWidth) &&
-			MuiExternalDtpicFieldMemoryCodec.TryRead(ref platform, instance,
-				MuiExternalDtpicField.MinHeight, out value.MinHeight) &&
-			MuiExternalDtpicFieldMemoryCodec.TryRead(ref platform, instance,
-				MuiExternalDtpicField.PicWidth, out value.PicWidth) &&
-			MuiExternalDtpicFieldMemoryCodec.TryRead(ref platform, instance,
-				MuiExternalDtpicField.PicHeight, out value.PicHeight);
+		if (!TryAddress(ref platform, instance, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiExternalDtpicState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var callerName) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var ownedName) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.OwnedNameSize) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var pictureObject) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Alpha) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MinWidth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MinHeight) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.PicWidth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.PicHeight)) return false;
+		value.CallerName = APTR.FromPointer(callerName);
+		value.OwnedName = APTR.FromPointer(ownedName);
+		value.PictureObject = APTR.FromPointer(pictureObject);
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		APTR instance, MuiExternalDtpicState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryAddress(ref platform, instance, out _)) return false;
-		return MuiExternalDtpicFieldMemoryCodec.TryWrite(ref platform, instance,
-			MuiExternalDtpicField.CallerName, value.CallerName.Raw) &&
-			MuiExternalDtpicFieldMemoryCodec.TryWrite(ref platform, instance,
-				MuiExternalDtpicField.OwnedName, value.OwnedName.Raw) &&
-			MuiExternalDtpicFieldMemoryCodec.TryWrite(ref platform, instance,
-				MuiExternalDtpicField.OwnedNameSize, value.OwnedNameSize) &&
-			MuiExternalDtpicFieldMemoryCodec.TryWrite(ref platform, instance,
-				MuiExternalDtpicField.PictureObject, value.PictureObject.Raw) &&
-			MuiExternalDtpicFieldMemoryCodec.TryWrite(ref platform, instance,
-				MuiExternalDtpicField.Alpha, value.Alpha) &&
-			MuiExternalDtpicFieldMemoryCodec.TryWrite(ref platform, instance,
-				MuiExternalDtpicField.MinWidth, value.MinWidth) &&
-			MuiExternalDtpicFieldMemoryCodec.TryWrite(ref platform, instance,
-				MuiExternalDtpicField.MinHeight, value.MinHeight) &&
-			MuiExternalDtpicFieldMemoryCodec.TryWrite(ref platform, instance,
-				MuiExternalDtpicField.PicWidth, value.PicWidth) &&
-			MuiExternalDtpicFieldMemoryCodec.TryWrite(ref platform, instance,
-				MuiExternalDtpicField.PicHeight, value.PicHeight);
+		if (!TryAddress(ref platform, instance, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiExternalDtpicState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.CallerName.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.OwnedName.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.OwnedNameSize) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PictureObject.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Alpha) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MinWidth) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MinHeight) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PicWidth) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PicHeight)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -946,12 +953,13 @@ internal static class MuiExternalDtpicLayoutResultCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiExternalDtpicLayoutResult.Size)) return false;
-		return MuiExternalDtpicLayoutFieldMemoryCodec.TryRead(ref platform,
-			address, MuiExternalDtpicLayoutField.Width, out value.Width) &&
-			MuiExternalDtpicLayoutFieldMemoryCodec.TryRead(ref platform, address,
-				MuiExternalDtpicLayoutField.Height, out value.Height);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalDtpicLayoutResult.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Width) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Height)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -989,26 +997,32 @@ internal static class MuiExternalNotificationStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryAddress(ref platform, instance, out _)) return false;
-		return MuiExternalNotificationFieldMemoryCodec.TryRead(ref platform,
-			instance, MuiExternalNotificationField.Attribute, out value.Attribute) &&
-			MuiExternalNotificationFieldMemoryCodec.TryRead(ref platform, instance,
-				MuiExternalNotificationField.Value, out value.Value) &&
-			MuiExternalNotificationFieldMemoryCodec.TryRead(ref platform, instance,
-				MuiExternalNotificationField.Count, out value.Count);
+		if (!TryAddress(ref platform, instance, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiExternalNotificationState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Attribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Value) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Count)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		APTR instance, MuiExternalNotificationState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryAddress(ref platform, instance, out _)) return false;
-		return MuiExternalNotificationFieldMemoryCodec.TryWrite(ref platform,
-			instance, MuiExternalNotificationField.Attribute, value.Attribute) &&
-			MuiExternalNotificationFieldMemoryCodec.TryWrite(ref platform, instance,
-				MuiExternalNotificationField.Value, value.Value) &&
-			MuiExternalNotificationFieldMemoryCodec.TryWrite(ref platform, instance,
-				MuiExternalNotificationField.Count, value.Count);
+		if (!TryAddress(ref platform, instance, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiExternalNotificationState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Attribute) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Value) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Count)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -1316,55 +1330,78 @@ internal static class MuiExternalDisplayEnvironmentCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiExternalDisplayEnvironmentRecord.Size)) return false;
-		return MuiExternalDisplayEnvironmentFieldMemoryCodec.TryRead(ref platform,
-			address, MuiExternalDisplayEnvironmentField.Window, out value.Window) &&
-			MuiExternalDisplayEnvironmentFieldMemoryCodec.TryRead(ref platform,
-				address, MuiExternalDisplayEnvironmentField.Screen, out value.Screen) &&
-			MuiExternalDisplayEnvironmentFieldMemoryCodec.TryRead(ref platform,
-				address, MuiExternalDisplayEnvironmentField.DrawInfo,
-				out value.DrawInfo);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalDisplayEnvironmentRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var window) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var screen) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var drawInfo)) return false;
+		value.Window = APTR.FromPointer(window);
+		value.Screen = APTR.FromPointer(screen);
+		value.DrawInfo = APTR.FromPointer(drawInfo);
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		APTR address, MuiExternalDisplayEnvironmentRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiExternalDisplayEnvironmentRecord.Size)) return false;
-		return MuiExternalDisplayEnvironmentFieldMemoryCodec.TryWrite(ref platform,
-			address, MuiExternalDisplayEnvironmentField.Window, value.Window) &&
-			MuiExternalDisplayEnvironmentFieldMemoryCodec.TryWrite(ref platform,
-				address, MuiExternalDisplayEnvironmentField.Screen, value.Screen) &&
-			MuiExternalDisplayEnvironmentFieldMemoryCodec.TryWrite(ref platform,
-				address, MuiExternalDisplayEnvironmentField.DrawInfo,
-				value.DrawInfo);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalDisplayEnvironmentRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Window.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Screen.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.DrawInfo.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
 internal static class MuiExternalRastPortSlotCodec
 {
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, APTR value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalRastPortSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out APTR value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = APTR.Null;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalRastPortSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var raw)) return false;
+		value = APTR.FromPointer(raw);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiExternalRastPortSlot value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiExternalRastPortSlot.Size)) return false;
-		return MuiExternalRastPortSlotFieldMemoryCodec.TryRead(ref platform,
-			address, MuiExternalRastPortSlotField.RastPort, out value.RastPort);
+		if (!TryReadValue(ref platform, address, out var rastPort)) return false;
+		value.RastPort = rastPort;
+		return true;
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		APTR address, MuiExternalRastPortSlot value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiExternalRastPortSlot.Size)) return false;
-		return MuiExternalRastPortSlotFieldMemoryCodec.TryWrite(ref platform,
-			address, MuiExternalRastPortSlotField.RastPort, value.RastPort);
-	}
+		=> WriteValue(ref platform, address, value.RastPort);
 }
 
 internal static class MuiExternalDisplayStateCodec
@@ -1523,16 +1560,21 @@ internal static class MuiExternalRenderInfoCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiExternalRenderInfoRecord.Size)) return false;
-		return MuiExternalRenderInfoFieldMemoryCodec.TryRead(ref platform,
-			address, MuiExternalRenderInfoField.Screen, out value.Screen) &&
-			MuiExternalRenderInfoFieldMemoryCodec.TryRead(ref platform, address,
-				MuiExternalRenderInfoField.Window, out value.Window) &&
-			MuiExternalRenderInfoFieldMemoryCodec.TryRead(ref platform, address,
-				MuiExternalRenderInfoField.DrawInfo, out value.DrawInfo) &&
-			MuiExternalRenderInfoFieldMemoryCodec.TryRead(ref platform, address,
-				MuiExternalRenderInfoField.RastPort, out value.RastPort);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalRenderInfoRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var screen) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var window) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var drawInfo) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rastPort)) return false;
+		value.Screen = APTR.FromPointer(screen);
+		value.Window = APTR.FromPointer(window);
+		value.DrawInfo = APTR.FromPointer(drawInfo);
+		value.RastPort = APTR.FromPointer(rastPort);
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -1887,6 +1929,181 @@ internal struct MuiExternalBoopsiResultWord
 	internal uint Value;
 }
 
+// Complete declaration-order codecs for the fixed BOOPSI packet records. The
+// legacy field adapter below remains available for compatibility diagnostics,
+// but live packet exchange goes through these named records and one bounded
+// cursor per record. This keeps packet access independent of repeated offsets
+// while preserving the exact MorphOS 32-bit ABI words.
+internal static class MuiExternalBoopsiOpSetMessageStructCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiExternalBoopsiOpSetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalBoopsiOpSetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var attributeList) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var gadgetInfo)) return false;
+		value.MethodId = methodId;
+		value.AttributeList = APTR.FromPointer(attributeList);
+		value.GadgetInfo = APTR.FromPointer(gadgetInfo);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform,
+		APTR address, MuiExternalBoopsiOpSetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalBoopsiOpSetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.AttributeList.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.GadgetInfo.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+internal static class MuiExternalBoopsiOpGetMessageStructCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiExternalBoopsiOpGetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalBoopsiOpGetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var attribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var storage)) return false;
+		value.MethodId = methodId;
+		value.Attribute = attribute;
+		value.Storage = APTR.FromPointer(storage);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform,
+		APTR address, MuiExternalBoopsiOpGetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalBoopsiOpGetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Attribute) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Storage.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+internal static class MuiExternalBoopsiRenderMessageStructCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiExternalBoopsiRenderMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalBoopsiRenderMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var gadgetInfo) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rastPort)) return false;
+		value.MethodId = methodId;
+		value.GadgetInfo = APTR.FromPointer(gadgetInfo);
+		value.RastPort = APTR.FromPointer(rastPort);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform,
+		APTR address, MuiExternalBoopsiRenderMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalBoopsiRenderMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.GadgetInfo.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RastPort.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+internal static class MuiExternalBoopsiTagItemStructCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiExternalBoopsiTagItem value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalBoopsiTagItem.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var tag) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var data)) return false;
+		value.Tag = tag;
+		value.Data = data;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform,
+		APTR address, MuiExternalBoopsiTagItem value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalBoopsiTagItem.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Tag) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Data)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+internal static class MuiExternalBoopsiResultWordStructCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiExternalBoopsiResultWord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalBoopsiResultWord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var result)) return false;
+		value.Value = result;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform,
+		APTR address, MuiExternalBoopsiResultWord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalBoopsiResultWord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 internal enum MuiExternalBoopsiPacketKind : byte
 {
 	OpSet,
@@ -2086,6 +2303,36 @@ internal static class MuiExternalTagListVectorMemoryCodec
 	}
 }
 
+// Production bridge for the caller-owned creation/update TagItem vector. The
+// vector-specific bound stays in the adapter while callers exchange the
+// complete named TagItem record rather than a slot address.
+internal static class MuiExternalTagListVectorCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR vector,
+		uint index, out MuiAslTagItemRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiExternalTagListVectorMemoryCodec.TryGetEntry(ref platform, vector,
+			index, out var address) || !MuiAslTagItemCodec.TryRead(ref platform,
+			address, out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, MuiAslTagItemRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiExternalTagListVectorMemoryCodec.TryGetEntry(ref platform, vector,
+			index, out var address)) return false;
+		return MuiAslTagItemCodec.Write(ref platform, address, value);
+	}
+}
+
 internal static class MuiExternalTagListCursorCodec
 {
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
@@ -2120,6 +2367,35 @@ internal static class MuiExternalRememberVectorMemoryCodec
 		if (vector.Raw > uint.MaxValue - offset) return false;
 		address = APTR.FromPointer(vector.Raw + offset);
 		return platform.IsMapped(address, MuiAslTagItemRecord.Size);
+	}
+}
+
+// Production bridge for the fixed five-entry remember buffer. The smaller
+// MorphOS bound remains owned by this adapter; callers receive named TagItems.
+internal static class MuiExternalRememberVectorCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR vector,
+		uint index, out MuiAslTagItemRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiExternalRememberVectorMemoryCodec.TryGetEntry(ref platform, vector,
+			index, out var address) || !MuiAslTagItemCodec.TryRead(ref platform,
+			address, out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, MuiAslTagItemRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiExternalRememberVectorMemoryCodec.TryGetEntry(ref platform, vector,
+			index, out var address)) return false;
+		return MuiAslTagItemCodec.Write(ref platform, address, value);
 	}
 }
 
@@ -2159,6 +2435,38 @@ internal static class MuiExternalBoopsiTagVectorMemoryCodec
 		if (vector.Raw > uint.MaxValue - offset) return false;
 		address = APTR.FromPointer(vector.Raw + offset);
 		return platform.IsMapped(address, MuiExternalBoopsiTagItem.Size);
+	}
+}
+
+// Production bridge for the fixed inline BOOPSI TagItem area. The inline
+// capacity remains owned by the vector adapter; callers exchange complete
+// named BOOPSI TagItem records without exposing slot addresses.
+internal static class MuiExternalBoopsiTagVectorCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR vector,
+		uint index, out MuiExternalBoopsiTagItem value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, index, out var address) ||
+			!MuiExternalBoopsiTagItemStructCodec.TryRead(ref platform, address,
+				out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, MuiExternalBoopsiTagItem value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, index, out var address)) return false;
+		return MuiExternalBoopsiTagItemStructCodec.Write(ref platform, address,
+			value);
 	}
 }
 
@@ -2271,33 +2579,13 @@ internal static class MuiExternalBoopsiPacketCodec
 		return platform.IsMapped(storage, MuiExternalBoopsiResultWord.Size);
 	}
 
-	private static bool WriteField<TPlatform>(ref TPlatform platform,
-		APTR address, MuiExternalBoopsiPacketKind kind,
-		MuiExternalBoopsiPacketField field, uint value)
-		where TPlatform : struct, IMuiGuestMemory
-		=> MuiExternalBoopsiPacketFieldMemoryCodec.TryWrite(ref platform, address,
-			kind, field, value);
-
-	private static bool ReadField<TPlatform>(ref TPlatform platform,
-		APTR address, MuiExternalBoopsiPacketKind kind,
-		MuiExternalBoopsiPacketField field, out uint value)
-		where TPlatform : struct, IMuiGuestMemory
-		=> MuiExternalBoopsiPacketFieldMemoryCodec.TryRead(ref platform, address,
-			kind, field, out value);
-
 	internal static bool WriteOpSet<TPlatform>(ref TPlatform platform,
 		APTR address, MuiExternalBoopsiOpSetMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (packet.MethodId != OmSet) return false;
-		return WriteField(ref platform, address,
-			MuiExternalBoopsiPacketKind.OpSet,
-			MuiExternalBoopsiPacketField.MethodId, packet.MethodId) &&
-			WriteField(ref platform, address, MuiExternalBoopsiPacketKind.OpSet,
-				MuiExternalBoopsiPacketField.AttributeList,
-				packet.AttributeList.Raw) &&
-			WriteField(ref platform, address, MuiExternalBoopsiPacketKind.OpSet,
-				MuiExternalBoopsiPacketField.GadgetInfo, packet.GadgetInfo.Raw);
+		return MuiExternalBoopsiOpSetMessageStructCodec.Write(ref platform,
+			address, packet);
 	}
 
 	internal static bool WriteOpGet<TPlatform>(ref TPlatform platform,
@@ -2313,13 +2601,12 @@ internal static class MuiExternalBoopsiPacketCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (methodId != OmGet) return false;
-		return WriteField(ref platform, address,
-			MuiExternalBoopsiPacketKind.OpGet,
-			MuiExternalBoopsiPacketField.MethodId, methodId) &&
-			WriteField(ref platform, address, MuiExternalBoopsiPacketKind.OpGet,
-				MuiExternalBoopsiPacketField.Attribute, attribute) &&
-			WriteField(ref platform, address, MuiExternalBoopsiPacketKind.OpGet,
-				MuiExternalBoopsiPacketField.Storage, storage);
+		var packet = default(MuiExternalBoopsiOpGetMessage);
+		packet.MethodId = methodId;
+		packet.Attribute = attribute;
+		packet.Storage = APTR.FromPointer(storage);
+		return MuiExternalBoopsiOpGetMessageStructCodec.Write(ref platform,
+			address, packet);
 	}
 
 	internal static bool WriteRender<TPlatform>(ref TPlatform platform,
@@ -2335,31 +2622,25 @@ internal static class MuiExternalBoopsiPacketCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (methodId != GmRender) return false;
-		return WriteField(ref platform, address,
-			MuiExternalBoopsiPacketKind.Render,
-			MuiExternalBoopsiPacketField.MethodId, methodId) &&
-			WriteField(ref platform, address, MuiExternalBoopsiPacketKind.Render,
-				MuiExternalBoopsiPacketField.GadgetInfo, gadgetInfo) &&
-			WriteField(ref platform, address, MuiExternalBoopsiPacketKind.Render,
-				MuiExternalBoopsiPacketField.RastPort, rastPort);
+		var packet = default(MuiExternalBoopsiRenderMessage);
+		packet.MethodId = methodId;
+		packet.GadgetInfo = APTR.FromPointer(gadgetInfo);
+		packet.RastPort = APTR.FromPointer(rastPort);
+		return MuiExternalBoopsiRenderMessageStructCodec.Write(ref platform,
+			address, packet);
 	}
 
 	internal static bool WriteTag<TPlatform>(ref TPlatform platform,
 		APTR address, MuiExternalBoopsiTagItem packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return WriteField(ref platform, address, MuiExternalBoopsiPacketKind.Tag,
-			MuiExternalBoopsiPacketField.Tag, packet.Tag) &&
-			WriteField(ref platform, address, MuiExternalBoopsiPacketKind.Tag,
-				MuiExternalBoopsiPacketField.Data, packet.Data);
-	}
+		=> MuiExternalBoopsiTagItemStructCodec.Write(ref platform, address,
+			packet);
 
 	internal static bool WriteResult<TPlatform>(ref TPlatform platform,
 		APTR address, MuiExternalBoopsiResultWord packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return WriteResultValue(ref platform, address, packet.Value);
-	}
+		=> MuiExternalBoopsiResultWordStructCodec.Write(ref platform, address,
+			packet);
 
 	// Keep a scalar ABI seam for the freestanding compiler's one-word record
 	// argument path. The public/host-facing surface remains the named result
@@ -2368,22 +2649,34 @@ internal static class MuiExternalBoopsiPacketCodec
 	internal static bool WriteResultValue<TPlatform>(ref TPlatform platform,
 		APTR address, uint value)
 		where TPlatform : struct, IMuiGuestMemory =>
-		WriteField(ref platform, address, MuiExternalBoopsiPacketKind.Result,
-			MuiExternalBoopsiPacketField.Value, value);
+		WriteResultValueCore(ref platform, address, value);
+
+	private static bool WriteResultValueCore<TPlatform>(ref TPlatform platform,
+		APTR address, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiExternalBoopsiResultWord);
+		packet.Value = value;
+		return MuiExternalBoopsiResultWordStructCodec.Write(ref platform,
+			address, packet);
+	}
 
 	internal static bool TryReadResult<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiExternalBoopsiResultWord packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		packet = default;
-		return TryReadResultValue(ref platform, address, out packet.Value);
-	}
+		=> MuiExternalBoopsiResultWordStructCodec.TryRead(ref platform, address,
+			out packet);
 
 	internal static bool TryReadResultValue<TPlatform>(ref TPlatform platform,
 		APTR address, out uint value)
-		where TPlatform : struct, IMuiGuestMemory =>
-		ReadField(ref platform, address, MuiExternalBoopsiPacketKind.Result,
-			MuiExternalBoopsiPacketField.Value, out value);
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiExternalBoopsiResultWordStructCodec.TryRead(ref platform,
+			address, out var packet)) return false;
+		value = packet.Value;
+		return true;
+	}
 }
 
 public static class MuiExternalWrapperCore
@@ -2763,10 +3056,8 @@ public static class MuiExternalWrapperCore
 		var drawInfo = display.DrawInfo.Raw;
 		for (var index = 0; index < MuiExternalWrapperLayout.MaxTagWalk; index++)
 		{
-			if (!MuiExternalTagListVectorMemoryCodec.TryGetEntry(ref platform,
-				tags, unchecked((uint)index), out var address)) break;
-			if (!MuiAslTagItemCodec.TryRead(ref platform, address,
-				out var item)) break;
+			if (!MuiExternalTagListVectorCodec.TryRead(ref platform, tags,
+				unchecked((uint)index), out var item)) break;
 			if (item.Tag == MuiAslTagListCore.TagDone) break;
 			var value = item.Data;
 			if (tagWindow != 0 && item.Tag == tagWindow) value = window;
@@ -2775,7 +3066,8 @@ public static class MuiExternalWrapperCore
 			if (value != item.Data)
 			{
 				item.Data = value;
-				if (!MuiAslTagItemCodec.Write(ref platform, address, item)) break;
+				if (!MuiExternalTagListVectorCodec.TryWrite(ref platform, tags,
+					unchecked((uint)index), item)) break;
 			}
 		}
 	}
@@ -2791,11 +3083,10 @@ public static class MuiExternalWrapperCore
 		if (count >= MuiExternalWrapperLayout.MaxRemember) return false;
 		var buffer = scratch.RememberBuffer;
 		if (buffer.IsNull) return false;
-		if (!MuiExternalRememberVectorMemoryCodec.TryGetEntry(ref platform,
-			buffer, count, out var address)) return false;
 		var item = default(MuiAslTagItemRecord);
 		item.Tag = tag;
-		if (!MuiAslTagItemCodec.Write(ref platform, address, item)) return false;
+		if (!MuiExternalRememberVectorCodec.TryWrite(ref platform, buffer, count,
+			item)) return false;
 		scratch.RememberCount = count + 1;
 		if (!MuiExternalScratchStateCodec.Write(ref platform, instance, scratch))
 			return false;
@@ -2820,12 +3111,11 @@ public static class MuiExternalWrapperCore
 			count = MuiExternalWrapperLayout.MaxRemember;
 		for (var index = 0u; index < count; index++)
 		{
-			if (!MuiExternalRememberVectorMemoryCodec.TryGetEntry(ref platform,
-				buffer, index, out var address)) return;
-			if (!MuiAslTagItemCodec.TryRead(ref platform, address,
+			if (!MuiExternalRememberVectorCodec.TryRead(ref platform, buffer, index,
 				out var item)) return;
 			item.Data = BoopsiGet(ref platform, instance, obj, item.Tag);
-			if (!MuiAslTagItemCodec.Write(ref platform, address, item)) return;
+			if (!MuiExternalRememberVectorCodec.TryWrite(ref platform, buffer, index,
+				item)) return;
 		}
 	}
 
@@ -2846,9 +3136,7 @@ public static class MuiExternalWrapperCore
 			count = MuiExternalWrapperLayout.MaxRemember;
 		for (var index = 0u; index < count; index++)
 		{
-			if (!MuiExternalRememberVectorMemoryCodec.TryGetEntry(ref platform,
-				buffer, index, out var address)) return;
-			if (!MuiAslTagItemCodec.TryRead(ref platform, address,
+			if (!MuiExternalRememberVectorCodec.TryRead(ref platform, buffer, index,
 				out var item)) return;
 			BoopsiSet(ref platform, instance, obj, item.Tag, item.Data);
 		}
@@ -3117,30 +3405,25 @@ public static class MuiExternalWrapperCore
 		var tag = default(MuiExternalBoopsiTagItem);
 		tag.Tag = GaLeft;
 		tag.Data = unchecked((uint)left);
-		if (!MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref platform,
-			list, 0, out var address) ||
-			!MuiExternalBoopsiPacketCodec.WriteTag(ref platform, address, tag))
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 0,
+			tag))
 			return false;
 		tag.Tag = GaTop;
 		tag.Data = unchecked((uint)top);
-		if (!MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref platform,
-			list, 1, out address) || !MuiExternalBoopsiPacketCodec.WriteTag(
-			ref platform, address, tag)) return false;
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 1,
+			tag)) return false;
 		tag.Tag = GaWidth;
 		tag.Data = unchecked((uint)appliedWidth);
-		if (!MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref platform,
-			list, 2, out address) || !MuiExternalBoopsiPacketCodec.WriteTag(
-			ref platform, address, tag)) return false;
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 2,
+			tag)) return false;
 		tag.Tag = GaHeight;
 		tag.Data = unchecked((uint)appliedHeight);
-		if (!MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref platform,
-			list, 3, out address) || !MuiExternalBoopsiPacketCodec.WriteTag(
-			ref platform, address, tag)) return false;
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 3,
+			tag)) return false;
 		tag.Tag = 0; // TAG_DONE
 		tag.Data = 0;
-		if (!MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref platform,
-			list, 4, out address) || !MuiExternalBoopsiPacketCodec.WriteTag(
-			ref platform, address, tag)) return false;
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 4,
+			tag)) return false;
 		platform.DoMethod(obj, work);
 		SetFlag(ref platform, instance, MuiExternalWrapperLayout.FlagRedraw, true);
 		return true;
@@ -3241,10 +3524,8 @@ public static class MuiExternalWrapperCore
 		var mapped = 0u;
 		for (var index = 0; index < MuiExternalWrapperLayout.MaxTagWalk; index++)
 		{
-			if (!MuiExternalTagListVectorMemoryCodec.TryGetEntry(ref platform,
-				attrList, unchecked((uint)index), out var address)) break;
-			if (!MuiAslTagItemCodec.TryRead(ref platform, address,
-				out var item)) break;
+			if (!MuiExternalTagListVectorCodec.TryRead(ref platform, attrList,
+				unchecked((uint)index), out var item)) break;
 			if (item.Tag == MuiAslTagListCore.TagDone) break;
 			RecordNotify(ref platform, instance, item.Tag, item.Data);
 			mapped++;
@@ -3612,12 +3893,10 @@ public static class MuiExternalWrapperCore
 		var tag = default(MuiExternalBoopsiTagItem);
 		tag.Tag = attribute;
 		tag.Data = value;
-		if (!MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref platform,
-			list, 0, out var address) || !MuiExternalBoopsiPacketCodec.WriteTag(
-			ref platform, address, tag)) return;
-		if (!MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref platform,
-			list, 1, out address) || !MuiExternalBoopsiPacketCodec.WriteTag(
-			ref platform, address, default)) return;
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 0,
+			tag)) return;
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 1,
+			default)) return;
 		platform.DoMethod(obj, work);
 	}
 

@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -380,6 +381,369 @@ internal static class MuiLayoutFieldCursorCodec
 			out value);
 }
 
+// Complete sequential codecs for the fixed MorphOS layout packet records.
+// Wire positions are defined by each packed declaration; the field adapter
+// above remains only as a compatibility/diagnostic surface.
+internal static class MuiLayoutMessageStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadAskMinMax<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiLayoutAskMinMaxMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutAskMinMaxMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var storage)) return false;
+		value.MethodId = methodId;
+		value.Storage = storage;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteAskMinMax<TPlatform>(ref TPlatform platform,
+		APTR message, MuiLayoutAskMinMaxMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutAskMinMaxMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Storage)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadRelayout<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiLayoutRelayoutMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutRelayoutMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var flags)) return false;
+		value.MethodId = methodId;
+		value.Flags = flags;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRelayout<TPlatform>(ref TPlatform platform,
+		APTR message, MuiLayoutRelayoutMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutRelayoutMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadRectangle<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiLayoutRectangleMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutRectangleMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var left) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var top) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rightOrWidth) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var bottomOrHeight) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var reserved0) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var reserved1) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var reserved2)) return false;
+		value.MethodId = methodId;
+		value.Left = left;
+		value.Top = top;
+		value.RightOrWidth = rightOrWidth;
+		value.BottomOrHeight = bottomOrHeight;
+		value.Reserved0 = reserved0;
+		value.Reserved1 = reserved1;
+		value.Reserved2 = reserved2;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRectangle<TPlatform>(ref TPlatform platform,
+		APTR message, MuiLayoutRectangleMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutRectangleMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Left) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Top) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RightOrWidth) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.BottomOrHeight) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved0) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved1) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved2)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadText<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiLayoutTextMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutTextMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var left) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var top) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var width) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var height) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var text) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var length) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var preParse) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var flags)) return false;
+		value.MethodId = methodId;
+		value.Left = left;
+		value.Top = top;
+		value.Width = width;
+		value.Height = height;
+		value.Text = text;
+		value.Length = length;
+		value.PreParse = preParse;
+		value.Flags = flags;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteText<TPlatform>(ref TPlatform platform,
+		APTR message, MuiLayoutTextMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutTextMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Left) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Top) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Width) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Height) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Text) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Length) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PreParse) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadRenderInfo<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiLayoutRenderInfoMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutRenderInfoMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var renderInfo)) return false;
+		value.MethodId = methodId;
+		value.RenderInfo = renderInfo;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRenderInfo<TPlatform>(ref TPlatform platform,
+		APTR message, MuiLayoutRenderInfoMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutRenderInfoMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RenderInfo)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadFlags<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiLayoutFlagsMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutFlagsMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var flags)) return false;
+		value.MethodId = methodId;
+		value.Flags = flags;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteFlags<TPlatform>(ref TPlatform platform,
+		APTR message, MuiLayoutFlagsMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutFlagsMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadTextDimensions<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiLayoutTextDimensionsMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutTextDimensionsMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var text) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var length) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var preParse) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var flags)) return false;
+		value.MethodId = methodId;
+		value.Text = text;
+		value.Length = length;
+		value.PreParse = preParse;
+		value.Flags = flags;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteTextDimensions<TPlatform>(ref TPlatform platform,
+		APTR message, MuiLayoutTextDimensionsMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutTextDimensionsMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Text) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Length) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PreParse) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadLayout<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiLayoutMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var left) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var top) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var width) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var height) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var flags)) return false;
+		value.MethodId = methodId;
+		value.Left = left;
+		value.Top = top;
+		value.Width = width;
+		value.Height = height;
+		value.Flags = flags;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteLayout<TPlatform>(ref TPlatform platform,
+		APTR message, MuiLayoutMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiLayoutMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Left) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Top) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Width) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Height) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 // Central codec for the fixed MorphOS layout packets. Consumers use the
 // named records above; explicit guest offsets are confined to this adapter.
 internal static class MuiLayoutPacketCodec
@@ -409,9 +773,8 @@ internal static class MuiLayoutPacketCodec
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		methodId = 0;
-		return MuiLayoutMessageMemoryCodec.TryReadMethodId(ref platform, message,
-			out methodId);
+		return MuiLayoutMessageStructCodec.TryReadMethodIdValue(ref platform,
+			message, out methodId);
 	}
 
 	internal static bool TryReadAskMinMax<TPlatform>(ref TPlatform platform,
@@ -421,12 +784,8 @@ internal static class MuiLayoutPacketCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiLayoutAskMinMaxMessage.Size,
 			AskMinMax)) return false;
-		return MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiLayoutPacketKind.AskMinMax, MuiLayoutField.MethodId,
-			out packet.MethodId) &&
-			MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiLayoutPacketKind.AskMinMax, MuiLayoutField.Storage,
-				out packet.Storage);
+		return MuiLayoutMessageStructCodec.TryReadAskMinMax(ref platform,
+			message, out packet);
 	}
 
 	internal static bool TryReadRelayout<TPlatform>(ref TPlatform platform,
@@ -436,12 +795,8 @@ internal static class MuiLayoutPacketCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiLayoutRelayoutMessage.Size,
 			Relayout)) return false;
-		return MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiLayoutPacketKind.Relayout, MuiLayoutField.MethodId,
-			out packet.MethodId) &&
-			MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiLayoutPacketKind.Relayout, MuiLayoutField.Flags,
-				out packet.Flags);
+		return MuiLayoutMessageStructCodec.TryReadRelayout(ref platform, message,
+			out packet);
 	}
 
 	internal static bool TryReadRectangle<TPlatform>(ref TPlatform platform,
@@ -452,30 +807,8 @@ internal static class MuiLayoutPacketCodec
 		if ((method != DrawBackground && method != Backfill) ||
 			!IsPacket(ref platform, message, MuiLayoutRectangleMessage.Size,
 			method)) return false;
-		return MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiLayoutPacketKind.Rectangle, MuiLayoutField.MethodId,
-			out packet.MethodId) &&
-			MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiLayoutPacketKind.Rectangle, MuiLayoutField.Left,
-				out packet.Left) &&
-				MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-					MuiLayoutPacketKind.Rectangle, MuiLayoutField.Top,
-					out packet.Top) &&
-					MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-						MuiLayoutPacketKind.Rectangle, MuiLayoutField.RightOrWidth,
-						out packet.RightOrWidth) &&
-						MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-							MuiLayoutPacketKind.Rectangle, MuiLayoutField.BottomOrHeight,
-							out packet.BottomOrHeight) &&
-							MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-								MuiLayoutPacketKind.Rectangle, MuiLayoutField.Reserved0,
-								out packet.Reserved0) &&
-								MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-									MuiLayoutPacketKind.Rectangle, MuiLayoutField.Reserved1,
-									out packet.Reserved1) &&
-									MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-										MuiLayoutPacketKind.Rectangle, MuiLayoutField.Reserved2,
-										out packet.Reserved2);
+		return MuiLayoutMessageStructCodec.TryReadRectangle(ref platform, message,
+			out packet);
 	}
 
 	internal static bool TryReadText<TPlatform>(ref TPlatform platform,
@@ -485,31 +818,8 @@ internal static class MuiLayoutPacketCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiLayoutTextMessage.Size, Text))
 			return false;
-		return MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiLayoutPacketKind.Text, MuiLayoutField.MethodId,
-			out packet.MethodId) &&
-			MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiLayoutPacketKind.Text, MuiLayoutField.Left, out packet.Left) &&
-				MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-					MuiLayoutPacketKind.Text, MuiLayoutField.Top, out packet.Top) &&
-					MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-						MuiLayoutPacketKind.Text, MuiLayoutField.Width,
-						out packet.Width) &&
-						MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-							MuiLayoutPacketKind.Text, MuiLayoutField.Height,
-							out packet.Height) &&
-							MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-								MuiLayoutPacketKind.Text, MuiLayoutField.Text,
-								out packet.Text) &&
-								MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-									MuiLayoutPacketKind.Text, MuiLayoutField.Length,
-									out packet.Length) &&
-									MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-						MuiLayoutPacketKind.Text, MuiLayoutField.PreParse,
-						out packet.PreParse) &&
-					MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-					MuiLayoutPacketKind.Text, MuiLayoutField.TextFlags,
-					out packet.Flags);
+		return MuiLayoutMessageStructCodec.TryReadText(ref platform, message,
+			out packet);
 	}
 
 	internal static bool TryReadRenderInfo<TPlatform>(ref TPlatform platform,
@@ -519,12 +829,8 @@ internal static class MuiLayoutPacketCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiLayoutRenderInfoMessage.Size,
 			method)) return false;
-		return MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiLayoutPacketKind.RenderInfo, MuiLayoutField.MethodId,
-			out packet.MethodId) &&
-			MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiLayoutPacketKind.RenderInfo, MuiLayoutField.RenderInfo,
-				out packet.RenderInfo);
+		return MuiLayoutMessageStructCodec.TryReadRenderInfo(ref platform,
+			message, out packet);
 	}
 
 	internal static bool TryReadFlags<TPlatform>(ref TPlatform platform,
@@ -534,12 +840,8 @@ internal static class MuiLayoutPacketCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiLayoutFlagsMessage.Size, method))
 			return false;
-		return MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiLayoutPacketKind.Flags, MuiLayoutField.MethodId,
-			out packet.MethodId) &&
-			MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiLayoutPacketKind.Flags, MuiLayoutField.Flags,
-				out packet.Flags);
+		return MuiLayoutMessageStructCodec.TryReadFlags(ref platform, message,
+			out packet);
 	}
 
 	internal static bool TryReadTextDimensions<TPlatform>(ref TPlatform platform,
@@ -549,21 +851,8 @@ internal static class MuiLayoutPacketCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiLayoutTextDimensionsMessage.Size,
 			TextDim)) return false;
-	return MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-		MuiLayoutPacketKind.TextDimensions, MuiLayoutField.MethodId,
-		out packet.MethodId) &&
-		MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiLayoutPacketKind.TextDimensions, MuiLayoutField.Text,
-			out packet.Text) &&
-		MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiLayoutPacketKind.TextDimensions, MuiLayoutField.Length,
-			out packet.Length) &&
-		MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiLayoutPacketKind.TextDimensions, MuiLayoutField.PreParse,
-			out packet.PreParse) &&
-		MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiLayoutPacketKind.TextDimensions, MuiLayoutField.TextFlags,
-			out packet.Flags);
+		return MuiLayoutMessageStructCodec.TryReadTextDimensions(ref platform,
+			message, out packet);
 	}
 
 	internal static bool TryReadLayout<TPlatform>(ref TPlatform platform,
@@ -573,33 +862,9 @@ internal static class MuiLayoutPacketCodec
 		packet = default;
 		if (!IsPacket(ref platform, message, MuiLayoutMessage.Size, Layout))
 			return false;
-		uint methodId;
-		uint left;
-		uint top;
-		uint width;
-		uint height;
-		uint flags;
-		if (!MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiLayoutPacketKind.Layout, MuiLayoutField.MethodId,
-			out methodId) || !MuiLayoutMessageMemoryCodec.TryReadUInt32(
-			ref platform, message, MuiLayoutPacketKind.Layout,
-			MuiLayoutField.Left, out left) ||
-			!MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiLayoutPacketKind.Layout, MuiLayoutField.Top, out top) ||
-			!MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiLayoutPacketKind.Layout, MuiLayoutField.Width, out width) ||
-			!MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiLayoutPacketKind.Layout, MuiLayoutField.Height, out height) ||
-			!MuiLayoutMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiLayoutPacketKind.Layout, MuiLayoutField.Flags, out flags))
-			return false;
-		packet.MethodId = methodId;
-		packet.Left = left;
-		packet.Top = top;
-		packet.Width = width;
-		packet.Height = height;
-		packet.Flags = flags;
-		return true;
+		if (!MuiLayoutMessageStructCodec.TryReadLayout(ref platform, message,
+			out packet)) return false;
+		return packet.MethodId == Layout;
 	}
 
 	private static bool IsPacket<TPlatform>(ref TPlatform platform,
@@ -617,6 +882,125 @@ public static class MuiLayoutPacketCore
 	public const uint DrawBackground = MuiLayoutPacketCodec.DrawBackground;
 	public const uint Backfill = MuiLayoutPacketCodec.Backfill;
 	public const uint Text = MuiLayoutPacketCodec.Text;
+	public const uint TextDimensions = MuiLayoutPacketCodec.TextDim;
+	public const uint Draw = 0x80426F3Fu;
+	public const uint Setup = 0x80428354u;
+	public const uint Cleanup = 0x8042D985u;
+
+	public static bool WriteMethod<TPlatform>(ref TPlatform platform,
+		APTR message, uint method)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiLayoutMessageStructCodec.WriteMethodIdValue(ref platform, message,
+			method);
+
+	public static bool WriteAskMinMax<TPlatform>(ref TPlatform platform,
+		APTR message, APTR storage)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiLayoutAskMinMaxMessage);
+		packet.MethodId = AskMinMax;
+		packet.Storage = storage.Raw;
+		return MuiLayoutMessageStructCodec.WriteAskMinMax(ref platform, message,
+			packet);
+	}
+
+	public static bool WriteRelayout<TPlatform>(ref TPlatform platform,
+		APTR message, uint flags)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiLayoutRelayoutMessage);
+		packet.MethodId = Relayout;
+		packet.Flags = flags;
+		return MuiLayoutMessageStructCodec.WriteRelayout(ref platform, message,
+			packet);
+	}
+
+	public static bool WriteRectangle<TPlatform>(ref TPlatform platform,
+		APTR message, uint method, uint left, uint top, uint rightOrWidth,
+		uint bottomOrHeight, uint reserved0, uint reserved1, uint reserved2)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiLayoutRectangleMessage);
+		packet.MethodId = method;
+		packet.Left = left;
+		packet.Top = top;
+		packet.RightOrWidth = rightOrWidth;
+		packet.BottomOrHeight = bottomOrHeight;
+		packet.Reserved0 = reserved0;
+		packet.Reserved1 = reserved1;
+		packet.Reserved2 = reserved2;
+		return (method == DrawBackground || method == Backfill) &&
+			MuiLayoutMessageStructCodec.WriteRectangle(ref platform, message, packet);
+	}
+
+	public static bool WriteText<TPlatform>(ref TPlatform platform,
+		APTR message, uint left, uint top, uint width, uint height, APTR text,
+		uint length, uint preParse, uint flags)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiLayoutTextMessage);
+		packet.MethodId = Text;
+		packet.Left = left;
+		packet.Top = top;
+		packet.Width = width;
+		packet.Height = height;
+		packet.Text = text.Raw;
+		packet.Length = length;
+		packet.PreParse = preParse;
+		packet.Flags = flags;
+		return MuiLayoutMessageStructCodec.WriteText(ref platform, message, packet);
+	}
+
+	public static bool WriteRenderInfo<TPlatform>(ref TPlatform platform,
+		APTR message, uint method, APTR renderInfo)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiLayoutRenderInfoMessage);
+		packet.MethodId = method;
+		packet.RenderInfo = renderInfo.Raw;
+		return MuiLayoutMessageStructCodec.WriteRenderInfo(ref platform, message,
+			packet);
+	}
+
+	public static bool WriteFlags<TPlatform>(ref TPlatform platform,
+		APTR message, uint method, uint flags)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiLayoutFlagsMessage);
+		packet.MethodId = method;
+		packet.Flags = flags;
+		return MuiLayoutMessageStructCodec.WriteFlags(ref platform, message,
+			packet);
+	}
+
+	public static bool WriteTextDimensions<TPlatform>(ref TPlatform platform,
+		APTR message, APTR text, uint length, uint preParse, uint flags)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiLayoutTextDimensionsMessage);
+		packet.MethodId = TextDimensions;
+		packet.Text = text.Raw;
+		packet.Length = length;
+		packet.PreParse = preParse;
+		packet.Flags = flags;
+		return MuiLayoutMessageStructCodec.WriteTextDimensions(ref platform,
+			message, packet);
+	}
+
+	public static bool WriteLayout<TPlatform>(ref TPlatform platform,
+		APTR message, uint left, uint top, uint width, uint height, uint flags)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiLayoutMessage);
+		packet.MethodId = Layout;
+		packet.Left = left;
+		packet.Top = top;
+		packet.Width = width;
+		packet.Height = height;
+		packet.Flags = flags;
+		return MuiLayoutMessageStructCodec.WriteLayout(ref platform, message,
+			packet);
+	}
 
 	internal static bool TryReadAskMinMax<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiLayoutAskMinMaxMessage packet)

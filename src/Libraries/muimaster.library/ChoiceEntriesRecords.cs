@@ -177,31 +177,36 @@ internal static class MuiChoiceEntriesStateRecordCodec
 
 internal static class MuiChoiceEntriesStateAdmission
 {
-	internal static bool Validate<TPlatform>(ref TPlatform platform,
-		MuiChoiceEntriesState value)
+	private static bool ValidateVector<TPlatform>(ref TPlatform platform,
+		APTR entries)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (value.Entries.IsNull) return true;
+		if (entries.IsNull) return true;
 		for (var index = 0u; index < MuiChoiceEntryCursor.MaximumEntries;
 			index++)
 		{
-			if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
-				value.Entries, index,
-				out var slot) || !MuiChoiceEntryCodec.TryRead(ref platform, slot,
-				out var entry)) return false;
-			if (entry.Text.IsNull) return true;
+			// Exchange the named entry's Text field through the bounded vector
+			// bridge.  This one-field primitive projection retains the complete
+			// struct-owned bounds while avoiding a CopperSharp 68k limitation
+			// with out one-field APTR records at high-bit values.
+			if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entries,
+				index, out var rawText)) return false;
+			if (rawText == 0) return true;
 		}
 		return false;
 	}
+
+	internal static bool Validate<TPlatform>(ref TPlatform platform,
+		MuiChoiceEntriesState value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> ValidateVector(ref platform, value.Entries);
 
 	internal static bool Validate<TPlatform>(ref TPlatform platform,
 		MuiChoiceEntriesStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (value.Magic != MuiChoiceEntriesStateRecord.Cookie) return false;
-		var state = default(MuiChoiceEntriesState);
-		state.Entries = value.Entries;
-		return Validate(ref platform, state);
+		return ValidateVector(ref platform, value.Entries);
 	}
 
 	internal static bool ValidateLive<TPlatform>(ref TPlatform platform,

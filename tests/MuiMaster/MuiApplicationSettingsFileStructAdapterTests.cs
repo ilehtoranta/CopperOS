@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Amiga;
 using CopperOS.MuiMaster;
 
@@ -48,5 +49,56 @@ public sealed class MuiApplicationSettingsFileStructAdapterTests
 			MuiApplicationSettingsRecordField.Length, out _));
 		Assert.False(MuiApplicationSettingsRecordMemoryCodec.TryGetAddress(
 			ref platform, record, (MuiApplicationSettingsRecordField)255, out _));
+	}
+
+	[Fact]
+	public void ApplicationSettingsFileStructCodecsRoundTripNamedValues()
+	{
+		Assert.Equal(16, Marshal.SizeOf<MuiApplicationSettingsHeader>());
+		Assert.Equal(8, Marshal.SizeOf<MuiApplicationSettingsRecord>());
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var headerAddress = APTR.FromPointer(0x2200);
+		var recordAddress = APTR.FromPointer(0x2240);
+		var header = new MuiApplicationSettingsHeader
+		{
+			MagicValue = 0x4D554953u,
+			VersionValue = 0x80000001u,
+			RecordCount = 0xFEDCBA98u,
+			PayloadBytes = 0x81234567u,
+		};
+		var record = new MuiApplicationSettingsRecord
+		{
+			Key = 0xF1234567u,
+			Length = 0x80000011u,
+		};
+		Assert.True(MuiApplicationSettingsHeaderStructCodec.Write(ref platform,
+			headerAddress, header));
+		Assert.True(MuiApplicationSettingsHeaderStructCodec.TryRead(ref platform,
+			headerAddress, out var readHeader));
+		Assert.Equal(header.MagicValue, readHeader.MagicValue);
+		Assert.Equal(header.VersionValue, readHeader.VersionValue);
+		Assert.Equal(header.RecordCount, readHeader.RecordCount);
+		Assert.Equal(header.PayloadBytes, readHeader.PayloadBytes);
+		Assert.True(MuiApplicationSettingsRecordStructCodec.Write(ref platform,
+			recordAddress, record));
+		Assert.True(MuiApplicationSettingsRecordStructCodec.TryRead(ref platform,
+			recordAddress, out var readRecord));
+		Assert.Equal(record.Key, readRecord.Key);
+		Assert.Equal(record.Length, readRecord.Length);
+
+		// The public production wrappers use the same named sequential codecs.
+		Assert.True(MuiApplicationSettingsHeaderCodec.TryRead(ref platform,
+			headerAddress, out var wrappedHeader));
+		Assert.Equal(header.PayloadBytes, wrappedHeader.PayloadBytes);
+		Assert.True(MuiApplicationSettingsRecordCodec.TryRead(ref platform,
+			recordAddress, out var wrappedRecord));
+		Assert.Equal(record.Key, wrappedRecord.Key);
+		Assert.False(MuiApplicationSettingsHeaderStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x40FF1), out _));
+		Assert.False(MuiApplicationSettingsRecordStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x40FF9), out _));
+		Assert.False(MuiApplicationSettingsHeaderStructCodec.Write(ref platform,
+			APTR.Null, header));
 	}
 }

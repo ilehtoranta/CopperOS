@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -196,17 +197,20 @@ internal static class MuiNotifyUserDataMessageCodec
 	}
 
 	// Keep native selector admission scalar while the named method record remains
-	// the dispatcher-facing ABI type. Packed offsets stay inside this codec.
+	// the dispatcher-facing ABI type. The fixed record is consumed sequentially;
+	// no field-offset adapter is needed on this production path.
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiNotifyUserDataMethodMessage.Size)) return false;
-		methodId = platform.ReadUInt32(message,
-			unchecked((int)MuiNotifyUserDataMethodMessage.MethodIdOffset));
-		return true;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiNotifyUserDataMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId)) return false;
+		methodId = rawMethodId;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -395,6 +399,41 @@ internal static class MuiUDataTraversalFrameMemoryCodec
 	}
 }
 
+// Complete sequential codec for the fixed 8-byte traversal frame.  The stack
+// vector below remains an indexed address adapter; once an entry is selected,
+// all frame fields travel through this named record codec.
+internal static class MuiUDataTraversalFrameRecordCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiUDataTraversalFrame value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiUDataTraversalFrame.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawObject) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var nextChild)) return false;
+		value.Object = APTR.FromPointer(rawObject);
+		value.NextChild = nextChild;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiUDataTraversalFrame value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiUDataTraversalFrame.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Object.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.NextChild)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 // Compatibility wrapper retained for existing typed cursor diagnostics.
 internal static class MuiUDataTraversalFieldCursorCodec
 {
@@ -452,26 +491,16 @@ internal static class MuiNotifyUserDataRecords
 		APTR address, ref MuiUDataTraversalFrame frame)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiUDataTraversalFrame.Size)) return false;
-		if (!MuiUDataTraversalFrameMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiUDataTraversalField.Object, out var rawObject) ||
-			!MuiUDataTraversalFrameMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiUDataTraversalField.NextChild, out frame.NextChild)) return false;
-		frame.Object = APTR.FromPointer(rawObject);
-		return true;
+		return MuiUDataTraversalFrameRecordCodec.TryRead(ref platform, address,
+			out frame);
 	}
 
 	public static bool WriteFrame<TPlatform>(ref TPlatform platform,
 		APTR address, MuiUDataTraversalFrame frame)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiUDataTraversalFrame.Size)) return false;
-		return MuiUDataTraversalFrameMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiUDataTraversalField.Object, frame.Object.Raw) &&
-			MuiUDataTraversalFrameMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiUDataTraversalField.NextChild, frame.NextChild);
+		return MuiUDataTraversalFrameRecordCodec.Write(ref platform, address,
+			frame);
 	}
 }
 

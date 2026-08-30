@@ -906,15 +906,13 @@ public static class MuiHeadlessObjectCore
 		while (cursor.Base.IsNotNull && visited++ <
 			MuiHeadlessLayout.MaximumTraversal)
 		{
-			if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
-				cursor.Base, cursor.Index,
-				out var current) || !MuiAslTagItemCodec.TryRead(ref platform, current,
+			if (!MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
 				out var item)) return false;
 			var tag = item.Tag;
 			if (tag == MuiAslTagListCore.TagDone) return true;
 			if (tag == MuiAslTagListCore.TagIgnore)
 			{
-				if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
+				if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
 					return false;
 				continue;
 			}
@@ -928,7 +926,7 @@ public static class MuiHeadlessObjectCore
 			if (tag == MuiAslTagListCore.TagSkip)
 			{
 				if (item.Data == uint.MaxValue ||
-					!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor,
+					!MuiAslTagItemVectorCodec.TryAdvance(ref cursor,
 						item.Data + 1u)) return false;
 				continue;
 			}
@@ -936,7 +934,7 @@ public static class MuiHeadlessObjectCore
 				item.Data != 0) noNotify = true;
 			if (tag == NoNotifyMethodAttribute)
 				noNotifyMethod = item.Data;
-			if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
+			if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
 				return false;
 		}
 		return cursor.Base.IsNull;
@@ -953,16 +951,14 @@ public static class MuiHeadlessObjectCore
 		while (cursor.Base.IsNotNull && visited++ <
 			MuiHeadlessLayout.MaximumTraversal)
 		{
-			if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
-				cursor.Base, cursor.Index,
-				out var current) || !MuiAslTagItemCodec.TryRead(ref platform, current,
+			if (!MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
 				out var item)) return false;
 			var tag = item.Tag;
 			var data = item.Data;
 			if (tag == MuiAslTagListCore.TagDone) return true;
 			if (tag == MuiAslTagListCore.TagIgnore)
 			{
-				if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
+				if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
 					return false;
 				continue;
 			}
@@ -976,20 +972,20 @@ public static class MuiHeadlessObjectCore
 			if (tag == MuiAslTagListCore.TagSkip)
 			{
 				if (data == uint.MaxValue ||
-					!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, data + 1))
+					!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, data + 1))
 					return false;
 				continue;
 			}
 			if (tag == NoNotifyAttribute || tag == NoNotifyMethodAttribute)
 			{
-				if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
+				if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
 					return false;
 				continue;
 			}
 			if (!SetRecordAttribute(ref platform, state, record, tag, data, notify,
 				routeCollectionRuntime))
 				return false;
-			if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
+			if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
 				return false;
 		}
 		return cursor.Base.IsNull;

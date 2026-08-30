@@ -443,30 +443,45 @@ internal struct MuiApplicationWindowCycleChainSlot
 
 internal static class MuiApplicationWindowCycleChainSlotCodec
 {
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationWindowCycleChainSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiApplicationWindowCycleChainSlot value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiApplicationWindowCycleChainSlot.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var @object) || !MuiGuestStructCursor.IsComplete(cursor))
-			return false;
+		if (!TryReadValue(ref platform, address, out var @object)) return false;
 		value.Object = APTR.FromPointer(@object);
 		return true;
 	}
 
-	internal static bool Write<TPlatform>(ref TPlatform platform,
-		APTR address, MuiApplicationWindowCycleChainSlot value)
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiApplicationWindowCycleChainSlot.Size, out var cursor) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				value.Object.Raw)) return false;
+				value)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationWindowCycleChainSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> WriteValue(ref platform, address, value.Object.Raw);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -502,6 +517,45 @@ internal static class MuiApplicationWindowCycleChainVectorMemoryCodec
 
 internal static class MuiApplicationWindowCycleChainVectorCodec
 {
+	// One-field APTR projection retained for the native 68k lowering seam;
+	// bounds and wire layout remain owned by the named slot bridge.
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiApplicationWindowCycleChainVectorMemoryCodec.TryGetEntry(
+			ref platform, vector, index, out var address)) return false;
+		return MuiApplicationWindowCycleChainSlotCodec.TryReadValue(ref platform,
+			address, out value);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR vector,
+		uint index, out MuiApplicationWindowCycleChainSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadValue(ref platform, vector, index, out var rawObject))
+			return false;
+		value.Object = APTR.FromPointer(rawObject);
+		return true;
+	}
+
+	internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiApplicationWindowCycleChainVectorMemoryCodec.TryGetEntry(
+			ref platform, vector, index, out var address)) return false;
+		return MuiApplicationWindowCycleChainSlotCodec.WriteValue(ref platform,
+			address, value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform, APTR vector,
+		uint index, MuiApplicationWindowCycleChainSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteValue(ref platform, vector, index, value.Object.Raw);
+
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiApplicationWindowCycleChainCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
@@ -4321,7 +4375,8 @@ public static class MuiApplicationWindowCore
 		if (!PublishApplicationSchedulerState(ref platform, state, application,
 			out _) || !TryGetApplicationSchedulerState(ref platform, state,
 			application, out var scheduler)) return 0;
-		var payloadBytes = (uint)count * 4u;
+		var payloadBytes = (uint)count *
+			MuiApplicationPushMethodParameter.Size;
 		if (!platform.IsMapped(parameters, payloadBytes)) return 0;
 		var size = MuiApplicationWindowNodeRecord.Size + payloadBytes;
 		var node = MuiHeadlessMemory.Allocate(ref platform, size);
@@ -5896,19 +5951,13 @@ public static class MuiApplicationWindowCore
 		for (var index = 0u; index < MuiHeadlessLayout.MaximumTraversal;
 			index++)
 		{
-			if (!MuiApplicationWindowCycleChainVectorMemoryCodec.TryGetEntry(
-				ref platform, vector, index, out var address))
+			if (!MuiApplicationWindowCycleChainVectorCodec.TryReadValue(
+				ref platform, vector, index, out var rawMember))
 			{
 				FreeNodes(ref platform, head);
 				return false;
 			}
-			if (!MuiApplicationWindowCycleChainSlotCodec.TryRead(
-				ref platform, address, out var slotValue))
-			{
-				FreeNodes(ref platform, head);
-				return false;
-			}
-			var member = slotValue.Object;
+			var member = APTR.FromPointer(rawMember);
 			if (member.IsNull)
 			{
 				terminated = true;

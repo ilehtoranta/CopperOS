@@ -61,6 +61,46 @@ internal struct MuiStringEditCommandRecord
 
 internal static class MuiStringEditCommandCodec
 {
+	// The command payload is a complete one-ULONG named record. Keep the
+	// address-only helper below for compatibility diagnostics, but exchange the
+	// production value through the bounded sequential cursor.
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint command)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		command = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringEditCommandRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out command)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint command)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringEditCommandRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				command)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStringEditCommandRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		record = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringEditCommandRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var command) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		record.Command = command;
+		return true;
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
@@ -77,25 +117,14 @@ internal static class MuiStringEditCommandCodec
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringEditCommandRecord record)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!TryGetAddress(ref platform, address, out var fieldAddress))
-			return false;
-		platform.WriteUInt32(fieldAddress,
-			unchecked((int)MuiStringEditCommandRecord.CommandOffset),
-			record.Command);
-		return true;
-	}
+		=> WriteValue(ref platform, address, record.Command);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringEditCommandRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (!TryGetAddress(ref platform, address, out var fieldAddress))
-			return false;
-		record.Command = platform.ReadUInt32(fieldAddress,
-			unchecked((int)MuiStringEditCommandRecord.CommandOffset));
-		return true;
+		return TryReadValue(ref platform, address, out record.Command);
 	}
 }
 
@@ -293,6 +322,9 @@ internal static class MuiStringEditRecordFieldCursorCodec
 
 internal static class MuiStringEditWorkCodec
 {
+	// The SGWork record is exchanged once as a complete named value. The
+	// field/offset adapter above remains a diagnostic compatibility surface;
+	// callback and edit paths do not re-read individual numeric positions.
 	internal const uint CommandKey = 1;
 	internal const uint ActionUse = 0x00000001;
 	internal const uint ActionEnd = 0x00000002;
@@ -307,51 +339,46 @@ internal static class MuiStringEditWorkCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringEditWorkRecord.Size)) return false;
-		if (!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiStringEditRecordField.Gadget, out var gadget) ||
-				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiStringEditRecordField.StringInfo,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringEditWorkRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var gadget) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var stringInfo) ||
-				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiStringEditRecordField.WorkBuffer,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var workBuffer) ||
-				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiStringEditRecordField.PrevBuffer,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var prevBuffer) ||
-				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiStringEditRecordField.Modes, out record.Modes) ||
-				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiStringEditRecordField.InputEvent,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Modes) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var inputEvent) ||
-				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt16(ref platform,
-				address, MuiStringEditRecordField.Code, out record.Code) ||
-				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt16(ref platform,
-				address, MuiStringEditRecordField.BufferPos,
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var code) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
 				out var bufferPos) ||
-				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt16(ref platform,
-				address, MuiStringEditRecordField.NumChars,
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
 				out var numChars) ||
-				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiStringEditRecordField.Actions, out record.Actions) ||
-				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiStringEditRecordField.LongInt, out var longInt) ||
-				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiStringEditRecordField.GadgetInfo,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Actions) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var longInt) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var gadgetInfo) ||
-				!MuiStringEditWorkRecordMemoryCodec.TryReadUInt16(ref platform,
-				address, MuiStringEditRecordField.EditOp, out record.EditOp))
-			return false;
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var editOp) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Gadget = APTR.FromPointer(gadget);
 		record.StringInfo = APTR.FromPointer(stringInfo);
 		record.WorkBuffer = APTR.FromPointer(workBuffer);
 		record.PrevBuffer = APTR.FromPointer(prevBuffer);
 		record.InputEvent = APTR.FromPointer(inputEvent);
+		record.Code = code;
 		record.BufferPos = unchecked((short)bufferPos);
 		record.NumChars = unchecked((short)numChars);
 		record.LongInt = unchecked((int)longInt);
 		record.GadgetInfo = APTR.FromPointer(gadgetInfo);
+		record.EditOp = editOp;
 		return true;
 	}
 
@@ -359,41 +386,34 @@ internal static class MuiStringEditWorkCodec
 		APTR address, MuiStringEditWorkRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringEditWorkRecord.Size)) return false;
-		return MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiStringEditRecordField.Gadget, record.Gadget.Raw) &&
-			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiStringEditRecordField.StringInfo,
+		return MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringEditWorkRecord.Size, out var cursor) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Gadget.Raw) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				record.StringInfo.Raw) &&
-			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiStringEditRecordField.WorkBuffer,
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				record.WorkBuffer.Raw) &&
-			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiStringEditRecordField.PrevBuffer,
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				record.PrevBuffer.Raw) &&
-			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiStringEditRecordField.Modes, record.Modes) &&
-			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiStringEditRecordField.InputEvent,
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Modes) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				record.InputEvent.Raw) &&
-			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt16(ref platform,
-				address, MuiStringEditRecordField.Code, record.Code) &&
-			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt16(ref platform,
-				address, MuiStringEditRecordField.BufferPos,
+			MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				record.Code) &&
+			MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
 				unchecked((ushort)record.BufferPos)) &&
-			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt16(ref platform,
-				address, MuiStringEditRecordField.NumChars,
+			MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
 				unchecked((ushort)record.NumChars)) &&
-			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiStringEditRecordField.Actions, record.Actions) &&
-			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiStringEditRecordField.LongInt,
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Actions) &&
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				unchecked((uint)record.LongInt)) &&
-			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiStringEditRecordField.GadgetInfo,
+			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				record.GadgetInfo.Raw) &&
-			MuiStringEditWorkRecordMemoryCodec.TryWriteUInt16(ref platform,
-				address, MuiStringEditRecordField.EditOp, record.EditOp);
+			MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				record.EditOp) &&
+			MuiGuestStructCursor.IsComplete(cursor);
 	}
 }

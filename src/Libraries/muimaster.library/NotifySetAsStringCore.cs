@@ -155,13 +155,36 @@ internal static class MuiSetAsStringMessageCodec
 	internal const uint Method = 0x80422590;
 	internal const uint ParameterSize = 4;
 
+	// Return the address of the trailing Value ULONG by walking the complete
+	// named record.  This is the live payload boundary used by MUIM_SetAsString;
+	// the compatibility field adapter below remains available for legacy callers.
+	internal static bool TryGetValueAddress<TPlatform>(ref TPlatform platform,
+		APTR message, out APTR value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = APTR.Null;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiSetAsStringMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiSetAsStringMessage.FieldSize, out _) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiSetAsStringMessage.FieldSize, out _) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiSetAsStringMessage.FieldSize, out _) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiSetAsStringMessage.FieldSize, out value))
+		{
+			value = APTR.Null;
+			return false;
+		}
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryGetParameters<TPlatform>(ref TPlatform platform,
 		APTR message, out APTR parameters)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiSetAsStringMessageMemoryCodec.TryGetAddress(ref platform,
-			message, MuiSetAsStringPacketField.Value, MuiSetAsStringMessage.Size,
-			out parameters);
+		return TryGetValueAddress(ref platform, message, out parameters);
 	}
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,

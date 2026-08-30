@@ -3,6 +3,7 @@
 - SPDX-License-Identifier: MIT
 */
 
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Amiga;
 
@@ -104,7 +105,87 @@ internal static class MuiStringInteger64FieldCursorCodec
 		APTR record, MuiStringInteger64Field field, uint value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiStringInteger64ValueMemoryCodec.TryWriteUInt32(ref platform, record, field,
-			value);
+		value);
+}
+
+// Sequential codec for the complete MorphOS QUAD record. The wire value is
+// two declaration-ordered ULONGs; byte-preserving scalar helpers retain the
+// full 32-bit range on the freestanding generic-interface path, including
+// signed values with bit 31 set.
+internal static class MuiStringInteger64ValueStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	private static bool TryReadUlong<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		APTR firstAddress;
+		APTR secondAddress;
+		APTR thirdAddress;
+		APTR fourthAddress;
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
+			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
+			ref platform, ref cursor, 1, out thirdAddress) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
+				out fourthAddress)) return false;
+		var first = platform.ReadUInt8(firstAddress, 0);
+		var second = platform.ReadUInt8(secondAddress, 0);
+		var third = platform.ReadUInt8(thirdAddress, 0);
+		var fourth = platform.ReadUInt8(fourthAddress, 0);
+		value = ((uint)first << 24) | ((uint)second << 16) |
+			((uint)third << 8) | fourth;
+		return true;
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	private static bool TryWriteUlong<TPlatform>(ref TPlatform platform,
+		ref MuiGuestStructCursor cursor, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		APTR firstAddress;
+		APTR secondAddress;
+		APTR thirdAddress;
+		APTR fourthAddress;
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
+			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
+			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
+			ref platform, ref cursor, 1, out thirdAddress) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
+				out fourthAddress)) return false;
+		platform.WriteUInt8(firstAddress, 0, (byte)(value >> 24));
+		platform.WriteUInt8(secondAddress, 0, (byte)(value >> 16));
+		platform.WriteUInt8(thirdAddress, 0, (byte)(value >> 8));
+		platform.WriteUInt8(fourthAddress, 0, (byte)value);
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiStringInteger64Value value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringInteger64Value.Size, out var cursor) ||
+			!TryReadUlong(ref platform, ref cursor, out var high) ||
+			!TryReadUlong(ref platform, ref cursor, out var low) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value.High = high;
+		value.Low = low;
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiStringInteger64Value value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStringInteger64Value.Size, out var cursor) ||
+			!TryWriteUlong(ref platform, ref cursor, value.High) ||
+			!TryWriteUlong(ref platform, ref cursor, value.Low)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
 }
 
 // The String attribute itself is a caller-facing pointer to the QUAD record.
@@ -135,28 +216,13 @@ internal static class MuiStringInteger64Codec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiStringInteger64Value value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringInteger64Value.Size)) return false;
-		if (!MuiStringInteger64ValueMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiStringInteger64Field.High, out value.High) ||
-			!MuiStringInteger64ValueMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiStringInteger64Field.Low, out value.Low)) return false;
-		return true;
-	}
+		=> MuiStringInteger64ValueStructCodec.TryRead(ref platform, address,
+			out value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiStringInteger64Value value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStringInteger64Value.Size)) return false;
-		return MuiStringInteger64ValueMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiStringInteger64Field.High, value.High) &&
-			MuiStringInteger64ValueMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiStringInteger64Field.Low, value.Low);
-	}
+		=> MuiStringInteger64ValueStructCodec.Write(ref platform, address, value);
 
 	// Parse the bounded C string used by MUIA_String_Contents into a signed
 	// QUAD.  The arithmetic is four 16-bit limbs: it is deliberately expressed

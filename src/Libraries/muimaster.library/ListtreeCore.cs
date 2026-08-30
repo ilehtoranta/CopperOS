@@ -5,6 +5,7 @@
 
 using Amiga;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 
 namespace CopperOS.MuiMaster;
 
@@ -373,6 +374,49 @@ public static class MuiListtreeCore
 		}
 	}
 
+	// Production bridge for the caller-owned DisplayHook column vector. The
+	// bounded adapter owns slot arithmetic; callers exchange the complete named
+	// record or its scalar Text capability without receiving a slot address.
+	internal static class MuiListtreeDisplayColumnVectorCodec
+	{
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, out MuiListtreeDisplayColumnRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!TryReadTextValue(ref platform, vector, index, out var text))
+				return false;
+			value.Text = APTR.FromPointer(text);
+			return true;
+		}
+
+		internal static bool TryReadTextValue<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, out uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = 0;
+			if (!MuiListtreeDisplayColumnVectorMemoryCodec.TryGetEntry(
+				ref platform, vector, index, out var address)) return false;
+			return MuiListtreeDisplayColumnCodec.TryReadTextValue(ref platform,
+				address, out value);
+		}
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, MuiListtreeDisplayColumnRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> TryWriteTextValue(ref platform, vector, index, value.Text.Raw);
+
+		internal static bool TryWriteTextValue<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiListtreeDisplayColumnVectorMemoryCodec.TryGetEntry(
+				ref platform, vector, index, out var address)) return false;
+			return MuiListtreeDisplayColumnCodec.WriteTextValue(ref platform,
+				address, value);
+		}
+	}
+
 	internal static class MuiListtreeDisplayColumnCursorCodec
 	{
 		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
@@ -384,16 +428,63 @@ public static class MuiListtreeCore
 
 	internal static class MuiListtreeDisplayColumnCodec
 	{
+		[MethodImpl(MethodImplOptions.NoInlining)]
+		internal static bool TryReadTextValue<TPlatform>(ref TPlatform platform,
+			APTR address, out uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = 0;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListtreeDisplayColumnRecord.Size, out var cursor)) return false;
+			APTR firstAddress;
+			APTR secondAddress;
+			APTR thirdAddress;
+			APTR fourthAddress;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
+				out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
+				ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
+				ref platform, ref cursor, 1, out thirdAddress) ||
+				!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
+					out fourthAddress)) return false;
+			var first = platform.ReadUInt8(firstAddress, 0);
+			var second = platform.ReadUInt8(secondAddress, 0);
+			var third = platform.ReadUInt8(thirdAddress, 0);
+			var fourth = platform.ReadUInt8(fourthAddress, 0);
+			value = ((uint)first << 24) | ((uint)second << 16) |
+				((uint)third << 8) | fourth;
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
+		[MethodImpl(MethodImplOptions.NoInlining)]
+		internal static bool WriteTextValue<TPlatform>(ref TPlatform platform,
+			APTR address, uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListtreeDisplayColumnRecord.Size, out var cursor)) return false;
+			APTR firstAddress;
+			APTR secondAddress;
+			APTR thirdAddress;
+			APTR fourthAddress;
+			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
+				out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
+				ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
+				ref platform, ref cursor, 1, out thirdAddress) ||
+				!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
+					out fourthAddress)) return false;
+			platform.WriteUInt8(firstAddress, 0, (byte)(value >> 24));
+			platform.WriteUInt8(secondAddress, 0, (byte)(value >> 16));
+			platform.WriteUInt8(thirdAddress, 0, (byte)(value >> 8));
+			platform.WriteUInt8(fourthAddress, 0, (byte)value);
+			return MuiGuestStructCursor.IsComplete(cursor);
+		}
+
 		internal static bool TryRead<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListtreeDisplayColumnRecord value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-				MuiListtreeDisplayColumnRecord.Size, out var cursor) ||
-				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-					out var text) || !MuiGuestStructCursor.IsComplete(cursor))
-				return false;
+			if (!TryReadTextValue(ref platform, address, out var text)) return false;
 			value.Text = APTR.FromPointer(text);
 			return true;
 		}
@@ -401,13 +492,7 @@ public static class MuiListtreeCore
 		internal static bool Write<TPlatform>(ref TPlatform platform,
 			APTR address, MuiListtreeDisplayColumnRecord value)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-				MuiListtreeDisplayColumnRecord.Size, out var cursor) ||
-				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-					value.Text.Raw)) return false;
-			return MuiGuestStructCursor.IsComplete(cursor);
-		}
+			=> WriteTextValue(ref platform, address, value.Text.Raw);
 	}
 
 	// One derived FORMAT column.  The record is guest-resident only for the
@@ -572,6 +657,38 @@ public static class MuiListtreeCore
 			address = APTR.FromPointer(vector.Raw + offset);
 			return platform.IsMapped(address,
 				MuiListtreeColumnGeometryRecord.Size);
+		}
+	}
+
+	// Production bridge for the temporary FORMAT geometry vector. The bounded
+	// adapter owns slot arithmetic and complete-record admission; geometry code
+	// exchanges only the named 24-byte record.
+	internal static class MuiListtreeColumnGeometryVectorCodec
+	{
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, out MuiListtreeColumnGeometryRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiListtreeColumnGeometryVectorMemoryCodec.TryGetEntry(
+				ref platform, vector, index, out var address) ||
+				!MuiListtreeColumnGeometryCodec.TryRead(ref platform, address,
+					out value))
+			{
+				value = default;
+				return false;
+			}
+			return true;
+		}
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, MuiListtreeColumnGeometryRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiListtreeColumnGeometryVectorMemoryCodec.TryGetEntry(
+				ref platform, vector, index, out var address)) return false;
+			return MuiListtreeColumnGeometryCodec.Write(ref platform, address,
+				value);
 		}
 	}
 
@@ -5004,19 +5121,12 @@ public static class MuiListtreeCore
 		platform.Clear(block, bytes);
 		for (var index = 0u; index < columns; index++)
 		{
-			if (!MuiListtreeColumnGeometryVectorMemoryCodec.TryGetEntry(ref platform,
-				block, index, out var entry))
-			{
-				platform.Clear(block, bytes);
-				platform.Free(block, bytes);
-				block = APTR.Null;
-				return false;
-			}
 			var value = default(MuiListtreeColumnGeometryRecord);
 			value.Delta = 4;
 			value.Weight = 100;
 			value.MaxWidth = uint.MaxValue;
-			if (!MuiListtreeColumnGeometryCodec.Write(ref platform, entry, value))
+			if (!MuiListtreeColumnGeometryVectorCodec.TryWrite(ref platform, block,
+				index, value))
 			{
 				platform.Clear(block, bytes);
 				platform.Free(block, bytes);
@@ -5052,13 +5162,12 @@ public static class MuiListtreeCore
 					else if (current == (byte)',') separator = true;
 				}
 				if (!separator) continue;
-				if (!MuiListtreeColumnGeometryVectorMemoryCodec.TryGetEntry(
-					ref platform, block, ordinal, out var entry)) break;
 				var value = default(MuiListtreeColumnGeometryRecord);
-				if (!MuiListtreeColumnGeometryCodec.TryRead(ref platform, entry,
-					out value) || !ParseListtreeFormatSegment(ref platform, format,
+				if (!MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform, block,
+					ordinal, out value) || !ParseListtreeFormatSegment(ref platform, format,
 					segmentStart, unchecked((int)index), ref value)) break;
-				if (!MuiListtreeColumnGeometryCodec.Write(ref platform, entry, value))
+				if (!MuiListtreeColumnGeometryVectorCodec.TryWrite(ref platform, block,
+					ordinal, value))
 					break;
 				ordinal++;
 				segmentStart = unchecked((int)index) + 1;
@@ -5068,10 +5177,8 @@ public static class MuiListtreeCore
 		var totalWeight = 0u;
 		for (var index = 0u; index < columns; index++)
 		{
-			if (!MuiListtreeColumnGeometryVectorMemoryCodec.TryGetEntry(
-				ref platform, block, index, out var entry) ||
-				!MuiListtreeColumnGeometryCodec.TryRead(ref platform, entry,
-				out var value))
+			if (!MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform, block,
+				index, out var value))
 			{
 				FreeColumnGeometry(ref platform, block, columns);
 				block = APTR.Null;
@@ -5089,10 +5196,8 @@ public static class MuiListtreeCore
 		var remainingWeight = totalWeight;
 		for (var index = 0u; index < columns; index++)
 		{
-			if (!MuiListtreeColumnGeometryVectorMemoryCodec.TryGetEntry(
-				ref platform, block, index, out var entry) ||
-				!MuiListtreeColumnGeometryCodec.TryRead(ref platform, entry,
-				out var value))
+			if (!MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform, block,
+				index, out var value))
 			{
 				FreeColumnGeometry(ref platform, block, columns);
 				block = APTR.Null;
@@ -5107,7 +5212,8 @@ public static class MuiListtreeCore
 			if (maximum != uint.MaxValue && share > maximum) share = maximum;
 			if (share > remaining) share = remaining;
 			value.Width = share;
-			if (!MuiListtreeColumnGeometryCodec.Write(ref platform, entry, value))
+			if (!MuiListtreeColumnGeometryVectorCodec.TryWrite(ref platform, block,
+				index, value))
 			{
 				FreeColumnGeometry(ref platform, block, columns);
 				block = APTR.Null;
@@ -5140,10 +5246,8 @@ public static class MuiListtreeCore
 		var selected = false;
 		for (var index = 0u; index < columns; index++)
 		{
-			if (!MuiListtreeColumnGeometryVectorMemoryCodec.TryGetEntry(
-				ref platform, block, index, out var entry) ||
-				!MuiListtreeColumnGeometryCodec.TryRead(ref platform, entry,
-				out var value)) break;
+			if (!MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform, block,
+				index, out var value)) break;
 			if (value.Width != 0 && offset < boundary + value.Width)
 			{
 				column = index;
@@ -6142,17 +6246,11 @@ public static class MuiListtreeCore
 		var populated = true;
 		for (var column = 0u; column < columnCount; column++)
 		{
-			if (!MuiListtreeDisplayColumnVectorMemoryCodec.TryGetEntry(ref platform,
-				vector, column, out var slot))
-			{
-				populated = false;
-				break;
-			}
-			var value = default(MuiListtreeDisplayColumnRecord);
 			// MorphOS uses NULL in the tree-column slot to request the
 			// built-in node name. A DisplayHook may replace it with a caller-
 			// owned string, so do not pre-populate a managed or copied value.
-			if (!MuiListtreeDisplayColumnCodec.Write(ref platform, slot, value))
+			if (!MuiListtreeDisplayColumnVectorCodec.TryWriteTextValue(ref platform,
+				vector, column, 0))
 			{
 				populated = false;
 				break;

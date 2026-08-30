@@ -35,6 +35,10 @@ public sealed class MuiSleepVolumelistAdmissionTests
 		Assert.Equal(sleep.SavedDisabled, sleepRead.SavedDisabled);
 		Assert.Equal(sleep.Request, sleepRead.Request);
 		Assert.Equal(volume.ExampleMode, volumeRead.ExampleMode);
+		Assert.False(MuiVolumelistCore.MuiVolumelistModeStateRecordCodec
+			.TryReadStructural(ref platform, APTR.FromPointer(0x20FFC), out _));
+		Assert.False(MuiVolumelistCore.MuiVolumelistModeStateRecordCodec.Write(
+			ref platform, APTR.FromPointer(0x20FFC), volume));
 	}
 
 	[Fact]

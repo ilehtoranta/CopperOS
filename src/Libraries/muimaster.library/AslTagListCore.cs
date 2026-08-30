@@ -153,6 +153,50 @@ internal static class MuiAslTagItemVectorMemoryCodec
 
 internal static class MuiAslTagItemVectorCodec
 {
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiAslTagItemCursor cursor, out MuiAslTagItemRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out var address) ||
+			!MuiAslTagItemCodec.TryRead(ref platform, address, out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiAslTagItemCursor cursor, MuiAslTagItemRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out var address)) return false;
+		return MuiAslTagItemCodec.Write(ref platform, address, value);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR vector,
+		uint index, out MuiAslTagItemRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiAslTagItemCursor);
+		cursor.Base = vector;
+		cursor.Index = index;
+		return TryRead(ref platform, cursor, out value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform, APTR vector,
+		uint index, MuiAslTagItemRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiAslTagItemCursor);
+		cursor.Base = vector;
+		cursor.Index = index;
+		return TryWrite(ref platform, cursor, value);
+	}
+
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiAslTagItemCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
@@ -257,9 +301,7 @@ public static class MuiAslTagListCore
 		uint steps = 0;
 		while (cursor.Base.IsNotNull && steps++ < MaximumSteps)
 		{
-			if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
-				cursor.Base, cursor.Index,
-				out var current) || !MuiAslTagItemCodec.TryRead(ref platform, current,
+			if (!MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
 				out var item)) return false;
 			var tag = item.Tag;
 			var data = item.Data;
@@ -274,13 +316,13 @@ public static class MuiAslTagListCore
 			if (tag == TagSkip)
 			{
 				if (data == uint.MaxValue ||
-					!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor,
+					!MuiAslTagItemVectorCodec.TryAdvance(ref cursor,
 						data + 1u)) return false;
 				continue;
 			}
 			if (tag == TagIgnore)
 			{
-				if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
+				if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
 					return false;
 				continue;
 			}
@@ -290,7 +332,7 @@ public static class MuiAslTagListCore
 				found = true;
 				return true;
 			}
-			if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1))
+			if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1))
 				return false;
 		}
 		return false;

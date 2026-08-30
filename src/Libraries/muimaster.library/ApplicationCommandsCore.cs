@@ -356,9 +356,7 @@ public static class MuiApplicationCommandsCore
 		var index = 0u;
 		while (index < MuiHeadlessLayout.MaximumTraversal)
 		{
-			if (!MuiApplicationCommandTableMemoryCodec.TryGetEntry(ref platform,
-				table, index, out var address)) return false;
-			if (!MuiApplicationCommandRecordCodec.TryRead(ref platform, address,
+			if (!MuiApplicationCommandTableCodec.TryRead(ref platform, table, index,
 				out var command)) return false;
 			// A NULL name terminates the caller-owned command table.  The
 			// remaining fields are intentionally not interpreted at this boundary.
@@ -408,6 +406,34 @@ internal struct MuiApplicationCommandTableCursor
 
 internal static class MuiApplicationCommandTableCodec
 {
+	// Complete named-record bridge for indexed command-table consumers. The
+	// bounded adapter owns slot arithmetic and complete-record admission.
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR table,
+		uint index, out MuiApplicationCommandRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiApplicationCommandTableMemoryCodec.TryGetEntry(ref platform,
+			table, index, out var address) ||
+			!MuiApplicationCommandRecordCodec.TryRead(ref platform, address,
+				out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR table, uint index, MuiApplicationCommandRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiApplicationCommandTableMemoryCodec.TryGetEntry(ref platform,
+			table, index, out var address)) return false;
+		return MuiApplicationCommandRecordCodec.Write(ref platform, address,
+			value);
+	}
+
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiApplicationCommandTableCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory

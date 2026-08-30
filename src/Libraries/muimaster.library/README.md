@@ -10,6 +10,862 @@ before a field is read or written. This keeps the 68k implementation
 exception-free, freestanding, and free of managed-runtime dependencies while
 preserving the MorphOS ABI.
 
+MG1970 routes caller-owned List pointer-vector reads and writes through the
+bounded named `MuiListPointerSlotRecord` bridge. List Insert, SortEntries, and
+source insertion exchange complete pointer-slot records without exposing
+vector slot addresses; scalar ULONG helpers remain inside the bridge for the
+freestanding ABI. Full-width APTR values and malformed vector bounds are
+covered by host and native tests. Package coverage is **2644/2644**, and the
+native closure passes (**2940-byte HUNK, 2822 instructions / 26154 cycles**)
+with 15 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1969 routes List ColumnOrder BYTE* permutation construction, validation,
+equality, cleanup, display lookup, and descriptor source mapping through the
+bounded named `MuiListColumnOrderByteRecord` bridge. Production consumers
+exchange complete one-byte records without exposing vector slot addresses;
+full-width values and malformed vector bounds are covered by host and native
+tests. Package coverage is **2643/2643**, and the native closure passes
+(**2284-byte HUNK, 2901 instructions / 26148 cycles**) with 11 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG1968 routes List column-metric vector measurement and lookup through the
+bounded named `MuiListColumnMetricValue` bridge. Production consumers exchange
+complete 4-byte records without exposing vector slot addresses; scalar ULONG
+helpers remain inside that struct boundary to avoid the known one-ULONG
+native-lowering defect. Full-width values and malformed vector bounds are
+covered by host and native tests. Package coverage is **2642/2642**, and the
+native closure passes (**2996-byte HUNK, 2371 instructions / 22256 cycles**)
+with 13 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1967 routes List FORMAT descriptor-vector construction, parsing, validation,
+cleanup, lookup, and projection through the bounded named
+`MuiListFormatDescriptor` bridge. Production consumers exchange complete
+40-byte records without exposing vector slot addresses. Full-width values and
+malformed vector bounds are covered by host and native tests. Package coverage
+is **2641/2641**, and the native closure passes (**5576-byte HUNK, 7247
+instructions / 71630 cycles**) with 23 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1966 routes Listtree FORMAT geometry-vector construction, parsing, sizing,
+and hit testing through the bounded named `MuiListtreeColumnGeometryRecord`
+bridge. Production geometry loops exchange complete 24-byte records without
+exposing vector slot addresses. Full-width values and malformed vector bounds
+are covered by host and native tests. Package coverage is **2640/2640**, and
+the native closure passes (**5016-byte HUNK, 5706 instructions / 54650 cycles**)
+with 22 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1965 routes Listtree DisplayHook column-vector population through the bounded
+named `MuiListtreeDisplayColumnRecord` bridge. Production code no longer
+exposes caller-owned column slot addresses; byte-safe Text helpers preserve
+full-width STRPTR values in the freestanding ABI. Full-width values and
+malformed vector bounds are covered by host and native tests. Package coverage
+is **2639/2639**, and the native closure passes (**3740-byte HUNK, 4607
+instructions / 42978 cycles**) with 16 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1964 routes Application PushMethod parameter copies through the bounded named
+`MuiApplicationPushMethodParameter` vector bridge. Queueing exchanges semantic
+ULONG values without exposing standalone vector slot addresses; byte-safe
+scalar helpers preserve full-width values for the freestanding ABI. Full-width
+values and malformed vector bounds are covered by host and native tests.
+Package coverage is **2638/2638**, and the native closure passes (**3548-byte
+HUNK, 2537 instructions / 24032 cycles**) with 14 reachable methods, zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG1963 routes both packet-facing MultiSet mutation walks through the bounded
+named `MuiMultiSetTargetEntry` vector bridge. Production code consumes semantic
+APTR capabilities without exposing caller-owned slot addresses; byte-safe
+scalar helpers preserve full-width pointers. Full-width values and malformed
+vector bounds are covered by host and native tests. Package coverage is
+**2637/2637**, and the native closure passes (**4876-byte HUNK, 5420
+instructions / 51276 cycles**) with 22 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1962 routes notification follow-parameter suppression and replay through the
+bounded named `MuiNotifyFollowParameterSlot` vector bridge. Production code
+exchanges semantic ULONG values without exposing caller-owned slot addresses;
+byte-safe scalar helpers preserve the freestanding ABI. Full-width values and
+malformed vector bounds are covered by host and native tests. Package coverage
+is **2636/2636**, and the native closure passes (**3616-byte HUNK, 3146
+instructions / 29192 cycles**) with 15 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1961 routes requester-format parameter-vector reads through the bounded named
+`MuiRequesterParameterSlot` bridge. Formatting consumes semantic ULONG values
+without exposing caller-owned slot addresses; vector index arithmetic remains
+inside the adapter. Full-width values and malformed vector bounds are covered
+by host tests, and the focused MC68000 closure qualifies the bridge read path.
+Package coverage is **2635/2635**, and the native closure passes (**3200-byte
+HUNK, 2949 instructions / 27282 cycles**) with 13 reachable methods, zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG1960 routes process dispatch and generated method-message argument vectors
+through the bounded named `MuiProcessDispatchArgumentSlot` bridge. Production
+semantic ULONG reads and generated writes no longer expose caller-owned slot
+addresses. Full-width values and malformed vector bounds are covered by host
+tests; the focused MC68000 closure qualifies the bridge read path. Package
+coverage is **2634/2634**, and the native closure passes (**2668-byte HUNK,
+1860 instructions / 16982 cycles**) with 11 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1959 routes the MUIM_Window_SetCycleChain caller-owned object vector through
+a bounded named `MuiApplicationWindowCycleChainSlot` bridge. The copy loop
+consumes semantic object capabilities without exposing slot addresses. Full-
+width pointers and malformed vector bounds are covered. Package coverage is
+**2633/2633**, and the focused MC68000 closure passes (**3260-byte HUNK, 2068
+instructions / 19270 cycles**) with 16 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1958 routes MUI_MakeObjectA Cycle/Radio entry-vector validation through the
+bounded named `MuiChoiceEntry` bridge. Construction consumes the struct-owned
+Text field while retaining CString validation and no longer exposes
+caller-owned slot addresses. Valid termination and malformed vector ranges are
+covered. Package coverage is **2632/2632**, and the focused MC68000 closure
+passes (**3524-byte HUNK, 2921 instructions / 26632 cycles**) with 18 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG1957 routes Choice/Radio entries admission through the bounded named
+`MuiChoiceEntry` vector bridge. The validator consumes the struct-owned Text
+field projection without exposing caller-owned slot addresses. High-bit
+STRPTR values, the NULL terminator, and malformed vector ranges are covered.
+Package coverage is **2631/2631**, and the MC68000 closure passes (**3372-byte
+HUNK, 3707 instructions / 34492 cycles**) with 16 reachable methods, zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG1956 routes Family Reorder/Sort object vectors through a bounded named-entry
+bridge. `FamilyCore.Reorder` consumes semantic Object capabilities without
+exposing vector slot addresses in production. Full 32-bit object pointers, the
+65535-entry bound, and malformed ranges are covered. Package coverage is
+**2630/2630**, and the MC68000 closure passes (**3188-byte HUNK, 2410
+instructions / 21876 cycles**) with 15 reachable methods and zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1955 routes the bounded Application Save/Load frame stack through a named
+`MuiApplicationPersistenceFrameState` vector bridge. The depth-first walker
+exchanges complete frames without exposing stack slot addresses in production.
+Pointer, marker, depth, and malformed ranges are covered. Package coverage is
+**2629/2629**, and the MC68000 closure passes (**3732-byte HUNK, 2488
+instructions / 23658 cycles**) with 17 reachable methods and zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1954 routes the NULL-terminated `MUIA_Application_Commands` table through a
+bounded named-record bridge. Validation consumes complete
+`MuiApplicationCommandRecord` values without exposing indexed slot addresses
+in production. Signed fields, pointer values, malformed ranges, and table
+arithmetic are covered. Package coverage is **2628/2628**, and the MC68000
+closure passes (**3844-byte HUNK, 3794 instructions / 36878 cycles**) with 15
+reachable methods and zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1953 routes `MUIA_Application_UsedClasses` indexed entries through a bounded
+named pointer-entry bridge. The NULL-terminated validator consumes the named
+`Name` field without exposing slot addresses in production. Full 32-bit
+class-name pointers and malformed ranges are covered. Package coverage is
+**2627/2627**, and the MC68000 closure passes (**2484-byte HUNK, 2205
+instructions / 19706 cycles**) with 15 reachable methods and zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1952 routes AppMessage Workbench argument-vector validation through a
+bounded named `MuiWorkbenchArgumentRecord` bridge. `ValidateMessage` consumes
+complete records without exposing indexed slot addresses in production.
+High-bit BPTR/STRPTR values, the 65535-entry ceiling, and malformed ranges are
+covered. Package coverage is **2626/2626**, and the MC68000 closure passes
+(**3232-byte HUNK, 2100 instructions / 19850 cycles**) with 15 reachable
+methods and zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG1951 routes the fixed inline BOOPSI TagItem area through a bounded named
+`MuiExternalBoopsiTagItem` vector bridge. ApplyGeometry and BoopsiSet exchange
+complete records without exposing inline slot addresses in production. Inline
+capacity, high-bit Tag/Data values, and malformed indices are covered. Package
+coverage is **2625/2625**, and the MC68000 closure passes (**3480-byte HUNK,
+2638 instructions / 24420 cycles**) with 16 reachable methods and zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG1950 routes external-wrapper creation/update TagItem lists and the fixed
+five-entry remember buffer through bounded named-record vector bridges.
+FillCreationTags, HandleUpdate, AddRemember, SaveRemembered, and
+ReapplyRemembered no longer expose slot addresses in production. High-bit
+Tag/Data values, distinct MorphOS bounds, and malformed ranges are covered.
+Package coverage is **2625/2625**; the MC68000 creation/update closure passes
+(**3764-byte HUNK, 2671 instructions / 24832 cycles**) and the remember
+closure passes (**3736-byte HUNK, 2354 instructions / 22122 cycles**), each
+with 18 reachable methods and zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1949 routes the shared ASL/MUI TagItem-list walkers and generated tag
+writers through complete named `MuiAslTagItemRecord` values and a bounded
+vector bridge. ASL traversal, headless object tag application, Stringscroll
+initializers, and MUI_MakeObjectA tag generation no longer expose slot
+addresses in production. High-bit Tag/Data values, malformed addresses, and
+vector bounds are covered. Package coverage is **2625/2625**, and the
+MC68000 TagItem-vector closure passes (**3972-byte HUNK, 2388 instructions /
+22612 cycles**) with 19 reachable methods and zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG1948 routes live MUI_MakeObjectA menustrip construction and NewMenu
+validation through a bounded named `MuiNewMenuRecord` vector bridge.
+Production code no longer exposes slot addresses or packed field positions;
+mixed byte/word/long fields, high-bit values, the 256-entry ceiling, and
+malformed ranges are covered. Package coverage is **2624/2624**, and the
+MC68000 NewMenu vector closure passes (**4620-byte HUNK, 3051 instructions /
+29844 cycles**) with 22 reachable methods and zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG1947 routes live Cycle/Radio entry counting, radio-child construction, and
+active-entry selection through a bounded named `MuiChoiceEntry` vector bridge.
+Production code no longer exposes raw slot addresses; high-bit pointers,
+maximum-entry bounds, and malformed ranges are covered. Package coverage is
+**2623/2623**, and the MC68000 Choice-entry closure passes (**3648-byte HUNK,
+2712 instructions / 25910 cycles**) with 17 reachable methods and zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG1946 routes NotifyWrite method-header selector admission through the complete
+named method-header struct and bounded cursor; the field-offset adapter remains
+compatibility-only. Full WriteLong and WriteString records remain complete
+named packets. Short headers, high-bit selectors, and malformed ranges are
+covered. Package coverage is **2623/2623**, and the MC68000 NotifyWrite closure
+passes (**2752-byte HUNK, 1665 instructions / 17052 cycles**) with 13
+reachable methods and zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1945 routes MUIM_SetAsString parameter-address discovery through the complete
+named packet cursor in the live Apply path. The field-offset adapter remains a
+compatibility shim, and complete-record bounds, high-bit addresses, and
+truncated packets are covered. Package coverage is **2623/2623**, and the
+MC68000 SetAsString closure passes (**4040-byte HUNK, 1931 instructions /
+19646 cycles**) with 19 reachable methods and zero framework members,
+managed allocations, and relocations. The overall goal remains open.
+
+MG1944 routes the Collection Edit packet family through complete named struct
+codecs in production. CreateEditObject, Edit, EditDone, and EndEdit no longer
+fall back to field-offset access; that adapter remains compatibility-only.
+High-bit values and complete-record bounds are enforced. Package coverage is
+**2623/2623**, and the MC68000 Collection Edit closure passes (**5084-byte
+HUNK, 4184 instructions / 42890 cycles**) with 19 reachable methods and zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG1943 routes Area custom-font dispatch through complete OpenCustomFont and
+CloseCustomFont named packet codecs. The live selector path no longer reads
+through the offset adapter; malformed and incomplete packets fail closed before
+provider work. Package coverage is **2622/2622**, and the MC68000 custom-font
+message closure passes (**4068-byte HUNK, 1453 instructions / 14992 cycles**)
+with 20 reachable methods and zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1942 routes the fixed OM_SET, OM_GET, GM_RENDER, inline TagItem, and
+result-word packet records through declaration-ordered named struct codecs for
+live exchange. The older per-field offset adapter remains compatibility-only.
+Complete-record mapping, high-bit word preservation, and malformed-range
+rejection are enforced for all five records. Package coverage is **2621/2621**,
+and the MC68000 OpSet closure passes (**2672-byte HUNK, 1134 instructions /
+11774 cycles**) with 12 reachable methods and zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG1941 routes the fixed 16-byte external RenderInfo input record (Screen,
+Window, DrawInfo, RastPort) through a declaration-ordered struct cursor.
+Production setup reads no longer use its per-field adapter; that adapter
+remains a compatibility shim. Complete-record mapping, high-bit pointer
+preservation, and malformed end-of-memory rejection are enforced. Package
+coverage is **2620/2620**, and the MC68000 RenderInfo closure passes
+(**2040-byte HUNK, 753 instructions / 7746 cycles**) with zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1940 routes the fixed eight-byte caller-owned Dtpic layout result (Width,
+Height) through a declaration-ordered struct cursor. Production reads now use
+the named record cursor; complete-record mapping, high-bit dimension
+preservation, and malformed end-of-memory rejection are enforced. Package
+coverage is **2620/2620**, and the MC68000 Dtpic-layout closure passes
+(**1904-byte HUNK, 510 instructions / 5338 cycles**) with zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1939 routes the fixed four-byte external RastPort slot through scalar-safe,
+declaration-ordered cursor helpers. The named slot API remains available while
+the one-word by-value lowering seam stays out of the native path; the field
+adapter remains a compatibility shim. Complete-slot mapping, high-bit pointer
+preservation, and malformed end-of-memory rejection are enforced. Package
+coverage is **2620/2620**, and the MC68000 RastPort-slot closure passes
+(**2364-byte HUNK, 679 instructions / 7002 cycles**) with zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1938 routes the fixed three-pointer display-environment record (Window,
+Screen, DrawInfo) through a declaration-ordered struct cursor. Production
+reads and writes no longer use its per-field adapter; that adapter remains a
+compatibility shim. Complete-record mapping, high-bit pointer preservation,
+and malformed end-of-memory rejection are enforced. Package coverage is
+**2619/2619**, and the MC68000 display-environment closure passes (**2640-byte
+HUNK, 1130 instructions / 11754 cycles**) with zero framework members,
+managed allocations, and relocations. The overall goal remains open.
+
+MG1937 routes the fixed twelve-byte external-wrapper notification state
+(Attribute, Value, Count) through a declaration-ordered struct cursor.
+Production reads and writes no longer use its per-field adapter; that adapter
+remains a compatibility shim. Complete-record mapping, high-bit preservation,
+and malformed end-of-memory rejection are enforced. Package coverage is
+**2619/2619**, and the MC68000 notification-state closure passes (**3052-byte
+HUNK, 1367 instructions / 13978 cycles**) with zero framework members,
+managed allocations, and relocations. The overall goal remains open.
+
+MG1936 routes the fixed 36-byte Dtpic state record through a declaration-
+ordered struct cursor. Production pointer and scalar reads and writes no
+longer use its per-field adapter; that adapter remains a compatibility shim.
+Complete-record mapping, high-bit preservation, and malformed end-of-memory
+rejection are enforced. Package coverage is **2619/2619**, and the MC68000
+Dtpic-state closure passes (**3552-byte HUNK, 2674 instructions / 27406
+cycles**) with zero framework members, managed allocations, and relocations.
+The overall goal remains open.
+
+MG1935 routes the fixed twelve-byte external-wrapper scratch state
+(RememberBuffer, RememberCount, WorkBuffer) through a declaration-ordered
+struct cursor. Production reads and writes no longer use its per-field
+adapter; that adapter remains a compatibility shim. Complete-record mapping,
+high-bit pointer/count preservation, and malformed end-of-memory rejection are
+enforced. Package coverage is **2619/2619**, and the MC68000 scratch-state
+closure passes (**3064-byte HUNK, 1360 instructions / 13954 cycles**) with
+zero framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG1934 routes the fixed five-pointer Boopsi resource state embedded in the
+external-wrapper instance through a declaration-ordered struct cursor.
+Production pointer reads and writes no longer use its per-field adapter; that
+adapter remains a compatibility shim. Complete-record mapping, high-bit
+pointer preservation, and malformed end-of-memory rejection are enforced.
+Package coverage is **2619/2619**, and the MC68000 Boopsi-resource closure
+passes (**3272-byte HUNK, 1774 instructions / 18186 cycles**) with zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG1933 routes the fixed seven-word Boopsi geometry/configuration record
+embedded in the external-wrapper instance through a declaration-ordered
+struct cursor. Production reads and writes no longer use its per-field
+adapter; that adapter remains a compatibility shim. Complete-record mapping,
+high-bit preservation, and malformed end-of-memory rejection are enforced.
+Package coverage is **2619/2619**, and the MC68000 Boopsi-geometry closure
+passes (**3392-byte HUNK, 2178 instructions / 22324 cycles**) with zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG1932 routes the shared fixed four-byte caller-owned ULONG result slot
+through scalar-safe, declaration-ordered struct-cursor helpers. Production
+reads and writes no longer use the legacy field adapter; it remains a
+compatibility shim. Complete-slot mapping, high-bit preservation, and
+malformed end-of-memory rejection are enforced. Package coverage is
+**2619/2619**, and the MC68000 ULONG-slot closure passes (**3076-byte HUNK,
+1080 instructions / 10844 cycles**) with zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG1931 routes the fixed caller-owned graphics Image geometry record through a
+declaration-ordered struct cursor. Mixed signed edge WORDs and unsigned
+dimension WORDs are transferred sequentially; the field adapter remains
+compatibility-only. Complete-record mapping, mixed-width value preservation,
+and malformed end-of-memory rejection are enforced. Package coverage is
+**2618/2618**, and the MC68000 Image-geometry closure passes (**3708-byte
+HUNK, 2036 instructions / 21004 cycles**) with zero framework members,
+managed allocations, and relocations. The overall goal remains open.
+
+MG1930 routes the fixed caller-owned Cycle/Radio choice entry (`STRPTR`)
+through a scalar-safe, declaration-ordered named struct cursor. Production
+vector traversal now decodes each choice entry without field offsets; the
+4096-entry vector adapter remains the only index/address boundary. Complete-
+slot mapping, high-bit pointer preservation, and malformed end-of-memory
+rejection are enforced. Package coverage is **2617/2617**, and the MC68000
+ChoiceEntry closure passes (**3380-byte HUNK, 2127 instructions / 20344
+cycles**) with zero framework members, managed allocations, and relocations.
+The overall goal remains open.
+
+MG1929 routes the fixed UpdateConfig redraw object and flag slots through
+scalar-safe, declaration-ordered named struct cursors. Production entry reads
+and writes no longer bypass the named one-slot records; the 64-entry vector
+adapters remain the only table-index/address boundary. Complete-slot mapping,
+high-bit preservation, and malformed end-of-memory rejection are enforced.
+Package coverage is **2616/2616**, and the MC68000 UpdateConfig slot closure
+passes (**7280-byte HUNK, 146719 instructions / 1348232 cycles**) with zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG1928 routes the fixed ReadIFF and WriteIFF message records through
+declaration-ordered named struct cursors. Method, handle, type, and ID fields
+are transferred sequentially; selected-field memory adapters remain
+compatibility-only, and stream payload transfer remains capability-backed.
+Complete-record mapping, high-bit preservation, and malformed end-of-memory
+rejection are enforced. Package coverage is **2615/2615**, and the MC68000
+Dataspace-IFF message closure passes (**3996-byte HUNK, 1923 instructions /
+19888 cycles**); MC68020/MC68040 closure artifacts are **4024/4024 bytes**.
+The overall goal remains open.
+
+MG1927 migrates the fixed 4-byte `MUIM_CallHook` parameter record to a
+declaration-ordered named struct cursor for reads and writes. Scalar-safe
+cursor entry points keep the one-ULONG by-value lowering seam out of hook code
+while retaining the named record API. Complete-record mapping, high-bit
+preservation, and malformed end-of-memory rejection are enforced; variadic
+vector address arithmetic remains bounded and separate. Package coverage is
+**2614/2614**, and the MC68000 CallHook-parameter closure passes (**2844-byte
+HUNK, 1259 instructions / 12646 cycles**). The overall goal remains open.
+
+MG1926 migrates the fixed 4-byte Process/Slave dispatch argument slot to a
+declaration-ordered named struct cursor for reads and writes. Scalar-safe
+cursor entry points keep the one-ULONG by-value lowering seam out of production
+dispatch while retaining the named slot API. Complete-record mapping, high-bit
+preservation, and malformed end-of-memory rejection are enforced. Package
+coverage is **2613/2613**, and the MC68000 dispatch-slot closure passes
+(**2528-byte HUNK, 1202 instructions / 12252 cycles**). The overall goal
+remains open.
+
+MG1925 migrates the fixed 4-byte ClassService loader-prefix record (`mui/`) to
+declaration-ordered named struct cursor reads and writes. The named record API
+remains available, while scalar-safe cursor entry points isolate CopperSharp's
+one-ULONG by-value lowering seam at the actual loader boundary. Complete-record
+mapping, high-bit preservation, and malformed end-of-memory rejection are
+enforced. Package coverage is **2612/2612**, and the MC68000 loader-prefix
+closure passes (**2216-byte HUNK, 553 instructions / 5664 cycles**). The
+overall goal remains open.
+
+MG1924 migrates the fixed 8-byte Dataspace IFF chunk-entry header (`Id`,
+`Length`) to a declaration-ordered named struct cursor at the ReadIFF/WriteIFF
+streaming boundary. Both ULONG fields retain their wire representation;
+complete-record mapping and malformed end-of-memory rejection are enforced,
+while stream payload transfer remains capability-backed. Package coverage is
+**2611/2611**, and the MC68000 entry-header closure passes (**2532-byte HUNK,
+913 instructions / 9474 cycles**). The overall goal remains open.
+
+MG1923 migrates the fixed Keyadjust policy, WindowPanel, FSProtectionBits, and
+Fontdisplay records (4, 8, 4, and 8 bytes) to declaration-ordered named struct
+cursors. The two one-ULONG records expose scalar-safe cursor entry points
+because CopperSharp cannot reliably lower one-word structs passed by value;
+production wrappers use those entry points while retaining the named struct API
+shape. Complete-record mapping and malformed end-of-memory rejection remain
+enforced. Package coverage is **2610/2610**, and the MC68000 small-record
+closure passes (**4144-byte HUNK, 2856 instructions / 29028 cycles**). The
+overall goal remains open.
+
+MG1922 migrates the fixed 12-byte private Scrmodelist state and 4-byte mode
+records to declaration-ordered named struct cursors for production state and
+mode transfers. Mode IDs, counts, and indices retain their ULONG wire
+representation; complete-record mapping and malformed end-of-memory rejection
+are enforced, and mode-vector address arithmetic remains isolated in its
+bounded index adapter. Package coverage is **2609/2609**, and the MC68000
+Scrmodelist closure passes (**3212-byte HUNK, 1718 instructions / 17594
+cycles**). The overall goal remains open.
+
+MG1921 migrates the fixed 16-byte Mccprefs specialist state and 24-byte
+registry-entry records to declaration-ordered named struct cursors for
+production configuration and registration transfers. Guest pointers, counts,
+and attributes retain their ULONG wire representation; complete-record
+mapping and malformed end-of-memory rejection are enforced, and registry-
+vector address arithmetic remains isolated in its bounded index adapter.
+Package coverage is **2608/2608**, and the MC68000 Mccprefs closure passes
+(**3804-byte HUNK, 3012 instructions / 31030 cycles**). The overall goal
+remains open.
+
+MG1920 migrates the fixed Filepanel service state, owned-string slot, and
+adopted row records (20, 8, and 8 bytes) to declaration-ordered named struct
+cursors for production transfers. Guest pointers and counts retain their
+ULONG wire representation; complete-record mapping and malformed end-of-
+memory rejection are enforced, and row-vector address arithmetic remains
+isolated in its bounded index adapter. Package coverage is **2607/2607**, and
+the MC68000 Filepanel closure passes (**4236-byte HUNK, 3172 instructions /
+32562 cycles**). The overall goal remains open.
+
+MG1919 migrates the fixed 32-byte Misc Title state and 8-byte Title page
+records to declaration-ordered named struct cursors for production state and
+page transfers. Signed Title attributes remain ULONG wire values;
+complete-record mapping and malformed end-of-memory rejection are enforced,
+and page-vector address arithmetic remains isolated in its bounded index
+adapter. Package coverage is **2606/2606**, and the MC68000 Title closure
+passes (**3704-byte HUNK, 3050 instructions / 31312 cycles**). The overall
+goal remains open.
+
+MG1918 migrates the fixed Dirlist byte-total QUAD, owned-entry header, and
+ExAll scan-entry header to declaration-ordered named struct cursors for
+production wire transfers. The 8-byte, 36-byte, and 28-byte records retain
+their ULONG wire representation while variable name/comment tails remain
+explicit; complete-record mapping and malformed end-of-memory rejection are
+enforced, and the legacy semantic field adapter stays diagnostic-only. Package
+coverage is **2605/2605**, and the MC68000 fixed-wire closure passes
+(**4884-byte HUNK, 5091 instructions / 52488 cycles**). The overall goal
+remains open.
+
+MG1917 migrates the fixed 8-byte Listview external-scroller connection record
+to a declaration-ordered named struct cursor for production connection setup
+and teardown. The Prop guest pointer and MorphOS cookie retain their ULONG
+wire representation; cookie admission, complete-record mapping, and malformed
+end-of-memory rejection remain enforced, while the legacy field adapter stays
+diagnostic-only. Package coverage is **2604/2604**, and the MC68000
+external-scroller closure passes (**6728-byte HUNK, 6068 instructions /
+60938 cycles**). The overall goal remains open.
+
+MG1916 migrates the fixed 20-byte Listview vertical-scroller projection to a
+declaration-ordered named struct cursor for production row-range state.
+Entry, visible, first, and maximum-first values retain their ULONG
+representation; cookie admission, complete-record mapping, and malformed
+end-of-memory rejection remain enforced. Package coverage is **2604/2604**,
+and the MC68000 Listview closure passes (**10560-byte HUNK, 13112
+instructions / 131576 cycles**). The overall goal remains open.
+
+MG1915 migrates the fixed 12-byte Listview render-context record to a
+declaration-ordered named struct cursor for production draw and child-binding
+state. Guest pointers, cookie admission, complete-record mapping, and
+malformed end-of-memory rejection remain enforced; the legacy field adapter
+is diagnostic-only. Package coverage is **2604/2604**, and the MC68000
+Listview closure passes (**10560-byte HUNK, 13112 instructions / 131576
+cycles**). The overall goal remains open.
+
+MG1914 migrates the fixed 36-byte Listview layout-state record to a
+declaration-ordered named struct cursor for production composite and child
+geometry. Signed coordinates and dimensions retain their ULONG wire
+representation, cookie admission and complete-record mapping remain enforced,
+and the legacy field adapter is diagnostic-only. Package coverage is
+**2604/2604**, and the MC68000 Listview closure passes (**10560-byte HUNK,
+13112 instructions / 131576 cycles**). The overall goal remains open.
+
+MG1913 migrates the fixed 8-byte Listview selection-signal record to a
+declaration-ordered named struct cursor for production notification
+projection. Cookie admission, complete-record mapping, and malformed
+end-of-memory rejection remain enforced; the legacy field adapter is
+diagnostic-only. Package coverage is **2604/2604**, and the MC68000 Listview
+closure passes (**10820-byte HUNK, 15053 instructions / 146960 cycles**). The
+overall goal remains open.
+
+MG1912 migrates the fixed 20-byte Listview interaction-policy record to a
+declaration-ordered named struct cursor for production input, scrolling, and
+drag policy. Cookie admission, complete-record mapping, and malformed
+end-of-memory rejection remain enforced; the legacy field adapter is
+diagnostic-only. Package coverage is **2604/2604**, and the MC68000 Listview
+closure passes (**10908-byte HUNK, 15129 instructions / 147120 cycles**). The
+overall goal remains open.
+
+MG1911 migrates the fixed 24-byte Listview click-state record to a
+declaration-ordered named struct cursor for production click publication.
+BOOL normalization, cookie admission, complete-record mapping, and malformed
+end-of-memory rejection remain enforced; the legacy field adapter is
+diagnostic-only. Package coverage is **2604/2604**, and the MC68000 Listview
+closure passes (**10960-byte HUNK, 15730 instructions / 151384 cycles**). The
+overall goal remains open.
+
+MG1910 migrates the fixed 8-byte Listview child-state record to a
+declaration-ordered named struct cursor for production child-ownership reads
+and writes. Complete-record mapping, cookie admission, and malformed
+end-of-memory rejection remain enforced; the legacy field adapter is
+diagnostic-only. Package coverage is **2604/2604**, and the MC68000 Listview
+closure passes (**11000-byte HUNK, 16532 instructions / 157168 cycles**). The
+overall goal remains open.
+
+MG1909 migrates the packed 20-byte GadTools `NewMenu` entry decoder to
+declaration order through a named struct cursor. Mixed byte, word, and long
+fields retain the MorphOS wire layout, truncation is rejected, and the legacy
+field adapter remains diagnostic-only. Package coverage is **2604/2604**, and
+the MC68000 NewMenu closure passes (**3544-byte HUNK, 1465 instructions /
+14572 cycles**). The overall goal remains open.
+
+MG1908 migrates the variable `MUI_MakeObjectA` parameter prefix read to a
+sequential named struct cursor. Count-aware short prefixes retain zeroed
+trailing fields, malformed vectors are rejected, and the legacy field adapter
+remains diagnostic-only. Package coverage is **2604/2604**, and the MC68000
+parameter-vector closure passes (**2708-byte HUNK, 1033 instructions /
+10950 cycles**). The overall goal remains open.
+
+MG1907 migrates the fixed 8-byte Volumelist mode sidecar to a
+declaration-ordered named struct codec for production construction, getter,
+and re-read paths. Complete-record mapping rejects truncation, the legacy
+field adapter remains diagnostic-only, package coverage is **2604/2604**, and
+the MC68000 Volumelist mode closure passes (**3296-byte HUNK, 1371
+instructions / 13894 cycles**). The overall goal remains open.
+
+MG1906 migrates the fixed String.mui edit-hook command payload and mixed-width
+44-byte SGWork record to declaration-ordered named structs for production
+callback exchange. Signed cursor fields and guest pointers are preserved; the
+one-ULONG command uses scalar-safe native entry points, complete-record
+mapping rejects truncation, and the legacy field adapter remains
+diagnostic-only. Package coverage is **2604/2604**, and the MC68000
+SGWork closure passes (**4068-byte HUNK, 3452 instructions / 35706 cycles**),
+and the command scalar closure passes (**2700-byte HUNK, 631 instructions /
+6578 cycles**). The overall goal remains open.
+
+MG1905 migrates the caller-owned 4-byte Store iteration counter to a
+declaration-ordered named struct codec for production iteration state. Scalar
+read/write entry points preserve the complete ULONG range at the freestanding
+boundary, and the legacy field adapter remains diagnostic-only. Package
+coverage is **2603/2603**, and the MC68000 iteration-counter closure passes
+(**2800-byte HUNK, 781 instructions / 7974 cycles**). The overall goal
+remains open.
+
+MG1904 migrates the foundational 48-byte `MuiMasterPrivateRoot` record to a
+declaration-ordered sequential named struct for production lifecycle reads and
+writes. The legacy field adapter remains diagnostic-only, complete-record
+mapping is enforced, and malformed end-of-memory records are rejected.
+Package coverage is **2603/2603**, and the MC68000 private-root closure passes
+(**3888-byte HUNK, 3003 instructions / 30424 cycles**). The overall goal
+remains open.
+
+MG1903 migrates the three fixed MG09 class-service records (service state,
+class lease, and MUI_CustomClass) to declaration-ordered sequential named
+structs for production class registration, leasing, and custom-object paths.
+Legacy field adapters remain diagnostic-only; full-width flags and counters are
+preserved and incomplete records are rejected. Package coverage is
+**2603/2603**, and the MC68000 class-service sequential-record closure passes
+(**5408-byte HUNK, 7720 instructions / 78398 cycles**). The overall goal
+remains open.
+
+MG1902 migrates the six fixed MG09 drawing-service records (service state,
+clip, refresh, pen, render-info, and raster-port) to declaration-ordered
+sequential named structs for production reads and writes. The one-field
+raster-port pointer also has a scalar native-safe read helper; legacy
+field/offset adapters remain diagnostic-only and incomplete records are
+rejected. Package coverage is **2602/2602**, and the MC68000 drawing
+sequential-record closure passes (**6844-byte HUNK, 6591 instructions /
+67536 cycles**). The overall goal remains open.
+
+MG1901 migrates the fixed 16-byte application-settings file header and 8-byte
+key/length record to declaration-ordered sequential named structs for
+production persistence reads and writes. Legacy field adapters remain
+diagnostic-only, null or incomplete records are rejected, and package coverage
+is **2601/2601**. The MC68000 settings sequential-record closure passes
+(**3680-byte HUNK, 2817 instructions / 28876 cycles**). The overall goal
+remains open.
+
+MG1900 migrates the seven fixed Store Datamap/Objectmap packet records
+(method, clear, key, counter, DatamapSet, DatamapGet, and ObjectmapSet) to
+declaration-ordered sequential named structs for production reads and writes.
+Method/clear selectors use scalar native-safe helpers for the compiler's
+single-field high-bit by-value limitation; payload records remain typed,
+offset adapters are diagnostic-only, and package coverage is **2600/2600**.
+The MC68000 Store packet closure passes (**7252-byte HUNK, 4871 instructions /
+49740 cycles**). The overall goal remains open.
+
+MG1899 migrates each fixed 4-byte caller-owned `MUIA_Application_UsedClasses`
+vector element to a declaration-ordered named STRPTR struct codec in
+production validation. Byte-preserving scalar helpers retain the full 32-bit
+pointer range, null or incomplete slots are rejected, and package coverage is
+**2598/2598**. The MC68000 UsedClasses vector-entry closure passes (**3092-byte
+HUNK, 1812 instructions / 18042 cycles**). The overall goal remains open.
+
+MG1898 migrates the fixed 20-byte control-font-resolution projection (`Magic`,
+`Present`, `Inherited`, `Depth`, `Font`) to a declaration-ordered sequential
+struct codec for production reads and writes. Byte-preserving scalar helpers
+retain exact ULONG and pointer bits, null or incomplete records are rejected,
+and package coverage is **2596/2596**. The MC68000 control-font sequential-
+record closure passes (**3024-byte HUNK, 6714 instructions / 65898 cycles**).
+The overall goal remains open.
+
+MG1897 migrates the fixed 8-byte MorphOS String Integer64 QUAD (`High`, `Low`)
+to a declaration-ordered sequential struct codec for production reads and
+writes. Byte-preserving scalar helpers retain exact two's-complement ULONG
+bits, including bit 31; null or incomplete records are rejected, and package
+coverage is **2594/2594**. The MC68000 QUAD sequential-record closure passes
+(**2976-byte HUNK, 2248 instructions / 22602 cycles**). The overall goal
+remains open.
+
+MG1896 migrates the fixed requester-service state and caller-owned requester
+parameter slot to declaration-ordered sequential struct codecs. Requester
+formatting uses the named slot through a full-range scalar helper; the
+compatibility field adapter remains diagnostic-only, null or incomplete
+records are rejected, and package coverage is **2592/2592**. The MC68000
+requester sequential-record closure passes (**4088-byte HUNK, 3215
+instructions / 32920 cycles**). The overall goal remains open.
+
+MG1895 migrates the fixed MUI error-service state record to a declaration-
+ordered sequential struct codec for production reads and writes. The
+compatibility field adapter remains diagnostic-only, null or incomplete
+records are rejected, and package coverage is **2590/2590**. The MC68000
+ErrorService sequential-record closure passes (**2696-byte HUNK, 1416
+instructions / 14864 cycles**). The overall goal remains open.
+
+MG1894 migrates the fixed ASL service-state and requester-lease records to
+declaration-ordered sequential struct codecs for production reads and writes.
+The compatibility field adapter remains diagnostic-only, null or incomplete
+records are rejected, and package coverage is **2588/2588**. The MC68000 ASL
+sequential-record closure passes (**3440-byte HUNK, 2262 instructions /
+23532 cycles**). The overall goal remains open.
+
+MG1893 migrates the fixed 24-byte Area handled-events registration state,
+including mixed-width handler flags, priority, and reserved fields, to a
+declaration-ordered sequential struct codec for production reads and writes.
+The compatibility field adapter remains diagnostic-only, incomplete records
+are rejected, and package coverage is **2586/2586**. The MC68000 handled-events
+state closure passes (**4204-byte HUNK, 2282 instructions / 23578 cycles**).
+The overall goal remains open.
+
+MG1892 migrates the fixed 12-byte Application Save/Load traversal frame
+(`Object`, `NextChild`, and `VisitMarker`) to a declaration-ordered sequential
+struct codec for production reads and writes. The compatibility field adapter
+remains diagnostic-only, incomplete frames are rejected, and package coverage
+is **2584/2584**. The MC68000 persistence-frame closure passes (**2620-byte
+HUNK, 1080 instructions / 11250 cycles**). The overall goal remains open.
+
+MG1891 migrates the fixed Family_DoChildMethods, Family_GetChild, and Family
+mutation packet records, plus the guest projection list and vector entries, to
+declaration-ordered sequential struct codecs for production reads and writes.
+Compatibility field/offset adapters remain diagnostic-only, incomplete records
+are rejected, and package coverage is **2582/2582**. The MC68000 Family packet
+closure passes (**6968-byte HUNK, 5697 instructions / 57706 cycles**). The
+overall goal remains open.
+
+MG1890 migrates the fixed MorphOS MUIM_Export/MUIM_Import packet pair and
+method header to declaration-ordered sequential struct codecs for production
+reads and writes. The compatibility field/offset adapter remains diagnostic-
+only, incomplete records are rejected, and package coverage is **2580/2580**.
+The MC68000 ObjectPersistence packet closure passes (**2796-byte HUNK, 1468
+instructions / 14998 cycles**). The overall goal remains open.
+
+MG1889 migrates the fixed headless method-header, BOOPSI OM_SET, and BOOPSI
+OM_UPDATE records to declaration-ordered sequential struct codecs for
+production reads and writes. Legacy field/offset adapters remain
+diagnostic-only, and complete-record validation is preserved. Package coverage
+is **2578/2578**; the MC68000 headless closure passes (**3964-byte HUNK, 2629
+instructions / 26828 cycles**). The overall goal remains open.
+
+MG1888 migrates the fixed ExternalWrapper Update, Get, Set, method,
+RenderInfo, AskMinMax, and Layout records to declaration-ordered sequential
+struct codecs for production reads and writes. Legacy field/offset adapters
+remain diagnostic-only, and complete-record validation is preserved. Package
+coverage is **2576/2576**; the MC68000 ExternalWrapper closure passes
+(**6204-byte HUNK, 5667 instructions / 56804 cycles**). The overall goal
+remains open.
+
+MG1887 migrates the fixed Dirlist/Volumelist method, Set, Rename, Protection,
+and GetEntry records to declaration-ordered sequential struct codecs for
+production reads and writes. Legacy field/offset adapters remain diagnostic-
+only, and complete-record validation is preserved. Package coverage is
+**2574/2574**; the MC68000 Dirlist closure passes (**5084-byte HUNK, 3938
+instructions / 40000 cycles**). The overall goal remains open.
+
+MG1886 migrates the fixed Dataspace Add, Find, Get, Merge, Remove, and Clear
+packet records plus the method header to declaration-ordered sequential struct
+codecs for production reads and writes. The legacy field adapter remains only
+for compatibility diagnostics; complete-record validation is preserved.
+Package coverage is **2572/2572**; the MC68000 Dataspace closure passes
+(**5844-byte HUNK, 4458 instructions / 45452 cycles**). The overall goal
+remains open.
+
+MG1885 migrates the nine fixed Layout packet records (method, AskMinMax,
+Relayout, rectangle, text, render-info, flags, text-dimensions, and Layout)
+to declaration-ordered sequential struct codecs for production reads and
+writes. Layout/text admission retains strict complete-record mapping checks.
+Package coverage is **2570/2570**; the MC68000 Layout closure passes
+(**13104-byte HUNK, 12370 instructions / 126302 cycles**). The overall goal
+remains open.
+
+MG1884 migrates the nine fixed CommonControl envelopes (method, signed
+numeric, scale-to-value, value-to-scale, stringify, HandleEvent, Get,
+Attribute, and AskMinMax) to declaration-ordered sequential struct codecs.
+Production reads and writes no longer traverse the generic field adapter;
+layout/text variants remain separate. Package coverage is **2570/2570**; the
+MC68000 CommonControl closure passes (**14012-byte HUNK, 7432 instructions /
+76776 cycles**). The overall goal remains open.
+
+MG1883 migrates the fixed 12-byte UpdateConfig header (MethodID, CfgId, and
+signed RedrawCount) to a named declaration-ordered struct codec. Scalar
+summary dispatch and narrow object/flag entry access avoid large packet ABI
+marshalling; the 64-entry object and flag tables remain separately typed
+bounded vectors. Package coverage is **2570/2570**; the MC68000 UpdateConfig
+closure passes (**6604-byte HUNK, 106875 instructions / 922352 cycles**) and
+the focused header selector closure passes (**2020-byte HUNK, 419
+instructions / 4420 cycles**). The overall goal remains open.
+
+MG1882 migrates the fixed Misc specialist lifecycle, Get, Set, Pointer, Pair,
+HandleInput, and RegisterGadget envelopes to complete named declaration-ordered
+struct codecs. One-ULONG method/lifecycle packets use cursor-local scalar
+helpers, and signed `MuiKey` bit patterns are preserved. Package host coverage
+is **2570/2570**, and the MC68000 Misc-specialist closure passes (**7704-byte
+HUNK, 5234 instructions / 53494 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1881 migrates the fixed Pop specialist method, Get, Set, and Close envelopes
+to complete named declaration-ordered struct codecs. Method-only packets and
+selector admission use cursor-local scalar helpers for the one-ULONG record;
+Close retains its MorphOS-compatible method-only read tolerance. Package host
+coverage is **2570/2570**, and the MC68000 Pop-specialist closure passes
+(**6412-byte HUNK, 3534 instructions / 36258 cycles**). The overall MorphOS
+MUI goal remains open.
+
+MG1880 migrates the fixed Menu specialist method, Get, Set, Pointer, Pair, and
+Popup envelopes to complete named declaration-ordered struct codecs. Method-only
+packets and selector admission use cursor-local scalar helpers for the
+one-ULONG record. Package host coverage is **2570/2570**, and the MC68000
+Menu-specialist closure passes (**8932-byte HUNK, 5178 instructions / 52962
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1879 migrates the fixed Color specialist method, Get, Set, Pointer, and RGB
+envelopes to complete named declaration-ordered struct codecs. Method-only
+packets and selector admission use cursor-local scalar helpers for the
+one-ULONG record. Package host coverage is **2570/2570**, and the MC68000
+Color-specialist closure passes (**7636-byte HUNK, 4263 instructions / 43644
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1878 migrates the fixed Process/Slave Get, Set, Signal, Error, and Dispatch
+envelopes to complete named declaration-ordered struct codecs. Method-only
+packets and selector admission use cursor-local scalar helpers for the
+one-ULONG record. Package host coverage is **2570/2570**, and the MC68000
+Process/Slave message closure passes (**8620-byte HUNK, 4631 instructions /
+47262 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1877 migrates the Process/Slave generated method-message prefix to a named
+sequential struct codec. Cursor-local scalar helpers avoid a known native
+one-field value-struct lowering fault, while the legacy field adapter remains
+diagnostic-only. Package host coverage is **2570/2570**, and the MC68000
+method-prefix closure passes (**2388-byte HUNK, 603 instructions / 6250
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1876 migrates UserData method admission and the fixed 8-byte traversal frame
+to complete named structs and bounded sequential cursors. The bounded stack
+vector remains an indexed adapter only for selecting entries. Package host
+coverage is **2570/2570**; the MC68000 UserData packet closure passes
+(**4796-byte HUNK, 3181 instructions / 32448 cycles**) and the production
+traversal-frame closure passes (**2820-byte HUNK, 856 instructions / 9004
+cycles**). The overall MorphOS MUI goal remains open.
+
+MG1875 migrates the fixed GetConfigItem envelope and method admission to
+complete named structs and bounded sequential cursors. Package host coverage
+is **2570/2570**, and the MC68000 GetConfigItem closure passes (**2884-byte
+HUNK, 1266 instructions / 13064 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1874 migrates Area drag method-selector admission to the complete named
+one-ULONG method record through a bounded sequential cursor. Package host
+coverage is **2570/2570**, and the MC68000 Area-drag closure passes
+(**12308-byte HUNK, 10507 instructions / 107520 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1873 migrates the fixed BoopsiQuery envelope and method admission to
+complete named structs and bounded sequential cursors. Package host coverage
+is **2570/2570**, and the MC68000 BoopsiQuery closure passes (**3412-byte
+HUNK, 2787 instructions / 28460 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1872 migrates the fixed CallHook envelope and method admission to complete
+named structs and bounded sequential cursors. The variadic parameter tail
+remains in its bounded indexed-vector adapter. Package host coverage is
+**2570/2570**, and the MC68000 CallHook envelope closure passes (**2844-byte
+HUNK, 1196 instructions / 12314 cycles**). The overall MorphOS MUI goal
+remains open.
+
+MG1871 migrates ShortHelp selector admission for Check, Create, and Delete to
+complete named packet structs. Package host coverage is **2570/2570**, and the
+MC68000 ShortHelp header closure passes (**2888-byte HUNK, 1029 instructions /
+10818 cycles**). The overall MorphOS MUI goal remains open.
+
+MG1870 migrates Area activation method-selector admission to the complete
+named one-ULONG method-header record through a bounded sequential cursor.
+Package host coverage is **2570/2570**, and the MC68000 Area activation closure
+passes (**3768-byte HUNK, 1365 instructions / 13886 cycles**). The overall
+MorphOS MUI goal remains open.
+
+MG1869 migrates Application queue selector admission to complete named
+PushMethod/UnpushMethod packet structs. Package host coverage is **2570/2570**,
+and the MC68000 queue-header closure passes (**2508-byte HUNK, 1211
+instructions / 12216 cycles**). The overall MorphOS MUI goal remains open.
+
 MG1849 migrates the shared collection-surface packet family to sequential
 named-struct codecs for layout, AskMinMax, draw, input, and attribute records.
 Package coverage is **2570/2570**, and the focused MC68000 closure passes

@@ -238,27 +238,27 @@ internal static class MuiClassRecordFieldCursorCodec
 			field, value);
 }
 
-internal static class MuiClassServiceStateCodec
+// Canonical sequential codec for the complete class-service state record.
+// The field resolver above remains a compatibility seam for diagnostics;
+// class registration and lease management exchange this named struct.
+internal static class MuiClassServiceStateStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiClassServiceStateRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiClassServiceStateRecord.Size) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.State, MuiClassRecordField.Magic,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiClassServiceStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out record.Magic) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.State, MuiClassRecordField.Head,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var head) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.State, MuiClassRecordField.Headless,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var headless) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.State, MuiClassRecordField.Generation,
-				out record.Generation)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Generation) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Head = APTR.FromPointer(head);
 		record.Headless = APTR.FromPointer(headless);
 		return true;
@@ -268,20 +268,32 @@ internal static class MuiClassServiceStateCodec
 		MuiClassServiceStateRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiClassServiceStateRecord.Size)) return false;
-		return MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiClassRecordKind.State, MuiClassRecordField.Magic, record.Magic) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.State, MuiClassRecordField.Head,
-				record.Head.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.State, MuiClassRecordField.Headless,
-				record.Headless.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.State, MuiClassRecordField.Generation,
-				record.Generation);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiClassServiceStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Head.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Headless.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Generation)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+}
+
+internal static class MuiClassServiceStateCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiClassServiceStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiClassServiceStateStructCodec.TryRead(ref platform, address,
+			out record);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiClassServiceStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiClassServiceStateStructCodec.Write(ref platform, address, record);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -313,47 +325,38 @@ internal struct MuiClassServiceLeaseRecord
 	internal uint ChildCount;
 }
 
-internal static class MuiClassServiceLeaseCodec
+internal static class MuiClassServiceLeaseStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiClassServiceLeaseRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiClassServiceLeaseRecord.Size)) return false;
-		if (!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiClassRecordKind.Lease, MuiClassRecordField.Next, out var next) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.Flags,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiClassServiceLeaseRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var next) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out record.Flags) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.ClassId,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var classId) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.Boopsi,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var boopsi) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.LibraryBase,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var libraryBase) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.RefCount,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out record.RefCount) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.HeadlessClass,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var headlessClass) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.CustomClass,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var customClass) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.SuperService,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var superService) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.ObjectCount,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out record.ObjectCount) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.ChildCount,
-				out record.ChildCount)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.ChildCount) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Next = APTR.FromPointer(next);
 		record.ClassId = APTR.FromPointer(classId);
 		record.Boopsi = APTR.FromPointer(boopsi);
@@ -368,40 +371,46 @@ internal static class MuiClassServiceLeaseCodec
 		MuiClassServiceLeaseRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiClassServiceLeaseRecord.Size)) return false;
-		return MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiClassRecordKind.Lease, MuiClassRecordField.Next, record.Next.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.Flags, record.Flags) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.ClassId,
-				record.ClassId.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.Boopsi,
-				record.Boopsi.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.LibraryBase,
-				record.LibraryBase.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.RefCount,
-				record.RefCount) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.HeadlessClass,
-				record.HeadlessClass.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.CustomClass,
-				record.CustomClass.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.SuperService,
-				record.SuperService.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.ObjectCount,
-				record.ObjectCount) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.Lease, MuiClassRecordField.ChildCount,
-				record.ChildCount);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiClassServiceLeaseRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Next.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Flags) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.ClassId.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Boopsi.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.LibraryBase.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.RefCount) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.HeadlessClass.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.CustomClass.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.SuperService.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.ObjectCount) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.ChildCount)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+}
+
+internal static class MuiClassServiceLeaseCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiClassServiceLeaseRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiClassServiceLeaseStructCodec.TryRead(ref platform, address,
+			out record);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiClassServiceLeaseRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiClassServiceLeaseStructCodec.Write(ref platform, address, record);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -425,36 +434,30 @@ internal struct MuiCustomClassRecord
 	internal APTR Class;
 }
 
-internal static class MuiCustomClassCodec
+internal static class MuiCustomClassStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiCustomClassRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiCustomClassRecord.Size)) return false;
-		if (!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiClassRecordKind.CustomClass, MuiClassRecordField.UserData,
-			out var userData) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.CustomClass, MuiClassRecordField.UtilityBase,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiCustomClassRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var userData) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var utilityBase) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.CustomClass, MuiClassRecordField.DosBase,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var dosBase) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.CustomClass, MuiClassRecordField.GfxBase,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var gfxBase) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.CustomClass, MuiClassRecordField.IntuitionBase,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var intuitionBase) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.CustomClass, MuiClassRecordField.Super,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var super) ||
-			!MuiClassRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiClassRecordKind.CustomClass, MuiClassRecordField.Class,
-				out var @class)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var @class) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.UserData = APTR.FromPointer(userData);
 		record.UtilityBase = APTR.FromPointer(utilityBase);
 		record.DosBase = APTR.FromPointer(dosBase);
@@ -469,30 +472,37 @@ internal static class MuiCustomClassCodec
 		MuiCustomClassRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiCustomClassRecord.Size)) return false;
-		return MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiClassRecordKind.CustomClass, MuiClassRecordField.UserData,
-			record.UserData.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.CustomClass, MuiClassRecordField.UtilityBase,
-				record.UtilityBase.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.CustomClass, MuiClassRecordField.DosBase,
-				record.DosBase.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.CustomClass, MuiClassRecordField.GfxBase,
-				record.GfxBase.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.CustomClass, MuiClassRecordField.IntuitionBase,
-				record.IntuitionBase.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.CustomClass, MuiClassRecordField.Super,
-				record.Super.Raw) &&
-			MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiClassRecordKind.CustomClass, MuiClassRecordField.Class,
-				record.Class.Raw);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiCustomClassRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.UserData.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.UtilityBase.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.DosBase.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.GfxBase.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.IntuitionBase.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Super.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Class.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+}
+
+internal static class MuiCustomClassCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiCustomClassRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiCustomClassStructCodec.TryRead(ref platform, address, out record);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiCustomClassRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiCustomClassStructCodec.Write(ref platform, address, record);
 }
 
 // Scalar qualification surface for the class-service state, lease, and
@@ -973,10 +983,8 @@ public static class MuiClassServiceCore
 		var total = prefixSize + length + 1u;   // "mui/" + classid + NUL
 		var name = MuiHeadlessMemory.Allocate(ref platform, total);
 		if (name.IsNull) return APTR.Null;
-		var prefix = default(MuiClassServiceLibraryPrefixRecord);
-		prefix.Prefix = MuiClassServiceLibraryPrefixRecordCodec.MuiSlash;
-		if (!MuiClassServiceLibraryPrefixRecordCodec.WriteRecord(ref platform, name,
-			prefix))
+		if (!MuiClassServiceLibraryPrefixRecordCodec.WritePrefix(ref platform, name,
+			MuiClassServiceLibraryPrefixRecordCodec.MuiSlash))
 		{
 			platform.Clear(name, total);
 			platform.Free(name, total);

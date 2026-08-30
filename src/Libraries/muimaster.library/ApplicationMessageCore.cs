@@ -699,6 +699,34 @@ internal static class MuiWorkbenchArgumentVectorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(ref platform,
 			cursor.Base, cursor.Index, out address);
+
+	// Complete named-record bridge for indexed consumers. The memory adapter
+	// remains the sole owner of slot arithmetic and range validation; callers
+	// receive the typed Workbench argument record rather than a guest address.
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out MuiWorkbenchArgumentRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, index, out var address) ||
+			!MuiWorkbenchArgumentRecordCodec.TryRead(ref platform, address,
+				out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, MuiWorkbenchArgumentRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, index, out var address)) return false;
+		return MuiWorkbenchArgumentRecordCodec.Write(ref platform, address, value);
+	}
 }
 
 internal static class MuiWorkbenchArgumentRecordCodec
@@ -1079,10 +1107,8 @@ public static class MuiApplicationMessageCore
 		if (!platform.IsMapped(value.ArgumentList, bytes)) return false;
 		for (var index = 0u; index < (uint)value.NumberOfArguments; index++)
 		{
-			if (!MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(ref platform,
-				value.ArgumentList, index, out var address)) return false;
-			if (!MuiWorkbenchArgumentRecordCodec.TryRead(ref platform, address,
-				out var argument)) return false;
+			if (!MuiWorkbenchArgumentVectorCodec.TryRead(ref platform,
+				value.ArgumentList, index, out var argument)) return false;
 			var name = APTR.FromPointer(argument.Name.Raw);
 			if (name.IsNotNull && !CStringCodec.TryReadLength(ref platform, name,
 				MaximumStringLength, out _)) return false;

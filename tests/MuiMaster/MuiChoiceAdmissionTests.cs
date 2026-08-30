@@ -117,6 +117,26 @@ public sealed class MuiChoiceAdmissionTests
 	}
 
 	[Fact]
+	public void ChoiceEntriesAdmissionConsumesCompleteNamedVectorEntries()
+	{
+		var platform = CreatePlatform();
+		var vector = APTR.FromPointer(0x1E40);
+		var state = new MuiChoiceEntriesState
+		{
+			Entries = vector,
+		};
+
+		Assert.True(MuiChoiceEntryVectorCodec.TryWrite(ref platform, vector, 0,
+			new MuiChoiceEntry { Text = APTR.FromPointer(0xFEDCBA98u) }));
+		Assert.True(MuiChoiceEntryVectorCodec.TryWrite(ref platform, vector, 1,
+			new MuiChoiceEntry { Text = APTR.Null }));
+		Assert.True(MuiChoiceEntriesStateAdmission.Validate(ref platform, state));
+
+		state.Entries = APTR.FromPointer(0x20FFE);
+		Assert.False(MuiChoiceEntriesStateAdmission.Validate(ref platform, state));
+	}
+
+	[Fact]
 	public void MalformedChoiceMagicRemainsStructuralButFailsClosed()
 	{
 		var platform = CreatePlatform();

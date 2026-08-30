@@ -151,26 +151,55 @@ internal struct MuiCallHookParameterRecord
 // use this codec without reaching through an anonymous ULONG offset.
 internal static class MuiCallHookParameterRecordCodec
 {
+	// CopperSharp's freestanding generic lowering has a known fault for a
+	// one-ULONG struct crossing a by-value call boundary. Keep the named record
+	// API, but expose scalar-safe cursor entry points for hook implementations
+	// that only need the parameter value.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiCallHookParameterRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var high) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var low) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		value = ((uint)high << 16) | low;
+		return true;
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiCallHookParameterRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				(ushort)(value >> 16)) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				(ushort)value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiCallHookParameterRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiCallHookParameterRecord.Size)) return false;
-		value.Value = platform.ReadUInt32(address, 0);
+		if (!TryReadValue(ref platform, address, out var rawValue)) return false;
+		value.Value = rawValue;
 		return true;
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		APTR address, MuiCallHookParameterRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiCallHookParameterRecord.Size)) return false;
-		platform.WriteUInt32(address, 0, value.Value);
-		return true;
-	}
+		=> WriteValue(ref platform, address, value.Value);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]

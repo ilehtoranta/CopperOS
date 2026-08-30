@@ -596,6 +596,26 @@ public sealed class MuiProcessSpecialistTests
 	}
 
 	[Fact]
+	public void ProcessDispatchArgumentSlotSequentialCodecPreservesHighBitAndBounds()
+	{
+		var p = NewPlatform();
+		var address = APTR.FromPointer(0x1700);
+		p.WriteUInt16(address, 0, 0x8042);
+		p.WriteUInt16(address, 2, 0xAAAA);
+
+		Assert.True(MuiProcessDispatchArgumentSlotCodec.TryReadValue(ref p,
+			address, out var value));
+		Assert.Equal(0x8042AAAAu, value);
+		Assert.False(MuiProcessDispatchArgumentSlotCodec.TryReadValue(ref p,
+			APTR.FromPointer(0x40FFEu), out _));
+		Assert.True(MuiProcessDispatchArgumentSlotCodec.WriteValue(ref p, address,
+			0xC001D00Du));
+		Assert.True(MuiProcessDispatchArgumentSlotCodec.TryReadValue(ref p,
+			address, out value));
+		Assert.Equal(0xC001D00Du, value);
+	}
+
+	[Fact]
 	public void ProcessGeneratedHeaderAndArgumentSlotUseDirectNamedAdapters()
 	{
 		var p = NewPlatform();
@@ -669,6 +689,33 @@ public sealed class MuiProcessSpecialistTests
 		Assert.False(MuiProcessArgumentVectorMemoryCodec.TryGetEntry(ref p,
 			APTR.FromPointer(0x40FFEu), MuiProcessArgumentVectorKind.MethodMessage,
 			0, 1, out _));
+	}
+
+	[Fact]
+	public void ProcessArgumentVectorBridgeUsesNamedDispatchSlots()
+	{
+		var p = NewPlatform();
+		var expected = new MuiProcessDispatchArgumentSlot
+		{
+			Value = 0xFEDCBA98u,
+		};
+
+		Assert.True(MuiProcessArgumentVectorCodec.TryWrite(ref p, Packet,
+			MuiProcessArgumentVectorKind.DispatchPacket, 1, 2, expected));
+		Assert.True(MuiProcessArgumentVectorCodec.TryRead(ref p, Packet,
+			MuiProcessArgumentVectorKind.DispatchPacket, 1, 2,
+			out var decoded));
+		Assert.Equal(expected.Value, decoded.Value);
+		Assert.True(MuiProcessArgumentVectorCodec.TryReadValue(ref p, Packet,
+			MuiProcessArgumentVectorKind.DispatchPacket, 1, 2,
+			out var rawValue));
+		Assert.Equal(expected.Value, rawValue);
+		Assert.False(MuiProcessArgumentVectorCodec.TryReadValue(ref p, Packet,
+			MuiProcessArgumentVectorKind.DispatchPacket,
+			MuiProcessSpecialistLayout.MaximumDispatchArgs, 2, out _));
+		Assert.False(MuiProcessArgumentVectorCodec.TryWriteValue(ref p,
+			APTR.FromPointer(0x40FFEu), MuiProcessArgumentVectorKind.MethodMessage,
+			0, 1, expected.Value));
 	}
 
 	[Fact]

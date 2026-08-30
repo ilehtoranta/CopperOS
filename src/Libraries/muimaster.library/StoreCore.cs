@@ -67,7 +67,7 @@ internal static class MuiStoreIterationCounterMemoryCodec
 }
 
 // Compatibility wrapper retained for typed cursor callers; production access
-// routes through MuiStoreIterationCounterMemoryCodec.
+// uses the complete named counter record below.
 internal static class MuiStoreIterationCounterFieldCursorCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -91,29 +91,44 @@ internal static class MuiStoreIterationCounterFieldCursorCodec
 
 internal static class MuiStoreIterationCounterCodec
 {
+	// A single-field record is still represented as a named struct, but the
+	// scalar entry points keep the 32-bit value out of a by-value struct return
+	// at the freestanding ABI boundary.
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStoreIterationCounter.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiStoreIterationCounter.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiStoreIterationCounter value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStoreIterationCounter.Size)) return false;
-		if (!MuiStoreIterationCounterMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiStoreIterationCounterField.Ordinal,
-			out value.Ordinal)) return false;
-		return true;
+		return TryReadValue(ref platform, address, out value.Ordinal);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		APTR address, MuiStoreIterationCounter value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiStoreIterationCounter.Size)) return false;
-		return MuiStoreIterationCounterMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiStoreIterationCounterField.Ordinal,
-			value.Ordinal);
-	}
+		=> WriteValue(ref platform, address, value.Ordinal);
 }
 
 public static class MuiStoreCore
@@ -689,8 +704,8 @@ public static class MuiStoreCore
 		APTR state, APTR obj, uint kind, APTR counter)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		if (!MuiStoreIterationCounterCodec.TryRead(ref platform, counter,
-			out var counterValue) || counterValue.Ordinal == 0) return APTR.Null;
+		if (!MuiStoreIterationCounterCodec.TryReadValue(ref platform, counter,
+			out var ordinal) || ordinal == 0) return APTR.Null;
 		var owner = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
 		if (owner.IsNull || !TryFindIterationState(ref platform, state, owner,
 			counter, kind, out var iterationAddress, out var iterationValue) ||
@@ -725,12 +740,11 @@ public static class MuiStoreCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var owner = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
-		if (owner.IsNull || !MuiStoreIterationCounterCodec.TryRead(ref platform,
-			counter, out var counterValue))
+		if (owner.IsNull || !MuiStoreIterationCounterCodec.TryReadValue(
+			ref platform, counter, out var ordinal))
 			return APTR.Null;
 		if (!MuiHeadlessObjectCodec.TryRead(ref platform, owner,
 			out var ownerValue)) return APTR.Null;
-		var ordinal = counterValue.Ordinal;
 		var current = ownerValue.Stores;
 		uint matched = 0;
 		uint visited = 0;
@@ -742,9 +756,8 @@ public static class MuiStoreCore
 			{
 				if (matched == ordinal)
 				{
-					counterValue.Ordinal = ordinal + 1;
-					if (!MuiStoreIterationCounterCodec.Write(ref platform, counter,
-						counterValue)) return APTR.Null;
+					if (!MuiStoreIterationCounterCodec.WriteValue(ref platform, counter,
+						ordinal + 1)) return APTR.Null;
 					if (returnRecord) return current;
 					return resultField == StoreIterationField.Key ?
 						APTR.FromPointer(currentRecord.Key) : currentRecord.Data;
@@ -869,14 +882,14 @@ public static class MuiStoreCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var owner = MuiHeadlessObjectCore.FindObject(ref platform, state, obj);
-		if (owner.IsNull || !MuiStoreIterationCounterCodec.TryRead(ref platform,
-			counter, out var counterValue) ||
+		if (owner.IsNull || !MuiStoreIterationCounterCodec.TryReadValue(
+			ref platform, counter, out var ordinal) ||
 			!MuiHeadlessObjectCodec.TryRead(ref platform, owner,
 				out var ownerValue)) return APTR.Null;
 		if (!FindOrCreateIterationState(ref platform, state, owner, counter, kind,
-			counterValue.Ordinal, out var iterationAddress,
+			ordinal, out var iterationAddress,
 			out var iterationValue) || iterationAddress.IsNull) return APTR.Null;
-		var start = counterValue.Ordinal == 0 ? ownerValue.Stores :
+		var start = ordinal == 0 ? ownerValue.Stores :
 			iterationValue.NextRecord;
 		if (!FindStringMapRecord(ref platform, start, kind, out var current))
 			return APTR.Null;
@@ -896,9 +909,8 @@ public static class MuiStoreCore
 		iterationValue.NextRecord = nextRecord;
 		if (!MuiStoreIterationStateCodec.Write(ref platform, iterationAddress,
 			iterationValue)) return APTR.Null;
-		counterValue.Ordinal = 1;
-		if (!MuiStoreIterationCounterCodec.Write(ref platform, counter,
-			counterValue)) return APTR.Null;
+		if (!MuiStoreIterationCounterCodec.WriteValue(ref platform, counter, 1))
+			return APTR.Null;
 		return currentRecord.Data;
 	}
 

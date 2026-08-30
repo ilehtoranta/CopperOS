@@ -524,6 +524,304 @@ internal static class MuiCommonFieldCursorCodec
 			field, value);
 }
 
+// Complete sequential codecs for the fixed CommonControl envelopes. Numeric
+// positions remain owned by the declaration order of each packed record; the
+// legacy field adapter above is retained only for compatibility diagnostics.
+internal static class MuiCommonMessageStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryWriteMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadSigned<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCommonSignedValueMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonSignedValueMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawValue)) return false;
+		value.MethodId = methodId;
+		value.Value = unchecked((int)rawValue);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteSigned<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCommonSignedValueMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonSignedValueMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Value))) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadScaleToValue<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCommonScaleToValueMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonScaleToValueMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMin) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMax) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawValue)) return false;
+		value.MethodId = methodId;
+		value.Min = unchecked((int)rawMin);
+		value.Max = unchecked((int)rawMax);
+		value.Value = unchecked((int)rawValue);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteScaleToValue<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCommonScaleToValueMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonScaleToValueMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Min)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Max)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Value))) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadValueToScale<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCommonValueToScaleMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonValueToScaleMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMin) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMax)) return false;
+		value.MethodId = methodId;
+		value.Min = unchecked((int)rawMin);
+		value.Max = unchecked((int)rawMax);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteValueToScale<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCommonValueToScaleMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonValueToScaleMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Min)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Max))) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadStringify<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCommonStringifyMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonStringifyMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawValue)) return false;
+		value.MethodId = methodId;
+		value.Value = unchecked((int)rawValue);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteStringify<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCommonStringifyMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonStringifyMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Value))) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadHandleEvent<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCommonHandleEventMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonHandleEventMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var inputMessage) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawKey) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var eventHandlerNode)) return false;
+		value.MethodId = methodId;
+		value.InputMessage = inputMessage;
+		value.MuiKey = unchecked((int)rawKey);
+		value.EventHandlerNode = eventHandlerNode;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteHandleEvent<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCommonHandleEventMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonHandleEventMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.InputMessage) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.MuiKey)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.EventHandlerNode)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadGet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCommonGetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonGetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var attribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var storage)) return false;
+		value.MethodId = methodId;
+		value.Attribute = attribute;
+		value.Storage = storage;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteGet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCommonGetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonGetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Attribute) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Storage)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadAttribute<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCommonAttributeMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonAttributeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var attribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var valueWord)) return false;
+		value.MethodId = methodId;
+		value.Attribute = attribute;
+		value.Value = valueWord;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteAttribute<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCommonAttributeMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonAttributeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Attribute) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadAskMinMax<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCommonAskMinMaxMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonAskMinMaxMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var storage)) return false;
+		value.MethodId = methodId;
+		value.Storage = storage;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteAskMinMax<TPlatform>(ref TPlatform platform,
+		APTR message, MuiCommonAskMinMaxMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCommonAskMinMaxMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Storage)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 // Fixed common-control records cross the guest boundary through named packet
 // structs and the direct memory adapter. The cursor wrapper below is retained
 // only for older callers; live codecs never construct a field cursor.
@@ -535,18 +833,15 @@ internal static class MuiCommonMethodMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		uint methodId;
-		if (!MuiCommonMessageMemoryCodec.TryReadMethodId(ref platform, message,
-			out methodId)) return false;
-		packet.MethodId = methodId;
-		return true;
+		return MuiCommonMessageStructCodec.TryReadMethodIdValue(ref platform,
+			message, out packet.MethodId);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiCommonMessageMemoryCodec.TryWriteMethodId(ref platform,
+		return MuiCommonMessageStructCodec.TryWriteMethodIdValue(ref platform,
 			message, method);
 	}
 }
@@ -557,25 +852,14 @@ internal static class MuiCommonSignedValueMessageCodec
 		APTR message, out MuiCommonSignedValueMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiCommonPacketKind.Signed, MuiCommonField.MethodId,
-			out packet.MethodId) ||
-			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.Signed, MuiCommonField.Value, out var rawValue))
-			return false;
-		packet.Value = unchecked((int)rawValue);
-		return true;
+		return MuiCommonMessageStructCodec.TryReadSigned(ref platform,
+			message, out packet);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonSignedValueMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.Signed, MuiCommonField.MethodId, packet.MethodId) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.Signed, MuiCommonField.Value,
-			unchecked((uint)packet.Value));
+		MuiCommonMessageStructCodec.WriteSigned(ref platform, message, packet);
 }
 
 internal static class MuiCommonScaleToValueMessageCodec
@@ -584,41 +868,15 @@ internal static class MuiCommonScaleToValueMessageCodec
 		APTR message, out MuiCommonScaleToValueMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiCommonPacketKind.ScaleToValue, MuiCommonField.MethodId,
-			out packet.MethodId) ||
-			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.ScaleToValue, MuiCommonField.Min,
-				out var rawMin) ||
-			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.ScaleToValue, MuiCommonField.Max,
-				out var rawMax) ||
-			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.ScaleToValue, MuiCommonField.Value,
-				out var rawValue))
-			return false;
-		packet.Min = unchecked((int)rawMin);
-		packet.Max = unchecked((int)rawMax);
-		packet.Value = unchecked((int)rawValue);
-		return true;
+		return MuiCommonMessageStructCodec.TryReadScaleToValue(ref platform,
+			message, out packet);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonScaleToValueMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.ScaleToValue, MuiCommonField.MethodId,
-			packet.MethodId) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.ScaleToValue, MuiCommonField.Min,
-			unchecked((uint)packet.Min)) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.ScaleToValue, MuiCommonField.Max,
-			unchecked((uint)packet.Max)) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.ScaleToValue, MuiCommonField.Value,
-			unchecked((uint)packet.Value));
+		MuiCommonMessageStructCodec.WriteScaleToValue(ref platform, message,
+			packet);
 }
 
 internal static class MuiCommonValueToScaleMessageCodec
@@ -627,104 +885,49 @@ internal static class MuiCommonValueToScaleMessageCodec
 		APTR message, out MuiCommonValueToScaleMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiCommonPacketKind.ValueToScale, MuiCommonField.MethodId,
-			out packet.MethodId) ||
-			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.ValueToScale, MuiCommonField.Min,
-				out var rawMin) ||
-			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.ValueToScale, MuiCommonField.Max,
-				out var rawMax))
-			return false;
-		packet.Min = unchecked((int)rawMin);
-		packet.Max = unchecked((int)rawMax);
-		return true;
+		return MuiCommonMessageStructCodec.TryReadValueToScale(ref platform,
+			message, out packet);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonValueToScaleMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.ValueToScale, MuiCommonField.MethodId,
-			packet.MethodId) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.ValueToScale, MuiCommonField.Min,
-			unchecked((uint)packet.Min)) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.ValueToScale, MuiCommonField.Max,
-			unchecked((uint)packet.Max));
+		MuiCommonMessageStructCodec.WriteValueToScale(ref platform, message,
+			packet);
 }
 
 internal static class MuiCommonStringifyMessageCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiCommonStringifyMessage packet)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiCommonPacketKind.Stringify, MuiCommonField.MethodId,
-			out packet.MethodId) ||
-			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.Stringify, MuiCommonField.Value,
-				out var rawValue))
-			return false;
-		packet.Value = unchecked((int)rawValue);
-		return true;
+		return MuiCommonMessageStructCodec.TryReadStringify(ref platform,
+			message, out packet);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonStringifyMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.Stringify, MuiCommonField.MethodId,
-			packet.MethodId) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.Stringify, MuiCommonField.Value,
-			unchecked((uint)packet.Value));
+		MuiCommonMessageStructCodec.WriteStringify(ref platform, message,
+			packet);
 }
 
 internal static class MuiCommonHandleEventMessageCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiCommonHandleEventMessage packet)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiCommonPacketKind.HandleEvent, MuiCommonField.MethodId,
-			out packet.MethodId) ||
-			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.HandleEvent, MuiCommonField.InputMessage,
-				out packet.InputMessage) ||
-			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.HandleEvent, MuiCommonField.MuiKey,
-				out var rawKey) ||
-			!MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.HandleEvent, MuiCommonField.EventHandlerNode,
-				out packet.EventHandlerNode))
-			return false;
-		packet.MuiKey = unchecked((int)rawKey);
-		return true;
+		return MuiCommonMessageStructCodec.TryReadHandleEvent(ref platform,
+			message, out packet);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonHandleEventMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.HandleEvent, MuiCommonField.MethodId,
-			packet.MethodId) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.HandleEvent, MuiCommonField.InputMessage,
-			packet.InputMessage) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.HandleEvent, MuiCommonField.MuiKey,
-			unchecked((uint)packet.MuiKey)) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.HandleEvent, MuiCommonField.EventHandlerNode,
-			packet.EventHandlerNode);
+		MuiCommonMessageStructCodec.WriteHandleEvent(ref platform, message,
+			packet);
 }
 
 internal static class MuiCommonGetMessageCodec
@@ -733,85 +936,46 @@ internal static class MuiCommonGetMessageCodec
 		APTR message, out MuiCommonGetMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		return MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiCommonPacketKind.Get, MuiCommonField.MethodId,
-			out packet.MethodId) &&
-			MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.Get, MuiCommonField.Attribute,
-				out packet.Attribute) &&
-			MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.Get, MuiCommonField.Storage,
-				out packet.Storage);
+		return MuiCommonMessageStructCodec.TryReadGet(ref platform, message,
+			out packet);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonGetMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.Get, MuiCommonField.MethodId, packet.MethodId) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.Get, MuiCommonField.Attribute,
-			packet.Attribute) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.Get, MuiCommonField.Storage, packet.Storage);
+		MuiCommonMessageStructCodec.WriteGet(ref platform, message, packet);
 }
 
 internal static class MuiCommonAttributeMessageCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiCommonAttributeMessage packet)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		return MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiCommonPacketKind.Attribute, MuiCommonField.MethodId,
-			out packet.MethodId) &&
-			MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.Attribute, MuiCommonField.Attribute,
-				out packet.Attribute) &&
-			MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.Attribute, MuiCommonField.Value,
-				out packet.Value);
+		return MuiCommonMessageStructCodec.TryReadAttribute(ref platform,
+			message, out packet);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonAttributeMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.Attribute, MuiCommonField.MethodId,
-			packet.MethodId) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.Attribute, MuiCommonField.Attribute,
-			packet.Attribute) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.Attribute, MuiCommonField.Value, packet.Value);
+		MuiCommonMessageStructCodec.WriteAttribute(ref platform, message, packet);
 }
 
 internal static class MuiCommonAskMinMaxMessageCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiCommonAskMinMaxMessage packet)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		return MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiCommonPacketKind.AskMinMax, MuiCommonField.MethodId,
-			out packet.MethodId) &&
-			MuiCommonMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiCommonPacketKind.AskMinMax, MuiCommonField.Storage,
-				out packet.Storage);
+		return MuiCommonMessageStructCodec.TryReadAskMinMax(ref platform,
+			message, out packet);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, MuiCommonAskMinMaxMessage packet)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.AskMinMax, MuiCommonField.MethodId,
-			packet.MethodId) &&
-		MuiCommonMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiCommonPacketKind.AskMinMax, MuiCommonField.Storage,
-			packet.Storage);
+		MuiCommonMessageStructCodec.WriteAskMinMax(ref platform, message, packet);
 }
 
 public static class MuiCommonControlPacketCore
@@ -865,11 +1029,8 @@ public static class MuiCommonControlPacketCore
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		methodId = 0;
-		if (!MuiCommonMethodMessageCodec.TryRead(ref platform, message,
-			out var packet)) return false;
-		methodId = packet.MethodId;
-		return true;
+		return MuiCommonMessageStructCodec.TryReadMethodIdValue(ref platform,
+			message, out methodId);
 	}
 
 	internal static bool WriteMethod<TPlatform>(ref TPlatform platform,
@@ -877,6 +1038,54 @@ public static class MuiCommonControlPacketCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		return MuiCommonMethodMessageCodec.TryWrite(ref platform, message, method);
+	}
+
+	public static bool WriteSigned<TPlatform>(ref TPlatform platform,
+		APTR message, uint method, int value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiCommonSignedValueMessage);
+		packet.MethodId = method;
+		packet.Value = value;
+		return (method == NumericDecrease || method == NumericIncrease ||
+			method == PropDecrease || method == PropIncrease) &&
+			MuiCommonSignedValueMessageCodec.TryWrite(ref platform, message, packet);
+	}
+
+	public static bool WriteScaleToValue<TPlatform>(ref TPlatform platform,
+		APTR message, int min, int max, int value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiCommonScaleToValueMessage);
+		packet.MethodId = NumericScaleToValue;
+		packet.Min = min;
+		packet.Max = max;
+		packet.Value = value;
+		return MuiCommonScaleToValueMessageCodec.TryWrite(ref platform, message,
+			packet);
+	}
+
+	public static bool WriteValueToScale<TPlatform>(ref TPlatform platform,
+		APTR message, int min, int max)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiCommonValueToScaleMessage);
+		packet.MethodId = NumericValueToScale;
+		packet.Min = min;
+		packet.Max = max;
+		return MuiCommonValueToScaleMessageCodec.TryWrite(ref platform, message,
+			packet);
+	}
+
+	public static bool WriteStringify<TPlatform>(ref TPlatform platform,
+		APTR message, int value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiCommonStringifyMessage);
+		packet.MethodId = NumericStringify;
+		packet.Value = value;
+		return MuiCommonStringifyMessageCodec.TryWrite(ref platform, message,
+			packet);
 	}
 
 	internal static bool TryReadSigned<TPlatform>(ref TPlatform platform,
@@ -966,6 +1175,28 @@ public static class MuiCommonControlPacketCore
 		packet.Value = value;
 		return (method == Set || method == NoNotifySet) &&
 			MuiCommonAttributeMessageCodec.TryWrite(ref platform, message, packet);
+	}
+
+	public static bool WriteGet<TPlatform>(ref TPlatform platform, APTR message,
+		uint attribute, APTR storage)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiCommonGetMessage);
+		packet.MethodId = OmGet;
+		packet.Attribute = attribute;
+		packet.Storage = storage.Raw;
+		return MuiCommonGetMessageCodec.TryWrite(ref platform, message, packet);
+	}
+
+	public static bool WriteAskMinMax<TPlatform>(ref TPlatform platform,
+		APTR message, APTR storage)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var packet = default(MuiCommonAskMinMaxMessage);
+		packet.MethodId = AskMinMax;
+		packet.Storage = storage.Raw;
+		return MuiCommonAskMinMaxMessageCodec.TryWrite(ref platform, message,
+			packet);
 	}
 
 	internal static bool TryReadAskMinMax<TPlatform>(ref TPlatform platform,

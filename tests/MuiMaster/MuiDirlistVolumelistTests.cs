@@ -320,6 +320,28 @@ public sealed class MuiDirlistVolumelistTests
 	}
 
 	[Fact]
+	public void DirlistFixedWireCodecsRejectTruncatedRecords()
+	{
+		var platform = CreatePlatform(out _, out _, out _);
+		var truncatedTotal = APTR.FromPointer(0x80FFC);
+		var truncatedEntry = APTR.FromPointer(0x80FDE);
+		var truncatedScan = APTR.FromPointer(0x80FE8);
+
+		Assert.False(MuiDirlistByteTotalCodec.TryRead(ref platform,
+			truncatedTotal, out _));
+		Assert.False(MuiDirlistByteTotalCodec.Write(ref platform,
+			truncatedTotal, default));
+		Assert.False(MuiDirlistEntryWireCodec.TryRead(ref platform,
+			truncatedEntry, out _));
+		Assert.False(MuiDirlistEntryWireCodec.Write(ref platform,
+			truncatedEntry, default));
+		Assert.False(MuiDirlistScanEntryWireCodec.TryRead(ref platform,
+			truncatedScan, out _));
+		Assert.False(MuiDirlistScanEntryWireCodec.Write(ref platform,
+			truncatedScan, default));
+	}
+
+	[Fact]
 	public void DirlistRecordFieldCursorUsesSemanticWireKinds()
 	{
 		var platform = CreatePlatform(out _, out _, out _);

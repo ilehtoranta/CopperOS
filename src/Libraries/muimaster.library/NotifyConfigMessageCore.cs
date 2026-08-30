@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -150,17 +151,21 @@ internal static class MuiGetConfigItemMessageCodec
 		return true;
 	}
 
-	// Keep native selector admission scalar while the named method record remains
-	// the dispatcher-facing ABI type. Packed offsets stay inside this codec.
+	// Selector admission remains scalar for callers that only need MethodID, but
+	// it is read from the named one-ULONG method record in declaration order.
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiGetConfigItemMethodMessage.Size)) return false;
-		return MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiGetConfigItemPacketField.MethodId, out methodId);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiGetConfigItemMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		methodId = rawMethodId;
+		return true;
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -173,12 +178,18 @@ internal static class MuiGetConfigItemMessageCodec
 			MuiGetConfigItemMessage.Size) ||
 			!TryReadMethodIdValue(ref platform, message, out methodId) ||
 			methodId != Method) return false;
-		if (!MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiGetConfigItemPacketField.ConfigId, out packet.ConfigId) ||
-			!MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
-				message, MuiGetConfigItemPacketField.Storage,
-				out var rawStorage)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiGetConfigItemMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var configId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawStorage) ||
+			!MuiGuestStructCursor.IsComplete(cursor) ||
+			rawMethodId != Method) return false;
 		packet.MethodId = methodId;
+		packet.ConfigId = configId;
 		packet.Storage = APTR.FromPointer(rawStorage);
 		return true;
 	}
@@ -187,15 +198,15 @@ internal static class MuiGetConfigItemMessageCodec
 		APTR message, MuiGetConfigItemMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiGetConfigItemMessage.Size)) return false;
-		return MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiGetConfigItemPacketField.MethodId, Method) &&
-			MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiGetConfigItemPacketField.ConfigId, packet.ConfigId) &&
-			MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiGetConfigItemPacketField.Storage,
-				packet.Storage.Raw);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiGetConfigItemMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				Method) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.ConfigId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Storage.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 

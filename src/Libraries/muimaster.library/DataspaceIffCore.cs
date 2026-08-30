@@ -323,12 +323,15 @@ internal static class MuiDataspaceIffEntryHeaderCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDataspaceIffEntryHeader.Size)) return false;
-		value.Id = platform.ReadUInt32(address,
-			(int)MuiDataspaceIffEntryHeader.IdOffset);
-		value.Length = platform.ReadUInt32(address,
-			(int)MuiDataspaceIffEntryHeader.LengthOffset);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDataspaceIffEntryHeader.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var id) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var length) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value.Id = id;
+		value.Length = length;
 		return true;
 	}
 
@@ -336,14 +339,13 @@ internal static class MuiDataspaceIffEntryHeaderCodec
 		APTR address, MuiDataspaceIffEntryHeader value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDataspaceIffEntryHeader.Size)) return false;
-		platform.WriteUInt32(address, (int)MuiDataspaceIffEntryHeader.IdOffset,
-			value.Id);
-		platform.WriteUInt32(address,
-			(int)MuiDataspaceIffEntryHeader.LengthOffset,
-			value.Length);
-		return true;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDataspaceIffEntryHeader.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Id) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Length)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -381,7 +383,10 @@ internal static class MuiDataspaceIffTransferCursorCodec
 }
 
 // Central codec for the two fixed Dataspace IFF packets. Consumers receive
-// named records; only this adapter carries the packed guest offsets.
+// named records; production reads and writes walk those records in declaration
+// order through MuiGuestStructCursor. The field-oriented memory adapters above
+// remain compatibility shims for callers that explicitly need a selected
+// guest field, but they are not used by the packet path.
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiDataspaceIffMethodMessage
 {
@@ -453,9 +458,12 @@ internal static class MuiDataspaceIffMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiDataspaceIffMethodMessage.Size)) return false;
-		methodId = platform.ReadUInt32(message, 0);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceIffMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		methodId = rawMethodId;
 		return true;
 	}
 
@@ -464,10 +472,9 @@ internal static class MuiDataspaceIffMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiDataspaceIffMethodMessage.Size)) return false;
-		if (!TryReadMethodIdValue(ref platform, message, out packet.MethodId))
+		if (!TryReadMethodIdValue(ref platform, message, out var methodId))
 			return false;
+		packet.MethodId = methodId;
 		return true;
 	}
 
@@ -484,13 +491,22 @@ internal static class MuiDataspaceIffMessageCodec
 	internal static bool TryReadReadIff<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceReadIffMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadReadIffRecord(ref platform, message, out packet);
+
+	internal static bool TryReadReadIffRecord<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDataspaceReadIffMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPacket(ref platform, message, MuiDataspaceReadIffMessage.Size,
-			ReadIffMethod)) return false;
-		packet.MethodId = ReadIffMethod;
-		if (!MuiDataspaceReadIffMessageMemoryCodec.TryRead(ref platform, message,
-			MuiDataspaceReadIffField.Handle, out var rawHandle)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceReadIffMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawHandle) ||
+			!MuiGuestStructCursor.IsComplete(cursor) ||
+			rawMethodId != ReadIffMethod) return false;
+		packet.MethodId = rawMethodId;
 		packet.Handle = APTR.FromPointer(rawHandle);
 		return true;
 	}
@@ -498,57 +514,72 @@ internal static class MuiDataspaceIffMessageCodec
 	internal static bool TryReadWriteIff<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceWriteIffMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadWriteIffRecord(ref platform, message, out packet);
+
+	internal static bool TryReadWriteIffRecord<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDataspaceWriteIffMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPacket(ref platform, message, MuiDataspaceWriteIffMessage.Size,
-			WriteIffMethod)) return false;
-		packet.MethodId = WriteIffMethod;
-		if (!MuiDataspaceWriteIffMessageMemoryCodec.TryRead(ref platform, message,
-			MuiDataspaceWriteIffField.Handle, out var rawHandle)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceWriteIffMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawHandle) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var type) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var id) ||
+			!MuiGuestStructCursor.IsComplete(cursor) ||
+			rawMethodId != WriteIffMethod) return false;
+		packet.MethodId = rawMethodId;
 		packet.Handle = APTR.FromPointer(rawHandle);
-		return MuiDataspaceWriteIffMessageMemoryCodec.TryRead(ref platform, message,
-			MuiDataspaceWriteIffField.Type, out packet.Type) &&
-			MuiDataspaceWriteIffMessageMemoryCodec.TryRead(ref platform, message,
-				MuiDataspaceWriteIffField.Id, out packet.Id);
+		packet.Type = type;
+		packet.Id = id;
+		return true;
 	}
 
 	internal static bool TryWriteReadIff<TPlatform>(ref TPlatform platform,
 		APTR message, MuiDataspaceReadIffMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteReadIffRecord(ref platform, message, packet);
+
+	internal static bool TryWriteReadIffRecord<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspaceReadIffMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsMapped(ref platform, message, MuiDataspaceReadIffMessage.Size))
-			return false;
-		return MuiDataspaceReadIffMessageMemoryCodec.TryWrite(ref platform,
-			message, MuiDataspaceReadIffField.MethodId, ReadIffMethod) &&
-			MuiDataspaceReadIffMessageMemoryCodec.TryWrite(ref platform, message,
-				MuiDataspaceReadIffField.Handle, packet.Handle.Raw);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceReadIffMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				ReadIffMethod) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Handle.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryWriteWriteIff<TPlatform>(ref TPlatform platform,
 		APTR message, MuiDataspaceWriteIffMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteWriteIffRecord(ref platform, message, packet);
+
+	internal static bool TryWriteWriteIffRecord<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspaceWriteIffMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsMapped(ref platform, message, MuiDataspaceWriteIffMessage.Size))
-			return false;
-		return MuiDataspaceWriteIffMessageMemoryCodec.TryWrite(ref platform,
-			message, MuiDataspaceWriteIffField.MethodId, WriteIffMethod) &&
-			MuiDataspaceWriteIffMessageMemoryCodec.TryWrite(ref platform, message,
-				MuiDataspaceWriteIffField.Handle, packet.Handle.Raw) &&
-			MuiDataspaceWriteIffMessageMemoryCodec.TryWrite(ref platform, message,
-				MuiDataspaceWriteIffField.Type, packet.Type) &&
-			MuiDataspaceWriteIffMessageMemoryCodec.TryWrite(ref platform, message,
-				MuiDataspaceWriteIffField.Id, packet.Id);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceWriteIffMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				WriteIffMethod) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Handle.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Type) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Id)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
-	private static bool IsPacket<TPlatform>(ref TPlatform platform,
-		APTR message, uint size, uint method)
-		where TPlatform : struct, IMuiGuestMemory =>
-		TryReadMethodId(ref platform, message, out var header) &&
-		header.MethodId == method && IsMapped(ref platform, message, size);
-
-	private static bool IsMapped<TPlatform>(ref TPlatform platform,
-		APTR message, uint size) where TPlatform : struct, IMuiGuestMemory =>
-		message.IsNotNull && platform.IsMapped(message, size);
 }
 
 public static class MuiDataspaceIffMessageCore

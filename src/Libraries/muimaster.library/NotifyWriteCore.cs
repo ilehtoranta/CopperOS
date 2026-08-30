@@ -49,17 +49,26 @@ internal struct MuiWriteStringMessage
 
 internal static class MuiNotifyWriteMethodMessageCodec
 {
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiNotifyWriteMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiNotifyWriteMethodMessage value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		uint methodId;
-		if (!MuiNotifyWritePacketMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiNotifyWritePacketKind.WriteLong,
-			MuiNotifyWritePacketField.MethodId,
-			MuiNotifyWriteMethodMessage.Size, out methodId)) return false;
+		if (!TryReadMethodIdValue(ref platform, address, out var methodId))
+			return false;
 		value.MethodId = methodId;
 		return true;
 	}
@@ -69,10 +78,11 @@ internal static class MuiNotifyWriteMethodMessageCodec
 		MuiNotifyWriteMethodMessage value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiNotifyWritePacketMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiNotifyWritePacketKind.WriteLong,
-			MuiNotifyWritePacketField.MethodId,
-			MuiNotifyWriteMethodMessage.Size, value.MethodId);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiNotifyWriteMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -276,18 +286,8 @@ internal static class MuiNotifyWriteMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		methodId = 0;
-		if (message.IsNotNull && platform.IsMapped(message,
-			MuiWriteLongMessage.Size) &&
-			MuiWriteLongMessageCodec.TryRead(ref platform, message,
-				out var completeLong))
-		{
-			methodId = completeLong.MethodId;
-			return true;
-		}
-		return MuiNotifyWritePacketMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiNotifyWritePacketKind.WriteLong,
-			MuiNotifyWritePacketField.MethodId, MuiNotifyWriteMethodMessage.Size,
-			out methodId);
+		return MuiNotifyWriteMethodMessageCodec.TryReadMethodIdValue(
+			ref platform, message, out methodId);
 	}
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,

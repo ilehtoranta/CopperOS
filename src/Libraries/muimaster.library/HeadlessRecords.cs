@@ -4,6 +4,7 @@
 */
 
 using Amiga;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace CopperOS.MuiMaster;
@@ -165,32 +166,42 @@ internal static class MuiGuestUlongStorageFieldCursorCodec
 
 internal static class MuiGuestUlongStorageCodec
 {
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
 		APTR address, uint value) where TPlatform : struct, IMuiGuestMemory
 	{
-		var record = default(MuiGuestUlongStorage);
-		record.Value = value;
-		return Write(ref platform, address, record);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGuestUlongStorage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value))
+			return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint value) where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGuestUlongStorage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value))
+			return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiGuestUlongStorage record) where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGuestUlongStorage.Size)) return false;
-		return MuiGuestUlongStorageMemoryCodec.TryWrite(ref platform,
-			address, MuiGuestUlongStorageField.Value, record.Value);
-	}
+		=> WriteValue(ref platform, address, record.Value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiGuestUlongStorage record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiGuestUlongStorage.Size)) return false;
-		return MuiGuestUlongStorageMemoryCodec.TryRead(ref platform, address,
-			MuiGuestUlongStorageField.Value, out record.Value);
+		if (!TryReadValue(ref platform, address, out var value)) return false;
+		record.Value = value;
+		return true;
 	}
 }
 

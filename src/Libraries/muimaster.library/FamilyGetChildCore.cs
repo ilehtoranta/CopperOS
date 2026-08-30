@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -132,6 +133,58 @@ internal static class MuiFamilyGetChildPacketFieldCursorCodec
 			field, value);
 }
 
+// Sequential codec for the fixed Family_GetChild records. The compatibility
+// field adapter remains available for diagnostics; production packet paths use
+// these declaration-ordered named members and complete-record admission.
+internal static class MuiFamilyGetChildMessageStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiFamilyGetChildMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out methodId) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiFamilyGetChildMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiFamilyGetChildMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawNumber) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawReference) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		packet.Number = unchecked((int)rawNumber);
+		packet.Reference = APTR.FromPointer(rawReference);
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR message, uint methodId, int number, APTR reference)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiFamilyGetChildMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, methodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)number)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				reference.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 // Central adapter for the fixed MorphOS MUIM_Family_GetChild packet. The
 // public selector record remains the consumer-facing shape; only this codec
 // knows the packed guest offsets and mapping boundary.
@@ -155,50 +208,23 @@ internal static class MuiFamilyGetChildMessageCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiFamilyGetChildMethodMessage.Size)) return false;
-		return MuiFamilyGetChildMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiFamilyGetChildPacketField.MethodId, out methodId);
-	}
+		=> MuiFamilyGetChildMessageStructCodec.TryReadMethodIdValue(ref platform,
+			message, out methodId);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiFamilyGetChildMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		uint methodId;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiFamilyGetChildMessage.Size) ||
-			!TryReadMethodIdValue(ref platform, message, out methodId) ||
-			methodId != Method) return false;
-		if (!MuiFamilyGetChildMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiFamilyGetChildPacketField.Number, out var rawNumber) ||
-			!MuiFamilyGetChildMessageMemoryCodec.TryReadUInt32(ref platform,
-				message, MuiFamilyGetChildPacketField.Reference,
-				out var rawReference)) return false;
-		packet.MethodId = methodId;
-		packet.Number = unchecked((int)rawNumber);
-		packet.Reference = APTR.FromPointer(rawReference);
-		return true;
+		return MuiFamilyGetChildMessageStructCodec.TryRead(ref platform, message,
+			out packet) && packet.MethodId == Method;
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		APTR message, MuiFamilyGetChildMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiFamilyGetChildMessage.Size)) return false;
-		return MuiFamilyGetChildMessageMemoryCodec.TryWriteUInt32(
-			ref platform, message, MuiFamilyGetChildPacketField.MethodId, Method) &&
-			MuiFamilyGetChildMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiFamilyGetChildPacketField.Number,
-				unchecked((uint)packet.Number)) &&
-			MuiFamilyGetChildMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiFamilyGetChildPacketField.Reference,
-				packet.Reference.Raw);
-	}
+		=> MuiFamilyGetChildMessageStructCodec.TryWrite(ref platform, message,
+			Method, packet.Number, packet.Reference);
 }
 
 // Selector-aware Family_GetChild dispatch.  The actual child topology remains

@@ -196,19 +196,22 @@ public struct MuiDirlistByteTotalState
 
 internal static class MuiDirlistByteTotalCodec
 {
+	// The QUAD is a declaration-ordered two-LONG record. Keep the field
+	// adapter below available for compatibility callers, but make production
+	// reads and writes consume the complete named record through one cursor.
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiDirlistByteTotalState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistByteTotalState.Size)) return false;
-		if (!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiDirlistRecordKind.ByteTotal, MuiDirlistRecordField.High,
-			out value.High) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.ByteTotal, MuiDirlistRecordField.Low,
-				out value.Low)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistByteTotalState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var high) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+				ref cursor, out var low) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value.High = high;
+		value.Low = low;
 		return true;
 	}
 
@@ -216,14 +219,12 @@ internal static class MuiDirlistByteTotalCodec
 		MuiDirlistByteTotalState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistByteTotalState.Size)) return false;
-		return MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiDirlistRecordKind.ByteTotal, MuiDirlistRecordField.High,
-			value.High) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.ByteTotal, MuiDirlistRecordField.Low,
-				value.Low);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistByteTotalState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.High) || !MuiGuestStructCursor.TryWriteUInt32(ref platform,
+				ref cursor, value.Low)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -259,41 +260,40 @@ internal struct MuiDirlistEntryWireState
 
 internal static class MuiDirlistEntryWireCodec
 {
+	// The fixed FileInfoBlock-like header is exchanged in declaration order.
+	// Inline name/comment bytes remain a variable tail owned by Dirlist; this
+	// codec covers only the complete named header record.
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiDirlistEntryWireState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistEntryWireState.Size)) return false;
-		if (!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiDirlistRecordKind.EntryWire,
-			MuiDirlistRecordField.RecordSize, out value.RecordSize) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Type,
-				out var type) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.SizeLow,
-				out value.SizeLow) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.SizeHigh,
-				out value.SizeHigh) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Protection,
-				out value.Protection) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Days,
-				out value.Days) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Mins,
-				out value.Mins) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Ticks,
-				out value.Ticks) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.CommentOffset,
-				out value.CommentOffset)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistEntryWireState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var recordSize) || !MuiGuestStructCursor.TryReadUInt32(
+				ref platform, ref cursor, out var type) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var sizeLow) || !MuiGuestStructCursor.TryReadUInt32(
+				ref platform, ref cursor, out var sizeHigh) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var protection) || !MuiGuestStructCursor.TryReadUInt32(
+				ref platform, ref cursor, out var days) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var mins) || !MuiGuestStructCursor.TryReadUInt32(
+				ref platform, ref cursor, out var ticks) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var commentOffset) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value.RecordSize = recordSize;
 		value.Type = unchecked((int)type);
+		value.SizeLow = sizeLow;
+		value.SizeHigh = sizeHigh;
+		value.Protection = protection;
+		value.Days = days;
+		value.Mins = mins;
+		value.Ticks = ticks;
+		value.CommentOffset = commentOffset;
 		return true;
 	}
 
@@ -301,35 +301,23 @@ internal static class MuiDirlistEntryWireCodec
 		MuiDirlistEntryWireState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistEntryWireState.Size)) return false;
-		return MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiDirlistRecordKind.EntryWire,
-			MuiDirlistRecordField.RecordSize, value.RecordSize) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Type,
-				unchecked((uint)value.Type)) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.SizeLow,
-				value.SizeLow) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.SizeHigh,
-				value.SizeHigh) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Protection,
-				value.Protection) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Days,
-				value.Days) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Mins,
-				value.Mins) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.Ticks,
-				value.Ticks) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.EntryWire, MuiDirlistRecordField.CommentOffset,
-				value.CommentOffset);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistEntryWireState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RecordSize) || !MuiGuestStructCursor.TryWriteUInt32(
+				ref platform, ref cursor, unchecked((uint)value.Type)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.SizeLow) || !MuiGuestStructCursor.TryWriteUInt32(
+				ref platform, ref cursor, value.SizeHigh) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Protection) || !MuiGuestStructCursor.TryWriteUInt32(
+				ref platform, ref cursor, value.Days) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Mins) || !MuiGuestStructCursor.TryWriteUInt32(
+				ref platform, ref cursor, value.Ticks) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.CommentOffset)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -817,35 +805,34 @@ internal static class MuiDirlistScanStateRecordCodec
 
 internal static class MuiDirlistScanEntryWireCodec
 {
+	// The transient ExAll header is a declaration-ordered sequence of ULONGs;
+	// its inline name/comment payload remains outside this fixed record.
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiDirlistScanEntryWireState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistScanEntryWireState.Size)) return false;
-		if (!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiDirlistRecordKind.ScanEntryWire,
-			MuiDirlistRecordField.Type, out var type) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.SizeLow,
-				out value.SizeLow) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.SizeHigh,
-				out value.SizeHigh) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Protection,
-				out value.Protection) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Days,
-				out value.Days) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Mins,
-				out value.Mins) ||
-			!MuiDirlistRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Ticks,
-				out value.Ticks)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistScanEntryWireState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var type) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+				ref cursor, out var sizeLow) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var sizeHigh) || !MuiGuestStructCursor.TryReadUInt32(
+				ref platform, ref cursor, out var protection) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var days) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+				ref cursor, out var mins) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var ticks) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
 		value.Type = unchecked((int)type);
+		value.SizeLow = sizeLow;
+		value.SizeHigh = sizeHigh;
+		value.Protection = protection;
+		value.Days = days;
+		value.Mins = mins;
+		value.Ticks = ticks;
 		return true;
 	}
 
@@ -853,29 +840,20 @@ internal static class MuiDirlistScanEntryWireCodec
 		MuiDirlistScanEntryWireState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDirlistScanEntryWireState.Size)) return false;
-		return MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiDirlistRecordKind.ScanEntryWire,
-			MuiDirlistRecordField.Type, unchecked((uint)value.Type)) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.SizeLow,
-				value.SizeLow) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.SizeHigh,
-				value.SizeHigh) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Protection,
-				value.Protection) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Days,
-				value.Days) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Mins,
-				value.Mins) &&
-			MuiDirlistRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDirlistRecordKind.ScanEntryWire, MuiDirlistRecordField.Ticks,
-				value.Ticks);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistScanEntryWireState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Type)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.SizeLow) || !MuiGuestStructCursor.TryWriteUInt32(
+				ref platform, ref cursor, value.SizeHigh) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Protection) || !MuiGuestStructCursor.TryWriteUInt32(
+				ref platform, ref cursor, value.Days) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Mins) || !MuiGuestStructCursor.TryWriteUInt32(
+				ref platform, ref cursor, value.Ticks)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 

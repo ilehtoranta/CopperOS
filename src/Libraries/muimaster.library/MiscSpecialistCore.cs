@@ -649,28 +649,48 @@ internal struct MuiKeyadjustPolicyStateRecord
 
 internal static class MuiKeyadjustPolicyStateCodec
 {
+	// CopperSharp currently has an unstable ABI when a one-ULONG struct is
+	// passed by value. Keep the named record as the public shape, but expose
+	// scalar-safe entry points for freestanding callers that must preserve the
+	// full ULONG range (including bit 31).
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiKeyadjustPolicyStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiKeyadjustPolicyStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiKeyadjustPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiKeyadjustPolicyStateRecord.Size)) return false;
-		return MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiMiscRecordKind.KeyadjustPolicy, MuiMiscRecordField.ForceKeyCode,
-			out value.ForceKeyCode);
+		if (!TryReadUInt32(ref platform, address, out var forceKeyCode))
+			return false;
+		value.ForceKeyCode = forceKeyCode;
+		return true;
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiKeyadjustPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiKeyadjustPolicyStateRecord.Size)) return false;
-		return MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiMiscRecordKind.KeyadjustPolicy, MuiMiscRecordField.ForceKeyCode,
-			value.ForceKeyCode);
-	}
+		=> TryWriteUInt32(ref platform, address, value.ForceKeyCode);
 }
 
 internal static class MuiMiscSpecialistHeaderCodec
@@ -961,32 +981,29 @@ internal static class MuiMiscTitleStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscTitleState.Size)) return false;
-		if (!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiMiscRecordKind.Title, MuiMiscRecordField.Pages, out var pages) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.PageCount,
-				out value.PageCount) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.ActivePage,
-				out value.ActivePage) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.PageSequence,
-				out value.PageSequence) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.Position,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscTitleState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var pages) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var pageCount) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var activePage) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var pageSequence) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var position) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.EventPriority,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var eventPriority) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.OnLastClose,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var onLastClose) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.Clickable,
-				out var clickable)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var clickable) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.Pages = APTR.FromPointer(pages);
+		value.PageCount = pageCount;
+		value.ActivePage = activePage;
+		value.PageSequence = pageSequence;
 		value.Position = unchecked((int)position);
 		value.EventPriority = unchecked((int)eventPriority);
 		value.OnLastClose = unchecked((int)onLastClose);
@@ -998,31 +1015,25 @@ internal static class MuiMiscTitleStateCodec
 		MuiMiscTitleState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscTitleState.Size)) return false;
-		return MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiMiscRecordKind.Title, MuiMiscRecordField.Pages, value.Pages.Raw) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.PageCount,
-				value.PageCount) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.ActivePage,
-				value.ActivePage) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiMiscRecordKind.Title, MuiMiscRecordField.PageSequence,
-				value.PageSequence) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.Position,
-				unchecked((uint)value.Position)) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.EventPriority,
-				unchecked((uint)value.EventPriority)) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiMiscRecordKind.Title, MuiMiscRecordField.OnLastClose,
-			unchecked((uint)value.OnLastClose)) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.Title, MuiMiscRecordField.Clickable,
-				unchecked((uint)value.Clickable));
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscTitleState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Pages.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PageCount) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ActivePage) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PageSequence) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Position)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.EventPriority)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.OnLastClose)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.Clickable))) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -1048,26 +1059,23 @@ internal static class MuiMiscFilepanelServiceStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscFilepanelServiceState.Size)) return false;
-		if (!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiMiscRecordKind.FilepanelService, MuiMiscRecordField.FilterFunc,
-			out var filterFunc) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.FilepanelService, MuiMiscRecordField.AslState,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscFilepanelServiceState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var filterFunc) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var aslState) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.FilepanelService, MuiMiscRecordField.Rows,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var rows) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.FilepanelService, MuiMiscRecordField.RowCount,
-				out value.RowCount) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.FilepanelService, MuiMiscRecordField.HookMsg,
-				out var hookMsg)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rowCount) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var hookMsg) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.FilterFunc = APTR.FromPointer(filterFunc);
 		value.AslState = APTR.FromPointer(aslState);
 		value.Rows = APTR.FromPointer(rows);
+		value.RowCount = rowCount;
 		value.HookMsg = APTR.FromPointer(hookMsg);
 		return true;
 	}
@@ -1076,23 +1084,19 @@ internal static class MuiMiscFilepanelServiceStateCodec
 		MuiMiscFilepanelServiceState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscFilepanelServiceState.Size)) return false;
-		return MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiMiscRecordKind.FilepanelService, MuiMiscRecordField.FilterFunc,
-			value.FilterFunc.Raw) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.FilepanelService, MuiMiscRecordField.AslState,
-				value.AslState.Raw) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.FilepanelService, MuiMiscRecordField.Rows,
-				value.Rows.Raw) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.FilepanelService, MuiMiscRecordField.RowCount,
-				value.RowCount) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.FilepanelService, MuiMiscRecordField.HookMsg,
-				value.HookMsg.Raw);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscFilepanelServiceState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.FilterFunc.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.AslState.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Rows.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RowCount) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.HookMsg.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -1174,16 +1178,15 @@ internal static class MuiMiscOwnedStringSlotCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscOwnedStringSlot.Size)) return false;
-		if (!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiMiscRecordKind.OwnedStringSlot, MuiMiscRecordField.Value,
-			out var stringValue) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.OwnedStringSlot,
-				MuiMiscRecordField.AllocationSize, out value.AllocationSize))
-			return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscOwnedStringSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var stringValue) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var allocationSize) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.Value = APTR.FromPointer(stringValue);
+		value.AllocationSize = allocationSize;
 		return true;
 	}
 
@@ -1191,14 +1194,13 @@ internal static class MuiMiscOwnedStringSlotCodec
 		MuiMiscOwnedStringSlot value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscOwnedStringSlot.Size)) return false;
-		return MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiMiscRecordKind.OwnedStringSlot, MuiMiscRecordField.Value,
-			value.Value.Raw) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.OwnedStringSlot,
-				MuiMiscRecordField.AllocationSize, value.AllocationSize);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscOwnedStringSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Value.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.AllocationSize)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -1222,22 +1224,19 @@ internal static class MuiMiscMccprefsStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscMccprefsState.Size)) return false;
-		if (!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiMiscRecordKind.Mccprefs, MuiMiscRecordField.Registry,
-			out var registry) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.Mccprefs, MuiMiscRecordField.RegistryCount,
-				out value.RegistryCount) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.Mccprefs, MuiMiscRecordField.RegistryConfig,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscMccprefsState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var registry) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var registryCount) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var registryConfig) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.Mccprefs,
-				MuiMiscRecordField.RegistryOriginator,
-				out var registryOriginator)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var registryOriginator) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.Registry = APTR.FromPointer(registry);
+		value.RegistryCount = registryCount;
 		value.RegistryConfig = APTR.FromPointer(registryConfig);
 		value.RegistryOriginator = APTR.FromPointer(registryOriginator);
 		return true;
@@ -1247,21 +1246,17 @@ internal static class MuiMiscMccprefsStateCodec
 		MuiMiscMccprefsState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscMccprefsState.Size)) return false;
-		return MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiMiscRecordKind.Mccprefs, MuiMiscRecordField.Registry,
-			value.Registry.Raw) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.Mccprefs, MuiMiscRecordField.RegistryCount,
-				value.RegistryCount) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.Mccprefs, MuiMiscRecordField.RegistryConfig,
-				value.RegistryConfig.Raw) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.Mccprefs,
-				MuiMiscRecordField.RegistryOriginator,
-				value.RegistryOriginator.Raw);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscMccprefsState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Registry.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RegistryCount) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RegistryConfig.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RegistryOriginator.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -1284,18 +1279,18 @@ internal static class MuiMiscScrmodelistStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscScrmodelistState.Size)) return false;
-		if (!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiMiscRecordKind.Scrmodelist, MuiMiscRecordField.Modes,
-			out var modes) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.Scrmodelist, MuiMiscRecordField.ModeCount,
-				out value.ModeCount) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.Scrmodelist, MuiMiscRecordField.ActiveMode,
-				out value.ActiveMode)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscScrmodelistState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var modes) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var modeCount) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var activeMode) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.Modes = APTR.FromPointer(modes);
+		value.ModeCount = modeCount;
+		value.ActiveMode = activeMode;
 		return true;
 	}
 
@@ -1303,17 +1298,15 @@ internal static class MuiMiscScrmodelistStateCodec
 		MuiMiscScrmodelistState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscScrmodelistState.Size)) return false;
-		return MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiMiscRecordKind.Scrmodelist, MuiMiscRecordField.Modes,
-			value.Modes.Raw) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.Scrmodelist, MuiMiscRecordField.ModeCount,
-				value.ModeCount) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.Scrmodelist, MuiMiscRecordField.ActiveMode,
-				value.ActiveMode);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscScrmodelistState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Modes.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ModeCount) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ActiveMode)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -1334,14 +1327,13 @@ internal static class MuiMiscWindowPanelStateCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscWindowPanelState.Size)) return false;
-		if (!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiMiscRecordKind.WindowPanel, MuiMiscRecordField.Application,
-			out var application) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.WindowPanel, MuiMiscRecordField.PanelWindow,
-				out var panelWindow)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscWindowPanelState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var application) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var panelWindow) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.Application = APTR.FromPointer(application);
 		value.PanelWindow = APTR.FromPointer(panelWindow);
 		return true;
@@ -1351,14 +1343,13 @@ internal static class MuiMiscWindowPanelStateCodec
 		MuiMiscWindowPanelState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscWindowPanelState.Size)) return false;
-		return MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiMiscRecordKind.WindowPanel, MuiMiscRecordField.Application,
-			value.Application.Raw) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.WindowPanel, MuiMiscRecordField.PanelWindow,
-				value.PanelWindow.Raw);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscWindowPanelState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Application.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PanelWindow.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -1374,26 +1365,45 @@ internal struct MuiMiscProtectionState
 
 internal static class MuiMiscProtectionStateCodec
 {
+	// Keep scalar entry points for the same one-ULONG by-value ABI limitation;
+	// the named struct APIs below remain the host-facing record shape.
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscProtectionState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR address, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscProtectionState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiMiscProtectionState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscProtectionState.Size)) return false;
-		value.Flags = platform.ReadUInt32(address, 0);
+		if (!TryReadUInt32(ref platform, address, out var flags)) return false;
+		value.Flags = flags;
 		return true;
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiMiscProtectionState value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscProtectionState.Size)) return false;
-		platform.WriteUInt32(address, 0, value.Flags);
-		return true;
-	}
+		=> TryWriteUInt32(ref platform, address, value.Flags);
 }
 
 // Named Fontdisplay natural-size state recorded by MUIM_Draw.
@@ -1412,14 +1422,15 @@ internal static class MuiMiscFontdisplaySizeCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscFontdisplaySize.Size)) return false;
-		if (!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiMiscRecordKind.Fontdisplay, MuiMiscRecordField.Width,
-			out value.Width) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.Fontdisplay, MuiMiscRecordField.Height,
-				out value.Height)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscFontdisplaySize.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var width) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var height) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		value.Width = width;
+		value.Height = height;
 		return true;
 	}
 
@@ -1427,13 +1438,13 @@ internal static class MuiMiscFontdisplaySizeCodec
 		MuiMiscFontdisplaySize value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMiscFontdisplaySize.Size)) return false;
-		return MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiMiscRecordKind.Fontdisplay, MuiMiscRecordField.Width, value.Width) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.Fontdisplay, MuiMiscRecordField.Height,
-				value.Height);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMiscFontdisplaySize.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Width) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Height)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -1472,14 +1483,15 @@ internal static class MuiTitlePageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiTitlePageRecord.Size)) return false;
-		if (!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiMiscRecordKind.TitlePage, MuiMiscRecordField.Handle,
-			out record.Handle) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.TitlePage, MuiMiscRecordField.PageFlags,
-				out record.Flags)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiTitlePageRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var handle) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var flags) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		record.Handle = handle;
+		record.Flags = flags;
 		return true;
 	}
 
@@ -1487,14 +1499,13 @@ internal static class MuiTitlePageCodec
 		MuiTitlePageRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiTitlePageRecord.Size)) return false;
-		return MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiMiscRecordKind.TitlePage, MuiMiscRecordField.Handle,
-			record.Handle) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.TitlePage, MuiMiscRecordField.PageFlags,
-				record.Flags);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiTitlePageRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Handle) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -1561,28 +1572,26 @@ internal static class MuiMccprefsRegistryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMccprefsRegistryRecord.Size)) return false;
-		if (!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiMiscRecordKind.MccprefsRegistry, MuiMiscRecordField.Gadget,
-			out var gadget) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.MccprefsRegistry, MuiMiscRecordField.Id,
-				out record.Id) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.MccprefsRegistry, MuiMiscRecordField.Params,
-				out record.Params) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.MccprefsRegistry, MuiMiscRecordField.Title,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMccprefsRegistryRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var gadget) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var id) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var parameters) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var title) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.MccprefsRegistry, MuiMiscRecordField.Attr,
-				out record.Attr) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.MccprefsRegistry, MuiMiscRecordField.Label,
-				out var label)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var attr) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var label) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Gadget = APTR.FromPointer(gadget);
+		record.Id = id;
+		record.Params = parameters;
 		record.Title = APTR.FromPointer(title);
+		record.Attr = attr;
 		record.Label = APTR.FromPointer(label);
 		return true;
 	}
@@ -1591,26 +1600,21 @@ internal static class MuiMccprefsRegistryCodec
 		MuiMccprefsRegistryRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMccprefsRegistryRecord.Size)) return false;
-		return MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiMiscRecordKind.MccprefsRegistry, MuiMiscRecordField.Gadget,
-			record.Gadget.Raw) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.MccprefsRegistry, MuiMiscRecordField.Id,
-				record.Id) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.MccprefsRegistry, MuiMiscRecordField.Params,
-				record.Params) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.MccprefsRegistry, MuiMiscRecordField.Title,
-				record.Title.Raw) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.MccprefsRegistry, MuiMiscRecordField.Attr,
-				record.Attr) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.MccprefsRegistry, MuiMiscRecordField.Label,
-				record.Label.Raw);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMccprefsRegistryRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Gadget.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Id) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Params) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Title.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Attr) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Label.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -1673,9 +1677,12 @@ internal static class MuiScrmodelistModeCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiScrmodelistModeRecord.Size)) return false;
-		record.ModeId = platform.ReadUInt32(address, 0);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiScrmodelistModeRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var modeId) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		record.ModeId = modeId;
 		return true;
 	}
 
@@ -1683,10 +1690,11 @@ internal static class MuiScrmodelistModeCodec
 		MuiScrmodelistModeRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiScrmodelistModeRecord.Size)) return false;
-		platform.WriteUInt32(address, 0, record.ModeId);
-		return true;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiScrmodelistModeRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.ModeId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -1749,14 +1757,13 @@ internal static class MuiFilepanelRowCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiFilepanelRowRecord.Size)) return false;
-		if (!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiMiscRecordKind.FilepanelRow, MuiMiscRecordField.Label,
-			out var label) ||
-			!MuiMiscRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiMiscRecordKind.FilepanelRow, MuiMiscRecordField.Contents,
-				out var contents)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiFilepanelRowRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var label) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var contents) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Label = APTR.FromPointer(label);
 		record.Contents = APTR.FromPointer(contents);
 		return true;
@@ -1766,14 +1773,13 @@ internal static class MuiFilepanelRowCodec
 		MuiFilepanelRowRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiFilepanelRowRecord.Size)) return false;
-		return MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiMiscRecordKind.FilepanelRow, MuiMiscRecordField.Label,
-			record.Label.Raw) &&
-			MuiMiscRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiMiscRecordKind.FilepanelRow, MuiMiscRecordField.Contents,
-				record.Contents.Raw);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiFilepanelRowRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Label.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Contents.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -2044,7 +2050,7 @@ public static class MuiMiscSpecialistCore
 		header.Magic = MuiMiscSpecialistHeader.Cookie;
 		header.Class = (uint)cls;
 		if (cls == MuiMiscSpecialistClass.Keyadjust &&
-			!WriteKeyadjustPolicy(ref platform, instance, default))
+			!WriteKeyadjustPolicy(ref platform, instance, 0))
 			return false;
 		var filepanelState = default(MuiMiscFilepanelServiceState);
 		filepanelState.AslState = aslState;
@@ -2179,11 +2185,10 @@ public static class MuiMiscSpecialistCore
 			case MuiMiscAttributes.FSProtectionBits_Flags:
 				if (cls != MuiMiscSpecialistClass.FSProtectionBits) return false;
 				if (!TryReadProtectionState(ref platform, instance,
-					out var protectionState)) return false;
-				changed = protectionState.Flags != value;
-				protectionState.Flags = value;
+					out var protectionFlags)) return false;
+				changed = protectionFlags != value;
 				if (changed && !WriteProtectionState(ref platform, instance,
-					protectionState)) return false;
+					value)) return false;
 				Notify(ref platform, instance, attribute, value, isInit, notify,
 					changed);
 				return true;
@@ -2380,8 +2385,7 @@ public static class MuiMiscSpecialistCore
 			case MuiMiscAttributes.FSProtectionBits_Flags:
 				if (cls != MuiMiscSpecialistClass.FSProtectionBits) return false;
 				if (!TryReadProtectionState(ref platform, instance,
-					out var protectionState)) return false;
-				value = protectionState.Flags;
+					out value)) return false;
 				return true;
 
 			// -- Title --
@@ -3249,11 +3253,10 @@ public static class MuiMiscSpecialistCore
 	{
 		changed = false;
 		if (cls != MuiMiscSpecialistClass.Keyadjust ||
-			!TryReadKeyadjustPolicy(ref platform, instance, out var policy))
+			!TryReadKeyadjustPolicy(ref platform, instance, out var previous))
 			return false;
-		changed = policy.ForceKeyCode != value;
-		policy.ForceKeyCode = value;
-		if (!WriteKeyadjustPolicy(ref platform, instance, policy)) return false;
+		changed = previous != value;
+		if (!WriteKeyadjustPolicy(ref platform, instance, value)) return false;
 		Notify(ref platform, instance, attribute, value, isInit, notify, changed);
 		return true;
 	}
@@ -3264,9 +3267,8 @@ public static class MuiMiscSpecialistCore
 	{
 		value = 0;
 		if (cls != MuiMiscSpecialistClass.Keyadjust ||
-			!TryReadKeyadjustPolicy(ref platform, instance, out var policy))
+			!TryReadKeyadjustPolicy(ref platform, instance, out value))
 			return false;
-		value = policy.ForceKeyCode;
 		return true;
 	}
 
@@ -3350,17 +3352,19 @@ public static class MuiMiscSpecialistCore
 
 	private static bool TryReadKeyadjustPolicy<TPlatform>(
 		ref TPlatform platform, APTR instance,
-		out MuiKeyadjustPolicyStateRecord policy)
-		where TPlatform : struct, IMuiGuestMemory =>
-		MuiKeyadjustPolicyStateCodec.TryRead(ref platform,
-			KeyadjustPolicyAddress(instance), out policy);
+		out uint forceKeyCode)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiKeyadjustPolicyStateCodec.TryReadUInt32(ref platform,
+			KeyadjustPolicyAddress(instance), out forceKeyCode);
+	}
 
 	private static bool WriteKeyadjustPolicy<TPlatform>(
 		ref TPlatform platform, APTR instance,
-		MuiKeyadjustPolicyStateRecord policy)
+		uint forceKeyCode)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiKeyadjustPolicyStateCodec.Write(ref platform,
-			KeyadjustPolicyAddress(instance), policy);
+		MuiKeyadjustPolicyStateCodec.TryWriteUInt32(ref platform,
+			KeyadjustPolicyAddress(instance), forceKeyCode);
 
 	private static bool TryReadTitleState<TPlatform>(ref TPlatform platform,
 		APTR instance, out MuiMiscTitleState state)
@@ -3461,16 +3465,16 @@ public static class MuiMiscSpecialistCore
 	}
 
 	private static bool TryReadProtectionState<TPlatform>(ref TPlatform platform,
-		APTR instance, out MuiMiscProtectionState state)
-		where TPlatform : struct, IMuiGuestMemory =>
-		MuiMiscProtectionStateCodec.TryRead(ref platform,
-			ProtectionStateAddress(instance), out state);
+		APTR instance, out uint flags)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiMiscProtectionStateCodec.TryReadUInt32(ref platform,
+			ProtectionStateAddress(instance), out flags);
 
 	private static bool WriteProtectionState<TPlatform>(ref TPlatform platform,
-		APTR instance, MuiMiscProtectionState state)
+		APTR instance, uint flags)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiMiscProtectionStateCodec.Write(ref platform,
-			ProtectionStateAddress(instance), state);
+		MuiMiscProtectionStateCodec.TryWriteUInt32(ref platform,
+			ProtectionStateAddress(instance), flags);
 
 	private static APTR FontdisplaySizeAddress(APTR instance)
 	{

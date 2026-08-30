@@ -176,84 +176,66 @@ internal static class MuiMasterPrivateRootCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMasterPrivateRoot.Size)) return false;
-		if (!MuiMasterPrivateRootRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiMasterPrivateRootField.ClassRegistry,
-			out value.ClassRegistry) ||
-			!MuiMasterPrivateRootRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiMasterPrivateRootField.AllocationPolicy,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMasterPrivateRoot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.ClassRegistry) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.AllocationPolicy) ||
-			!MuiMasterPrivateRootRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiMasterPrivateRootField.ErrorState,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.ErrorState) ||
-			!MuiMasterPrivateRootRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiMasterPrivateRootField.ApplicationHead,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.ApplicationHead) ||
-			!MuiMasterPrivateRootRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiMasterPrivateRootField.ExternalClassHead,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.ExternalClassHead) ||
-			!MuiMasterPrivateRootRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiMasterPrivateRootField.CallbackState,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.CallbackState) ||
-			!MuiMasterPrivateRootRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiMasterPrivateRootField.LoaderState,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.LoaderState) ||
-			!MuiMasterPrivateRootRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiMasterPrivateRootField.RegistryGeneration,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.RegistryGeneration) ||
-			!MuiMasterPrivateRootRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiMasterPrivateRootField.ActiveDispatchDepth,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.ActiveDispatchDepth) ||
-			!MuiMasterPrivateRootRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiMasterPrivateRootField.ActiveCallbackDepth,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out value.ActiveCallbackDepth) ||
-			!MuiMasterPrivateRootRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiMasterPrivateRootField.Flags, out value.Flags) ||
-			!MuiMasterPrivateRootRecordMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiMasterPrivateRootField.Reserved, out value.Reserved))
-			return false;
-		return true;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Flags) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Reserved)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiMasterPrivateRoot value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiMasterPrivateRoot.Size)) return false;
-		return MuiMasterPrivateRootRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiMasterPrivateRootField.ClassRegistry, value.ClassRegistry) &&
-			MuiMasterPrivateRootRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiMasterPrivateRootField.AllocationPolicy,
-				value.AllocationPolicy) &&
-			MuiMasterPrivateRootRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiMasterPrivateRootField.ErrorState, value.ErrorState) &&
-			MuiMasterPrivateRootRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiMasterPrivateRootField.ApplicationHead,
-				value.ApplicationHead) &&
-			MuiMasterPrivateRootRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiMasterPrivateRootField.ExternalClassHead,
-				value.ExternalClassHead) &&
-			MuiMasterPrivateRootRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiMasterPrivateRootField.CallbackState,
-				value.CallbackState) &&
-			MuiMasterPrivateRootRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiMasterPrivateRootField.LoaderState,
-				value.LoaderState) &&
-			MuiMasterPrivateRootRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiMasterPrivateRootField.RegistryGeneration,
-				value.RegistryGeneration) &&
-			MuiMasterPrivateRootRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiMasterPrivateRootField.ActiveDispatchDepth,
-				value.ActiveDispatchDepth) &&
-			MuiMasterPrivateRootRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiMasterPrivateRootField.ActiveCallbackDepth,
-				value.ActiveCallbackDepth) &&
-			MuiMasterPrivateRootRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiMasterPrivateRootField.Flags, value.Flags) &&
-			MuiMasterPrivateRootRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiMasterPrivateRootField.Reserved, value.Reserved);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiMasterPrivateRoot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ClassRegistry) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.AllocationPolicy) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ErrorState) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ApplicationHead) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ExternalClassHead) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.CallbackState) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.LoaderState) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RegistryGeneration) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ActiveDispatchDepth) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ActiveCallbackDepth) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Reserved)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 

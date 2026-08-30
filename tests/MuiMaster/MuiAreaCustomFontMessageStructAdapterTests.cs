@@ -52,4 +52,20 @@ public sealed class MuiAreaCustomFontMessageStructAdapterTests
 			APTR.Null, MuiAreaCustomFontMessageKind.Close,
 			MuiAreaCustomFontMessageField.Pointer, out _));
 	}
+
+	[Fact]
+	public void CustomFontDispatchAdmitsOnlyCompleteNamedPackets()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var openAddress = APTR.FromPointer(0x3000);
+		Assert.True(MuiAreaCustomFontMessageCodec.WriteOpen(ref platform,
+			openAddress, APTR.Null));
+		Assert.Equal(0u, MuiAreaCustomFontMessageCore.Dispatch(ref platform,
+			APTR.FromPointer(0x1000), APTR.FromPointer(0x3800), openAddress));
+
+		var truncated = APTR.FromPointer(0x20FFC);
+		Assert.Equal(0u, MuiAreaCustomFontMessageCore.Dispatch(ref platform,
+			APTR.FromPointer(0x1000), APTR.FromPointer(0x3800), truncated));
+	}
 }

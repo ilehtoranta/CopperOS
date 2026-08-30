@@ -103,16 +103,15 @@ internal static class MuiHeadlessMethodMessageRecordCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		return MuiHeadlessMethodMessageRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, MuiHeadlessMethodMessageField.MethodId,
-			out value.MethodId);
+		return MuiHeadlessMessageStructCodec.TryReadMethodIdValue(ref platform,
+			address, out value.MethodId);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiHeadlessMethodMessage value)
 		where TPlatform : struct, IMuiGuestMemory =>
-		MuiHeadlessMethodMessageRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiHeadlessMethodMessageField.MethodId, value.MethodId);
+		MuiHeadlessMessageStructCodec.TryWriteMethod(ref platform, address,
+			value.MethodId);
 }
 
 // BOOPSI OM_SET carries a standard TagItem list and an optional GadgetInfo
@@ -211,32 +210,14 @@ internal static class MuiHeadlessOmSetMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiHeadlessOmSetMessage value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (!MuiHeadlessOmSetMessageMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiHeadlessOmSetField.MethodId, out var methodId) ||
-			methodId != Method ||
-			!MuiHeadlessOmSetMessageMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiHeadlessOmSetField.Attributes, out var attributes) ||
-			!MuiHeadlessOmSetMessageMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiHeadlessOmSetField.GadgetInfo, out var gadgetInfo)) return false;
-		value.MethodId = methodId;
-		value.Attributes = APTR.FromPointer(attributes);
-		value.GadgetInfo = APTR.FromPointer(gadgetInfo);
-		return true;
-	}
+		=> MuiHeadlessMessageStructCodec.TryReadOmSet(ref platform, address,
+			out value);
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR address, MuiHeadlessOmSetMessage value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiHeadlessOmSetMessageMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiHeadlessOmSetField.MethodId, Method) &&
-			MuiHeadlessOmSetMessageMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiHeadlessOmSetField.Attributes, value.Attributes.Raw) &&
-			MuiHeadlessOmSetMessageMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiHeadlessOmSetField.GadgetInfo, value.GadgetInfo.Raw);
-	}
+		=> MuiHeadlessMessageStructCodec.TryWriteOmSet(ref platform, address,
+			value);
 }
 
 // BOOPSI OM_UPDATE carries the same caller-owned TagItem list as OM_SET, plus
@@ -341,17 +322,97 @@ internal static class MuiHeadlessOmUpdateMessageCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiHeadlessOmUpdateMessage value)
 		where TPlatform : struct, IMuiGuestMemory
+		=> MuiHeadlessMessageStructCodec.TryReadOmUpdate(ref platform, address,
+			out value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR address, MuiHeadlessOmUpdateMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiHeadlessMessageStructCodec.TryWriteOmUpdate(ref platform, address,
+			value);
+}
+
+// Sequential codecs for the fixed headless/BOOPSI message records.  The
+// field adapters above remain compatibility diagnostics; live dispatch paths
+// consume these declaration-ordered named structs and validate the complete
+// record before exposing any caller-owned pointer.
+internal static class MuiHeadlessMessageStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out methodId) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool TryWriteMethod<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadOmSet<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiHeadlessOmSetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiHeadlessOmUpdateMessageMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiHeadlessOmUpdateField.MethodId, out var methodId) ||
-			methodId != Method ||
-			!MuiHeadlessOmUpdateMessageMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiHeadlessOmUpdateField.Attributes, out var attributes) ||
-			!MuiHeadlessOmUpdateMessageMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiHeadlessOmUpdateField.GadgetInfo, out var gadgetInfo) ||
-			!MuiHeadlessOmUpdateMessageMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiHeadlessOmUpdateField.Flags, out var flags)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessOmSetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var attributes) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var gadgetInfo) || !MuiGuestStructCursor.IsComplete(cursor) ||
+			methodId != MuiHeadlessOmSetMessageCodec.Method) return false;
+		value.MethodId = methodId;
+		value.Attributes = APTR.FromPointer(attributes);
+		value.GadgetInfo = APTR.FromPointer(gadgetInfo);
+		return true;
+	}
+
+	internal static bool TryWriteOmSet<TPlatform>(ref TPlatform platform,
+		APTR address, MuiHeadlessOmSetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessOmSetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				MuiHeadlessOmSetMessageCodec.Method) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Attributes.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.GadgetInfo.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadOmUpdate<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiHeadlessOmUpdateMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessOmUpdateMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var attributes) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var gadgetInfo) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var flags) || !MuiGuestStructCursor.IsComplete(cursor) ||
+			methodId != MuiHeadlessOmUpdateMessageCodec.Method) return false;
 		value.MethodId = methodId;
 		value.Attributes = APTR.FromPointer(attributes);
 		value.GadgetInfo = APTR.FromPointer(gadgetInfo);
@@ -359,18 +420,21 @@ internal static class MuiHeadlessOmUpdateMessageCodec
 		return true;
 	}
 
-	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+	internal static bool TryWriteOmUpdate<TPlatform>(ref TPlatform platform,
 		APTR address, MuiHeadlessOmUpdateMessage value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiHeadlessOmUpdateMessageMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiHeadlessOmUpdateField.MethodId, Method) &&
-			MuiHeadlessOmUpdateMessageMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiHeadlessOmUpdateField.Attributes, value.Attributes.Raw) &&
-			MuiHeadlessOmUpdateMessageMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiHeadlessOmUpdateField.GadgetInfo, value.GadgetInfo.Raw) &&
-			MuiHeadlessOmUpdateMessageMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiHeadlessOmUpdateField.Flags, value.Flags);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessOmUpdateMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				MuiHeadlessOmUpdateMessageCodec.Method) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Attributes.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.GadgetInfo.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -385,13 +449,8 @@ internal static class MuiHeadlessMessageCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (!MuiHeadlessMethodMessageRecordCodec.TryRead(ref platform, message,
-			out var packet)) return false;
-		methodId = packet.MethodId;
-		return true;
-	}
+		=> MuiHeadlessMessageStructCodec.TryReadMethodIdValue(ref platform,
+			message, out methodId);
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiHeadlessMethodMessage packet)

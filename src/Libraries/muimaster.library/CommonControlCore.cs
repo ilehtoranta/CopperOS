@@ -4,6 +4,7 @@
 */
 
 using Amiga;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace CopperOS.MuiMaster;
@@ -147,13 +148,39 @@ internal static class MuiChoiceEntryMemoryCodec
 
 internal static class MuiChoiceEntryCodec
 {
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiChoiceEntry.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawText) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value = rawText;
+		return true;
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiChoiceEntry.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiChoiceEntry value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiChoiceEntryMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiChoiceEntryField.Text, out var text)) return false;
+		if (!TryReadValue(ref platform, address, out var text)) return false;
 		value.Text = APTR.FromPointer(text);
 		return true;
 	}
@@ -161,10 +188,7 @@ internal static class MuiChoiceEntryCodec
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiChoiceEntry value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiChoiceEntryMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiChoiceEntryField.Text, value.Text.Raw);
-	}
+		=> WriteValue(ref platform, address, value.Text.Raw);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -176,9 +200,9 @@ internal struct MuiChoiceEntryCursor
 	internal uint Index;
 }
 
-// Struct-first guest-memory adapter for caller-owned Cycle/Radio entry
-// vectors. Complete named pointer records and the MorphOS 4096-entry bound
-// are admitted here; the typed cursor remains a compatibility wrapper.
+// Bounded guest-memory adapter for caller-owned Cycle/Radio entry vectors.
+// Complete named pointer records and the MorphOS 4096-entry bound are
+// admitted here; production callers use MuiChoiceEntryVectorCodec below.
 internal static class MuiChoiceEntryVectorMemoryCodec
 {
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
@@ -192,6 +216,46 @@ internal static class MuiChoiceEntryVectorMemoryCodec
 		if (vector.Raw > uint.MaxValue - offset) return false;
 		address = APTR.FromPointer(vector.Raw + offset);
 		return platform.IsMapped(address, MuiChoiceEntry.Size);
+	}
+}
+
+// Production vector bridge. Each caller-owned slot is admitted through the
+// bounded vector check and exchanged as the complete named MuiChoiceEntry
+// record; callers do not handle slot addresses or wire offsets themselves.
+internal static class MuiChoiceEntryVectorCodec
+{
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, vector,
+			index, out var address)) return false;
+		return MuiChoiceEntryCodec.TryReadValue(ref platform, address, out value);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out MuiChoiceEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, vector,
+			index, out var address) || !MuiChoiceEntryCodec.TryRead(ref platform,
+			address, out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, MuiChoiceEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, vector,
+			index, out var address)) return false;
+		return MuiChoiceEntryCodec.Write(ref platform, address, value);
 	}
 }
 
@@ -322,16 +386,17 @@ internal static class MuiImageGeometryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiImageGeometryState.Size)) return false;
-		if (!MuiImageGeometryMemoryCodec.TryReadUInt16(ref platform, address,
-			MuiImageGeometryField.LeftEdge, out var leftEdge) ||
-			!MuiImageGeometryMemoryCodec.TryReadUInt16(ref platform, address,
-				MuiImageGeometryField.TopEdge, out var topEdge) ||
-			!MuiImageGeometryMemoryCodec.TryReadUInt16(ref platform, address,
-				MuiImageGeometryField.Width, out var width) ||
-			!MuiImageGeometryMemoryCodec.TryReadUInt16(ref platform, address,
-				MuiImageGeometryField.Height, out var height)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiImageGeometryState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var leftEdge) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var topEdge) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var width) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var height) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.LeftEdge = unchecked((short)leftEdge);
 		value.TopEdge = unchecked((short)topEdge);
 		value.Width = width;
@@ -343,17 +408,17 @@ internal static class MuiImageGeometryCodec
 		MuiImageGeometryState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiImageGeometryState.Size)) return false;
-		return MuiImageGeometryMemoryCodec.TryWriteUInt16(ref platform,
-			address, MuiImageGeometryField.LeftEdge,
-			unchecked((ushort)value.LeftEdge)) &&
-			MuiImageGeometryMemoryCodec.TryWriteUInt16(ref platform, address,
-				MuiImageGeometryField.TopEdge, unchecked((ushort)value.TopEdge)) &&
-			MuiImageGeometryMemoryCodec.TryWriteUInt16(ref platform, address,
-				MuiImageGeometryField.Width, value.Width) &&
-			MuiImageGeometryMemoryCodec.TryWriteUInt16(ref platform, address,
-				MuiImageGeometryField.Height, value.Height);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiImageGeometryState.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				unchecked((ushort)value.LeftEdge)) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				unchecked((ushort)value.TopEdge)) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				value.Width) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				value.Height)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -1635,11 +1700,9 @@ public static class MuiCommonControlCore
 		if (textClass.IsNull) textClass = classRecord;
 		for (var index = 0; index < count; index++)
 		{
-			if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
-				entries, unchecked((uint)index), out var address)) return false;
-			if (!MuiChoiceEntryCodec.TryRead(ref platform, address,
-				out var entry)) return false;
-			var label = entry.Text;
+			if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entries,
+				unchecked((uint)index), out var rawText)) return false;
+			var label = APTR.FromPointer(rawText);
 			var child = label.IsNull ? APTR.Null :
 				MuiHeadlessObjectCore.CreateObjectA(ref platform, state, textClass,
 					APTR.Null);
@@ -15885,11 +15948,9 @@ public static class MuiCommonControlCore
 		if (entries.IsNull) return 0;
 		for (var count = 0; count < 4096; count++)
 		{
-			if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
-				entries, unchecked((uint)count), out var slot)) return 0;
-			if (!MuiChoiceEntryCodec.TryRead(ref platform, slot,
-				out var entry)) return 0;
-			if (entry.Text.IsNull) return count;
+			if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entries,
+				unchecked((uint)count), out var text)) return 0;
+			if (text == 0) return count;
 		}
 		return 0;
 	}
@@ -15897,10 +15958,8 @@ public static class MuiCommonControlCore
 	private static APTR ChoiceEntry<TPlatform>(ref TPlatform platform,
 		APTR entries, uint active) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
-			entries, active, out var slot)) return APTR.Null;
-		return MuiChoiceEntryCodec.TryRead(ref platform, slot,
-			out var entry) ? entry.Text : APTR.Null;
+		return MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entries, active,
+			out var text) ? APTR.FromPointer(text) : APTR.Null;
 	}
 
 	private static uint Read<TPlatform>(ref TPlatform platform, APTR state,

@@ -1435,6 +1435,18 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void DataspaceIffEntryHeaderStructCodecRejectsTruncation()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var tail = APTR.FromPointer(0x20FFC);
+		Assert.False(MuiDataspaceIffEntryHeaderCodec.TryRead(ref platform,
+			tail, out _));
+		Assert.False(MuiDataspaceIffEntryHeaderCodec.Write(ref platform, tail,
+			default));
+	}
+
+	[Fact]
 	public void DataspaceIffEntryHeaderFieldCursorUsesNamedBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -1615,6 +1627,42 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void DataspaceIffStructCodecsPreserveHighBitFieldsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1800);
+		var handle = APTR.FromPointer(0xF00DCAFEu);
+		Assert.True(MuiDataspaceIffMessageCore.WriteReadIffRecord(ref platform,
+			packet, handle));
+		Assert.True(MuiDataspaceIffMessageCore.TryReadReadIff(ref platform,
+			packet, out var read));
+		Assert.Equal(MuiDataspaceIffMessageCore.ReadIffMethod, read.MethodId);
+		Assert.Equal(handle.Raw, read.Handle.Raw);
+
+		const uint type = 0x80420001;
+		const uint id = 0xFEEDBEEF;
+		Assert.True(MuiDataspaceIffMessageCore.WriteWriteIffRecord(ref platform,
+			packet, handle, type, id));
+		Assert.True(MuiDataspaceIffMessageCore.TryReadWriteIff(ref platform,
+			packet, out var write));
+		Assert.Equal(MuiDataspaceIffMessageCore.WriteIffMethod, write.MethodId);
+		Assert.Equal(handle.Raw, write.Handle.Raw);
+		Assert.Equal(type, write.Type);
+		Assert.Equal(id, write.Id);
+
+		var tail = APTR.FromPointer(0x20FFCu);
+		Assert.False(MuiDataspaceIffMessageCore.WriteReadIffRecord(ref platform,
+			tail, handle));
+		Assert.False(MuiDataspaceIffMessageCore.TryReadReadIff(ref platform,
+			tail, out _));
+		Assert.False(MuiDataspaceIffMessageCore.WriteWriteIffRecord(ref platform,
+			tail, handle, type, id));
+		Assert.False(MuiDataspaceIffMessageCore.TryReadWriteIff(ref platform,
+			tail, out _));
+	}
+
+	[Fact]
 	public void NotifyWriteMethodsUseNamedPacketsAndBoundedGuestCopy()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -1678,6 +1726,16 @@ public sealed class MuiHeadlessDispatcherTests
 			MuiNotifyWritePacketField.MethodId, MuiNotifyWriteMethodMessage.Size,
 			out var directMethodId));
 		Assert.Equal(MuiNotifyWriteCore.WriteLongMethod, directMethodId);
+		var shortHeaderAddress = APTR.FromPointer(0x1FFFCu);
+		var shortHeader = new MuiNotifyWriteMethodMessage
+		{
+			MethodId = MuiNotifyWriteCore.WriteStringMethod,
+		};
+		Assert.True(MuiNotifyWriteMethodMessageCodec.Write(ref platform,
+			shortHeaderAddress, shortHeader));
+		Assert.True(MuiNotifyWriteMessageCodec.TryReadMethodIdValue(ref platform,
+			shortHeaderAddress, out var shortMethodId));
+		Assert.Equal(shortHeader.MethodId, shortMethodId);
 		Assert.False(MuiNotifyWriteMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -2053,6 +2111,9 @@ public sealed class MuiHeadlessDispatcherTests
 			out var directValueAddress));
 		Assert.Equal(message.Raw + MuiSetAsStringMessage.ValueOffset,
 			directValueAddress.Raw);
+		Assert.True(MuiSetAsStringMessageCodec.TryGetValueAddress(ref platform,
+			message, out var structValueAddress));
+		Assert.Equal(APTR.FromPointer(0x180C), structValueAddress);
 		Assert.True(MuiSetAsStringMessageCodec.TryGetParameters(ref platform,
 			message, out var parameters));
 		Assert.Equal(APTR.FromPointer(0x180C), parameters);
@@ -2324,6 +2385,27 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void CallHookParameterRecordSequentialCodecPreservesHighBitAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var address = APTR.FromPointer(0x1410);
+		platform.WriteUInt16(address, 0, 0x8042);
+		platform.WriteUInt16(address, 2, 0xAAAA);
+
+		Assert.True(MuiCallHookParameterRecordCodec.TryReadValue(ref platform,
+			address, out var value));
+		Assert.Equal(0x8042AAAAu, value);
+		Assert.False(MuiCallHookParameterRecordCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFF), out _));
+		Assert.True(MuiCallHookParameterRecordCodec.WriteValue(ref platform,
+			address, 0xC001D00Du));
+		Assert.True(MuiCallHookParameterRecordCodec.TryReadValue(ref platform,
+			address, out value));
+		Assert.Equal(0xC001D00Du, value);
+	}
+
+	[Fact]
 	public void CallHookMethodHeaderUsesNamedField()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -2551,6 +2633,37 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.Equal(slot.Value, decoded.Value);
 		Assert.False(MuiUpdateConfigFlagSlotCodec.TryRead(ref platform,
 			APTR.FromPointer(0x21000), out _));
+	}
+
+	[Fact]
+	public void UpdateConfigSlotValueCodecsPreserveHighBitsAndBounds()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var objectAddress = APTR.FromPointer(0x1500);
+		const uint objectValue = 0xF00DCAFE;
+		Assert.True(MuiUpdateConfigObjectSlotCodec.WriteValue(ref platform,
+			objectAddress, objectValue));
+		Assert.True(MuiUpdateConfigObjectSlotCodec.TryReadValue(ref platform,
+			objectAddress, out var decodedObject));
+		Assert.Equal(objectValue, decodedObject);
+
+		var flagAddress = APTR.FromPointer(0x1504);
+		const byte flagValue = 0xA5;
+		Assert.True(MuiUpdateConfigFlagSlotCodec.WriteValue(ref platform,
+			flagAddress, flagValue));
+		Assert.True(MuiUpdateConfigFlagSlotCodec.TryReadValue(ref platform,
+			flagAddress, out var decodedFlag));
+		Assert.Equal(flagValue, decodedFlag);
+
+		Assert.False(MuiUpdateConfigObjectSlotCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFD), out _));
+		Assert.False(MuiUpdateConfigObjectSlotCodec.WriteValue(ref platform,
+			APTR.FromPointer(0x20FFD), objectValue));
+		Assert.False(MuiUpdateConfigFlagSlotCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x21000), out _));
+		Assert.False(MuiUpdateConfigFlagSlotCodec.WriteValue(ref platform,
+			APTR.FromPointer(0x21000), flagValue));
 	}
 
 	[Fact]

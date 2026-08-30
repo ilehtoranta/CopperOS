@@ -55,4 +55,19 @@ public sealed class MuiClassServiceLibraryPrefixStructAdapterTests
 		Assert.False(MuiClassServiceLibraryPrefixRecordCodec.TryReadRecord(ref platform,
 			APTR.FromPointer(0x20FFD), out _));
 	}
+
+	[Fact]
+	public void LoaderPrefixSequentialReadPreservesHighBit()
+	{
+		var state = APTR.FromPointer(0x1000);
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			state);
+		var address = APTR.FromPointer(0x2500);
+		platform.WriteUInt16(address, 0, 0x8042);
+		platform.WriteUInt16(address, 2, 0x0000);
+
+		Assert.True(MuiClassServiceLibraryPrefixRecordCodec.TryReadRecord(ref platform,
+			address, out var decoded));
+		Assert.Equal(0x80420000u, decoded.Prefix);
+	}
 }

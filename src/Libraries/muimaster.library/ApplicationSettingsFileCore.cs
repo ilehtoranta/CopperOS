@@ -212,47 +212,92 @@ internal static class MuiApplicationSettingsRecordFieldCursorCodec
 			value);
 }
 
-internal static class MuiApplicationSettingsHeaderCodec
+// Canonical codecs for the complete named settings records. Production
+// persistence consumes declaration-ordered members through the bounded guest
+// cursor; the field/offset adapters above remain compatibility seams for
+// diagnostics and older callers.
+internal static class MuiApplicationSettingsHeaderStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiApplicationSettingsHeader value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationSettingsHeader.Size)) return false;
-		return MuiApplicationSettingsHeaderMemoryCodec.TryRead(ref platform,
-			address, MuiApplicationSettingsHeaderField.MagicValue,
-			out value.MagicValue) &&
-			MuiApplicationSettingsHeaderMemoryCodec.TryRead(ref platform,
-				address, MuiApplicationSettingsHeaderField.VersionValue,
-				out value.VersionValue) &&
-			MuiApplicationSettingsHeaderMemoryCodec.TryRead(ref platform,
-				address, MuiApplicationSettingsHeaderField.RecordCount,
-				out value.RecordCount) &&
-			MuiApplicationSettingsHeaderMemoryCodec.TryRead(ref platform,
-				address, MuiApplicationSettingsHeaderField.PayloadBytes,
-				out value.PayloadBytes);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationSettingsHeader.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.MagicValue) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.VersionValue) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.RecordCount) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.PayloadBytes) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
 	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationSettingsHeader value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationSettingsHeader.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MagicValue) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.VersionValue) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.RecordCount) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.PayloadBytes)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+internal static class MuiApplicationSettingsHeaderCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiApplicationSettingsHeader value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiApplicationSettingsHeaderStructCodec.TryRead(ref platform, address,
+			out value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiApplicationSettingsHeader value)
 		where TPlatform : struct, IMuiGuestMemory
+		=> MuiApplicationSettingsHeaderStructCodec.Write(ref platform, address,
+			value);
+}
+
+internal static class MuiApplicationSettingsRecordStructCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiApplicationSettingsRecord value)
+		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationSettingsHeader.Size)) return false;
-		return MuiApplicationSettingsHeaderMemoryCodec.TryWrite(ref platform,
-			address, MuiApplicationSettingsHeaderField.MagicValue,
-			value.MagicValue) &&
-			MuiApplicationSettingsHeaderMemoryCodec.TryWrite(ref platform,
-				address, MuiApplicationSettingsHeaderField.VersionValue,
-				value.VersionValue) &&
-			MuiApplicationSettingsHeaderMemoryCodec.TryWrite(ref platform,
-				address, MuiApplicationSettingsHeaderField.RecordCount,
-				value.RecordCount) &&
-			MuiApplicationSettingsHeaderMemoryCodec.TryWrite(ref platform,
-				address, MuiApplicationSettingsHeaderField.PayloadBytes,
-				value.PayloadBytes);
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationSettingsRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Key) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out value.Length) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationSettingsRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiApplicationSettingsRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Key) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Length)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -261,27 +306,14 @@ internal static class MuiApplicationSettingsRecordCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiApplicationSettingsRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationSettingsRecord.Size)) return false;
-		return MuiApplicationSettingsRecordMemoryCodec.TryRead(ref platform,
-			address, MuiApplicationSettingsRecordField.Key, out value.Key) &&
-			MuiApplicationSettingsRecordMemoryCodec.TryRead(ref platform,
-				address, MuiApplicationSettingsRecordField.Length, out value.Length);
-	}
+		=> MuiApplicationSettingsRecordStructCodec.TryRead(ref platform, address,
+			out value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiApplicationSettingsRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiApplicationSettingsRecord.Size)) return false;
-		return MuiApplicationSettingsRecordMemoryCodec.TryWrite(ref platform,
-			address, MuiApplicationSettingsRecordField.Key, value.Key) &&
-			MuiApplicationSettingsRecordMemoryCodec.TryWrite(ref platform,
-				address, MuiApplicationSettingsRecordField.Length, value.Length);
-	}
+		=> MuiApplicationSettingsRecordStructCodec.Write(ref platform, address,
+			value);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]

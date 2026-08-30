@@ -3,6 +3,7 @@
 - SPDX-License-Identifier: MIT
 */
 
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -168,6 +169,194 @@ internal static class MuiProcessSpecialistFieldCursorCodec
 			message, packet, field, value);
 }
 
+// Complete sequential codecs for the fixed Process/Slave packet envelopes.
+// One-ULONG method-only packets use scalar cursor helpers so the native
+// compiler does not materialize a temporary one-field value struct; every
+// multi-field envelope is exchanged as its named declaration-ordered record.
+internal static class MuiProcessSpecialistMessageStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiProcessSpecialistMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId)) return false;
+		methodId = rawMethodId;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryWriteMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiProcessSpecialistMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadGet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiProcessSpecialistGetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiProcessSpecialistGetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var attribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var storage)) return false;
+		value.MethodId = methodId;
+		value.Attribute = attribute;
+		value.Storage = storage;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteGet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiProcessSpecialistGetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiProcessSpecialistGetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Attribute) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Storage)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadSet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiProcessSpecialistSetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiProcessSpecialistSetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var attribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var valueWord)) return false;
+		value.MethodId = methodId;
+		value.Attribute = attribute;
+		value.Value = valueWord;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteSet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiProcessSpecialistSetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiProcessSpecialistSetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Attribute) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadSignal<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiProcessSpecialistSignalMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiProcessSpecialistSignalMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var signals)) return false;
+		value.MethodId = methodId;
+		value.Signals = signals;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteSignal<TPlatform>(ref TPlatform platform,
+		APTR message, MuiProcessSpecialistSignalMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiProcessSpecialistSignalMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Signals)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadError<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiProcessSpecialistErrorMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiProcessSpecialistErrorMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var errorCode)) return false;
+		value.MethodId = methodId;
+		value.ErrorCode = errorCode;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteError<TPlatform>(ref TPlatform platform,
+		APTR message, MuiProcessSpecialistErrorMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiProcessSpecialistErrorMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.ErrorCode)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadDispatch<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiProcessSpecialistDispatchMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiProcessSpecialistDispatchMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var packet)) return false;
+		value.MethodId = methodId;
+		value.Packet = packet;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteDispatch<TPlatform>(ref TPlatform platform,
+		APTR message, MuiProcessSpecialistDispatchMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiProcessSpecialistDispatchMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Packet)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 internal static class MuiProcessSpecialistMessageCodec
 {
 	internal const uint OmDispose = 0x00000102u;
@@ -186,19 +375,15 @@ internal static class MuiProcessSpecialistMessageCodec
 		return true;
 	}
 
-	// Native selector admission stays scalar so compiler paths do not need to
-	// materialize a temporary one-field record. Public packet consumers still
-	// receive the named struct above.
+	// Selector admission stays scalar for callers that only need MethodID, but
+	// the value is read from the named one-ULONG record in declaration order.
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiProcessSpecialistMethodMessage.Size)) return false;
-		return MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiProcessSpecialistPacketKind.Method,
-			MuiProcessSpecialistField.MethodId, out methodId);
+		return MuiProcessSpecialistMessageStructCodec.TryReadMethodIdValue(
+			ref platform, message, out methodId);
 	}
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
@@ -226,11 +411,9 @@ internal static class MuiProcessSpecialistMessageCodec
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsMethod(method) || message.IsNull || !platform.IsMapped(message,
-			MuiProcessSpecialistMethodMessage.Size)) return false;
-		return MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiProcessSpecialistPacketKind.Method,
-			MuiProcessSpecialistField.MethodId, method);
+		return IsMethod(method) &&
+			MuiProcessSpecialistMessageStructCodec.TryWriteMethodIdValue(
+				ref platform, message, method);
 	}
 
 	internal static bool TryReadGet<TPlatform>(ref TPlatform platform,
@@ -238,33 +421,20 @@ internal static class MuiProcessSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPacket(ref platform, message, MuiProcessSpecialistGetMessage.Size,
-			OmGet)) return false;
-		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
-		packet.MethodId = methodId;
-		return MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiProcessSpecialistPacketKind.Get,
-			MuiProcessSpecialistField.Attribute, out packet.Attribute) &&
-			MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-				message, MuiProcessSpecialistPacketKind.Get,
-				MuiProcessSpecialistField.Storage, out packet.Storage);
+		return MuiProcessSpecialistMessageStructCodec.TryReadGet(ref platform,
+			message, out packet) && packet.MethodId == OmGet;
 	}
 
 	internal static bool WriteGet<TPlatform>(ref TPlatform platform,
 		APTR message, uint attribute, uint storage)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiProcessSpecialistGetMessage.Size)) return false;
-		return MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiProcessSpecialistPacketKind.Get,
-			MuiProcessSpecialistField.MethodId, OmGet) &&
-			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiProcessSpecialistPacketKind.Get,
-				MuiProcessSpecialistField.Attribute, attribute) &&
-			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiProcessSpecialistPacketKind.Get,
-				MuiProcessSpecialistField.Storage, storage);
+		var packet = default(MuiProcessSpecialistGetMessage);
+		packet.MethodId = OmGet;
+		packet.Attribute = attribute;
+		packet.Storage = storage;
+		return MuiProcessSpecialistMessageStructCodec.WriteGet(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadSet<TPlatform>(ref TPlatform platform,
@@ -272,33 +442,22 @@ internal static class MuiProcessSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsSetMethod(method) || !IsPacket(ref platform, message,
-			MuiProcessSpecialistSetMessage.Size, method)) return false;
-		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
-		packet.MethodId = methodId;
-		return MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiProcessSpecialistPacketKind.Set,
-			MuiProcessSpecialistField.Attribute, out packet.Attribute) &&
-			MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-				message, MuiProcessSpecialistPacketKind.Set,
-				MuiProcessSpecialistField.Value, out packet.Value);
+		return IsSetMethod(method) &&
+			MuiProcessSpecialistMessageStructCodec.TryReadSet(ref platform,
+				message, out packet) && packet.MethodId == method;
 	}
 
 	internal static bool WriteSet<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, uint attribute, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsSetMethod(method) || message.IsNull || !platform.IsMapped(
-			message, MuiProcessSpecialistSetMessage.Size)) return false;
-		return MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiProcessSpecialistPacketKind.Set,
-			MuiProcessSpecialistField.MethodId, method) &&
-			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiProcessSpecialistPacketKind.Set,
-				MuiProcessSpecialistField.Attribute, attribute) &&
-			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiProcessSpecialistPacketKind.Set,
-				MuiProcessSpecialistField.Value, value);
+		if (!IsSetMethod(method)) return false;
+		var packet = default(MuiProcessSpecialistSetMessage);
+		packet.MethodId = method;
+		packet.Attribute = attribute;
+		packet.Value = value;
+		return MuiProcessSpecialistMessageStructCodec.WriteSet(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadSignal<TPlatform>(ref TPlatform platform,
@@ -306,27 +465,21 @@ internal static class MuiProcessSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsSignalMethod(method) || !IsPacket(ref platform, message,
-			MuiProcessSpecialistSignalMessage.Size, method)) return false;
-		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
-		packet.MethodId = methodId;
-		return MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiProcessSpecialistPacketKind.Signal,
-			MuiProcessSpecialistField.Signals, out packet.Signals);
+		return IsSignalMethod(method) &&
+			MuiProcessSpecialistMessageStructCodec.TryReadSignal(ref platform,
+				message, out packet) && packet.MethodId == method;
 	}
 
 	internal static bool WriteSignal<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, uint signals)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsSignalMethod(method) || message.IsNull || !platform.IsMapped(
-			message, MuiProcessSpecialistSignalMessage.Size)) return false;
-		return MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiProcessSpecialistPacketKind.Signal,
-			MuiProcessSpecialistField.MethodId, method) &&
-			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiProcessSpecialistPacketKind.Signal,
-				MuiProcessSpecialistField.Signals, signals);
+		if (!IsSignalMethod(method)) return false;
+		var packet = default(MuiProcessSpecialistSignalMessage);
+		packet.MethodId = method;
+		packet.Signals = signals;
+		return MuiProcessSpecialistMessageStructCodec.WriteSignal(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadError<TPlatform>(ref TPlatform platform,
@@ -334,28 +487,20 @@ internal static class MuiProcessSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPacket(ref platform, message, MuiProcessSpecialistErrorMessage.Size,
-			MuiProcessAttributes.Slave_Error)) return false;
-		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
-		packet.MethodId = methodId;
-		return MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiProcessSpecialistPacketKind.Error,
-			MuiProcessSpecialistField.ErrorCode, out packet.ErrorCode);
+		return MuiProcessSpecialistMessageStructCodec.TryReadError(ref platform,
+			message, out packet) && packet.MethodId ==
+			MuiProcessAttributes.Slave_Error;
 	}
 
 	internal static bool WriteError<TPlatform>(ref TPlatform platform,
 		APTR message, uint errorCode)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiProcessSpecialistErrorMessage.Size)) return false;
-		return MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiProcessSpecialistPacketKind.Error,
-			MuiProcessSpecialistField.MethodId,
-			MuiProcessAttributes.Slave_Error) &&
-			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiProcessSpecialistPacketKind.Error,
-				MuiProcessSpecialistField.ErrorCode, errorCode);
+		var packet = default(MuiProcessSpecialistErrorMessage);
+		packet.MethodId = MuiProcessAttributes.Slave_Error;
+		packet.ErrorCode = errorCode;
+		return MuiProcessSpecialistMessageStructCodec.WriteError(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadDispatch<TPlatform>(ref TPlatform platform,
@@ -363,29 +508,20 @@ internal static class MuiProcessSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPacket(ref platform, message,
-			MuiProcessSpecialistDispatchMessage.Size,
-			MuiProcessAttributes.Slave_Dispatch)) return false;
-		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
-		packet.MethodId = methodId;
-		return MuiProcessSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiProcessSpecialistPacketKind.Dispatch,
-			MuiProcessSpecialistField.Packet, out packet.Packet);
+		return MuiProcessSpecialistMessageStructCodec.TryReadDispatch(ref platform,
+			message, out packet) && packet.MethodId ==
+			MuiProcessAttributes.Slave_Dispatch;
 	}
 
 	internal static bool WriteDispatch<TPlatform>(ref TPlatform platform,
 		APTR message, uint packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiProcessSpecialistDispatchMessage.Size)) return false;
-		return MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiProcessSpecialistPacketKind.Dispatch,
-			MuiProcessSpecialistField.MethodId,
-			MuiProcessAttributes.Slave_Dispatch) &&
-			MuiProcessSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiProcessSpecialistPacketKind.Dispatch,
-				MuiProcessSpecialistField.Packet, packet);
+		var dispatch = default(MuiProcessSpecialistDispatchMessage);
+		dispatch.MethodId = MuiProcessAttributes.Slave_Dispatch;
+		dispatch.Packet = packet;
+		return MuiProcessSpecialistMessageStructCodec.WriteDispatch(ref platform,
+			message, dispatch);
 	}
 
 	private static bool IsMethod(uint method) => method == OmDispose ||

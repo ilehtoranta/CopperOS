@@ -58,30 +58,29 @@ internal struct MuiDrawingServiceStateRecord
 	internal uint Generation;
 }
 
-internal static class MuiDrawingServiceStateCodec
+// Canonical sequential codec for the complete drawing-service state record.
+// The field resolver below remains a compatibility seam for diagnostics; live
+// service code exchanges the declaration-ordered named struct instead.
+internal static class MuiDrawingServiceStateStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiDrawingServiceStateRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDrawingServiceStateRecord.Size) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.State, MuiDrawingRecordField.Magic,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDrawingServiceStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out record.Magic) ||
-				!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-					MuiDrawingRecordKind.State, MuiDrawingRecordField.ClipHead,
-					out var clipHead) ||
-				!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-					MuiDrawingRecordKind.State, MuiDrawingRecordField.RefreshHead,
-					out var refreshHead) ||
-				!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-					MuiDrawingRecordKind.State, MuiDrawingRecordField.PenHead,
-					out var penHead) ||
-				!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-					MuiDrawingRecordKind.State, MuiDrawingRecordField.Generation,
-					out record.Generation)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var clipHead) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var refreshHead) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var penHead) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Generation) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.ClipHead = APTR.FromPointer(clipHead);
 		record.RefreshHead = APTR.FromPointer(refreshHead);
 		record.PenHead = APTR.FromPointer(penHead);
@@ -92,23 +91,34 @@ internal static class MuiDrawingServiceStateCodec
 		MuiDrawingServiceStateRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDrawingServiceStateRecord.Size)) return false;
-		return MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiDrawingRecordKind.State, MuiDrawingRecordField.Magic, record.Magic) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.State, MuiDrawingRecordField.ClipHead,
-				record.ClipHead.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.State, MuiDrawingRecordField.RefreshHead,
-				record.RefreshHead.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.State, MuiDrawingRecordField.PenHead,
-				record.PenHead.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.State, MuiDrawingRecordField.Generation,
-				record.Generation);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDrawingServiceStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.ClipHead.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.RefreshHead.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.PenHead.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Generation)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+}
+
+internal static class MuiDrawingServiceStateCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiDrawingServiceStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiDrawingServiceStateStructCodec.TryRead(ref platform, address,
+			out record);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiDrawingServiceStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiDrawingServiceStateStructCodec.Write(ref platform, address, record);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -126,26 +136,24 @@ internal struct MuiDrawingClipRecord
 	internal APTR Token;
 }
 
-internal static class MuiDrawingClipCodec
+internal static class MuiDrawingClipStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiDrawingClipRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDrawingClipRecord.Size)) return false;
-		if (!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiDrawingRecordKind.Clip, MuiDrawingRecordField.Next, out var next) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.Clip, MuiDrawingRecordField.Kind,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDrawingClipRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var next) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out record.Kind) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.Clip, MuiDrawingRecordField.Layer,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var layer) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.Clip, MuiDrawingRecordField.Token,
-				out var token)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var token) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Next = APTR.FromPointer(next);
 		record.Layer = APTR.FromPointer(layer);
 		record.Token = APTR.FromPointer(token);
@@ -156,19 +164,31 @@ internal static class MuiDrawingClipCodec
 		MuiDrawingClipRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDrawingClipRecord.Size)) return false;
-		return MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiDrawingRecordKind.Clip, MuiDrawingRecordField.Next, record.Next.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.Clip, MuiDrawingRecordField.Kind, record.Kind) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.Clip, MuiDrawingRecordField.Layer,
-				record.Layer.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.Clip, MuiDrawingRecordField.Token,
-				record.Token.Raw);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDrawingClipRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Next.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Kind) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Layer.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Token.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+}
+
+internal static class MuiDrawingClipCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiDrawingClipRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiDrawingClipStructCodec.TryRead(ref platform, address, out record);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiDrawingClipRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiDrawingClipStructCodec.Write(ref platform, address, record);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -186,27 +206,24 @@ internal struct MuiDrawingRefreshRecord
 	internal uint SavedFlags;
 }
 
-internal static class MuiDrawingRefreshCodec
+internal static class MuiDrawingRefreshStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiDrawingRefreshRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDrawingRefreshRecord.Size)) return false;
-		if (!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiDrawingRecordKind.Refresh, MuiDrawingRecordField.Next,
-			out var next) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.Refresh, MuiDrawingRecordField.RenderInfo,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDrawingRefreshRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var next) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var renderInfo) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.Refresh, MuiDrawingRecordField.Layer,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var layer) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.Refresh, MuiDrawingRecordField.SavedFlags,
-				out record.SavedFlags)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.SavedFlags) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Next = APTR.FromPointer(next);
 		record.RenderInfo = APTR.FromPointer(renderInfo);
 		record.Layer = APTR.FromPointer(layer);
@@ -217,21 +234,32 @@ internal static class MuiDrawingRefreshCodec
 		MuiDrawingRefreshRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDrawingRefreshRecord.Size)) return false;
-		return MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiDrawingRecordKind.Refresh, MuiDrawingRecordField.Next,
-			record.Next.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.Refresh, MuiDrawingRecordField.RenderInfo,
-				record.RenderInfo.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.Refresh, MuiDrawingRecordField.Layer,
-				record.Layer.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.Refresh, MuiDrawingRecordField.SavedFlags,
-				record.SavedFlags);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDrawingRefreshRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Next.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.RenderInfo.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Layer.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.SavedFlags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+}
+
+internal static class MuiDrawingRefreshCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiDrawingRefreshRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiDrawingRefreshStructCodec.TryRead(ref platform, address,
+			out record);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiDrawingRefreshRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiDrawingRefreshStructCodec.Write(ref platform, address, record);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -247,23 +275,22 @@ internal struct MuiDrawingPenRecord
 	internal uint Token;
 }
 
-internal static class MuiDrawingPenCodec
+internal static class MuiDrawingPenStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiDrawingPenRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDrawingPenRecord.Size)) return false;
-		if (!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiDrawingRecordKind.Pen, MuiDrawingRecordField.Next, out var next) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.Pen, MuiDrawingRecordField.RenderInfo,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDrawingPenRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var next) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var renderInfo) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.Pen, MuiDrawingRecordField.Token,
-				out record.Token)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Token) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.Next = APTR.FromPointer(next);
 		record.RenderInfo = APTR.FromPointer(renderInfo);
 		return true;
@@ -273,17 +300,29 @@ internal static class MuiDrawingPenCodec
 		MuiDrawingPenRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDrawingPenRecord.Size)) return false;
-		return MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiDrawingRecordKind.Pen, MuiDrawingRecordField.Next, record.Next.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.Pen, MuiDrawingRecordField.RenderInfo,
-				record.RenderInfo.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.Pen, MuiDrawingRecordField.Token,
-				record.Token);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDrawingPenRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Next.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.RenderInfo.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Token)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+}
+
+internal static class MuiDrawingPenCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiDrawingPenRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiDrawingPenStructCodec.TryRead(ref platform, address, out record);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiDrawingPenRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiDrawingPenStructCodec.Write(ref platform, address, record);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -307,36 +346,30 @@ internal struct MuiDrawingRenderInfoRecord
 	internal uint Flags;
 }
 
-internal static class MuiDrawingRenderInfoCodec
+internal static class MuiDrawingRenderInfoStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiDrawingRenderInfoRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDrawingRenderInfoRecord.Size)) return false;
-		if (!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.WindowObject,
-			out var windowObject) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.Screen,
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDrawingRenderInfoRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var windowObject) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var screen) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.DrawInfo,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var drawInfo) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.Pens,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var pens) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.Window,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var window) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.RastPort,
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var rastPort) ||
-			!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.Flags,
-				out record.Flags)) return false;
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Flags) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		record.WindowObject = APTR.FromPointer(windowObject);
 		record.Screen = APTR.FromPointer(screen);
 		record.DrawInfo = APTR.FromPointer(drawInfo);
@@ -350,30 +383,38 @@ internal static class MuiDrawingRenderInfoCodec
 		MuiDrawingRenderInfoRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDrawingRenderInfoRecord.Size)) return false;
-		return MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-			MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.WindowObject,
-			record.WindowObject.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.Screen,
-				record.Screen.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.DrawInfo,
-				record.DrawInfo.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.Pens,
-				record.Pens.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.Window,
-				record.Window.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.RastPort,
-				record.RastPort.Raw) &&
-			MuiDrawingRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiDrawingRecordKind.RenderInfo, MuiDrawingRecordField.Flags,
-				record.Flags);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDrawingRenderInfoRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.WindowObject.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Screen.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.DrawInfo.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Pens.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Window.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.RastPort.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+}
+
+internal static class MuiDrawingRenderInfoCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiDrawingRenderInfoRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiDrawingRenderInfoStructCodec.TryRead(ref platform, address,
+			out record);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiDrawingRenderInfoRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiDrawingRenderInfoStructCodec.Write(ref platform, address, record);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -383,6 +424,34 @@ internal struct MuiDrawingRasterPortRecord
 	internal const uint FieldSize = 4;
 	internal const uint LayerOffset = 0;
 	internal APTR Layer;
+}
+
+internal static class MuiDrawingRasterPortStructCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiDrawingRasterPortRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		record = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDrawingRasterPortRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var layer) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		record.Layer = APTR.FromPointer(layer);
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiDrawingRasterPortRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDrawingRasterPortRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Layer.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
 }
 
 internal enum MuiDrawingRecordKind : byte
@@ -567,19 +636,26 @@ internal static class MuiDrawingRecordFieldCursorCodec
 
 internal static class MuiDrawingRasterPortCodec
 {
+	// Keep the scalar helper available at the native boundary: this record is
+	// one pointer wide, and returning that single-field struct by value can
+	// lose high pointer bits in the freestanding compiler.
+	internal static bool TryReadLayerValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint layer)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		layer = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDrawingRasterPortRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out layer)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiDrawingRasterPortRecord record)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiDrawingRasterPortRecord.Size)) return false;
-		if (!MuiDrawingRecordMemoryCodec.TryReadUInt32(ref platform, address,
-			MuiDrawingRecordKind.RasterPort, MuiDrawingRecordField.Layer,
-			out var layer)) return false;
-		record.Layer = APTR.FromPointer(layer);
-		return true;
-	}
+		=> MuiDrawingRasterPortStructCodec.TryRead(ref platform, address,
+			out record);
 }
 
 // Scalar qualification surface for the drawing service's state and owned
@@ -1053,10 +1129,8 @@ public static class MuiDrawingServiceCore
 		if (!MuiDrawingRenderInfoCodec.TryRead(ref platform, renderInfo,
 			out renderInfoValue))
 			return APTR.Null;
-		MuiDrawingRasterPortRecord rastPort = default;
-		if (!MuiDrawingRasterPortCodec.TryRead(ref platform,
-			renderInfoValue.RastPort, out rastPort)) return APTR.Null;
-		var layerRaw = rastPort.Layer.Raw;
+		if (!MuiDrawingRasterPortCodec.TryReadLayerValue(ref platform,
+			renderInfoValue.RastPort, out var layerRaw)) return APTR.Null;
 		return APTR.FromPointer(layerRaw);
 	}
 

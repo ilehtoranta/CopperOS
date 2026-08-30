@@ -137,15 +137,13 @@ internal static class MuiVolumelistModeFieldCursorCodec
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiVolumelistModeStateRecord.Size) ||
-				!MuiVolumelistModeStateRecordMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiVolumelistModeField.Magic, out var magic) ||
-				!MuiVolumelistModeStateRecordMemoryCodec.TryReadUInt32(ref platform, address,
-					MuiVolumelistModeField.ExampleMode, out value.ExampleMode))
-				return false;
-			value.Magic = magic;
-			return true;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiVolumelistModeStateRecord.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.Magic) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out value.ExampleMode)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
 		}
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -161,13 +159,14 @@ internal static class MuiVolumelistModeFieldCursorCodec
 			APTR address, MuiVolumelistModeStateRecord value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiVolumelistModeStateRecord.Size) ||
-				!MuiVolumelistModeStateAdmission.Validate(value)) return false;
-			return MuiVolumelistModeStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiVolumelistModeField.Magic, value.Magic) &&
-				MuiVolumelistModeStateRecordMemoryCodec.TryWriteUInt32(ref platform, address,
-					MuiVolumelistModeField.ExampleMode, value.ExampleMode);
+			if (!MuiVolumelistModeStateAdmission.Validate(value) ||
+				!MuiGuestStructCursor.TryCreate(ref platform, address,
+					MuiVolumelistModeStateRecord.Size, out var cursor) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.Magic) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.ExampleMode)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
 		}
 	}
 

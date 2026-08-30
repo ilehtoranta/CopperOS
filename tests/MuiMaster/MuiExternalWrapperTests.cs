@@ -415,10 +415,10 @@ public sealed class MuiExternalWrapperTests
 		var p = NewPlatform();
 		var instance = APTR.FromPointer(0x2000);
 		var expected = default(MuiExternalBoopsiGeometryState);
-		expected.MinWidth = 11;
-		expected.MinHeight = 12;
-		expected.MaxWidth = 640;
-		expected.MaxHeight = 480;
+		expected.MinWidth = 0xF00DCAFEu;
+		expected.MinHeight = 0xCAFEF00Du;
+		expected.MaxWidth = 0x80030280u;
+		expected.MaxHeight = 0x800301E0u;
 		expected.TagWindow = 0x80030001u;
 		expected.TagScreen = 0x80030002u;
 		expected.TagDrawInfo = 0x80030003u;
@@ -435,6 +435,10 @@ public sealed class MuiExternalWrapperTests
 		Assert.Equal(expected.TagDrawInfo, actual.TagDrawInfo);
 		Assert.False(MuiExternalBoopsiGeometryCodec.TryRead(ref p,
 			APTR.FromPointer(0x50000), out _));
+		Assert.False(MuiExternalBoopsiGeometryCodec.TryRead(ref p,
+			APTR.FromPointer((uint)(Base + Size - 32)), out _));
+		Assert.False(MuiExternalBoopsiGeometryCodec.Write(ref p,
+			APTR.FromPointer((uint)(Base + Size - 32)), expected));
 	}
 
 	[Fact]
@@ -503,25 +507,47 @@ public sealed class MuiExternalWrapperTests
 		var environment = APTR.FromPointer(0x3100);
 		var rastPort = APTR.FromPointer(0x3120);
 		var environmentValue = default(MuiExternalDisplayEnvironmentRecord);
-		environmentValue.Window = Window;
-		environmentValue.Screen = Screen;
-		environmentValue.DrawInfo = DrawInfo;
+		environmentValue.Window = APTR.FromPointer(0xF00DCAFEu);
+		environmentValue.Screen = APTR.FromPointer(0xCAFEF00Du);
+		environmentValue.DrawInfo = APTR.FromPointer(0x80032940u);
 		Assert.True(MuiExternalDisplayEnvironmentCodec.Write(ref p, environment,
 			environmentValue));
 		var rastPortValue = default(MuiExternalRastPortSlot);
-		rastPortValue.RastPort = RastPort;
+		rastPortValue.RastPort = APTR.FromPointer(0xF00DCAFEu);
 		Assert.True(MuiExternalRastPortSlotCodec.Write(ref p, rastPort,
 			rastPortValue));
 		Assert.True(MuiExternalDisplayEnvironmentCodec.TryRead(ref p, environment,
 			out var environmentActual));
-		Assert.Equal(Window.Raw, environmentActual.Window.Raw);
-		Assert.Equal(Screen.Raw, environmentActual.Screen.Raw);
-		Assert.Equal(DrawInfo.Raw, environmentActual.DrawInfo.Raw);
+		Assert.Equal(environmentValue.Window.Raw, environmentActual.Window.Raw);
+		Assert.Equal(environmentValue.Screen.Raw, environmentActual.Screen.Raw);
+		Assert.Equal(environmentValue.DrawInfo.Raw, environmentActual.DrawInfo.Raw);
 		Assert.True(MuiExternalRastPortSlotCodec.TryRead(ref p, rastPort,
 			out var rastPortActual));
-		Assert.Equal(RastPort.Raw, rastPortActual.RastPort.Raw);
+		Assert.Equal(rastPortValue.RastPort.Raw, rastPortActual.RastPort.Raw);
 		Assert.False(MuiExternalDisplayEnvironmentCodec.TryRead(ref p,
 			APTR.FromPointer(0x50000), out _));
+		Assert.False(MuiExternalDisplayEnvironmentCodec.TryRead(ref p,
+			APTR.FromPointer((uint)(Base + Size - 11)), out _));
+		Assert.False(MuiExternalDisplayEnvironmentCodec.Write(ref p,
+			APTR.FromPointer((uint)(Base + Size - 11)), environmentValue));
+	}
+
+	[Fact]
+	public void RastPortSlotStructCodecPreservesHighBitsAndBounds()
+	{
+		var p = NewPlatform();
+		var address = APTR.FromPointer(0x3200);
+		var expected = APTR.FromPointer(0xF00DCAFEu);
+		Assert.True(MuiExternalRastPortSlotCodec.WriteValue(ref p, address,
+			expected));
+		Assert.True(MuiExternalRastPortSlotCodec.TryReadValue(ref p, address,
+			out var actual));
+		Assert.Equal(expected.Raw, actual.Raw);
+		var truncated = APTR.FromPointer((uint)(Base + Size - 3));
+		Assert.False(MuiExternalRastPortSlotCodec.TryReadValue(ref p, truncated,
+			out _));
+		Assert.False(MuiExternalRastPortSlotCodec.WriteValue(ref p, truncated,
+			expected));
 	}
 
 	[Fact]
@@ -631,14 +657,20 @@ public sealed class MuiExternalWrapperTests
 	{
 		var p = NewPlatform();
 		BuildRenderInfo(ref p);
+		p.WriteUInt32(RenderInfo, 0, 0xF00DCAFEu);
+		p.WriteUInt32(RenderInfo, 4, 0xCAFEF00Du);
+		p.WriteUInt32(RenderInfo, 8, 0x80032940u);
+		p.WriteUInt32(RenderInfo, 12, 0x80032960u);
 		Assert.True(MuiExternalRenderInfoCodec.TryRead(ref p, RenderInfo,
 			out var value));
-		Assert.Equal(Screen.Raw, value.Screen.Raw);
-		Assert.Equal(Window.Raw, value.Window.Raw);
-		Assert.Equal(DrawInfo.Raw, value.DrawInfo.Raw);
-		Assert.Equal(RastPort.Raw, value.RastPort.Raw);
+		Assert.Equal(0xF00DCAFEu, value.Screen.Raw);
+		Assert.Equal(0xCAFEF00Du, value.Window.Raw);
+		Assert.Equal(0x80032940u, value.DrawInfo.Raw);
+		Assert.Equal(0x80032960u, value.RastPort.Raw);
 		Assert.False(MuiExternalRenderInfoCodec.TryRead(ref p,
 			APTR.FromPointer(0x50000), out _));
+		Assert.False(MuiExternalRenderInfoCodec.TryRead(ref p,
+			APTR.FromPointer((uint)(Base + Size - 15)), out _));
 	}
 
 	[Fact]
@@ -698,11 +730,11 @@ public sealed class MuiExternalWrapperTests
 	{
 		var p = NewPlatform();
 		var expected = default(MuiExternalBoopsiResourceState);
-		expected.PrivateClass = PrivateClass;
-		expected.ClassId = ClassId;
-		expected.OpenedClass = APTR.FromPointer(0x2A00);
-		expected.BoopsiObject = APTR.FromPointer(0x2A20);
-		expected.CreationTags = CreationTags;
+		expected.PrivateClass = APTR.FromPointer(0xF00DCAFEu);
+		expected.ClassId = APTR.FromPointer(0xCAFEF00Du);
+		expected.OpenedClass = APTR.FromPointer(0x80032A00u);
+		expected.BoopsiObject = APTR.FromPointer(0x80032A20u);
+		expected.CreationTags = APTR.FromPointer(0x80032300u);
 		Assert.True(MuiExternalBoopsiResourceCodec.Write(ref p, Instance,
 			expected));
 		Assert.True(MuiExternalBoopsiResourceCodec.TryRead(ref p, Instance,
@@ -714,6 +746,10 @@ public sealed class MuiExternalWrapperTests
 		Assert.Equal(expected.CreationTags.Raw, actual.CreationTags.Raw);
 		Assert.False(MuiExternalBoopsiResourceCodec.TryRead(ref p,
 			APTR.FromPointer(0x50000), out _));
+		Assert.False(MuiExternalBoopsiResourceCodec.TryRead(ref p,
+			APTR.FromPointer((uint)(Base + Size - 31)), out _));
+		Assert.False(MuiExternalBoopsiResourceCodec.Write(ref p,
+			APTR.FromPointer((uint)(Base + Size - 31)), expected));
 	}
 
 	[Fact]
@@ -759,9 +795,9 @@ public sealed class MuiExternalWrapperTests
 	{
 		var p = NewPlatform();
 		var expected = default(MuiExternalScratchState);
-		expected.RememberBuffer = APTR.FromPointer(0x2B00);
-		expected.RememberCount = 3;
-		expected.WorkBuffer = APTR.FromPointer(0x2B40);
+		expected.RememberBuffer = APTR.FromPointer(0xF00DCAFEu);
+		expected.RememberCount = 0xCAFEF00Du;
+		expected.WorkBuffer = APTR.FromPointer(0x80032B40u);
 		Assert.True(MuiExternalScratchStateCodec.Write(ref p, Instance,
 			expected));
 		Assert.True(MuiExternalScratchStateCodec.TryRead(ref p, Instance,
@@ -771,6 +807,10 @@ public sealed class MuiExternalWrapperTests
 		Assert.Equal(expected.WorkBuffer.Raw, actual.WorkBuffer.Raw);
 		Assert.False(MuiExternalScratchStateCodec.TryRead(ref p,
 			APTR.FromPointer(0x50000), out _));
+		Assert.False(MuiExternalScratchStateCodec.TryRead(ref p,
+			APTR.FromPointer((uint)(Base + Size - 72 - 11)), out _));
+		Assert.False(MuiExternalScratchStateCodec.Write(ref p,
+			APTR.FromPointer((uint)(Base + Size - 72 - 11)), expected));
 	}
 
 	[Fact]
@@ -813,15 +853,15 @@ public sealed class MuiExternalWrapperTests
 	{
 		var p = NewPlatform();
 		var expected = default(MuiExternalDtpicState);
-		expected.CallerName = NameA;
-		expected.OwnedName = APTR.FromPointer(0x2C00);
-		expected.OwnedNameSize = 17;
-		expected.PictureObject = APTR.FromPointer(0x2C40);
-		expected.Alpha = 255;
-		expected.MinWidth = 32;
-		expected.MinHeight = 24;
-		expected.PicWidth = 640;
-		expected.PicHeight = 480;
+		expected.CallerName = APTR.FromPointer(0xF00DCAFEu);
+		expected.OwnedName = APTR.FromPointer(0xCAFEF00Du);
+		expected.OwnedNameSize = 0x80030011u;
+		expected.PictureObject = APTR.FromPointer(0x80032C40u);
+		expected.Alpha = 0x800300FFu;
+		expected.MinWidth = 0x80030020u;
+		expected.MinHeight = 0x80030018u;
+		expected.PicWidth = 0x80030280u;
+		expected.PicHeight = 0x800301E0u;
 		Assert.True(MuiExternalDtpicStateCodec.Write(ref p, Instance,
 			expected));
 		Assert.True(MuiExternalDtpicStateCodec.TryRead(ref p, Instance,
@@ -837,6 +877,10 @@ public sealed class MuiExternalWrapperTests
 		Assert.Equal(expected.PicHeight, actual.PicHeight);
 		Assert.False(MuiExternalDtpicStateCodec.TryRead(ref p,
 			APTR.FromPointer(0x50000), out _));
+		Assert.False(MuiExternalDtpicStateCodec.TryRead(ref p,
+			APTR.FromPointer((uint)(Base + Size - 84 - 35)), out _));
+		Assert.False(MuiExternalDtpicStateCodec.Write(ref p,
+			APTR.FromPointer((uint)(Base + Size - 84 - 35)), expected));
 	}
 
 	[Fact]
@@ -878,14 +922,16 @@ public sealed class MuiExternalWrapperTests
 	public void DtpicLayoutResultCodecUsesNamedFields()
 	{
 		var p = NewPlatform();
-		p.WriteUInt32(Packet, 0, 640);
-		p.WriteUInt32(Packet, 4, 480);
+		p.WriteUInt32(Packet, 0, 0xF00DCAFEu);
+		p.WriteUInt32(Packet, 4, 0xCAFEF00Du);
 		Assert.True(MuiExternalDtpicLayoutResultCodec.TryRead(ref p, Packet,
 			out var value));
-		Assert.Equal(640u, value.Width);
-		Assert.Equal(480u, value.Height);
+		Assert.Equal(0xF00DCAFEu, value.Width);
+		Assert.Equal(0xCAFEF00Du, value.Height);
 		Assert.False(MuiExternalDtpicLayoutResultCodec.TryRead(ref p,
 			APTR.FromPointer(0x50000), out _));
+		Assert.False(MuiExternalDtpicLayoutResultCodec.TryRead(ref p,
+			APTR.FromPointer((uint)(Base + Size - 7)), out _));
 	}
 
 	[Fact]
@@ -940,8 +986,8 @@ public sealed class MuiExternalWrapperTests
 		var p = NewPlatform();
 		var expected = default(MuiExternalNotificationState);
 		expected.Attribute = 0x8042BFA3u;
-		expected.Value = 37;
-		expected.Count = 9;
+		expected.Value = 0xF00DCAFEu;
+		expected.Count = 0xCAFEF00Du;
 		Assert.True(MuiExternalNotificationStateCodec.Write(ref p, Instance,
 			expected));
 		Assert.True(MuiExternalNotificationStateCodec.TryRead(ref p, Instance,
@@ -951,6 +997,10 @@ public sealed class MuiExternalWrapperTests
 		Assert.Equal(expected.Count, actual.Count);
 		Assert.False(MuiExternalNotificationStateCodec.TryRead(ref p,
 			APTR.FromPointer(0x50000), out _));
+		Assert.False(MuiExternalNotificationStateCodec.TryRead(ref p,
+			APTR.FromPointer((uint)(Base + Size - 120 - 11)), out _));
+		Assert.False(MuiExternalNotificationStateCodec.Write(ref p,
+			APTR.FromPointer((uint)(Base + Size - 120 - 11)), expected));
 	}
 
 	[Fact]
@@ -1031,6 +1081,82 @@ public sealed class MuiExternalWrapperTests
 			render));
 		Assert.False(MuiExternalBoopsiPacketCodec.TryGetInlineTagList(ref p,
 			APTR.FromPointer(Base + (uint)Size - 1), out _));
+	}
+
+	[Fact]
+	public void BoopsiPacketStructCodecsPreserveHighBitsAndRejectTruncatedRecords()
+	{
+		var p = NewPlatform();
+		var opSet = new MuiExternalBoopsiOpSetMessage
+		{
+			MethodId = OmSet,
+			AttributeList = APTR.FromPointer(0xF00DCAFEu),
+			GadgetInfo = APTR.FromPointer(0xCAFEF00Du),
+		};
+		Assert.True(MuiExternalBoopsiOpSetMessageStructCodec.Write(ref p,
+			Packet, opSet));
+		Assert.True(MuiExternalBoopsiOpSetMessageStructCodec.TryRead(ref p,
+			Packet, out var opSetActual));
+		Assert.Equal(opSet.MethodId, opSetActual.MethodId);
+		Assert.Equal(opSet.AttributeList.Raw, opSetActual.AttributeList.Raw);
+		Assert.Equal(opSet.GadgetInfo.Raw, opSetActual.GadgetInfo.Raw);
+
+		var opGet = new MuiExternalBoopsiOpGetMessage
+		{
+			MethodId = OmGet,
+			Attribute = 0x80421234u,
+			Storage = APTR.FromPointer(0x80032940u),
+		};
+		Assert.True(MuiExternalBoopsiOpGetMessageStructCodec.Write(ref p,
+			Packet, opGet));
+		Assert.True(MuiExternalBoopsiOpGetMessageStructCodec.TryRead(ref p,
+			Packet, out var opGetActual));
+		Assert.Equal(opGet.MethodId, opGetActual.MethodId);
+		Assert.Equal(opGet.Attribute, opGetActual.Attribute);
+		Assert.Equal(opGet.Storage.Raw, opGetActual.Storage.Raw);
+
+		var render = new MuiExternalBoopsiRenderMessage
+		{
+			MethodId = MuiExternalBoopsiPacketCodec.GmRender,
+			GadgetInfo = APTR.FromPointer(0xF00DCAFEu),
+			RastPort = APTR.FromPointer(0x80032960u),
+		};
+		Assert.True(MuiExternalBoopsiRenderMessageStructCodec.Write(ref p,
+			Packet, render));
+		Assert.True(MuiExternalBoopsiRenderMessageStructCodec.TryRead(ref p,
+			Packet, out var renderActual));
+		Assert.Equal(render.MethodId, renderActual.MethodId);
+		Assert.Equal(render.GadgetInfo.Raw, renderActual.GadgetInfo.Raw);
+		Assert.Equal(render.RastPort.Raw, renderActual.RastPort.Raw);
+
+		var tag = new MuiExternalBoopsiTagItem
+		{
+			Tag = 0x80421234u,
+			Data = 0xF00DCAFEu,
+		};
+		Assert.True(MuiExternalBoopsiTagItemStructCodec.Write(ref p, AttrList,
+			tag));
+		Assert.True(MuiExternalBoopsiTagItemStructCodec.TryRead(ref p, AttrList,
+			out var tagActual));
+		Assert.Equal(tag.Tag, tagActual.Tag);
+		Assert.Equal(tag.Data, tagActual.Data);
+
+		var result = new MuiExternalBoopsiResultWord { Value = 0xFEEDBEEFu };
+		Assert.True(MuiExternalBoopsiResultWordStructCodec.Write(ref p, Storage,
+			result));
+		Assert.True(MuiExternalBoopsiResultWordStructCodec.TryRead(ref p, Storage,
+			out var resultActual));
+		Assert.Equal(result.Value, resultActual.Value);
+
+		var truncated = APTR.FromPointer(Base + (uint)Size - 11);
+		Assert.False(MuiExternalBoopsiOpSetMessageStructCodec.TryRead(ref p,
+			truncated, out _));
+		Assert.False(MuiExternalBoopsiOpSetMessageStructCodec.Write(ref p,
+			truncated, opSet));
+		Assert.False(MuiExternalBoopsiTagItemStructCodec.TryRead(ref p,
+			APTR.FromPointer(Base + (uint)Size - 3), out _));
+		Assert.False(MuiExternalBoopsiResultWordStructCodec.Write(ref p,
+			APTR.FromPointer(Base + (uint)Size - 3), result));
 	}
 
 	[Fact]
@@ -1164,15 +1290,25 @@ public sealed class MuiExternalWrapperTests
 		Assert.True(MuiExternalTagListVectorMemoryCodec.TryGetEntry(ref p,
 			vector, 1, out var address));
 		Assert.Equal(APTR.FromPointer(0x3008), address);
-		var expected = new MuiAslTagItemRecord { Tag = 0x80421234, Data = 77 };
-		Assert.True(MuiAslTagItemCodec.Write(ref p, address, expected));
-		Assert.True(MuiAslTagItemCodec.TryRead(ref p, address, out var actual));
+		var expected = new MuiAslTagItemRecord
+		{
+			Tag = 0xF00DCAFEu,
+			Data = 0x87654321u,
+		};
+		Assert.True(MuiExternalTagListVectorCodec.TryWrite(ref p, vector, 1,
+			expected));
+		Assert.True(MuiExternalTagListVectorCodec.TryRead(ref p, vector, 1,
+			out var actual));
 		Assert.Equal(expected.Tag, actual.Tag);
 		Assert.Equal(expected.Data, actual.Data);
 		Assert.False(MuiExternalTagListVectorMemoryCodec.TryGetEntry(ref p,
 			vector, MuiExternalTagListCursor.MaximumEntries, out _));
+		Assert.False(MuiExternalTagListVectorCodec.TryRead(ref p, vector,
+			MuiExternalTagListCursor.MaximumEntries, out _));
 		Assert.False(MuiExternalTagListVectorMemoryCodec.TryGetEntry(ref p,
 			APTR.FromPointer(0x40FFC), 0, out _));
+		Assert.False(MuiExternalTagListVectorCodec.TryWrite(ref p,
+			APTR.FromPointer(0x40FFC), 0, expected));
 		Assert.False(MuiExternalTagListVectorMemoryCodec.TryGetEntry(ref p,
 			APTR.FromPointer(0xFFFFFFF0), 4, out _));
 	}
@@ -1667,10 +1803,25 @@ public sealed class MuiExternalWrapperTests
 		Assert.True(MuiExternalRememberVectorMemoryCodec.TryGetEntry(ref p,
 			vector, 4, out var address));
 		Assert.Equal(APTR.FromPointer(0x2B20), address);
+		var expected = new MuiAslTagItemRecord
+		{
+			Tag = 0xF00DCAFEu,
+			Data = 0x87654321u,
+		};
+		Assert.True(MuiExternalRememberVectorCodec.TryWrite(ref p, vector, 4,
+			expected));
+		Assert.True(MuiExternalRememberVectorCodec.TryRead(ref p, vector, 4,
+			out var actual));
+		Assert.Equal(expected.Tag, actual.Tag);
+		Assert.Equal(expected.Data, actual.Data);
 		Assert.False(MuiExternalRememberVectorMemoryCodec.TryGetEntry(ref p,
 			vector, MuiExternalRememberCursor.MaximumEntries, out _));
+		Assert.False(MuiExternalRememberVectorCodec.TryRead(ref p, vector,
+			MuiExternalRememberCursor.MaximumEntries, out _));
 		Assert.False(MuiExternalRememberVectorMemoryCodec.TryGetEntry(ref p,
 			APTR.FromPointer(0x40FFC), 0, out _));
+		Assert.False(MuiExternalRememberVectorCodec.TryWrite(ref p,
+			APTR.FromPointer(0x40FFC), 0, expected));
 		Assert.False(MuiExternalRememberVectorMemoryCodec.TryGetEntry(ref p,
 			APTR.FromPointer(0xFFFFFFF0), 1, out _));
 	}
@@ -1703,15 +1854,25 @@ public sealed class MuiExternalWrapperTests
 		Assert.True(MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref p,
 			vector, 4, out var address));
 		Assert.Equal(APTR.FromPointer(0x3030), address);
-		var expected = new MuiExternalBoopsiTagItem { Tag = 0x80421234, Data = 88 };
-		Assert.True(MuiExternalBoopsiPacketCodec.WriteTag(ref p, address,
+		var expected = new MuiExternalBoopsiTagItem
+		{
+			Tag = 0xF00DCAFEu,
+			Data = 0x87654321u,
+		};
+		Assert.True(MuiExternalBoopsiTagVectorCodec.TryWrite(ref p, vector, 4,
 			expected));
-		Assert.Equal(expected.Tag, p.ReadUInt32(address, 0));
-		Assert.Equal(expected.Data, p.ReadUInt32(address, 4));
+		Assert.True(MuiExternalBoopsiTagVectorCodec.TryRead(ref p, vector, 4,
+			out var actual));
+		Assert.Equal(expected.Tag, actual.Tag);
+		Assert.Equal(expected.Data, actual.Data);
 		Assert.False(MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref p,
 			vector, MuiExternalBoopsiTagCursor.MaximumEntries, out _));
+		Assert.False(MuiExternalBoopsiTagVectorCodec.TryRead(ref p, vector,
+			MuiExternalBoopsiTagCursor.MaximumEntries, out _));
 		Assert.False(MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref p,
 			APTR.FromPointer(0x40FFC), 0, out _));
+		Assert.False(MuiExternalBoopsiTagVectorCodec.TryWrite(ref p,
+			APTR.FromPointer(0x40FFC), 0, expected));
 		Assert.False(MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref p,
 			APTR.FromPointer(0xFFFFFFF0), 1, out _));
 	}

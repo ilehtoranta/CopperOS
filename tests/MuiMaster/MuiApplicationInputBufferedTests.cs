@@ -206,6 +206,37 @@ public sealed class MuiApplicationInputBufferedTests
 	}
 
 	[Fact]
+	public void ApplicationPushMethodParameterVectorBridgeUsesNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var vector = APTR.FromPointer(0x1900);
+		var expected = new MuiApplicationPushMethodParameter
+		{
+			Value = 0xFEDCBA98u,
+		};
+
+		Assert.True(MuiApplicationPushMethodParameterVectorCodec.TryWrite(ref platform,
+			vector, 2, expected));
+		Assert.True(MuiApplicationPushMethodParameterVectorCodec.TryRead(ref platform,
+			vector, 2, out var decoded));
+		Assert.Equal(expected.Value, decoded.Value);
+		Assert.True(MuiApplicationPushMethodParameterVectorCodec.TryReadValue(
+			ref platform, vector, 2, out var rawValue));
+		Assert.Equal(expected.Value, rawValue);
+		Assert.True(MuiApplicationPushMethodParameterVectorCodec.TryWriteValue(
+			ref platform, vector, 3, 0x80000001u));
+		Assert.True(MuiApplicationPushMethodParameterVectorCodec.TryReadValue(
+			ref platform, vector, 3, out rawValue));
+		Assert.Equal(0x80000001u, rawValue);
+		Assert.False(MuiApplicationPushMethodParameterVectorCodec.TryReadValue(
+			ref platform, vector,
+			MuiApplicationPushMethodParameterCursor.MaximumEntries, out _));
+		Assert.False(MuiApplicationPushMethodParameterVectorCodec.TryWriteValue(
+			ref platform, APTR.FromPointer(0xFFFFFFF0), 0, expected.Value));
+	}
+
+	[Fact]
 	public void InputBufferedDispatchesOneQueuedPushMethod()
 	{
 		var platform = CreatePlatform(out var cl);

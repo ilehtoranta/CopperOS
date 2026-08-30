@@ -260,6 +260,31 @@ public sealed class MuiCommonControlClassTests
 	}
 
 	[Fact]
+	public void ImageGeometryStructCodecPreservesWordValuesAndBounds()
+	{
+		var platform = NewPlatform();
+		var address = APTR.FromPointer(0x3500);
+		var expected = new MuiImageGeometryState
+		{
+			LeftEdge = unchecked((short)0x8001),
+			TopEdge = unchecked((short)0x7FFE),
+			Width = 0xF00D,
+			Height = 0xCAFE,
+		};
+		Assert.True(MuiImageGeometryCodec.Write(ref platform, address, expected));
+		Assert.True(MuiImageGeometryCodec.TryRead(ref platform, address,
+			out var actual));
+		Assert.Equal(expected.LeftEdge, actual.LeftEdge);
+		Assert.Equal(expected.TopEdge, actual.TopEdge);
+		Assert.Equal(expected.Width, actual.Width);
+		Assert.Equal(expected.Height, actual.Height);
+
+		var tail = APTR.FromPointer(0x40FFC);
+		Assert.False(MuiImageGeometryCodec.TryRead(ref platform, tail, out _));
+		Assert.False(MuiImageGeometryCodec.Write(ref platform, tail, expected));
+	}
+
+	[Fact]
 	public void ImageGeometryFieldCursorUsesNamedMixedWidthBoundaries()
 	{
 		var platform = NewPlatform();

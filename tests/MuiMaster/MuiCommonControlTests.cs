@@ -72,6 +72,23 @@ public sealed class MuiCommonControlTests
 	}
 
 	[Fact]
+	public void ChoiceEntryValueCodecPreservesHighBitsAndBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1180);
+		const uint text = 0xF00DCAFE;
+		Assert.True(MuiChoiceEntryCodec.WriteValue(ref platform, address, text));
+		Assert.True(MuiChoiceEntryCodec.TryReadValue(ref platform, address,
+			out var decoded));
+		Assert.Equal(text, decoded);
+
+		var tail = APTR.FromPointer(0x20FFD);
+		Assert.False(MuiChoiceEntryCodec.TryReadValue(ref platform, tail,
+			out _));
+		Assert.False(MuiChoiceEntryCodec.WriteValue(ref platform, tail, text));
+	}
+
+	[Fact]
 	public void ChoiceEntryFieldCursorUsesNamedTextBoundary()
 	{
 		var platform = CreatePlatform(out _);
@@ -122,9 +139,23 @@ public sealed class MuiCommonControlTests
 		Assert.True(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
 			vector, 4095, out var address));
 		Assert.Equal(APTR.FromPointer(0x51FC), address);
+		var expected = default(MuiChoiceEntry);
+		expected.Text = APTR.FromPointer(0xF00DCAFEu);
+		Assert.True(MuiChoiceEntryVectorCodec.TryWrite(ref platform, vector, 0,
+			expected));
+		Assert.True(MuiChoiceEntryVectorCodec.TryRead(ref platform, vector, 0,
+			out var decoded));
+		Assert.Equal(expected.Text, decoded.Text);
+		Assert.True(MuiChoiceEntryVectorCodec.TryReadValue(ref platform, vector, 0,
+			out var rawDecoded));
+		Assert.Equal(expected.Text.Raw, rawDecoded);
 		Assert.False(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
 			vector, MuiChoiceEntryCursor.MaximumEntries, out _));
+		Assert.False(MuiChoiceEntryVectorCodec.TryRead(ref platform, vector,
+			MuiChoiceEntryCursor.MaximumEntries, out _));
 		Assert.False(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0x20FFE), 0, out _));
+		Assert.False(MuiChoiceEntryVectorCodec.TryRead(ref platform,
 			APTR.FromPointer(0x20FFE), 0, out _));
 		Assert.False(MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
 			APTR.FromPointer(0xFFFFFFFF), 1, out _));

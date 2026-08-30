@@ -118,6 +118,82 @@ public sealed class MuiClassServiceTests
 			MuiClassRecordKind.CustomClass, (MuiClassRecordField)255, out _));
 	}
 
+	[Fact]
+	public void ClassServiceSequentialStructCodecsRoundTripCompleteRecords()
+	{
+		var platform = NewPlatform();
+		var stateAddress = APTR.FromPointer(0x1B00);
+		var leaseAddress = APTR.FromPointer(0x1B20);
+		var customAddress = APTR.FromPointer(0x1B60);
+		var state = new MuiClassServiceStateRecord
+		{
+			Magic = MuiClassServiceLayout.Magic,
+			Head = leaseAddress,
+			Headless = HeadlessState,
+			Generation = 0xFEDCBA98u,
+		};
+		Assert.True(MuiClassServiceStateStructCodec.Write(ref platform,
+			stateAddress, state));
+		Assert.True(MuiClassServiceStateStructCodec.TryRead(ref platform,
+			stateAddress, out var readState));
+		Assert.Equal(state.Head, readState.Head);
+		Assert.Equal(state.Headless, readState.Headless);
+		Assert.Equal(state.Generation, readState.Generation);
+		Assert.True(MuiClassServiceStateCodec.TryRead(ref platform, stateAddress,
+			out var wrappedState));
+		Assert.Equal(state.Magic, wrappedState.Magic);
+
+		var lease = new MuiClassServiceLeaseRecord
+		{
+			Next = APTR.FromPointer(0x1BA0),
+			Flags = 0x80000011u,
+			ClassId = APTR.FromPointer(0x1BC0),
+			Boopsi = APTR.FromPointer(0x1BE0),
+			LibraryBase = APTR.FromPointer(0x1C00),
+			RefCount = 0xFEDCBA98u,
+			HeadlessClass = APTR.FromPointer(0x1C20),
+			CustomClass = customAddress,
+			SuperService = stateAddress,
+			ObjectCount = 0x81234567u,
+			ChildCount = 7,
+		};
+		Assert.True(MuiClassServiceLeaseStructCodec.Write(ref platform,
+			leaseAddress, lease));
+		Assert.True(MuiClassServiceLeaseStructCodec.TryRead(ref platform,
+			leaseAddress, out var readLease));
+		Assert.Equal(lease.Flags, readLease.Flags);
+		Assert.Equal(lease.Boopsi, readLease.Boopsi);
+		Assert.Equal(lease.ObjectCount, readLease.ObjectCount);
+		Assert.Equal(lease.ChildCount, readLease.ChildCount);
+
+		var custom = new MuiCustomClassRecord
+		{
+			UserData = APTR.FromPointer(0xF1234567u),
+			UtilityBase = APTR.FromPointer(0x1C40),
+			DosBase = APTR.FromPointer(0x1C60),
+			GfxBase = APTR.FromPointer(0x1C80),
+			IntuitionBase = APTR.FromPointer(0x1CA0),
+			Super = APTR.FromPointer(0x1CC0),
+			Class = APTR.FromPointer(0x1CE0),
+		};
+		Assert.True(MuiCustomClassStructCodec.Write(ref platform, customAddress,
+			custom));
+		Assert.True(MuiCustomClassStructCodec.TryRead(ref platform, customAddress,
+			out var readCustom));
+		Assert.Equal(custom.UserData, readCustom.UserData);
+		Assert.Equal(custom.Class, readCustom.Class);
+		Assert.True(MuiCustomClassCodec.TryRead(ref platform, customAddress,
+			out var wrappedCustom));
+		Assert.Equal(custom.Super, wrappedCustom.Super);
+
+		Assert.False(MuiClassServiceLeaseStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FF0), out _));
+		Assert.False(MuiClassServiceStateStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FF1), out _));
+		Assert.False(MuiCustomClassStructCodec.Write(ref platform, APTR.Null,
+			custom));
+	}
+
 	// ---- Initialize ----------------------------------------------------------
 
 	[Fact]

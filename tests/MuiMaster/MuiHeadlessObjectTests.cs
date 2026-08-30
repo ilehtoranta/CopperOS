@@ -64,6 +64,33 @@ public sealed class MuiHeadlessObjectTests
 	}
 
 	[Fact]
+	public void MakeObjectChoiceVectorAdmissionUsesNamedEntryProjection()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var className = APTR.FromPointer(0x1200);
+		var label = APTR.FromPointer(0x1240);
+		var entries = APTR.FromPointer(0x1280);
+		var parameters = APTR.FromPointer(0x12C0);
+		platform.WriteCString(className, "Cycle.mui");
+		platform.WriteCString(label, "Cycle");
+		Assert.True(MuiHeadlessObjectCore.Initialize(ref platform, State));
+		Assert.True(MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform, State,
+			className, APTR.Null, 0, APTR.FromPointer(1)).IsNotNull);
+		Assert.True(MuiChoiceEntryVectorCodec.TryWrite(ref platform, entries, 0,
+			new MuiChoiceEntry { Text = label }));
+		Assert.True(MuiChoiceEntryVectorCodec.TryWrite(ref platform, entries, 1,
+			new MuiChoiceEntry { Text = APTR.Null }));
+		platform.WriteUInt32(parameters, 0, label.Raw);
+		platform.WriteUInt32(parameters, 4, entries.Raw);
+
+		var obj = MuiMakeObjectServiceCore.MakeObjectA(ref platform, State,
+			MuiMakeObjectServiceCore.MUIO_Cycle, parameters);
+		Assert.True(obj.IsNotNull);
+		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State, obj));
+	}
+
+	[Fact]
 	public void NewMenuCursorUsesNamedEntryBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -103,6 +130,41 @@ public sealed class MuiHeadlessObjectTests
 	}
 
 	[Fact]
+	public void NewMenuVectorCodecExchangesCompleteNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var vector = APTR.FromPointer(0x1600);
+		var expected = new MuiNewMenuRecord
+		{
+			Type = 2,
+			Padding = 0xA5,
+			Label = 0xF00DCAFEu,
+			CommandKey = 0xEEDDCCBBu,
+			Flags = 0xBEEF,
+			MutualExclude = 0x87654321u,
+			UserData = 0xCAFEBABEu,
+		};
+
+		Assert.True(MuiNewMenuRecordCodec.Write(ref platform, vector, expected));
+		Assert.True(MuiNewMenuVectorCodec.TryRead(ref platform, vector, 0,
+			out var actual));
+		Assert.Equal(expected.Type, actual.Type);
+		Assert.Equal(expected.Padding, actual.Padding);
+		Assert.Equal(expected.Label, actual.Label);
+		Assert.Equal(expected.CommandKey, actual.CommandKey);
+		Assert.Equal(expected.Flags, actual.Flags);
+		Assert.Equal(expected.MutualExclude, actual.MutualExclude);
+		Assert.Equal(expected.UserData, actual.UserData);
+		Assert.False(MuiNewMenuVectorCodec.TryRead(ref platform, vector,
+			MuiNewMenuCursor.MaximumEntries, out _));
+		Assert.False(MuiNewMenuVectorCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FF0), 0, out _));
+		Assert.False(MuiNewMenuVectorCodec.TryRead(ref platform,
+			APTR.FromPointer(0xFFFFFFFF), 1, out _));
+	}
+
+	[Fact]
 	public void MakeObjectAndNewMenuFieldsUseNamedBoundaries()
 	{
 		Assert.Equal(16, System.Runtime.InteropServices.Marshal.SizeOf<
@@ -124,6 +186,22 @@ public sealed class MuiHeadlessObjectTests
 		var parameters = APTR.FromPointer(0x1300);
 		platform.WriteUInt32(parameters, 0, 0x11111111u);
 		platform.WriteUInt32(parameters, 4, 0x22222222u);
+		platform.WriteUInt32(parameters, 8, 0x33333333u);
+		platform.WriteUInt32(parameters, 12, 0x44444444u);
+		Assert.True(MuiMakeObjectParameterCodec.TryRead(ref platform,
+			parameters, 4, out var record));
+		Assert.Equal(0x11111111u, record.First);
+		Assert.Equal(0x22222222u, record.Second);
+		Assert.Equal(0x33333333u, record.Third);
+		Assert.Equal(0x44444444u, record.Fourth);
+		Assert.True(MuiMakeObjectParameterCodec.TryRead(ref platform,
+			parameters, 2, out var shortRecord));
+		Assert.Equal(0x11111111u, shortRecord.First);
+		Assert.Equal(0x22222222u, shortRecord.Second);
+		Assert.Equal(0u, shortRecord.Third);
+		Assert.Equal(0u, shortRecord.Fourth);
+		Assert.False(MuiMakeObjectParameterCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFD), 1, out _));
 		Assert.True(MuiMakeObjectParameterMemoryCodec.TryGetAddress(ref platform,
 			parameters, MuiMakeObjectParameterField.Second, 8, out var directAddress));
 		Assert.Equal(APTR.FromPointer(0x1304), directAddress);
@@ -152,6 +230,17 @@ public sealed class MuiHeadlessObjectTests
 		platform.WriteUInt16(menu, 10, 0x55AA);
 		platform.WriteUInt32(menu, 12, 0x01020304u);
 		platform.WriteUInt32(menu, 16, 0xAABBCCDDu);
+		Assert.True(MuiNewMenuRecordCodec.TryRead(ref platform, menu,
+			out var menuRecord));
+		Assert.Equal((byte)2, menuRecord.Type);
+		Assert.Equal((byte)0xA5, menuRecord.Padding);
+		Assert.Equal(0x12345678u, menuRecord.Label);
+		Assert.Equal(0x87654321u, menuRecord.CommandKey);
+		Assert.Equal((ushort)0x55AA, menuRecord.Flags);
+		Assert.Equal(0x01020304u, menuRecord.MutualExclude);
+		Assert.Equal(0xAABBCCDDu, menuRecord.UserData);
+		Assert.False(MuiNewMenuRecordCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FF0), out _));
 		Assert.True(MuiNewMenuRecordMemoryCodec.TryGetAddress(ref platform, menu,
 			MuiNewMenuField.Flags, out var directMenuAddress, out var directSize));
 		Assert.Equal(APTR.FromPointer(0x140A), directMenuAddress);

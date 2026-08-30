@@ -42,4 +42,31 @@ public sealed class MuiWorkbenchArgumentStructAdapterTests
 		Assert.False(MuiWorkbenchArgumentRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiWorkbenchArgumentField.Name, out _));
 	}
+
+	[Fact]
+	public void WorkbenchArgumentVectorBridgeUsesCompleteNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var vector = APTR.FromPointer(0x3200);
+		var expected = new MuiWorkbenchArgumentRecord
+		{
+			Lock = BPTR.FromRaw(0xF1234567u),
+			Name = STRPTR.FromPointer(0xE2345678u),
+		};
+
+		Assert.True(MuiWorkbenchArgumentVectorCodec.TryWrite(ref platform,
+			vector, 3, expected));
+		Assert.True(MuiWorkbenchArgumentVectorCodec.TryRead(ref platform,
+			vector, 3, out var actual));
+		Assert.Equal(expected.Lock, actual.Lock);
+		Assert.Equal(expected.Name, actual.Name);
+
+		Assert.False(MuiWorkbenchArgumentVectorCodec.TryRead(ref platform,
+			vector, MuiWorkbenchArgumentVectorCursor.MaximumEntries, out _));
+		Assert.False(MuiWorkbenchArgumentVectorCodec.TryRead(ref platform,
+			APTR.FromPointer(0x30FFCu), 0, out _));
+		Assert.False(MuiWorkbenchArgumentVectorCodec.TryWrite(ref platform,
+			APTR.Null, 0, expected));
+	}
 }

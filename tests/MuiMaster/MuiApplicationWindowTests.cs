@@ -936,6 +936,31 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void WindowCycleChainVectorBridgeUsesNamedObjectSlot()
+	{
+		var platform = CreatePlatform(out _);
+		var vector = APTR.FromPointer(0x1900);
+		var expected = new MuiApplicationWindowCycleChainSlot
+		{
+			Object = APTR.FromPointer(0xFEDCBA98u),
+		};
+
+		Assert.True(MuiApplicationWindowCycleChainVectorCodec.TryWrite(ref platform,
+			vector, 0, expected));
+		Assert.True(MuiApplicationWindowCycleChainVectorCodec.TryRead(ref platform,
+			vector, 0, out var actual));
+		Assert.Equal(expected.Object, actual.Object);
+		Assert.True(MuiApplicationWindowCycleChainVectorCodec.TryReadValue(
+			ref platform, vector, 0, out var rawObject));
+		Assert.Equal(expected.Object.Raw, rawObject);
+		Assert.False(MuiApplicationWindowCycleChainVectorCodec.TryReadValue(
+			ref platform, vector,
+			MuiApplicationWindowCycleChainCursor.MaximumEntries, out _));
+		Assert.False(MuiApplicationWindowCycleChainVectorCodec.TryWriteValue(
+			ref platform, APTR.FromPointer(0x20FFE), 0, expected.Object.Raw));
+	}
+
+	[Fact]
 	public void ApplicationMethodHeaderCodecUsesNamedField()
 	{
 		var platform = CreatePlatform(out _);

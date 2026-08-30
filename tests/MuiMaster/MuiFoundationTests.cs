@@ -52,7 +52,16 @@ public sealed class MuiFoundationTests
 		Assert.True(MuiMasterPrivateRootCodec.TryRead(ref platform, address,
 			out var decoded));
 		Assert.Equal(value.ClassRegistry, decoded.ClassRegistry);
+		Assert.Equal(value.AllocationPolicy, decoded.AllocationPolicy);
+		Assert.Equal(value.ErrorState, decoded.ErrorState);
+		Assert.Equal(value.ApplicationHead, decoded.ApplicationHead);
+		Assert.Equal(value.ExternalClassHead, decoded.ExternalClassHead);
+		Assert.Equal(value.CallbackState, decoded.CallbackState);
+		Assert.Equal(value.LoaderState, decoded.LoaderState);
 		Assert.Equal(value.RegistryGeneration, decoded.RegistryGeneration);
+		Assert.Equal(value.ActiveDispatchDepth, decoded.ActiveDispatchDepth);
+		Assert.Equal(value.ActiveCallbackDepth, decoded.ActiveCallbackDepth);
+		Assert.Equal(value.Flags, decoded.Flags);
 		Assert.Equal(value.Reserved, decoded.Reserved);
 
 		var cursor = default(MuiMasterPrivateRootFieldCursor);
@@ -94,6 +103,26 @@ public sealed class MuiFoundationTests
 			out _));
 		Assert.False(MuiGuestUlongStorageCodec.WriteValue(ref platform,
 			APTR.FromPointer(0x30000), expected));
+	}
+
+	[Fact]
+	public void GuestUlongStorageValueCodecPreservesHighBitsAndBounds()
+	{
+		var state = APTR.FromPointer(0x1000);
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			state);
+		var address = APTR.FromPointer(0x2400);
+		const uint expected = 0xF00DCAFE;
+
+		Assert.True(MuiGuestUlongStorageCodec.WriteValue(ref platform, address,
+			expected));
+		Assert.True(MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out var actual));
+		Assert.Equal(expected, actual);
+		Assert.False(MuiGuestUlongStorageCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFD), out _));
+		Assert.False(MuiGuestUlongStorageCodec.WriteValue(ref platform,
+			APTR.FromPointer(0x20FFD), expected));
 	}
 
 	[Fact]

@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -121,6 +122,53 @@ internal static class MuiObjectPersistencePacketFieldCursorCodec
 			message, field, value);
 }
 
+// Sequential codecs for the fixed Export/Import records. The legacy field
+// adapter remains available for compatibility diagnostics; production paths
+// consume these declaration-ordered named structs.
+internal static class MuiObjectPersistenceMessageStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiObjectPersistenceMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out methodId) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR message,
+		out MuiObjectPersistenceMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiObjectPersistenceMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawDataspace) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		packet.Dataspace = APTR.FromPointer(rawDataspace);
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR message, uint method, APTR dataspace)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiObjectPersistenceMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, method) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				dataspace.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 // Central codec for the fixed MorphOS Export/Import packet pair. The public
 // core below consumes the named record; only this adapter carries guest
 // offsets and packet mapping checks.
@@ -146,14 +194,8 @@ internal static class MuiObjectPersistenceMessageCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiObjectPersistenceMethodMessage.Size)) return false;
-		return MuiObjectPersistenceMessageMemoryCodec.TryReadUInt32(
-			ref platform, message, MuiObjectPersistencePacketField.MethodId,
-			out methodId);
-	}
+		=> MuiObjectPersistenceMessageStructCodec.TryReadMethodIdValue(
+			ref platform, message, out methodId);
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
 		APTR message, out uint method)
@@ -168,35 +210,21 @@ internal static class MuiObjectPersistenceMessageCodec
 		APTR message, uint method, out MuiObjectPersistenceMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		uint methodId;
-		if ((method != ExportMethod && method != ImportMethod) ||
-			message.IsNull || !platform.IsMapped(message,
-			MuiObjectPersistenceMessage.Size) ||
-			!TryReadMethodIdValue(ref platform, message, out methodId) ||
-			methodId != method) return false;
-		if (!MuiObjectPersistenceMessageMemoryCodec.TryReadUInt32(
-			ref platform, message, MuiObjectPersistencePacketField.Dataspace,
-			out var rawDataspace)) return false;
-		packet.MethodId = methodId;
-		packet.Dataspace = APTR.FromPointer(rawDataspace);
-		return true;
+		if (method != ExportMethod && method != ImportMethod)
+		{
+			packet = default;
+			return false;
+		}
+		return MuiObjectPersistenceMessageStructCodec.TryRead(ref platform,
+			message, out packet) && packet.MethodId == method;
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, MuiObjectPersistenceMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if ((method != ExportMethod && method != ImportMethod) ||
-			message.IsNull || !platform.IsMapped(message,
-			MuiObjectPersistenceMessage.Size)) return false;
-		return MuiObjectPersistenceMessageMemoryCodec.TryWriteUInt32(
-			ref platform, message, MuiObjectPersistencePacketField.MethodId,
-			method) &&
-			MuiObjectPersistenceMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiObjectPersistencePacketField.Dataspace,
-				packet.Dataspace.Raw);
-	}
+		=> (method == ExportMethod || method == ImportMethod) &&
+			MuiObjectPersistenceMessageStructCodec.TryWrite(ref platform, message,
+				method, packet.Dataspace);
 }
 
 // Struct-first codec for the MorphOS MUIM_Export/MUIM_Import packet pair.

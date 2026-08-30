@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Amiga;
 using CopperOS.MuiMaster;
 
@@ -138,6 +139,51 @@ public sealed class MuiServiceRecordCursorTests
 			APTR.Null, MuiStringEditRecordField.EditOp, out _, out _));
 		Assert.False(MuiStringEditWorkRecordMemoryCodec.TryGetAddress(ref platform,
 			record, (MuiStringEditRecordField)255, out _, out _));
+	}
+
+	[Fact]
+	public void StringEditWorkCodecUsesCompleteNamedRecord()
+	{
+		var platform = CreatePlatform();
+		var record = APTR.FromPointer(0x3600);
+		var expected = new MuiStringEditWorkRecord
+		{
+			Gadget = APTR.FromPointer(0x11111111),
+			StringInfo = APTR.FromPointer(0x22222222),
+			WorkBuffer = APTR.FromPointer(0x33333333),
+			PrevBuffer = APTR.FromPointer(0x44444444),
+			Modes = 0x55555555,
+			InputEvent = APTR.FromPointer(0x66666666),
+			Code = 0x1234,
+			BufferPos = -12,
+			NumChars = 34,
+			Actions = 0x77777777,
+			LongInt = -45,
+			GadgetInfo = APTR.FromPointer(0x88888888),
+			EditOp = 0x4321,
+		};
+
+		Assert.Equal(44, Unsafe.SizeOf<MuiStringEditWorkRecord>());
+		Assert.True(MuiStringEditWorkCodec.Write(ref platform, record, expected));
+		Assert.True(MuiStringEditWorkCodec.TryRead(ref platform, record,
+			out var actual));
+		Assert.Equal(expected.Gadget, actual.Gadget);
+		Assert.Equal(expected.StringInfo, actual.StringInfo);
+		Assert.Equal(expected.WorkBuffer, actual.WorkBuffer);
+		Assert.Equal(expected.PrevBuffer, actual.PrevBuffer);
+		Assert.Equal(expected.Modes, actual.Modes);
+		Assert.Equal(expected.InputEvent, actual.InputEvent);
+		Assert.Equal(expected.Code, actual.Code);
+		Assert.Equal(expected.BufferPos, actual.BufferPos);
+		Assert.Equal(expected.NumChars, actual.NumChars);
+		Assert.Equal(expected.Actions, actual.Actions);
+		Assert.Equal(expected.LongInt, actual.LongInt);
+		Assert.Equal(expected.GadgetInfo, actual.GadgetInfo);
+		Assert.Equal(expected.EditOp, actual.EditOp);
+		Assert.False(MuiStringEditWorkCodec.TryRead(ref platform,
+			APTR.FromPointer(0x40FD5), out _));
+		Assert.False(MuiStringEditWorkCodec.Write(ref platform,
+			APTR.FromPointer(0x40FD5), expected));
 	}
 
 	[Fact]

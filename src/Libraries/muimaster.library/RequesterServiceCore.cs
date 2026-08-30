@@ -111,23 +111,30 @@ internal static class MuiRequesterServiceStateFieldCursorCodec
 		APTR record, MuiRequesterServiceStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiRequesterServiceStateMemoryCodec.TryWriteUInt32(ref platform, record,
-			field, value);
+		field, value);
 }
 
-internal static class MuiRequesterServiceStateCodec
+// Sequential codec for the complete requester-service state record. The
+// field cursor remains a compatibility/diagnostic surface; live requester
+// lifecycle code exchanges declaration-ordered named members instead.
+internal static class MuiRequesterServiceStateStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiRequesterServiceStateRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiRequesterServiceStateRecord.Size)) return false;
-		if (!MuiRequesterServiceStateMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiRequesterServiceStateField.Magic, out record.Magic) ||
-			!MuiRequesterServiceStateMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiRequesterServiceStateField.Generation,
-				out record.Generation)) return false;
+		uint rawMagic;
+		uint rawGeneration;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiRequesterServiceStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out rawMagic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out rawGeneration) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		record.Magic = rawMagic;
+		record.Generation = rawGeneration;
 		return true;
 	}
 
@@ -135,13 +142,29 @@ internal static class MuiRequesterServiceStateCodec
 		MuiRequesterServiceStateRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiRequesterServiceStateRecord.Size)) return false;
-		return MuiRequesterServiceStateMemoryCodec.TryWriteUInt32(
-			ref platform, address, MuiRequesterServiceStateField.Magic, record.Magic) &&
-			MuiRequesterServiceStateMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiRequesterServiceStateField.Generation, record.Generation);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiRequesterServiceStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Generation)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+}
+
+internal static class MuiRequesterServiceStateCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiRequesterServiceStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiRequesterServiceStateStructCodec.TryRead(ref platform, address,
+			out record);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiRequesterServiceStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiRequesterServiceStateStructCodec.Write(ref platform, address,
+			record);
 }
 
 // Scalar qualification surface for the synchronous requester service state.

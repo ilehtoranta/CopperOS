@@ -21,6 +21,15 @@ public sealed class MuiHeadlessCollectionTests
 		Assert.Equal(expected.Ordinal, actual.Ordinal);
 		Assert.False(MuiStoreIterationCounterCodec.TryRead(ref platform,
 			APTR.Null, out _));
+		Assert.False(MuiStoreIterationCounterCodec.TryRead(ref platform,
+			APTR.FromPointer(0x30FFF), out _));
+		Assert.False(MuiStoreIterationCounterCodec.Write(ref platform,
+			APTR.FromPointer(0x30FFF), expected));
+		Assert.True(MuiStoreIterationCounterCodec.WriteValue(ref platform, address,
+			0xFFFFFFFF));
+		Assert.True(MuiStoreIterationCounterCodec.TryReadValue(ref platform,
+			address, out var scalar));
+		Assert.Equal(0xFFFFFFFFu, scalar);
 	}
 
 	[Fact]
@@ -230,6 +239,27 @@ public sealed class MuiHeadlessCollectionTests
 			APTR.FromPointer(0x40FFE), 0, out _));
 		Assert.False(MuiFamilyMutationVectorMemoryCodec.TryGetEntry(ref platform,
 			APTR.FromPointer(0xFFFFFFF0), 4, out _));
+	}
+
+	[Fact]
+	public void FamilyMutationVectorBridgeUsesCompleteNamedObjectEntries()
+	{
+		var platform = CreatePlatform(out _);
+		var vector = APTR.FromPointer(0x1B00);
+		var expected = APTR.FromPointer(0xFEDCBA98u);
+
+		Assert.True(MuiFamilyMutationVectorCodec.TryWriteObject(ref platform,
+			vector, 2, expected));
+		Assert.True(MuiFamilyMutationVectorCodec.TryReadObject(ref platform,
+			vector, 2, out var actual));
+		Assert.Equal(expected, actual);
+
+		Assert.False(MuiFamilyMutationVectorCodec.TryReadObject(ref platform,
+			vector, MuiFamilyMutationVectorCursor.MaximumEntries, out _));
+		Assert.False(MuiFamilyMutationVectorCodec.TryReadObject(ref platform,
+			APTR.FromPointer(0x30FFEu), 0, out _));
+		Assert.False(MuiFamilyMutationVectorCodec.TryWriteObject(ref platform,
+			APTR.Null, 0, expected));
 	}
 
 	[Fact]

@@ -241,6 +241,223 @@ internal static class MuiDataspaceFieldCursorCodec
 			field, value);
 }
 
+// Sequential codecs for the fixed Dataspace records.  The legacy field
+// adapter above remains available for compatibility diagnostics, but live
+// packet reads and writes go through these declaration-order cursors so the
+// ABI is described by named structs rather than repeated offsets.
+internal static class MuiDataspaceMessageStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out methodId) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool TryReadAdd<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDataspaceAddMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceAddMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawData) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawLength) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var id) ||
+			!MuiGuestStructCursor.IsComplete(cursor) || methodId !=
+			MuiDataspaceMessageCodec.AddMethod) return false;
+		packet.MethodId = methodId;
+		packet.Data = APTR.FromPointer(rawData);
+		packet.Length = unchecked((int)rawLength);
+		packet.Id = id;
+		return true;
+	}
+
+	internal static bool TryWriteAdd<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspaceAddMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceAddMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				MuiDataspaceMessageCodec.AddMethod) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Data.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)packet.Length)) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Id)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadFind<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDataspaceFindMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceFindMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var id) ||
+			!MuiGuestStructCursor.IsComplete(cursor) || methodId !=
+			MuiDataspaceMessageCodec.FindMethod) return false;
+		packet.MethodId = methodId;
+		packet.Id = id;
+		return true;
+	}
+
+	internal static bool TryWriteFind<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspaceFindMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceFindMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				MuiDataspaceMessageCodec.FindMethod) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Id)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadGet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDataspaceGetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceGetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var id) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawStorage) ||
+			!MuiGuestStructCursor.IsComplete(cursor) || methodId !=
+			MuiDataspaceMessageCodec.GetMethod) return false;
+		packet.MethodId = methodId;
+		packet.Id = id;
+		packet.SizeStorage = APTR.FromPointer(rawStorage);
+		return true;
+	}
+
+	internal static bool TryWriteGet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspaceGetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceGetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				MuiDataspaceMessageCodec.GetMethod) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Id) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.SizeStorage.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadMerge<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDataspaceMergeMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceMergeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawDataspace) ||
+			!MuiGuestStructCursor.IsComplete(cursor) || methodId !=
+			MuiDataspaceMessageCodec.MergeMethod) return false;
+		packet.MethodId = methodId;
+		packet.Dataspace = APTR.FromPointer(rawDataspace);
+		return true;
+	}
+
+	internal static bool TryWriteMerge<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspaceMergeMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceMergeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				MuiDataspaceMessageCodec.MergeMethod) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Dataspace.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadRemove<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDataspaceRemoveMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceRemoveMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var id) ||
+			!MuiGuestStructCursor.IsComplete(cursor) || methodId !=
+			MuiDataspaceMessageCodec.RemoveMethod) return false;
+		packet.MethodId = methodId;
+		packet.Id = id;
+		return true;
+	}
+
+	internal static bool TryWriteRemove<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspaceRemoveMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceRemoveMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				MuiDataspaceMessageCodec.RemoveMethod) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.Id)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadClear<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiDataspaceClearMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceClearMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.IsComplete(cursor) || methodId !=
+			MuiDataspaceMessageCodec.ClearMethod) return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	internal static bool TryWriteClear<TPlatform>(ref TPlatform platform,
+		APTR message, MuiDataspaceClearMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiDataspaceClearMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				MuiDataspaceMessageCodec.ClearMethod)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 // Central codec for the fixed Dataspace packet family. All consumers receive
 // named records; the explicit offsets below are confined to this packed ABI
 // adapter and are never repeated by dispatch or store code.
@@ -260,8 +477,8 @@ internal static class MuiDataspaceMessageCodec
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiDataspacePacketKind.Method, MuiDataspaceField.MethodId, out methodId);
+		return MuiDataspaceMessageStructCodec.TryReadMethodIdValue(ref platform,
+			message, out methodId);
 	}
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
@@ -290,192 +507,86 @@ internal static class MuiDataspaceMessageCodec
 		APTR message, out MuiDataspaceAddMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!IsPacket(ref platform, message, MuiDataspaceAddMessage.Size,
-			AddMethod)) return false;
-		if (!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiDataspacePacketKind.Add, MuiDataspaceField.MethodId,
-			out packet.MethodId) ||
-			!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDataspacePacketKind.Add, MuiDataspaceField.Data, out var rawData) ||
-			!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDataspacePacketKind.Add, MuiDataspaceField.Length, out var rawLength) ||
-			!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDataspacePacketKind.Add, MuiDataspaceField.Id, out packet.Id))
-			return false;
-		packet.Data = APTR.FromPointer(rawData);
-		packet.Length = unchecked((int)rawLength);
-		return true;
+		return MuiDataspaceMessageStructCodec.TryReadAdd(ref platform, message,
+			out packet) && packet.MethodId == AddMethod;
 	}
 
 	internal static bool TryReadFind<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceFindMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!IsPacket(ref platform, message, MuiDataspaceFindMessage.Size,
-			FindMethod)) return false;
-		return MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiDataspacePacketKind.Find, MuiDataspaceField.MethodId,
-			out packet.MethodId) &&
-			MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDataspacePacketKind.Find, MuiDataspaceField.Id, out packet.Id);
+		return MuiDataspaceMessageStructCodec.TryReadFind(ref platform, message,
+			out packet) && packet.MethodId == FindMethod;
 	}
 
 	internal static bool TryReadGet<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceGetMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!IsPacket(ref platform, message, MuiDataspaceGetMessage.Size,
-			GetMethod)) return false;
-		if (!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiDataspacePacketKind.Get, MuiDataspaceField.MethodId,
-			out packet.MethodId) ||
-			!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDataspacePacketKind.Get, MuiDataspaceField.Id, out packet.Id) ||
-			!MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDataspacePacketKind.Get, MuiDataspaceField.SizeStorage,
-				out var rawStorage)) return false;
-		packet.SizeStorage = APTR.FromPointer(rawStorage);
-		return true;
+		return MuiDataspaceMessageStructCodec.TryReadGet(ref platform, message,
+			out packet) && packet.MethodId == GetMethod;
 	}
 
 	internal static bool TryReadMerge<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceMergeMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!IsPacket(ref platform, message, MuiDataspaceMergeMessage.Size,
-			MergeMethod)) return false;
-		return MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiDataspacePacketKind.Merge, MuiDataspaceField.MethodId,
-			out packet.MethodId) &&
-			MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDataspacePacketKind.Merge, MuiDataspaceField.Dataspace,
-				out var rawDataspace) && SetDataspace(out packet.Dataspace, rawDataspace);
+		return MuiDataspaceMessageStructCodec.TryReadMerge(ref platform, message,
+			out packet) && packet.MethodId == MergeMethod;
 	}
 
 	internal static bool TryReadRemove<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceRemoveMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!IsPacket(ref platform, message, MuiDataspaceRemoveMessage.Size,
-			RemoveMethod)) return false;
-		return MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiDataspacePacketKind.Remove, MuiDataspaceField.MethodId,
-			out packet.MethodId) &&
-			MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiDataspacePacketKind.Remove, MuiDataspaceField.Id, out packet.Id);
+		return MuiDataspaceMessageStructCodec.TryReadRemove(ref platform, message,
+			out packet) && packet.MethodId == RemoveMethod;
 	}
 
 	internal static bool TryReadClear<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceClearMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!IsPacket(ref platform, message, MuiDataspaceClearMessage.Size,
-			ClearMethod)) return false;
-		return MuiDataspaceMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiDataspacePacketKind.Clear, MuiDataspaceField.MethodId,
-			out packet.MethodId);
+		return MuiDataspaceMessageStructCodec.TryReadClear(ref platform, message,
+			out packet) && packet.MethodId == ClearMethod;
 	}
 
 	internal static bool TryWriteAdd<TPlatform>(ref TPlatform platform,
 		APTR message, MuiDataspaceAddMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!IsMapped(ref platform, message, MuiDataspaceAddMessage.Size))
-			return false;
-		return MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiDataspacePacketKind.Add, MuiDataspaceField.MethodId, AddMethod) &&
-			MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiDataspacePacketKind.Add, MuiDataspaceField.Data, packet.Data.Raw) &&
-				MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-					MuiDataspacePacketKind.Add, MuiDataspaceField.Length,
-					unchecked((uint)packet.Length)) &&
-					MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-						MuiDataspacePacketKind.Add, MuiDataspaceField.Id, packet.Id);
-	}
+		=> MuiDataspaceMessageStructCodec.TryWriteAdd(ref platform, message,
+			packet);
 
 	internal static bool TryWriteFind<TPlatform>(ref TPlatform platform,
 		APTR message, MuiDataspaceFindMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!IsMapped(ref platform, message, MuiDataspaceFindMessage.Size))
-			return false;
-		return MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiDataspacePacketKind.Find, MuiDataspaceField.MethodId, FindMethod) &&
-			MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiDataspacePacketKind.Find, MuiDataspaceField.Id, packet.Id);
-	}
+		=> MuiDataspaceMessageStructCodec.TryWriteFind(ref platform, message,
+			packet);
 
 	internal static bool TryWriteGet<TPlatform>(ref TPlatform platform,
 		APTR message, MuiDataspaceGetMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!IsMapped(ref platform, message, MuiDataspaceGetMessage.Size))
-			return false;
-		return MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiDataspacePacketKind.Get, MuiDataspaceField.MethodId, GetMethod) &&
-			MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiDataspacePacketKind.Get, MuiDataspaceField.Id, packet.Id) &&
-				MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-					MuiDataspacePacketKind.Get, MuiDataspaceField.SizeStorage,
-					packet.SizeStorage.Raw);
-	}
+		=> MuiDataspaceMessageStructCodec.TryWriteGet(ref platform, message,
+			packet);
 
 	internal static bool TryWriteMerge<TPlatform>(ref TPlatform platform,
 		APTR message, MuiDataspaceMergeMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!IsMapped(ref platform, message, MuiDataspaceMergeMessage.Size))
-			return false;
-		return MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiDataspacePacketKind.Merge, MuiDataspaceField.MethodId, MergeMethod) &&
-			MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiDataspacePacketKind.Merge, MuiDataspaceField.Dataspace,
-				packet.Dataspace.Raw);
-	}
+		=> MuiDataspaceMessageStructCodec.TryWriteMerge(ref platform, message,
+			packet);
 
 	internal static bool TryWriteRemove<TPlatform>(ref TPlatform platform,
 		APTR message, MuiDataspaceRemoveMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!IsMapped(ref platform, message, MuiDataspaceRemoveMessage.Size))
-			return false;
-		return MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiDataspacePacketKind.Remove, MuiDataspaceField.MethodId, RemoveMethod) &&
-			MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiDataspacePacketKind.Remove, MuiDataspaceField.Id, packet.Id);
-	}
+		=> MuiDataspaceMessageStructCodec.TryWriteRemove(ref platform, message,
+			packet);
 
 	internal static bool TryWriteClear<TPlatform>(ref TPlatform platform,
 		APTR message, MuiDataspaceClearMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!IsMapped(ref platform, message, MuiDataspaceClearMessage.Size))
-			return false;
-		return MuiDataspaceMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-			MuiDataspacePacketKind.Clear, MuiDataspaceField.MethodId, ClearMethod);
-	}
+		=> MuiDataspaceMessageStructCodec.TryWriteClear(ref platform, message,
+			packet);
 
-	private static bool IsPacket<TPlatform>(ref TPlatform platform,
-		APTR message, uint size, uint method)
-		where TPlatform : struct, IMuiGuestMemory =>
-		TryReadMethodId(ref platform, message, out var header) &&
-		header.MethodId == method && IsMapped(ref platform, message, size);
-
-	private static bool IsMapped<TPlatform>(ref TPlatform platform,
-		APTR message, uint size) where TPlatform : struct, IMuiGuestMemory =>
-		message.IsNotNull && platform.IsMapped(message, size);
-
-	private static bool SetDataspace(out APTR target, uint raw)
-	{
-		target = APTR.FromPointer(raw);
-		return true;
-	}
 }
 
 // Fixed packet codecs for the Dataspace superclass. The live store remains

@@ -61,4 +61,31 @@ public sealed class MuiCollectionEditMessageStructAdapterTests
 			ref platform, APTR.Null, MuiCollectionEditPacketKind.EndEdit,
 			MuiCollectionEditField.Mode, out _));
 	}
+
+	[Fact]
+	public void CollectionEditCompleteRecordsPreserveHighBitsWithoutOffsetFallback()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3100);
+		Assert.True(MuiCollectionEditMessageCodec.WriteEditDone(ref platform,
+			address, -0x4000, int.MinValue, 0xF00DCAFEu, 0x80032940u));
+		Assert.True(MuiCollectionEditMessageCodec.TryReadEditDone(ref platform,
+			address, out var packet));
+		Assert.Equal(-0x4000, packet.Row);
+		Assert.Equal(int.MinValue, packet.Column);
+		Assert.Equal(0xF00DCAFEu, packet.Entry);
+		Assert.Equal(0x80032940u, packet.EditObject);
+
+		var truncated = APTR.FromPointer(0x20FFC);
+		Assert.False(MuiCollectionEditMessageCodec.TryReadEditDone(ref platform,
+			truncated, out _));
+		Assert.False(MuiCollectionEditMessageCodec.WriteEditDone(ref platform,
+			truncated, 1, 2, 3, 4));
+		Assert.True(MuiCollectionEditMessageCodec.WriteEndEdit(ref platform,
+			address, 2));
+		Assert.True(MuiCollectionEditMessageCodec.TryReadEndEdit(ref platform,
+			address, out var end));
+		Assert.Equal(2u, end.Mode);
+	}
 }

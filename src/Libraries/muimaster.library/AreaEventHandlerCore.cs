@@ -53,6 +53,72 @@ internal struct MuiAreaHandledEventsStateFieldCursor
 	internal MuiAreaHandledEventsStateField Field;
 }
 
+// Sequential codec for the complete handled-events registration record. The
+// field cursor above remains a compatibility/diagnostic surface; live state
+// publication and consumption use these declaration-ordered named members.
+internal static class MuiAreaHandledEventsStateStructCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiAreaHandledEventsStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		record = default;
+		ushort handlerFlags;
+		byte rawPriority;
+		byte rawReserved;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaHandledEventsStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Signature) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Events) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawWindow) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawHandler) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Generation) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out handlerFlags) ||
+			!MuiGuestStructCursor.TryReadUInt8(ref platform, ref cursor,
+				out rawPriority) ||
+			!MuiGuestStructCursor.TryReadUInt8(ref platform, ref cursor,
+				out rawReserved) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		record.Window = APTR.FromPointer(rawWindow);
+		record.Handler = APTR.FromPointer(rawHandler);
+		record.HandlerFlags = handlerFlags;
+		record.Priority = unchecked((sbyte)rawPriority);
+		record.Reserved = rawReserved;
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiAreaHandledEventsStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaHandledEventsStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Signature) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Events) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Window.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Handler.Raw) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Generation) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				record.HandlerFlags) ||
+			!MuiGuestStructCursor.TryWriteUInt8(ref platform, ref cursor,
+				unchecked((byte)record.Priority)) ||
+			!MuiGuestStructCursor.TryWriteUInt8(ref platform, ref cursor,
+				record.Reserved)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 internal static class MuiAreaHandledEventsStateCodec
 {
 	private static bool TryResolve(MuiAreaHandledEventsStateField field,
@@ -188,40 +254,8 @@ internal static class MuiAreaHandledEventsStateCodec
 		out MuiAreaHandledEventsStateRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		record = default;
-		uint signature;
-		uint events;
-		uint window;
-		uint handler;
-		uint generation;
-		ushort handlerFlags;
-		byte priority;
-		byte reserved;
-		if (!TryReadUInt32(ref platform, address,
-			MuiAreaHandledEventsStateField.Signature, out signature) ||
-			!TryReadUInt32(ref platform, address,
-				MuiAreaHandledEventsStateField.Events, out events) ||
-			!TryReadUInt32(ref platform, address,
-				MuiAreaHandledEventsStateField.Window, out window) ||
-			!TryReadUInt32(ref platform, address,
-				MuiAreaHandledEventsStateField.Handler, out handler) ||
-			!TryReadUInt32(ref platform, address,
-				MuiAreaHandledEventsStateField.Generation, out generation) ||
-			!TryReadUInt16(ref platform, address,
-				MuiAreaHandledEventsStateField.HandlerFlags, out handlerFlags) ||
-			!TryReadUInt8(ref platform, address,
-				MuiAreaHandledEventsStateField.Priority, out priority) ||
-			!TryReadUInt8(ref platform, address,
-				MuiAreaHandledEventsStateField.Reserved, out reserved))
-			return false;
-		record.Signature = signature;
-		record.Events = events;
-		record.Window = APTR.FromPointer(window);
-		record.Handler = APTR.FromPointer(handler);
-		record.Generation = generation;
-		record.HandlerFlags = handlerFlags;
-		record.Priority = unchecked((sbyte)priority);
-		record.Reserved = reserved;
+		if (!MuiAreaHandledEventsStateStructCodec.TryRead(ref platform, address,
+			out record)) return false;
 		record.HandlerFlags = (ushort)(record.HandlerFlags &
 			MuiAreaHandledEventsStateRecord.PolicyFlags);
 		return record.Signature == MuiAreaHandledEventsStateRecord.Magic;
@@ -230,26 +264,8 @@ internal static class MuiAreaHandledEventsStateCodec
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaHandledEventsStateRecord record)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiAreaHandledEventsStateRecord.Size)) return false;
-		return TryWriteUInt32(ref platform, address,
-			MuiAreaHandledEventsStateField.Signature, record.Signature) &&
-			TryWriteUInt32(ref platform, address,
-				MuiAreaHandledEventsStateField.Events, record.Events) &&
-			TryWriteUInt32(ref platform, address,
-				MuiAreaHandledEventsStateField.Window, record.Window.Raw) &&
-			TryWriteUInt32(ref platform, address,
-				MuiAreaHandledEventsStateField.Handler, record.Handler.Raw) &&
-			TryWriteUInt32(ref platform, address,
-				MuiAreaHandledEventsStateField.Generation, record.Generation) &&
-			TryWriteUInt16(ref platform, address,
-				MuiAreaHandledEventsStateField.HandlerFlags, record.HandlerFlags) &&
-			TryWriteUInt8(ref platform, address,
-				MuiAreaHandledEventsStateField.Priority, unchecked((byte)record.Priority)) &&
-			TryWriteUInt8(ref platform, address,
-				MuiAreaHandledEventsStateField.Reserved, record.Reserved);
-	}
+		=> MuiAreaHandledEventsStateStructCodec.Write(ref platform, address,
+			record);
 }
 
 internal enum MuiAreaEventHandlerPolicyField : byte

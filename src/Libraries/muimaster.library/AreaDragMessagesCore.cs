@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -932,19 +933,21 @@ internal static class MuiAreaDragMessageCodec
 		return true;
 	}
 
-	// Native selector admission stays scalar so compiler paths do not need to
-	// materialize a temporary one-field record. Public packet consumers still
-	// receive the named struct above.
+	// Selector admission stays scalar for callers that only need MethodID, but
+	// it is read from the named one-ULONG method record in declaration order.
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiAreaDragMethodMessage.Size)) return false;
-		return MuiAreaDragMessageMemoryCodec.TryReadUInt32(ref platform, message,
-			MuiAreaDragPacketKind.Method, MuiAreaDragField.MethodId,
-			out methodId);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiAreaDragMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		methodId = rawMethodId;
+		return true;
 	}
 
 	internal static bool TryReadBegin<TPlatform>(ref TPlatform platform,

@@ -147,13 +147,12 @@ public static class MuiListviewCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewChildState.Size) ||
-				!MuiListviewChildStateMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewChildStateField.Magic, out var magic) ||
-				!MuiListviewChildStateMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewChildStateField.Child, out var child))
-				return false;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListviewChildState.Size, out var cursor)) return false;
+			if (!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+				ref cursor, out var child) ||
+				!MuiGuestStructCursor.IsComplete(cursor)) return false;
 			value.Magic = magic;
 			value.Child = APTR.FromPointer(child);
 			return true;
@@ -169,14 +168,13 @@ public static class MuiListviewCore
 			APTR address, MuiListviewChildState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewChildState.Size) ||
-				value.Magic != MuiListviewChildState.Cookie) return false;
-			return MuiListviewChildStateMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiListviewChildStateField.Magic,
-				value.Magic) &&
-				MuiListviewChildStateMemoryCodec.TryWriteUInt32(ref platform,
-					address, MuiListviewChildStateField.Child, value.Child.Raw);
+			if (value.Magic != MuiListviewChildState.Cookie ||
+				!MuiGuestStructCursor.TryCreate(ref platform, address,
+					MuiListviewChildState.Size, out var cursor)) return false;
+			if (!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) || !MuiGuestStructCursor.TryWriteUInt32(ref platform,
+				ref cursor, value.Child.Raw)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
 		}
 
 		internal static bool Clear<TPlatform>(ref TPlatform platform,
@@ -320,25 +318,25 @@ public static class MuiListviewCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewClickState.Size) ||
-				!MuiListviewClickStateMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewClickStateField.Magic, out var magic) ||
-				!MuiListviewClickStateMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewClickStateField.ClickColumn,
-					out value.ClickColumn) ||
-				!MuiListviewClickStateMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewClickStateField.DoubleClick,
-					out value.DoubleClick) ||
-				!MuiListviewClickStateMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewClickStateField.AgainClick,
-					out value.AgainClick) ||
-				!MuiListviewClickStateMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewClickStateField.Clicks, out value.Clicks) ||
-				!MuiListviewClickStateMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewClickStateField.DefClickColumn,
-					out value.DefClickColumn)) return false;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListviewClickState.Size, out var cursor)) return false;
+			if (!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+				ref cursor, out var clickColumn) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var doubleClick) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var againClick) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var clicks) || !MuiGuestStructCursor.TryReadUInt32(
+					ref platform, ref cursor, out var defClickColumn) ||
+				!MuiGuestStructCursor.IsComplete(cursor)) return false;
 			value.Magic = magic;
+			value.ClickColumn = clickColumn;
+			value.DoubleClick = doubleClick;
+			value.AgainClick = againClick;
+			value.Clicks = clicks;
+			value.DefClickColumn = defClickColumn;
 			return true;
 		}
 
@@ -358,25 +356,20 @@ public static class MuiListviewCore
 			APTR address, MuiListviewClickState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewClickState.Size) ||
-				value.Magic != MuiListviewClickState.Cookie) return false;
-			return MuiListviewClickStateMemoryCodec.TryWriteUInt32(
-				ref platform, address, MuiListviewClickStateField.Magic, value.Magic) &&
-				MuiListviewClickStateMemoryCodec.TryWriteUInt32(ref platform,
-					address, MuiListviewClickStateField.ClickColumn,
-					value.ClickColumn) &&
-				MuiListviewClickStateMemoryCodec.TryWriteUInt32(ref platform,
-					address, MuiListviewClickStateField.DoubleClick,
-					value.DoubleClick == 0 ? 0u : 1u) &&
-				MuiListviewClickStateMemoryCodec.TryWriteUInt32(ref platform,
-					address, MuiListviewClickStateField.AgainClick,
-					value.AgainClick == 0 ? 0u : 1u) &&
-				MuiListviewClickStateMemoryCodec.TryWriteUInt32(ref platform,
-					address, MuiListviewClickStateField.Clicks, value.Clicks) &&
-				MuiListviewClickStateMemoryCodec.TryWriteUInt32(ref platform,
-					address, MuiListviewClickStateField.DefClickColumn,
-					value.DefClickColumn);
+			if (value.Magic != MuiListviewClickState.Cookie ||
+				!MuiGuestStructCursor.TryCreate(ref platform, address,
+					MuiListviewClickState.Size, out var cursor)) return false;
+			if (!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) || !MuiGuestStructCursor.TryWriteUInt32(ref platform,
+				ref cursor, value.ClickColumn) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.DoubleClick == 0 ? 0u : 1u) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.AgainClick == 0 ? 0u : 1u) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.Clicks) || !MuiGuestStructCursor.TryWriteUInt32(
+					ref platform, ref cursor, value.DefClickColumn)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
 		}
 
 		internal static bool Clear<TPlatform>(ref TPlatform platform,
@@ -519,27 +512,23 @@ public static class MuiListviewCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewInteractionPolicyState.Size) ||
-				!MuiListviewInteractionPolicyMemoryCodec.TryReadUInt32(
-					ref platform, address,
-					MuiListviewInteractionPolicyField.Magic, out var magic) ||
-				!MuiListviewInteractionPolicyMemoryCodec.TryReadUInt32(
-					ref platform, address,
-					MuiListviewInteractionPolicyField.Input, out value.Input) ||
-				!MuiListviewInteractionPolicyMemoryCodec.TryReadUInt32(
-					ref platform, address,
-					MuiListviewInteractionPolicyField.MultiSelect,
-					out value.MultiSelect) ||
-				!MuiListviewInteractionPolicyMemoryCodec.TryReadUInt32(
-					ref platform, address,
-					MuiListviewInteractionPolicyField.ScrollerPos,
-					out value.ScrollerPos) ||
-				!MuiListviewInteractionPolicyMemoryCodec.TryReadUInt32(
-					ref platform, address,
-					MuiListviewInteractionPolicyField.DragType,
-					out value.DragType)) return false;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListviewInteractionPolicyState.Size, out var cursor)) return false;
+			if (!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+				ref cursor, out var input) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var multiSelect) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var scrollerPos) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var dragType) || !MuiGuestStructCursor.IsComplete(cursor))
+				return false;
 			value.Magic = magic;
+			value.Input = input;
+			value.MultiSelect = multiSelect;
+			value.ScrollerPos = scrollerPos;
+			value.DragType = dragType;
 			return true;
 		}
 
@@ -553,27 +542,20 @@ public static class MuiListviewCore
 			MuiListviewInteractionPolicyState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewInteractionPolicyState.Size) ||
-				value.Magic != MuiListviewInteractionPolicyState.Cookie)
+			if (value.Magic != MuiListviewInteractionPolicyState.Cookie ||
+				!MuiGuestStructCursor.TryCreate(ref platform, address,
+					MuiListviewInteractionPolicyState.Size, out var cursor))
 				return false;
-			return MuiListviewInteractionPolicyMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiListviewInteractionPolicyField.Magic, value.Magic) &&
-				MuiListviewInteractionPolicyMemoryCodec.TryWriteUInt32(
-					ref platform, address,
-					MuiListviewInteractionPolicyField.Input, value.Input) &&
-				MuiListviewInteractionPolicyMemoryCodec.TryWriteUInt32(
-					ref platform, address,
-					MuiListviewInteractionPolicyField.MultiSelect,
-					value.MultiSelect) &&
-				MuiListviewInteractionPolicyMemoryCodec.TryWriteUInt32(
-					ref platform, address,
-					MuiListviewInteractionPolicyField.ScrollerPos,
-					value.ScrollerPos) &&
-				MuiListviewInteractionPolicyMemoryCodec.TryWriteUInt32(
-					ref platform, address,
-					MuiListviewInteractionPolicyField.DragType, value.DragType);
+			if (!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) || !MuiGuestStructCursor.TryWriteUInt32(ref platform,
+				ref cursor, value.Input) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.MultiSelect) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.ScrollerPos) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.DragType)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
 		}
 	}
 
@@ -689,15 +671,14 @@ public static class MuiListviewCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewSelectionSignalState.Size) ||
-				!MuiListviewSelectionSignalMemoryCodec.TryReadUInt32(
-					ref platform, address,
-					MuiListviewSelectionSignalField.Magic, out var magic) ||
-				!MuiListviewSelectionSignalMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiListviewSelectionSignalField.Value, out value.Value)) return false;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListviewSelectionSignalState.Size, out var cursor)) return false;
+			if (!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+				ref cursor, out var signal) ||
+				!MuiGuestStructCursor.IsComplete(cursor)) return false;
 			value.Magic = magic;
+			value.Value = signal;
 			return true;
 		}
 
@@ -711,16 +692,14 @@ public static class MuiListviewCore
 			MuiListviewSelectionSignalState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewSelectionSignalState.Size) ||
-				value.Magic != MuiListviewSelectionSignalState.Cookie)
+			if (value.Magic != MuiListviewSelectionSignalState.Cookie ||
+				!MuiGuestStructCursor.TryCreate(ref platform, address,
+					MuiListviewSelectionSignalState.Size, out var cursor))
 				return false;
-			return MuiListviewSelectionSignalMemoryCodec.TryWriteUInt32(
-				ref platform, address,
-				MuiListviewSelectionSignalField.Magic, value.Magic) &&
-				MuiListviewSelectionSignalMemoryCodec.TryWriteUInt32(
-					ref platform, address,
-					MuiListviewSelectionSignalField.Value, value.Value);
+			if (!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) || !MuiGuestStructCursor.TryWriteUInt32(ref platform,
+				ref cursor, value.Value)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
 		}
 	}
 
@@ -898,31 +877,33 @@ public static class MuiListviewCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewLayoutState.Size) ||
-				!MuiListviewLayoutMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewLayoutField.Magic, out var magic) ||
-				!MuiListviewLayoutMemoryCodec.TryReadInt32(ref platform,
-					address, MuiListviewLayoutField.Left, out value.Left) ||
-				!MuiListviewLayoutMemoryCodec.TryReadInt32(ref platform,
-					address, MuiListviewLayoutField.Top, out value.Top) ||
-				!MuiListviewLayoutMemoryCodec.TryReadInt32(ref platform,
-					address, MuiListviewLayoutField.Width, out value.Width) ||
-				!MuiListviewLayoutMemoryCodec.TryReadInt32(ref platform,
-					address, MuiListviewLayoutField.Height, out value.Height) ||
-				!MuiListviewLayoutMemoryCodec.TryReadInt32(ref platform,
-					address, MuiListviewLayoutField.ChildLeft,
-					out value.ChildLeft) ||
-				!MuiListviewLayoutMemoryCodec.TryReadInt32(ref platform,
-					address, MuiListviewLayoutField.ChildTop,
-					out value.ChildTop) ||
-				!MuiListviewLayoutMemoryCodec.TryReadInt32(ref platform,
-					address, MuiListviewLayoutField.ChildWidth,
-					out value.ChildWidth) ||
-				!MuiListviewLayoutMemoryCodec.TryReadInt32(ref platform,
-					address, MuiListviewLayoutField.ChildHeight,
-					out value.ChildHeight)) return false;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListviewLayoutState.Size, out var cursor)) return false;
+			if (!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+				ref cursor, out var left) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var top) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+					ref cursor, out var width) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var height) || !MuiGuestStructCursor.TryReadUInt32(
+					ref platform, ref cursor, out var childLeft) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var childTop) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var childWidth) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var childHeight) || !MuiGuestStructCursor.IsComplete(cursor))
+				return false;
 			value.Magic = magic;
+			value.Left = unchecked((int)left);
+			value.Top = unchecked((int)top);
+			value.Width = unchecked((int)width);
+			value.Height = unchecked((int)height);
+			value.ChildLeft = unchecked((int)childLeft);
+			value.ChildTop = unchecked((int)childTop);
+			value.ChildWidth = unchecked((int)childWidth);
+			value.ChildHeight = unchecked((int)childHeight);
 			return true;
 		}
 
@@ -936,27 +917,27 @@ public static class MuiListviewCore
 			APTR address, MuiListviewLayoutState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewLayoutState.Size) || value.Magic !=
-				MuiListviewLayoutState.Cookie) return false;
-			return MuiListviewLayoutMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiListviewLayoutField.Magic, value.Magic) &&
-				MuiListviewLayoutMemoryCodec.TryWriteInt32(ref platform,
-					address, MuiListviewLayoutField.Left, value.Left) &&
-				MuiListviewLayoutMemoryCodec.TryWriteInt32(ref platform,
-					address, MuiListviewLayoutField.Top, value.Top) &&
-				MuiListviewLayoutMemoryCodec.TryWriteInt32(ref platform,
-					address, MuiListviewLayoutField.Width, value.Width) &&
-				MuiListviewLayoutMemoryCodec.TryWriteInt32(ref platform,
-					address, MuiListviewLayoutField.Height, value.Height) &&
-				MuiListviewLayoutMemoryCodec.TryWriteInt32(ref platform,
-					address, MuiListviewLayoutField.ChildLeft, value.ChildLeft) &&
-				MuiListviewLayoutMemoryCodec.TryWriteInt32(ref platform,
-					address, MuiListviewLayoutField.ChildTop, value.ChildTop) &&
-				MuiListviewLayoutMemoryCodec.TryWriteInt32(ref platform,
-					address, MuiListviewLayoutField.ChildWidth, value.ChildWidth) &&
-				MuiListviewLayoutMemoryCodec.TryWriteInt32(ref platform,
-					address, MuiListviewLayoutField.ChildHeight, value.ChildHeight);
+			if (value.Magic != MuiListviewLayoutState.Cookie ||
+				!MuiGuestStructCursor.TryCreate(ref platform, address,
+					MuiListviewLayoutState.Size, out var cursor)) return false;
+			if (!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) || !MuiGuestStructCursor.TryWriteUInt32(ref platform,
+				ref cursor, unchecked((uint)value.Left)) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					unchecked((uint)value.Top)) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					unchecked((uint)value.Width)) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					unchecked((uint)value.Height)) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					unchecked((uint)value.ChildLeft)) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					unchecked((uint)value.ChildTop)) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					unchecked((uint)value.ChildWidth)) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					unchecked((uint)value.ChildHeight))) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
 		}
 	}
 
@@ -1076,14 +1057,13 @@ public static class MuiListviewCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewRenderState.Size) ||
-				!MuiListviewRenderMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewRenderField.Magic, out var magic) ||
-				!MuiListviewRenderMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewRenderField.RenderInfo, out var info) ||
-				!MuiListviewRenderMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewRenderField.RastPort, out var rastPort))
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListviewRenderState.Size, out var cursor)) return false;
+			if (!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+				ref cursor, out var info) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var rastPort) || !MuiGuestStructCursor.IsComplete(cursor))
 				return false;
 			value.Magic = magic;
 			value.RenderInfo = APTR.FromPointer(info);
@@ -1101,17 +1081,15 @@ public static class MuiListviewCore
 			APTR address, MuiListviewRenderState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewRenderState.Size) || value.Magic !=
-				MuiListviewRenderState.Cookie) return false;
-			return MuiListviewRenderMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiListviewRenderField.Magic, value.Magic) &&
-				MuiListviewRenderMemoryCodec.TryWriteUInt32(ref platform,
-					address, MuiListviewRenderField.RenderInfo,
-					value.RenderInfo.Raw) &&
-				MuiListviewRenderMemoryCodec.TryWriteUInt32(ref platform,
-					address, MuiListviewRenderField.RastPort,
-					value.RastPort.Raw);
+			if (value.Magic != MuiListviewRenderState.Cookie ||
+				!MuiGuestStructCursor.TryCreate(ref platform, address,
+					MuiListviewRenderState.Size, out var cursor)) return false;
+			if (!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) || !MuiGuestStructCursor.TryWriteUInt32(ref platform,
+				ref cursor, value.RenderInfo.Raw) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.RastPort.Raw)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
 		}
 	}
 
@@ -1271,16 +1249,14 @@ public static class MuiListviewCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewExternalScrollerConnectionState.Size)) return false;
-			if (!MuiListviewExternalScrollerConnectionMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiListviewExternalScrollerConnectionField.Magic,
-				out value.Magic)) return false;
-			if (!MuiListviewExternalScrollerConnectionMemoryCodec.TryReadUInt32(
-				ref platform, address,
-				MuiListviewExternalScrollerConnectionField.Prop,
-				out var prop)) return false;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListviewExternalScrollerConnectionState.Size, out var cursor))
+				return false;
+			if (!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+				ref cursor, out var prop) ||
+				!MuiGuestStructCursor.IsComplete(cursor)) return false;
+			value.Magic = magic;
 			value.Prop = APTR.FromPointer(prop);
 			return true;
 		}
@@ -1295,16 +1271,14 @@ public static class MuiListviewCore
 			APTR address, MuiListviewExternalScrollerConnectionState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewExternalScrollerConnectionState.Size) ||
-				value.Magic != MuiListviewExternalScrollerConnectionState.Cookie)
+			if (value.Magic != MuiListviewExternalScrollerConnectionState.Cookie ||
+				!MuiGuestStructCursor.TryCreate(ref platform, address,
+					MuiListviewExternalScrollerConnectionState.Size, out var cursor))
 				return false;
-			return MuiListviewExternalScrollerConnectionMemoryCodec
-				.TryWriteUInt32(ref platform, address,
-					MuiListviewExternalScrollerConnectionField.Magic, value.Magic) &&
-				MuiListviewExternalScrollerConnectionMemoryCodec
-				.TryWriteUInt32(ref platform, address,
-					MuiListviewExternalScrollerConnectionField.Prop, value.Prop.Raw);
+			if (!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) || !MuiGuestStructCursor.TryWriteUInt32(ref platform,
+				ref cursor, value.Prop.Raw)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
 		}
 
 		internal static void Clear<TPlatform>(ref TPlatform platform, APTR address)
@@ -1421,19 +1395,22 @@ public static class MuiListviewCore
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = default;
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewScrollerState.Size) ||
-				!MuiListviewScrollerMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewScrollerField.Magic, out var magic) ||
-				!MuiListviewScrollerMemoryCodec.TryReadUInt32(ref platform,
-				address, MuiListviewScrollerField.Entries, out value.Entries) ||
-				!MuiListviewScrollerMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewScrollerField.Visible, out value.Visible) ||
-				!MuiListviewScrollerMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewScrollerField.First, out value.First) ||
-				!MuiListviewScrollerMemoryCodec.TryReadUInt32(ref platform,
-					address, MuiListviewScrollerField.MaxFirst, out value.MaxFirst)) return false;
+			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiListviewScrollerState.Size, out var cursor)) return false;
+			if (!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var magic) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+				ref cursor, out var entries) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var visible) || !MuiGuestStructCursor.TryReadUInt32(
+					ref platform, ref cursor, out var first) ||
+				!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+					out var maxFirst) || !MuiGuestStructCursor.IsComplete(cursor))
+				return false;
 			value.Magic = magic;
+			value.Entries = entries;
+			value.Visible = visible;
+			value.First = first;
+			value.MaxFirst = maxFirst;
 			return true;
 		}
 
@@ -1447,19 +1424,18 @@ public static class MuiListviewCore
 			APTR address, MuiListviewScrollerState value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			if (address.IsNull || !platform.IsMapped(address,
-				MuiListviewScrollerState.Size) || value.Magic !=
-				MuiListviewScrollerState.Cookie) return false;
-			return MuiListviewScrollerMemoryCodec.TryWriteUInt32(ref platform,
-				address, MuiListviewScrollerField.Magic, value.Magic) &&
-				MuiListviewScrollerMemoryCodec.TryWriteUInt32(ref platform,
-					address, MuiListviewScrollerField.Entries, value.Entries) &&
-				MuiListviewScrollerMemoryCodec.TryWriteUInt32(ref platform,
-					address, MuiListviewScrollerField.Visible, value.Visible) &&
-				MuiListviewScrollerMemoryCodec.TryWriteUInt32(ref platform,
-					address, MuiListviewScrollerField.First, value.First) &&
-				MuiListviewScrollerMemoryCodec.TryWriteUInt32(ref platform,
-					address, MuiListviewScrollerField.MaxFirst, value.MaxFirst);
+			if (value.Magic != MuiListviewScrollerState.Cookie ||
+				!MuiGuestStructCursor.TryCreate(ref platform, address,
+					MuiListviewScrollerState.Size, out var cursor)) return false;
+			if (!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Magic) || !MuiGuestStructCursor.TryWriteUInt32(ref platform,
+				ref cursor, value.Entries) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.Visible) || !MuiGuestStructCursor.TryWriteUInt32(
+					ref platform, ref cursor, value.First) ||
+				!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+					value.MaxFirst)) return false;
+			return MuiGuestStructCursor.IsComplete(cursor);
 		}
 	}
 

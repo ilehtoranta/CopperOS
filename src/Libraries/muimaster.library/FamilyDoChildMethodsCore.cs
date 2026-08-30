@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -51,6 +52,49 @@ internal static class MuiFamilyDoChildMethodsPacketFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiFamilyDoChildMethodsMessageMemoryCodec.TryWriteUInt32(ref platform,
 			message, field, value);
+}
+
+// Sequential codec for the fixed Family_DoChildMethods record. The legacy
+// field adapter above remains available for compatibility diagnostics; live
+// packet paths consume the declaration-ordered struct through this seam.
+internal static class MuiFamilyDoChildMethodsMessageStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiFamilyDoChildMethodsMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out methodId) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiFamilyDoChildMethodsMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiFamilyDoChildMethodsMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR message, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiFamilyDoChildMethodsMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, methodId))
+			return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
 }
 
 // Struct-first guest-memory adapter for the fixed Family_DoChildMethods
@@ -117,21 +161,16 @@ internal static class MuiFamilyDoChildMethodsMessageCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiFamilyDoChildMethodsMessage.Size)) return false;
-		return MuiFamilyDoChildMethodsMessageMemoryCodec.TryReadUInt32(
-			ref platform, message,
-			MuiFamilyDoChildMethodsPacketField.MethodId, out methodId);
-	}
+		=> MuiFamilyDoChildMethodsMessageStructCodec.TryReadMethodIdValue(
+			ref platform, message, out methodId);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiFamilyDoChildMethodsMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		return IsValid(ref platform, message);
+		return MuiFamilyDoChildMethodsMessageStructCodec.TryRead(ref platform,
+			message, out packet) && packet.MethodId == Method;
 	}
 
 	internal static bool IsValid<TPlatform>(ref TPlatform platform, APTR message)
@@ -144,13 +183,8 @@ internal static class MuiFamilyDoChildMethodsMessageCodec
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR message)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiFamilyDoChildMethodsMessage.Size)) return false;
-		return MuiFamilyDoChildMethodsMessageMemoryCodec.TryWriteUInt32(
-			ref platform, message,
-			MuiFamilyDoChildMethodsPacketField.MethodId, Method);
-	}
+		=> MuiFamilyDoChildMethodsMessageStructCodec.TryWrite(ref platform,
+			message, Method);
 }
 
 public static class MuiFamilyDoChildMethodsCore
@@ -163,13 +197,8 @@ public static class MuiFamilyDoChildMethodsCore
 		APTR message, out MuiFamilyDoChildMethodsMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		uint methodId;
-		if (!MuiFamilyDoChildMethodsMessageCodec.TryReadMethodIdValue(ref platform,
-			message, out methodId) || methodId != MuiFamilyDoChildMethodsMessageCodec.Method)
-			return false;
-		packet.MethodId = methodId;
-		return true;
+		return MuiFamilyDoChildMethodsMessageCodec.TryRead(ref platform, message,
+			out packet);
 	}
 
 	public static bool WriteRecord<TPlatform>(ref TPlatform platform,

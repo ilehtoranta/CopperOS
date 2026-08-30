@@ -172,6 +172,35 @@ public sealed class MuiRequesterServiceTests
 	}
 
 	[Fact]
+	public void RequesterParameterVectorBridgeUsesNamedSlots()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var expected = new MuiRequesterParameterSlot
+		{
+			Value = 0xFEDCBA98u,
+		};
+
+		Assert.True(MuiRequesterParameterVectorCodec.TryWrite(ref platform,
+			Parameters, 2, expected));
+		Assert.True(MuiRequesterParameterVectorCodec.TryRead(ref platform,
+			Parameters, 2, out var decoded));
+		Assert.Equal(expected.Value, decoded.Value);
+		Assert.True(MuiRequesterParameterVectorCodec.TryReadValue(ref platform,
+			Parameters, 2, out var rawValue));
+		Assert.Equal(expected.Value, rawValue);
+		Assert.True(MuiRequesterParameterVectorCodec.TryWriteValue(ref platform,
+			Parameters, 3, 0x80000001u));
+		Assert.True(MuiRequesterParameterVectorCodec.TryReadValue(ref platform,
+			Parameters, 3, out rawValue));
+		Assert.Equal(0x80000001u, rawValue);
+		Assert.False(MuiRequesterParameterVectorCodec.TryReadValue(ref platform,
+			Parameters, MuiRequesterParameterCursor.MaximumEntries, out _));
+		Assert.False(MuiRequesterParameterVectorCodec.TryWriteValue(ref platform,
+			APTR.FromPointer(0xFFFFFFF0), 4, expected.Value));
+	}
+
+	[Fact]
 	public void RequestFormatCountsConversionsAndStarArguments()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

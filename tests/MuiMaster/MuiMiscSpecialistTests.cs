@@ -139,6 +139,25 @@ public sealed class MuiMiscSpecialistTests
 	}
 
 	[Fact]
+	public void MiscTitleStructCodecsRejectTruncatedRecords()
+	{
+		var p = NewPlatform();
+		var titleTail = APTR.FromPointer(Base + (uint)Size -
+			MuiMiscTitleState.Size + 1);
+		Assert.False(MuiMiscTitleStateCodec.TryRead(ref p, titleTail,
+			out _));
+		Assert.False(MuiMiscTitleStateCodec.Write(ref p, titleTail,
+			default));
+
+		var pageTail = APTR.FromPointer(Base + (uint)Size -
+			MuiTitlePageRecord.Size + 1);
+		Assert.False(MuiTitlePageCodec.TryRead(ref p, pageTail,
+			out _));
+		Assert.False(MuiTitlePageCodec.Write(ref p, pageTail,
+			default));
+	}
+
+	[Fact]
 	public void MiscPersistentRecordFieldCursorUsesNamedRecordKinds()
 	{
 		var p = NewPlatform();
@@ -276,6 +295,32 @@ public sealed class MuiMiscSpecialistTests
 	}
 
 	[Fact]
+	public void MiscFilepanelStructCodecsRejectTruncatedRecords()
+	{
+		var p = NewPlatform();
+		var serviceTail = APTR.FromPointer(Base + (uint)Size -
+			MuiMiscFilepanelServiceState.Size + 1);
+		Assert.False(MuiMiscFilepanelServiceStateCodec.TryRead(ref p,
+			serviceTail, out _));
+		Assert.False(MuiMiscFilepanelServiceStateCodec.Write(ref p,
+			serviceTail, default));
+
+		var slotTail = APTR.FromPointer(Base + (uint)Size -
+			MuiMiscOwnedStringSlot.Size + 1);
+		Assert.False(MuiMiscOwnedStringSlotCodec.TryRead(ref p, slotTail,
+			out _));
+		Assert.False(MuiMiscOwnedStringSlotCodec.Write(ref p, slotTail,
+			default));
+
+		var rowTail = APTR.FromPointer(Base + (uint)Size -
+			MuiFilepanelRowRecord.Size + 1);
+		Assert.False(MuiFilepanelRowCodec.TryRead(ref p, rowTail,
+			out _));
+		Assert.False(MuiFilepanelRowCodec.Write(ref p, rowTail,
+			default));
+	}
+
+	[Fact]
 	public void MiscOwnedStringSlotCodecUsesNamedFields()
 	{
 		var p = NewPlatform();
@@ -314,6 +359,25 @@ public sealed class MuiMiscSpecialistTests
 	}
 
 	[Fact]
+	public void MiscMccprefsStructCodecsRejectTruncatedRecords()
+	{
+		var p = NewPlatform();
+		var stateTail = APTR.FromPointer(Base + (uint)Size -
+			MuiMiscMccprefsState.Size + 1);
+		Assert.False(MuiMiscMccprefsStateCodec.TryRead(ref p, stateTail,
+			out _));
+		Assert.False(MuiMiscMccprefsStateCodec.Write(ref p, stateTail,
+			default));
+
+		var registryTail = APTR.FromPointer(Base + (uint)Size -
+			MuiMccprefsRegistryRecord.Size + 1);
+		Assert.False(MuiMccprefsRegistryCodec.TryRead(ref p, registryTail,
+			out _));
+		Assert.False(MuiMccprefsRegistryCodec.Write(ref p, registryTail,
+			default));
+	}
+
+	[Fact]
 	public void MiscScrmodelistStateCodecUsesNamedFields()
 	{
 		var p = NewPlatform();
@@ -330,6 +394,25 @@ public sealed class MuiMiscSpecialistTests
 		Assert.Equal(expected.ActiveMode, actual.ActiveMode);
 		Assert.False(MuiMiscScrmodelistStateCodec.TryRead(ref p,
 			APTR.FromPointer(0x50000), out _));
+	}
+
+	[Fact]
+	public void MiscScrmodelistStructCodecsRejectTruncatedRecords()
+	{
+		var p = NewPlatform();
+		var stateTail = APTR.FromPointer(Base + (uint)Size -
+			MuiMiscScrmodelistState.Size + 1);
+		Assert.False(MuiMiscScrmodelistStateCodec.TryRead(ref p, stateTail,
+			out _));
+		Assert.False(MuiMiscScrmodelistStateCodec.Write(ref p, stateTail,
+			default));
+
+		var modeTail = APTR.FromPointer(Base + (uint)Size -
+			MuiScrmodelistModeRecord.Size + 1);
+		Assert.False(MuiScrmodelistModeCodec.TryRead(ref p, modeTail,
+			out _));
+		Assert.False(MuiScrmodelistModeCodec.Write(ref p, modeTail,
+			default));
 	}
 
 	[Fact]
@@ -379,6 +462,48 @@ public sealed class MuiMiscSpecialistTests
 		Assert.Equal(expected.Height, actual.Height);
 		Assert.False(MuiMiscFontdisplaySizeCodec.TryRead(ref p,
 			APTR.FromPointer(0x50000), out _));
+	}
+
+	[Fact]
+	public void MiscSmallStructCodecsUseNamedFieldsAndRejectTruncation()
+	{
+		var p = NewPlatform();
+		var key = default(MuiKeyadjustPolicyStateRecord);
+		key.ForceKeyCode = 0x80420000u;
+		var keyAddress = APTR.FromPointer(0x3900);
+		Assert.True(MuiKeyadjustPolicyStateCodec.Write(ref p, keyAddress,
+			key));
+		Assert.True(MuiKeyadjustPolicyStateCodec.TryRead(ref p, keyAddress,
+			out var keyRead));
+		Assert.Equal(key.ForceKeyCode, keyRead.ForceKeyCode);
+
+		var keyTail = APTR.FromPointer(Base + (uint)Size -
+			MuiKeyadjustPolicyStateRecord.Size + 1);
+		Assert.False(MuiKeyadjustPolicyStateCodec.TryRead(ref p, keyTail,
+			out _));
+		Assert.False(MuiKeyadjustPolicyStateCodec.Write(ref p, keyTail,
+			default));
+
+		var windowTail = APTR.FromPointer(Base + (uint)Size -
+			MuiMiscWindowPanelState.Size + 1);
+		Assert.False(MuiMiscWindowPanelStateCodec.TryRead(ref p, windowTail,
+			out _));
+		Assert.False(MuiMiscWindowPanelStateCodec.Write(ref p, windowTail,
+			default));
+
+		var protectionTail = APTR.FromPointer(Base + (uint)Size -
+			MuiMiscProtectionState.Size + 1);
+		Assert.False(MuiMiscProtectionStateCodec.TryRead(ref p,
+			protectionTail, out _));
+		Assert.False(MuiMiscProtectionStateCodec.Write(ref p, protectionTail,
+			default));
+
+		var fontTail = APTR.FromPointer(Base + (uint)Size -
+			MuiMiscFontdisplaySize.Size + 1);
+		Assert.False(MuiMiscFontdisplaySizeCodec.TryRead(ref p, fontTail,
+			out _));
+		Assert.False(MuiMiscFontdisplaySizeCodec.Write(ref p, fontTail,
+			default));
 	}
 
 	[Fact]

@@ -3,6 +3,7 @@
 - SPDX-License-Identifier: MIT
 */
 
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Amiga;
 
@@ -187,6 +188,174 @@ internal static class MuiColorSpecialistFieldCursorCodec
 			message, packet, field, value);
 }
 
+// Complete sequential codecs for the fixed Color specialist packet records.
+// Method-only packets use scalar cursor helpers for their one-ULONG record;
+// all payload envelopes exchange every named field in declaration order.
+internal static class MuiColorSpecialistMessageStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiColorSpecialistMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId)) return false;
+		methodId = rawMethodId;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryWriteMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiColorSpecialistMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadGet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiColorSpecialistGetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiColorSpecialistGetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var attribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var storage)) return false;
+		value.MethodId = methodId;
+		value.Attribute = attribute;
+		value.Storage = storage;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteGet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiColorSpecialistGetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiColorSpecialistGetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Attribute) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Storage)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadSet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiColorSpecialistSetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiColorSpecialistSetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var attribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var valueWord)) return false;
+		value.MethodId = methodId;
+		value.Attribute = attribute;
+		value.Value = valueWord;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteSet<TPlatform>(ref TPlatform platform,
+		APTR message, MuiColorSpecialistSetMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiColorSpecialistSetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Attribute) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadPointer<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiColorSpecialistPointerMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiColorSpecialistPointerMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var pointer)) return false;
+		value.MethodId = methodId;
+		value.Pointer = pointer;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WritePointer<TPlatform>(ref TPlatform platform,
+		APTR message, MuiColorSpecialistPointerMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiColorSpecialistPointerMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Pointer)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadRgb<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiColorSpecialistRgbMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiColorSpecialistRgbMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var red) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var green) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var blue)) return false;
+		value.MethodId = methodId;
+		value.Red = red;
+		value.Green = green;
+		value.Blue = blue;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteRgb<TPlatform>(ref TPlatform platform,
+		APTR message, MuiColorSpecialistRgbMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiColorSpecialistRgbMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Red) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Green) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.Blue)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 // Central codec for the fixed MorphOS pen/color specialist packet family.
 // Dispatch consumers use the named records declared at the public boundary;
 // only this adapter owns their packed guest-memory layout.
@@ -211,19 +380,15 @@ internal static class MuiColorSpecialistMessageCodec
 		return true;
 	}
 
-	// Native selector admission stays scalar so compiler paths do not need to
-	// materialize a temporary one-field record. Public packet consumers still
-	// receive the named struct above.
+	// Selector admission stays scalar for callers that only need MethodID, but
+	// the value is read from the named one-ULONG record in declaration order.
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiColorSpecialistMethodMessage.Size)) return false;
-		return MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiColorSpecialistPacketKind.Method,
-			MuiColorSpecialistField.MethodId, out methodId);
+		return MuiColorSpecialistMessageStructCodec.TryReadMethodIdValue(
+			ref platform, message, out methodId);
 	}
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
@@ -251,11 +416,9 @@ internal static class MuiColorSpecialistMessageCodec
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsMethod(method) || message.IsNull || !platform.IsMapped(message,
-			MuiColorSpecialistMethodMessage.Size)) return false;
-		return MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiColorSpecialistPacketKind.Method,
-			MuiColorSpecialistField.MethodId, method);
+		return IsMethod(method) &&
+			MuiColorSpecialistMessageStructCodec.TryWriteMethodIdValue(
+				ref platform, message, method);
 	}
 
 	internal static bool TryReadGet<TPlatform>(ref TPlatform platform,
@@ -263,33 +426,20 @@ internal static class MuiColorSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPacket(ref platform, message, MuiColorSpecialistGetMessage.Size,
-			OmGet)) return false;
-		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
-		packet.MethodId = methodId;
-		return MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiColorSpecialistPacketKind.Get,
-			MuiColorSpecialistField.Attribute, out packet.Attribute) &&
-			MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-				message, MuiColorSpecialistPacketKind.Get,
-				MuiColorSpecialistField.Storage, out packet.Storage);
+		return MuiColorSpecialistMessageStructCodec.TryReadGet(ref platform,
+			message, out packet) && packet.MethodId == OmGet;
 	}
 
 	internal static bool WriteGet<TPlatform>(ref TPlatform platform,
 		APTR message, uint attribute, uint storage)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiColorSpecialistGetMessage.Size)) return false;
-		return MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiColorSpecialistPacketKind.Get,
-			MuiColorSpecialistField.MethodId, OmGet) &&
-			MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiColorSpecialistPacketKind.Get,
-				MuiColorSpecialistField.Attribute, attribute) &&
-			MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiColorSpecialistPacketKind.Get,
-				MuiColorSpecialistField.Storage, storage);
+		var packet = default(MuiColorSpecialistGetMessage);
+		packet.MethodId = OmGet;
+		packet.Attribute = attribute;
+		packet.Storage = storage;
+		return MuiColorSpecialistMessageStructCodec.WriteGet(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadSet<TPlatform>(ref TPlatform platform,
@@ -297,33 +447,22 @@ internal static class MuiColorSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsSetMethod(method) || !IsPacket(ref platform, message,
-			MuiColorSpecialistSetMessage.Size, method)) return false;
-		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
-		packet.MethodId = methodId;
-		return MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiColorSpecialistPacketKind.Set,
-			MuiColorSpecialistField.Attribute, out packet.Attribute) &&
-			MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-				message, MuiColorSpecialistPacketKind.Set,
-				MuiColorSpecialistField.Value, out packet.Value);
+		return IsSetMethod(method) &&
+			MuiColorSpecialistMessageStructCodec.TryReadSet(ref platform,
+				message, out packet) && packet.MethodId == method;
 	}
 
 	internal static bool WriteSet<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, uint attribute, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsSetMethod(method) || message.IsNull || !platform.IsMapped(
-			message, MuiColorSpecialistSetMessage.Size)) return false;
-		return MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiColorSpecialistPacketKind.Set,
-			MuiColorSpecialistField.MethodId, method) &&
-			MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiColorSpecialistPacketKind.Set,
-				MuiColorSpecialistField.Attribute, attribute) &&
-			MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiColorSpecialistPacketKind.Set,
-				MuiColorSpecialistField.Value, value);
+		if (!IsSetMethod(method)) return false;
+		var packet = default(MuiColorSpecialistSetMessage);
+		packet.MethodId = method;
+		packet.Attribute = attribute;
+		packet.Value = value;
+		return MuiColorSpecialistMessageStructCodec.WriteSet(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadPointer<TPlatform>(ref TPlatform platform,
@@ -331,27 +470,21 @@ internal static class MuiColorSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPointerMethod(method) || !IsPacket(ref platform, message,
-			MuiColorSpecialistPointerMessage.Size, method)) return false;
-		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
-		packet.MethodId = methodId;
-		return MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiColorSpecialistPacketKind.Pointer,
-			MuiColorSpecialistField.Pointer, out packet.Pointer);
+		return IsPointerMethod(method) &&
+			MuiColorSpecialistMessageStructCodec.TryReadPointer(ref platform,
+				message, out packet) && packet.MethodId == method;
 	}
 
 	internal static bool WritePointer<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, uint pointer)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsPointerMethod(method) || message.IsNull || !platform.IsMapped(
-			message, MuiColorSpecialistPointerMessage.Size)) return false;
-		return MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiColorSpecialistPacketKind.Pointer,
-			MuiColorSpecialistField.MethodId, method) &&
-			MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiColorSpecialistPacketKind.Pointer,
-				MuiColorSpecialistField.Pointer, pointer);
+		if (!IsPointerMethod(method)) return false;
+		var packet = default(MuiColorSpecialistPointerMessage);
+		packet.MethodId = method;
+		packet.Pointer = pointer;
+		return MuiColorSpecialistMessageStructCodec.WritePointer(ref platform,
+			message, packet);
 	}
 
 	internal static bool TryReadRgb<TPlatform>(ref TPlatform platform,
@@ -359,39 +492,21 @@ internal static class MuiColorSpecialistMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsPacket(ref platform, message, MuiColorSpecialistRgbMessage.Size,
-			SetRGB)) return false;
-		if (!TryReadMethodIdValue(ref platform, message, out var methodId)) return false;
-		packet.MethodId = methodId;
-		return MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiColorSpecialistPacketKind.Rgb,
-			MuiColorSpecialistField.Red, out packet.Red) &&
-			MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-				message, MuiColorSpecialistPacketKind.Rgb,
-				MuiColorSpecialistField.Green, out packet.Green) &&
-				MuiColorSpecialistMessageMemoryCodec.TryReadUInt32(ref platform,
-					message, MuiColorSpecialistPacketKind.Rgb,
-					MuiColorSpecialistField.Blue, out packet.Blue);
+		return MuiColorSpecialistMessageStructCodec.TryReadRgb(ref platform,
+			message, out packet) && packet.MethodId == SetRGB;
 	}
 
 	internal static bool WriteRgb<TPlatform>(ref TPlatform platform,
 		APTR message, uint red, uint green, uint blue)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiColorSpecialistRgbMessage.Size)) return false;
-		return MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiColorSpecialistPacketKind.Rgb,
-			MuiColorSpecialistField.MethodId, SetRGB) &&
-			MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiColorSpecialistPacketKind.Rgb,
-				MuiColorSpecialistField.Red, red) &&
-				MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-					message, MuiColorSpecialistPacketKind.Rgb,
-					MuiColorSpecialistField.Green, green) &&
-					MuiColorSpecialistMessageMemoryCodec.TryWriteUInt32(ref platform,
-						message, MuiColorSpecialistPacketKind.Rgb,
-						MuiColorSpecialistField.Blue, blue);
+		var packet = default(MuiColorSpecialistRgbMessage);
+		packet.MethodId = SetRGB;
+		packet.Red = red;
+		packet.Green = green;
+		packet.Blue = blue;
+		return MuiColorSpecialistMessageStructCodec.WriteRgb(ref platform,
+			message, packet);
 	}
 
 	private static bool IsMethod(uint method) => method == OmDispose;

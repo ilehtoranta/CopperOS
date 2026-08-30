@@ -3,6 +3,7 @@
 - SPDX-License-Identifier: MIT
 */
 
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Amiga;
 
@@ -165,6 +166,15 @@ internal struct MuiUpdateConfigMessage
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiUpdateConfigHeader
+{
+	internal const uint Size = 12;
+	internal uint MethodId;
+	internal uint CfgId;
+	internal int RedrawCount;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiUpdateConfigMethodMessage
 {
 	internal const uint Size = 4;
@@ -267,6 +277,62 @@ internal static class MuiUpdateConfigPacketFieldCursorCodec
 			message, field, value);
 }
 
+// Complete sequential codec for the fixed 12-byte UpdateConfig header. The
+// inline redraw tables remain separate bounded vectors because their element
+// widths differ (APTR versus UBYTE) and are selected by index.
+internal static class MuiUpdateConfigHeaderStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiUpdateConfigMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId)) return false;
+		methodId = rawMethodId;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadHeader<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiUpdateConfigHeader value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiUpdateConfigHeader.Size,
+			out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var methodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var cfgId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawRedrawCount)) return false;
+		value.MethodId = methodId;
+		value.CfgId = cfgId;
+		value.RedrawCount = unchecked((int)rawRedrawCount);
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteHeader<TPlatform>(ref TPlatform platform,
+		APTR message, MuiUpdateConfigHeader value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform,
+			message, MuiUpdateConfigHeader.Size,
+			out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.MethodId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value.CfgId) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				unchecked((uint)value.RedrawCount))) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 // The redraw object table is a contiguous array of APTR slots in the public
 // packet. Keep the dynamic table writer on this named slot boundary rather than
 // duplicating the ULONG pointer field offset in the mutation path.
@@ -353,13 +419,39 @@ internal static class MuiUpdateConfigObjectSlotFieldCursorCodec
 
 internal static class MuiUpdateConfigObjectSlotCodec
 {
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiUpdateConfigObjectSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawObject) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value = rawObject;
+		return true;
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiUpdateConfigObjectSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiUpdateConfigObjectSlot slot)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		slot = default;
-		if (!MuiUpdateConfigObjectSlotFieldMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiUpdateConfigObjectSlotField.Object, out var value)) return false;
+		if (!TryReadValue(ref platform, address, out var value)) return false;
 		slot.Object = APTR.FromPointer(value);
 		return true;
 	}
@@ -367,10 +459,7 @@ internal static class MuiUpdateConfigObjectSlotCodec
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiUpdateConfigObjectSlot slot)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiUpdateConfigObjectSlotFieldMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiUpdateConfigObjectSlotField.Object, slot.Object.Raw);
-	}
+		=> WriteValue(ref platform, address, slot.Object.Raw);
 }
 
 // The redraw flag table is a contiguous UBYTE slot array. Keep the dynamic
@@ -456,23 +545,45 @@ internal static class MuiUpdateConfigFlagSlotFieldCursorCodec
 
 internal static class MuiUpdateConfigFlagSlotCodec
 {
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiUpdateConfigFlagSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt8(ref platform, ref cursor,
+				out var rawValue) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		value = rawValue;
+		return true;
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiUpdateConfigFlagSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt8(ref platform, ref cursor,
+				value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiUpdateConfigFlagSlot slot)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		slot = default;
-		if (!MuiUpdateConfigFlagSlotFieldMemoryCodec.TryReadUInt8(ref platform,
-			address, MuiUpdateConfigFlagSlotField.Value, out slot.Value)) return false;
-		return true;
+		return TryReadValue(ref platform, address, out slot.Value);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiUpdateConfigFlagSlot slot)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		return MuiUpdateConfigFlagSlotFieldMemoryCodec.TryWriteUInt8(ref platform,
-			address, MuiUpdateConfigFlagSlotField.Value, slot.Value);
-	}
+		=> WriteValue(ref platform, address, slot.Value);
 }
 
 // The two inline redraw tables have different wire widths. Keep each cursor
@@ -721,18 +832,15 @@ public static class MuiUpdateConfigCore
 		return true;
 	}
 
-	// Native selector admission stays scalar so the compiler does not need to
-	// materialize a temporary one-field record. The public method header remains
-	// a named struct for host and dispatcher consumers.
+	// Selector admission stays scalar for callers that only need MethodID, but
+	// the value is read from the named one-ULONG record in declaration order.
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiUpdateConfigMethodMessage.Size)) return false;
-		return MuiUpdateConfigPacketFieldMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiUpdateConfigPacketField.MethodId, out methodId);
+		return MuiUpdateConfigHeaderStructCodec.TryReadMethodIdValue(ref platform,
+			message, out methodId);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR message,
@@ -740,16 +848,12 @@ public static class MuiUpdateConfigCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!TryReadMethodIdValue(ref platform, message, out var methodId) ||
-			methodId != Method || !platform.IsMapped(message,
+		if (!MuiUpdateConfigHeaderStructCodec.TryReadHeader(ref platform, message,
+			out var header) || header.MethodId != Method || !platform.IsMapped(message,
 			MuiUpdateConfigMessage.Size)) return false;
-		if (!MuiUpdateConfigPacketFieldMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiUpdateConfigPacketField.CfgId, out packet.CfgId) ||
-			!MuiUpdateConfigPacketFieldMemoryCodec.TryReadUInt32(ref platform,
-				message, MuiUpdateConfigPacketField.RedrawCount,
-				out var rawRedrawCount)) return false;
-		packet.MethodId = methodId;
-		packet.RedrawCount = unchecked((int)rawRedrawCount);
+		packet.MethodId = header.MethodId;
+		packet.CfgId = header.CfgId;
+		packet.RedrawCount = header.RedrawCount;
 		if (packet.RedrawCount < 0 || packet.RedrawCount > MaximumRedrawObjects)
 			return false;
 		var objectVector = APTR.FromPointer(message.Raw +
@@ -773,6 +877,78 @@ public static class MuiUpdateConfigCore
 		return true;
 	}
 
+	// Read one redraw-table entry through the named slot records. These narrow
+	// accessors keep callers from carrying the packet's inline-table offsets and
+	// avoid marshalling the complete 332-byte packet across a freestanding ABI.
+	public static bool TryReadObjectEntry<TPlatform>(ref TPlatform platform,
+		APTR message, int index, out APTR redrawObject)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		redrawObject = APTR.Null;
+		if (message.IsNull || index < 0 || index >= MaximumRedrawObjects ||
+			!platform.IsMapped(message, MuiUpdateConfigMessage.Size)) return false;
+		var objectVector = APTR.FromPointer(message.Raw +
+			unchecked((uint)ObjectTableOffset));
+		if (!MuiUpdateConfigObjectVectorMemoryCodec.TryGetEntry(ref platform,
+			objectVector, unchecked((uint)index), out var objectAddress) ||
+			!MuiUpdateConfigObjectSlotCodec.TryRead(ref platform, objectAddress,
+				out var objectSlot)) return false;
+		redrawObject = objectSlot.Object;
+		return true;
+	}
+
+	public static bool TryReadFlagEntry<TPlatform>(ref TPlatform platform,
+		APTR message, int index, out byte redrawFlags)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		redrawFlags = 0;
+		if (message.IsNull || index < 0 || index >= MaximumRedrawObjects ||
+			!platform.IsMapped(message, MuiUpdateConfigMessage.Size)) return false;
+		var flagVector = APTR.FromPointer(message.Raw +
+			unchecked((uint)FlagTableOffset));
+		if (!MuiUpdateConfigFlagVectorMemoryCodec.TryGetEntry(ref platform,
+			flagVector, unchecked((uint)index), out var flagAddress) ||
+			!platform.IsMapped(flagAddress, MuiUpdateConfigFlagSlot.Size)) return false;
+		if (!MuiUpdateConfigFlagSlotCodec.TryReadValue(ref platform, flagAddress,
+			out var value)) return false;
+		redrawFlags = value;
+		return true;
+	}
+
+	// Value-returning variants are used by freestanding callers whose ABI does
+	// not need an out parameter for a one-slot record. The slot address is still
+	// resolved by the named vector adapter above.
+	public static APTR ReadObjectEntry<TPlatform>(ref TPlatform platform,
+		APTR message, int index)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (message.IsNull || index < 0 || index >= MaximumRedrawObjects ||
+			!platform.IsMapped(message, MuiUpdateConfigMessage.Size)) return APTR.Null;
+		var objectVector = APTR.FromPointer(message.Raw +
+			unchecked((uint)ObjectTableOffset));
+		if (!MuiUpdateConfigObjectVectorMemoryCodec.TryGetEntry(ref platform,
+			objectVector, unchecked((uint)index), out var objectAddress) ||
+			!platform.IsMapped(objectAddress, MuiUpdateConfigObjectSlot.Size))
+			return APTR.Null;
+		return MuiUpdateConfigObjectSlotCodec.TryReadValue(ref platform,
+			objectAddress, out var value) ? APTR.FromPointer(value) : APTR.Null;
+	}
+
+	public static uint ReadFlagEntry<TPlatform>(ref TPlatform platform,
+		APTR message, int index)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (message.IsNull || index < 0 || index >= MaximumRedrawObjects ||
+			!platform.IsMapped(message, MuiUpdateConfigMessage.Size)) return 0;
+		var flagVector = APTR.FromPointer(message.Raw +
+			unchecked((uint)FlagTableOffset));
+		if (!MuiUpdateConfigFlagVectorMemoryCodec.TryGetEntry(ref platform,
+			flagVector, unchecked((uint)index), out var flagAddress) ||
+			!platform.IsMapped(flagAddress, MuiUpdateConfigFlagSlot.Size)) return 0;
+		return MuiUpdateConfigFlagSlotCodec.TryReadValue(ref platform, flagAddress,
+			out var value) ? value : (byte)0;
+	}
+
 	// Initialize a complete packet record. Redraw entries are written with the
 	// bounded WriteEntry helper so callers never need to calculate wire offsets.
 	public static bool WriteRecord<TPlatform>(ref TPlatform platform, APTR message,
@@ -783,13 +959,12 @@ public static class MuiUpdateConfigCore
 			redrawCount > MaximumRedrawObjects ||
 			!platform.IsMapped(message, MuiUpdateConfigMessage.Size)) return false;
 		platform.Clear(message, MuiUpdateConfigMessage.Size);
-		return MuiUpdateConfigPacketFieldMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiUpdateConfigPacketField.MethodId, Method) &&
-			MuiUpdateConfigPacketFieldMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiUpdateConfigPacketField.CfgId, cfgId) &&
-			MuiUpdateConfigPacketFieldMemoryCodec.TryWriteUInt32(ref platform,
-				message, MuiUpdateConfigPacketField.RedrawCount,
-				unchecked((uint)redrawCount));
+		var packet = default(MuiUpdateConfigHeader);
+		packet.MethodId = Method;
+		packet.CfgId = cfgId;
+		packet.RedrawCount = redrawCount;
+		return MuiUpdateConfigHeaderStructCodec.WriteHeader(ref platform, message,
+			packet);
 	}
 
 	// Set one named redraw-table entry. The packet remains valid when entries are
@@ -815,10 +990,8 @@ public static class MuiUpdateConfigCore
 			unchecked((uint)FlagTableOffset));
 		if (!MuiUpdateConfigFlagVectorMemoryCodec.TryGetEntry(ref platform,
 			flagVector, unchecked((uint)index), out var flagSlot)) return false;
-		var flagRecord = default(MuiUpdateConfigFlagSlot);
-		flagRecord.Value = redrawFlags;
-		return MuiUpdateConfigFlagSlotCodec.Write(ref platform, flagSlot,
-			flagRecord);
+		return MuiUpdateConfigFlagSlotCodec.WriteValue(ref platform, flagSlot,
+			redrawFlags);
 	}
 
 	// A packet-only qualification seam. Returning cfgid makes the decoded
@@ -826,5 +999,39 @@ public static class MuiUpdateConfigCore
 	// preference service or an external BOOPSI callback.
 	public static uint DispatchRecord<TPlatform>(ref TPlatform platform,
 		APTR message) where TPlatform : struct, IMuiGuestMemory =>
-		TryRead(ref platform, message, out var packet) ? packet.CfgId : 0u;
+		TryReadSummary(ref platform, message, out var cfgId, out _) ? cfgId : 0u;
+
+	// Native callers often need admission and identity without materializing the
+	// 332-byte inline-table packet. Keep that path scalar at the ABI boundary,
+	// while still decoding each fixed slot through its named value-type record.
+	public static bool TryReadSummary<TPlatform>(ref TPlatform platform,
+		APTR message, out uint cfgId, out int redrawCount)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		cfgId = 0;
+		redrawCount = 0;
+		if (!MuiUpdateConfigHeaderStructCodec.TryReadHeader(ref platform, message,
+			out var header) || header.MethodId != Method || !platform.IsMapped(message,
+			MuiUpdateConfigMessage.Size) || header.RedrawCount < 0 ||
+			header.RedrawCount > MaximumRedrawObjects) return false;
+		var objectVector = APTR.FromPointer(message.Raw +
+			unchecked((uint)ObjectTableOffset));
+		var flagVector = APTR.FromPointer(message.Raw +
+			unchecked((uint)FlagTableOffset));
+		for (var index = 0u; index < MuiUpdateConfigObjectCursor.MaximumEntries;
+			index++)
+		{
+			if (!MuiUpdateConfigObjectVectorMemoryCodec.TryGetEntry(ref platform,
+				objectVector, index, out var objectAddress) ||
+				!MuiUpdateConfigObjectSlotCodec.TryRead(ref platform, objectAddress,
+				out _) ||
+				!MuiUpdateConfigFlagVectorMemoryCodec.TryGetEntry(ref platform,
+					flagVector, index, out var flagAddress) ||
+			!MuiUpdateConfigFlagSlotCodec.TryReadValue(ref platform, flagAddress,
+				out _)) return false;
+		}
+		cfgId = header.CfgId;
+		redrawCount = header.RedrawCount;
+		return true;
+	}
 }

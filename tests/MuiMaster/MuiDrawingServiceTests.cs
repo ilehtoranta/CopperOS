@@ -212,6 +212,100 @@ public sealed class MuiDrawingServiceTests
 	}
 
 	[Fact]
+	public void DrawingSequentialStructCodecsRoundTripCompleteNamedRecords()
+	{
+		var platform = NewInitializedPlatform();
+		var stateAddress = APTR.FromPointer(0x2200);
+		var clipAddress = APTR.FromPointer(0x2220);
+		var refreshAddress = APTR.FromPointer(0x2240);
+		var penAddress = APTR.FromPointer(0x2260);
+		var renderInfoAddress = APTR.FromPointer(0x2280);
+		var rasterPortAddress = APTR.FromPointer(0x22A0);
+		var state = new MuiDrawingServiceStateRecord
+		{
+			Magic = 0x4D554944u,
+			ClipHead = clipAddress,
+			RefreshHead = refreshAddress,
+			PenHead = penAddress,
+			Generation = 0xFEDCBA98u,
+		};
+		Assert.True(MuiDrawingServiceStateStructCodec.Write(ref platform,
+			stateAddress, state));
+		Assert.True(MuiDrawingServiceStateStructCodec.TryRead(ref platform,
+			stateAddress, out var readState));
+		Assert.Equal(state.ClipHead, readState.ClipHead);
+		Assert.Equal(state.PenHead, readState.PenHead);
+		Assert.Equal(state.Generation, readState.Generation);
+
+		var clip = new MuiDrawingClipRecord
+		{
+			Next = stateAddress,
+			Kind = MuiDrawingServiceLayout.ClipKindRegion,
+			Layer = Layer,
+			Token = APTR.FromPointer(0x80001234u),
+		};
+		Assert.True(MuiDrawingClipStructCodec.Write(ref platform, clipAddress,
+			clip));
+		Assert.True(MuiDrawingClipStructCodec.TryRead(ref platform, clipAddress,
+			out var readClip));
+		Assert.Equal(clip.Token, readClip.Token);
+
+		var refresh = new MuiDrawingRefreshRecord
+		{
+			Next = stateAddress,
+			RenderInfo = renderInfoAddress,
+			Layer = Layer,
+			SavedFlags = 0x80000011u,
+		};
+		Assert.True(MuiDrawingRefreshStructCodec.Write(ref platform,
+			refreshAddress, refresh));
+		Assert.True(MuiDrawingRefreshStructCodec.TryRead(ref platform,
+			refreshAddress, out var readRefresh));
+		Assert.Equal(refresh.SavedFlags, readRefresh.SavedFlags);
+
+		var pen = new MuiDrawingPenRecord
+		{
+			Next = stateAddress,
+			RenderInfo = renderInfoAddress,
+			Token = 0xF1234567u,
+		};
+		Assert.True(MuiDrawingPenStructCodec.Write(ref platform, penAddress, pen));
+		Assert.True(MuiDrawingPenStructCodec.TryRead(ref platform, penAddress,
+			out var readPen));
+		Assert.Equal(pen.Token, readPen.Token);
+
+		var renderInfo = new MuiDrawingRenderInfoRecord
+		{
+			WindowObject = APTR.FromPointer(0x2300),
+			Screen = APTR.FromPointer(0x2310),
+			DrawInfo = APTR.FromPointer(0x2320),
+			Pens = APTR.FromPointer(0x2330),
+			Window = APTR.FromPointer(0x2340),
+			RastPort = rasterPortAddress,
+			Flags = 0xFEDCBA98u,
+		};
+		Assert.True(MuiDrawingRenderInfoStructCodec.Write(ref platform,
+			renderInfoAddress, renderInfo));
+		Assert.True(MuiDrawingRenderInfoStructCodec.TryRead(ref platform,
+			renderInfoAddress, out var readRenderInfo));
+		Assert.Equal(renderInfo.RastPort, readRenderInfo.RastPort);
+		Assert.Equal(renderInfo.Flags, readRenderInfo.Flags);
+
+		Assert.True(MuiDrawingRasterPortStructCodec.Write(ref platform,
+			rasterPortAddress, new MuiDrawingRasterPortRecord { Layer = Layer }));
+		Assert.True(MuiDrawingRasterPortStructCodec.TryRead(ref platform,
+			rasterPortAddress, out var readRasterPort));
+		Assert.Equal(Layer, readRasterPort.Layer);
+		Assert.True(MuiDrawingRasterPortCodec.TryReadLayerValue(ref platform,
+			rasterPortAddress, out var layerRaw));
+		Assert.Equal(Layer.Raw, layerRaw);
+		Assert.False(MuiDrawingServiceStateStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FF1), out _));
+		Assert.False(MuiDrawingRenderInfoStructCodec.Write(ref platform,
+			APTR.Null, renderInfo));
+	}
+
+	[Fact]
 	public void OperationsRequireInitialization()
 	{
 		var platform = new MuiHeadlessTestPlatform(Base, Size, FirstAllocation,

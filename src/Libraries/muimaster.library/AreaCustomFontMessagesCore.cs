@@ -325,15 +325,12 @@ public static class MuiAreaCustomFontMessageCore
 	public static uint Dispatch<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj, APTR message) where TPlatform : struct, IMuiLayoutPlatform
 	{
-		if (!MuiAreaCustomFontMessageMemoryCodec.TryReadUInt32(
-			ref platform, message,
-			MuiAreaCustomFontMessageKind.Open,
-			MuiAreaCustomFontMessageField.MethodId, out var method) ||
-			!MuiAreaCustomFontMessageCodec.IsMethod(method)) return 0;
-		if (method == MuiAreaCustomFontMessageCodec.OpenCustomFont)
+		// Admit the complete named packet before dispatching. Trying the two
+		// selector-specific records keeps the shared first word typed without
+		// exposing an offset-based method read to the live path.
+		if (MuiAreaCustomFontMessageCodec.TryReadOpen(ref platform, message,
+			out var open))
 		{
-			if (!MuiAreaCustomFontMessageCodec.TryReadOpen(ref platform, message,
-				out var open)) return 0;
 			return MuiAreaCustomFontPacketCore.TryOpenCustomFont(ref platform,
 				state, obj, open.Spec, out var opened) ? opened.Font.Raw : 0;
 		}

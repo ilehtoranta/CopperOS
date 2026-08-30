@@ -117,9 +117,11 @@ internal struct MuiProcessMethodMessageHeaderFieldCursor
 	internal MuiProcessMethodMessageHeaderField Field;
 }
 
-// Struct-first access for the generated BOOPSI method-message prefix. The
-// message may have an inline argument vector after this record; only this
-// adapter owns the four-byte header boundary.
+// Compatibility field adapter for the generated BOOPSI method-message prefix.
+// The production path uses MuiProcessMethodMessageHeaderStructCodec below;
+// this adapter remains for callers that explicitly need a field address. The
+// message may have an inline argument vector after this record, so only this
+// adapter owns that four-byte header boundary.
 internal static class MuiProcessMethodMessageHeaderMemoryCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -161,8 +163,58 @@ internal static class MuiProcessMethodMessageHeaderMemoryCodec
 	}
 }
 
+// Complete sequential codec for the fixed generated method-message prefix.
+// The scalar helpers deliberately keep the one-ULONG exchange in a local
+// cursor: this preserves the named record contract while avoiding a native
+// compiler temporary for a one-field struct passed by value.
+internal static class MuiProcessMethodMessageHeaderStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiProcessMethodMessageHeader.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawMethodId)) return false;
+		methodId = rawMethodId;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiProcessMethodMessageHeader value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadMethodIdValue(ref platform, address, out var methodId))
+			return false;
+		value.MethodId = methodId;
+		return true;
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryWriteMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiProcessMethodMessageHeader.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiProcessMethodMessageHeader value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryWriteMethodIdValue(ref platform, address, value.MethodId);
+}
+
 // Compatibility wrapper retained for callers that still construct the typed
-// method-message header cursor. New code uses the direct named-record adapter.
+// method-message header cursor. Its TryRead/Write operations use the complete
+// sequential record codec; only TryGetAddress exposes the legacy adapter.
 internal static class MuiProcessMethodMessageHeaderCodec
 {
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -174,13 +226,13 @@ internal static class MuiProcessMethodMessageHeaderCodec
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiProcessMethodMessageHeader value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> MuiProcessMethodMessageHeaderMemoryCodec.TryRead(ref platform, address,
+		=> MuiProcessMethodMessageHeaderStructCodec.TryRead(ref platform, address,
 			out value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiProcessMethodMessageHeader value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> MuiProcessMethodMessageHeaderMemoryCodec.Write(ref platform, address,
+		=> MuiProcessMethodMessageHeaderStructCodec.Write(ref platform, address,
 			value);
 }
 
@@ -267,28 +319,55 @@ internal static class MuiProcessDispatchArgumentSlotFieldCursorCodec
 
 internal static class MuiProcessDispatchArgumentSlotCodec
 {
+	// CopperSharp's freestanding generic lowering has a known fault for a
+	// one-ULONG struct crossing a by-value call boundary. Keep the named slot
+	// API, but expose scalar-safe cursor entry points for dispatch production
+	// and the native qualification root.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiProcessDispatchArgumentSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var high) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var low) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		value = ((uint)high << 16) | low;
+		return true;
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiProcessDispatchArgumentSlot.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				(ushort)(value >> 16)) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				(ushort)value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiProcessDispatchArgumentSlot slot)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		slot = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiProcessDispatchArgumentSlot.Size)) return false;
-		// This record contains exactly one ULONG, so its named struct address is
-		// already the field address; no positional offset is needed.
-		slot.Value = platform.ReadUInt32(address, 0);
+		if (!TryReadValue(ref platform, address, out var value)) return false;
+		slot.Value = value;
 		return true;
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiProcessDispatchArgumentSlot slot)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiProcessDispatchArgumentSlot.Size)) return false;
-		platform.WriteUInt32(address, 0, slot.Value);
-		return true;
-	}
+		=> WriteValue(ref platform, address, slot.Value);
 }
 
 // Process dispatch uses two related inline ULONG vectors: the caller packet
@@ -341,6 +420,55 @@ internal static class MuiProcessArgumentVectorMemoryCodec
 		address = APTR.FromPointer(vector.Raw + offset);
 		return platform.IsMapped(address, MuiProcessDispatchArgumentSlot.Size);
 	}
+}
+
+// Production bridge for the two inline argument vectors. Index arithmetic and
+// complete slot admission stay inside the named vector boundary; consumers
+// exchange semantic ULONG values or their one-field slot record.
+internal static class MuiProcessArgumentVectorCodec
+{
+	// Scalar projection keeps the one-ULONG record on the native-safe lowering
+	// path while preserving the named MuiProcessDispatchArgumentSlot layout.
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR message, MuiProcessArgumentVectorKind kind, uint index, uint count,
+		out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiProcessArgumentVectorMemoryCodec.TryGetEntry(ref platform,
+			message, kind, index, count, out var address)) return false;
+		return MuiProcessDispatchArgumentSlotCodec.TryReadValue(ref platform,
+			address, out value);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR message,
+		MuiProcessArgumentVectorKind kind, uint index, uint count,
+		out MuiProcessDispatchArgumentSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadValue(ref platform, message, kind, index, count,
+			out var rawValue)) return false;
+		value.Value = rawValue;
+		return true;
+	}
+
+	internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+		APTR message, MuiProcessArgumentVectorKind kind, uint index, uint count,
+		uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiProcessArgumentVectorMemoryCodec.TryGetEntry(ref platform,
+			message, kind, index, count, out var address)) return false;
+		return MuiProcessDispatchArgumentSlotCodec.WriteValue(ref platform,
+			address, value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform, APTR message,
+		MuiProcessArgumentVectorKind kind, uint index, uint count,
+		MuiProcessDispatchArgumentSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteValue(ref platform, message, kind, index, count, value.Value);
 }
 
 internal enum MuiProcessRecordKind : byte
@@ -564,7 +692,8 @@ internal static class MuiProcessDispatchPacketCodec
 			address, out packet)) return false;
 		if (packet.ArgumentCount > MuiProcessSpecialistLayout.MaximumDispatchArgs ||
 			packet.MethodId == 0) return false;
-		return platform.IsMapped(address, 8u + packet.ArgumentCount * 4u);
+		return platform.IsMapped(address, MuiProcessDispatchPacketHeader.Size +
+			packet.ArgumentCount * MuiProcessDispatchArgumentSlot.Size);
 	}
 
 	internal static bool TryReadArgument<TPlatform>(ref TPlatform platform,
@@ -575,15 +704,12 @@ internal static class MuiProcessDispatchPacketCodec
 		value = 0;
 		if (index >= packet.ArgumentCount || index >=
 			MuiProcessSpecialistLayout.MaximumDispatchArgs || address.IsNull ||
-			!platform.IsMapped(address, 8u + packet.ArgumentCount * 4u))
+			!platform.IsMapped(address, MuiProcessDispatchPacketHeader.Size +
+				packet.ArgumentCount * MuiProcessDispatchArgumentSlot.Size))
 			return false;
-		if (!MuiProcessArgumentVectorMemoryCodec.TryGetEntry(ref platform,
-			address, MuiProcessArgumentVectorKind.DispatchPacket, index,
-			packet.ArgumentCount, out var slot)) return false;
-		if (!MuiProcessDispatchArgumentSlotCodec.TryRead(ref platform, slot,
-			out var argument)) return false;
-		value = argument.Value;
-		return true;
+		return MuiProcessArgumentVectorCodec.TryReadValue(ref platform, address,
+			MuiProcessArgumentVectorKind.DispatchPacket, index,
+			packet.ArgumentCount, out value);
 	}
 }
 
@@ -1261,8 +1387,8 @@ public static class MuiProcessSpecialistCore
 		{
 			var methodHeader = default(MuiProcessMethodMessageHeader);
 			methodHeader.MethodId = methodId;
-			if (!MuiProcessMethodMessageHeaderMemoryCodec.Write(ref platform, message,
-				methodHeader))
+			if (!MuiProcessMethodMessageHeaderStructCodec.TryWriteMethodIdValue(
+				ref platform, message, methodHeader.MethodId))
 			{
 				platform.Clear(message, messageBytes);
 				platform.Free(message, messageBytes);
@@ -1283,21 +1409,9 @@ public static class MuiProcessSpecialistCore
 					MuiSemaphoreCore.Release(ref platform, state, target);
 					return false;
 				}
-				if (!MuiProcessArgumentVectorMemoryCodec.TryGetEntry(ref platform,
+				if (!MuiProcessArgumentVectorCodec.TryWriteValue(ref platform,
 					message, MuiProcessArgumentVectorKind.MethodMessage, i,
-					argCount, out var argumentSlot))
-				{
-					platform.Clear(message, messageBytes);
-					platform.Free(message, messageBytes);
-					record.DispatchDepth = 0;
-					MuiProcessSpecialistCodec.Write(ref platform, sc, record);
-					MuiSemaphoreCore.Release(ref platform, state, target);
-					return false;
-				}
-				var argumentRecord = default(MuiProcessDispatchArgumentSlot);
-				argumentRecord.Value = argument;
-				if (!MuiProcessDispatchArgumentSlotCodec.Write(ref platform,
-					argumentSlot, argumentRecord))
+					argCount, argument))
 				{
 					platform.Clear(message, messageBytes);
 					platform.Free(message, messageBytes);

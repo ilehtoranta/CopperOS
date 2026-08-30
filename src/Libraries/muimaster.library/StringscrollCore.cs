@@ -1655,9 +1655,7 @@ public static class MuiStringscrollCore
 		uint visited = 0;
 		while (cursor.Base.IsNotNull && visited++ < MuiAslTagListCore.MaximumSteps)
 		{
-			if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
-				cursor.Base, cursor.Index,
-				out var current) || !MuiAslTagItemCodec.TryRead(ref platform, current,
+			if (!MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
 				out var item)) return false;
 			if (item.Tag == MuiAslTagListCore.TagDone) return true;
 			if (item.Tag == MuiAslTagListCore.TagMore)
@@ -1670,7 +1668,7 @@ public static class MuiStringscrollCore
 			if (item.Tag == MuiAslTagListCore.TagSkip)
 			{
 				if (item.Data == uint.MaxValue ||
-					!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, item.Data + 1))
+					!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, item.Data + 1))
 					return false;
 				continue;
 			}
@@ -1679,7 +1677,7 @@ public static class MuiStringscrollCore
 				value = APTR.FromPointer(item.Data);
 				return true;
 			}
-		if (!MuiAslTagItemVectorMemoryCodec.TryAdvance(ref cursor, 1)) return false;
+		if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1)) return false;
 		}
 		return tags.IsNull;
 	}
@@ -3602,10 +3600,8 @@ public static class MuiStringscrollCore
 		groupTag.Data = horizontal ? 1u : 0u;
 		var doneTag = default(MuiAslTagItemRecord);
 		doneTag.Tag = MuiAslTagListCore.TagDone;
-		if (!MuiAslTagItemCodec.Write(ref platform, tags, groupTag) ||
-			!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform, tags, 1,
-				out var doneAddress) ||
-			!MuiAslTagItemCodec.Write(ref platform, doneAddress, doneTag))
+		if (!MuiAslTagItemVectorCodec.TryWrite(ref platform, tags, 0, groupTag) ||
+			!MuiAslTagItemVectorCodec.TryWrite(ref platform, tags, 1, doneTag))
 		{
 			platform.Clear(tags, automaticScrollbarTagBytes);
 			platform.Free(tags, automaticScrollbarTagBytes);

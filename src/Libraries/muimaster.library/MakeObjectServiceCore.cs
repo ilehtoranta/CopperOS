@@ -110,28 +110,31 @@ internal static class MuiMakeObjectParameterCodec
 	{
 		record = default;
 		if (count == 0) return true;
-		if (parameters.IsNull || count > 4 ||
-			!platform.IsMapped(parameters, count * 4) ||
-			!MuiMakeObjectParameterMemoryCodec.TryReadUInt32(ref platform,
-				parameters, MuiMakeObjectParameterField.First, count *
-				MuiMakeObjectParameterRecord.FieldSize, out record.First))
-			return false;
-		if (count > 1 &&
-			!MuiMakeObjectParameterMemoryCodec.TryReadUInt32(ref platform,
-				parameters, MuiMakeObjectParameterField.Second, count *
-				MuiMakeObjectParameterRecord.FieldSize, out record.Second))
-			return false;
-		if (count > 2 &&
-			!MuiMakeObjectParameterMemoryCodec.TryReadUInt32(ref platform,
-				parameters, MuiMakeObjectParameterField.Third, count *
-				MuiMakeObjectParameterRecord.FieldSize, out record.Third))
-			return false;
-		if (count > 3 &&
-			!MuiMakeObjectParameterMemoryCodec.TryReadUInt32(ref platform,
-				parameters, MuiMakeObjectParameterField.Fourth, count *
-				MuiMakeObjectParameterRecord.FieldSize, out record.Fourth))
-			return false;
-		return true;
+		if (count > 4 || !MuiGuestStructCursor.TryCreate(ref platform,
+			parameters, count * MuiMakeObjectParameterRecord.FieldSize,
+			out var cursor)) return false;
+		if (!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+			out var first)) return false;
+		record.First = first;
+		if (count > 1)
+		{
+			if (!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var second)) return false;
+			record.Second = second;
+		}
+		if (count > 2)
+		{
+			if (!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var third)) return false;
+			record.Third = third;
+		}
+		if (count > 3)
+		{
+			if (!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var fourth)) return false;
+			record.Fourth = fourth;
+		}
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -287,23 +290,50 @@ internal static class MuiNewMenuRecordCodec
 		out MuiNewMenuRecord record) where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiNewMenuRecord.Size)) return false;
-		if (!MuiNewMenuRecordMemoryCodec.TryReadUInt8(ref platform, address,
-			MuiNewMenuField.Type, out record.Type) ||
-			!MuiNewMenuRecordMemoryCodec.TryReadUInt8(ref platform, address,
-				MuiNewMenuField.Padding, out record.Padding) ||
-			!MuiNewMenuRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiNewMenuField.Label, out record.Label) ||
-			!MuiNewMenuRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiNewMenuField.CommandKey, out record.CommandKey) ||
-			!MuiNewMenuRecordMemoryCodec.TryReadUInt16(ref platform, address,
-				MuiNewMenuField.Flags, out record.Flags) ||
-			!MuiNewMenuRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiNewMenuField.MutualExclude, out record.MutualExclude) ||
-			!MuiNewMenuRecordMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiNewMenuField.UserData, out record.UserData)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiNewMenuRecord.Size, out var cursor)) return false;
+		if (!MuiGuestStructCursor.TryReadUInt8(ref platform, ref cursor,
+			out var type) || !MuiGuestStructCursor.TryReadUInt8(ref platform,
+			ref cursor, out var padding) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var label) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+				ref cursor, out var commandKey) ||
+			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
+				out var flags) || !MuiGuestStructCursor.TryReadUInt32(ref platform,
+				ref cursor, out var mutualExclude) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var userData) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		record.Type = type;
+		record.Padding = padding;
+		record.Label = label;
+		record.CommandKey = commandKey;
+		record.Flags = flags;
+		record.MutualExclude = mutualExclude;
+		record.UserData = userData;
 		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiNewMenuRecord record) where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiNewMenuRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt8(ref platform, ref cursor,
+				record.Type) ||
+			!MuiGuestStructCursor.TryWriteUInt8(ref platform, ref cursor,
+				record.Padding) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Label) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.CommandKey) ||
+			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
+				record.Flags) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.MutualExclude) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.UserData)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
 
@@ -332,6 +362,27 @@ internal static class MuiNewMenuVectorMemoryCodec
 		if (vector.Raw > uint.MaxValue - offset) return false;
 		address = APTR.FromPointer(vector.Raw + offset);
 		return platform.IsMapped(address, MuiNewMenuRecord.Size);
+	}
+}
+
+// Production vector bridge. Each caller-owned NewMenu slot is admitted by
+// the bounded vector adapter and exchanged as the complete named record;
+// callers do not reproduce slot arithmetic or packed field positions.
+internal static class MuiNewMenuVectorCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR vector,
+		uint index, out MuiNewMenuRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform, vector, index,
+			out var address) || !MuiNewMenuRecordCodec.TryRead(ref platform, address,
+			out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
 	}
 }
 
@@ -875,20 +926,10 @@ public static class MuiMakeObjectServiceCore
 	private static void AddTag<TPlatform>(ref TPlatform platform, APTR tags,
 		ref uint index, uint tag, uint value) where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAslTagItemCursor);
-		cursor.Base = tags;
-		cursor.Index = index;
-		if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
-			cursor.Base, cursor.Index,
-			out var address))
-		{
-			index++;
-			return;
-		}
 		var item = default(MuiAslTagItemRecord);
 		item.Tag = tag;
 		item.Data = value;
-		MuiAslTagItemCodec.Write(ref platform, address, item);
+		MuiAslTagItemVectorCodec.TryWrite(ref platform, tags, index, item);
 		index++;
 	}
 
@@ -911,14 +952,8 @@ public static class MuiMakeObjectServiceCore
 		APTR menuItem = APTR.Null;
 		for (var index = 0u; index < MaximumMenuEntries; index++)
 		{
-			if (!MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(newMenuRaw), index, out var entry))
-			{
-				DisposeMenuTree(ref platform, state, strip);
-				return APTR.Null;
-			}
-			if (!MuiNewMenuRecordCodec.TryRead(ref platform, entry,
-				out var menuRecord))
+			if (!MuiNewMenuVectorCodec.TryRead(ref platform,
+				APTR.FromPointer(newMenuRaw), index, out var menuRecord))
 			{
 				DisposeMenuTree(ref platform, state, strip);
 				return APTR.Null;
@@ -1084,9 +1119,7 @@ public static class MuiMakeObjectServiceCore
 		var haveItem = false;
 		for (var index = 0u; index < MaximumMenuEntries; index++)
 		{
-			if (!MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform,
-				newMenu, index, out var entry)) return 2;
-			if (!MuiNewMenuRecordCodec.TryRead(ref platform, entry,
+			if (!MuiNewMenuVectorCodec.TryRead(ref platform, newMenu, index,
 				out var menuRecord)) return 2;
 			var entryType = menuRecord.Type;
 			if (!MuiNewMenuTypeRecordCodec.TryClassify(entryType,
@@ -1145,15 +1178,9 @@ public static class MuiMakeObjectServiceCore
 	private static void WriteTagDone<TPlatform>(ref TPlatform platform, APTR tags,
 		uint index) where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAslTagItemCursor);
-		cursor.Base = tags;
-		cursor.Index = index;
-		if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform,
-			cursor.Base, cursor.Index,
-			out var address)) return;
 		var item = default(MuiAslTagItemRecord);
 		item.Tag = MuiAslTagListCore.TagDone;
-		MuiAslTagItemCodec.Write(ref platform, address, item);
+		MuiAslTagItemVectorCodec.TryWrite(ref platform, tags, index, item);
 	}
 
 	private static bool ValidCString<TPlatform>(ref TPlatform platform, uint raw)
@@ -1172,20 +1199,20 @@ public static class MuiMakeObjectServiceCore
 		return ValidCString(ref platform, raw);
 	}
 
-	private static bool ValidEntryVector<TPlatform>(ref TPlatform platform,
+	internal static bool ValidEntryVector<TPlatform>(ref TPlatform platform,
 		uint raw, bool requireEntry) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (raw == 0) return !requireEntry;
 		var entries = APTR.FromPointer(raw);
 		for (var index = 0u; index < 4096; index++)
 		{
-			if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
-				entries, index,
-				out var slot)) return false;
-			if (!MuiChoiceEntryCodec.TryRead(ref platform, slot,
-				out var entry)) return false;
-			if (entry.Text.IsNull) return index != 0 || !requireEntry;
-			if (!CStringCodec.TryReadLength(ref platform, entry.Text,
+			// The vector bridge owns entry bounds and the named Text field;
+			// construction does not expose or rebuild a caller-owned slot address.
+			if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entries, index,
+				out var rawText)) return false;
+			var text = APTR.FromPointer(rawText);
+			if (text.IsNull) return index != 0 || !requireEntry;
+			if (!CStringCodec.TryReadLength(ref platform, text,
 				MaximumCString + 1, out _)) return false;
 		}
 		return false;

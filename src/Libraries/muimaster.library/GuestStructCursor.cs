@@ -32,7 +32,7 @@ internal struct MuiGuestStructCursor
 		return true;
 	}
 
-	private static bool TryTake<TPlatform>(ref TPlatform platform,
+	internal static bool TryTake<TPlatform>(ref TPlatform platform,
 		ref MuiGuestStructCursor cursor, uint byteSize, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{

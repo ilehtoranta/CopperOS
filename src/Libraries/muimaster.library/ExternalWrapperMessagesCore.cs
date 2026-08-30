@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -189,6 +190,227 @@ internal static class MuiExternalWrapperFieldCursorCodec
 			message, packet, field, value);
 }
 
+// Sequential codecs for the fixed Boopsi/Dtpic wrapper records.  The legacy
+// field adapter remains available for compatibility diagnostics; production
+// packet consumers use these declaration-ordered named records instead.
+internal static class MuiExternalWrapperMessageStructCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out methodId) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool TryReadUpdate<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiExternalUpdateMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalUpdateMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.AttributeList) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.GadgetInfo) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		return true;
+	}
+
+	internal static bool TryWriteUpdate<TPlatform>(ref TPlatform platform,
+		APTR message, uint attributeList, uint gadgetInfo, uint flags)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalUpdateMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				MuiExternalWrapperMessageCodec.OmUpdate) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				attributeList) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				gadgetInfo) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadGet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiExternalGetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalGetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Attribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Storage) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		return true;
+	}
+
+	internal static bool TryWriteGet<TPlatform>(ref TPlatform platform,
+		APTR message, uint attribute, uint storage)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalGetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				MuiExternalWrapperMessageCodec.OmGet) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				attribute) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				storage)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadSet<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiExternalSetMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalSetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Attribute) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Value) || !MuiGuestStructCursor.IsComplete(cursor))
+			return false;
+		return true;
+	}
+
+	internal static bool TryWriteSet<TPlatform>(ref TPlatform platform,
+		APTR message, uint method, uint attribute, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalSetMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, method) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				attribute) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				value)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteMethod<TPlatform>(ref TPlatform platform,
+		APTR message, uint method)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, method))
+			return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadRenderInfo<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiExternalRenderInfoMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalRenderInfoMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.RenderInfo) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool TryWriteRenderInfo<TPlatform>(ref TPlatform platform,
+		APTR message, uint method, uint renderInfo)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalRenderInfoMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, method) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				renderInfo)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadAskMinMax<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiExternalAskMinMaxMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalAskMinMaxMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Storage) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool TryWriteAskMinMax<TPlatform>(ref TPlatform platform,
+		APTR message, uint storage)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalAskMinMaxMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				MuiExternalWrapperMessageCodec.AskMinMax) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				storage)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadLayout<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiExternalLayoutMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalLayoutMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Left) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Top) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Width) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Height) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		return true;
+	}
+
+	internal static bool TryWriteLayout<TPlatform>(ref TPlatform platform,
+		APTR message, uint left, uint top, uint width, uint height)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiExternalLayoutMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				MuiExternalWrapperMessageCodec.Layout) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, left) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, top) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, width) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, height))
+			return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 // Central codec for the fixed MorphOS Boopsi.mui/Dtpic.mui wrapper packets.
 // Wrapper consumers use named records; packed guest offsets are confined to
 // this adapter and never repeated in the external-resource dispatcher.
@@ -210,112 +432,46 @@ internal static class MuiExternalWrapperMessageCodec
 		APTR message, out MuiExternalUpdateMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!IsPacket(ref platform, message, MuiExternalUpdateMessage.Size,
-			OmUpdate)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.Update,
-			MuiExternalWrapperField.MethodId, out packet.MethodId) &&
-			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiExternalWrapperPacketKind.Update,
-				MuiExternalWrapperField.AttributeList, out packet.AttributeList) &&
-				MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
-					MuiExternalWrapperPacketKind.Update,
-					MuiExternalWrapperField.GadgetInfo, out packet.GadgetInfo) &&
-					MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
-						MuiExternalWrapperPacketKind.Update,
-						MuiExternalWrapperField.Flags, out packet.Flags);
+		return MuiExternalWrapperMessageStructCodec.TryReadUpdate(ref platform,
+			message, out packet) && packet.MethodId == OmUpdate;
 	}
 
 	internal static bool WriteUpdate<TPlatform>(ref TPlatform platform,
 		APTR message, uint attributeList, uint gadgetInfo, uint flags)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiExternalUpdateMessage.Size)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.Update,
-			MuiExternalWrapperField.MethodId, OmUpdate) &&
-			MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiExternalWrapperPacketKind.Update,
-				MuiExternalWrapperField.AttributeList, attributeList) &&
-				MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-					MuiExternalWrapperPacketKind.Update,
-					MuiExternalWrapperField.GadgetInfo, gadgetInfo) &&
-					MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-						MuiExternalWrapperPacketKind.Update,
-						MuiExternalWrapperField.Flags, flags);
-	}
+		=> MuiExternalWrapperMessageStructCodec.TryWriteUpdate(ref platform,
+			message, attributeList, gadgetInfo, flags);
 
 	internal static bool TryReadGet<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiExternalGetMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!IsPacket(ref platform, message, MuiExternalGetMessage.Size,
-			OmGet)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.Get,
-			MuiExternalWrapperField.MethodId, out packet.MethodId) &&
-			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiExternalWrapperPacketKind.Get, MuiExternalWrapperField.Attribute,
-				out packet.Attribute) &&
-				MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
-					MuiExternalWrapperPacketKind.Get, MuiExternalWrapperField.Storage,
-					out packet.Storage);
+		return MuiExternalWrapperMessageStructCodec.TryReadGet(ref platform,
+			message, out packet) && packet.MethodId == OmGet;
 	}
 
 	internal static bool WriteGet<TPlatform>(ref TPlatform platform, APTR message,
 		uint attribute, uint storage)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiExternalGetMessage.Size)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.Get,
-			MuiExternalWrapperField.MethodId, OmGet) &&
-			MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiExternalWrapperPacketKind.Get, MuiExternalWrapperField.Attribute,
-				attribute) &&
-				MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-					MuiExternalWrapperPacketKind.Get, MuiExternalWrapperField.Storage,
-					storage);
-	}
+		=> MuiExternalWrapperMessageStructCodec.TryWriteGet(ref platform, message,
+			attribute, storage);
 
 	internal static bool TryReadSet<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, out MuiExternalSetMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsSetMethod(method) || !IsPacket(ref platform, message,
-			MuiExternalSetMessage.Size, method)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.Set,
-			MuiExternalWrapperField.MethodId, out packet.MethodId) &&
-			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiExternalWrapperPacketKind.Set, MuiExternalWrapperField.Attribute,
-				out packet.Attribute) &&
-				MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
-					MuiExternalWrapperPacketKind.Set, MuiExternalWrapperField.Value,
-					out packet.Value);
+		return IsSetMethod(method) &&
+			MuiExternalWrapperMessageStructCodec.TryReadSet(ref platform, message,
+				out packet) && packet.MethodId == method;
 	}
 
 	internal static bool WriteSet<TPlatform>(ref TPlatform platform, APTR message,
 		uint method, uint attribute, uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!IsSetMethod(method) || message.IsNull || !platform.IsMapped(
-			message, MuiExternalSetMessage.Size)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.Set,
-			MuiExternalWrapperField.MethodId, method) &&
-			MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiExternalWrapperPacketKind.Set, MuiExternalWrapperField.Attribute,
-				attribute) &&
-				MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-					MuiExternalWrapperPacketKind.Set, MuiExternalWrapperField.Value,
-					value);
-	}
+		=> IsSetMethod(method) &&
+			MuiExternalWrapperMessageStructCodec.TryWriteSet(ref platform, message,
+				method, attribute, value);
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, out MuiExternalMethodMessage packet)
@@ -349,12 +505,8 @@ internal static class MuiExternalWrapperMessageCodec
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		methodId = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiExternalMethodMessage.Size)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.Method,
-			MuiExternalWrapperField.MethodId, out methodId);
+		return MuiExternalWrapperMessageStructCodec.TryReadMethodIdValue(
+			ref platform, message, out methodId);
 	}
 
 	internal static bool IsValidMethod<TPlatform>(ref TPlatform platform,
@@ -370,114 +522,54 @@ internal static class MuiExternalWrapperMessageCodec
 	internal static bool WriteMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!IsMethod(method) || message.IsNull || !platform.IsMapped(message,
-			MuiExternalMethodMessage.Size)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.Method,
-			MuiExternalWrapperField.MethodId, method);
-	}
+		=> IsMethod(method) &&
+			MuiExternalWrapperMessageStructCodec.TryWriteMethod(ref platform,
+				message, method);
 
 	internal static bool TryReadRenderInfo<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, out MuiExternalRenderInfoMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		if (!IsRenderMethod(method) || !IsPacket(ref platform, message,
-			MuiExternalRenderInfoMessage.Size, method)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.RenderInfo,
-			MuiExternalWrapperField.MethodId, out packet.MethodId) &&
-			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiExternalWrapperPacketKind.RenderInfo,
-				MuiExternalWrapperField.RenderInfo, out packet.RenderInfo);
+		return IsRenderMethod(method) &&
+			MuiExternalWrapperMessageStructCodec.TryReadRenderInfo(ref platform,
+				message, out packet) && packet.MethodId == method;
 	}
 
 	internal static bool WriteRenderInfo<TPlatform>(ref TPlatform platform,
 		APTR message, uint method, uint renderInfo)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!IsRenderMethod(method) || message.IsNull || !platform.IsMapped(
-			message, MuiExternalRenderInfoMessage.Size)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.RenderInfo,
-			MuiExternalWrapperField.MethodId, method) &&
-			MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiExternalWrapperPacketKind.RenderInfo,
-				MuiExternalWrapperField.RenderInfo, renderInfo);
-	}
+		=> IsRenderMethod(method) &&
+			MuiExternalWrapperMessageStructCodec.TryWriteRenderInfo(ref platform,
+				message, method, renderInfo);
 
 	internal static bool TryReadAskMinMax<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiExternalAskMinMaxMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!IsPacket(ref platform, message, MuiExternalAskMinMaxMessage.Size,
-			AskMinMax)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.AskMinMax,
-			MuiExternalWrapperField.MethodId, out packet.MethodId) &&
-			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiExternalWrapperPacketKind.AskMinMax,
-				MuiExternalWrapperField.Storage, out packet.Storage);
+		return MuiExternalWrapperMessageStructCodec.TryReadAskMinMax(ref platform,
+			message, out packet) && packet.MethodId == AskMinMax;
 	}
 
 	internal static bool WriteAskMinMax<TPlatform>(ref TPlatform platform,
 		APTR message, uint storage)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiExternalAskMinMaxMessage.Size)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.AskMinMax,
-			MuiExternalWrapperField.MethodId, AskMinMax) &&
-			MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiExternalWrapperPacketKind.AskMinMax,
-				MuiExternalWrapperField.Storage, storage);
-	}
+		=> MuiExternalWrapperMessageStructCodec.TryWriteAskMinMax(ref platform,
+			message, storage);
 
 	internal static bool TryReadLayout<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiExternalLayoutMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		if (!IsPacket(ref platform, message, MuiExternalLayoutMessage.Size,
-			Layout)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.Layout,
-			MuiExternalWrapperField.MethodId, out packet.MethodId) &&
-			MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
-				MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Left,
-				out packet.Left) &&
-				MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
-					MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Top,
-					out packet.Top) &&
-					MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
-						MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Width,
-						out packet.Width) &&
-						MuiExternalWrapperMessageMemoryCodec.TryReadUInt32(ref platform, message,
-							MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Height,
-							out packet.Height);
+		return MuiExternalWrapperMessageStructCodec.TryReadLayout(ref platform,
+			message, out packet) && packet.MethodId == Layout;
 	}
 
 	internal static bool WriteLayout<TPlatform>(ref TPlatform platform,
 		APTR message, uint left, uint top, uint width, uint height)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiExternalLayoutMessage.Size)) return false;
-		return MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform,
-			message, MuiExternalWrapperPacketKind.Layout,
-			MuiExternalWrapperField.MethodId, Layout) &&
-			MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-				MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Left, left) &&
-				MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-					MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Top, top) &&
-					MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-						MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Width, width) &&
-						MuiExternalWrapperMessageMemoryCodec.TryWriteUInt32(ref platform, message,
-							MuiExternalWrapperPacketKind.Layout, MuiExternalWrapperField.Height, height);
-	}
+		=> MuiExternalWrapperMessageStructCodec.TryWriteLayout(ref platform,
+			message, left, top, width, height);
 
 	private static bool IsSetMethod(uint method) => method == MethodSet ||
 		method == MethodNoNotifySet;
@@ -486,9 +578,4 @@ internal static class MuiExternalWrapperMessageCodec
 		method == Show || method == Hide || method == Draw;
 
 	private static bool IsRenderMethod(uint method) => method == Setup;
-
-	private static bool IsPacket<TPlatform>(ref TPlatform platform, APTR message,
-		uint size, uint method) where TPlatform : struct, IMuiGuestMemory =>
-		TryReadMethodIdValue(ref platform, message, out uint methodId) &&
-		methodId == method && platform.IsMapped(message, size);
 }

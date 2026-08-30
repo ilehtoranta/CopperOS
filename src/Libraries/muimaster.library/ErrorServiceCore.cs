@@ -116,26 +116,30 @@ internal static class MuiErrorServiceStateFieldCursorCodec
 		APTR record, MuiErrorServiceStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform, record, field,
-			value);
+		value);
 }
 
-internal static class MuiErrorServiceStateCodec
+// Sequential codec for the complete process-local error record.  The field
+// cursor remains a compatibility/diagnostic surface; live error state uses
+// declaration-ordered named members through the bounded guest cursor.
+internal static class MuiErrorServiceStateStructCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiErrorServiceStateRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiErrorServiceStateRecord.Size)) return false;
-		if (!MuiErrorServiceStateMemoryCodec.TryReadUInt32(ref platform,
-			address, MuiErrorServiceStateField.Magic, out record.Magic) ||
-			!MuiErrorServiceStateMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiErrorServiceStateField.Version, out record.Version) ||
-			!MuiErrorServiceStateMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiErrorServiceStateField.Error, out record.Error) ||
-			!MuiErrorServiceStateMemoryCodec.TryReadUInt32(ref platform, address,
-				MuiErrorServiceStateField.Sequence, out record.Sequence)) return false;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiErrorServiceStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Magic) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Version) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Error) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Sequence) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		return true;
 	}
 
@@ -143,17 +147,32 @@ internal static class MuiErrorServiceStateCodec
 		MuiErrorServiceStateRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (address.IsNull || !platform.IsMapped(address,
-			MuiErrorServiceStateRecord.Size)) return false;
-		return MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform,
-			address, MuiErrorServiceStateField.Magic, record.Magic) &&
-			MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiErrorServiceStateField.Version, record.Version) &&
-			MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiErrorServiceStateField.Error, record.Error) &&
-			MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform, address,
-				MuiErrorServiceStateField.Sequence, record.Sequence);
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiErrorServiceStateRecord.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Magic) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Version) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Error) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				record.Sequence)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+}
+
+internal static class MuiErrorServiceStateCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
+		out MuiErrorServiceStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiErrorServiceStateStructCodec.TryRead(ref platform, address,
+			out record);
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiErrorServiceStateRecord record)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiErrorServiceStateStructCodec.Write(ref platform, address, record);
 }
 
 // Scalar qualification surface for the process-local MUI error record.

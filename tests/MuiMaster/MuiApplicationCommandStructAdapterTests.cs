@@ -51,4 +51,41 @@ public sealed class MuiApplicationCommandStructAdapterTests
 		Assert.False(MuiApplicationCommandRecordMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiApplicationCommandField.Template, out _));
 	}
+
+	[Fact]
+	public void ApplicationCommandTableBridgeUsesCompleteNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var table = APTR.FromPointer(0x2C00);
+		var expected = new MuiApplicationCommandRecord
+		{
+			Name = APTR.FromPointer(0xF1234567u),
+			Template = APTR.FromPointer(0xE2345678u),
+			Parameters = -99,
+			Hook = APTR.FromPointer(0xD3456789u),
+			Reserved0 = 1,
+			Reserved1 = -2,
+			Reserved2 = 3,
+			Reserved3 = -4,
+			Reserved4 = 0x55667788,
+		};
+
+		Assert.True(MuiApplicationCommandTableCodec.TryWrite(ref platform, table,
+			2, expected));
+		Assert.True(MuiApplicationCommandTableCodec.TryRead(ref platform, table, 2,
+			out var actual));
+		Assert.Equal(expected.Name, actual.Name);
+		Assert.Equal(expected.Template, actual.Template);
+		Assert.Equal(expected.Parameters, actual.Parameters);
+		Assert.Equal(expected.Hook, actual.Hook);
+		Assert.Equal(expected.Reserved4, actual.Reserved4);
+
+		Assert.False(MuiApplicationCommandTableCodec.TryRead(ref platform, table,
+			0x10000000u, out _));
+		Assert.False(MuiApplicationCommandTableCodec.TryRead(ref platform,
+			APTR.FromPointer(0x30FF0u), 0, out _));
+		Assert.False(MuiApplicationCommandTableCodec.TryWrite(ref platform,
+			APTR.Null, 0, expected));
+	}
 }
