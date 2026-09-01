@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>CopperOS.Commands.MakeDirNativeExecution</AssemblyName>
+    <RootNamespace>CopperOS.Commands.MakeDirNativeExecution</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Copper68k" Version="1.4.0" />
+    <Compile Include="..\Commands.NativeExecution\HunkImage.cs" Link="HunkImage.cs" />
+  </ItemGroup>
+</Project>

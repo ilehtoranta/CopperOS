@@ -8,6 +8,32 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
+// Named bounded cursor for MUI_MakeObject menu/control-label scanning.  The
+// guest string remains caller-owned; this adapter centralizes the 4 KiB bound,
+// address overflow, and mapped-byte admission used by underscore-key lookup.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiMakeObjectControlCharByteCursor
+{
+	internal const uint MaximumLength = 4096;
+	internal APTR Text;
+	internal uint Index;
+}
+
+internal static class MuiMakeObjectControlCharByteCursorCodec
+{
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiMakeObjectControlCharByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiMakeObjectControlCharByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+}
+
 // Host-side view of the variable MUI_MakeObjectA parameter prefix. The guest
 // vector is decoded once at this boundary; construction code consumes named
 // fields rather than repeating byte offsets.
@@ -370,6 +396,40 @@ internal static class MuiNewMenuVectorMemoryCodec
 // callers do not reproduce slot arithmetic or packed field positions.
 internal static class MuiNewMenuVectorCodec
 {
+	internal static bool TryAdvance(ref MuiNewMenuCursor cursor, uint items)
+	{
+		if (items == 0 || cursor.Index > uint.MaxValue - items)
+			return false;
+		var next = cursor.Index + items;
+		if (next > MuiNewMenuCursor.MaximumEntries) return false;
+		cursor.Index = next;
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiNewMenuCursor cursor, out MuiNewMenuRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiNewMenuCursorCodec.TryGetEntry(ref platform, cursor,
+			out var address) || !MuiNewMenuRecordCodec.TryRead(ref platform, address,
+			out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiNewMenuCursor cursor, MuiNewMenuRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiNewMenuCursorCodec.TryGetEntry(ref platform, cursor,
+			out var address)) return false;
+		return MuiNewMenuRecordCodec.Write(ref platform, address, value);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR vector,
 		uint index, out MuiNewMenuRecord value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -929,7 +989,10 @@ public static class MuiMakeObjectServiceCore
 		var item = default(MuiAslTagItemRecord);
 		item.Tag = tag;
 		item.Data = value;
-		MuiAslTagItemVectorCodec.TryWrite(ref platform, tags, index, item);
+		var cursor = default(MuiAslTagItemCursor);
+		cursor.Base = tags;
+		cursor.Index = index;
+		MuiAslTagItemVectorCodec.TryWrite(ref platform, cursor, item);
 		index++;
 	}
 
@@ -950,10 +1013,13 @@ public static class MuiMakeObjectServiceCore
 
 		APTR menu = APTR.Null;
 		APTR menuItem = APTR.Null;
-		for (var index = 0u; index < MaximumMenuEntries; index++)
+		var menuCursor = default(MuiNewMenuCursor);
+		menuCursor.Base = APTR.FromPointer(newMenuRaw);
+		menuCursor.Index = 0;
+		for (var index = 0u; index < MuiNewMenuCursor.MaximumEntries; index++)
 		{
-			if (!MuiNewMenuVectorCodec.TryRead(ref platform,
-				APTR.FromPointer(newMenuRaw), index, out var menuRecord))
+			if (!MuiNewMenuVectorCodec.TryRead(ref platform, menuCursor,
+				out var menuRecord))
 			{
 				DisposeMenuTree(ref platform, state, strip);
 				return APTR.Null;
@@ -970,7 +1036,16 @@ public static class MuiMakeObjectServiceCore
 			var mutualExclude = menuRecord.MutualExclude;
 			var userData = menuRecord.UserData;
 			if (entryKind == MuiNewMenuEntryKind.End) return strip;
-			if (entryKind == MuiNewMenuEntryKind.Ignored) continue;
+			if (entryKind == MuiNewMenuEntryKind.Ignored)
+			{
+				if (index + 1 < MuiNewMenuCursor.MaximumEntries &&
+					!MuiNewMenuVectorCodec.TryAdvance(ref menuCursor, 1))
+				{
+					DisposeMenuTree(ref platform, state, strip);
+					return APTR.Null;
+				}
+				continue;
+			}
 			// MorphOS Menuitem.mui deliberately excludes GadTools image menus.
 			// Keep the rejection explicit and before any attempt to interpret the
 			// label as a text pointer.
@@ -1004,6 +1079,12 @@ public static class MuiMakeObjectServiceCore
 					return APTR.Null;
 				}
 				menuItem = APTR.Null;
+				if (index + 1 < MuiNewMenuCursor.MaximumEntries &&
+					!MuiNewMenuVectorCodec.TryAdvance(ref menuCursor, 1))
+				{
+					DisposeMenuTree(ref platform, state, strip);
+					return APTR.Null;
+				}
 				continue;
 			}
 
@@ -1050,6 +1131,12 @@ public static class MuiMakeObjectServiceCore
 				return APTR.Null;
 			}
 			if (entryKind == MuiNewMenuEntryKind.Item) menuItem = item;
+			if (index + 1 < MuiNewMenuCursor.MaximumEntries &&
+				!MuiNewMenuVectorCodec.TryAdvance(ref menuCursor, 1))
+			{
+				DisposeMenuTree(ref platform, state, strip);
+				return APTR.Null;
+			}
 		}
 
 		DisposeMenuTree(ref platform, state, strip);
@@ -1110,16 +1197,19 @@ public static class MuiMakeObjectServiceCore
 			specialistClass);
 	}
 
-	private static uint ValidateNewMenuCode<TPlatform>(ref TPlatform platform,
+	internal static uint ValidateNewMenuCode<TPlatform>(ref TPlatform platform,
 		APTR newMenu, uint flags) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (newMenu.IsNull ||
 			(flags & ~MUIO_MenustripNMCommandKeyCheck) != 0) return 1;
 		var haveMenu = false;
 		var haveItem = false;
-		for (var index = 0u; index < MaximumMenuEntries; index++)
+		var menuCursor = default(MuiNewMenuCursor);
+		menuCursor.Base = newMenu;
+		menuCursor.Index = 0;
+		for (var index = 0u; index < MuiNewMenuCursor.MaximumEntries; index++)
 		{
-			if (!MuiNewMenuVectorCodec.TryRead(ref platform, newMenu, index,
+			if (!MuiNewMenuVectorCodec.TryRead(ref platform, menuCursor,
 				out var menuRecord)) return 2;
 			var entryType = menuRecord.Type;
 			if (!MuiNewMenuTypeRecordCodec.TryClassify(entryType,
@@ -1127,7 +1217,12 @@ public static class MuiMakeObjectServiceCore
 			var label = menuRecord.Label;
 			var shortcut = menuRecord.CommandKey;
 			if (entryKind == MuiNewMenuEntryKind.End) return 0;
-			if (entryKind == MuiNewMenuEntryKind.Ignored) continue;
+			if (entryKind == MuiNewMenuEntryKind.Ignored)
+			{
+				if (index + 1 < MuiNewMenuCursor.MaximumEntries &&
+					!MuiNewMenuVectorCodec.TryAdvance(ref menuCursor, 1)) return 2;
+				continue;
+			}
 			if (entryKind == MuiNewMenuEntryKind.ImageItem ||
 				entryKind == MuiNewMenuEntryKind.ImageSub ||
 				entryKind == MuiNewMenuEntryKind.ImageUnsupported) return 3;
@@ -1136,6 +1231,8 @@ public static class MuiMakeObjectServiceCore
 				if (!ValidCString(ref platform, label)) return 4;
 				haveMenu = true;
 				haveItem = false;
+				if (index + 1 < MuiNewMenuCursor.MaximumEntries &&
+					!MuiNewMenuVectorCodec.TryAdvance(ref menuCursor, 1)) return 2;
 				continue;
 			}
 			if (entryKind != MuiNewMenuEntryKind.Item &&
@@ -1145,6 +1242,8 @@ public static class MuiMakeObjectServiceCore
 			if (!ResolveMenuItemStrings(ref platform, label, shortcut, flags,
 				out _, out _)) return 7;
 			if (entryKind == MuiNewMenuEntryKind.Item) haveItem = true;
+			if (index + 1 < MuiNewMenuCursor.MaximumEntries &&
+				!MuiNewMenuVectorCodec.TryAdvance(ref menuCursor, 1)) return 2;
 		}
 		return 8;
 	}
@@ -1180,7 +1279,10 @@ public static class MuiMakeObjectServiceCore
 	{
 		var item = default(MuiAslTagItemRecord);
 		item.Tag = MuiAslTagListCore.TagDone;
-		MuiAslTagItemVectorCodec.TryWrite(ref platform, tags, index, item);
+		var cursor = default(MuiAslTagItemCursor);
+		cursor.Base = tags;
+		cursor.Index = index;
+		MuiAslTagItemVectorCodec.TryWrite(ref platform, cursor, item);
 	}
 
 	private static bool ValidCString<TPlatform>(ref TPlatform platform, uint raw)
@@ -1203,17 +1305,23 @@ public static class MuiMakeObjectServiceCore
 		uint raw, bool requireEntry) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (raw == 0) return !requireEntry;
-		var entries = APTR.FromPointer(raw);
-		for (var index = 0u; index < 4096; index++)
+		var entryCursor = default(MuiChoiceEntryCursor);
+		entryCursor.Base = APTR.FromPointer(raw);
+		entryCursor.Index = 0;
+		for (var index = 0u; index < MuiChoiceEntryCursor.MaximumEntries;
+			index++)
 		{
-			// The vector bridge owns entry bounds and the named Text field;
-			// construction does not expose or rebuild a caller-owned slot address.
-			if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entries, index,
+			// The cursor bridge owns entry bounds and the named Text field;
+			// validation does not expose or rebuild a caller-owned slot address.
+			if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entryCursor,
 				out var rawText)) return false;
 			var text = APTR.FromPointer(rawText);
 			if (text.IsNull) return index != 0 || !requireEntry;
 			if (!CStringCodec.TryReadLength(ref platform, text,
 				MaximumCString + 1, out _)) return false;
+			if (index + 1 < MuiChoiceEntryCursor.MaximumEntries &&
+				!MuiChoiceEntryVectorCodec.TryAdvance(ref entryCursor, 1))
+				return false;
 		}
 		return false;
 	}
@@ -1223,16 +1331,19 @@ public static class MuiMakeObjectServiceCore
 	{
 		if (raw == 0) return 0;
 		var text = APTR.FromPointer(raw);
+		var cursor = default(MuiMakeObjectControlCharByteCursor);
+		cursor.Text = text;
 		for (var index = 0u; index < MaximumCString; index++)
 		{
-			if (!platform.IsMapped(text, index + 1)) return 0;
-			var ch = platform.ReadUInt8(text, unchecked((int)index));
+			cursor.Index = index;
+			if (!MuiMakeObjectControlCharByteCursorCodec.TryReadByte(ref platform,
+				cursor, out var ch)) return 0;
 			if (ch == 0) return 0;
 			if (ch == (byte)'_')
 			{
-				if (!platform.IsMapped(text, index + 2)) return 0;
-				var key = platform.ReadUInt8(text, unchecked((int)(index + 1)));
-				if (key == 0) return 0;
+				cursor.Index = index + 1;
+				if (!MuiMakeObjectControlCharByteCursorCodec.TryReadByte(
+					ref platform, cursor, out var key) || key == 0) return 0;
 				return key >= (byte)'A' && key <= (byte)'Z' ?
 					unchecked((uint)(key + 32)) : key;
 			}

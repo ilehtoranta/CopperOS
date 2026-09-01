@@ -11,4 +11,10 @@
   <ItemGroup>
     <Compile Remove="DosShellPlatform.cs;DosShellNativeEntrypoints.cs;DosShellNativeParkEntrypoint.cs;DosShellNativePlatform.cs;DosShellNativeLaunchCore.cs;DosShellNativeChildCore.cs" />
   </ItemGroup>
+  <ItemGroup Condition="'$(CopperOSUseLocalCopperSharp)' == 'true' and Exists('$(CopperSharp68kRoot)\Sdk.Amiga\CopperSharp.Sdk.Amiga.csproj')">
+    <ProjectReference Include="$(CopperSharp68kRoot)\Sdk.Amiga.Support\CopperSharp.Sdk.Amiga.Support.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(CopperOSUseLocalCopperSharp)' != 'true' or !Exists('$(CopperSharp68kRoot)\Sdk.Amiga\CopperSharp.Sdk.Amiga.csproj')">
+    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
+  </ItemGroup>
 </Project>

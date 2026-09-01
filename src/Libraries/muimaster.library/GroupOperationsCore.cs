@@ -673,12 +673,11 @@ public static class MuiGroupOperationsCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = APTR.Null;
-		if (!MuiFamilyMutationVectorMemoryCodec.TryGetEntry(ref platform,
-			objects, index, out var address)) return false;
-		if (!MuiFamilyMutationVectorEntryCodec.TryRead(ref platform, address,
-			out var entry)) return false;
-		value = entry.Object;
-		return true;
+		var cursor = default(MuiFamilyMutationVectorCursor);
+		cursor.Base = objects;
+		cursor.Index = index;
+		return MuiFamilyMutationVectorCodec.TryReadObject(ref platform, cursor,
+			out value);
 	}
 
 	private static APTR ChildAt<TPlatform>(ref TPlatform platform, APTR state,

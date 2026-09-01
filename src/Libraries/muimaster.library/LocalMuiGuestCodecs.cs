@@ -7,6 +7,73 @@ using System.Runtime.InteropServices;
 using Amiga;
 using CopperOS.MuiMaster;
 
+namespace CopperOS.MuiMaster
+{
+
+// Shared bounded cursor for C-string scans that cross the guest-memory
+// boundary.  Callers keep a named base/index/limit value; only this adapter
+// performs address arithmetic and mapped-byte admission.  The limit matches
+// the largest C-string bound used by the MorphOS MUI surface (64 KiB).
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiCStringByteCursor
+{
+	internal const uint MaximumLength = 65536;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Limit;
+}
+
+internal static class MuiCStringByteCursorCodec
+{
+	internal static bool TryGetRange<TMemory>(ref TMemory memory,
+		MuiCStringByteCursor cursor, uint byteCount, out APTR address)
+		where TMemory : struct, IAmigaGuestMemory
+	{
+		address = APTR.Null;
+		var text = APTR.FromPointer(cursor.Base.Raw);
+		if (text.IsNull || cursor.Limit > MuiCStringByteCursor.MaximumLength ||
+			cursor.Index > cursor.Limit || byteCount > cursor.Limit - cursor.Index ||
+			text.Raw > uint.MaxValue - cursor.Index) return false;
+		address = APTR.FromPointer(text.Raw + cursor.Index);
+		return memory.IsMapped(address, byteCount);
+	}
+
+	internal static bool TryGetAddress<TMemory>(ref TMemory memory,
+		MuiCStringByteCursor cursor, out APTR address)
+		where TMemory : struct, IAmigaGuestMemory
+	{
+		address = APTR.Null;
+		var text = APTR.FromPointer(cursor.Base.Raw);
+		if (text.IsNull || cursor.Limit == 0 ||
+			cursor.Limit > MuiCStringByteCursor.MaximumLength ||
+			cursor.Index >= cursor.Limit ||
+			text.Raw > uint.MaxValue - cursor.Index) return false;
+		address = APTR.FromPointer(text.Raw + cursor.Index);
+		return memory.IsMapped(address, 1);
+	}
+
+	internal static bool TryReadByte<TMemory>(ref TMemory memory,
+		MuiCStringByteCursor cursor, out byte value)
+		where TMemory : struct, IAmigaGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref memory, cursor, out var address)) return false;
+		value = memory.ReadUInt8(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteByte<TMemory>(ref TMemory memory,
+		MuiCStringByteCursor cursor, byte value)
+		where TMemory : struct, IAmigaGuestMemory
+	{
+		if (!TryGetAddress(ref memory, cursor, out var address)) return false;
+		memory.WriteUInt8(address, 0, value);
+		return true;
+	}
+}
+
+}
+
 namespace Amiga
 {
 
@@ -23,13 +90,15 @@ public static class CStringCodec
 	{
 		length = 0;
 		if (value.IsNull) return false;
-		for (var index = 0u; index < maximumLength; index++)
+		var cursor = default(MuiCStringByteCursor);
+		cursor.Base = value;
+		cursor.Limit = maximumLength;
+		for (cursor.Index = 0; cursor.Index < maximumLength; cursor.Index++)
 		{
-			if (value.Raw > uint.MaxValue - index) return false;
-			var address = APTR.FromPointer(value.Raw + index);
-			if (!memory.IsMapped(address, 1)) return false;
-			if (memory.ReadUInt8(address, 0) != 0) continue;
-			length = index;
+			if (!MuiCStringByteCursorCodec.TryReadByte(ref memory, cursor,
+				out var current)) return false;
+			if (current != 0) continue;
+			length = cursor.Index;
 			return true;
 		}
 		return false;
@@ -42,16 +111,19 @@ public static class CStringCodec
 		equal = left.Raw == right.Raw;
 		if (equal) return true;
 		if (left.IsNull || right.IsNull) return false;
-		for (var index = 0u; index < maximumLength; index++)
+		var leftCursor = default(MuiCStringByteCursor);
+		leftCursor.Base = left;
+		leftCursor.Limit = maximumLength;
+		var rightCursor = default(MuiCStringByteCursor);
+		rightCursor.Base = right;
+		rightCursor.Limit = maximumLength;
+		for (leftCursor.Index = 0; leftCursor.Index < maximumLength;
+			leftCursor.Index++)
 		{
-			if (left.Raw > uint.MaxValue - index ||
-				right.Raw > uint.MaxValue - index) return false;
-			var leftAddress = APTR.FromPointer(left.Raw + index);
-			var rightAddress = APTR.FromPointer(right.Raw + index);
-			if (!memory.IsMapped(leftAddress, 1) ||
-				!memory.IsMapped(rightAddress, 1)) return false;
-			var leftByte = memory.ReadUInt8(leftAddress, 0);
-			var rightByte = memory.ReadUInt8(rightAddress, 0);
+			rightCursor.Index = leftCursor.Index;
+			if (!MuiCStringByteCursorCodec.TryReadByte(ref memory, leftCursor,
+				out var leftByte) || !MuiCStringByteCursorCodec.TryReadByte(
+				ref memory, rightCursor, out var rightByte)) return false;
 			if (leftByte != rightByte) return true;
 			if (leftByte != 0) continue;
 			equal = true;
@@ -70,16 +142,19 @@ public static class CStringCodec
 		comparison = 0;
 		if (left.Raw == right.Raw) return true;
 		if (left.IsNull || right.IsNull) return false;
-		for (var index = 0u; index < maximumLength; index++)
+		var leftCursor = default(MuiCStringByteCursor);
+		leftCursor.Base = left;
+		leftCursor.Limit = maximumLength;
+		var rightCursor = default(MuiCStringByteCursor);
+		rightCursor.Base = right;
+		rightCursor.Limit = maximumLength;
+		for (leftCursor.Index = 0; leftCursor.Index < maximumLength;
+			leftCursor.Index++)
 		{
-			if (left.Raw > uint.MaxValue - index ||
-				right.Raw > uint.MaxValue - index) return false;
-			var leftAddress = APTR.FromPointer(left.Raw + index);
-			var rightAddress = APTR.FromPointer(right.Raw + index);
-			if (!memory.IsMapped(leftAddress, 1) ||
-				!memory.IsMapped(rightAddress, 1)) return false;
-			var leftByte = memory.ReadUInt8(leftAddress, 0);
-			var rightByte = memory.ReadUInt8(rightAddress, 0);
+			rightCursor.Index = leftCursor.Index;
+			if (!MuiCStringByteCursorCodec.TryReadByte(ref memory, leftCursor,
+				out var leftByte) || !MuiCStringByteCursorCodec.TryReadByte(
+				ref memory, rightCursor, out var rightByte)) return false;
 			if (leftByte < rightByte) { comparison = -1; return true; }
 			if (leftByte > rightByte) { comparison = 1; return true; }
 			if (leftByte == 0) return true;

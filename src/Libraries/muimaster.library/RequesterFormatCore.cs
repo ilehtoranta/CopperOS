@@ -8,6 +8,90 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
+// Named bounded byte view for requester format strings and %s source text.
+// The formatter carries logical length separately from guest addresses; this
+// adapter centralizes index/overflow/mapping checks for the MC68000 path.
+[System.Runtime.InteropServices.StructLayout(
+	System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 2)]
+internal struct MuiRequesterFormatByteCursor
+{
+	internal const uint MaximumLength = MuiRequesterPayloadCore.MaximumStringLength;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Length;
+}
+
+internal static class MuiRequesterFormatByteCursorCodec
+{
+	internal static bool TryCreate<TPlatform>(ref TPlatform platform,
+		APTR baseAddress, uint length, out MuiRequesterFormatByteCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		cursor = default;
+		if (baseAddress.IsNull || length == 0 ||
+			length > MuiRequesterFormatByteCursor.MaximumLength)
+			return false;
+		cursor.Base = baseAddress;
+		cursor.Length = length;
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiRequesterFormatByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (cursor.Length > MuiRequesterFormatByteCursor.MaximumLength)
+			return false;
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiRequesterFormatByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+}
+
+// Named bounded destination cursor for requester printf materialization.
+// Append operations carry the guest base, logical output index, and capacity;
+// range, overflow, and mapped-byte checks stay in this adapter.
+[System.Runtime.InteropServices.StructLayout(
+	System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 2)]
+internal struct MuiRequesterOutputByteCursor
+{
+	internal const uint MaximumLength = MuiRequesterPayloadCore.MaximumStringLength + 1;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Capacity;
+}
+
+internal static class MuiRequesterOutputByteCursorCodec
+{
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiRequesterOutputByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (cursor.Capacity > MuiRequesterOutputByteCursor.MaximumLength)
+			return false;
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Capacity;
+		return MuiCStringByteCursorCodec.TryWriteByte(ref platform, shared,
+			value);
+	}
+}
+
 // Requester formatting parameters are caller-owned ULONG values. Keep each
 // four-byte element as a named wire slot so formatting never repeats the
 // parameter vector's raw value offset at the conversion call sites.
@@ -210,6 +294,44 @@ internal static class MuiRequesterParameterCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiRequesterParameterVectorMemoryCodec.TryGetEntry(ref platform,
 			cursor.Base, cursor.Index, out address);
+
+	// Formatter consumers exchange the complete named parameter slot through
+	// this cursor; the one-ULONG scalar remains confined to the slot codec for
+	// freestanding native ABI stability.
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		MuiRequesterParameterCursor cursor, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiRequesterParameterSlotStructCodec.TryReadValue(ref platform,
+			address, out value);
+	}
+
+	internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+		MuiRequesterParameterCursor cursor, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiRequesterParameterSlotStructCodec.TryWriteValue(ref platform,
+			address, value);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiRequesterParameterCursor cursor,
+		out MuiRequesterParameterSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadValue(ref platform, cursor, out var rawValue)) return false;
+		value.Value = rawValue;
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiRequesterParameterCursor cursor, MuiRequesterParameterSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteValue(ref platform, cursor, value.Value);
 }
 
 // Struct-first guest-memory adapter for the caller-owned requester ULONG
@@ -498,8 +620,11 @@ public static class MuiRequesterFormatCore
 		value = 0;
 		if (parameters.IsNull || index >= MuiRequesterPayloadCore.MaximumFormatParameters)
 			return false;
-		if (!MuiRequesterParameterVectorCodec.TryReadValue(ref platform,
-			parameters, index, out value)) return false;
+		var cursor = default(MuiRequesterParameterCursor);
+		cursor.Base = parameters;
+		cursor.Index = index;
+		if (!MuiRequesterParameterCursorCodec.TryReadValue(ref platform, cursor,
+			out value)) return false;
 		index++;
 		return true;
 	}
@@ -510,9 +635,16 @@ public static class MuiRequesterFormatCore
 	{
 		if (!AppendPadding(ref platform, output, ref outputLength, width, length,
 			left)) return false;
+		var sourceCursor = default(MuiRequesterFormatByteCursor);
+		if (length != 0 && !MuiRequesterFormatByteCursorCodec.TryCreate(
+			ref platform, source, length, out sourceCursor)) return false;
 		for (var index = 0u; index < length; index++)
-			if (!Append(ref platform, output, ref outputLength,
-				platform.ReadUInt8(APTR.FromPointer(source.Raw + index)))) return false;
+		{
+			sourceCursor.Index = index;
+			if (!MuiRequesterFormatByteCursorCodec.TryReadByte(ref platform,
+				sourceCursor, out var value) ||
+				!Append(ref platform, output, ref outputLength, value)) return false;
+		}
 		return !left || width <= length || AppendSpaces(ref platform, output,
 			ref outputLength, width - length);
 	}
@@ -604,13 +736,26 @@ public static class MuiRequesterFormatCore
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		if (outputLength >= MaximumOutputLength) return false;
-		platform.WriteUInt8(output, (int)outputLength++, value);
+		var cursor = default(MuiRequesterOutputByteCursor);
+		cursor.Base = output;
+		cursor.Index = outputLength;
+		cursor.Capacity = MaximumOutputLength + 1;
+		if (!MuiRequesterOutputByteCursorCodec.TryWriteByte(ref platform, cursor,
+			value)) return false;
+		outputLength++;
 		return true;
 	}
 
 	private static byte Read<TPlatform>(ref TPlatform platform, APTR format,
-		uint index) where TPlatform : struct, IMuiHeadlessPlatform =>
-		platform.ReadUInt8(APTR.FromPointer(format.Raw + index));
+		uint index) where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var cursor = default(MuiRequesterFormatByteCursor);
+		cursor.Base = format;
+		cursor.Length = MuiRequesterFormatByteCursor.MaximumLength;
+		cursor.Index = index;
+		return MuiRequesterFormatByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) ? value : (byte)0;
+	}
 
 	private static bool IsLengthPrefix(byte value) => value == (byte)'h' ||
 		value == (byte)'l' || value == (byte)'j' || value == (byte)'z' ||

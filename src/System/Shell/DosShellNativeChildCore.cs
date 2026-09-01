@@ -100,7 +100,8 @@ internal static class DosShellNativeChildCore
 					dos.WriteUInt8(path, unchecked((int)index),
 						dos.ReadUInt8(commandFile, unchecked((int)index + 1)));
 				dos.WriteUInt8(path, unchecked((int)pathLength), 0);
-				status = shell.TryExecuteScript(cli, path, pathLength, out result);
+				status = shell.TryExecuteScript(cli, path, pathLength,
+					APTR.Null, 0, out result);
 			}
 		}
 		for (var poll = 0u; status == ShellScriptExecutionStatus.Pending &&

@@ -694,11 +694,47 @@ internal static class MuiWorkbenchArgumentVectorMemoryCodec
 
 internal static class MuiWorkbenchArgumentVectorCodec
 {
+	internal static bool TryAdvance(ref MuiWorkbenchArgumentVectorCursor cursor,
+		uint items)
+	{
+		if (items == 0 || cursor.Index > uint.MaxValue - items)
+			return false;
+		var next = cursor.Index + items;
+		if (next > MuiWorkbenchArgumentVectorCursor.MaximumEntries) return false;
+		cursor.Index = next;
+		return true;
+	}
+
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiWorkbenchArgumentVectorCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(ref platform,
 			cursor.Base, cursor.Index, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiWorkbenchArgumentVectorCursor cursor,
+		out MuiWorkbenchArgumentRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryGetEntry(ref platform, cursor, out var address) ||
+			!MuiWorkbenchArgumentRecordCodec.TryRead(ref platform, address,
+				out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiWorkbenchArgumentVectorCursor cursor,
+		MuiWorkbenchArgumentRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiWorkbenchArgumentRecordCodec.Write(ref platform, address, value);
+	}
 
 	// Complete named-record bridge for indexed consumers. The memory adapter
 	// remains the sole owner of slot arithmetic and range validation; callers
@@ -1105,13 +1141,19 @@ public static class MuiApplicationMessageCore
 		var bytes = (uint)value.NumberOfArguments *
 			MuiWorkbenchArgumentRecord.Size;
 		if (!platform.IsMapped(value.ArgumentList, bytes)) return false;
+		var argumentCursor = default(MuiWorkbenchArgumentVectorCursor);
+		argumentCursor.Base = value.ArgumentList;
+		argumentCursor.Index = 0;
 		for (var index = 0u; index < (uint)value.NumberOfArguments; index++)
 		{
 			if (!MuiWorkbenchArgumentVectorCodec.TryRead(ref platform,
-				value.ArgumentList, index, out var argument)) return false;
+				argumentCursor, out var argument)) return false;
 			var name = APTR.FromPointer(argument.Name.Raw);
 			if (name.IsNotNull && !CStringCodec.TryReadLength(ref platform, name,
 				MaximumStringLength, out _)) return false;
+			if (index + 1 < (uint)value.NumberOfArguments &&
+				!MuiWorkbenchArgumentVectorCodec.TryAdvance(ref argumentCursor, 1))
+				return false;
 		}
 		return true;
 	}

@@ -9,6 +9,42 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
+// Named bounded byte cursor for Area frame-title C-string measurement.  The
+// helper keeps its 4 KiB guest-text limit and address admission here rather
+// than composing offsets at the draw call site.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiAreaLayoutCStringByteCursor
+{
+	internal const uint MaximumLength = 4096;
+	internal APTR Text;
+	internal uint Index;
+}
+
+internal static class MuiAreaLayoutCStringByteCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiAreaLayoutCStringByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiAreaLayoutCStringByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiAreaLayoutCStringByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+}
+
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiMinMaxValues
 {
@@ -517,10 +553,14 @@ public static class MuiAreaLayoutCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (text.IsNull) return 0;
+		var cursor = default(MuiAreaLayoutCStringByteCursor);
+		cursor.Text = text;
 		for (var index = 0; index < 4096; index++)
 		{
-			if (!platform.IsMapped(text, (uint)index + 1)) return index;
-			if (platform.ReadUInt8(text, index) == 0) return index;
+			cursor.Index = (uint)index;
+			if (!MuiAreaLayoutCStringByteCursorCodec.TryReadByte(ref platform,
+				cursor, out var value)) return index;
+			if (value == 0) return index;
 		}
 		return 4096;
 	}

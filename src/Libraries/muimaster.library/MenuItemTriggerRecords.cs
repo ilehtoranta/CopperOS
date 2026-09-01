@@ -238,6 +238,55 @@ internal struct MuiMenuItemTriggerStoragePrefix
 	internal IntuiText Text;
 }
 
+// Bounded byte range used while materializing the caller-visible title.  The
+// range is represented as a value type so the copy remains freestanding and
+// does not expose guest-address arithmetic to the projection logic.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiMenuItemTriggerStringByteCursor
+{
+	internal const uint MaximumLength = MuiMenuSpecialistLayout.MaximumString + 1;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Length;
+}
+
+internal static class MuiMenuItemTriggerStringByteCursorCodec
+{
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiMenuItemTriggerStringByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (cursor.Length > MuiMenuItemTriggerStringByteCursor.MaximumLength)
+			return false;
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiMenuItemTriggerStringByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiMenuItemTriggerStringByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		platform.WriteUInt8(address, 0, value);
+		return true;
+	}
+}
+
 internal static class MuiMenuItemTriggerStorageCodec
 {
 	internal const uint StringCapacity = MuiMenuSpecialistLayout.MaximumString + 1;
@@ -290,9 +339,21 @@ internal static class MuiMenuItemTriggerStorageCodec
 				out titleLength);
 		if (hasTitle)
 		{
-			for (var index = 0u; index <= titleLength; index++)
-				platform.WriteUInt8(stringAddress, (int)index,
-					platform.ReadUInt8(title, (int)index));
+			var sourceCursor = default(MuiMenuItemTriggerStringByteCursor);
+			sourceCursor.Base = title;
+			sourceCursor.Length = titleLength + 1;
+			var destinationCursor = default(MuiMenuItemTriggerStringByteCursor);
+			destinationCursor.Base = stringAddress;
+			destinationCursor.Length = titleLength + 1;
+			for (var index = 0u; index < sourceCursor.Length; index++)
+			{
+				sourceCursor.Index = index;
+				destinationCursor.Index = index;
+				if (!MuiMenuItemTriggerStringByteCursorCodec.TryReadByte(
+					ref platform, sourceCursor, out var value) ||
+					!MuiMenuItemTriggerStringByteCursorCodec.TryWriteByte(
+					ref platform, destinationCursor, value)) return false;
+			}
 		}
 		else
 		{

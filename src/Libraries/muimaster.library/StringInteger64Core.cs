@@ -9,6 +9,71 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
+// Named cursor for decimal String Integer64 text. The parser/stringifier carry
+// only a guest text base, logical index, and validated span length; byte
+// address formation, the 64 KiB ceiling, overflow checks, and map admission
+// remain in this value-type adapter.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiStringInteger64TextByteCursor
+{
+	internal const uint MaximumLength = 65536;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Length;
+}
+
+internal static class MuiStringInteger64TextByteCursorCodec
+{
+	internal static bool TryReadAt<TPlatform>(ref TPlatform platform,
+		APTR baseAddress, uint length, int index, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (index < 0) return false;
+		var cursor = default(MuiStringInteger64TextByteCursor);
+		cursor.Base = baseAddress;
+		cursor.Index = (uint)index;
+		cursor.Length = length;
+		return TryReadByte(ref platform, cursor, out value);
+	}
+
+	internal static bool TryGetByte<TPlatform>(ref TPlatform platform,
+		MuiStringInteger64TextByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiStringInteger64TextByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiStringInteger64TextByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryWriteByte(ref platform, shared,
+			value);
+	}
+}
+
 // MorphOS QUAD is a signed 64-bit guest value.  Keep the wire representation
 // as two named ULONGs so the String core never depends on a managed Int64
 // object or runtime conversion helper.
@@ -235,8 +300,12 @@ internal static class MuiStringInteger64Codec
 		if (source.IsNull) return false;
 		var index = 0;
 		var negative = false;
-		if (!platform.IsMapped(source, 1)) return false;
-		var first = platform.ReadUInt8(source, 0);
+		var sourceCursor = default(MuiStringInteger64TextByteCursor);
+		sourceCursor.Base = source;
+		sourceCursor.Length = 4096;
+		sourceCursor.Index = 0;
+		if (!MuiStringInteger64TextByteCursorCodec.TryReadByte(ref platform,
+			sourceCursor, out var first)) return false;
 		if (first == (byte)'-') { negative = true; index++; }
 		else if (first == (byte)'+') index++;
 		var digits = 0;
@@ -247,9 +316,9 @@ internal static class MuiStringInteger64Codec
 		uint limb3 = 0;
 		for (; index < 4096; index++)
 		{
-			if (!platform.IsMapped(source, unchecked((uint)index + 1)))
-				return false;
-			var ch = platform.ReadUInt8(source, index);
+			sourceCursor.Index = (uint)index;
+			if (!MuiStringInteger64TextByteCursorCodec.TryReadByte(ref platform,
+				sourceCursor, out var ch)) return false;
 			if (ch == 0) { terminated = true; break; }
 			if (ch < (byte)'0' || ch > (byte)'9') return false;
 			digits++;
@@ -293,7 +362,11 @@ internal static class MuiStringInteger64Codec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (destination.IsNull || capacity < 2 ||
+			(uint)capacity > MuiStringInteger64TextByteCursor.MaximumLength ||
 			!platform.IsMapped(destination, unchecked((uint)capacity))) return -1;
+		var destinationCursor = default(MuiStringInteger64TextByteCursor);
+		destinationCursor.Base = destination;
+		destinationCursor.Length = unchecked((uint)capacity);
 		var high = value.High;
 		var low = value.Low;
 		var negative = (high & 0x80000000u) != 0;
@@ -306,8 +379,12 @@ internal static class MuiStringInteger64Codec
 		if (high == 0 && low == 0)
 		{
 			if (capacity < 2) return -1;
-			platform.WriteUInt8(destination, 0, (byte)'0');
-			platform.WriteUInt8(destination, 1, 0);
+			destinationCursor.Index = 0;
+			if (!MuiStringInteger64TextByteCursorCodec.TryWriteByte(ref platform,
+				destinationCursor, (byte)'0')) return -1;
+			destinationCursor.Index = 1;
+			if (!MuiStringInteger64TextByteCursorCodec.TryWriteByte(ref platform,
+				destinationCursor, 0)) return -1;
 			return 1;
 		}
 		while (high != 0 || low != 0)
@@ -332,26 +409,47 @@ internal static class MuiStringInteger64Codec
 			remainder = current % 10u;
 			high = (quotient3 << 16) | quotient2;
 			low = (quotient1 << 16) | quotient0;
-			platform.WriteUInt8(destination, count++, unchecked((byte)('0' + remainder)));
+			destinationCursor.Index = (uint)count;
+			if (!MuiStringInteger64TextByteCursorCodec.TryWriteByte(ref platform,
+				destinationCursor, unchecked((byte)('0' + remainder)))) return -1;
+			count++;
 		}
 		if (negative)
 		{
 			for (var index = count; index >= 0; index--)
-				platform.WriteUInt8(destination, index + 1,
-					platform.ReadUInt8(destination, index));
-			platform.WriteUInt8(destination, 0, (byte)'-');
+			{
+				destinationCursor.Index = (uint)index;
+				if (!MuiStringInteger64TextByteCursorCodec.TryReadByte(ref platform,
+					destinationCursor, out var digit)) return -1;
+				destinationCursor.Index = (uint)(index + 1);
+				if (!MuiStringInteger64TextByteCursorCodec.TryWriteByte(ref platform,
+					destinationCursor, digit)) return -1;
+			}
+			destinationCursor.Index = 0;
+			if (!MuiStringInteger64TextByteCursorCodec.TryWriteByte(ref platform,
+				destinationCursor, (byte)'-')) return -1;
 			count++;
 		}
 		var left = negative ? 1 : 0;
 		var right = count - 1;
 		for (; left < right; left++, right--)
 		{
-			var leftValue = platform.ReadUInt8(destination, left);
-			var rightValue = platform.ReadUInt8(destination, right);
-			platform.WriteUInt8(destination, left, rightValue);
-			platform.WriteUInt8(destination, right, leftValue);
+			destinationCursor.Index = (uint)left;
+			if (!MuiStringInteger64TextByteCursorCodec.TryReadByte(ref platform,
+				destinationCursor, out var leftValue)) return -1;
+			destinationCursor.Index = (uint)right;
+			if (!MuiStringInteger64TextByteCursorCodec.TryReadByte(ref platform,
+				destinationCursor, out var rightValue)) return -1;
+			destinationCursor.Index = (uint)left;
+			if (!MuiStringInteger64TextByteCursorCodec.TryWriteByte(ref platform,
+				destinationCursor, rightValue)) return -1;
+			destinationCursor.Index = (uint)right;
+			if (!MuiStringInteger64TextByteCursorCodec.TryWriteByte(ref platform,
+				destinationCursor, leftValue)) return -1;
 		}
-		platform.WriteUInt8(destination, count, 0);
+		destinationCursor.Index = (uint)count;
+		if (!MuiStringInteger64TextByteCursorCodec.TryWriteByte(ref platform,
+			destinationCursor, 0)) return -1;
 		return count;
 	}
 }

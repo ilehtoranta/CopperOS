@@ -746,6 +746,26 @@ internal static class MuiPoplistArrayCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, cursor.Base,
 			cursor.Index, out address);
+
+	// Poplist consumers exchange complete pointer-slot records through the
+	// typed cursor. Indexed address arithmetic remains private to the bounded
+	// vector adapter and never reaches array materialization or selection code.
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiPoplistArrayCursor cursor, out MuiPoplistArrayEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiPoplistArrayEntryCodec.TryRead(ref platform, address, out value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiPoplistArrayCursor cursor, MuiPoplistArrayEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiPoplistArrayEntryCodec.Write(ref platform, address, value);
+	}
 }
 
 // The Pop* class discriminator. The values are ordinal; the exact official
@@ -1212,13 +1232,13 @@ public static class MuiPopSpecialistCore
 		{
 			return MuiPopSpecialistStateCodec.Write(ref platform, instance, state);
 		}
+		var sourceCursor = default(MuiPoplistArrayCursor);
+		sourceCursor.Base = array;
 		var count = 0;
 		while (count < MuiPopSpecialistLayout.MaximumArray)
 		{
-			if (!MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, array,
-				unchecked((uint)count),
-				out var address)) break;
-			if (!MuiPoplistArrayEntryCodec.TryRead(ref platform, address,
+			sourceCursor.Index = unchecked((uint)count);
+			if (!MuiPoplistArrayCursorCodec.TryRead(ref platform, sourceCursor,
 				out var entry)) break;
 			if (entry.Value.IsNull) break;
 			count++;
@@ -1226,22 +1246,15 @@ public static class MuiPopSpecialistCore
 		var block = Alloc(ref platform, (uint)(count + 1) *
 			MuiPoplistArrayEntry.Size);
 		if (block.IsNull) return false;
+		var destinationCursor = default(MuiPoplistArrayCursor);
+		destinationCursor.Base = block;
 		for (var index = 0; index < count; index++)
 		{
-			if (!MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, array,
-				unchecked((uint)index), out var source) ||
-				!MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, block,
-					unchecked((uint)index), out var destination))
-			{
-				platform.Clear(block, (uint)(count + 1) *
-					MuiPoplistArrayEntry.Size);
-				platform.Free(block, (uint)(count + 1) *
-					MuiPoplistArrayEntry.Size);
-				return false;
-			}
-			if (!MuiPoplistArrayEntryCodec.TryRead(ref platform, source,
-				out var entry) || !MuiPoplistArrayEntryCodec.Write(ref platform,
-					destination, entry))
+			sourceCursor.Index = unchecked((uint)index);
+			destinationCursor.Index = unchecked((uint)index);
+			if (!MuiPoplistArrayCursorCodec.TryRead(ref platform, sourceCursor,
+				out var entry) || !MuiPoplistArrayCursorCodec.TryWrite(ref platform,
+				destinationCursor, entry))
 			{
 				platform.Clear(block, (uint)(count + 1) *
 					MuiPoplistArrayEntry.Size);
@@ -1251,9 +1264,9 @@ public static class MuiPopSpecialistCore
 			}
 		}
 		var end = default(MuiPoplistArrayEntry);
-		if (!MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, block,
-			unchecked((uint)count), out var terminator) ||
-			!MuiPoplistArrayEntryCodec.Write(ref platform, terminator, end))
+		destinationCursor.Index = unchecked((uint)count);
+		if (!MuiPoplistArrayCursorCodec.TryWrite(ref platform,
+			destinationCursor, end))
 		{
 			platform.Clear(block, (uint)(count + 1) * MuiPoplistArrayEntry.Size);
 			platform.Free(block, (uint)(count + 1) * MuiPoplistArrayEntry.Size);
@@ -1279,9 +1292,10 @@ public static class MuiPopSpecialistCore
 		if (index >= count) return false;
 		var block = state.MaterializedArray;
 		if (block.IsNull) return false;
-		if (!MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, block, index,
-			out var address)) return false;
-		if (!MuiPoplistArrayEntryCodec.TryRead(ref platform, address,
+		var cursor = default(MuiPoplistArrayCursor);
+		cursor.Base = block;
+		cursor.Index = index;
+		if (!MuiPoplistArrayCursorCodec.TryRead(ref platform, cursor,
 			out var entry)) return false;
 		state.Selected = entry.Value.Raw;
 		MuiPopSpecialistStateCodec.Write(ref platform, instance, state);

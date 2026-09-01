@@ -517,6 +517,62 @@ internal static class MuiApplicationWindowCycleChainVectorMemoryCodec
 
 internal static class MuiApplicationWindowCycleChainVectorCodec
 {
+	internal static bool TryAdvance(ref MuiApplicationWindowCycleChainCursor cursor,
+		uint items)
+	{
+		if (items == 0 || cursor.Index > uint.MaxValue - items)
+			return false;
+		var next = cursor.Index + items;
+		if (next > MuiApplicationWindowCycleChainCursor.MaximumEntries)
+			return false;
+		cursor.Index = next;
+		return true;
+	}
+
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		MuiApplicationWindowCycleChainCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiApplicationWindowCycleChainVectorMemoryCodec.TryGetEntry(
+			ref platform, cursor.Base, cursor.Index, out address);
+
+	// Keep the one-pointer record named while confining scalar access to its
+	// native-safe slot adapter.
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		MuiApplicationWindowCycleChainCursor cursor, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiApplicationWindowCycleChainSlotCodec.TryReadValue(ref platform,
+			address, out value);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiApplicationWindowCycleChainCursor cursor,
+		out MuiApplicationWindowCycleChainSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadValue(ref platform, cursor, out var rawObject)) return false;
+		value.Object = APTR.FromPointer(rawObject);
+		return true;
+	}
+
+	internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+		MuiApplicationWindowCycleChainCursor cursor, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiApplicationWindowCycleChainSlotCodec.WriteValue(ref platform,
+			address, value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiApplicationWindowCycleChainCursor cursor,
+		MuiApplicationWindowCycleChainSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteValue(ref platform, cursor, value.Object.Raw);
+
 	// One-field APTR projection retained for the native 68k lowering seam;
 	// bounds and wire layout remain owned by the named slot bridge.
 	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
@@ -556,11 +612,6 @@ internal static class MuiApplicationWindowCycleChainVectorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> TryWriteValue(ref platform, vector, index, value.Object.Raw);
 
-	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
-		MuiApplicationWindowCycleChainCursor cursor, out APTR address)
-		where TPlatform : struct, IMuiGuestMemory
-		=> MuiApplicationWindowCycleChainVectorMemoryCodec.TryGetEntry(
-			ref platform, cursor.Base, cursor.Index, out address);
 }
 
 // MUIA_Application_ReturnID/Signal input uses an optional caller-owned ULONG
@@ -5948,11 +5999,14 @@ public static class MuiApplicationWindowCore
 		APTR tail = APTR.Null;
 		uint count = 0;
 		var terminated = false;
+		var memberCursor = default(MuiApplicationWindowCycleChainCursor);
+		memberCursor.Base = vector;
+		memberCursor.Index = 0;
 		for (var index = 0u; index < MuiHeadlessLayout.MaximumTraversal;
 			index++)
 		{
 			if (!MuiApplicationWindowCycleChainVectorCodec.TryReadValue(
-				ref platform, vector, index, out var rawMember))
+				ref platform, memberCursor, out var rawMember))
 			{
 				FreeNodes(ref platform, head);
 				return false;
@@ -6002,6 +6056,13 @@ public static class MuiApplicationWindowCore
 			}
 			tail = node;
 			count++;
+			if (index + 1 < MuiHeadlessLayout.MaximumTraversal &&
+				!MuiApplicationWindowCycleChainVectorCodec.TryAdvance(ref memberCursor,
+					1))
+			{
+				FreeNodes(ref platform, head);
+				return false;
+			}
 		}
 		if (!terminated)
 		{

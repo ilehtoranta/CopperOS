@@ -91,6 +91,29 @@ public sealed class MuiHeadlessObjectTests
 	}
 
 	[Fact]
+	public void MakeObjectChoiceVectorValidationUsesNamedCursorTraversal()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var entries = APTR.FromPointer(0x1300);
+		var label = APTR.FromPointer(0x1340);
+		var cursor = default(MuiChoiceEntryCursor);
+		cursor.Base = entries;
+		cursor.Index = 0;
+		platform.WriteCString(label, "Cursor");
+		Assert.True(MuiChoiceEntryVectorCodec.TryWrite(ref platform, cursor,
+			new MuiChoiceEntry { Text = label }));
+		Assert.True(MuiChoiceEntryVectorCodec.TryAdvance(ref cursor, 1));
+		Assert.True(MuiChoiceEntryVectorCodec.TryWrite(ref platform, cursor,
+			new MuiChoiceEntry { Text = APTR.Null }));
+
+		Assert.True(MuiMakeObjectServiceCore.ValidEntryVector(ref platform,
+			entries.Raw, true));
+		Assert.False(MuiMakeObjectServiceCore.ValidEntryVector(ref platform,
+			0xFFFFFFFF, true));
+	}
+
+	[Fact]
 	public void NewMenuCursorUsesNamedEntryBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -162,6 +185,70 @@ public sealed class MuiHeadlessObjectTests
 			APTR.FromPointer(0x20FF0), 0, out _));
 		Assert.False(MuiNewMenuVectorCodec.TryRead(ref platform,
 			APTR.FromPointer(0xFFFFFFFF), 1, out _));
+	}
+
+	[Fact]
+	public void NewMenuVectorCursorExchangesCompleteNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var cursor = default(MuiNewMenuCursor);
+		cursor.Base = APTR.FromPointer(0x1800);
+		cursor.Index = 0;
+		var first = new MuiNewMenuRecord
+		{
+			Type = 1,
+			Padding = 0xA5,
+			Label = 0xF00DCAFEu,
+			CommandKey = 0xEEDDCCBBu,
+			Flags = 0xBEEF,
+			MutualExclude = 0x87654321u,
+			UserData = 0xCAFEBABEu,
+		};
+		Assert.True(MuiNewMenuVectorCodec.TryWrite(ref platform, cursor, first));
+		Assert.True(MuiNewMenuVectorCodec.TryRead(ref platform, cursor,
+			out var actual));
+		Assert.Equal(first.Label, actual.Label);
+		Assert.Equal(first.UserData, actual.UserData);
+		Assert.True(MuiNewMenuVectorCodec.TryAdvance(ref cursor, 1));
+		var second = first;
+		second.Type = 0;
+		Assert.True(MuiNewMenuVectorCodec.TryWrite(ref platform, cursor, second));
+		Assert.True(MuiNewMenuVectorCodec.TryRead(ref platform, cursor,
+			out actual));
+		Assert.Equal((byte)0, actual.Type);
+		Assert.False(MuiNewMenuVectorCodec.TryAdvance(ref cursor,
+			MuiNewMenuCursor.MaximumEntries));
+	}
+
+	[Fact]
+	public void NewMenuValidationWalksNamedCursorRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var vector = APTR.FromPointer(0x1A00);
+		var title = APTR.FromPointer(0x1B00);
+		var item = APTR.FromPointer(0x1B40);
+		platform.WriteCString(title, "Project");
+		platform.WriteCString(item, "Open");
+		var cursor = default(MuiNewMenuCursor);
+		cursor.Base = vector;
+		cursor.Index = 0;
+		Assert.True(MuiNewMenuVectorCodec.TryWrite(ref platform, cursor,
+			new MuiNewMenuRecord { Type = MuiNewMenuTypeRecord.Title,
+				Label = title.Raw }));
+		Assert.True(MuiNewMenuVectorCodec.TryAdvance(ref cursor, 1));
+		Assert.True(MuiNewMenuVectorCodec.TryWrite(ref platform, cursor,
+			new MuiNewMenuRecord { Type = MuiNewMenuTypeRecord.Item,
+				Label = item.Raw }));
+		Assert.True(MuiNewMenuVectorCodec.TryAdvance(ref cursor, 1));
+		Assert.True(MuiNewMenuVectorCodec.TryWrite(ref platform, cursor,
+			new MuiNewMenuRecord { Type = MuiNewMenuTypeRecord.End }));
+
+		Assert.Equal(0u, MuiMakeObjectServiceCore.ValidateNewMenuCode(ref platform,
+			vector, 0));
+		Assert.Equal(2u, MuiMakeObjectServiceCore.ValidateNewMenuCode(ref platform,
+			APTR.FromPointer(0xFFFFFFFF), 0));
 	}
 
 	[Fact]
@@ -511,6 +598,29 @@ public sealed class MuiHeadlessObjectTests
 		Assert.True(equal);
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
 			button));
+	}
+
+	[Fact]
+	public void MakeObjectGeneratedTagWriterUsesNamedCursorRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var tags = APTR.FromPointer(0x1400);
+		var text = APTR.FromPointer(0x1480);
+		var preParse = APTR.FromPointer(0x14A0);
+		Assert.True(MuiMakeObjectServiceCore.WriteButtonTagRecords(ref platform,
+			tags, text.Raw, preParse));
+		var cursor = default(MuiAslTagItemCursor);
+		cursor.Base = tags;
+		cursor.Index = 0;
+		Assert.True(MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
+			out var first));
+		Assert.Equal(0x8042AC64u, first.Tag);
+		Assert.Equal(1u, first.Data);
+		Assert.True(MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 6));
+		Assert.True(MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
+			out var done));
+		Assert.Equal(MuiAslTagListCore.TagDone, done.Tag);
 	}
 
 	[Fact]

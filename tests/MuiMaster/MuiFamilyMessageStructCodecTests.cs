@@ -124,4 +124,27 @@ public sealed class MuiFamilyMessageStructCodecTests
 		Assert.False(MuiFamilyMutationVectorEntryStructCodec.TryRead(ref platform,
 			APTR.FromPointer(0x20FFD), out _));
 	}
+
+	[Fact]
+	public void FamilyMutationVectorCursorExchangesNamedObjectValues()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var cursor = new MuiFamilyMutationVectorCursor
+		{
+			Base = APTR.FromPointer(0x5000),
+			Index = 2,
+		};
+		var value = APTR.FromPointer(0xFEDCBA98u);
+		Assert.True(MuiFamilyMutationVectorCodec.TryWriteObject(ref platform,
+			cursor, value));
+		Assert.True(MuiFamilyMutationVectorCodec.TryReadObjectValue(ref platform,
+			cursor, out var raw));
+		Assert.Equal(value.Raw, raw);
+		cursor.Index = MuiFamilyMutationVectorCursor.MaximumEntries;
+		Assert.False(MuiFamilyMutationVectorCodec.TryReadObjectValue(ref platform,
+			cursor, out _));
+		Assert.False(MuiFamilyMutationVectorCodec.TryWriteObject(ref platform,
+			cursor, value));
+	}
 }

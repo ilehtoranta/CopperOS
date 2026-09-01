@@ -119,4 +119,33 @@ public sealed class MuiApplicationUsedClassesStructAdapterTests
 		Assert.False(MuiApplicationUsedClassesVectorMemoryCodec.TryGetEntry(
 			ref platform, APTR.Null, 0, out _));
 	}
+
+	[Fact]
+	public void ApplicationUsedClassesVectorCursorExchangesNamedEntries()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var cursor = new MuiApplicationUsedClassesVectorCursor
+		{
+			Base = APTR.FromPointer(0x1900),
+			Index = 1,
+		};
+		var expected = new MuiApplicationUsedClassesVectorEntry
+		{
+			Name = APTR.FromPointer(0xFEDCBA98u),
+		};
+
+		Assert.True(MuiApplicationUsedClassesVectorCodec.TryWrite(ref platform,
+			cursor, expected));
+		Assert.True(MuiApplicationUsedClassesVectorCodec.TryRead(ref platform,
+			cursor, out var actual));
+		Assert.Equal(expected.Name.Raw, actual.Name.Raw);
+		Assert.True(MuiApplicationUsedClassesVectorCodec.TryAdvance(ref cursor, 1));
+		Assert.Equal(2u, cursor.Index);
+		Assert.False(MuiApplicationUsedClassesVectorCodec.TryAdvance(ref cursor,
+			MuiHeadlessLayout.MaximumTraversal));
+		cursor.Index = MuiHeadlessLayout.MaximumTraversal;
+		Assert.False(MuiApplicationUsedClassesVectorCodec.TryRead(ref platform,
+			cursor, out _));
+	}
 }

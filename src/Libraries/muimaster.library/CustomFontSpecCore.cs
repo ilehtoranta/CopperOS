@@ -8,6 +8,54 @@ using System.Runtime.InteropServices;
 
 namespace CopperOS.MuiMaster;
 
+// Named cursor for bounded MorphOS font-specification bytes. Parser helpers
+// carry a guest STRPTR and logical index; the adapter owns the 512-byte source
+// bound, overflow guard, and mapped-byte admission.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiCustomFontSpecStringByteCursor
+{
+	internal const uint MaximumLength = MuiAreaCustomFontCore.MaximumSpecLength;
+	internal APTR Text;
+	internal uint Index;
+}
+
+internal static class MuiCustomFontSpecStringByteCursorCodec
+{
+	internal static bool TryReadAt<TPlatform>(ref TPlatform platform,
+		APTR text, int index, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (index < 0) return false;
+		var cursor = default(MuiCustomFontSpecStringByteCursor);
+		cursor.Text = text;
+		cursor.Index = (uint)index;
+		return TryReadByte(ref platform, cursor, out value);
+	}
+
+	internal static bool TryGetByte<TPlatform>(ref TPlatform platform,
+		MuiCustomFontSpecStringByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiCustomFontSpecStringByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiCustomFontSpecStringByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetByte(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+}
+
 // Fixed-width result of parsing a MorphOS MUI font-specification string. The
 // family is a span into the caller-owned guest string; no managed substring is
 // created. Size/color presence is carried separately from the values so a
@@ -66,8 +114,14 @@ internal static class MuiCustomFontSpecCore
 			while (segmentStart <= length)
 			{
 				var segmentEnd = segmentStart;
-				while (segmentEnd < length && platform.ReadUInt8(source,
-					unchecked((int)segmentEnd)) != (byte)'/') segmentEnd++;
+				while (segmentEnd < length)
+				{
+					if (!MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+						source, unchecked((int)segmentEnd), out var segmentByte))
+						return false;
+					if (segmentByte == (byte)'/') break;
+					segmentEnd++;
+				}
 				if (segmentEnd != segmentStart && !ParseSegment(ref platform, source,
 					segmentStart, segmentEnd - segmentStart, ref value)) return false;
 				if (segmentEnd >= length) break;
@@ -81,7 +135,8 @@ internal static class MuiCustomFontSpecCore
 		APTR source, uint start, uint length, ref MuiCustomFontSpec value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var first = platform.ReadUInt8(source, unchecked((int)start));
+		if (!MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+			source, unchecked((int)start), out var first)) return false;
 		if (first == (byte)'+' || first == (byte)'-')
 			return ParseSize(ref platform, source, start, length, true, ref value);
 		if (first >= (byte)'0' && first <= (byte)'9')
@@ -118,14 +173,20 @@ internal static class MuiCustomFontSpecCore
 		uint number = 0;
 		for (; position < start + length; position++)
 		{
-			var ch = platform.ReadUInt8(source, unchecked((int)position));
+			if (!MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+				source, unchecked((int)position), out var ch)) return false;
 			if (ch < (byte)'0' || ch > (byte)'9') return false;
 			var digit = unchecked((uint)(ch - (byte)'0'));
 			if (number > (0x7FFFFFFFu - digit) / 10u) return false;
 			number = number * 10 + digit;
 		}
-		var negative = relative && platform.ReadUInt8(source,
-			unchecked((int)start)) == (byte)'-';
+		var negative = false;
+		if (relative)
+		{
+			if (!MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+				source, unchecked((int)start), out var sign)) return false;
+			negative = sign == (byte)'-';
+		}
 		if (negative)
 		{
 			if (number > 0x80000000u) return false;
@@ -147,8 +208,10 @@ internal static class MuiCustomFontSpecCore
 		uint color = 0;
 		for (var index = 1; index < 7; index++)
 		{
-			var nibble = HexNibble(platform.ReadUInt8(source,
-				unchecked((int)(start + unchecked((uint)index)))));
+			if (!MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+				source, unchecked((int)(start + unchecked((uint)index))),
+				out var colorByte)) return false;
+			var nibble = HexNibble(colorByte);
 			if (nibble < 0) return false;
 			color = unchecked((color << 4) | (uint)nibble);
 		}
@@ -169,7 +232,8 @@ internal static class MuiCustomFontSpecCore
 		uint length, byte target) where TPlatform : struct, IMuiGuestMemory
 	{
 		for (var index = 0u; index < length; index++)
-			if (platform.ReadUInt8(source, unchecked((int)index)) == target)
+			if (MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+				source, unchecked((int)index), out var value) && value == target)
 				return index;
 		return uint.MaxValue;
 	}

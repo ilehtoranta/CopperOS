@@ -75,4 +75,36 @@ public sealed class MuiApplicationPersistenceFrameStructCodecTests
 		Assert.False(MuiApplicationPersistenceFrameVectorCodec.TryWrite(ref platform,
 			APTR.Null, 0, expected));
 	}
+
+	[Fact]
+	public void PersistenceFrameCursorExchangesCompleteNamedFrames()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var cursor = new MuiApplicationPersistenceFrameCursor
+		{
+			Base = APTR.FromPointer(0x2800),
+			Index = 3,
+		};
+		var expected = new MuiApplicationPersistenceFrameState
+		{
+			Object = APTR.FromPointer(0xFEDCBA98u),
+			NextChild = 0x81234567u,
+			VisitMarker = 0xF1234567u,
+		};
+
+		Assert.True(MuiApplicationPersistenceFrameCursorCodec.TryWrite(ref platform,
+			cursor, expected));
+		Assert.True(MuiApplicationPersistenceFrameCursorCodec.TryRead(ref platform,
+			cursor, out var actual));
+		Assert.Equal(expected.Object.Raw, actual.Object.Raw);
+		Assert.Equal(expected.NextChild, actual.NextChild);
+		Assert.Equal(expected.VisitMarker, actual.VisitMarker);
+		Assert.False(MuiApplicationPersistenceFrameCursorCodec.TryRead(ref platform,
+			new MuiApplicationPersistenceFrameCursor
+			{
+				Base = APTR.FromPointer(0x30FF8u),
+				Index = 0,
+			}, out _));
+	}
 }

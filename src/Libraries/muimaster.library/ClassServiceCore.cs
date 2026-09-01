@@ -60,6 +60,64 @@ internal static class MuiClassServiceLayout
 	public const uint MaximumTraversal = 65535;
 }
 
+// Named cursor for bounded class-id C strings used by the class-service
+// loader. Consumers carry only a guest STRPTR and logical byte index; this
+// adapter owns the MorphOS class-id bound, overflow guard, and mapped-byte
+// admission instead of forming raw STRPTR + index expressions at call sites.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiClassServiceStringByteCursor
+{
+	internal const uint MaximumLength = MuiClassServiceLayout.ClassIdMaximum + 1;
+	internal APTR Text;
+	internal uint Index;
+}
+
+internal static class MuiClassServiceStringByteCursorCodec
+{
+	internal static bool TryReadAt<TPlatform>(ref TPlatform platform,
+		APTR text, int index, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (index < 0) return false;
+		var cursor = default(MuiClassServiceStringByteCursor);
+		cursor.Text = text;
+		cursor.Index = (uint)index;
+		return TryReadByte(ref platform, cursor, out value);
+	}
+
+	internal static bool TryGetByte<TPlatform>(ref TPlatform platform,
+		MuiClassServiceStringByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiClassServiceStringByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiClassServiceStringByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetByte(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiClassServiceStringByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetByte(ref platform, cursor, out var address)) return false;
+		platform.WriteUInt8(address, 0, value);
+		return true;
+	}
+}
+
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiClassServiceStateRecord
 {
@@ -990,10 +1048,39 @@ public static class MuiClassServiceCore
 			platform.Free(name, total);
 			return APTR.Null;
 		}
+		if (!MuiClassServiceLibraryPrefixRecordCodec.TryGetPayloadAddress(
+			ref platform, name, out var libraryId))
+		{
+			platform.Clear(name, total);
+			platform.Free(name, total);
+			return APTR.Null;
+		}
+		var sourceCursor = default(MuiClassServiceStringByteCursor);
+		sourceCursor.Text = classId;
+		var destinationCursor = default(MuiClassServiceStringByteCursor);
+		destinationCursor.Text = libraryId;
 		for (uint index = 0; index < length; index++)
-			platform.WriteUInt8(name, (int)(prefixSize + index),
-				platform.ReadUInt8(classId, (int)index));
-		platform.WriteUInt8(name, (int)(prefixSize + length), 0);
+		{
+			sourceCursor.Index = index;
+			destinationCursor.Index = index;
+			if (!MuiClassServiceStringByteCursorCodec.TryReadByte(ref platform,
+				sourceCursor, out var value) ||
+				!MuiClassServiceStringByteCursorCodec.TryWriteByte(ref platform,
+					destinationCursor, value))
+			{
+				platform.Clear(name, total);
+				platform.Free(name, total);
+				return APTR.Null;
+			}
+		}
+		destinationCursor.Index = length;
+		if (!MuiClassServiceStringByteCursorCodec.TryWriteByte(ref platform,
+			destinationCursor, 0))
+		{
+			platform.Clear(name, total);
+			platform.Free(name, total);
+			return APTR.Null;
+		}
 
 		var library = platform.OpenLibrary(name, 0);
 		platform.Clear(name, total);
@@ -1013,10 +1100,32 @@ public static class MuiClassServiceCore
 			platform.CloseLibrary(library);
 			return APTR.Null;
 		}
+		destinationCursor = default(MuiClassServiceStringByteCursor);
+		destinationCursor.Text = ownedId;
 		for (uint index = 0; index < length; index++)
-			platform.WriteUInt8(ownedId, (int)index,
-				platform.ReadUInt8(classId, (int)index));
-		platform.WriteUInt8(ownedId, (int)length, 0);
+		{
+			sourceCursor.Index = index;
+			destinationCursor.Index = index;
+			if (!MuiClassServiceStringByteCursorCodec.TryReadByte(ref platform,
+				sourceCursor, out var value) ||
+				!MuiClassServiceStringByteCursorCodec.TryWriteByte(ref platform,
+					destinationCursor, value))
+			{
+				platform.Clear(ownedId, length + 1u);
+				platform.Free(ownedId, length + 1u);
+				platform.CloseLibrary(library);
+				return APTR.Null;
+			}
+		}
+		destinationCursor.Index = length;
+		if (!MuiClassServiceStringByteCursorCodec.TryWriteByte(ref platform,
+			destinationCursor, 0))
+		{
+			platform.Clear(ownedId, length + 1u);
+			platform.Free(ownedId, length + 1u);
+			platform.CloseLibrary(library);
+			return APTR.Null;
+		}
 
 		var headlessRecord = MuiHeadlessObjectCore.RegisterExternalClass(
 			ref platform, headless, ownedId, boopsi, APTR.Null);
@@ -1212,8 +1321,9 @@ public static class MuiClassServiceCore
 		uint index = 0;
 		while (index < maximum)
 		{
-			if (!platform.IsMapped(text, index + 1)) return 0;
-			if (platform.ReadUInt8(text, (int)index) == 0) return index;
+			if (!MuiClassServiceStringByteCursorCodec.TryReadAt(ref platform,
+				text, (int)index, out var value)) return 0;
+			if (value == 0) return index;
 			index++;
 		}
 		return 0;   // unterminated within the bound

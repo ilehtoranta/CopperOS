@@ -2333,6 +2333,27 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void CallHookFirstParameterRoutesThroughNamedCursor()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1400);
+		var cursor = default(MuiCallHookParameterCursor);
+		cursor.Message = packet;
+		cursor.Index = 0;
+		Assert.True(MuiCallHookParameterCursorCodec.TryGetEntry(ref platform,
+			cursor, out var expected));
+		Assert.True(MuiCallHookParameterRecordCodec.WriteValue(ref platform,
+			expected, 0x8042B96Bu));
+
+		Assert.True(MuiCallHookMessageCodec.TryGetFirstParameter(ref platform,
+			packet, out var actual));
+		Assert.Equal(expected, actual);
+		Assert.Equal(0x8042B96Bu,
+			platform.ReadUInt32(actual, 0));
+	}
+
+	[Fact]
 	public void CallHookParameterCursorUsesNamedEntryBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -2724,6 +2745,57 @@ public sealed class MuiHeadlessDispatcherTests
 		flagCursor.Index = 1;
 		Assert.False(MuiUpdateConfigFlagCursorCodec.TryGetEntry(ref platform,
 			flagCursor, out _));
+	}
+
+	[Fact]
+	public void UpdateConfigTableCursorsExchangeCompleteRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var objectCursor = default(MuiUpdateConfigObjectCursor);
+		objectCursor.Base = APTR.FromPointer(0x1500);
+		objectCursor.Index = 2;
+		var expectedObject = default(MuiUpdateConfigObjectSlot);
+		expectedObject.Object = APTR.FromPointer(0xFEDCBA98u);
+		Assert.True(MuiUpdateConfigObjectCursorCodec.TryWrite(ref platform,
+			objectCursor, expectedObject));
+		Assert.True(MuiUpdateConfigObjectCursorCodec.TryRead(ref platform,
+			objectCursor, out var actualObject));
+		Assert.Equal(expectedObject.Object, actualObject.Object);
+
+		var flagCursor = default(MuiUpdateConfigFlagCursor);
+		flagCursor.Base = APTR.FromPointer(0x1800);
+		flagCursor.Index = 2;
+		var expectedFlag = default(MuiUpdateConfigFlagSlot);
+		expectedFlag.Value = 0xA5;
+		Assert.True(MuiUpdateConfigFlagCursorCodec.TryWrite(ref platform,
+			flagCursor, expectedFlag));
+		Assert.True(MuiUpdateConfigFlagCursorCodec.TryRead(ref platform,
+			flagCursor, out var actualFlag));
+		Assert.Equal(expectedFlag.Value, actualFlag.Value);
+
+		objectCursor.Base = APTR.FromPointer(0x20FFD);
+		Assert.False(MuiUpdateConfigObjectCursorCodec.TryRead(ref platform,
+			objectCursor, out _));
+		var message = APTR.FromPointer(0x4000);
+		Assert.True(MuiUpdateConfigCore.WriteRecord(ref platform, message, 7, 0));
+		Assert.True(MuiUpdateConfigTableCursorCodec.TryGetObjectCursor(
+			ref platform, message, 63, out var inlineObjectCursor));
+		Assert.Equal(message.Raw + 12u + (63u * 4u),
+			inlineObjectCursor.Base.Raw + inlineObjectCursor.Index * 4u);
+		Assert.True(MuiUpdateConfigTableCursorCodec.TryGetFlagCursor(ref platform,
+			message, 63, out var inlineFlagCursor));
+		Assert.Equal(message.Raw + 268u,
+			inlineFlagCursor.Base.Raw);
+		Assert.False(MuiUpdateConfigTableCursorCodec.TryGetObjectCursor(ref platform,
+			APTR.FromPointer(0x20FFC), 0, out _));
+		flagCursor.Base = APTR.FromPointer(0xFFFFFFFFu);
+		Assert.False(MuiUpdateConfigFlagCursorCodec.TryWrite(ref platform,
+			flagCursor, expectedFlag));
+		objectCursor.Base = APTR.FromPointer(0x1500);
+		objectCursor.Index = MuiUpdateConfigObjectCursor.MaximumEntries;
+		Assert.False(MuiUpdateConfigObjectCursorCodec.TryRead(ref platform,
+			objectCursor, out _));
 	}
 
 	[Fact]

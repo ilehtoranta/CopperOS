@@ -619,6 +619,52 @@ public sealed class MuiListStructAdapterTests
 	}
 
 	[Fact]
+	public void ListFormatDescriptorVectorCursorExchangesCompleteNamedRecords()
+	{
+		var platform = CreatePlatform();
+		var cursor = new MuiListCore.MuiListFormatDescriptorCursor
+		{
+			Base = APTR.FromPointer(0x5000),
+			Index = 2,
+		};
+		var expected = new MuiListCore.MuiListFormatDescriptor
+		{
+			Delta = 0xFEDCBA98u,
+			Weight = 100,
+			MinWidth = 16,
+			MaxWidth = 0x80000001u,
+			Column = 3,
+			Flags = 0xA55Au,
+			Preparse = APTR.FromPointer(0xFFFFFFF0u),
+			PreparseLength = 6,
+			PreparseStorage = APTR.FromPointer(0xABCDEF01u),
+			PreparseStorageLength = 7,
+		};
+
+		Assert.True(MuiListCore.MuiListFormatDescriptorVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+		Assert.True(MuiListCore.MuiListFormatDescriptorVectorCodec.TryRead(
+			ref platform, cursor, out var decoded));
+		Assert.Equal(expected.Delta, decoded.Delta);
+		Assert.Equal(expected.Weight, decoded.Weight);
+		Assert.Equal(expected.MinWidth, decoded.MinWidth);
+		Assert.Equal(expected.MaxWidth, decoded.MaxWidth);
+		Assert.Equal(expected.Column, decoded.Column);
+		Assert.Equal(expected.Flags, decoded.Flags);
+		Assert.Equal(expected.Preparse, decoded.Preparse);
+		Assert.Equal(expected.PreparseLength, decoded.PreparseLength);
+		Assert.Equal(expected.PreparseStorage, decoded.PreparseStorage);
+		Assert.Equal(expected.PreparseStorageLength,
+			decoded.PreparseStorageLength);
+
+		cursor.Index = MuiListCore.MuiListFormatDescriptorCursor.MaximumEntries;
+		Assert.False(MuiListCore.MuiListFormatDescriptorVectorCodec.TryRead(
+			ref platform, cursor, out _));
+		Assert.False(MuiListCore.MuiListFormatDescriptorVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+	}
+
+	[Fact]
 	public void ListColumnMetricsAdaptersUseNamedStateAndValueFields()
 	{
 		var platform = CreatePlatform();
@@ -676,6 +722,32 @@ public sealed class MuiListStructAdapterTests
 			ref platform, APTR.FromPointer(0x20FFDu), 0, expected));
 		Assert.False(MuiListCore.MuiListColumnMetricVectorCodec.TryRead(
 			ref platform, APTR.FromPointer(0xFFFFFFFEu), 1, out _));
+	}
+
+	[Fact]
+	public void ListColumnMetricVectorCursorExchangesNamedValues()
+	{
+		var platform = CreatePlatform();
+		var cursor = new MuiListCore.MuiListColumnMetricCursor
+		{
+			Base = APTR.FromPointer(0x5000),
+			Index = 2,
+		};
+		var expected = new MuiListCore.MuiListColumnMetricValue
+		{
+			Value = 0xFEDCBA98u,
+		};
+
+		Assert.True(MuiListCore.MuiListColumnMetricVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+		Assert.True(MuiListCore.MuiListColumnMetricVectorCodec.TryRead(
+			ref platform, cursor, out var decoded));
+		Assert.Equal(expected.Value, decoded.Value);
+		cursor.Index = MuiListCore.MuiListColumnMetricCursor.MaximumEntries;
+		Assert.False(MuiListCore.MuiListColumnMetricVectorCodec.TryRead(
+			ref platform, cursor, out _));
+		Assert.False(MuiListCore.MuiListColumnMetricVectorCodec.TryWrite(
+			ref platform, cursor, expected));
 	}
 
 	[Fact]
@@ -757,6 +829,195 @@ public sealed class MuiListStructAdapterTests
 	}
 
 	[Fact]
+	public void ListPointerVectorCursorExchangesCompleteNamedRecords()
+	{
+		var platform = CreatePlatform();
+		var cursor = new MuiListCore.MuiListPointerVectorCursor
+		{
+			Base = APTR.FromPointer(0x6000),
+			Index = 2,
+		};
+		var expected = new MuiListCore.MuiListPointerSlotRecord
+		{
+			Value = APTR.FromPointer(0xFEDCBA98u),
+		};
+
+		Assert.True(MuiListCore.MuiListPointerVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+		Assert.True(MuiListCore.MuiListPointerVectorCodec.TryRead(
+			ref platform, cursor, out var decoded));
+		Assert.Equal(expected.Value, decoded.Value);
+		cursor.Index = MuiListCore.MuiListPointerVectorCursor.MaximumEntries;
+		Assert.False(MuiListCore.MuiListPointerVectorCodec.TryRead(
+			ref platform, cursor, out _));
+		Assert.False(MuiListCore.MuiListPointerVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+	}
+
+	[Fact]
+	public void ListPointerSlotVectorBridgeUsesNamedRecords()
+	{
+		var platform = CreatePlatform();
+		var vector = APTR.FromPointer(0x6800);
+		var expected = new MuiListCore.MuiListPointerSlotRecord
+		{
+			Value = APTR.FromPointer(0xFEDCBA98u),
+		};
+
+		Assert.True(MuiListCore.MuiListPointerSlotVectorCodec.TryWrite(
+			ref platform, vector, 2, expected));
+		Assert.True(MuiListCore.MuiListPointerSlotVectorCodec.TryRead(
+			ref platform, vector, 2, out var decoded));
+		Assert.Equal(expected.Value, decoded.Value);
+		Assert.True(MuiListCore.MuiListPointerSlotVectorCodec.TryWriteValue(
+			ref platform, APTR.FromPointer(0x6C00), 3, 0x80000001u));
+		Assert.True(MuiListCore.MuiListPointerSlotVectorCodec.TryReadValue(
+			ref platform, APTR.FromPointer(0x6C00), 3, out var rawValue));
+		Assert.Equal(0x80000001u, rawValue);
+		Assert.False(MuiListCore.MuiListPointerSlotVectorCodec.TryRead(
+			ref platform, vector,
+			MuiListCore.MuiListPointerSlotCursor.MaximumEntries, out _));
+		Assert.False(MuiListCore.MuiListPointerSlotVectorCodec.TryWriteValue(
+			ref platform, APTR.FromPointer(0x20FFEu), 1, 0));
+		Assert.False(MuiListCore.MuiListPointerSlotVectorCodec.TryReadValue(
+			ref platform, APTR.FromPointer(0xFFFFFFF0u), 4, out _));
+	}
+
+	[Fact]
+	public void ListPointerSlotVectorCursorExchangesCompleteNamedRecords()
+	{
+		var platform = CreatePlatform();
+		var cursor = new MuiListCore.MuiListPointerSlotCursor
+		{
+			Base = APTR.FromPointer(0x6800),
+			Index = 2,
+		};
+		var expected = new MuiListCore.MuiListPointerSlotRecord
+		{
+			Value = APTR.FromPointer(0xFEDCBA98u),
+		};
+
+		Assert.True(MuiListCore.MuiListPointerSlotVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+		Assert.True(MuiListCore.MuiListPointerSlotVectorCodec.TryRead(
+			ref platform, cursor, out var decoded));
+		Assert.Equal(expected.Value, decoded.Value);
+		cursor.Index = MuiListCore.MuiListPointerSlotCursor.MaximumEntries;
+		Assert.False(MuiListCore.MuiListPointerSlotVectorCodec.TryRead(
+			ref platform, cursor, out _));
+		Assert.False(MuiListCore.MuiListPointerSlotVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+	}
+
+	[Fact]
+	public void ListSlotVectorBridgeUsesNamedRecords()
+	{
+		var platform = CreatePlatform();
+		var vector = APTR.FromPointer(0x7000);
+		var expected = new MuiListSlotState
+		{
+			Entry = APTR.FromPointer(0xFEDCBA98u),
+			Flags = 0x80000001u,
+		};
+
+		Assert.True(MuiListCore.MuiListSlotVectorCodec.TryWrite(
+			ref platform, vector, 2, expected));
+		Assert.True(MuiListCore.MuiListSlotVectorCodec.TryRead(
+			ref platform, vector, 2, out var decoded));
+		Assert.Equal(expected.Entry, decoded.Entry);
+		Assert.Equal(expected.Flags, decoded.Flags);
+		Assert.False(MuiListCore.MuiListSlotVectorCodec.TryRead(
+			ref platform, vector, MuiListCore.MuiListSlotCursor.MaximumEntries,
+			out _));
+		Assert.False(MuiListCore.MuiListSlotVectorCodec.TryWrite(
+			ref platform, APTR.FromPointer(0x20FFEu), 1, expected));
+		Assert.False(MuiListCore.MuiListSlotVectorCodec.TryRead(
+			ref platform, APTR.FromPointer(0xFFFFFFF0u), 4, out _));
+	}
+
+	[Fact]
+	public void ListSlotVectorCursorExchangesCompleteNamedRecords()
+	{
+		var platform = CreatePlatform();
+		var cursor = new MuiListCore.MuiListSlotCursor
+		{
+			Base = APTR.FromPointer(0x7000),
+			Index = 2,
+		};
+		var expected = new MuiListSlotState
+		{
+			Entry = APTR.FromPointer(0xFEDCBA98u),
+			Flags = 0x80000001u,
+		};
+
+		Assert.True(MuiListCore.MuiListSlotVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+		Assert.True(MuiListCore.MuiListSlotVectorCodec.TryRead(
+			ref platform, cursor, out var decoded));
+		Assert.Equal(expected.Entry, decoded.Entry);
+		Assert.Equal(expected.Flags, decoded.Flags);
+		cursor.Index = MuiListCore.MuiListSlotCursor.MaximumEntries;
+		Assert.False(MuiListCore.MuiListSlotVectorCodec.TryRead(
+			ref platform, cursor, out _));
+		Assert.False(MuiListCore.MuiListSlotVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+	}
+
+	[Fact]
+	public void ListColumnGeometryVectorBridgeUsesNamedRecords()
+	{
+		var platform = CreatePlatform();
+		var vector = APTR.FromPointer(0x7800);
+		var expected = new MuiListCore.MuiListColumnGeometry
+		{
+			Offset = 0xFEDCBA98u,
+			Width = 0x80000001u,
+		};
+
+		Assert.True(MuiListCore.MuiListColumnGeometryVectorCodec.TryWrite(
+			ref platform, vector, 2, expected));
+		Assert.True(MuiListCore.MuiListColumnGeometryVectorCodec.TryRead(
+			ref platform, vector, 2, out var decoded));
+		Assert.Equal(expected.Offset, decoded.Offset);
+		Assert.Equal(expected.Width, decoded.Width);
+		Assert.False(MuiListCore.MuiListColumnGeometryVectorCodec.TryRead(
+			ref platform, vector,
+			MuiListCore.MuiListColumnGeometryCursor.MaximumEntries, out _));
+		Assert.False(MuiListCore.MuiListColumnGeometryVectorCodec.TryWrite(
+			ref platform, APTR.FromPointer(0x20FF9u), 0, expected));
+		Assert.False(MuiListCore.MuiListColumnGeometryVectorCodec.TryRead(
+			ref platform, APTR.FromPointer(0xFFFFFFF0u), 4, out _));
+	}
+
+	[Fact]
+	public void ListColumnGeometryVectorCursorExchangesCompleteNamedRecords()
+	{
+		var platform = CreatePlatform();
+		var cursor = new MuiListCore.MuiListColumnGeometryCursor
+		{
+			Base = APTR.FromPointer(0x7800),
+			Index = 2,
+		};
+		var expected = new MuiListCore.MuiListColumnGeometry
+		{
+			Offset = 0xFEDCBA98u,
+			Width = 0x80000001u,
+		};
+
+		Assert.True(MuiListCore.MuiListColumnGeometryVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+		Assert.True(MuiListCore.MuiListColumnGeometryVectorCodec.TryRead(
+			ref platform, cursor, out var decoded));
+		Assert.Equal(expected.Offset, decoded.Offset);
+		Assert.Equal(expected.Width, decoded.Width);
+		cursor.Index = MuiListCore.MuiListColumnGeometryCursor.MaximumEntries;
+		Assert.False(MuiListCore.MuiListColumnGeometryVectorCodec.TryRead(
+			ref platform, cursor, out _));
+		Assert.False(MuiListCore.MuiListColumnGeometryVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+	}
+
+	[Fact]
 	public void ListColumnOrderByteSequentialRecordPreservesValueAndBounds()
 	{
 		var platform = CreatePlatform();
@@ -799,6 +1060,32 @@ public sealed class MuiListStructAdapterTests
 			ref platform, APTR.FromPointer(0x21000u), 0, 0));
 		Assert.False(MuiListCore.MuiListColumnOrderByteVectorCodec.TryReadValue(
 			ref platform, APTR.FromPointer(0xFFFFFFFFu), 1, out _));
+	}
+
+	[Fact]
+	public void ListColumnOrderByteVectorCursorExchangesNamedRecords()
+	{
+		var platform = CreatePlatform();
+		var cursor = new MuiListCore.MuiListColumnOrderByteCursor
+		{
+			Base = APTR.FromPointer(0x5800),
+			Index = 3,
+		};
+		var expected = new MuiListCore.MuiListColumnOrderByteRecord
+		{
+			Value = 0xFE,
+		};
+
+		Assert.True(MuiListCore.MuiListColumnOrderByteVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+		Assert.True(MuiListCore.MuiListColumnOrderByteVectorCodec.TryRead(
+			ref platform, cursor, out var decoded));
+		Assert.Equal(expected.Value, decoded.Value);
+		cursor.Index = MuiListCore.MuiListColumnOrderByteCursor.MaximumEntries;
+		Assert.False(MuiListCore.MuiListColumnOrderByteVectorCodec.TryRead(
+			ref platform, cursor, out _));
+		Assert.False(MuiListCore.MuiListColumnOrderByteVectorCodec.TryWrite(
+			ref platform, cursor, expected));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform() =>

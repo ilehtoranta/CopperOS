@@ -62,7 +62,7 @@ public static class DosShellNativeEntrypoints
 			unchecked((uint)ShellCommandResult.Error));
 		var platform = new DosShellNativePlatform(dosState);
 		var status = platform.TryExecuteScript(cli, file, fileLength,
-			out var result);
+			APTR.Null, 0, out var result);
 		return ReturnPair((uint)status, unchecked((uint)result));
 	}
 

@@ -55,16 +55,19 @@ public static class MuiFamilyCore
 	{
 		if (name.IsNull) return false;
 		uint hash = 2166136261u;
+		var cursor = default(MuiClassNameByteCursor);
+		cursor.Name = name;
 		var length = 0;
 		for (; length < 64; length++)
 		{
-			if (!platform.IsMapped(name, (uint)length + 1)) return false;
-			var ch = platform.ReadUInt8(name, length);
+			cursor.Index = (uint)length;
+			if (!MuiClassNameByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var ch)) return false;
 			if (ch == 0) break;
 			if (ch >= (byte)'A' && ch <= (byte)'Z') ch = unchecked((byte)(ch + 32));
 			hash = (hash ^ ch) * 16777619u;
 		}
-		if (length == 64 || platform.ReadUInt8(name, length) != 0) return false;
+		if (length == 64) return false;
 		return hash == 0x118A9B7Au || // Family.mui
 			hash == 0x48A3473Fu || // Group.mui
 			hash == 0xC243A52Eu || // Application.mui
@@ -285,10 +288,13 @@ public static class MuiFamilyCore
 	{
 		if (objects.IsNull) return false;
 		var predecessor = after;
+		var cursor = default(MuiFamilyMutationVectorCursor);
+		cursor.Base = objects;
 		for (var index = 0u; index < MuiHeadlessLayout.MaximumTraversal; index++)
 		{
+			cursor.Index = index;
 			if (!MuiFamilyMutationVectorCodec.TryReadObjectValue(ref platform,
-				objects, index, out var rawChild)) return false;
+				cursor, out var rawChild)) return false;
 			var child = APTR.FromPointer(rawChild);
 			if (child.IsNull) return true;
 			if (!MoveAfter(ref platform, state, family, child, predecessor))

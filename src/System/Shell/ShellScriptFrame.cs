@@ -57,9 +57,15 @@ public struct ShellScriptFrameState
     public APTR InputState;
     public APTR LabelTop;
     public APTR SignalState;
-    public APTR PendingCommand;
-    public uint PendingNextLine;
-    public uint PendingNextOffset;
+	public APTR PendingCommand;
+	public uint PendingNextLine;
+	public uint PendingNextOffset;
+	/// <summary>Raw Execute tail owned by the persistent runner.</summary>
+	public APTR ScriptArguments;
+	public uint ScriptArgumentLength;
+	/// <summary>Runner-owned storage for a decoded .KEY template.</summary>
+	public APTR ScriptKeyTemplate;
+	public uint ScriptKeyTemplateLength;
 }
 
 /// <summary>
@@ -68,8 +74,8 @@ public struct ShellScriptFrameState
 public static class ShellScriptFrameCodec
 {
     public const uint Magic = 0x5343_4652;
-    public const uint Version = 1;
-    public const uint Size = 96;
+	public const uint Version = 3;
+	public const uint Size = 112;
 
     public static bool Initialize<TPlatform>(
         ref TPlatform platform,
@@ -117,9 +123,13 @@ public static class ShellScriptFrameCodec
         state.InputState = APTR.FromPointer(platform.ReadUInt32(frame, 72));
         state.LabelTop = APTR.FromPointer(platform.ReadUInt32(frame, 76));
         state.SignalState = APTR.FromPointer(platform.ReadUInt32(frame, 80));
-        state.PendingCommand = APTR.FromPointer(platform.ReadUInt32(frame, 84));
-        state.PendingNextLine = platform.ReadUInt32(frame, 88);
-        state.PendingNextOffset = platform.ReadUInt32(frame, 92);
+		state.PendingCommand = APTR.FromPointer(platform.ReadUInt32(frame, 84));
+		state.PendingNextLine = platform.ReadUInt32(frame, 88);
+		state.PendingNextOffset = platform.ReadUInt32(frame, 92);
+		state.ScriptArguments = APTR.FromPointer(platform.ReadUInt32(frame, 96));
+		state.ScriptArgumentLength = platform.ReadUInt32(frame, 100);
+		state.ScriptKeyTemplate = APTR.FromPointer(platform.ReadUInt32(frame, 104));
+		state.ScriptKeyTemplateLength = platform.ReadUInt32(frame, 108);
         return true;
     }
 
@@ -233,6 +243,25 @@ public static class ShellScriptFrameCodec
         return WriteState(ref platform, frame, in state);
     }
 
+    /// <summary>
+    /// Switches a frame to a prebuilt Execute work-file reader. Buffered input
+    /// records cannot be retargeted safely and must be released first.
+    /// </summary>
+    public static bool TryReplaceInput<TPlatform>(
+        ref TPlatform platform,
+        APTR frame,
+        BPTR input)
+        where TPlatform : struct, IShellPlatform
+    {
+        if (input.IsNull || !TryRead(ref platform, frame, out var state) ||
+            state.InputState.IsNotNull)
+            return false;
+        state.Input = input;
+        state.CurrentLine = 1;
+        state.CurrentOffset = 0;
+        return WriteState(ref platform, frame, in state);
+    }
+
     public static bool TrySetControlTop<TPlatform>(
         ref TPlatform platform,
         APTR frame,
@@ -269,6 +298,25 @@ public static class ShellScriptFrameCodec
         if (!TryRead(ref platform, frame, out var state))
             return false;
         state.InputState = inputState;
+        return WriteState(ref platform, frame, in state);
+    }
+
+    /// <summary>Publishes the runner-owned template for one Execute .KEY line.</summary>
+    public static bool TrySetScriptKeyTemplate<TPlatform>(
+        ref TPlatform platform,
+        APTR frame,
+        APTR template,
+        uint templateLength)
+        where TPlatform : struct, IShellPlatform
+    {
+        if (!TryRead(ref platform, frame, out var state) ||
+            template.IsNull || templateLength == 0 ||
+            templateLength >= 4096 ||
+            template.Raw > uint.MaxValue - templateLength ||
+            !platform.IsMapped(template, templateLength + 1))
+            return false;
+        state.ScriptKeyTemplate = template;
+        state.ScriptKeyTemplateLength = templateLength;
         return WriteState(ref platform, frame, in state);
     }
 
@@ -431,9 +479,13 @@ public static class ShellScriptFrameCodec
         platform.WriteUInt32(frame, 72, state.InputState.Raw);
         platform.WriteUInt32(frame, 76, state.LabelTop.Raw);
         platform.WriteUInt32(frame, 80, state.SignalState.Raw);
-        platform.WriteUInt32(frame, 84, state.PendingCommand.Raw);
-        platform.WriteUInt32(frame, 88, state.PendingNextLine);
-        platform.WriteUInt32(frame, 92, state.PendingNextOffset);
+		platform.WriteUInt32(frame, 84, state.PendingCommand.Raw);
+		platform.WriteUInt32(frame, 88, state.PendingNextLine);
+		platform.WriteUInt32(frame, 92, state.PendingNextOffset);
+		platform.WriteUInt32(frame, 96, state.ScriptArguments.Raw);
+		platform.WriteUInt32(frame, 100, state.ScriptArgumentLength);
+		platform.WriteUInt32(frame, 104, state.ScriptKeyTemplate.Raw);
+		platform.WriteUInt32(frame, 108, state.ScriptKeyTemplateLength);
         return true;
     }
 

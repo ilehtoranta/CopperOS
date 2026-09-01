@@ -324,7 +324,8 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 	}
 
 	public ShellScriptExecutionStatus TryExecuteScript(APTR cli, APTR file,
-		uint fileLength, out int result)
+		uint fileLength, APTR scriptArguments, uint scriptArgumentLength,
+		out int result)
 	{
 		var dos = CreateDos();
 		result = (int)ShellCommandResult.Error;
@@ -338,7 +339,8 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 		var input = DosShellNativeBridge.OpenScript(ref dos, State, file,
 			fileLength);
 		if (input.IsNull) return ShellScriptExecutionStatus.Failed;
-		return StartScriptRunner(cli, input, input, 1, out result);
+		return StartScriptRunner(cli, input, input, 1, scriptArguments,
+			scriptArgumentLength, file, fileLength, out result);
 	}
 
 	/// <summary>
@@ -357,7 +359,8 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 		var input = cliValue.CurrentInput.IsNotNull ? cliValue.CurrentInput :
 			cliValue.StandardInput;
 		if (input.IsNull) return ShellScriptExecutionStatus.Failed;
-		return StartScriptRunner(cli, input, input, 0, out result);
+		return StartScriptRunner(cli, input, input, 0, APTR.Null, 0,
+			APTR.Null, 0, out result);
 	}
 
 	/// <summary>
@@ -386,14 +389,34 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 			DosShellNativeBridge.CloseScript(ref dos, State, commandInput);
 			return ShellScriptExecutionStatus.Failed;
 		}
-		return StartScriptRunner(cli, commandInput, standardInput, 1, out result);
+		return StartScriptRunner(cli, commandInput, standardInput, 1,
+			APTR.Null, 0, APTR.Null, 0, out result);
 	}
 
 	private ShellScriptExecutionStatus StartScriptRunner(APTR cli,
-		BPTR readerInput, BPTR commandInput, uint inputOwned, out int result)
+		BPTR readerInput, BPTR commandInput, uint inputOwned,
+		APTR scriptArguments, uint scriptArgumentLength, APTR scriptSourcePath,
+		uint scriptSourcePathLength, out int result)
 	{
 		var dos = CreateDos();
 		result = (int)ShellCommandResult.Error;
+		var ownedArguments = CopyScriptArguments(ref dos, scriptArguments,
+			scriptArgumentLength);
+		if (scriptArgumentLength != 0 && ownedArguments.IsNull)
+		{
+			if (inputOwned != 0)
+				DosShellNativeBridge.CloseScript(ref dos, State, readerInput);
+			return ShellScriptExecutionStatus.Failed;
+		}
+		var ownedSourcePath = CopyScriptPath(ref dos, scriptSourcePath,
+			scriptSourcePathLength);
+		if (scriptSourcePathLength != 0 && ownedSourcePath.IsNull)
+		{
+			ReleaseScriptGuest(ref dos, ownedArguments, scriptArgumentLength);
+			if (inputOwned != 0)
+				DosShellNativeBridge.CloseScript(ref dos, State, readerInput);
+			return ShellScriptExecutionStatus.Failed;
+		}
 		var frame = dos.AllocateGuest(ShellScriptFrameCodec.Size);
 		var line = dos.AllocateGuest(ScriptLineCapacity);
 		var commandName = dos.AllocateGuest(ScriptCommandNameCapacity);
@@ -409,6 +432,8 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 		var redirectionError = dos.AllocateGuest(ScriptSmallCapacity);
 		var aliasLine = dos.AllocateGuest(ScriptLineCapacity);
 		var lookupPath = dos.AllocateGuest(ScriptSmallCapacity);
+		var keyTemplate = dos.AllocateGuest(ScriptLineCapacity);
+		var temporaryPath = dos.AllocateGuest(ScriptSmallCapacity);
 		var runnerValue = new DosShellScriptRunnerRecord
 		{
 			Cli = cli, Frame = frame, Input = readerInput, Line = line,
@@ -419,7 +444,13 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 			RedirectionInput = redirectionInput,
 			RedirectionOutput = redirectionOutput,
 			RedirectionError = redirectionError, AliasLine = aliasLine,
-			LookupPath = lookupPath, State = DosShellScriptRunnerState.Running,
+			LookupPath = lookupPath, ScriptKeyTemplate = keyTemplate,
+			ScriptTemporaryPath = temporaryPath,
+			ScriptSourcePath = ownedSourcePath,
+			ScriptSourcePathLength = scriptSourcePathLength,
+			ScriptArguments = ownedArguments,
+			ScriptArgumentLength = scriptArgumentLength,
+			State = DosShellScriptRunnerState.Running,
 		};
 		if (!ValidScriptRunnerBuffers(ref dos, in runnerValue))
 		{
@@ -445,6 +476,9 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 				? unchecked((uint)cliValue.FailLevel) : 0,
 			LastResult = (int)ShellCommandResult.Ok,
 			Flags = ShellScriptFrameFlags.Active,
+			ScriptArguments = ownedArguments,
+			ScriptArgumentLength = scriptArgumentLength,
+			ScriptKeyTemplate = keyTemplate,
 		};
 		if (!ShellScriptFrameCodec.Initialize(ref this, frame, in initial) ||
 			!DosShellNativeBridge.BindScriptFrame(ref dos, State, cli, frame))
@@ -530,6 +564,24 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 			return ShellScriptExecutionStatus.Failed;
 		}
 		var workspace = BuildScriptWorkspace(in stored);
+		if (stored.ScriptSourcePathLength != 0 &&
+			stored.ScriptTemporaryPathLength == 0)
+		{
+			var prepared = ShellScriptPreScanner.Prepare(ref this, stored.Cli,
+				stored.Frame, stored.Input, stored.ScriptSourcePath,
+				stored.ScriptSourcePathLength, stored.ScriptTemporaryPath,
+				ScriptSmallCapacity, in workspace);
+			if (prepared == ShellScriptPreScanResult.Failed)
+			{
+				DosShellNativeBridge.FreeScriptRunner(ref dos, State, runner);
+				DosShellNativeBridge.UnbindScriptFrame(ref dos, State, stored.Cli,
+					stored.Frame);
+				return ShellScriptExecutionStatus.Failed;
+			}
+			if (prepared == ShellScriptPreScanResult.Transformed &&
+				!DosShellNativeBridge.ReadScriptRunner(ref dos, State, runner,
+					out stored)) return ShellScriptExecutionStatus.Failed;
+		}
 		var run = ShellScriptEngine.Run(ref this, stored.Frame, in workspace,
 			ScriptMaximumSteps);
 		result = run.Result;
@@ -619,7 +671,24 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 			ScriptSmallCapacity) && value.AliasLine.IsNotNull &&
 		dos.IsMapped(value.AliasLine, ScriptLineCapacity) &&
 		value.LookupPath.IsNotNull && dos.IsMapped(value.LookupPath,
-			ScriptSmallCapacity);
+			ScriptSmallCapacity) && value.ScriptKeyTemplate.IsNotNull &&
+			dos.IsMapped(value.ScriptKeyTemplate, ScriptLineCapacity) &&
+		value.ScriptTemporaryPath.IsNotNull && dos.IsMapped(value.ScriptTemporaryPath,
+			ScriptSmallCapacity) &&
+		(value.ScriptSourcePathLength == 0
+			? value.ScriptSourcePath.IsNull
+			: value.ScriptSourcePath.IsNotNull &&
+				value.ScriptSourcePathLength <= 65_535 &&
+				dos.IsMapped(value.ScriptSourcePath,
+					value.ScriptSourcePathLength + 1) &&
+				dos.ReadUInt8(value.ScriptSourcePath,
+					unchecked((int)value.ScriptSourcePathLength)) == 0) &&
+		(value.ScriptArgumentLength == 0
+			? value.ScriptArguments.IsNull
+			: value.ScriptArguments.IsNotNull &&
+				value.ScriptArgumentLength <= 65_535 &&
+				dos.IsMapped(value.ScriptArguments,
+					value.ScriptArgumentLength));
 
 	private void CleanupUnpublishedScript(ref CopperSharpNativeDosPlatform dos,
 		ref DosShellScriptRunnerRecord value)
@@ -655,6 +724,23 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 		value.AliasLine = APTR.Null;
 		ReleaseScriptGuest(ref dos, value.LookupPath, ScriptSmallCapacity);
 		value.LookupPath = APTR.Null;
+		ReleaseScriptGuest(ref dos, value.ScriptKeyTemplate,
+			ScriptLineCapacity);
+		value.ScriptKeyTemplate = APTR.Null;
+		ReleaseScriptGuest(ref dos, value.ScriptTemporaryPath,
+			ScriptSmallCapacity);
+		value.ScriptTemporaryPath = APTR.Null;
+		value.ScriptTemporaryPathLength = 0;
+		ReleaseScriptGuest(ref dos, value.ScriptSourcePath,
+			value.ScriptSourcePathLength == 0 ? 0 :
+				value.ScriptSourcePathLength + 1);
+		value.ScriptSourcePath = APTR.Null;
+		value.ScriptSourcePathLength = 0;
+		ReleaseScriptGuest(ref dos, value.ScriptArguments,
+			value.ScriptArgumentLength);
+		value.ScriptArguments = APTR.Null;
+		value.ScriptArgumentLength = 0;
+		value.ScriptKeyTemplateLength = 0;
 		if (value.Input.IsNotNull)
 		{
 			DosShellNativeBridge.CloseScript(ref dos, State, value.Input);
@@ -667,6 +753,42 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 	{
 		if (address.IsNotNull)
 			dos.FreeGuest(address, size);
+	}
+
+	private static APTR CopyScriptPath(ref CopperSharpNativeDosPlatform dos,
+		APTR source, uint length)
+	{
+		if (length == 0) return APTR.Null;
+		if (source.IsNull || length > 65_535 ||
+			source.Raw > uint.MaxValue - length - 1 ||
+			!dos.IsMapped(source, length + 1) ||
+			dos.ReadUInt8(source, unchecked((int)length)) != 0)
+			return APTR.Null;
+		var owned = dos.AllocateGuest(length + 1);
+		if (owned.IsNull || !dos.IsMapped(owned, length + 1))
+		{
+			if (owned.IsNotNull) dos.FreeGuest(owned, length + 1);
+			return APTR.Null;
+		}
+		dos.Copy(source, owned, length + 1);
+		return owned;
+	}
+
+	private static APTR CopyScriptArguments(ref CopperSharpNativeDosPlatform dos,
+		APTR source, uint length)
+	{
+		if (length == 0) return APTR.Null;
+		if (source.IsNull || length > 65_535 ||
+			source.Raw > uint.MaxValue - length || !dos.IsMapped(source, length))
+			return APTR.Null;
+		var owned = dos.AllocateGuest(length);
+		if (owned.IsNull || !dos.IsMapped(owned, length))
+		{
+			if (owned.IsNotNull) dos.FreeGuest(owned, length);
+			return APTR.Null;
+		}
+		dos.Copy(source, owned, length);
+		return owned;
 	}
 
 	public bool TryManageResident(APTR cli, BPTR output, APTR name,
@@ -753,6 +875,14 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 		rdArgs = DosShellNativeBridge.ReadArgs(ref dos, State, argumentText,
 			argumentLength, template, resultArray);
 		return rdArgs.IsNotNull;
+	}
+
+	public bool TryReadScriptFilePrefix(APTR argumentText,
+		uint argumentLength, out uint consumed)
+	{
+		var dos = CreateDos();
+		return DosShellNativeBridge.TryReadScriptFilePrefix(ref dos, State,
+			argumentText, argumentLength, out consumed);
 	}
 
 	public void FreeArgs(APTR rdArgs)
@@ -957,6 +1087,33 @@ public struct DosShellNativePlatform : IShellPlatform, IShellScriptPlatform
 		handle = DosShellNativeBridge.OpenOutput(ref dos, State, path,
 			pathLength, append);
 		return handle.IsNotNull;
+	}
+
+	public bool TryPublishScriptInput(APTR cli, APTR frame, BPTR source,
+		BPTR replacement, APTR temporaryPath, uint temporaryPathLength)
+	{
+		var dos = CreateDos();
+		var runner = DosShellNativeBridge.FindScriptRunner(ref dos, State, cli);
+		return runner.IsNotNull && DosShellNativeBridge.ReadScriptRunner(ref dos,
+			State, runner, out var stored) && stored.Frame.Raw == frame.Raw &&
+			stored.Input.Raw == source.Raw &&
+			ShellScriptFrameCodec.TryRead(ref this, frame, out var frameState) &&
+			frameState.Input.Raw == source.Raw && frameState.InputState.IsNull &&
+			DosShellNativeBridge.CloseScript(ref dos, State, source) &&
+			DosShellNativeBridge.SetScriptRunnerTemporaryInput(ref dos, runner,
+				replacement, temporaryPath, temporaryPathLength) &&
+			ShellScriptFrameCodec.TryReplaceInput(ref this, frame, replacement);
+	}
+
+	public bool TryDeleteScriptPath(APTR cli, APTR path, uint pathLength)
+	{
+		var dos = CreateDos();
+		return cli.IsNotNull && path.IsNotNull && pathLength != 0 &&
+			pathLength < uint.MaxValue &&
+			path.Raw <= uint.MaxValue - pathLength - 1 &&
+			dos.IsMapped(path, pathLength + 1) &&
+			dos.ReadUInt8(path, unchecked((int)pathLength)) == 0 &&
+			DosCore.DeleteFile(ref dos, State, path) != 0;
 	}
 
 	public bool TryCloseScriptRedirection(APTR cli, BPTR handle)

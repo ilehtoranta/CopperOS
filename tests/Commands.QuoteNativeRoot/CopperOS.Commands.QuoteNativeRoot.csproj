@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
+  </PropertyGroup>
+  <Import Project="..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <AssemblyName>CopperOS.Commands.QuoteNativeRoot</AssemblyName>
+    <RootNamespace>CopperOS.Commands.QuoteNativeRoot</RootNamespace>
+    <ImplicitUsings>false</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
+    <Compile Include="..\..\src\Commands\QuoteReadItemFormatter.cs" Link="QuoteReadItemFormatter.cs" />
+    <Compile Include="..\..\src\Commands\QuoteHexFormatter.cs" Link="QuoteHexFormatter.cs" />
+    <Compile Include="..\..\src\Commands\QuoteUriFormatter.cs" Link="QuoteUriFormatter.cs" />
+    <Compile Include="..\..\src\Commands\QuoteBase64Formatter.cs" Link="QuoteBase64Formatter.cs" />
+    <Compile Include="..\..\src\Commands\QuoteForwardPipeline.cs" Link="QuoteForwardPipeline.cs" />
+    <Compile Include="..\..\src\Commands\QuoteReversePipeline.cs" Link="QuoteReversePipeline.cs" />
+    <Compile Include="..\..\src\Commands\QuoteRuleParser.cs" Link="QuoteRuleParser.cs" />
+  </ItemGroup>
+</Project>

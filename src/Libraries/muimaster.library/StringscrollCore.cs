@@ -8,6 +8,67 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
+// Named, bounded view over a guest Stringscroll text buffer.  Text parsing is
+// intentionally expressed through this value type so every byte access keeps
+// the MC68000 address/overflow/mapping checks in one place instead of relying
+// on ad-hoc pointer arithmetic at each call site.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiStringscrollTextByteCursor
+{
+	internal const uint MaximumLength = 65536;
+	internal APTR Text;
+	internal uint Length;
+	internal uint Index;
+}
+
+internal static class MuiStringscrollTextByteCursorCodec
+{
+	internal static bool TryCreate<TPlatform>(ref TPlatform platform,
+		APTR text, uint length, out MuiStringscrollTextByteCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		cursor = default;
+		if (text.IsNull || length > MuiStringscrollTextByteCursor.MaximumLength)
+			return false;
+		cursor.Text = text;
+		cursor.Length = length;
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiStringscrollTextByteCursor cursor, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadAt<TPlatform>(ref TPlatform platform,
+		MuiStringscrollTextByteCursor cursor, uint index, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, cursor, index, out var address))
+			return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		ref MuiStringscrollTextByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryReadAt(ref platform, cursor, cursor.Index, out value))
+			return false;
+		cursor.Index++;
+		return true;
+	}
+}
+
 // Guest-resident Stringscroll runtime state exposed as one named record. The
 // public String attribute still points at the object-owned guest buffer; the
 // metric and pixel-scroll fields are private implementation values, but their
@@ -2139,11 +2200,14 @@ public static class MuiStringscrollCore
 		if (text.IsNull) return true;
 		if (!CStringCodec.TryReadLength(ref platform, text, MaximumStringLength,
 			out var length)) return false;
+		if (!MuiStringscrollTextByteCursorCodec.TryCreate(ref platform, text,
+			length, out var textCursor)) return false;
 		uint current = 0;
 		var index = 0u;
 		while (index < length)
 		{
-			var ch = platform.ReadUInt8(APTR.FromPointer(text.Raw + index), 0);
+			if (!MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform,
+				textCursor, index, out var ch)) return false;
 			if (ch == (byte)'\r')
 			{
 				index++;
@@ -3595,13 +3659,7 @@ public static class MuiStringscrollCore
 		var tags = MuiHeadlessMemory.Allocate(ref platform,
 			automaticScrollbarTagBytes);
 		if (tags.IsNull) return APTR.Null;
-		var groupTag = default(MuiAslTagItemRecord);
-		groupTag.Tag = MuiCommonControlCore.GroupHoriz;
-		groupTag.Data = horizontal ? 1u : 0u;
-		var doneTag = default(MuiAslTagItemRecord);
-		doneTag.Tag = MuiAslTagListCore.TagDone;
-		if (!MuiAslTagItemVectorCodec.TryWrite(ref platform, tags, 0, groupTag) ||
-			!MuiAslTagItemVectorCodec.TryWrite(ref platform, tags, 1, doneTag))
+		if (!WriteAutomaticScrollbarTagRecords(ref platform, tags, horizontal))
 		{
 			platform.Clear(tags, automaticScrollbarTagBytes);
 			platform.Free(tags, automaticScrollbarTagBytes);
@@ -3612,6 +3670,27 @@ public static class MuiStringscrollCore
 		platform.Clear(tags, automaticScrollbarTagBytes);
 		platform.Free(tags, automaticScrollbarTagBytes);
 		return child;
+	}
+
+	// Emit the minimal Group tag list through the shared named TagItem cursor.
+	// Keeping this writer separate lets native qualification prove the exact
+	// caller-owned records without pulling Stringscroll construction into the
+	// freestanding closure.
+	internal static bool WriteAutomaticScrollbarTagRecords<TPlatform>(
+		ref TPlatform platform, APTR tags, bool horizontal)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiAslTagItemCursor);
+		cursor.Base = tags;
+		cursor.Index = 0;
+		var groupTag = default(MuiAslTagItemRecord);
+		groupTag.Tag = MuiCommonControlCore.GroupHoriz;
+		groupTag.Data = horizontal ? 1u : 0u;
+		if (!MuiAslTagItemVectorCodec.TryWrite(ref platform, cursor, groupTag) ||
+			!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1)) return false;
+		var doneTag = default(MuiAslTagItemRecord);
+		doneTag.Tag = MuiAslTagListCore.TagDone;
+		return MuiAslTagItemVectorCodec.TryWrite(ref platform, cursor, doneTag);
 	}
 
 	private static void DisposeOwnedScrollbar<TPlatform>(ref TPlatform platform,
@@ -3906,6 +3985,9 @@ public static class MuiStringscrollCore
 		if ((hasHorizontalChild || hasVerticalChild) &&
 			!DrawCompositionChildren(ref platform, state, obj, renderState,
 				viewport)) return false;
+		MuiStringscrollTextByteCursor textCursor = default;
+		if (text.IsNotNull && !MuiStringscrollTextByteCursorCodec.TryCreate(
+			ref platform, text, length, out textCursor)) return false;
 		if (!platform.LockLayer(rastPort)) return false;
 		if (!platform.BeginUpdate(rastPort))
 		{
@@ -3928,12 +4010,32 @@ public static class MuiStringscrollCore
 			while (position < length && baseline <= top + viewportHeight)
 			{
 				var end = position;
-				while (end < length && platform.ReadUInt8(
-					APTR.FromPointer(text.Raw + end), 0) != (byte)'\n') end++;
+				while (end < length)
+				{
+					if (!MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform,
+						textCursor, end, out var lineByte))
+					{
+						platform.PopClip(rastPort, clip);
+						platform.EndUpdate(rastPort, false);
+						platform.UnlockLayer(rastPort);
+						return false;
+					}
+					if (lineByte == (byte)'\n') break;
+					end++;
+				}
 				var logicalEnd = end;
-				if (logicalEnd > position && platform.ReadUInt8(
-					APTR.FromPointer(text.Raw + logicalEnd - 1), 0) == (byte)'\r')
-					logicalEnd--;
+				if (logicalEnd > position)
+				{
+					if (!MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform,
+						textCursor, logicalEnd - 1, out var terminatorByte))
+					{
+						platform.PopClip(rastPort, clip);
+						platform.EndUpdate(rastPort, false);
+						platform.UnlockLayer(rastPort);
+						return false;
+					}
+					if (terminatorByte == (byte)'\r') logicalEnd--;
+				}
 				if (line >= firstLine)
 				{
 					var start = ByteOffsetForColumns(ref platform, text, position,
@@ -4119,8 +4221,10 @@ public static class MuiStringscrollCore
 	{
 		codePoint = 0;
 		byteCount = 1;
-		if (index >= length) return false;
-		var first = platform.ReadUInt8(APTR.FromPointer(text.Raw + index), 0);
+		if (!MuiStringscrollTextByteCursorCodec.TryCreate(ref platform, text,
+			length, out var textCursor) || index >= length) return false;
+		if (!MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform,
+			textCursor, index, out var first)) return false;
 		if (first < 0x80)
 		{
 			codePoint = first;
@@ -4128,7 +4232,8 @@ public static class MuiStringscrollCore
 		}
 		if (first >= 0xC2 && first <= 0xDF && index + 1 < length)
 		{
-			var second = platform.ReadUInt8(APTR.FromPointer(text.Raw + index + 1), 0);
+			if (!MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform,
+				textCursor, index + 1, out var second)) return false;
 			if ((second & 0xC0) == 0x80)
 			{
 				codePoint = (uint)(first & 0x1F) << 6 |
@@ -4139,8 +4244,10 @@ public static class MuiStringscrollCore
 		}
 		if (first >= 0xE0 && first <= 0xEF && index + 2 < length)
 		{
-			var second = platform.ReadUInt8(APTR.FromPointer(text.Raw + index + 1), 0);
-			var third = platform.ReadUInt8(APTR.FromPointer(text.Raw + index + 2), 0);
+			if (!MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform,
+				textCursor, index + 1, out var second) ||
+				!MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform,
+					textCursor, index + 2, out var third)) return false;
 			var validSecond = (second & 0xC0) == 0x80 &&
 				(first != 0xE0 || second >= 0xA0) &&
 				(first != 0xED || second <= 0x9F);
@@ -4154,9 +4261,12 @@ public static class MuiStringscrollCore
 		}
 		if (first >= 0xF0 && first <= 0xF4 && index + 3 < length)
 		{
-			var second = platform.ReadUInt8(APTR.FromPointer(text.Raw + index + 1), 0);
-			var third = platform.ReadUInt8(APTR.FromPointer(text.Raw + index + 2), 0);
-			var fourth = platform.ReadUInt8(APTR.FromPointer(text.Raw + index + 3), 0);
+			if (!MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform,
+				textCursor, index + 1, out var second) ||
+				!MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform,
+					textCursor, index + 2, out var third) ||
+				!MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform,
+					textCursor, index + 3, out var fourth)) return false;
 			var validSecond = (second & 0xC0) == 0x80 &&
 				(first != 0xF0 || second >= 0x90) &&
 				(first != 0xF4 || second <= 0x8F);

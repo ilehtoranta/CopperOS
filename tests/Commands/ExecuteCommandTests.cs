@@ -30,7 +30,7 @@ public sealed class ExecuteCommandTests
     }
 
     [Fact]
-    public void Execute_decodes_quoted_file_names_and_rejects_extra_arguments()
+    public void Execute_decodes_quoted_file_names_and_preserves_script_arguments()
     {
         EchoCommandTests.TestShellPlatform platform = new();
         string commandLine = "\"S:My Startup\"";
@@ -60,8 +60,10 @@ public sealed class ExecuteCommandTests
             new APTR(128),
             64);
 
-        Assert.Equal((int)ShellCommandResult.Error, result);
-        Assert.Equal(0, platform.Store.ExecuteCount);
+        Assert.Equal((int)ShellCommandResult.Ok, result);
+        Assert.Equal("S:Startup", platform.Store.ExecutedScript);
+        Assert.Equal(" extra", platform.Store.ExecutedScriptArguments);
+        Assert.Equal(1, platform.Store.ExecuteCount);
     }
 
     [Theory]

@@ -10,6 +10,31 @@ public sealed class MuiAreaFixedTextAdmissionTests
 	private const uint FixHeightTxt = 0x804276F2;
 
 	[Fact]
+	public void FixedTextStringByteCursorUsesBoundedNamedReads()
+	{
+		var platform = CreatePlatform(out _);
+		var text = APTR.FromPointer(0x1380);
+		platform.WriteCString(text, "wide");
+		var cursor = default(MuiAreaFixedTextStringByteCursor);
+		cursor.Text = text;
+		cursor.Index = 1;
+		Assert.True(MuiAreaFixedTextStringByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value));
+		Assert.Equal((byte)'i', value);
+		Assert.True(MuiAreaFixedTextStringByteCursorCodec.TryReadAt(ref platform,
+			text, 4, out value));
+		Assert.Equal(0, value);
+		Assert.False(MuiAreaFixedTextStringByteCursorCodec.TryReadAt(ref platform,
+			text, -1, out _));
+		Assert.False(MuiAreaFixedTextStringByteCursorCodec.TryReadAt(ref platform,
+			text, (int)MuiAreaFixedTextStringByteCursor.MaximumLength, out _));
+		Assert.False(MuiAreaFixedTextStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0xFFFFFFFEu), 2, out _));
+		Assert.False(MuiAreaFixedTextStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0x30000), 0, out _));
+	}
+
+	[Fact]
 	public void FixedTextAdmissionRequiresGenerationLiveOwnerAndMappedSamples()
 	{
 		var platform = CreatePlatform(out var textClass);

@@ -131,6 +131,30 @@ public sealed class MuiCommonControlTests
 	}
 
 	[Fact]
+	public void ChoiceEntryVectorCursorExchangesNamedSlots()
+	{
+		var platform = CreatePlatform(out _);
+		var cursor = default(MuiChoiceEntryCursor);
+		cursor.Base = APTR.FromPointer(0x1200);
+		cursor.Index = 0;
+		var expected = default(MuiChoiceEntry);
+		expected.Text = APTR.FromPointer(0xFEDCBA98u);
+
+		Assert.True(MuiChoiceEntryVectorCodec.TryWrite(ref platform, cursor,
+			expected));
+		Assert.True(MuiChoiceEntryVectorCodec.TryRead(ref platform, cursor,
+			out var actual));
+		Assert.Equal(expected.Text.Raw, actual.Text.Raw);
+		Assert.True(MuiChoiceEntryVectorCodec.TryAdvance(ref cursor, 1));
+		Assert.Equal(1u, cursor.Index);
+		Assert.False(MuiChoiceEntryVectorCodec.TryAdvance(ref cursor,
+			MuiChoiceEntryCursor.MaximumEntries));
+		cursor.Index = MuiChoiceEntryCursor.MaximumEntries;
+		Assert.False(MuiChoiceEntryVectorCodec.TryRead(ref platform, cursor,
+			out _));
+	}
+
+	[Fact]
 	public void ChoiceEntryVectorMemoryAdapterOwnsEntryBounds()
 	{
 		var platform = CreatePlatform(out _);

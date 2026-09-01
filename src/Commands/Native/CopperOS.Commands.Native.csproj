@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <CopperOSUseLocalCopperSharp>true</CopperOSUseLocalCopperSharp>
+  </PropertyGroup>
+  <Import Project="..\..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <AssemblyName>CopperOS.Commands.Native</AssemblyName>
+    <RootNamespace>CopperOS.Commands.Native</RootNamespace>
+    <ImplicitUsings>false</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
+    <Compile Include="..\EvalExpressionEvaluator.cs" Link="EvalExpressionEvaluator.cs" />
+    <Compile Include="..\EvalNumericFormatter.cs" Link="EvalNumericFormatter.cs" />
+    <Compile Include="..\EvalLFormatFormatter.cs" Link="EvalLFormatFormatter.cs" />
+    <Compile Include="..\EvalClassicLFormatFormatter.cs" Link="EvalClassicLFormatFormatter.cs" />
+    <Compile Include="..\Exe2ArcIo.cs" Link="Exe2ArcIo.cs" />
+  </ItemGroup>
+</Project>

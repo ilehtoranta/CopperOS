@@ -40,8 +40,17 @@ public static class ExecuteCommand
             return (int)ShellCommandResult.Fail;
         WriteFileTemplate(ref platform, fileTokenBuffer);
 
+        // ReadItem establishes the exact raw boundary of FILE before ReadArgs
+        // decodes it.  The suffix remains untouched for the script frame; it
+        // is not a second Execute option list.
+        if (!platform.TryReadScriptFilePrefix(invocation.ArgumentText,
+                invocation.ArgumentLength, out var filePrefixLength) ||
+            filePrefixLength == 0 ||
+            filePrefixLength > invocation.ArgumentLength)
+            return (int)ShellCommandResult.Error;
+
         if (!platform.TryReadArgs(invocation.ArgumentText,
-            invocation.ArgumentLength, fileTokenBuffer, templateLength,
+            filePrefixLength, fileTokenBuffer, templateLength,
             stableFileBuffer, 4, out var rdArgs))
             return (int)ShellCommandResult.Error;
 
@@ -53,8 +62,12 @@ public static class ExecuteCommand
             return (int)ShellCommandResult.Fail;
         }
 
+        var scriptArgumentLength = invocation.ArgumentLength - filePrefixLength;
+        var scriptArguments = scriptArgumentLength == 0
+            ? APTR.Null
+            : APTR.FromPointer(invocation.ArgumentText.Raw + filePrefixLength);
         var status = platform.TryExecuteScript(invocation.Cli, file, fileLength,
-            out var commandResult);
+            scriptArguments, scriptArgumentLength, out var commandResult);
         platform.FreeArgs(rdArgs);
         return status switch
         {

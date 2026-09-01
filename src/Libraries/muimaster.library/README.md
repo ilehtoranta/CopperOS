@@ -10,6 +10,953 @@ before a field is read or written. This keeps the 68k implementation
 exception-free, freestanding, and free of managed-runtime dependencies while
 preserving the MorphOS ABI.
 
+MG2092 routes the fixed four-byte PushMethod parameter slot and UsedClasses
+vector-entry pointer through the named packed `MuiGuestUlongStorage` codec
+instead of local byte/offset loops, preserving vector bounds and high-bit
+ULONG values. Package coverage is **2757/2757**. Focused MC68000 closures
+pass: PushMethod (**4644-byte HUNK, 2149 instructions / 20860 cycles**, 22
+reachable methods) and UsedClasses (**5404-byte HUNK, 2972 instructions /
+28112 cycles**, 26 reachable methods), both with zero framework members,
+managed-allocation sites, and relocations. The overall MorphOS MUI goal
+remains open.
+
+MG2091 replaces the local Layers Exec-list fallback's raw head offset with a
+bounded codec over the named packed `Amiga.List` struct. `TryRead` and `Write`
+cover the complete list record through the shared value-type guest cursor, while
+`ReadHead` preserves the application window projection API and 16-byte mapping
+guard. Package coverage is **2756/2756**, and the focused MC68000 closure passes
+(**3688-byte HUNK, 1572 instructions / 16368 cycles**) with 18 reachable
+methods, zero framework members, managed-allocation sites, and relocations. Host
+field/boundary tests pass; the overall MorphOS MUI goal remains open.
+
+MG2090 qualifies the MorphOS ShortHelp provider boundary with named packed
+`MuiShortHelpCreateSample` and `MuiShortHelpDeleteSample` records. The
+freestanding closure publishes one bounded guest C string, preserves the
+caller-owned static pointer, rejects a wrong delete handle, and clears the
+temporary string only for the matching owner. Package coverage remains
+**2754/2754**, and the focused MC68000 provider closure passes (**2244-byte
+HUNK, 753 instructions / 8730 cycles**) with 8 reachable methods, zero
+framework members, managed-allocation sites, and relocations. Full
+object/window integration and MorphOS differential parity remain progressive.
+
+MG2089 qualifies the Keyadjust `MUIP_HandleInput` path through the complete
+named packet and typed RAWKEY/text-input records. The native closure dispatches
+a printable RAWKEY into a bounded class-owned C string and rejects a
+non-RAWKEY message before publication. Package coverage remains **2754/2754**,
+and the focused MC68000 closure passes (**24120-byte HUNK, 44542 instructions /
+443802 cycles**) with 102 reachable methods, zero framework members and
+managed-allocation sites, and 16 generated internal switch-edge relocations.
+The overall goal remains open; ForceKeyCode conversion stays unclaimed because
+MorphOS documents that ULONG as undocumented.
+
+MG2088 routes the generic guest byte-copy source and destination through two
+shared named `MuiCStringByteCursor` instances, retaining the 16 KiB copy-span
+limit, read-before-write ordering, and failure-atomic mapping checks. Package
+coverage remains **2754/2754**, and the focused native closure passes
+(**2632-byte HUNK, 2491 instructions / 30934 cycles**) with 9 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2087 routes MenuItem trigger title-string byte reads and writes through the
+shared named `MuiCStringByteCursor`, retaining the 4097-byte materialization
+bound and failure-atomic guest admission. Package coverage remains
+**2754/2754**, and the focused native closure passes (**2304-byte HUNK, 782
+instructions / 9670 cycles**) with 9 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2086 routes Numeric output, Text render, and String edit bounded ranges
+through the shared named `MuiCStringByteCursor` range adapter, retaining each
+consumer’s narrower compatibility limits. Package coverage remains
+**2754/2754**. Focused native closures pass: Numeric (**2760-byte HUNK, 4372
+instructions / 44408 cycles**), Text (**2136-byte HUNK, 975 instructions /
+12192 cycles**), and String edit (**5416-byte HUNK, 2092 instructions / 25910
+cycles**), all with compatible reports, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2085 routes Notify string-copy byte reads and writes through the shared
+named `MuiCStringByteCursor`, retaining the 4096-byte span bound and
+failure-atomic source/destination admission. Package coverage remains
+**2754/2754**, and the focused native closure passes (**2508-byte HUNK, 906
+instructions / 10600 cycles**) with 10 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2084 routes String Integer64 text byte reads and writes through the shared
+named `MuiCStringByteCursor`, preserving the 64 KiB span bound and signed
+QUAD stringification path. Package coverage remains **2754/2754**, and the
+focused native span closure passes (**3504-byte HUNK, 1214 instructions /
+14932 cycles**) with 14 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2083 adds a bounded-range operation to the shared named
+`MuiCStringByteCursor` and routes ImageSpec variable-payload reads through it,
+retaining the 512-byte payload limit and valid zero-length end ranges. Package
+coverage remains **2754/2754**, and the focused native closure passes
+(**5232-byte HUNK, 4050 instructions / 47570 cycles**) with 20 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2082 routes Requester gadget/format payload byte reads through the shared
+named `MuiCStringByteCursor`, retaining the 4096-byte payload limit and
+existing malformed-pointer checks. Package coverage remains **2754/2754**,
+and the focused native closure passes (**2296-byte HUNK, 876 instructions /
+10390 cycles**) with 9 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2081 routes Requester format-string reads and printf materialization writes
+through the shared named `MuiCStringByteCursor`, retaining their distinct
+4096-byte input and 4097-byte output bounds. Package coverage remains
+**2754/2754**. Focused native closures pass: format (**2260-byte HUNK, 852
+instructions / 10156 cycles**) and output (**1960-byte HUNK, 820 instructions /
+10330 cycles**), with compatible reports, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2080 routes Dirlist fixed name/comment byte reads and writes through the
+shared named `MuiCStringByteCursor`, retaining the combined 188-byte span
+bound used by copy and comparison paths. Package coverage remains **2754/2754**,
+and the focused native closure passes (**2740-byte HUNK, 891 instructions /
+10598 cycles**) with 11 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2079 routes Dirlist path-buffer byte reads and writes through the shared
+named `MuiCStringByteCursor`, retaining the explicit 2048-byte path capacity
+and existing overflow, null, and mapped-memory checks. Package coverage
+remains **2754/2754**, and the focused native closure passes (**2796-byte
+HUNK, 737 instructions / 8952 cycles**) with 11 reachable methods, zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG2078 routes Dirlist pattern/name matching byte reads through the shared
+named `MuiCStringByteCursor`, retaining the explicit 257-byte pattern span
+bound and existing malformed-pointer checks. Package coverage remains
+**2754/2754**, and the focused native closure passes (**2068-byte HUNK, 818
+instructions / 10480 cycles**) with 8 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2077 routes Floattext source and scratch byte-span reads and writes through
+the shared named `MuiCStringByteCursor`, retaining the explicit 64 KiB
+Floattext limit. Package coverage remains **2754/2754**, and the focused
+native closure passes (**2820-byte HUNK, 1405 instructions / 17468 cycles**)
+with 11 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2076 routes ExternalWrapper Dtpic name and class-ID text reads and writes
+through the shared named `MuiCStringByteCursor`, retaining the explicit
+257-byte ExternalWrapper span bound. Package coverage remains **2754/2754**,
+and the focused native closure passes (**2612-byte HUNK, 874 instructions /
+10882 cycles**) with 10 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2075 routes List FORMAT reads and PREPARSE writes through the shared named
+`MuiCStringByteCursor`, retaining the 4,096-byte FORMAT and 4,097-byte
+PREPARSE bounds. Package coverage remains **2754/2754**. Both focused native
+closures pass: FORMAT (**1820-byte HUNK, 554 instructions / 6740 cycles**) and
+PREPARSE (**1656-byte HUNK, 485 instructions / 6026 cycles**), with compatible
+freestanding reports, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2074 routes List/Listtree class-name readers and MakeObject control-label
+scanning through the shared named `MuiCStringByteCursor`, retaining the
+collection 64-byte and parser 4 KiB limits. Package coverage remains
+**2754/2754**, and the focused native closure passes (**2900-byte HUNK, 1023
+instructions / 12642 cycles**) with 11 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2073 routes Stringscroll and String Integer64 bounded span admission through
+the shared named `MuiCStringByteCursor`, preserving explicit caller-owned
+lengths and Integer64 writes while removing duplicate source-plus-index address
+formation. Package coverage remains **2754/2754**, and the focused native
+closure passes (**3272-byte HUNK, 1212 instructions / 14940 cycles**) with 13
+reachable methods, zero framework members, managed allocations, and relocations.
+The overall goal remains open.
+
+MG2072 routes the seven bounded Text/Index cursors in CommonControlCore through
+the shared named `MuiCStringByteCursor`: class-name, Numeric format, String
+integer/filter/length, and Text bracket/scan consumers retain their individual
+limits while sharing one adapter. Package coverage remains **2754/2754**, and
+the focused native closure passes (**3604-byte HUNK, 1488 instructions / 17914
+cycles**) with 13 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2071 routes CustomFontSpec parser byte reads through the shared named packed
+`MuiCStringByteCursor`, retaining the parser-specific 512-byte limit and
+removing another duplicate guest `Base + Index` adapter. Package coverage
+remains **2754/2754**, and the focused native closure passes (**2124-byte HUNK,
+1043 instructions / 12578 cycles**) with 8 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2070 routes class-service loader class-id reads/writes through the shared
+named packed `MuiCStringByteCursor`, retaining the class-id-specific 256-byte
+limit and removing another duplicate guest `Base + Index` adapter. Package
+coverage remains **2754/2754**, and the focused native closure passes
+(**3880-byte HUNK, 1659 instructions / 19094 cycles**) with 17 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2069 routes Area frame-title C-string reads through the shared named packed
+`MuiCStringByteCursor`, retaining the Area-specific 4 KiB limit and removing
+another duplicate guest `Base + Index` adapter. Package coverage remains
+**2754/2754**, and the focused native closure passes (**1968-byte HUNK, 729
+instructions / 9114 cycles**) with 8 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2068 routes Area FixedText sample-string reads through the shared named
+packed `MuiCStringByteCursor`, retaining the FixedText-specific 4 KiB limit
+and removing a duplicate guest `Base + Index` adapter. Package coverage remains
+**2754/2754**, and the focused native closure passes (**2100-byte HUNK, 1037
+instructions / 12530 cycles**) with 8 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2067 routes Text.mui and String.mui render span derivation through the named
+packed `MuiTextRenderByteCursor`. Line, glyph, single-line, and multiline draw
+ranges now enforce explicit bounds, overflow, and mapped-memory checks without
+raw source-plus-index span arithmetic. Package coverage is **2754/2754**, and
+the focused native closure passes (**1860-byte HUNK, 645 instructions / 7710
+cycles**) with 6 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2066 routes the shared `CStringCodec` length, equality, and ordering scans
+through the named packed `MuiCStringByteCursor`, enforcing the 64 KiB bound,
+index/overflow checks, and mapped-byte admission. Package coverage is
+**2753/2753**, and the focused native closure passes (**3032-byte HUNK, 9065
+instructions / 104716 cycles**) with 9 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2065 routes ObjectPersistence string export/import terminator accesses
+through `MuiStringEditByteCursor` and `MuiStringLengthByteCursor` helpers.
+Package coverage is **2751/2751**, and the focused native closure passes
+(**3212-byte HUNK, 1783 instructions / 18040 cycles**) with 12 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2064 routes List.mui FORMAT C-string scans, PREPARSE materialization writes,
+alignment-code reads, line counting, and string comparison through named
+packed cursors (`MuiListFormatByteCursor`, `MuiListPreparseByteCursor`, and
+`MuiStringLengthByteCursor`). Package coverage is **2750/2750**, and the
+focused native closure passes (**1364-byte HUNK, 325 instructions / 3984
+cycles**) with 5 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2063 routes requester printf materialization output through the named packed
+`MuiRequesterOutputByteCursor`, enforcing destination capacity, the 4097-byte
+output bound, address-overflow checks, and mapped-byte admission. Package
+coverage is **2749/2749**, and the focused native closure passes (**1476-byte
+HUNK, 441 instructions / 5468 cycles**) with 5 reachable methods, zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG2062 routes ObjectPersistence Area/Group class-name matching through the
+shared named packed `MuiCommonControlClassNameByteCursor`, enforcing the
+64-byte C-string bound, address-overflow checks, and mapped-byte admission.
+Package coverage is **2748/2748**, and the focused native closure passes
+(**1812-byte HUNK, 1336 instructions / 13358 cycles**) with 6 reachable
+methods, zero framework members, managed allocations, and relocations. The
+native root covers Area; host coverage covers both Area and Group matching. The
+overall goal remains open.
+
+MG2061 routes Menu, Misc, and Process specialist-owned C-string copies through
+the named packed `MuiGuestByteCopyCursor`, enforcing source/destination spans,
+the 16 KiB bound, address-overflow checks, and mapped-byte admission. Package
+coverage is **2746/2746**, and the focused native closure passes (**1868-byte
+HUNK, 1127 instructions / 13018 cycles**) with 6 reachable methods, zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG2060 routes Numeric.mui decimal/printf output and String.mui secret-mask
+buffer writes through the named packed `MuiNumericOutputByteCursor`, enforcing
+destination capacity, the 16 KiB bound, address-overflow checks, and mapped-byte
+admission. Package coverage is **2744/2744**, and the focused native closure
+passes (**2488-byte HUNK, 3854 instructions / 37366 cycles**) with 7 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2059 routes String.mui edit-hook snapshot restoration, UTF-8 character
+writes, and copied-string terminator writes through the named packed
+`MuiStringEditByteCursor`, enforcing bounded guest accesses. Package coverage
+is **2742/2742**, and the focused native closure passes (**4876-byte HUNK,
+1574 instructions / 18868 cycles**) with 14 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2058 routes Image.mui `MUIA_Image_Spec` colour, decimal, and named-resource
+payload scans through the named packed `MuiImageSpecByteCursor`, enforcing the
+512-byte payload bound, range/overflow checks, and mapped-byte admission.
+Package coverage is **2741/2741**, and the focused native closure passes
+(**4952-byte HUNK, 3157 instructions / 35410 cycles**) with 19 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2057 routes String.mui edit-buffer shifts, edit-hook snapshots, and byte
+code-point reads through the named packed `MuiStringEditByteCursor`, enforcing
+bounded source/destination spans, range, overflow, and mapped-byte checks.
+Package coverage is **2739/2739**, and the focused native closure passes
+(**4212-byte HUNK, 953 instructions / 11632 cycles**) with 13 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2056 routes Store/Dataspace owned-key cleanup length measurement through the
+named packed `MuiStringLengthByteCursor`, enforcing terminator-inclusive spans
+and malformed guest-pointer handling. Package coverage is **2737/2737**, and
+the focused native closure passes (**1584-byte HUNK, 951 instructions / 10026
+cycles**) with 6 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2055 routes String.mui frame-title C-string length and multiline draw-text
+line-boundary scans through the named packed `MuiStringLengthByteCursor` and
+`MuiTextRenderByteCursor`, enforcing bounded guest reads. Package coverage is
+**2735/2735**, and the independently compilable native closure passes
+(**4492-byte HUNK, 4075 instructions / 45270 cycles**) with 14 reachable
+methods, zero framework members, managed allocations, and relocations. Full
+native multiline rendering remains pending a CopperSharp register-pair backend
+fix; host renderer coverage is green. The overall goal remains open.
+
+MG2054 routes Text.mui render-buffer source traversal and destination writes
+through the named packed `MuiTextRenderByteCursor`, enforcing bounded range,
+overflow, and mapped-byte checks while preserving escape stripping, newline
+output, alignment, and shortening behavior. Package coverage is **2734/2734**,
+and the focused native closure passes (**3968-byte HUNK, 3701 instructions /
+41500 cycles**) with 12 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2053 routes Text.mui leading style, inline-colour, and inline-image
+directive scans plus hexadecimal payload helpers through the named packed
+`MuiTextScanByteCursor`, enforcing their 4096-byte bound, index/overflow
+checks, and mapped-byte admission. Package coverage is **2732/2732**, and the
+focused native closure passes (**7100-byte HUNK, 9464 instructions / 93336
+cycles**) with 16 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2052 routes Text.mui visible-text scanning and bounded escape consumption
+through the named packed `MuiTextScanByteCursor`, enforcing the 4096-byte text
+bound, index/overflow checks, and mapped-byte admission while preserving
+newline metrics and bracketed escape skipping. Package coverage is **2729/2729**,
+and the focused native closure passes (**5052-byte HUNK, 2376 instructions /
+24592 cycles**) with 14 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2051 routes Text.mui bracketed escape payload parsing through the named
+packed `MuiTextBracketByteCursor`, enforcing the 4096-byte text bound,
+index/overflow checks, and mapped-byte admission while retaining the parser’s
+64-byte payload cap. Package coverage is **2727/2727**, and the focused native
+adapter closure passes (**2316-byte HUNK, 1606 instructions / 16754 cycles**)
+with 7 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2050 routes String.mui C-string length measurement through the named packed
+`MuiStringLengthByteCursor`, enforcing the 4096-byte bound, index/overflow
+checks, and mapped-byte admission. Package coverage is **2725/2725**, and the
+focused native adapter closure passes (**1428-byte HUNK, 461 instructions /
+5206 cycles**) with 5 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2049 routes String.mui filter-byte membership scans through the named packed
+`MuiStringFilterByteCursor`, enforcing the 256-byte bound, index/overflow
+checks, and mapped-byte admission through the C-string terminator. Package
+coverage is **2724/2724**, and the focused native adapter closure passes
+(**1420-byte HUNK, 459 instructions / 5190 cycles**) with 5 reachable methods,
+zero framework members, managed allocations, and relocations. The overall
+goal remains open.
+
+MG2048 routes Dirlist case-insensitive name comparison through the named
+`MuiDirlistStringByteCursor` read codec, keeping mapping, index, and overflow
+checks inside the adapter. Package coverage is **2723/2723**, and the focused
+native adapter closure passes (**1912-byte HUNK, 2361 instructions / 25320
+cycles**) with 8 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2047 routes String.mui signed-integer sign, digit, and terminator scanning
+through the named packed `MuiStringIntegerParseByteCursor`, enforcing the
+4096-byte text bound, index/overflow checks, and mapped-byte admission.
+Package coverage is **2722/2722**, and the focused native adapter closure
+passes (**1440-byte HUNK, 461 instructions / 5206 cycles**) with 5 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2046 routes ClassService external-loader and owned class-id string
+construction through paired named `MuiClassServiceStringByteCursor` values
+and the prefix-payload resolver, enforcing bounded source/destination byte
+admission, index/overflow checks, and prefix validation. Package coverage is
+**2721/2721**, and the focused native adapter closure passes (**3620-byte
+HUNK, 1377 instructions / 15212 cycles**) with 16 reachable methods, zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG2045 routes menu-trigger title-string projection copying through paired
+named packed `MuiMenuItemTriggerStringByteCursor` values, enforcing the
+4097-byte span bound, index/overflow checks, and mapped-byte admission.
+Package coverage is **2720/2720**, and the focused native adapter closure
+passes (**2036-byte HUNK, 598 instructions / 7268 cycles**) with 8 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2044 routes ExternalWrapper Dtpic name copies and class-ID probes through the
+named packed `MuiExternalTextByteCursor`, enforcing the 257-byte span bound,
+index/overflow checks, and mapped-byte admission. Package coverage is
+**2719/2719**, and the focused native adapter closure passes (**1888-byte HUNK,
+488 instructions / 5772 cycles**) with 7 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2043 routes MakeObject control-character label scanning through the named
+packed `MuiMakeObjectControlCharByteCursor`, enforcing the 4 KiB bound,
+index/overflow checks, and mapped-byte admission. Package coverage is
+**2718/2718**, and the focused native adapter closure passes (**1480-byte HUNK,
+378 instructions / 4354 cycles**) with 6 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2042 routes Dirlist filename suffix and pattern matching through the named
+packed `MuiDirlistMatchByteCursor`, enforcing measured span bounds,
+index/overflow checks, and mapped-byte admission. Package coverage is
+**2717/2717**, and the focused native adapter closure passes (**1588-byte HUNK,
+443 instructions / 5408 cycles**) with 6 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2041 routes Numeric.mui format-string scanning through the named packed
+`MuiNumericFormatByteCursor`, enforcing the 256-byte format bound,
+index/overflow checks, and mapped-byte admission. Package coverage is
+**2716/2716**, and the focused native adapter closure passes (**1456-byte HUNK,
+375 instructions / 4334 cycles**) with 6 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2040 routes CommonControl class-name hashing and `.mui` suffix validation
+through the named packed `MuiCommonControlClassNameByteCursor`, enforcing the
+64-byte bound, index/overflow checks, and mapped-byte admission. Package
+coverage is **2715/2715**, and the focused native adapter closure passes
+(**1496-byte HUNK, 377 instructions / 4410 cycles**) with 6 reachable methods,
+zero framework members, managed allocations, and relocations. The overall
+goal remains open.
+
+MG2039 routes AreaLayout frame-title C-string measurement through the named
+packed `MuiAreaLayoutCStringByteCursor`, enforcing its 4 KiB bound,
+index/overflow checks, and mapped-byte admission. Package coverage is
+**2714/2714**, and the focused native adapter closure passes (**1700-byte HUNK,
+514 instructions / 6160 cycles**) with 7 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2038 routes requester payload gadget/format parsing through the named packed
+`MuiRequesterPayloadByteCursor`, enforcing the 4 KiB text bound,
+declared-length checks, overflow checks, and mapped-byte admission. Package
+coverage is **2713/2713**, and the focused native adapter closure passes
+(**2028-byte HUNK, 692 instructions / 7958 cycles**) with 8 reachable methods,
+zero framework members, managed allocations, and relocations. The overall
+goal remains open.
+
+MG2037 routes requester format and `%s` source text through the named packed
+`MuiRequesterFormatByteCursor`, enforcing the 4 KiB text bound,
+declared-length checks, overflow checks, and mapped-byte admission. The
+focused native adapter closure passes (**1992-byte HUNK, 668 instructions /
+7724 cycles**) with 8 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2036 routes Notify WriteString source/destination copying through paired
+named packed `MuiNotifyWriteByteCursor` values. The adapters enforce the 4 KiB
+copy bound, index/overflow checks, and mapped-byte admission. Package coverage
+is **2711/2711**, and the focused native adapter closure passes (**2240-byte
+HUNK, 722 instructions / 8168 cycles**) with 9 reachable methods, zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG2035 routes Stringscroll text measurement, line scanning, and UTF-8 decoding
+through the named packed `MuiStringscrollTextByteCursor`. Declared-length
+bounds, the 64 KiB ceiling, overflow checks, and mapped-byte admission cover
+the text paths. Package coverage is **2710/2710**, and the focused native
+adapter closure passes (**2028-byte HUNK, 747 instructions / 8546 cycles**)
+with 8 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2034 routes String Integer64 decimal parsing and stringification through the
+named packed `MuiStringInteger64TextByteCursor`. Text-span bounds, overflow
+checks, and mapped-byte admission cover QUAD source/destination exchange.
+Package coverage is **2709/2709**, and the focused native adapter closure
+passes (**2376-byte HUNK, 1113 instructions / 13440 cycles**) with 9 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2033 routes Bodychunk ByteRun1 compressed-source and decoded-destination byte
+and range exchange through the named packed `MuiByteRunByteCursor`. Its 16 MiB
+ceiling, index/range checks, overflow guard, and mapped-byte admission cover the
+decoder loop. Package coverage is **2708/2708**, and the focused native adapter
+closure passes (**2356-byte HUNK, 1082 instructions / 13086 cycles**) with 9
+reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2032 routes Floattext source, scratch, skip-character, and output-buffer byte
+exchange through the named packed `MuiFloattextByteCursor`. Logical lengths,
+the 64 KiB maximum, overflow checks, and mapped-byte admission cover the
+append/rebuild paths. Package coverage is **2707/2707**, and the focused native
+adapter closure passes (**2336-byte HUNK, 1115 instructions / 13460 cycles**)
+with 9 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2031 routes all CustomFontSpec parser byte consumers through the named packed
+`MuiCustomFontSpecStringByteCursor`. Slash scanning, segment dispatch, size/sign
+parsing, color decoding, and style recognition share its 512-byte bound,
+overflow checks, and mapped-byte admission. Package coverage is **2706/2706**,
+and the focused native adapter closure passes (**1864-byte HUNK, 802
+instructions / 9260 cycles**) with 7 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2030 routes Area FixedText width/height sample measurement through the named
+packed `MuiAreaFixedTextStringByteCursor`. Its 4 KiB bound, overflow checks,
+and mapped-byte admission cover the complete scan. Package coverage is
+**2705/2705**, and the focused native adapter closure passes (**1844-byte HUNK,
+796 instructions / 9212 cycles**) with 7 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2029 routes class-service class-id measurement and external-loader copying
+through the named packed `MuiClassServiceStringByteCursor`. Its 256-byte bound,
+overflow checks, and mapped-byte admission are shared by `Measure` and
+`LoadExternal`. Package coverage is **2704/2704**, and the focused native
+adapter closure passes (**1848-byte HUNK, 800 instructions / 9252 cycles**) with
+7 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2028 routes Listtree node-name CString validation and comparison through the
+named packed `MuiListtreeStringByteCursor`. Both consumers share the 4 KiB
+bound, overflow checks, and mapped-byte admission after CString validation.
+Package coverage is **2703/2703**, and the focused native adapter closure
+passes (**1792-byte HUNK, 666 instructions / 7570 cycles**) with 7 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2024 routes collection and Family class-name hashing through the shared
+packed `MuiClassNameByteCursor`. The 64-byte bound, overflow checks, and
+mapped-byte admission remain inside the adapter. Package coverage is
+**2699/2699**, and the focused native closure passes (**1892-byte HUNK, 502
+instructions / 5760 cycles**) with 8 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2023 routes Dirlist path construction through a bounded
+`MuiDirlistPathByteCursor`. Directory/name appends, separators, terminators,
+and cleanup share the adapter, and `EndsWithSeparator` uses it for bounded
+inspection. Package coverage is **2698/2698**, and the focused native closure
+passes (**2004-byte HUNK, 559 instructions / 6610 cycles**) with 8 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2022 routes Dirlist entry and scan-entry string copying through
+`MuiDirlistStringByteCursor` read/write adapters, including explicit NUL
+termination and the nullable-comment case. Package coverage is **2697/2697**,
+and the focused native closure passes (**5016-byte HUNK, 3969 instructions /
+41920 cycles**) with 20 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2021 routes the Dirlist sort comparator's bounded string walk through a named
+`MuiDirlistStringByteCursor`. Byte-index bounds, overflow checks, and mapped
+byte admission remain inside the adapter. Package coverage is **2696/2696**,
+and the focused native closure passes (**1272-byte HUNK, 398 instructions /
+4494 cycles**) with 4 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2020 routes transient Dirlist scan-entry name/comment arrays through a named
+`MuiDirlistScanEntryTailCursor`. Fixed capacities, complete scratch bounds, and
+mapped range admission remain inside the adapter. Package coverage is
+**2695/2695**, and the focused native closure passes (**1488-byte HUNK, 438
+instructions / 4622 cycles**) with 6 reachable methods, zero framework members,
+managed allocations, and relocations. The overall goal remains open.
+
+MG2019 routes owned Dirlist entry name/comment range resolution through a named
+`MuiDirlistEntryTailCursor`. Variable-tail pointer arithmetic and mapped range
+admission remain inside the bounded adapter. Package coverage is **2694/2694**,
+and the focused native closure passes (**1708-byte HUNK, 464 instructions /
+5436 cycles**) with 6 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2018 routes Family projection Reorder/Sort traversal through a named
+`MuiFamilyInlineVectorCursor` and complete `MuiFamilyMutationVectorEntry`
+records. Projection reads and the public vector writer share the cursor
+boundary, so projection code no longer consumes indexed raw entries directly.
+Package coverage is **2693/2693**, and the focused native closure passes
+(**3388-byte HUNK, 1480 instructions / 14704 cycles**) with 16 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2017 routes Group Reorder/Sort vector element reads through
+`MuiFamilyMutationVectorCursor` and its APTR-returning struct bridge. Production
+group ordering no longer consumes the indexed raw entry adapter directly.
+Package coverage is **2692/2692**, and the focused native closure passes
+(**3384-byte HUNK, 1739 instructions / 16884 cycles**) with 16 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2016 routes MUIM_Application_PushMethod queue parameter-range resolution
+through `MuiApplicationPushMethodParameterCursor`. The inline tail base is
+resolved through the bounded cursor before exposing the complete caller-owned
+range; packet admission and slot arithmetic remain adapter-owned. Package
+coverage is **2691/2691**, and the focused native closure passes (**3384-byte
+HUNK, 2474 instructions / 23604 cycles**) with 13 reachable methods, zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG2015 routes MUIM_CallHook first-parameter resolution through
+`MuiCallHookParameterCursor`. The callback receives the bounded cursor-resolved
+guest parameter address while complete packet admission and slot arithmetic
+remain adapter-owned. Package coverage is **2690/2690**, and the focused
+native closure passes (**3060-byte HUNK, 1286 instructions / 12992 cycles**)
+with 14 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2014 routes `MUIA_Application_Commands` validation through
+`MuiApplicationCommandTableCursor` Base/Index cursors. Complete named command
+records cross the guest boundary while NULL termination and slot arithmetic
+remain adapter-owned. Package coverage is **2689/2689**, and the focused
+native closure passes (**4072-byte HUNK, 3623 instructions / 36082 cycles**)
+with 16 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2013 routes standalone PushMethod parameter copies through
+`MuiApplicationPushMethodParameterVectorCursor` Base/Index cursors. Named
+ULONG records cross the guest boundary while inline packet tails retain their
+message-bound cursor. Package coverage is **2688/2688**, and the focused
+native closure passes (**4104-byte HUNK, 2672 instructions / 25800 cycles**)
+with 16 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2012 routes Listtree DisplayHook temporary column-vector initialization
+through `MuiListtreeDisplayColumnCursor` overloads. Named pointer records cross
+the guest boundary while slot arithmetic remains adapter-owned. Package
+coverage is **2687/2687**, and the focused native closure passes (**4084-byte
+HUNK, 4741 instructions / 44750 cycles**) with 17 reachable methods, zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG2011 routes Family Reorder/Sort child-pointer traversal through
+`MuiFamilyMutationVectorCursor`. The NULL-terminated vector exchanges named
+object values through a bounded cursor bridge while slot arithmetic remains
+adapter-owned. Package coverage is **2686/2686**, and the focused native
+closure passes (**3188-byte HUNK, 2410 instructions / 21876 cycles**) with 15
+reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2010 routes measured-column metric reads and writes through
+`MuiListColumnMetricCursor` overloads. Named ULONG values cross the guest
+boundary while slot arithmetic remains adapter-owned; scalar lowering stays
+explicit for the one-ULONG ABI record. Package coverage is **2685/2685**, and
+the focused native closure passes (**3628-byte HUNK, 2462 instructions /
+23516 cycles**) with 16 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2009 routes ColumnOrder permutation lookup, validation, copying, comparison,
+clearing, and projection through `MuiListColumnOrderByteCursor` overloads.
+Named byte records/values cross the guest boundary while slot arithmetic
+remains adapter-owned. Package coverage is **2684/2684**, and the focused
+native closure passes (**2660-byte HUNK, 3111 instructions / 28990 cycles**)
+with 12 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2008 routes FORMAT descriptor parsing, validation, cleanup, and projection
+reads through `MuiListFormatDescriptorCursor` overloads. Complete named
+40-byte records cross the guest boundary while descriptor slot arithmetic
+remains adapter-owned. Package coverage is **2683/2683**, and the focused
+native closure passes (**6228-byte HUNK, 7269 instructions / 73348 cycles**)
+with 25 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2007 routes Choice entries admission through `MuiChoiceEntryCursor`. The
+caller-owned STRPTR vector validator walks named cursor records while retaining
+the MorphOS bound and NUL termination policy; slot arithmetic remains
+adapter-owned. Package coverage is **2682/2682**, and the focused native
+closure passes (**3776-byte HUNK, 2536 instructions / 24314 cycles**) with 18
+reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG2006 routes internal List display, title-array, string-array, and scratch-copy
+consumers through `MuiListPointerSlotCursor` overloads. Complete named
+pointer-slot records or scalar APTR values cross the guest boundary while slot
+arithmetic remains adapter-owned. Package coverage is **2681/2681**, and the
+focused native closure passes (**3676-byte HUNK, 3066 instructions / 29464
+cycles**) with 18 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2005 routes caller-owned List entry-array Insert, source insertion, and
+in-place sorting through `MuiListPointerVectorCursor` overloads. Named
+pointer-slot records/scalar APTR values cross the guest boundary while slot
+arithmetic remains adapter-owned. Package coverage is **2680/2680**, and the
+focused native closure passes (**3656-byte HUNK, 3081 instructions / 29580
+cycles**) with 18 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2004 routes Listtree FORMAT geometry construction and hit-testing through
+`MuiListtreeColumnGeometryCursor` overloads. Complete named 24-byte geometry
+records cross the guest boundary across all production loops while index
+arithmetic remains adapter-owned. Package coverage is **2679/2679**, and the
+focused native closure passes (**5412-byte HUNK, 5916 instructions / 57612
+cycles**) with 23 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2003 routes List column-geometry layout writes and cached geometry reads
+through `MuiListColumnGeometryCursor` overloads. Complete named `{offset,width}`
+records cross the guest boundary while index arithmetic remains adapter-owned.
+Package coverage is **2678/2678**, and the focused native closure passes
+(**4040-byte HUNK, 2228 instructions / 22080 cycles**) with 20 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG2002 routes private List index-slot mutation, scratch-copy, lookup, and
+destruction helpers through `MuiListSlotCursor` overloads. Complete named
+`MuiListSlotState` records cross the guest boundary while indexed slot
+arithmetic remains adapter-owned. Package coverage is **2677/2677**, and the
+focused native closure passes (**4052-byte HUNK, 2272 instructions / 22490
+cycles**) with 20 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG2001 routes Application WindowList projection entry construction through a
+bounded `MuiApplicationWindowListEntryCursor`. The writer advances named
+cursors and exchanges complete `MuiApplicationWindowListEntry` structs;
+indexed slot arithmetic remains adapter-owned. Package coverage is
+**2676/2676**, and the focused native closure passes (**3872-byte HUNK, 1972
+instructions / 19494 cycles**) with 17 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG2000 routes Stringscroll automatic-scrollbar TagItem emission through a
+named `MuiAslTagItemCursor` helper. Generated Group and TAG_DONE records cross
+the guest boundary as complete structs; indexed slot arithmetic remains
+adapter-owned. Package coverage is **2675/2675**, and the focused native
+closure passes (**4056-byte HUNK, 3132 instructions / 30428 cycles**) with 20
+reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1999 routes the MUI_MakeObjectA generated TagItem writer through a named
+`MuiAslTagItemCursor`. Shared `AddTag` and `WriteTagDone` helpers exchange
+complete named `MuiAslTagItemRecord` values; indexed slot arithmetic remains
+adapter-owned. Package coverage is **2674/2674**, and the focused native
+closure passes (**4820-byte HUNK, 9732 instructions / 94788 cycles**) with 22
+reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1998 routes external-wrapper OM_UPDATE attribute-list handling through a
+bounded `MuiExternalTagListCursor`. `HandleUpdate` exchanges complete named
+`MuiAslTagItemRecord` values; notification recording and TAG_DONE termination
+remain intact, while indexed slot arithmetic stays adapter-owned. Package
+coverage is **2673/2673**, and the focused native closure passes (**11968-byte
+HUNK, 19838 instructions / 198108 cycles**) with 46 reachable methods, zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG1997 routes external-wrapper creation TagItem patching through a bounded
+`MuiExternalTagListCursor`. `FillCreationTags` exchanges complete named
+`MuiAslTagItemRecord` values; indexed slot arithmetic remains adapter-owned,
+with caller-owned bounds and TAG_DONE termination enforced. Package coverage
+is **2672/2672**, and the focused native closure passes (**3988-byte HUNK,
+2252 instructions / 22108 cycles**) with 19 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1996 routes external-wrapper inline BOOPSI TagItem producers through a
+bounded `MuiExternalBoopsiTagCursor`. ApplyGeometry and OM_SET marshalling
+exchange complete named `MuiExternalBoopsiTagItem` records, including TAG_DONE;
+indexed slot arithmetic remains adapter-owned. Package coverage is
+**2671/2671**, and the focused native closure passes (**3704-byte HUNK, 2220
+instructions / 21712 cycles**) with 17 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1995 routes the external-wrapper boopsi remember buffer through a bounded
+`MuiExternalRememberCursor`. Production add, save, and reapply paths exchange
+complete named `MuiAslTagItemRecord` values; indexed slot arithmetic remains
+adapter-owned and the five-entry MorphOS bound is enforced. Package coverage
+is **2670/2670**, and the focused native closure passes (**3996-byte HUNK,
+2252 instructions / 22108 cycles**) with 19 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1994 routes MUI_MakeObjectA NewMenu materialization through the bounded named
+`MuiNewMenuCursor`. Ignored, title, item, and termination branches exchange
+complete packed `MuiNewMenuRecord` values; indexed slot arithmetic stays
+adapter-owned and rollback behavior is retained. Package coverage is
+**2669/2669**, and the focused native closure passes (**7308-byte HUNK, 8863
+instructions / 86856 cycles**) with 32 reachable methods, zero framework
+members, managed allocations, and relocations. The broader service root still
+encounters the unrelated `DirlistCore::ValidateOwnedPattern` register-pair
+compiler backend failure.
+
+MG1993 routes NewMenu validation through a bounded named `MuiNewMenuCursor`.
+Production validation exchanges complete packed `MuiNewMenuRecord` values;
+indexed slot arithmetic stays adapter-owned and malformed bounds fail closed.
+Package coverage is **2668/2668**, and the focused native closure passes
+(**5288-byte HUNK, 3337 instructions / 33658 cycles**) with 25 reachable
+methods, zero framework members, managed allocations, and relocations. Menu
+materialization remains a separate progressive seam.
+
+MG1992 routes MUI_MakeObjectA Cycle/Radio entry validation through a bounded
+`MuiChoiceEntryCursor`. Production validation exchanges complete named
+`MuiChoiceEntry` records; indexed slot arithmetic stays adapter-owned, and
+malformed bounds or CString pointers fail closed. Package coverage is
+**2667/2667**, and the focused native closure passes (**4196-byte HUNK, 3166
+instructions / 29696 cycles**) with 21 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1991 routes AppMessage Workbench argument-vector validation through a bounded
+named cursor for complete `{Lock,Name}` records. Indexed slot arithmetic stays
+adapter-owned and high-bit BPTR/STRPTR values remain opaque. Package coverage
+is **2666/2666**, and the focused native closure passes (**3852-byte HUNK,
+2185 instructions / 20888 cycles**) with 18 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1990 routes Window SetCycleChain's caller-owned object vector through a
+bounded named cursor. Indexed slot arithmetic remains adapter-owned; scalar
+pointer access stays inside the named slot codec for native ABI stability.
+Package coverage is **2665/2665**, and the focused native closure passes
+(**4172-byte HUNK, 2197 instructions / 20932 cycles**) with 20 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
+MG1989 routes Cycle/Radio choice-entry counting, selection, and Radio child
+creation through a bounded named cursor. Indexed slot arithmetic remains
+adapter-owned; scalar pointer access stays inside the named entry codec for
+native ABI stability. Package coverage is **2664/2664**, and the focused native
+closure passes (**4208-byte HUNK, 2809 instructions / 27082 cycles**) with 20
+reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1988 routes Application persistence frame-stack access through a semantic
+cursor. The production walker exchanges complete named
+`MuiApplicationPersistenceFrameState` records without passing stack offsets to
+the vector bridge. Package coverage is **2663/2663**, and the focused native
+closure passes (**4728-byte HUNK, 4105 instructions / 39930 cycles**) with 21
+reachable methods, zero framework members, managed allocations, and
+relocations. The larger persistence-tree root currently encounters an
+unrelated compiler register-allocation nonconvergence in `WriteClassId`; the
+overall goal remains open.
+
+MG1987 routes Application UsedClasses validation through a bounded named
+vector cursor. Indexed entry arithmetic remains adapter-owned; complete named
+entries and scalar-safe pointer access stay at the record boundary. Package
+coverage is **2662/2662**, and the focused native closure passes (**3128-byte
+HUNK, 2316 instructions / 21048 cycles**) with 14 reachable methods, zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG1986 routes MultiSet target and Notify follow vectors through bounded named
+cursors in production walkers. Indexed vector arithmetic remains adapter-
+owned; scalar one-ULONG access stays inside the named record codecs for
+native ABI stability. Package coverage is **2661/2661**, and the focused
+native closure passes (**5420-byte HUNK, 5050 instructions / 47746 cycles**)
+with 24 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1985 routes requester format conversion's caller-owned ULONG parameters
+through a typed `MuiRequesterParameterCursor` backed by
+`MuiRequesterParameterSlot`. Complete parameter records cross the bounded
+vector boundary without exposing indexed addresses; scalar access remains
+inside the record codec. Package coverage is **2659/2659**, and the native
+closure passes (**3524-byte HUNK, 2796 instructions / 26650 cycles**) with 14
+reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1984 routes Process dispatch and generated method-message argument vectors
+through a typed `MuiProcessArgumentCursor` backed by
+`MuiProcessDispatchArgumentSlot`. Complete argument records cross the bounded
+vector boundary without exposing indexed addresses; scalar one-ULONG access
+remains inside the record codec. Package coverage is **2658/2658**, and the
+native closure passes (**3004-byte HUNK, 2028 instructions / 20144 cycles**)
+with 12 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1983 routes UpdateConfig inline redraw-object and redraw-flag tables through a
+named packet-table cursor adapter and complete object/flag slot records. Inline
+table offsets remain adapter-owned; scalar one-ULONG and byte helpers stay
+inside their named record codecs for native ABI stability. Package coverage is
+**2657/2657**, and the native closure passes (**6560-byte HUNK, 6714
+instructions / 55820 cycles**) with 31 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1982 routes Poplist source-array materialization and selection through a
+typed cursor bridge backed by `MuiPoplistArrayEntry`. Complete pointer-slot
+records cross the bounded vector boundary without exposing indexed addresses;
+malformed bounds remain adapter-owned. Package coverage is **2656/2656**, and
+the native closure passes (**2960-byte HUNK, 2001 instructions / 18514 cycles**)
+with 14 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1981 routes UserData depth-first traversal stack reads and writes through a
+typed cursor bridge backed by `MuiUDataTraversalFrame`. Complete frame records
+cross the bounded vector boundary without exposing stack-slot addresses;
+malformed bounds remain adapter-owned. Package coverage is **2655/2655**, and
+the native closure passes (**3540-byte HUNK, 2431 instructions / 23114 cycles**)
+with 16 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1980 routes Filepanel adopted-row insertion and disposal through a typed
+cursor bridge backed by `MuiFilepanelRowRecord`. Complete label/contents
+records cross the vector boundary without exposing indexed row-slot addresses;
+malformed bounds remain adapter-owned. Package coverage is **2654/2654**, and
+the native closure passes (**3528-byte HUNK, 2471 instructions / 23602 cycles**)
+with 16 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1979 routes Scrmodelist mode append and indexed lookup through a typed cursor
+bridge backed by `MuiScrmodelistModeRecord`. Complete mode records cross the
+vector boundary without exposing indexed slot addresses; malformed bounds
+remain adapter-owned. Package coverage is **2653/2653**, and the native
+closure passes (**3212-byte HUNK, 1861 instructions / 17578 cycles**) with 15
+reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1978 routes Mccprefs registration, update, and unregister operations through
+a typed cursor bridge backed by `MuiMccprefsRegistryRecord`. Complete 24-byte
+records cross the vector boundary without exposing indexed slot addresses;
+malformed bounds remain adapter-owned. Package coverage is **2652/2652**, and
+the native closure passes (**4000-byte HUNK, 3305 instructions / 32384 cycles**)
+with 16 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1977 routes Title page-table creation, compaction, and lookup through a typed
+cursor bridge backed by the named `MuiTitlePageRecord`. Complete page records
+cross the vector boundary without exposing indexed slot addresses; malformed
+bounds remain adapter-owned. Package coverage is **2651/2651**, and the
+native closure passes (**3496-byte HUNK, 2466 instructions / 23586 cycles**)
+with 16 reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1976 routes Group child-list projection entries through a typed cursor bridge
+backed by the named `MuiGroupChildListEntry` record. Projection construction
+exchanges complete 16-byte records without raw vector access; explicit
+addresses remain only for Exec link fields. Package coverage is **2650/2650**,
+and the native closure passes (**4228-byte HUNK, 3437 instructions / 33462
+cycles**) with 18 reachable methods, zero framework members, managed
+allocations, and relocations. The overall goal remains open.
+
+MG1975 routes the inline Window SetCycleChain vector through a typed cursor
+bridge backed by the named `MuiApplicationWindowCycleChainSlot` record. Packet
+validation and slot read/write helpers exchange complete records rather than
+raw ULONG values, with full-width APTR and malformed-bound coverage. Package
+coverage is **2649/2649**, and the native closure passes (**3820-byte HUNK,
+2546 instructions / 24612 cycles**) with 17 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1974 routes Application WindowList projection entries through the bounded
+named `MuiApplicationWindowListEntry` bridge. Projection writes and
+complete-record admission no longer call the raw vector adapter; explicit
+entry addresses remain only for Exec `Next`/`Previous` links. Full-width APTR
+members and malformed vector bounds are covered by host and native tests.
+Package coverage is **2648/2648**, and the native closure passes (**3640-byte
+HUNK, 2447 instructions / 23712 cycles**) with 16 reachable methods, zero
+framework members, managed allocations, and relocations. The overall goal
+remains open.
+
+MG1973 routes the cached List `{offset,width}` geometry vector through the
+bounded named `MuiListColumnGeometry` bridge. Layout construction and
+edit-target lookup exchange complete geometry records without exposing slot
+addresses. Full-width values and malformed vector bounds are covered by host
+and native tests. Package coverage is **2647/2647**, and the native closure
+passes (**3332-byte HUNK, 2019 instructions / 19360 cycles**) with 17
+reachable methods, zero framework members, managed allocations, and
+relocations. The overall goal remains open.
+
+MG1972 routes the private List index vector through the bounded named
+`MuiListSlotState` bridge. Drag-selection buffers, row lookup, selection
+updates, destruction, and write-back exchange complete entry/flag records
+without exposing slot addresses. Full-width pointers and flags plus malformed
+vector bounds are covered by host and native tests. Package coverage is
+**2646/2646**, and the native closure passes (**3380-byte HUNK, 2064
+instructions / 19774 cycles**) with 17 reachable methods, zero framework
+members, managed allocations, and relocations. The overall goal remains open.
+
+MG1971 routes internal List pointer-slot vectors used by display, title-array,
+and string-array paths through the bounded named `MuiListPointerSlotRecord`
+bridge. Production consumers exchange complete pointer-slot records without
+exposing slot addresses; the display-storage prefix remains adapter-owned.
+Full-width APTR values and malformed vector bounds are covered by host and
+native tests. Package coverage is **2645/2645**, and the native closure passes
+(**2956-byte HUNK, 2807 instructions / 26038 cycles**) with 15 reachable
+methods, zero framework members, managed allocations, and relocations. The
+overall goal remains open.
+
 MG1970 routes caller-owned List pointer-vector reads and writes through the
 bounded named `MuiListPointerSlotRecord` bridge. List Insert, SortEntries, and
 source insertion exchange complete pointer-slot records without exposing

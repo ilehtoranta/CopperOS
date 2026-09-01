@@ -5,8 +5,8 @@ namespace CopperOS.Shell;
 /// <summary>
 /// Fixed ReadArgs templates used by commands that have no caller-owned
 /// template storage.  The template is written into the supplied guest buffer
-/// and the result array follows its terminating NUL.  No managed strings or
-/// command-local lexer are involved in this boundary.
+/// and the result array follows its terminating NUL at a four-byte-aligned
+/// guest address. No managed strings or command-local lexer are involved.
 /// </summary>
 internal enum ReadArgsCommandTemplate : byte
 {
@@ -52,16 +52,24 @@ internal static class ReadArgsCommandSupport
     {
         templateLength = Length(template);
         resultArray = APTR.Null;
-        var resultOffset = templateLength + 1;
+        var templateBytes = templateLength + 1;
         if (buffer.IsNull || resultBytes == 0 ||
-            resultOffset > uint.MaxValue - resultBytes ||
-            capacity < resultOffset + resultBytes ||
+            capacity < templateBytes ||
             buffer.Raw > uint.MaxValue - capacity ||
             !platform.IsMapped(buffer, capacity))
             return false;
 
+        // Strings may start at any byte address, but DOS stores LONG result
+        // slots. Align the absolute address, not just the relative offset;
+        // validate the padding and full result span before writing anything.
+        var resultAddress = buffer.Raw + templateBytes;
+        var padding = (4u - (resultAddress & 3u)) & 3u;
+        var remaining = capacity - templateBytes;
+        if (padding > remaining || resultBytes > remaining - padding)
+            return false;
+
         Write(ref platform, buffer, template);
-        resultArray = APTR.FromPointer(buffer.Raw + resultOffset);
+        resultArray = APTR.FromPointer(resultAddress + padding);
         return true;
     }
 

@@ -182,15 +182,18 @@ internal static class MuiChoiceEntriesStateAdmission
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (entries.IsNull) return true;
+		var cursor = default(MuiChoiceEntryCursor);
+		cursor.Base = entries;
 		for (var index = 0u; index < MuiChoiceEntryCursor.MaximumEntries;
 			index++)
 		{
+			cursor.Index = index;
 			// Exchange the named entry's Text field through the bounded vector
 			// bridge.  This one-field primitive projection retains the complete
 			// struct-owned bounds while avoiding a CopperSharp 68k limitation
 			// with out one-field APTR records at high-bit values.
-			if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entries,
-				index, out var rawText)) return false;
+			if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, cursor,
+				out var rawText)) return false;
 			if (rawText == 0) return true;
 		}
 		return false;

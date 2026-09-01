@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <AssemblyName>CopperOS.Commands.Exe2ArcNativeRoot</AssemblyName>
+    <RootNamespace>CopperOS.Commands.Exe2ArcNativeRoot</RootNamespace>
+    <ImplicitUsings>false</ImplicitUsings>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="CopperSharp.Sdk.Amiga.Support" Version="$(CopperSharpSdkAmigaVersion)" />
+    <!-- Compile the exact production source without rebuilding Commands/Shell. -->
+    <Compile Include="..\..\src\Commands\Exe2ArcHeaderProbe.cs" Link="Exe2ArcHeaderProbe.cs" />
+  </ItemGroup>
+</Project>

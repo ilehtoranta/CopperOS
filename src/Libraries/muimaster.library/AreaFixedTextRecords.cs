@@ -8,6 +8,54 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
+// Named cursor for bounded FixWidthTxt/FixHeightTxt sample strings. The
+// measurement consumer carries only a guest STRPTR and logical byte index;
+// this adapter owns the 4 KiB bound, overflow guard, and mapped-byte check.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiAreaFixedTextStringByteCursor
+{
+	internal const uint MaximumLength = 4096;
+	internal APTR Text;
+	internal uint Index;
+}
+
+internal static class MuiAreaFixedTextStringByteCursorCodec
+{
+	internal static bool TryReadAt<TPlatform>(ref TPlatform platform,
+		APTR text, int index, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (index < 0) return false;
+		var cursor = default(MuiAreaFixedTextStringByteCursor);
+		cursor.Text = text;
+		cursor.Index = (uint)index;
+		return TryReadByte(ref platform, cursor, out value);
+	}
+
+	internal static bool TryGetByte<TPlatform>(ref TPlatform platform,
+		MuiAreaFixedTextStringByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiAreaFixedTextStringByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiAreaFixedTextStringByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetByte(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+}
+
 // MUIA_FixWidthTxt and MUIA_FixHeightTxt are initializer-only STRPTRs.  Keep
 // the copied samples and their public projection in one named guest record so
 // sizing never depends on a private object offset or a managed string.
@@ -328,8 +376,8 @@ internal static class MuiAreaFixedTextCore
 		var lineCount = 1;
 		for (var index = 0u; index < MaximumTextLength; index++)
 		{
-			if (!platform.IsMapped(text, index + 1)) return false;
-			var ch = platform.ReadUInt8(text, unchecked((int)index));
+			if (!MuiAreaFixedTextStringByteCursorCodec.TryReadAt(ref platform,
+				text, unchecked((int)index), out var ch)) return false;
 			if (ch == 0)
 			{
 				maxWidth = Larger(maxWidth, lineLength);

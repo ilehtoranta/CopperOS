@@ -1457,8 +1457,16 @@ public static class MuiMenuSpecialistCore
 		var total = length + 1;
 		var b = MuiHeadlessMemory.Allocate(ref platform, total);
 		if (b.IsNull) return false;
-		for (var i = 0u; i < total; i++)
-			platform.WriteUInt8(b, (int)i, platform.ReadUInt8(source, (int)i));
+		var cursor = default(MuiGuestByteCopyCursor);
+		cursor.Source = source;
+		cursor.Destination = b;
+		cursor.Length = total;
+		for (cursor.Index = 0; cursor.Index < total; cursor.Index++)
+			if (!MuiGuestByteCopyCursorCodec.TryCopyByte(ref platform, cursor))
+			{
+				platform.Free(b, total);
+				return false;
+			}
 		block = b;
 		size = total;
 		return true;

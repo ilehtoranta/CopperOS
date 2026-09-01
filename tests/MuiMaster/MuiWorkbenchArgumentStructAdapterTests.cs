@@ -69,4 +69,35 @@ public sealed class MuiWorkbenchArgumentStructAdapterTests
 		Assert.False(MuiWorkbenchArgumentVectorCodec.TryWrite(ref platform,
 			APTR.Null, 0, expected));
 	}
+
+	[Fact]
+	public void WorkbenchArgumentVectorCursorExchangesCompleteNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var cursor = new MuiWorkbenchArgumentVectorCursor
+		{
+			Base = APTR.FromPointer(0x3200),
+			Index = 3,
+		};
+		var expected = new MuiWorkbenchArgumentRecord
+		{
+			Lock = BPTR.FromRaw(0xF1234567u),
+			Name = STRPTR.FromPointer(0xE2345678u),
+		};
+
+		Assert.True(MuiWorkbenchArgumentVectorCodec.TryWrite(ref platform, cursor,
+			expected));
+		Assert.True(MuiWorkbenchArgumentVectorCodec.TryRead(ref platform, cursor,
+			out var actual));
+		Assert.Equal(expected.Lock.Raw, actual.Lock.Raw);
+		Assert.Equal(expected.Name.Raw, actual.Name.Raw);
+		Assert.True(MuiWorkbenchArgumentVectorCodec.TryAdvance(ref cursor, 1));
+		Assert.Equal(4u, cursor.Index);
+		Assert.False(MuiWorkbenchArgumentVectorCodec.TryAdvance(ref cursor,
+			MuiWorkbenchArgumentVectorCursor.MaximumEntries));
+		cursor.Index = MuiWorkbenchArgumentVectorCursor.MaximumEntries;
+		Assert.False(MuiWorkbenchArgumentVectorCodec.TryRead(ref platform, cursor,
+			out _));
+	}
 }

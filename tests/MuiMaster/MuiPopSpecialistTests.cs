@@ -112,6 +112,33 @@ public sealed class MuiPopSpecialistTests
 	}
 
 	[Fact]
+	public void PoplistArrayCursorBridgeUsesCompleteNamedRecords()
+	{
+		var p = NewPlatform();
+		var cursor = default(MuiPoplistArrayCursor);
+		cursor.Base = APTR.FromPointer(0x2400);
+		cursor.Index = 2;
+		var expected = default(MuiPoplistArrayEntry);
+		expected.Value = APTR.FromPointer(0xFEDCBA98u);
+
+		Assert.True(MuiPoplistArrayCursorCodec.TryWrite(ref p, cursor, expected));
+		Assert.True(MuiPoplistArrayCursorCodec.TryRead(ref p, cursor,
+			out var actual));
+		Assert.Equal(expected.Value, actual.Value);
+
+		cursor.Base = APTR.FromPointer(0x40FFC);
+		Assert.False(MuiPoplistArrayCursorCodec.TryRead(ref p, cursor,
+			out _));
+		cursor.Base = APTR.FromPointer(0xFFFFFFFCu);
+		Assert.False(MuiPoplistArrayCursorCodec.TryWrite(ref p, cursor,
+			expected));
+		cursor.Base = APTR.FromPointer(0x2400);
+		cursor.Index = MuiPoplistArrayCursor.MaximumEntries;
+		Assert.False(MuiPoplistArrayCursorCodec.TryRead(ref p, cursor,
+			out _));
+	}
+
+	[Fact]
 	public void PopSpecialistStateCodecUsesNamedFields()
 	{
 		var p = NewPlatform();

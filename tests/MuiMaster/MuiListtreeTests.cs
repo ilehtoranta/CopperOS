@@ -53,6 +53,49 @@ public sealed class MuiListtreeTests
 	private const int PositionPrevious = -4;
 
 	[Fact]
+	public void ListtreeStringByteCursorUsesBoundedNamedReads()
+	{
+		var platform = CreatePlatform(out _);
+		var text = APTR.FromPointer(0x1800);
+		platform.WriteUInt8(text, 5, (byte)'N');
+		var cursor = new MuiListtreeStringByteCursor
+		{
+			Text = text,
+			Index = 5,
+		};
+		Assert.True(MuiListtreeStringByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value));
+		Assert.Equal((byte)'N', value);
+		Assert.True(MuiListtreeStringByteCursorCodec.TryReadAt(ref platform,
+			text, 5, out value));
+		Assert.Equal((byte)'N', value);
+		cursor.Index = MuiListtreeStringByteCursor.MaximumLength;
+		Assert.False(MuiListtreeStringByteCursorCodec.TryGetByte(ref platform,
+			cursor, out _));
+		Assert.False(MuiListtreeStringByteCursorCodec.TryReadAt(ref platform,
+			text, -1, out _));
+		Assert.False(MuiListtreeStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0x300000), 0, out _));
+	}
+
+	[Fact]
+	public void ListtreeFormatParserByteHelperUsesNamedCursorBounds()
+	{
+		var platform = CreatePlatform(out _);
+		var format = APTR.FromPointer(0x1800);
+		platform.WriteUInt8(format, 3, (byte)'K');
+		Assert.True(MuiListtreeCore.TryReadListtreeFormatByte(ref platform,
+			format, 3, out var value));
+		Assert.Equal((byte)'K', value);
+		Assert.False(MuiListtreeCore.TryReadListtreeFormatByte(ref platform,
+			format, -1, out _));
+		Assert.False(MuiListtreeCore.TryReadListtreeFormatByte(ref platform,
+			format, (int)MuiListFormatByteCursor.MaximumLength, out _));
+		Assert.False(MuiListtreeCore.TryReadListtreeFormatByte(ref platform,
+			APTR.FromPointer(0x300000), 0, out _));
+	}
+
+	[Fact]
 	public void ListtreeHeaderCodecUsesNamedGuestFields()
 	{
 		var platform = CreatePlatform(out _);

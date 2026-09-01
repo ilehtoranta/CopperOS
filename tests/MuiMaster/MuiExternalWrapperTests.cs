@@ -1314,6 +1314,34 @@ public sealed class MuiExternalWrapperTests
 	}
 
 	[Fact]
+	public void ExternalTagListVectorCursorExchangesCompleteNamedRecords()
+	{
+		var p = NewPlatform();
+		var cursor = default(MuiExternalTagListCursor);
+		cursor.Base = APTR.FromPointer(0x3400);
+		cursor.Index = 0;
+		var first = new MuiAslTagItemRecord
+		{
+			Tag = 0xF00DCAFEu,
+			Data = 0x87654321u,
+		};
+		Assert.True(MuiExternalTagListVectorCodec.TryWrite(ref p, cursor, first));
+		Assert.True(MuiExternalTagListVectorCodec.TryRead(ref p, cursor,
+			out var actual));
+		Assert.Equal(first.Tag, actual.Tag);
+		Assert.Equal(first.Data, actual.Data);
+		Assert.True(MuiExternalTagListVectorCodec.TryAdvance(ref cursor, 1));
+		var second = first;
+		second.Tag = 0x12345678u;
+		Assert.True(MuiExternalTagListVectorCodec.TryWrite(ref p, cursor, second));
+		Assert.True(MuiExternalTagListVectorCodec.TryRead(ref p, cursor,
+			out actual));
+		Assert.Equal(second.Tag, actual.Tag);
+		Assert.False(MuiExternalTagListVectorCodec.TryAdvance(ref cursor,
+			MuiExternalTagListCursor.MaximumEntries));
+	}
+
+	[Fact]
 	public void ExternalWrapperMethodHeaderUsesNamedField()
 	{
 		var p = NewPlatform();
@@ -1827,6 +1855,36 @@ public sealed class MuiExternalWrapperTests
 	}
 
 	[Fact]
+	public void ExternalRememberVectorCursorExchangesCompleteNamedRecords()
+	{
+		var p = NewPlatform();
+		var cursor = default(MuiExternalRememberCursor);
+		cursor.Base = APTR.FromPointer(0x2C00);
+		cursor.Index = 0;
+		var first = new MuiAslTagItemRecord
+		{
+			Tag = 0xF00DCAFEu,
+			Data = 0x87654321u,
+		};
+		Assert.True(MuiExternalRememberVectorCodec.TryWrite(ref p, cursor,
+			first));
+		Assert.True(MuiExternalRememberVectorCodec.TryRead(ref p, cursor,
+			out var actual));
+		Assert.Equal(first.Tag, actual.Tag);
+		Assert.Equal(first.Data, actual.Data);
+		Assert.True(MuiExternalRememberVectorCodec.TryAdvance(ref cursor, 1));
+		var second = first;
+		second.Tag = 0x12345678u;
+		Assert.True(MuiExternalRememberVectorCodec.TryWrite(ref p, cursor,
+			second));
+		Assert.True(MuiExternalRememberVectorCodec.TryRead(ref p, cursor,
+			out actual));
+		Assert.Equal(second.Tag, actual.Tag);
+		Assert.False(MuiExternalRememberVectorCodec.TryAdvance(ref cursor,
+			MuiExternalRememberCursor.MaximumEntries));
+	}
+
+	[Fact]
 	public void ExternalBoopsiTagCursorUsesNamedEntryBoundary()
 	{
 		var p = NewPlatform();
@@ -1877,6 +1935,36 @@ public sealed class MuiExternalWrapperTests
 			APTR.FromPointer(0xFFFFFFF0), 1, out _));
 	}
 
+	[Fact]
+	public void ExternalBoopsiTagVectorCursorExchangesCompleteNamedRecords()
+	{
+		var p = NewPlatform();
+		var cursor = default(MuiExternalBoopsiTagCursor);
+		cursor.Base = APTR.FromPointer(0x3200);
+		cursor.Index = 0;
+		var first = new MuiExternalBoopsiTagItem
+		{
+			Tag = 0xF00DCAFEu,
+			Data = 0x87654321u,
+		};
+		Assert.True(MuiExternalBoopsiTagVectorCodec.TryWrite(ref p, cursor,
+			first));
+		Assert.True(MuiExternalBoopsiTagVectorCodec.TryRead(ref p, cursor,
+			out var actual));
+		Assert.Equal(first.Tag, actual.Tag);
+		Assert.Equal(first.Data, actual.Data);
+		Assert.True(MuiExternalBoopsiTagVectorCodec.TryAdvance(ref cursor, 1));
+		var second = first;
+		second.Tag = 0x12345678u;
+		Assert.True(MuiExternalBoopsiTagVectorCodec.TryWrite(ref p, cursor,
+			second));
+		Assert.True(MuiExternalBoopsiTagVectorCodec.TryRead(ref p, cursor,
+			out actual));
+		Assert.Equal(second.Tag, actual.Tag);
+		Assert.False(MuiExternalBoopsiTagVectorCodec.TryAdvance(ref cursor,
+			MuiExternalBoopsiTagCursor.MaximumEntries));
+	}
+
 	// ---- IDCMP_UPDATE -> notification ---------------------------------------
 
 	[Fact]
@@ -1899,6 +1987,30 @@ public sealed class MuiExternalWrapperTests
 			MuiExternalWrapperCore.LastNotifiedAttribute(ref p, Instance));
 		Assert.Equal(88u,
 			MuiExternalWrapperCore.LastNotifiedValue(ref p, Instance));
+	}
+
+	[Fact]
+	public void OmUpdateCursorWalkUsesCompleteNamedTagItems()
+	{
+		var p = NewPlatform();
+		SetupPrivateBoopsi(ref p);
+		var cursor = default(MuiExternalTagListCursor);
+		cursor.Base = AttrList;
+		cursor.Index = 0;
+		Assert.True(MuiExternalTagListVectorCodec.TryWrite(ref p, cursor,
+			new MuiAslTagItemRecord { Tag = 0x80421234u, Data = 77 }));
+		Assert.True(MuiExternalTagListVectorCodec.TryAdvance(ref cursor, 1));
+		Assert.True(MuiExternalTagListVectorCodec.TryWrite(ref p, cursor,
+			new MuiAslTagItemRecord { Tag = 0x80425678u, Data = 88 }));
+		Assert.True(MuiExternalTagListVectorCodec.TryAdvance(ref cursor, 1));
+		Assert.True(MuiExternalTagListVectorCodec.TryWrite(ref p, cursor,
+			default));
+
+		Assert.Equal(2u, MuiExternalWrapperCore.HandleUpdate(ref p, Instance,
+			AttrList));
+		Assert.Equal(2u, MuiExternalWrapperCore.NotificationCount(ref p, Instance));
+		Assert.Equal(0x80425678u,
+			MuiExternalWrapperCore.LastNotifiedAttribute(ref p, Instance));
 	}
 
 	// ---- Transparent attribute pass-through ---------------------------------

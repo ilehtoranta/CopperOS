@@ -9,6 +9,54 @@ using System.Runtime.CompilerServices;
 
 namespace CopperOS.MuiMaster;
 
+// Named cursor for bounded Listtree node-name strings. String consumers supply
+// only a logical byte index; the adapter owns the 4 KiB limit, overflow guard,
+// and mapped-byte admission used by both CString validation and comparison.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiListtreeStringByteCursor
+{
+	internal const uint MaximumLength = 4096;
+	internal APTR Text;
+	internal uint Index;
+}
+
+internal static class MuiListtreeStringByteCursorCodec
+{
+	internal static bool TryReadAt<TPlatform>(ref TPlatform platform,
+		APTR text, int index, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (index < 0) return false;
+		var cursor = default(MuiListtreeStringByteCursor);
+		cursor.Text = text;
+		cursor.Index = (uint)index;
+		return TryReadByte(ref platform, cursor, out value);
+	}
+
+	internal static bool TryGetByte<TPlatform>(ref TPlatform platform,
+		MuiListtreeStringByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiListtreeStringByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiListtreeStringByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetByte(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+}
+
 // Listtree.mcc (autodoc MUI_Listtree.doc, header mui/Listtree_mcc.h).
 //
 // Packaging: docs/Libraries/MorphOs320Mui/packaging.md classifies Listtree.mcc
@@ -380,6 +428,18 @@ public static class MuiListtreeCore
 	internal static class MuiListtreeDisplayColumnVectorCodec
 	{
 		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			MuiListtreeDisplayColumnCursor cursor,
+			out MuiListtreeDisplayColumnRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!TryReadTextValue(ref platform, cursor, out var text))
+				return false;
+			value.Text = APTR.FromPointer(text);
+			return true;
+		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
 			APTR vector, uint index, out MuiListtreeDisplayColumnRecord value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -388,6 +448,17 @@ public static class MuiListtreeCore
 				return false;
 			value.Text = APTR.FromPointer(text);
 			return true;
+		}
+
+		internal static bool TryReadTextValue<TPlatform>(ref TPlatform platform,
+			MuiListtreeDisplayColumnCursor cursor, out uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = 0;
+			if (!MuiListtreeDisplayColumnCursorCodec.TryGetEntry(ref platform,
+				cursor, out var address)) return false;
+			return MuiListtreeDisplayColumnCodec.TryReadTextValue(ref platform,
+				address, out value);
 		}
 
 		internal static bool TryReadTextValue<TPlatform>(ref TPlatform platform,
@@ -405,6 +476,22 @@ public static class MuiListtreeCore
 			APTR vector, uint index, MuiListtreeDisplayColumnRecord value)
 			where TPlatform : struct, IMuiGuestMemory
 			=> TryWriteTextValue(ref platform, vector, index, value.Text.Raw);
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			MuiListtreeDisplayColumnCursor cursor,
+			MuiListtreeDisplayColumnRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> TryWriteTextValue(ref platform, cursor, value.Text.Raw);
+
+		internal static bool TryWriteTextValue<TPlatform>(ref TPlatform platform,
+			MuiListtreeDisplayColumnCursor cursor, uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiListtreeDisplayColumnCursorCodec.TryGetEntry(ref platform,
+				cursor, out var address)) return false;
+			return MuiListtreeDisplayColumnCodec.WriteTextValue(ref platform,
+				address, value);
+		}
 
 		internal static bool TryWriteTextValue<TPlatform>(ref TPlatform platform,
 			APTR vector, uint index, uint value)
@@ -665,6 +752,34 @@ public static class MuiListtreeCore
 	// exchanges only the named 24-byte record.
 	internal static class MuiListtreeColumnGeometryVectorCodec
 	{
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			MuiListtreeColumnGeometryCursor cursor,
+			out MuiListtreeColumnGeometryRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiListtreeColumnGeometryCursorCodec.TryGetEntry(ref platform,
+				cursor, out var address) ||
+				!MuiListtreeColumnGeometryCodec.TryRead(ref platform, address,
+					out value))
+			{
+				value = default;
+				return false;
+			}
+			return true;
+		}
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			MuiListtreeColumnGeometryCursor cursor,
+			MuiListtreeColumnGeometryRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiListtreeColumnGeometryCursorCodec.TryGetEntry(ref platform,
+				cursor, out var address)) return false;
+			return MuiListtreeColumnGeometryCodec.Write(ref platform, address,
+				value);
+		}
+
 		internal static bool TryRead<TPlatform>(ref TPlatform platform,
 			APTR vector, uint index, out MuiListtreeColumnGeometryRecord value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -4784,7 +4899,8 @@ public static class MuiListtreeCore
 		var quoted = 0u;
 		for (var index = 0u; index < length; index++)
 		{
-			var value = platform.ReadUInt8(format, unchecked((int)index));
+			if (!TryReadListtreeFormatByte(ref platform, format,
+				unchecked((int)index), out var value)) return 1;
 			if (quoted != 0)
 			{
 				if (value == (byte)'*')
@@ -4809,6 +4925,13 @@ public static class MuiListtreeCore
 	private static bool IsListtreeFormatSpace(byte value) =>
 		value == (byte)' ' || value == (byte)'\t';
 
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal static bool TryReadListtreeFormatByte<TPlatform>(
+		ref TPlatform platform, APTR format, int index, out byte value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListFormatByteCursorCodec.TryReadAt(ref platform, format, index,
+			out value);
+
 	private static byte UpperAscii(byte value) => value >= (byte)'a' &&
 		value <= (byte)'z' ? (byte)(value - ((byte)'a' - (byte)'A')) : value;
 
@@ -4818,13 +4941,21 @@ public static class MuiListtreeCore
 	{
 		var length = end - start;
 		if (length == 1)
-			return UpperAscii(platform.ReadUInt8(format, start)) == (byte)'D';
+			return TryReadListtreeFormatByte(ref platform, format, start,
+				out var single) && UpperAscii(single) == (byte)'D';
 		if (length != 5) return false;
-		return UpperAscii(platform.ReadUInt8(format, start)) == (byte)'D' &&
-			UpperAscii(platform.ReadUInt8(format, start + 1)) == (byte)'E' &&
-			UpperAscii(platform.ReadUInt8(format, start + 2)) == (byte)'L' &&
-			UpperAscii(platform.ReadUInt8(format, start + 3)) == (byte)'T' &&
-			UpperAscii(platform.ReadUInt8(format, start + 4)) == (byte)'A';
+		return TryReadListtreeFormatByte(ref platform, format, start,
+			out var first) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 1,
+				out var second) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 2,
+				out var third) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 3,
+				out var fourth) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 4,
+				out var fifth) && UpperAscii(first) == (byte)'D' &&
+			UpperAscii(second) == (byte)'E' && UpperAscii(third) == (byte)'L' &&
+			UpperAscii(fourth) == (byte)'T' && UpperAscii(fifth) == (byte)'A';
 	}
 
 	private static bool IsListtreeWeightKey<TPlatform>(ref TPlatform platform,
@@ -4833,14 +4964,24 @@ public static class MuiListtreeCore
 	{
 		var length = end - start;
 		if (length == 1)
-			return UpperAscii(platform.ReadUInt8(format, start)) == (byte)'W';
+			return TryReadListtreeFormatByte(ref platform, format, start,
+				out var single) && UpperAscii(single) == (byte)'W';
 		if (length != 6) return false;
-		return UpperAscii(platform.ReadUInt8(format, start)) == (byte)'W' &&
-			UpperAscii(platform.ReadUInt8(format, start + 1)) == (byte)'E' &&
-			UpperAscii(platform.ReadUInt8(format, start + 2)) == (byte)'I' &&
-			UpperAscii(platform.ReadUInt8(format, start + 3)) == (byte)'G' &&
-			UpperAscii(platform.ReadUInt8(format, start + 4)) == (byte)'H' &&
-			UpperAscii(platform.ReadUInt8(format, start + 5)) == (byte)'T';
+		return TryReadListtreeFormatByte(ref platform, format, start,
+			out var first) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 1,
+				out var second) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 2,
+				out var third) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 3,
+				out var fourth) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 4,
+				out var fifth) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 5,
+				out var sixth) && UpperAscii(first) == (byte)'W' &&
+			UpperAscii(second) == (byte)'E' && UpperAscii(third) == (byte)'I' &&
+			UpperAscii(fourth) == (byte)'G' && UpperAscii(fifth) == (byte)'H' &&
+			UpperAscii(sixth) == (byte)'T';
 	}
 
 	private static bool IsListtreeMinWidthKey<TPlatform>(ref TPlatform platform,
@@ -4849,18 +4990,34 @@ public static class MuiListtreeCore
 	{
 		var length = end - start;
 		if (length == 3)
-			return UpperAscii(platform.ReadUInt8(format, start)) == (byte)'M' &&
-				UpperAscii(platform.ReadUInt8(format, start + 1)) == (byte)'I' &&
-				UpperAscii(platform.ReadUInt8(format, start + 2)) == (byte)'W';
+			return TryReadListtreeFormatByte(ref platform, format, start,
+				out var first) &&
+				TryReadListtreeFormatByte(ref platform, format, start + 1,
+					out var second) &&
+				TryReadListtreeFormatByte(ref platform, format, start + 2,
+					out var third) && UpperAscii(first) == (byte)'M' &&
+				UpperAscii(second) == (byte)'I' && UpperAscii(third) == (byte)'W';
 		if (length != 8) return false;
-		return UpperAscii(platform.ReadUInt8(format, start)) == (byte)'M' &&
-			UpperAscii(platform.ReadUInt8(format, start + 1)) == (byte)'I' &&
-			UpperAscii(platform.ReadUInt8(format, start + 2)) == (byte)'N' &&
-			UpperAscii(platform.ReadUInt8(format, start + 3)) == (byte)'W' &&
-			UpperAscii(platform.ReadUInt8(format, start + 4)) == (byte)'I' &&
-			UpperAscii(platform.ReadUInt8(format, start + 5)) == (byte)'D' &&
-			UpperAscii(platform.ReadUInt8(format, start + 6)) == (byte)'T' &&
-			UpperAscii(platform.ReadUInt8(format, start + 7)) == (byte)'H';
+		return TryReadListtreeFormatByte(ref platform, format, start,
+			out var firstFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 1,
+				out var secondFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 2,
+				out var thirdFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 3,
+				out var fourthFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 4,
+				out var fifthFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 5,
+				out var sixthFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 6,
+				out var seventhFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 7,
+				out var eighthFull) && UpperAscii(firstFull) == (byte)'M' &&
+			UpperAscii(secondFull) == (byte)'I' && UpperAscii(thirdFull) == (byte)'N' &&
+			UpperAscii(fourthFull) == (byte)'W' && UpperAscii(fifthFull) == (byte)'I' &&
+			UpperAscii(sixthFull) == (byte)'D' && UpperAscii(seventhFull) == (byte)'T' &&
+			UpperAscii(eighthFull) == (byte)'H';
 	}
 
 	private static bool IsListtreeMaxWidthKey<TPlatform>(ref TPlatform platform,
@@ -4869,18 +5026,34 @@ public static class MuiListtreeCore
 	{
 		var length = end - start;
 		if (length == 3)
-			return UpperAscii(platform.ReadUInt8(format, start)) == (byte)'M' &&
-				UpperAscii(platform.ReadUInt8(format, start + 1)) == (byte)'A' &&
-				UpperAscii(platform.ReadUInt8(format, start + 2)) == (byte)'W';
+			return TryReadListtreeFormatByte(ref platform, format, start,
+				out var first) &&
+				TryReadListtreeFormatByte(ref platform, format, start + 1,
+					out var second) &&
+				TryReadListtreeFormatByte(ref platform, format, start + 2,
+					out var third) && UpperAscii(first) == (byte)'M' &&
+				UpperAscii(second) == (byte)'A' && UpperAscii(third) == (byte)'W';
 		if (length != 8) return false;
-		return UpperAscii(platform.ReadUInt8(format, start)) == (byte)'M' &&
-			UpperAscii(platform.ReadUInt8(format, start + 1)) == (byte)'A' &&
-			UpperAscii(platform.ReadUInt8(format, start + 2)) == (byte)'X' &&
-			UpperAscii(platform.ReadUInt8(format, start + 3)) == (byte)'W' &&
-			UpperAscii(platform.ReadUInt8(format, start + 4)) == (byte)'I' &&
-			UpperAscii(platform.ReadUInt8(format, start + 5)) == (byte)'D' &&
-			UpperAscii(platform.ReadUInt8(format, start + 6)) == (byte)'T' &&
-			UpperAscii(platform.ReadUInt8(format, start + 7)) == (byte)'H';
+		return TryReadListtreeFormatByte(ref platform, format, start,
+			out var firstFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 1,
+				out var secondFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 2,
+				out var thirdFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 3,
+				out var fourthFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 4,
+				out var fifthFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 5,
+				out var sixthFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 6,
+				out var seventhFull) &&
+			TryReadListtreeFormatByte(ref platform, format, start + 7,
+				out var eighthFull) && UpperAscii(firstFull) == (byte)'M' &&
+			UpperAscii(secondFull) == (byte)'A' && UpperAscii(thirdFull) == (byte)'X' &&
+			UpperAscii(fourthFull) == (byte)'W' && UpperAscii(fifthFull) == (byte)'I' &&
+			UpperAscii(sixthFull) == (byte)'D' && UpperAscii(seventhFull) == (byte)'T' &&
+			UpperAscii(eighthFull) == (byte)'H';
 	}
 
 	private static bool TryReadListtreeFormatValueEnd<TPlatform>(
@@ -4890,15 +5063,21 @@ public static class MuiListtreeCore
 	{
 		valueEnd = start;
 		if (start >= end) return false;
-		if (platform.ReadUInt8(format, start) == (byte)'"')
+		if (!TryReadListtreeFormatByte(ref platform, format, start,
+			out var first)) return false;
+		if (first == (byte)'"')
 		{
 			var cursor = start + 1;
 			while (cursor < end)
 			{
-				var value = platform.ReadUInt8(format, cursor++);
+				if (!TryReadListtreeFormatByte(ref platform, format, cursor,
+					out var value)) return false;
+				cursor++;
 				if (value == (byte)'*')
 				{
 					if (cursor >= end) return false;
+					if (!TryReadListtreeFormatByte(ref platform, format, cursor,
+						out _)) return false;
 					cursor++;
 					continue;
 				}
@@ -4911,8 +5090,13 @@ public static class MuiListtreeCore
 			return false;
 		}
 		var cursorUnquoted = start;
-		while (cursorUnquoted < end && !IsListtreeFormatSpace(
-			platform.ReadUInt8(format, cursorUnquoted))) cursorUnquoted++;
+		while (cursorUnquoted < end)
+		{
+			if (!TryReadListtreeFormatByte(ref platform, format, cursorUnquoted,
+				out var current)) return false;
+			if (IsListtreeFormatSpace(current)) break;
+			cursorUnquoted++;
+		}
 		if (cursorUnquoted == start) return false;
 		valueEnd = cursorUnquoted;
 		return true;
@@ -4924,27 +5108,41 @@ public static class MuiListtreeCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		number = 0;
-		while (start < end && IsListtreeFormatSpace(platform.ReadUInt8(
-			format, start))) start++;
-		if (start >= end) return false;
-		var negative = platform.ReadUInt8(format, start) == (byte)'-';
-		if (negative) start++;
-		if (start >= end) return false;
+		var cursor = start;
+		while (cursor < end)
+		{
+			if (!TryReadListtreeFormatByte(ref platform, format, cursor,
+				out var leading)) return false;
+			if (!IsListtreeFormatSpace(leading)) break;
+			cursor++;
+		}
+		if (cursor >= end) return false;
+		if (!TryReadListtreeFormatByte(ref platform, format, cursor,
+			out var sign)) return false;
+		var negative = sign == (byte)'-';
+		if (negative) cursor++;
+		if (cursor >= end) return false;
 		var digits = 0;
 		var value = 0;
-		while (start < end)
+		while (cursor < end)
 		{
-			var digit = platform.ReadUInt8(format, start);
+			if (!TryReadListtreeFormatByte(ref platform, format, cursor,
+				out var digit)) return false;
 			if (digit < (byte)'0' || digit > (byte)'9') break;
 			if (value > (int.MaxValue - (digit - (byte)'0')) / 10)
 				return false;
 			value = value * 10 + digit - (byte)'0';
 			digits++;
-			start++;
+			cursor++;
 		}
-		while (start < end && IsListtreeFormatSpace(platform.ReadUInt8(
-			format, start))) start++;
-		if (digits == 0 || start != end) return false;
+		while (cursor < end)
+		{
+			if (!TryReadListtreeFormatByte(ref platform, format, cursor,
+				out var trailing)) return false;
+			if (!IsListtreeFormatSpace(trailing)) break;
+			cursor++;
+		}
+		if (digits == 0 || cursor != end) return false;
 		number = negative ? -value : value;
 		return true;
 	}
@@ -4956,9 +5154,16 @@ public static class MuiListtreeCore
 	{
 		width = uint.MaxValue;
 		flags = 0;
-		var pixels = end - start >= 2 &&
-			UpperAscii(platform.ReadUInt8(format, end - 2)) == (byte)'P' &&
-			UpperAscii(platform.ReadUInt8(format, end - 1)) == (byte)'X';
+		var pixels = false;
+		if (end - start >= 2)
+		{
+			if (!TryReadListtreeFormatByte(ref platform, format, end - 2,
+				out var penultimate) ||
+				!TryReadListtreeFormatByte(ref platform, format, end - 1,
+					out var last)) return false;
+			pixels = UpperAscii(penultimate) == (byte)'P' &&
+				UpperAscii(last) == (byte)'X';
+		}
 		var numberEnd = pixels ? end - 2 : end;
 		if (!TryParseListtreeFormatNumber(ref platform, format, start,
 			numberEnd, out var number) || number < -1) return false;
@@ -4979,41 +5184,68 @@ public static class MuiListtreeCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		var cursor = start;
+		var guard = 0;
 		while (cursor < end)
 		{
-			while (cursor < end && IsListtreeFormatSpace(platform.ReadUInt8(
-				format, cursor))) cursor++;
+			if (++guard > end - start + 1) return false;
+			while (cursor < end)
+			{
+				if (!TryReadListtreeFormatByte(ref platform, format, cursor,
+					out var leading)) return false;
+				if (!IsListtreeFormatSpace(leading)) break;
+				cursor++;
+			}
 			if (cursor >= end) break;
 			var keyStart = cursor;
-			while (cursor < end && !IsListtreeFormatSpace(platform.ReadUInt8(
-				format, cursor)) && platform.ReadUInt8(format, cursor) !=
-				(byte)'=') cursor++;
+			while (cursor < end)
+			{
+				if (!TryReadListtreeFormatByte(ref platform, format, cursor,
+					out var keyByte)) return false;
+				if (IsListtreeFormatSpace(keyByte) || keyByte == (byte)'=')
+					break;
+				cursor++;
+			}
 			var keyEnd = cursor;
-			while (cursor < end && IsListtreeFormatSpace(platform.ReadUInt8(
-				format, cursor))) cursor++;
+			while (cursor < end)
+			{
+				if (!TryReadListtreeFormatByte(ref platform, format, cursor,
+					out var separator)) return false;
+				if (!IsListtreeFormatSpace(separator)) break;
+				cursor++;
+			}
 			var hasValue = false;
 			var valueStart = cursor;
 			var valueEnd = cursor;
-			if (cursor < end && platform.ReadUInt8(format, cursor) == (byte)'=')
+			if (cursor < end)
 			{
-				hasValue = true;
-				valueStart = ++cursor;
-				while (valueStart < end && IsListtreeFormatSpace(
-					platform.ReadUInt8(format, valueStart))) valueStart++;
-				if (!TryReadListtreeFormatValueEnd(ref platform, format,
-					valueStart, end, out valueEnd)) return false;
+				if (!TryReadListtreeFormatByte(ref platform, format, cursor,
+					out var equalsByte)) return false;
+				if (equalsByte == (byte)'=')
+				{
+					hasValue = true;
+					valueStart = ++cursor;
+					while (valueStart < end)
+					{
+						if (!TryReadListtreeFormatByte(ref platform, format,
+							valueStart, out var valueSpace)) return false;
+						if (!IsListtreeFormatSpace(valueSpace)) break;
+						valueStart++;
+					}
+					if (!TryReadListtreeFormatValueEnd(ref platform, format,
+						valueStart, end, out valueEnd)) return false;
+				}
 			}
-			else if (IsListtreeDeltaKey(ref platform, format, keyStart, keyEnd) ||
+			if (!hasValue && (IsListtreeDeltaKey(ref platform, format, keyStart, keyEnd) ||
 				IsListtreeWeightKey(ref platform, format, keyStart, keyEnd) ||
 				IsListtreeMinWidthKey(ref platform, format, keyStart, keyEnd) ||
-				IsListtreeMaxWidthKey(ref platform, format, keyStart, keyEnd))
+				IsListtreeMaxWidthKey(ref platform, format, keyStart, keyEnd)))
 			{
 				hasValue = true;
 				valueStart = cursor;
 				if (!TryReadListtreeFormatValueEnd(ref platform, format,
 					valueStart, end, out valueEnd)) return false;
 			}
-			else
+			else if (!hasValue)
 			{
 				// Bare labels and switches (for example BAR or SORTABLE) do not
 				// affect Listtree hit geometry. Leave their value untouched.
@@ -5024,11 +5256,15 @@ public static class MuiListtreeCore
 			{
 				var numberEnd = valueEnd;
 				var numberStart = valueStart;
-				if (numberStart < numberEnd && platform.ReadUInt8(format,
-					numberStart) == (byte)'"')
+				if (numberStart < numberEnd)
 				{
-					numberStart++;
-					numberEnd--;
+					if (!TryReadListtreeFormatByte(ref platform, format,
+						numberStart, out var openingQuote)) return false;
+					if (openingQuote == (byte)'"')
+					{
+						numberStart++;
+						numberEnd--;
+					}
 				}
 				if (IsListtreeDeltaKey(ref platform, format, keyStart, keyEnd))
 				{
@@ -5119,14 +5355,17 @@ public static class MuiListtreeCore
 		block = MuiHeadlessMemory.Allocate(ref platform, bytes);
 		if (block.IsNull) return false;
 		platform.Clear(block, bytes);
+		var geometryCursor = default(MuiListtreeColumnGeometryCursor);
+		geometryCursor.Base = block;
 		for (var index = 0u; index < columns; index++)
 		{
 			var value = default(MuiListtreeColumnGeometryRecord);
 			value.Delta = 4;
 			value.Weight = 100;
 			value.MaxWidth = uint.MaxValue;
-			if (!MuiListtreeColumnGeometryVectorCodec.TryWrite(ref platform, block,
-				index, value))
+			geometryCursor.Index = index;
+			if (!MuiListtreeColumnGeometryVectorCodec.TryWrite(ref platform,
+				geometryCursor, value))
 			{
 				platform.Clear(block, bytes);
 				platform.Free(block, bytes);
@@ -5147,8 +5386,9 @@ public static class MuiListtreeCore
 				var separator = index == length;
 				if (!separator)
 				{
-					var current = platform.ReadUInt8(format,
-						unchecked((int)index));
+					if (!TryReadListtreeFormatByte(ref platform, format,
+						unchecked((int)index), out var current))
+						break;
 					if (quoted != 0)
 					{
 						if (current == (byte)'*')
@@ -5163,11 +5403,14 @@ public static class MuiListtreeCore
 				}
 				if (!separator) continue;
 				var value = default(MuiListtreeColumnGeometryRecord);
-				if (!MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform, block,
-					ordinal, out value) || !ParseListtreeFormatSegment(ref platform, format,
-					segmentStart, unchecked((int)index), ref value)) break;
-				if (!MuiListtreeColumnGeometryVectorCodec.TryWrite(ref platform, block,
-					ordinal, value))
+				geometryCursor.Index = ordinal;
+				if (!MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform,
+					geometryCursor, out value)) break;
+				if (!ParseListtreeFormatSegment(ref platform, format,
+					segmentStart, unchecked((int)index), ref value))
+					break;
+				if (!MuiListtreeColumnGeometryVectorCodec.TryWrite(ref platform,
+					geometryCursor, value))
 					break;
 				ordinal++;
 				segmentStart = unchecked((int)index) + 1;
@@ -5177,8 +5420,9 @@ public static class MuiListtreeCore
 		var totalWeight = 0u;
 		for (var index = 0u; index < columns; index++)
 		{
-			if (!MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform, block,
-				index, out var value))
+			geometryCursor.Index = index;
+			if (!MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform,
+				geometryCursor, out var value))
 			{
 				FreeColumnGeometry(ref platform, block, columns);
 				block = APTR.Null;
@@ -5196,8 +5440,9 @@ public static class MuiListtreeCore
 		var remainingWeight = totalWeight;
 		for (var index = 0u; index < columns; index++)
 		{
-			if (!MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform, block,
-				index, out var value))
+			geometryCursor.Index = index;
+			if (!MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform,
+				geometryCursor, out var value))
 			{
 				FreeColumnGeometry(ref platform, block, columns);
 				block = APTR.Null;
@@ -5212,8 +5457,8 @@ public static class MuiListtreeCore
 			if (maximum != uint.MaxValue && share > maximum) share = maximum;
 			if (share > remaining) share = remaining;
 			value.Width = share;
-			if (!MuiListtreeColumnGeometryVectorCodec.TryWrite(ref platform, block,
-				index, value))
+			if (!MuiListtreeColumnGeometryVectorCodec.TryWrite(ref platform,
+				geometryCursor, value))
 			{
 				FreeColumnGeometry(ref platform, block, columns);
 				block = APTR.Null;
@@ -5244,10 +5489,13 @@ public static class MuiListtreeCore
 			out var block, out var columns)) return false;
 		var boundary = 0u;
 		var selected = false;
+		var geometryCursor = default(MuiListtreeColumnGeometryCursor);
+		geometryCursor.Base = block;
 		for (var index = 0u; index < columns; index++)
 		{
-			if (!MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform, block,
-				index, out var value)) break;
+			geometryCursor.Index = index;
+			if (!MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform,
+				geometryCursor, out var value)) break;
 			if (value.Width != 0 && offset < boundary + value.Width)
 			{
 				column = index;
@@ -6244,13 +6492,16 @@ public static class MuiListtreeCore
 		var vector = MuiHeadlessMemory.Allocate(ref platform, vectorSize);
 		if (vector.IsNull) return false;
 		var populated = true;
+		var cursor = default(MuiListtreeDisplayColumnCursor);
+		cursor.Base = vector;
 		for (var column = 0u; column < columnCount; column++)
 		{
+			cursor.Index = column;
 			// MorphOS uses NULL in the tree-column slot to request the
 			// built-in node name. A DisplayHook may replace it with a caller-
 			// owned string, so do not pre-populate a managed or copied value.
 			if (!MuiListtreeDisplayColumnVectorCodec.TryWriteTextValue(ref platform,
-				vector, column, 0))
+				cursor, 0))
 			{
 				populated = false;
 				break;
@@ -6799,12 +7050,14 @@ public static class MuiListtreeCore
 	{
 		length = 0;
 		if (value.IsNull) return false;
+		var cursor = default(MuiListtreeStringByteCursor);
+		cursor.Text = value;
 		for (var index = 0u; index < maximumLength; index++)
 		{
-			if (value.Raw > uint.MaxValue - index) return false;
-			var address = APTR.FromPointer(value.Raw + index);
-			if (!platform.IsMapped(address, 1)) return false;
-			if (platform.ReadUInt8(address, 0) != 0) continue;
+			cursor.Index = index;
+			if (!MuiListtreeStringByteCursorCodec.TryReadByte(ref platform,
+				cursor, out var ch)) return false;
+			if (ch != 0) continue;
 			length = index;
 			return true;
 		}
@@ -6821,13 +7074,18 @@ public static class MuiListtreeCore
 		if (left.Raw == right.Raw) return 0;
 		if (left.IsNull) return right.IsNull ? 0 : -1;
 		if (right.IsNull) return 1;
+		var leftCursor = default(MuiListtreeStringByteCursor);
+		leftCursor.Text = left;
+		var rightCursor = default(MuiListtreeStringByteCursor);
+		rightCursor.Text = right;
 		for (var i = 0u; i < MaximumStringLength; i++)
 		{
-			var la = APTR.FromPointer(left.Raw + i);
-			var ra = APTR.FromPointer(right.Raw + i);
-			if (!platform.IsMapped(la, 1) || !platform.IsMapped(ra, 1)) return 0;
-			var lb = platform.ReadUInt8(la, 0);
-			var rb = platform.ReadUInt8(ra, 0);
+			leftCursor.Index = i;
+			rightCursor.Index = i;
+			if (!MuiListtreeStringByteCursorCodec.TryReadByte(ref platform,
+				leftCursor, out var lb) ||
+				!MuiListtreeStringByteCursorCodec.TryReadByte(ref platform,
+					rightCursor, out var rb)) return 0;
 			if (lb != rb) return lb < rb ? -1 : 1;
 			if (lb == 0) return 0;
 		}

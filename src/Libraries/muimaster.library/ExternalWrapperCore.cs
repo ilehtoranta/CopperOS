@@ -9,6 +9,53 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
+// Named bounded text-span cursor for ExternalWrapper's Dtpic name and class-ID
+// paths. Source/destination exchange and fixed-ID matching share the same
+// address, overflow, and mapped-byte admission rules.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiExternalTextByteCursor
+{
+	internal const uint MaximumLength = 257;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Length;
+}
+
+internal static class MuiExternalTextByteCursorCodec
+{
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiExternalTextByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (cursor.Length == 0 || cursor.Length >
+			MuiExternalTextByteCursor.MaximumLength)
+		{
+			value = 0;
+			return false;
+		}
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiExternalTextByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (cursor.Length == 0 || cursor.Length >
+			MuiExternalTextByteCursor.MaximumLength) return false;
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryWriteByte(ref platform, shared,
+			value);
+	}
+}
+
 // Fixed guest-memory layout for the MG09 external-resource wrapper family:
 // the official Boopsi.mui and Dtpic.mui classes, both of which inherit from
 // Area and both of which own an external resource (an opened BOOPSI class plus
@@ -2308,6 +2355,41 @@ internal static class MuiExternalTagListVectorMemoryCodec
 // complete named TagItem record rather than a slot address.
 internal static class MuiExternalTagListVectorCodec
 {
+	internal static bool TryAdvance(ref MuiExternalTagListCursor cursor,
+		uint items)
+	{
+		if (items == 0 || cursor.Index > uint.MaxValue - items)
+			return false;
+		var next = cursor.Index + items;
+		if (next > MuiExternalTagListCursor.MaximumEntries) return false;
+		cursor.Index = next;
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiExternalTagListCursor cursor, out MuiAslTagItemRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiExternalTagListCursorCodec.TryGetEntry(ref platform, cursor,
+			out var address) || !MuiAslTagItemCodec.TryRead(ref platform, address,
+			out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiExternalTagListCursor cursor, MuiAslTagItemRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiExternalTagListCursorCodec.TryGetEntry(ref platform, cursor,
+			out var address)) return false;
+		return MuiAslTagItemCodec.Write(ref platform, address, value);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR vector,
 		uint index, out MuiAslTagItemRecord value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -2374,6 +2456,41 @@ internal static class MuiExternalRememberVectorMemoryCodec
 // MorphOS bound remains owned by this adapter; callers receive named TagItems.
 internal static class MuiExternalRememberVectorCodec
 {
+	internal static bool TryAdvance(ref MuiExternalRememberCursor cursor,
+		uint items)
+	{
+		if (items == 0 || cursor.Index > uint.MaxValue - items)
+			return false;
+		var next = cursor.Index + items;
+		if (next > MuiExternalRememberCursor.MaximumEntries) return false;
+		cursor.Index = next;
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiExternalRememberCursor cursor, out MuiAslTagItemRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiExternalRememberCursorCodec.TryGetEntry(ref platform, cursor,
+			out var address) || !MuiAslTagItemCodec.TryRead(ref platform, address,
+			out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiExternalRememberCursor cursor, MuiAslTagItemRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiExternalRememberCursorCodec.TryGetEntry(ref platform, cursor,
+			out var address)) return false;
+		return MuiAslTagItemCodec.Write(ref platform, address, value);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR vector,
 		uint index, out MuiAslTagItemRecord value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -2443,6 +2560,42 @@ internal static class MuiExternalBoopsiTagVectorMemoryCodec
 // named BOOPSI TagItem records without exposing slot addresses.
 internal static class MuiExternalBoopsiTagVectorCodec
 {
+	internal static bool TryAdvance(ref MuiExternalBoopsiTagCursor cursor,
+		uint items)
+	{
+		if (items == 0 || cursor.Index > uint.MaxValue - items)
+			return false;
+		var next = cursor.Index + items;
+		if (next > MuiExternalBoopsiTagCursor.MaximumEntries) return false;
+		cursor.Index = next;
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiExternalBoopsiTagCursor cursor, out MuiExternalBoopsiTagItem value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiExternalBoopsiTagCursorCodec.TryGetEntry(ref platform, cursor,
+			out var address) || !MuiExternalBoopsiTagItemStructCodec.TryRead(
+				ref platform, address, out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiExternalBoopsiTagCursor cursor, MuiExternalBoopsiTagItem value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiExternalBoopsiTagCursorCodec.TryGetEntry(ref platform, cursor,
+			out var address)) return false;
+		return MuiExternalBoopsiTagItemStructCodec.Write(ref platform, address,
+			value);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR vector,
 		uint index, out MuiExternalBoopsiTagItem value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -3054,10 +3207,14 @@ public static class MuiExternalWrapperCore
 		var window = display.Window.Raw;
 		var screen = display.Screen.Raw;
 		var drawInfo = display.DrawInfo.Raw;
-		for (var index = 0; index < MuiExternalWrapperLayout.MaxTagWalk; index++)
+		var tagCursor = default(MuiExternalTagListCursor);
+		tagCursor.Base = tags;
+		tagCursor.Index = 0;
+		for (var index = 0u; index < MuiExternalTagListCursor.MaximumEntries;
+			index++)
 		{
-			if (!MuiExternalTagListVectorCodec.TryRead(ref platform, tags,
-				unchecked((uint)index), out var item)) break;
+			if (!MuiExternalTagListVectorCodec.TryRead(ref platform, tagCursor,
+				out var item)) break;
 			if (item.Tag == MuiAslTagListCore.TagDone) break;
 			var value = item.Data;
 			if (tagWindow != 0 && item.Tag == tagWindow) value = window;
@@ -3066,9 +3223,11 @@ public static class MuiExternalWrapperCore
 			if (value != item.Data)
 			{
 				item.Data = value;
-				if (!MuiExternalTagListVectorCodec.TryWrite(ref platform, tags,
-					unchecked((uint)index), item)) break;
+				if (!MuiExternalTagListVectorCodec.TryWrite(ref platform, tagCursor,
+					item)) break;
 			}
+			if (index + 1 < MuiExternalTagListCursor.MaximumEntries &&
+				!MuiExternalTagListVectorCodec.TryAdvance(ref tagCursor, 1)) break;
 		}
 	}
 
@@ -3085,7 +3244,10 @@ public static class MuiExternalWrapperCore
 		if (buffer.IsNull) return false;
 		var item = default(MuiAslTagItemRecord);
 		item.Tag = tag;
-		if (!MuiExternalRememberVectorCodec.TryWrite(ref platform, buffer, count,
+		var cursor = default(MuiExternalRememberCursor);
+		cursor.Base = buffer;
+		cursor.Index = count;
+		if (!MuiExternalRememberVectorCodec.TryWrite(ref platform, cursor,
 			item)) return false;
 		scratch.RememberCount = count + 1;
 		if (!MuiExternalScratchStateCodec.Write(ref platform, instance, scratch))
@@ -3109,13 +3271,18 @@ public static class MuiExternalWrapperCore
 		var count = scratch.RememberCount;
 		if (count > MuiExternalWrapperLayout.MaxRemember)
 			count = MuiExternalWrapperLayout.MaxRemember;
+		var cursor = default(MuiExternalRememberCursor);
+		cursor.Base = buffer;
+		cursor.Index = 0;
 		for (var index = 0u; index < count; index++)
 		{
-			if (!MuiExternalRememberVectorCodec.TryRead(ref platform, buffer, index,
+			if (!MuiExternalRememberVectorCodec.TryRead(ref platform, cursor,
 				out var item)) return;
 			item.Data = BoopsiGet(ref platform, instance, obj, item.Tag);
-			if (!MuiExternalRememberVectorCodec.TryWrite(ref platform, buffer, index,
+			if (!MuiExternalRememberVectorCodec.TryWrite(ref platform, cursor,
 				item)) return;
+			if (index + 1 < count &&
+				!MuiExternalRememberVectorCodec.TryAdvance(ref cursor, 1)) return;
 		}
 	}
 
@@ -3134,11 +3301,16 @@ public static class MuiExternalWrapperCore
 		var count = scratch.RememberCount;
 		if (count > MuiExternalWrapperLayout.MaxRemember)
 			count = MuiExternalWrapperLayout.MaxRemember;
+		var cursor = default(MuiExternalRememberCursor);
+		cursor.Base = buffer;
+		cursor.Index = 0;
 		for (var index = 0u; index < count; index++)
 		{
-			if (!MuiExternalRememberVectorCodec.TryRead(ref platform, buffer, index,
+			if (!MuiExternalRememberVectorCodec.TryRead(ref platform, cursor,
 				out var item)) return;
 			BoopsiSet(ref platform, instance, obj, item.Tag, item.Data);
+			if (index + 1 < count &&
+				!MuiExternalRememberVectorCodec.TryAdvance(ref cursor, 1)) return;
 		}
 	}
 
@@ -3243,13 +3415,30 @@ public static class MuiExternalWrapperCore
 		if (name.IsNotNull)
 		{
 			var length = CStringLength(ref platform, name);
-			var copy = Alloc(ref platform, (uint)length + 1);
+			var copySize = (uint)length + 1;
+			var copy = Alloc(ref platform, copySize);
 			if (copy.IsNull) return false;   // atomic: leaves no owned name
-			for (var index = 0; index < length; index++)
-				platform.WriteUInt8(copy, index, platform.ReadUInt8(name, index));
-			platform.WriteUInt8(copy, length, 0);
+			var sourceCursor = default(MuiExternalTextByteCursor);
+			sourceCursor.Base = name;
+			sourceCursor.Length = copySize;
+			var destinationCursor = default(MuiExternalTextByteCursor);
+			destinationCursor.Base = copy;
+			destinationCursor.Length = copySize;
+			for (var index = 0u; index < copySize; index++)
+			{
+				sourceCursor.Index = index;
+				destinationCursor.Index = index;
+				if (!MuiExternalTextByteCursorCodec.TryReadByte(ref platform,
+					sourceCursor, out var value) ||
+					!MuiExternalTextByteCursorCodec.TryWriteByte(ref platform,
+						destinationCursor, value))
+				{
+					Free(ref platform, copy, copySize);
+					return false;
+				}
+			}
 			dtpic.OwnedName = copy;
-			dtpic.OwnedNameSize = (uint)length + 1;
+			dtpic.OwnedNameSize = copySize;
 		}
 		if (!MuiExternalDtpicStateCodec.Write(ref platform, instance, dtpic))
 		{
@@ -3286,11 +3475,15 @@ public static class MuiExternalWrapperCore
 	private static int CStringLength<TPlatform>(ref TPlatform platform, APTR text)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiExternalTextByteCursor);
+		cursor.Base = text;
+		cursor.Length = MuiExternalTextByteCursor.MaximumLength;
 		var length = 0;
 		while (length < MuiExternalWrapperLayout.MaxNameLength)
 		{
-			if (!platform.IsMapped(text, (uint)length + 1)) break;
-			if (platform.ReadUInt8(text, length) == 0) break;
+			cursor.Index = (uint)length;
+			if (!MuiExternalTextByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var value) || value == 0) break;
 			length++;
 		}
 		return length;
@@ -3402,27 +3595,38 @@ public static class MuiExternalWrapperCore
 		opSet.AttributeList = list;
 		if (!MuiExternalBoopsiPacketCodec.WriteOpSet(ref platform, work, opSet))
 			return false;
+		var tagCursor = default(MuiExternalBoopsiTagCursor);
+		tagCursor.Base = list;
+		tagCursor.Index = 0;
 		var tag = default(MuiExternalBoopsiTagItem);
 		tag.Tag = GaLeft;
 		tag.Data = unchecked((uint)left);
-		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 0,
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, tagCursor,
 			tag))
+			return false;
+		if (!MuiExternalBoopsiTagVectorCodec.TryAdvance(ref tagCursor, 1))
 			return false;
 		tag.Tag = GaTop;
 		tag.Data = unchecked((uint)top);
-		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 1,
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, tagCursor,
 			tag)) return false;
+		if (!MuiExternalBoopsiTagVectorCodec.TryAdvance(ref tagCursor, 1))
+			return false;
 		tag.Tag = GaWidth;
 		tag.Data = unchecked((uint)appliedWidth);
-		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 2,
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, tagCursor,
 			tag)) return false;
+		if (!MuiExternalBoopsiTagVectorCodec.TryAdvance(ref tagCursor, 1))
+			return false;
 		tag.Tag = GaHeight;
 		tag.Data = unchecked((uint)appliedHeight);
-		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 3,
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, tagCursor,
 			tag)) return false;
+		if (!MuiExternalBoopsiTagVectorCodec.TryAdvance(ref tagCursor, 1))
+			return false;
 		tag.Tag = 0; // TAG_DONE
 		tag.Data = 0;
-		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 4,
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, tagCursor,
 			tag)) return false;
 		platform.DoMethod(obj, work);
 		SetFlag(ref platform, instance, MuiExternalWrapperLayout.FlagRedraw, true);
@@ -3522,13 +3726,19 @@ public static class MuiExternalWrapperCore
 	{
 		if (!Valid(ref platform, instance) || attrList.IsNull) return 0;
 		var mapped = 0u;
-		for (var index = 0; index < MuiExternalWrapperLayout.MaxTagWalk; index++)
+		var tagCursor = default(MuiExternalTagListCursor);
+		tagCursor.Base = attrList;
+		tagCursor.Index = 0;
+		for (var index = 0u; index < MuiExternalTagListCursor.MaximumEntries;
+			index++)
 		{
-			if (!MuiExternalTagListVectorCodec.TryRead(ref platform, attrList,
-				unchecked((uint)index), out var item)) break;
+			if (!MuiExternalTagListVectorCodec.TryRead(ref platform, tagCursor,
+				out var item)) break;
 			if (item.Tag == MuiAslTagListCore.TagDone) break;
 			RecordNotify(ref platform, instance, item.Tag, item.Data);
 			mapped++;
+			if (index + 1 < MuiExternalTagListCursor.MaximumEntries &&
+				!MuiExternalTagListVectorCodec.TryAdvance(ref tagCursor, 1)) break;
 		}
 		return mapped;
 	}
@@ -3890,12 +4100,16 @@ public static class MuiExternalWrapperCore
 		opSet.AttributeList = list;
 		if (!MuiExternalBoopsiPacketCodec.WriteOpSet(ref platform, work, opSet))
 			return;
+		var tagCursor = default(MuiExternalBoopsiTagCursor);
+		tagCursor.Base = list;
+		tagCursor.Index = 0;
 		var tag = default(MuiExternalBoopsiTagItem);
 		tag.Tag = attribute;
 		tag.Data = value;
-		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 0,
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, tagCursor,
 			tag)) return;
-		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, list, 1,
+		if (!MuiExternalBoopsiTagVectorCodec.TryAdvance(ref tagCursor, 1) ||
+			!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, tagCursor,
 			default)) return;
 		platform.DoMethod(obj, work);
 	}
@@ -3951,8 +4165,22 @@ public static class MuiExternalWrapperCore
 
 	private static bool M<TPlatform>(ref TPlatform platform, APTR text, int index,
 		byte expected) where TPlatform : struct, IMuiGuestMemory =>
-		platform.IsMapped(text, (uint)index + 1) &&
-		platform.ReadUInt8(text, index) == expected;
+		TryReadExternalTextByte(ref platform, text, index, out var value) &&
+		value == expected;
+
+	private static bool TryReadExternalTextByte<TPlatform>(ref TPlatform platform,
+		APTR text, int index, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (index < 0) return false;
+		var cursor = default(MuiExternalTextByteCursor);
+		cursor.Base = text;
+		cursor.Length = MuiExternalTextByteCursor.MaximumLength;
+		cursor.Index = (uint)index;
+		return MuiExternalTextByteCursorCodec.TryReadByte(ref platform, cursor,
+			out value);
+	}
 
 	// ---- Recursive class-owned disposal --------------------------------------
 

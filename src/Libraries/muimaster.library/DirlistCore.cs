@@ -348,6 +348,200 @@ internal struct MuiDirlistScanEntryWireState
 	internal uint Ticks;
 }
 
+// Named view of the fixed ExAll-like scan payload tail. The scratch header
+// codec supplies the record identity; this cursor owns the two fixed string
+// ranges and their capacities so scan consumers never rebuild raw offsets.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiDirlistScanEntryTailCursor
+{
+	internal const uint NameOffset = MuiDirlistScanEntryWireState.NameOffset;
+	internal const uint CommentOffset = MuiDirlistScanEntryWireState.CommentOffset;
+	internal const uint TotalSize = MuiDirlistScanEntryWireState.TotalSize;
+	internal const uint NameCapacity = CommentOffset - NameOffset;
+	internal const uint CommentCapacity = TotalSize - CommentOffset;
+	internal APTR Scratch;
+}
+
+internal static class MuiDirlistScanEntryTailCursorCodec
+{
+	private static bool TryGetRange<TPlatform>(ref TPlatform platform,
+		MuiDirlistScanEntryTailCursor cursor, uint offset, uint length,
+		out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		var scratch = APTR.FromPointer(cursor.Scratch.Raw);
+		if (scratch.IsNull || offset >
+			MuiDirlistScanEntryTailCursor.TotalSize || length >
+			MuiDirlistScanEntryTailCursor.TotalSize - offset ||
+			scratch.Raw > uint.MaxValue - offset ||
+			!platform.IsMapped(scratch,
+				MuiDirlistScanEntryTailCursor.TotalSize)) return false;
+		address = APTR.FromPointer(scratch.Raw + offset);
+		return platform.IsMapped(address, length);
+	}
+
+	internal static bool TryGetName<TPlatform>(ref TPlatform platform,
+		MuiDirlistScanEntryTailCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryGetRange(ref platform, cursor,
+			MuiDirlistScanEntryTailCursor.NameOffset,
+			MuiDirlistScanEntryTailCursor.NameCapacity, out address);
+
+	internal static bool TryGetComment<TPlatform>(ref TPlatform platform,
+		MuiDirlistScanEntryTailCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryGetRange(ref platform, cursor,
+			MuiDirlistScanEntryTailCursor.CommentOffset,
+			MuiDirlistScanEntryTailCursor.CommentCapacity, out address);
+}
+
+// Named cursor for bounded byte-wise traversal of a Dirlist string. The
+// comparison path only needs one byte at a time, so the cursor carries the
+// guest STRPTR and logical index while the adapter owns range admission and
+// address formation.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiDirlistStringByteCursor
+{
+	internal const uint MaximumBytes = MuiDirlistCore.MaxName +
+		MuiDirlistCore.MaxComment;
+	internal APTR Base;
+	internal uint Index;
+}
+
+internal static class MuiDirlistStringByteCursorCodec
+{
+	internal static bool TryGetByte<TPlatform>(ref TPlatform platform,
+		MuiDirlistStringByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiDirlistStringByteCursor.MaximumBytes;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiDirlistStringByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiDirlistStringByteCursor.MaximumBytes;
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiDirlistStringByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiDirlistStringByteCursor.MaximumBytes;
+		return MuiCStringByteCursorCodec.TryWriteByte(ref platform, shared,
+			value);
+	}
+}
+
+// Named bounded cursor for Dirlist pattern/name matching.  Pattern and name
+// spans carry their measured lengths, while this adapter owns the maximum
+// range, index/overflow checks, and mapped-byte admission for each read.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiDirlistMatchByteCursor
+{
+	internal const uint MaximumLength = MuiDirlistCore.MaxPattern + 1;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Length;
+}
+
+internal static class MuiDirlistMatchByteCursorCodec
+{
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiDirlistMatchByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		if (shared.Limit > MuiDirlistMatchByteCursor.MaximumLength)
+		{
+			value = 0;
+			return false;
+		}
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+}
+
+// Named cursor for bounded path-buffer byte exchange. Unlike the fixed-size
+// name/comment cursor above, this view carries its validated buffer length so
+// ComputePath can append directory, separator, name, and terminator bytes
+// without exposing indexed guest addresses to the production consumer.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiDirlistPathByteCursor
+{
+	internal const uint MaximumLength = 2048;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Length;
+}
+
+internal static class MuiDirlistPathByteCursorCodec
+{
+	internal static bool TryGetByte<TPlatform>(ref TPlatform platform,
+		MuiDirlistPathByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		if (shared.Limit > MuiDirlistPathByteCursor.MaximumLength)
+			return false;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiDirlistPathByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		if (shared.Limit > MuiDirlistPathByteCursor.MaximumLength)
+		{
+			value = 0;
+			return false;
+		}
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiDirlistPathByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		if (shared.Limit > MuiDirlistPathByteCursor.MaximumLength) return false;
+		return MuiCStringByteCursorCodec.TryWriteByte(ref platform, shared,
+			value);
+	}
+}
+
 internal enum MuiDirlistRecordKind : byte
 {
 	ByteTotal,
@@ -857,6 +1051,55 @@ internal static class MuiDirlistScanEntryWireCodec
 	}
 }
 
+// Named view of the variable tail carried by an owned Dirlist entry. The
+// fixed header codec supplies RecordSize/CommentOffset; this cursor owns the
+// validated name/comment ranges so consumers never rebuild entry+offset
+// arithmetic themselves.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiDirlistEntryTailCursor
+{
+	internal const uint NameOffset = MuiDirlistEntryWireState.NameOffset;
+	internal const uint MaximumRecordSize = 228;
+	internal APTR Entry;
+	internal uint RecordSize;
+	internal uint CommentOffset;
+}
+
+internal static class MuiDirlistEntryTailCursorCodec
+{
+	private static bool TryGetRange<TPlatform>(ref TPlatform platform,
+		MuiDirlistEntryTailCursor cursor, uint offset, out APTR address,
+		out uint length)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		length = 0;
+		if (cursor.Entry.IsNull || cursor.RecordSize >
+			MuiDirlistEntryTailCursor.MaximumRecordSize || offset <
+			MuiDirlistEntryTailCursor.NameOffset || offset >= cursor.RecordSize ||
+			cursor.Entry.Raw > uint.MaxValue - offset) return false;
+		length = cursor.RecordSize - offset;
+		address = APTR.FromPointer(cursor.Entry.Raw + offset);
+		return platform.IsMapped(address, length);
+	}
+
+	internal static bool TryGetName<TPlatform>(ref TPlatform platform,
+		MuiDirlistEntryTailCursor cursor, out APTR address, out uint length)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryGetRange(ref platform, cursor,
+			MuiDirlistEntryTailCursor.NameOffset, out address, out length);
+
+	internal static bool TryGetComment<TPlatform>(ref TPlatform platform,
+		MuiDirlistEntryTailCursor cursor, out APTR address, out uint length)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		length = 0;
+		return cursor.CommentOffset != 0 && TryGetRange(ref platform, cursor,
+			cursor.CommentOffset, out address, out length);
+	}
+}
+
 // Dirlist.mui (autodoc MUI_Dirlist.doc). Dirlist is a subclass of List that
 // shows the entries of a directory. It is built directly on the shared
 // MuiListCore backbone: each displayed entry is an owned, guest-resident
@@ -933,11 +1176,11 @@ public static class MuiDirlistCore
 	private const uint IoErrKey = 0x0D100010u;
 
 	// ---- Bounds --------------------------------------------------------------
-	private const uint MaxName = 108;
-	private const uint MaxComment = 80;
+	internal const uint MaxName = 108;
+	internal const uint MaxComment = 80;
 	private const uint MaxEntryRecord = 228;
 	private const uint MaxPath = 1024;
-	private const uint MaxPattern = 256;
+	internal const uint MaxPattern = 256;
 	private const int MaxScanEntries = 65536;
 
 	// ---- Scan-entry scratch layout (written by IMuiDirectoryCapability) ------
@@ -1419,8 +1662,13 @@ public static class MuiDirlistCore
 			recordSize > MaxEntryRecord ||
 			!platform.IsMapped(entry, recordSize)) return false;
 
-		var name = APTR.FromPointer(entry.Raw + MuiDirlistEntryWireState.NameOffset);
-		var nameLimit = recordSize - MuiDirlistEntryWireState.NameOffset;
+		var tailCursor = default(MuiDirlistEntryTailCursor);
+		tailCursor.Entry = entry;
+		tailCursor.RecordSize = recordSize;
+		tailCursor.CommentOffset = wire.CommentOffset;
+		if (!MuiDirlistEntryTailCursorCodec.TryGetName(ref platform, tailCursor,
+			out var name, out var nameCapacity)) return false;
+		var nameLimit = nameCapacity;
 		if (nameLimit > MaxName) nameLimit = MaxName;
 		if (nameLimit == 0 || !CStringCodec.TryReadLength(ref platform, name,
 			nameLimit, out var nameLength)) return false;
@@ -1439,11 +1687,12 @@ public static class MuiDirlistCore
 		{
 			var minimumComment = MuiDirlistEntryWireState.NameOffset +
 				nameLength + 1;
-			if (commentOffset < minimumComment || commentOffset >= recordSize)
-				return false;
-			var commentLimit = recordSize - commentOffset;
+			if (commentOffset < minimumComment) return false;
+			tailCursor.CommentOffset = commentOffset;
+			if (!MuiDirlistEntryTailCursorCodec.TryGetComment(ref platform,
+				tailCursor, out comment, out var commentCapacity)) return false;
+			var commentLimit = commentCapacity;
 			if (commentLimit > MaxComment + 1) commentLimit = MaxComment + 1;
-			comment = APTR.FromPointer(entry.Raw + commentOffset);
 			if (!CStringCodec.TryReadLength(ref platform, comment, commentLimit,
 				out commentLength)) return false;
 		}
@@ -1461,6 +1710,29 @@ public static class MuiDirlistCore
 		result.NameLength = nameLength;
 		result.Comment = comment;
 		result.CommentLength = commentLength;
+		return true;
+	}
+
+	private static bool CopyStringThroughCursor<TPlatform>(ref TPlatform platform,
+		APTR source, APTR destination, uint length)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (destination.IsNull || length >= MuiDirlistStringByteCursor.MaximumBytes ||
+			(length != 0 && source.IsNull)) return false;
+		var sourceCursor = default(MuiDirlistStringByteCursor);
+		sourceCursor.Base = source;
+		var destinationCursor = default(MuiDirlistStringByteCursor);
+		destinationCursor.Base = destination;
+		for (var i = 0u; i <= length; i++)
+		{
+			sourceCursor.Index = i;
+			destinationCursor.Index = i;
+			var value = (byte)0;
+			if (i < length && !MuiDirlistStringByteCursorCodec.TryReadByte(
+				ref platform, sourceCursor, out value)) return false;
+			if (!MuiDirlistStringByteCursorCodec.TryWriteByte(ref platform,
+				destinationCursor, value)) return false;
+		}
 		return true;
 	}
 
@@ -1488,7 +1760,7 @@ public static class MuiDirlistCore
 		if (target.Name.Raw < target.Address.Raw ||
 			target.Comment.Raw < target.Address.Raw ||
 			target.Name.Raw - target.Address.Raw !=
-				MuiDirlistEntryWireState.NameOffset)
+			MuiDirlistEntryWireState.NameOffset)
 			return false;
 		var commentOffset = target.Comment.Raw - target.Address.Raw;
 		if (commentOffset < MuiDirlistEntryWireState.NameOffset +
@@ -1496,6 +1768,15 @@ public static class MuiDirlistCore
 			commentOffset >= target.RecordSize ||
 			target.RecordSize - commentOffset < target.CommentLength + 1)
 			return false;
+		var tailCursor = default(MuiDirlistEntryTailCursor);
+		tailCursor.Entry = target.Address;
+		tailCursor.RecordSize = target.RecordSize;
+		tailCursor.CommentOffset = commentOffset;
+		if (!MuiDirlistEntryTailCursorCodec.TryGetName(ref platform, tailCursor,
+			out var expectedName, out _) || expectedName.Raw != target.Name.Raw ||
+			!MuiDirlistEntryTailCursorCodec.TryGetComment(ref platform, tailCursor,
+				out var expectedComment, out _) ||
+			expectedComment.Raw != target.Comment.Raw) return false;
 
 		var wire = default(MuiDirlistEntryWireState);
 		wire.RecordSize = target.RecordSize;
@@ -1509,15 +1790,9 @@ public static class MuiDirlistCore
 		wire.CommentOffset = commentOffset;
 		if (!MuiDirlistEntryWireCodec.Write(ref platform, target.Address, wire))
 			return false;
-		for (var i = 0u; i < target.NameLength; i++)
-			platform.WriteUInt8(target.Name, (int)i,
-				platform.ReadUInt8(sourceName, (int)i));
-		platform.WriteUInt8(target.Name, (int)target.NameLength, 0);
-		for (var i = 0u; i < target.CommentLength; i++)
-			platform.WriteUInt8(target.Comment, (int)i,
-				platform.ReadUInt8(sourceComment, (int)i));
-		platform.WriteUInt8(target.Comment, (int)target.CommentLength, 0);
-		return true;
+		return CopyStringThroughCursor(ref platform, sourceName, target.Name,
+			target.NameLength) && CopyStringThroughCursor(ref platform,
+			sourceComment, target.Comment, target.CommentLength);
 	}
 
 	private static bool WriteEntryProtection<TPlatform>(ref TPlatform platform,
@@ -1540,12 +1815,14 @@ public static class MuiDirlistCore
 			!MuiDirlistScanEntryWireCodec.TryRead(ref platform, scratch,
 				out var wire) || !platform.IsMapped(scratch, ScanEntrySize))
 			return false;
-		var name = APTR.FromPointer(scratch.Raw +
-			MuiDirlistScanEntryWireState.NameOffset);
+		var tailCursor = default(MuiDirlistScanEntryTailCursor);
+		tailCursor.Scratch = scratch;
+		if (!MuiDirlistScanEntryTailCursorCodec.TryGetName(ref platform,
+			tailCursor, out var name)) return false;
 		if (!CStringCodec.TryReadLength(ref platform, name, MaxName,
 			out var nameLength)) return false;
-		var comment = APTR.FromPointer(scratch.Raw +
-			MuiDirlistScanEntryWireState.CommentOffset);
+		if (!MuiDirlistScanEntryTailCursorCodec.TryGetComment(ref platform,
+			tailCursor, out var comment)) return false;
 		var commentLength = 0u;
 		if (!CStringCodec.TryReadLength(ref platform, comment, MaxComment,
 			out commentLength)) comment = APTR.Null;
@@ -1591,19 +1868,14 @@ public static class MuiDirlistCore
 		wire.Ticks = value.Ticks;
 		if (!MuiDirlistScanEntryWireCodec.Write(ref platform, scratch, wire))
 			return false;
-		var name = APTR.FromPointer(scratch.Raw +
-			MuiDirlistScanEntryWireState.NameOffset);
-		for (var i = 0u; i < nameLength; i++)
-			platform.WriteUInt8(name, (int)i,
-				platform.ReadUInt8(value.Name, (int)i));
-		platform.WriteUInt8(name, (int)nameLength, 0);
-		var comment = APTR.FromPointer(scratch.Raw +
-			MuiDirlistScanEntryWireState.CommentOffset);
-		for (var i = 0u; i < commentLength; i++)
-			platform.WriteUInt8(comment, (int)i,
-				platform.ReadUInt8(value.Comment, (int)i));
-		platform.WriteUInt8(comment, (int)commentLength, 0);
-		return true;
+		var tailCursor = default(MuiDirlistScanEntryTailCursor);
+		tailCursor.Scratch = scratch;
+		if (!MuiDirlistScanEntryTailCursorCodec.TryGetName(ref platform,
+			tailCursor, out var name) || !MuiDirlistScanEntryTailCursorCodec
+			.TryGetComment(ref platform, tailCursor, out var comment)) return false;
+		return CopyStringThroughCursor(ref platform, value.Name, name,
+			nameLength) && CopyStringThroughCursor(ref platform, value.Comment,
+			comment, commentLength);
 	}
 
 	// Emit the deterministic example-volume name without exposing its fixed
@@ -1619,8 +1891,10 @@ public static class MuiDirlistCore
 		wire.Type = 2;
 		if (!MuiDirlistScanEntryWireCodec.Write(ref platform, scratch, wire))
 			return false;
-		var name = APTR.FromPointer(scratch.Raw +
-			MuiDirlistScanEntryWireState.NameOffset);
+		var tailCursor = default(MuiDirlistScanEntryTailCursor);
+		tailCursor.Scratch = scratch;
+		if (!MuiDirlistScanEntryTailCursorCodec.TryGetName(ref platform,
+			tailCursor, out var name)) return false;
 		return MuiDirlistExampleVolumeNameRecordCodec.WriteRecord(ref platform, name,
 			MuiDirlistExampleVolumeNameRecord.Create(digit));
 	}
@@ -2039,11 +2313,20 @@ public static class MuiDirlistCore
 		var target = source;
 		target.Address = record;
 		target.RecordSize = recordSize;
-		target.Name = APTR.FromPointer(record.Raw +
-			MuiDirlistEntryWireState.NameOffset);
 		var commentOffset = MuiDirlistEntryWireState.NameOffset +
 			target.NameLength + 1;
-		target.Comment = APTR.FromPointer(record.Raw + commentOffset);
+		var tailCursor = default(MuiDirlistEntryTailCursor);
+		tailCursor.Entry = record;
+		tailCursor.RecordSize = recordSize;
+		tailCursor.CommentOffset = commentOffset;
+		if (!MuiDirlistEntryTailCursorCodec.TryGetName(ref platform, tailCursor,
+			out target.Name, out _) || !MuiDirlistEntryTailCursorCodec.TryGetComment(
+			ref platform, tailCursor, out target.Comment, out _))
+		{
+			platform.Clear(record, recordSize);
+			platform.Free(record, recordSize);
+			return APTR.Null;
+		}
 		if (!WriteEntryRecord(ref platform, target, source.Name, source.Comment))
 		{
 			platform.Clear(record, recordSize);
@@ -2128,13 +2411,26 @@ public static class MuiDirlistCore
 	private static bool HasInfoSuffix<TPlatform>(ref TPlatform platform, APTR name)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!CStringCodec.TryReadLength(ref platform, name, MaxName, out var length)
+	if (!CStringCodec.TryReadLength(ref platform, name, MaxName, out var length)
 			|| length < 5) return false;
-		return Lower(platform.ReadUInt8(name, (int)length - 5)) == (byte)'.' &&
-			Lower(platform.ReadUInt8(name, (int)length - 4)) == (byte)'i' &&
-			Lower(platform.ReadUInt8(name, (int)length - 3)) == (byte)'n' &&
-			Lower(platform.ReadUInt8(name, (int)length - 2)) == (byte)'f' &&
-			Lower(platform.ReadUInt8(name, (int)length - 1)) == (byte)'o';
+		var cursor = default(MuiDirlistMatchByteCursor);
+		cursor.Base = name;
+		cursor.Length = length;
+		cursor.Index = length - 5;
+		if (!MuiDirlistMatchByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var dot) || Lower(dot) != (byte)'.') return false;
+		cursor.Index++;
+		if (!MuiDirlistMatchByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var i) || Lower(i) != (byte)'i') return false;
+		cursor.Index++;
+		if (!MuiDirlistMatchByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var n) || Lower(n) != (byte)'n') return false;
+		cursor.Index++;
+		if (!MuiDirlistMatchByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var f) || Lower(f) != (byte)'f') return false;
+		cursor.Index++;
+		return MuiDirlistMatchByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var o) && Lower(o) == (byte)'o';
 	}
 
 	// A bounded, case-insensitive AmigaDOS-style pattern matcher supporting the
@@ -2160,10 +2456,12 @@ public static class MuiDirlistCore
 		var n = ni;
 		while (p < pLen)
 		{
-			var pc = platform.ReadUInt8(pattern, p);
+			if (!TryReadMatchByte(ref platform, pattern, pLen, p, out var pc))
+				return false;
 			var isAny = pc == (byte)'*' ||
 				(pc == (byte)'#' && p + 1 < pLen &&
-					platform.ReadUInt8(pattern, p + 1) == (byte)'?');
+					TryReadMatchByte(ref platform, pattern, pLen, p + 1,
+						out var hashQuestion) && hashQuestion == (byte)'?');
 			if (isAny)
 			{
 				var advance = pc == (byte)'*' ? 1 : 2;
@@ -2174,12 +2472,27 @@ public static class MuiDirlistCore
 				return false;
 			}
 			if (n >= nLen) return false;
-			var nc = platform.ReadUInt8(name, n);
+			if (!TryReadMatchByte(ref platform, name, nLen, n, out var nc))
+				return false;
 			if (pc != (byte)'?' && Lower(pc) != Lower(nc)) return false;
 			p++;
 			n++;
 		}
 		return n == nLen;
+	}
+
+	private static bool TryReadMatchByte<TPlatform>(ref TPlatform platform,
+		APTR text, int length, int index, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (length <= 0 || index < 0) return false;
+		var cursor = default(MuiDirlistMatchByteCursor);
+		cursor.Base = text;
+		cursor.Length = (uint)length;
+		cursor.Index = (uint)index;
+		return MuiDirlistMatchByteCursorCodec.TryReadByte(ref platform, cursor,
+			out value);
 	}
 
 	// ---- Comparison ----------------------------------------------------------
@@ -2245,17 +2558,24 @@ public static class MuiDirlistCore
 	private static int CompareSigned(int left, int right) =>
 		left == right ? 0 : left < right ? -1 : 1;
 
-	private static int CompareStrings<TPlatform>(ref TPlatform platform, APTR left,
+	internal static int CompareStrings<TPlatform>(ref TPlatform platform, APTR left,
 		APTR right) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (left.Raw == right.Raw) return 0;
+		var leftCursor = default(MuiDirlistStringByteCursor);
+		leftCursor.Base = left;
+		var rightCursor = default(MuiDirlistStringByteCursor);
+		rightCursor.Base = right;
 		for (var i = 0u; i < MaxName + MaxComment; i++)
 		{
-			var la = APTR.FromPointer(left.Raw + i);
-			var ra = APTR.FromPointer(right.Raw + i);
-			if (!platform.IsMapped(la, 1) || !platform.IsMapped(ra, 1)) return 0;
-			var lb = Lower(platform.ReadUInt8(la, 0));
-			var rb = Lower(platform.ReadUInt8(ra, 0));
+			leftCursor.Index = i;
+			rightCursor.Index = i;
+			if (!MuiDirlistStringByteCursorCodec.TryReadByte(ref platform,
+				leftCursor, out var la) ||
+				!MuiDirlistStringByteCursorCodec.TryReadByte(ref platform,
+					rightCursor, out var ra)) return 0;
+			var lb = Lower(la);
+			var rb = Lower(ra);
 			if (lb != rb) return lb < rb ? -1 : 1;
 			if (lb == 0) return 0;
 		}
@@ -2263,6 +2583,27 @@ public static class MuiDirlistCore
 	}
 
 	// ---- Path computation ----------------------------------------------------
+
+	private static bool AppendPathBytes<TPlatform>(ref TPlatform platform,
+		APTR source, uint sourceLength,
+		ref MuiDirlistPathByteCursor destination)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (sourceLength == 0) return true;
+		var sourceCursor = default(MuiDirlistPathByteCursor);
+		sourceCursor.Base = source;
+		sourceCursor.Length = sourceLength;
+		for (var i = 0u; i < sourceLength; i++)
+		{
+			sourceCursor.Index = i;
+			if (!MuiDirlistPathByteCursorCodec.TryReadByte(ref platform,
+				sourceCursor, out var value) ||
+				!MuiDirlistPathByteCursorCodec.TryWriteByte(ref platform,
+				destination, value)) return false;
+			destination.Index++;
+		}
+		return true;
+	}
 
 	private static APTR ComputePath<TPlatform>(ref TPlatform platform, APTR state,
 		APTR obj) where TPlatform : struct, IMuiHeadlessPlatform
@@ -2289,15 +2630,33 @@ public static class MuiDirlistCore
 		var total = dirLength + (separator ? 1u : 0u) + nameLength;
 		var scratch = MuiHeadlessMemory.Allocate(ref platform, total + 1);
 		if (scratch.IsNull) return APTR.Null;
-		var cursor = 0u;
-		for (var i = 0u; i < dirLength; i++)
-			platform.WriteUInt8(scratch, (int)cursor++,
-				platform.ReadUInt8(dir, (int)i));
-		if (separator) platform.WriteUInt8(scratch, (int)cursor++, (byte)'/');
-		for (var i = 0u; i < nameLength; i++)
-			platform.WriteUInt8(scratch, (int)cursor++,
-				platform.ReadUInt8(name, (int)i));
-		platform.WriteUInt8(scratch, (int)cursor, 0);
+		var pathCursor = default(MuiDirlistPathByteCursor);
+		pathCursor.Base = scratch;
+		pathCursor.Length = total + 1;
+		if (!AppendPathBytes(ref platform, dir, dirLength, ref pathCursor))
+		{
+			platform.Clear(scratch, total + 1);
+			platform.Free(scratch, total + 1);
+			return APTR.Null;
+		}
+		if (separator)
+		{
+			if (!MuiDirlistPathByteCursorCodec.TryWriteByte(ref platform,
+				pathCursor, (byte)'/'))
+			{
+				platform.Clear(scratch, total + 1);
+				platform.Free(scratch, total + 1);
+				return APTR.Null;
+			}
+			pathCursor.Index++;
+		}
+		if (!AppendPathBytes(ref platform, name, nameLength, ref pathCursor) ||
+			!MuiDirlistPathByteCursorCodec.TryWriteByte(ref platform, pathCursor, 0))
+		{
+			platform.Clear(scratch, total + 1);
+			platform.Free(scratch, total + 1);
+			return APTR.Null;
+		}
 		var stored = MuiStoreCore.DataspaceAdd(ref platform, state, obj, PathKey,
 			scratch, (int)(total + 1));
 		platform.Clear(scratch, total + 1);
@@ -2310,7 +2669,12 @@ public static class MuiDirlistCore
 		APTR dir, uint length) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (length == 0) return false;
-		var last = platform.ReadUInt8(dir, (int)length - 1);
+		var cursor = default(MuiDirlistPathByteCursor);
+		cursor.Base = dir;
+		cursor.Index = length - 1;
+		cursor.Length = length;
+		if (!MuiDirlistPathByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var last)) return false;
 		return last == (byte)':' || last == (byte)'/';
 	}
 

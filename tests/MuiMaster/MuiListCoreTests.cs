@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Amiga;
 using CopperOS.MuiMaster;
 
@@ -6,6 +7,72 @@ namespace CopperOS.MuiMaster.Tests;
 public sealed class MuiListCoreTests
 {
 	private static readonly APTR State = APTR.FromPointer(0x1000);
+
+	[Fact]
+	public void ListFormatByteCursorUsesBoundedNamedReads()
+	{
+		var platform = CreatePlatform(out _, out _, 0x40000);
+		var cursor = new MuiListFormatByteCursor
+		{
+			Format = APTR.FromPointer(0x1800),
+			Index = 2,
+		};
+		platform.WriteUInt8(cursor.Format, 2, (byte)'X');
+		Assert.True(MuiListFormatByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value));
+		Assert.Equal((byte)'X', value);
+		cursor.Index = MuiListFormatByteCursor.MaximumLength;
+		Assert.False(MuiListFormatByteCursorCodec.TryGetByte(ref platform,
+			cursor, out _));
+		cursor.Format = APTR.FromPointer(0x41000);
+		cursor.Index = 1;
+		Assert.False(MuiListFormatByteCursorCodec.TryGetByte(ref platform,
+			cursor, out _));
+		cursor.Format = APTR.Null;
+		cursor.Index = 0;
+		Assert.False(MuiListFormatByteCursorCodec.TryGetByte(ref platform,
+			cursor, out _));
+	}
+
+	[Fact]
+	public void ListFormatByteCursorSupportsIndexedAdmission()
+	{
+		var platform = CreatePlatform(out _, out _, 0x40000);
+		var format = APTR.FromPointer(0x1800);
+		platform.WriteUInt8(format, 4, (byte)'Q');
+		Assert.True(MuiListFormatByteCursorCodec.TryReadAt(ref platform,
+			format, 4, out var value));
+		Assert.Equal((byte)'Q', value);
+		Assert.False(MuiListFormatByteCursorCodec.TryReadAt(ref platform,
+			format, -1, out _));
+		Assert.False(MuiListFormatByteCursorCodec.TryReadAt(ref platform,
+			format, (int)MuiListFormatByteCursor.MaximumLength, out _));
+	}
+
+	[Fact]
+	public void ListPreparseByteCursorUsesBoundedNamedWrites()
+	{
+		Assert.Equal(12, Unsafe.SizeOf<MuiListPreparseByteCursor>());
+		var platform = CreatePlatform(out _, out _, 0x40000);
+		var storage = APTR.FromPointer(0x1800);
+		var cursor = default(MuiListPreparseByteCursor);
+		cursor.Base = storage;
+		cursor.Capacity = 4;
+		Assert.True(MuiListPreparseByteCursorCodec.TryWriteByte(ref platform,
+			cursor, (byte)'P'));
+		Assert.Equal((byte)'P', platform.ReadUInt8(storage, 0));
+		cursor.Index = 4;
+		Assert.False(MuiListPreparseByteCursorCodec.TryWriteByte(ref platform,
+			cursor, 0));
+		cursor.Index = 0;
+		cursor.Capacity = MuiListPreparseByteCursor.MaximumLength + 1;
+		Assert.False(MuiListPreparseByteCursorCodec.TryWriteByte(ref platform,
+			cursor, 0));
+		cursor.Capacity = 4;
+		cursor.Base = APTR.Null;
+		Assert.False(MuiListPreparseByteCursorCodec.TryWriteByte(ref platform,
+			cursor, 0));
+	}
 
 	// MUIV_List_* selectors exercised by the tests.
 	private const int InsertBottom = -3;

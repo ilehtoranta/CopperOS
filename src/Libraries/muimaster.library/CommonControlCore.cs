@@ -9,6 +9,386 @@ using System.Runtime.InteropServices;
 
 namespace CopperOS.MuiMaster;
 
+// Named bounded cursor for common-control class-name classification.  Class
+// identity is derived from a guest C string; this value type keeps the 64-byte
+// admission bound and byte mapping checks out of the hash/suffix logic.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiCommonControlClassNameByteCursor
+{
+	internal const uint MaximumLength = 64;
+	internal APTR Text;
+	internal uint Index;
+}
+
+internal static class MuiCommonControlClassNameByteCursorCodec
+{
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiCommonControlClassNameByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiCommonControlClassNameByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+}
+
+// Named bounded cursor for Numeric.mui format-string scanning.  The parser's
+// 256-byte MorphOS compatibility limit and guest-byte admission stay here,
+// separate from the output-buffer writer.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiNumericFormatByteCursor
+{
+	internal const uint MaximumLength = 256;
+	internal APTR Text;
+	internal uint Index;
+}
+
+internal static class MuiNumericFormatByteCursorCodec
+{
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiNumericFormatByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiNumericFormatByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+}
+
+// Named bounded cursor for Numeric.mui output buffers. Formatting loops carry
+// the destination base, logical index, and caller capacity; range, overflow,
+// and mapped-byte checks stay in this value-type adapter.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiNumericOutputByteCursor
+{
+	internal const uint MaximumLength = 16u * 1024u;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Capacity;
+}
+
+internal static class MuiNumericOutputByteCursorCodec
+{
+	internal static bool TryGetRange<TPlatform>(ref TPlatform platform,
+		MuiNumericOutputByteCursor cursor, uint byteCount, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (cursor.Capacity > MuiNumericOutputByteCursor.MaximumLength)
+			return false;
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Capacity;
+		return MuiCStringByteCursorCodec.TryGetRange(ref platform, shared,
+			byteCount, out address);
+	}
+
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiNumericOutputByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetRange(ref platform, cursor, 1, out var address)) return false;
+		platform.WriteUInt8(address, 0, value);
+		return true;
+	}
+}
+
+// Named bounded cursor for String.mui integer parsing. The parser only needs
+// the guest text base and a logical byte index; all 4 KiB admission and
+// address-overflow checks remain in this value-type adapter.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiStringIntegerParseByteCursor
+{
+	internal const uint MaximumLength = 4096;
+	internal APTR Text;
+	internal uint Index;
+}
+
+internal static class MuiStringIntegerParseByteCursorCodec
+{
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiStringIntegerParseByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiStringIntegerParseByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+}
+
+// Named bounded cursor for String.mui filter-byte membership checks. The
+// caller carries only a guest C-string base and byte index; the 256-byte
+// admission and mapping rules stay in this value-type codec.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiStringFilterByteCursor
+{
+	internal const uint MaximumLength = 256;
+	internal APTR Text;
+	internal uint Index;
+}
+
+internal static class MuiStringFilterByteCursorCodec
+{
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiStringFilterByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiStringFilterByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+}
+
+// Named bounded cursor for String.mui C-string length measurement. The
+// adapter preserves the 4 KiB scan limit and keeps guest address admission out
+// of the callers that consume the measured length.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiStringLengthByteCursor
+{
+	internal const uint MaximumLength = 4096;
+	internal APTR Text;
+	internal uint Index;
+}
+
+internal static class MuiStringLengthByteCursorCodec
+{
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiStringLengthByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiStringLengthByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+}
+
+// Named bounded cursor for Text.mui bracketed escape payloads. The parser
+// consumes only a guest text base and logical index; 4 KiB address admission
+// and overflow checks remain in this value-type adapter.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiTextBracketByteCursor
+{
+	internal const uint MaximumLength = 4096;
+	internal APTR Text;
+	internal uint Index;
+}
+
+internal static class MuiTextBracketByteCursorCodec
+{
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiTextBracketByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiTextBracketByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+}
+
+// Named bounded cursor for Text.mui visible-text scans. The scanner carries
+// only a guest text base and logical byte index; the 4 KiB admission bound,
+// overflow check, and mapped-byte test remain in this value-type adapter.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiTextScanByteCursor
+{
+	internal const uint MaximumLength = 4096;
+	internal APTR Text;
+	internal uint Index;
+}
+
+internal static class MuiTextScanByteCursorCodec
+{
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiTextScanByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Text;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiTextScanByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+}
+
+// Named bounded cursor for Text.mui's private render buffers. Both source
+// scans and destination writes carry an explicit span length; range, overflow,
+// and mapping checks stay in this value-type adapter rather than in drawing
+// loops that otherwise tend to repeat raw pointer arithmetic.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiTextRenderByteCursor
+{
+	internal const uint MaximumLength = 4096;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Length;
+}
+
+internal static class MuiTextRenderByteCursorCodec
+{
+	internal static bool TryGetRange<TPlatform>(ref TPlatform platform,
+		MuiTextRenderByteCursor cursor, uint byteCount, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (cursor.Length > MuiTextRenderByteCursor.MaximumLength) return false;
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryGetRange(ref platform, shared,
+			byteCount, out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiTextRenderByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetRange(ref platform, cursor, 1, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiTextRenderByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetRange(ref platform, cursor, 1, out var address)) return false;
+		platform.WriteUInt8(address, 0, value);
+		return true;
+	}
+}
+
+// Named bounded cursor for String.mui editable contents and edit-hook
+// snapshots. Source and destination copies carry an explicit span length;
+// range, overflow, and mapping checks stay in this value-type adapter.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiStringEditByteCursor
+{
+	internal const uint MaximumLength = 16u * 1024u;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Length;
+}
+
+internal static class MuiStringEditByteCursorCodec
+{
+	internal static bool TryGetRange<TPlatform>(ref TPlatform platform,
+		MuiStringEditByteCursor cursor, uint byteCount, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (cursor.Length > MuiStringEditByteCursor.MaximumLength) return false;
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryGetRange(ref platform, shared,
+			byteCount, out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiStringEditByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetRange(ref platform, cursor, 1, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiStringEditByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetRange(ref platform, cursor, 1, out var address)) return false;
+		platform.WriteUInt8(address, 0, value);
+		return true;
+	}
+}
+
+// Named cursor for the bounded ByteRun1 compressed/decompressed spans used by
+// Bodychunk. The decoder carries guest base, logical index, and span length;
+// range and byte admission stay here instead of being repeated as raw pointer
+// arithmetic in the compression loop.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiByteRunByteCursor
+{
+	internal const uint MaximumLength = 16u * 1024u * 1024u;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Length;
+}
+
+internal static class MuiByteRunByteCursorCodec
+{
+	internal static bool TryReadAt<TPlatform>(ref TPlatform platform,
+		APTR baseAddress, uint length, int index, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (index < 0) return false;
+		var cursor = default(MuiByteRunByteCursor);
+		cursor.Base = baseAddress;
+		cursor.Index = (uint)index;
+		cursor.Length = length;
+		return TryReadByte(ref platform, cursor, out value);
+	}
+
+	internal static bool TryGetRange<TPlatform>(ref TPlatform platform,
+		MuiByteRunByteCursor cursor, uint byteCount, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		var baseAddress = APTR.FromPointer(cursor.Base.Raw);
+		if (baseAddress.IsNull || cursor.Length == 0 ||
+			cursor.Length > MuiByteRunByteCursor.MaximumLength ||
+			cursor.Index > cursor.Length || byteCount > cursor.Length - cursor.Index ||
+			baseAddress.Raw > uint.MaxValue - cursor.Index) return false;
+		address = APTR.FromPointer(baseAddress.Raw + cursor.Index);
+		return platform.IsMapped(address, byteCount);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiByteRunByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetRange(ref platform, cursor, 1, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiByteRunByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetRange(ref platform, cursor, 1, out var address)) return false;
+		platform.WriteUInt8(address, 0, value);
+		return true;
+	}
+}
+
 // Class identity for the active MG07 common controls. Determined from the
 // registered class name rather than from any private MorphOS vector, so no
 // MorphOS compatibility is advertised.
@@ -224,6 +604,58 @@ internal static class MuiChoiceEntryVectorMemoryCodec
 // record; callers do not handle slot addresses or wire offsets themselves.
 internal static class MuiChoiceEntryVectorCodec
 {
+	internal static bool TryAdvance(ref MuiChoiceEntryCursor cursor,
+		uint items)
+	{
+		if (items == 0 || cursor.Index > uint.MaxValue - items)
+			return false;
+		var next = cursor.Index + items;
+		if (next > MuiChoiceEntryCursor.MaximumEntries) return false;
+		cursor.Index = next;
+		return true;
+	}
+
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		MuiChoiceEntryCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
+			cursor.Base, cursor.Index, out address);
+
+	// The one-pointer record remains named at the semantic boundary; scalar
+	// access is confined to its native-safe record codec.
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		MuiChoiceEntryCursor cursor, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiChoiceEntryCodec.TryReadValue(ref platform, address, out value);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiChoiceEntryCursor cursor, out MuiChoiceEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadValue(ref platform, cursor, out var rawText)) return false;
+		value.Text = APTR.FromPointer(rawText);
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiChoiceEntryCursor cursor, MuiChoiceEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteValue(ref platform, cursor, value.Text.Raw);
+
+	internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+		MuiChoiceEntryCursor cursor, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiChoiceEntryCodec.WriteValue(ref platform, address,
+			value);
+	}
+
 	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 		APTR vector, uint index, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -937,21 +1369,20 @@ public static class MuiCommonControlCore
 		APTR name) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (name.IsNull) return MuiControlClass.Unknown;
+		var cursor = default(MuiCommonControlClassNameByteCursor);
+		cursor.Text = name;
 		uint hash = 2166136261u;
 		var length = 0;
 		for (; length < 64; length++)
 		{
-			if (!platform.IsMapped(name, (uint)length + 1))
-				return MuiControlClass.Unknown;
-			var ch = platform.ReadUInt8(name, length);
+			cursor.Index = (uint)length;
+			if (!MuiCommonControlClassNameByteCursorCodec.TryReadByte(ref platform,
+				cursor, out var ch)) return MuiControlClass.Unknown;
 			if (ch == 0) break;
 			hash = (hash ^ Lower(ch)) * 16777619u;
 		}
 		if (length < 5 || length == 64 ||
-			platform.ReadUInt8(name, length - 4) != (byte)'.' ||
-			Lower(platform.ReadUInt8(name, length - 3)) != (byte)'m' ||
-			Lower(platform.ReadUInt8(name, length - 2)) != (byte)'u' ||
-			Lower(platform.ReadUInt8(name, length - 1)) != (byte)'i')
+			!TryReadClassNameSuffix(ref platform, ref cursor, length))
 			return MuiControlClass.Unknown;
 		switch (hash)
 		{
@@ -979,6 +1410,24 @@ public static class MuiCommonControlCore
 			case 0x4BC2FBC7u: return MuiControlClass.Objectmap;
 		}
 		return MuiControlClass.Unknown;
+	}
+
+	private static bool TryReadClassNameSuffix<TPlatform>(ref TPlatform platform,
+		ref MuiCommonControlClassNameByteCursor cursor, int length)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		cursor.Index = (uint)(length - 4);
+		if (!MuiCommonControlClassNameByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var dot) || dot != (byte)'.') return false;
+		cursor.Index = (uint)(length - 3);
+		if (!MuiCommonControlClassNameByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var m) || Lower(m) != (byte)'m') return false;
+		cursor.Index = (uint)(length - 2);
+		if (!MuiCommonControlClassNameByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var u) || Lower(u) != (byte)'u') return false;
+		cursor.Index = (uint)(length - 1);
+		return MuiCommonControlClassNameByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var i) && Lower(i) == (byte)'i';
 	}
 
 	private static byte Lower(byte ch) =>
@@ -1698,10 +2147,13 @@ public static class MuiCommonControlCore
 		// compatibility path; MakeObjectA roots register Text.mui and therefore
 		// produce semantically correct Text children.
 		if (textClass.IsNull) textClass = classRecord;
+		var entryCursor = default(MuiChoiceEntryCursor);
+		entryCursor.Base = entries;
+		entryCursor.Index = 0;
 		for (var index = 0; index < count; index++)
 		{
-			if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entries,
-				unchecked((uint)index), out var rawText)) return false;
+			if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entryCursor,
+				out var rawText)) return false;
 			var label = APTR.FromPointer(rawText);
 			var child = label.IsNull ? APTR.Null :
 				MuiHeadlessObjectCore.CreateObjectA(ref platform, state, textClass,
@@ -1719,6 +2171,9 @@ public static class MuiCommonControlCore
 					MuiFamilyCore.RemoveAllChildren(ref platform, state, record, true);
 				return false;
 			}
+			if (index + 1 < count &&
+				!MuiChoiceEntryVectorCodec.TryAdvance(ref entryCursor, 1))
+				return false;
 		}
 		return true;
 	}
@@ -5982,14 +6437,24 @@ public static class MuiCommonControlCore
 		// instead of widening the buffer and leaking a digit.
 		if (bufferSize == 1)
 		{
-			platform.WriteUInt8(buffer, 0, 0);
+			var terminator = default(MuiNumericOutputByteCursor);
+			terminator.Base = buffer;
+			terminator.Capacity = (uint)bufferSize;
+			if (!MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform,
+				terminator, 0)) return -1;
 			return 0;
 		}
 		var position = 0;
+		var output = default(MuiNumericOutputByteCursor);
+		output.Base = buffer;
+		output.Capacity = (uint)bufferSize;
 		uint number;
 		if (value < 0)
 		{
-			platform.WriteUInt8(buffer, position++, (byte)'-');
+			output.Index = (uint)position;
+			if (!MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform,
+				output, (byte)'-')) return -1;
+			position++;
 			number = ~(uint)value + 1u;
 		}
 		else number = (uint)value;
@@ -6003,11 +6468,16 @@ public static class MuiCommonControlCore
 		while (divisor >= 1 && position < bufferSize - 1)
 		{
 			var digit = (byte)((number / divisor) % 10);
-			platform.WriteUInt8(buffer, position++, unchecked((byte)('0' + digit)));
+			output.Index = (uint)position;
+			if (!MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform,
+				output, unchecked((byte)('0' + digit)))) return -1;
+			position++;
 			if (divisor == 1) break;
 			divisor /= 10;
 		}
-		platform.WriteUInt8(buffer, position, 0);
+		output.Index = (uint)position;
+		if (!MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform, output, 0))
+			return -1;
 		return position;
 	}
 
@@ -6026,10 +6496,13 @@ public static class MuiCommonControlCore
 			!platform.IsMapped(buffer, (uint)bufferSize)) return -1;
 		var position = 0;
 		var formatPosition = 0;
+		var formatCursor = default(MuiNumericFormatByteCursor);
+		formatCursor.Text = format;
 		while (formatPosition < 256)
 		{
-			if (!platform.IsMapped(format, (uint)formatPosition + 1)) return -1;
-			var ch = platform.ReadUInt8(format, formatPosition++);
+			formatCursor.Index = (uint)formatPosition++;
+			if (!MuiNumericFormatByteCursorCodec.TryReadByte(ref platform,
+				formatCursor, out var ch)) return -1;
 			if (ch == 0) break;
 			if (ch != (byte)'%')
 			{
@@ -6037,8 +6510,9 @@ public static class MuiCommonControlCore
 					ref position, ch)) return -1;
 				continue;
 			}
-			if (!platform.IsMapped(format, (uint)formatPosition + 1)) return -1;
-			ch = platform.ReadUInt8(format, formatPosition++);
+			formatCursor.Index = (uint)formatPosition++;
+			if (!MuiNumericFormatByteCursorCodec.TryReadByte(ref platform,
+				formatCursor, out ch)) return -1;
 
 			if (ch == (byte)'%')
 			{
@@ -6051,22 +6525,23 @@ public static class MuiCommonControlCore
 			{
 				if (ch == (byte)'+') flags |= FormatPlus;
 				if (ch == (byte)'0') flags |= FormatZero;
-				if (!platform.IsMapped(format, (uint)formatPosition + 1))
-					return -1;
-				ch = platform.ReadUInt8(format, formatPosition++);
+				formatCursor.Index = (uint)formatPosition++;
+				if (!MuiNumericFormatByteCursorCodec.TryReadByte(ref platform,
+					formatCursor, out ch)) return -1;
 			}
 			var width = 0;
 			while (ch >= (byte)'0' && ch <= (byte)'9')
 			{
 				if (width < 64) width = width * 10 + ch - (byte)'0';
-				if (!platform.IsMapped(format, (uint)formatPosition + 1))
-					return -1;
-				ch = platform.ReadUInt8(format, formatPosition++);
+				formatCursor.Index = (uint)formatPosition++;
+				if (!MuiNumericFormatByteCursorCodec.TryReadByte(ref platform,
+					formatCursor, out ch)) return -1;
 			}
 			if (ch == (byte)'l')
 			{
-				if (!platform.IsMapped(format, (uint)formatPosition + 1)) return -1;
-				ch = platform.ReadUInt8(format, formatPosition++);
+				formatCursor.Index = (uint)formatPosition++;
+				if (!MuiNumericFormatByteCursorCodec.TryReadByte(ref platform,
+					formatCursor, out ch)) return -1;
 			}
 			if (ch == (byte)'u') flags |= FormatUnsigned;
 			if (ch == (byte)'x' || ch == (byte)'X')
@@ -6079,16 +6554,29 @@ public static class MuiCommonControlCore
 		}
 		if (formatPosition >= 256) return -1;
 		if (position >= bufferSize) return -1;
-		platform.WriteUInt8(buffer, position, 0);
+		var terminator = default(MuiNumericOutputByteCursor);
+		terminator.Base = buffer;
+		terminator.Index = (uint)position;
+		terminator.Capacity = (uint)bufferSize;
+		if (!MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform, terminator, 0))
+			return -1;
 		return position;
 	}
 
 	private static bool WriteFormattedByte<TPlatform>(ref TPlatform platform,
 		APTR buffer, int bufferSize, ref int position, byte value)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 	{
 		if (position >= bufferSize - 1) return false;
-		platform.WriteUInt8(buffer, position++, value);
+		if (position < 0 || bufferSize <= 0 || bufferSize >
+			(int)MuiNumericOutputByteCursor.MaximumLength) return false;
+		var cursor = default(MuiNumericOutputByteCursor);
+		cursor.Base = buffer;
+		cursor.Index = (uint)position;
+		cursor.Capacity = (uint)bufferSize;
+		if (!MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform, cursor, value))
+			return false;
+		position++;
 		return true;
 	}
 
@@ -6240,9 +6728,18 @@ public static class MuiCommonControlCore
 			obj, StringMaskKey);
 		if (buffer.IsNull || !platform.IsMapped(buffer, (uint)capacity))
 			return APTR.Null;
+		var mask = default(MuiNumericOutputByteCursor);
+		mask.Base = buffer;
+		mask.Capacity = (uint)capacity;
 		for (var index = 0; index < count; index++)
-			platform.WriteUInt8(buffer, index, (byte)'.');
-		platform.WriteUInt8(buffer, count, 0);
+		{
+			mask.Index = (uint)index;
+			if (!MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform, mask,
+				(byte)'.')) return APTR.Null;
+		}
+		mask.Index = (uint)count;
+		if (!MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform, mask, 0))
+			return APTR.Null;
 		return buffer;
 	}
 
@@ -9155,10 +9652,20 @@ public static class MuiCommonControlCore
 				unicode);
 			var end = StringByteOffset(ref platform, contents, position, unicode);
 			var removed = end > start ? end - start : 1u;
+			var source = default(MuiStringEditByteCursor);
+			source.Base = contents;
+			source.Length = byteLength < 0 || byteLength >=
+				(int)MuiStringEditByteCursor.MaximumLength ? 0u : (uint)(byteLength + 1);
+			var destination = source;
 			for (var index = unchecked((int)start);
 				index <= byteLength - unchecked((int)removed); index++)
-				platform.WriteUInt8(contents, index,
-					platform.ReadUInt8(contents, index + unchecked((int)removed)));
+			{
+				source.Index = unchecked((uint)(index + unchecked((int)removed)));
+				destination.Index = unchecked((uint)index);
+				if (!MuiStringEditByteCursorCodec.TryReadByte(ref platform, source,
+					out var value) || !MuiStringEditByteCursorCodec.TryWriteByte(
+					ref platform, destination, value)) return 0;
+			}
 			return CommitStringEdit(ref platform, state, obj, position - 1);
 		}
 		if (muiKey == KeyDelete)
@@ -9168,10 +9675,20 @@ public static class MuiCommonControlCore
 			var end = StringByteOffset(ref platform, contents, position + 1,
 				unicode);
 			var removed = end > start ? end - start : 1u;
+			var source = default(MuiStringEditByteCursor);
+			source.Base = contents;
+			source.Length = byteLength < 0 || byteLength >=
+				(int)MuiStringEditByteCursor.MaximumLength ? 0u : (uint)(byteLength + 1);
+			var destination = source;
 			for (var index = unchecked((int)start);
 				index <= byteLength - unchecked((int)removed); index++)
-				platform.WriteUInt8(contents, index,
-					platform.ReadUInt8(contents, index + unchecked((int)removed)));
+			{
+				source.Index = unchecked((uint)(index + unchecked((int)removed)));
+				destination.Index = unchecked((uint)index);
+				if (!MuiStringEditByteCursorCodec.TryReadByte(ref platform, source,
+					out var value) || !MuiStringEditByteCursorCodec.TryWriteByte(
+					ref platform, destination, value)) return 0;
+			}
 			return CommitStringEdit(ref platform, state, obj, position);
 		}
 		if (muiKey == KeyPress)
@@ -9221,9 +9738,20 @@ public static class MuiCommonControlCore
 		if (editedContents.IsNull) return 0;
 		var bytePosition = StringByteOffset(ref platform, editedContents, position,
 			unicode);
+		if (desired <= 0 || desired > MuiStringEditByteCursor.MaximumLength)
+			return 0;
+		var source = default(MuiStringEditByteCursor);
+		source.Base = editedContents;
+		source.Length = (uint)desired;
+		var destination = source;
 		for (var index = byteLength; index >= unchecked((int)bytePosition); index--)
-			platform.WriteUInt8(editedContents, index + encoded.Length,
-				platform.ReadUInt8(editedContents, index));
+		{
+			source.Index = unchecked((uint)index);
+			destination.Index = unchecked((uint)(index + encoded.Length));
+			if (!MuiStringEditByteCursorCodec.TryReadByte(ref platform, source,
+				out var value) || !MuiStringEditByteCursorCodec.TryWriteByte(
+				ref platform, destination, value)) return 0;
+		}
 		WriteUtf8Character(ref platform, editedContents,
 			unchecked((int)bytePosition),
 			encoded);
@@ -9467,7 +9995,7 @@ public static class MuiCommonControlCore
 		return true;
 	}
 
-	private static bool TryReadStringCodePoint<TPlatform>(
+	internal static bool TryReadStringCodePoint<TPlatform>(
 		ref TPlatform platform, APTR contents, uint byteIndex, uint byteLength,
 		bool unicode, out uint codePoint, out uint bytes)
 		where TPlatform : struct, IMuiGuestMemory
@@ -9477,7 +10005,13 @@ public static class MuiCommonControlCore
 		if (byteIndex >= byteLength) return false;
 		if (!unicode)
 		{
-			codePoint = platform.ReadUInt8(contents, unchecked((int)byteIndex));
+			var cursor = default(MuiStringEditByteCursor);
+			cursor.Base = contents;
+			cursor.Index = byteIndex;
+			cursor.Length = byteLength;
+			if (!MuiStringEditByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var value)) return false;
+			codePoint = value;
 			return true;
 		}
 		if (!MuiStringscrollCore.TryReadUtf8(ref platform, contents, byteIndex,
@@ -9599,9 +10133,28 @@ public static class MuiCommonControlCore
 				handled = lonely;
 				return 0;
 			}
+			var source = default(MuiStringEditByteCursor);
+			source.Base = hookContents.Contents;
+			source.Length = snapshotLength + 1;
+			var destination = default(MuiStringEditByteCursor);
+			destination.Base = snapshotAddress;
+			destination.Length = snapshotLength + 1;
 			for (var index = 0; index <= unchecked((int)snapshotLength); index++)
-				platform.WriteUInt8(snapshotAddress, index,
-					platform.ReadUInt8(hookContents.Contents, index));
+			{
+				source.Index = (uint)index;
+				destination.Index = (uint)index;
+				if (!MuiStringEditByteCursorCodec.TryReadByte(ref platform, source,
+					out var value) || !MuiStringEditByteCursorCodec.TryWriteByte(
+					ref platform, destination, value))
+				{
+					ReleaseStringEditSnapshot(ref platform, snapshotAddress,
+						snapshotLength + 1);
+					platform.Free(commandAddress, MuiStringEditCommandRecord.Size);
+					platform.Free(workAddress, MuiStringEditWorkRecord.Size);
+					handled = lonely;
+					return 0;
+				}
+			}
 		}
 		work.WorkBuffer = hookContents.Contents;
 		work.PrevBuffer = work.WorkBuffer;
@@ -9825,9 +10378,21 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (destination.IsNull || snapshot.IsNull) return;
+		if (length >= MuiStringEditByteCursor.MaximumLength) return;
+		var source = default(MuiStringEditByteCursor);
+		source.Base = snapshot;
+		source.Length = length + 1;
+		var target = default(MuiStringEditByteCursor);
+		target.Base = destination;
+		target.Length = length + 1;
 		for (var index = 0; index <= unchecked((int)length); index++)
-			platform.WriteUInt8(destination, index,
-				platform.ReadUInt8(snapshot, index));
+		{
+			source.Index = (uint)index;
+			target.Index = (uint)index;
+			if (!MuiStringEditByteCursorCodec.TryReadByte(ref platform, source,
+				out var value) || !MuiStringEditByteCursorCodec.TryWriteByte(
+				ref platform, target, value)) return;
+		}
 	}
 
 	private static void ReleaseStringEditSnapshot<TPlatform>(
@@ -11461,26 +12026,44 @@ public static class MuiCommonControlCore
 			return TryEncodeUtf8Input(input, unicode, out encoded);
 		}
 
-		private static void WriteUtf8Character<TPlatform>(ref TPlatform platform,
+		internal static void WriteUtf8Character<TPlatform>(ref TPlatform platform,
 			APTR destination, int offset, MuiUtf8Character encoded)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			platform.WriteUInt8(destination, offset, encoded.First);
+			if (offset < 0 || encoded.Length == 0 || encoded.Length > 4 ||
+				offset > (int)MuiStringEditByteCursor.MaximumLength - encoded.Length)
+				return;
+			var cursor = default(MuiStringEditByteCursor);
+			cursor.Base = destination;
+			cursor.Length = MuiStringEditByteCursor.MaximumLength;
+			cursor.Index = (uint)offset;
+			if (!MuiStringEditByteCursorCodec.TryWriteByte(ref platform, cursor,
+				encoded.First)) return;
 			if (encoded.Length < 2) return;
-			platform.WriteUInt8(destination, offset + 1, encoded.Second);
+			cursor.Index = (uint)(offset + 1);
+			if (!MuiStringEditByteCursorCodec.TryWriteByte(ref platform, cursor,
+				encoded.Second)) return;
 			if (encoded.Length < 3) return;
-			platform.WriteUInt8(destination, offset + 2, encoded.Third);
+			cursor.Index = (uint)(offset + 2);
+			if (!MuiStringEditByteCursorCodec.TryWriteByte(ref platform, cursor,
+				encoded.Third)) return;
 			if (encoded.Length < 4) return;
-			platform.WriteUInt8(destination, offset + 3, encoded.Fourth);
+			cursor.Index = (uint)(offset + 3);
+			MuiStringEditByteCursorCodec.TryWriteByte(ref platform, cursor,
+				encoded.Fourth);
 		}
 
 		private static bool ContainsByte<TPlatform>(ref TPlatform platform,
-		APTR source, byte value) where TPlatform : struct, IMuiGuestMemory
+			APTR source, byte value) where TPlatform : struct, IMuiGuestMemory
 	{
-		for (var index = 0; index < 256; index++)
+		var cursor = default(MuiStringFilterByteCursor);
+		cursor.Text = source;
+		for (var index = 0u; index < MuiStringFilterByteCursor.MaximumLength;
+			index++)
 		{
-			if (!platform.IsMapped(source, (uint)index + 1)) return false;
-			var current = platform.ReadUInt8(source, index);
+			cursor.Index = index;
+			if (!MuiStringFilterByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var current)) return false;
 			if (current == 0) return false;
 			if (current == value) return true;
 		}
@@ -11693,7 +12276,18 @@ public static class MuiCommonControlCore
 			}
 		}
 		if (maxChars == 0)
-			platform.WriteUInt8(buffer, 0, 0);
+		{
+			var terminator = default(MuiNumericOutputByteCursor);
+			terminator.Base = buffer;
+			terminator.Capacity = (uint)capacity;
+			if (!MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform,
+				terminator, 0))
+			{
+				RollbackStringInteger64Mutation(ref platform, state, obj,
+					ref mutation);
+				return false;
+			}
+		}
 		else if (MuiStringInteger64Codec.Stringify(ref platform, buffer, capacity,
 			value) < 0)
 		{
@@ -11890,17 +12484,21 @@ public static class MuiCommonControlCore
 		if (source.IsNull) return 0;
 		var index = 0;
 		var negative = false;
-		if (platform.IsMapped(source, 1))
+		var cursor = default(MuiStringIntegerParseByteCursor);
+		cursor.Text = source;
+		cursor.Index = 0;
+		if (MuiStringIntegerParseByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var first))
 		{
-			var first = platform.ReadUInt8(source, 0);
 			if (first == (byte)'-') { negative = true; index = 1; }
 			else if (first == (byte)'+') index = 1;
 		}
 		uint result = 0;
-		for (; index < 4096; index++)
+		for (; index < (int)MuiStringIntegerParseByteCursor.MaximumLength; index++)
 		{
-			if (!platform.IsMapped(source, (uint)index + 1)) break;
-			var ch = platform.ReadUInt8(source, index);
+			cursor.Index = (uint)index;
+			if (!MuiStringIntegerParseByteCursorCodec.TryReadByte(ref platform,
+				cursor, out var ch)) break;
 			if (ch < (byte)'0' || ch > (byte)'9') break;
 			result = unchecked(result * 10u + (uint)(ch - (byte)'0'));
 		}
@@ -13561,7 +14159,12 @@ public static class MuiCommonControlCore
 			length + 1)) return false;
 		var copy = MuiStoreCore.DataspaceFind(ref platform, state, obj, storeKey);
 		if (copy.IsNull) return false;
-		platform.WriteUInt8(copy, length, 0);
+		var terminator = default(MuiStringEditByteCursor);
+		terminator.Base = copy;
+		terminator.Index = unchecked((uint)length);
+		terminator.Length = unchecked((uint)(length + 1));
+		if (!MuiStringEditByteCursorCodec.TryWriteByte(ref platform, terminator, 0))
+			return false;
 		if (attribute == StringContents &&
 			Classify(ref platform, state, obj) == MuiControlClass.String)
 		{
@@ -13618,12 +14221,17 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (source.IsNull) return 0;
-		for (var index = 0; index < 4096; index++)
+		var cursor = default(MuiStringLengthByteCursor);
+		cursor.Text = source;
+		for (var index = 0u; index < MuiStringLengthByteCursor.MaximumLength;
+			index++)
 		{
-			if (!platform.IsMapped(source, (uint)index + 1)) return index;
-			if (platform.ReadUInt8(source, index) == 0) return index;
+			cursor.Index = index;
+			if (!MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var value)) return unchecked((int)index);
+			if (value == 0) return unchecked((int)index);
 		}
-		return 4096;
+		return unchecked((int)MuiStringLengthByteCursor.MaximumLength);
 	}
 
 	// Caller-owned String/Text contents are guest C strings at the public ABI
@@ -13718,10 +14326,13 @@ public static class MuiCommonControlCore
 		var textLength = unchecked((uint)scanLength);
 		var hasLength = unicode && (byteLength >= 0 ||
 			CStringCodec.TryReadLength(ref platform, text, 4096, out textLength));
+		var cursor = default(MuiTextScanByteCursor);
+		cursor.Text = text;
 		for (var i = 0; i < scanLength; i++)
 		{
-			if (!platform.IsMapped(text, (uint)i + 1)) break;
-			var ch = platform.ReadUInt8(text, i);
+			cursor.Index = (uint)i;
+			if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var ch)) break;
 			if (ch == 0) break;
 			if (engineOn && ch == TextEscape)
 			{
@@ -13751,8 +14362,12 @@ public static class MuiCommonControlCore
 	private static int ConsumeEscape<TPlatform>(ref TPlatform platform, APTR text,
 		int pos, ref bool engineOn) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!platform.IsMapped(text, (uint)pos + 1)) return 0;
-		var c = platform.ReadUInt8(text, pos);
+		if (pos < 0 || pos >= (int)MuiTextScanByteCursor.MaximumLength) return 0;
+		var cursor = default(MuiTextScanByteCursor);
+		cursor.Text = text;
+		cursor.Index = (uint)pos;
+		if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var c)) return 0;
 		if (c == 0) return 0;
 		if (c == (byte)'-') { engineOn = false; return 1; }
 		if (c == (byte)'p' || c == (byte)'P' || c == (byte)'I')
@@ -13760,18 +14375,28 @@ public static class MuiCommonControlCore
 		return 1;
 	}
 
-	private static int ConsumeBracketedSpec<TPlatform>(ref TPlatform platform,
+	internal static int ConsumeBracketedSpec<TPlatform>(ref TPlatform platform,
 		APTR text, int pos) where TPlatform : struct, IMuiGuestMemory
 	{
+		if (pos < 0) return 0;
 		var consumed = 1;
+		var cursor = default(MuiTextBracketByteCursor);
+		cursor.Text = text;
+		cursor.Index = (uint)pos;
+		if (!platform.IsMapped(text, (uint)pos + 1) ||
+			!MuiTextBracketByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var code) || code == 0) return 0;
+		cursor.Index = (uint)pos + 1;
 		if (platform.IsMapped(text, (uint)pos + 2) &&
-			platform.ReadUInt8(text, pos + 1) == (byte)'[')
+			MuiTextBracketByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var opening) && opening == (byte)'[')
 		{
 			consumed++;
 			for (var j = pos + 2; j < pos + 2 + 64; j++)
 			{
-				if (!platform.IsMapped(text, (uint)j + 1)) break;
-				var d = platform.ReadUInt8(text, j);
+				cursor.Index = (uint)j;
+				if (!MuiTextBracketByteCursorCodec.TryReadByte(ref platform,
+					cursor, out var d)) break;
 				consumed++;
 				if (d == (byte)']' || d == 0) break;
 			}
@@ -13819,7 +14444,7 @@ public static class MuiCommonControlCore
 	// one bounded value record and the existing escape consumer still strips the
 	// directives from the guest-visible glyph buffer.  A reset is reported as a
 	// present zero-style request so the provider can restore its defaults.
-	private static bool TryReadLeadingTextStyle<TPlatform>(
+	internal static bool TryReadLeadingTextStyle<TPlatform>(
 		ref TPlatform platform, APTR preParse, out uint styleFlags)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -13827,13 +14452,17 @@ public static class MuiCommonControlCore
 		if (preParse.IsNull) return false;
 		var present = false;
 		var engineOn = true;
+		var cursor = default(MuiTextScanByteCursor);
+		cursor.Text = preParse;
 		for (var i = 0; i < 4096 && engineOn; i++)
 		{
-			if (!platform.IsMapped(preParse, (uint)i + 1)) break;
-			var ch = platform.ReadUInt8(preParse, i);
+			cursor.Index = (uint)i;
+			if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var ch)) break;
 			if (ch == 0 || ch != TextEscape) break;
-			if (!platform.IsMapped(preParse, (uint)i + 2)) break;
-			var code = platform.ReadUInt8(preParse, i + 1);
+			cursor.Index = (uint)(i + 1);
+			if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var code)) break;
 			switch (code)
 			{
 				case (byte)'s': styleFlags |= MuiCustomFontSpecFlags.Shadow;
@@ -13864,7 +14493,7 @@ public static class MuiCommonControlCore
 	// intentionally bounded and value-only: providers receive the final colour
 	// and alpha fields, while the existing render-buffer consumer strips the
 	// escape bytes.  Per-glyph colour runs remain provider-owned work.
-	private static bool TryReadLeadingTextInlineColor<TPlatform>(
+	internal static bool TryReadLeadingTextInlineColor<TPlatform>(
 		ref TPlatform platform, APTR preParse, out uint color, out uint alpha,
 		out uint flags) where TPlatform : struct, IMuiGuestMemory
 	{
@@ -13874,13 +14503,17 @@ public static class MuiCommonControlCore
 		if (preParse.IsNull) return false;
 		var present = false;
 		var engineOn = true;
+		var cursor = default(MuiTextScanByteCursor);
+		cursor.Text = preParse;
 		for (var i = 0; i < 4096 && engineOn; i++)
 		{
-			if (!platform.IsMapped(preParse, (uint)i + 1)) break;
-			var ch = platform.ReadUInt8(preParse, i);
+			cursor.Index = (uint)i;
+			if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var ch)) break;
 			if (ch == 0 || ch != TextEscape) break;
-			if (!platform.IsMapped(preParse, (uint)i + 2)) break;
-			var code = platform.ReadUInt8(preParse, i + 1);
+			cursor.Index = (uint)(i + 1);
+			if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var code)) break;
 			if (code == (byte)'-') { engineOn = false; i++; continue; }
 			if (code == (byte)'I')
 			{
@@ -13936,19 +14569,26 @@ public static class MuiCommonControlCore
 		return present;
 	}
 
-	private static bool TryReadBracketedPayload<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadBracketedPayload<TPlatform>(ref TPlatform platform,
 		APTR text, int specPos, out int payloadStart, out int payloadLength)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		payloadStart = 0;
 		payloadLength = 0;
-		if (!platform.IsMapped(text, (uint)specPos + 2) ||
-			platform.ReadUInt8(text, specPos + 1) != (byte)'[') return false;
+		if (specPos < -1 || specPos >
+			unchecked((int)MuiTextBracketByteCursor.MaximumLength - 2) ||
+			!platform.IsMapped(text, (uint)specPos + 2)) return false;
+		var cursor = default(MuiTextBracketByteCursor);
+		cursor.Text = text;
+		cursor.Index = (uint)(specPos + 1);
+		if (!MuiTextBracketByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var opening) || opening != (byte)'[') return false;
 		payloadStart = specPos + 2;
 		for (var j = payloadStart; j < payloadStart + 64; j++)
 		{
-			if (!platform.IsMapped(text, (uint)j + 1)) return false;
-			var ch = platform.ReadUInt8(text, j);
+			cursor.Index = (uint)j;
+			if (!MuiTextBracketByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var ch)) return false;
 			if (ch == (byte)']')
 			{
 				payloadLength = j - payloadStart;
@@ -13959,31 +14599,49 @@ public static class MuiCommonControlCore
 		return false;
 	}
 
-	private static bool TryParseHex<TPlatform>(ref TPlatform platform, APTR text,
+	internal static bool TryParseHex<TPlatform>(ref TPlatform platform, APTR text,
 		int start, int length, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (length <= 0 || length > 8) return false;
+		if (start < 0 || length <= 0 || length > 8 ||
+			start > (int)MuiTextScanByteCursor.MaximumLength - length) return false;
+		var cursor = default(MuiTextScanByteCursor);
+		cursor.Text = text;
 		for (var i = 0; i < length; i++)
 		{
-			if (!TryReadHexNibble(platform.ReadUInt8(text, start + i),
-				out var nibble)) return false;
+			cursor.Index = (uint)(start + i);
+			if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var digit) || !TryReadHexNibble(digit, out var nibble))
+				return false;
 			value = (value << 4) | nibble;
 		}
 		return true;
 	}
 
-	private static bool TryReadHexAlphaOnly<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadHexAlphaOnly<TPlatform>(ref TPlatform platform,
 		APTR text, int start, out uint alpha)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		alpha = 0;
-		if (!TryReadHexNibble(platform.ReadUInt8(text, start), out var high) ||
-			!TryReadHexNibble(platform.ReadUInt8(text, start + 1), out var low))
+		if (start < 0 || start >
+			(int)MuiTextScanByteCursor.MaximumLength - 8) return false;
+		var cursor = default(MuiTextScanByteCursor);
+		cursor.Text = text;
+		cursor.Index = (uint)start;
+		if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var highByte) || !TryReadHexNibble(highByte, out var high))
+			return false;
+		cursor.Index = (uint)(start + 1);
+		if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var lowByte) || !TryReadHexNibble(lowByte, out var low))
 			return false;
 		for (var i = 2; i < 8; i++)
-			if (platform.ReadUInt8(text, start + i) != (byte)'-') return false;
+		{
+			cursor.Index = (uint)(start + i);
+			if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var separator) || separator != (byte)'-') return false;
+		}
 		alpha = (high << 4) | low;
 		return true;
 	}
@@ -14012,7 +14670,7 @@ public static class MuiCommonControlCore
 	// Decode a leading MorphOS Text.mui `ESC I[s]` directive into the existing
 	// named image-spec value. Rendering and resource lookup remain provider
 	// owned; this bounded parser creates no managed string or image object.
-	private static bool TryReadLeadingTextInlineImage<TPlatform>(
+	internal static bool TryReadLeadingTextInlineImage<TPlatform>(
 		ref TPlatform platform, APTR preParse, out MuiImageSpec spec)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -14021,13 +14679,17 @@ public static class MuiCommonControlCore
 		if (preParse.IsNull) return false;
 		var present = false;
 		var engineOn = true;
+		var cursor = default(MuiTextScanByteCursor);
+		cursor.Text = preParse;
 		for (var i = 0; i < 4096 && engineOn; i++)
 		{
-			if (!platform.IsMapped(preParse, (uint)i + 1)) break;
-			var ch = platform.ReadUInt8(preParse, i);
+			cursor.Index = (uint)i;
+			if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var ch)) break;
 			if (ch == 0 || ch != TextEscape) break;
-			if (!platform.IsMapped(preParse, (uint)i + 2)) break;
-			var code = platform.ReadUInt8(preParse, i + 1);
+			cursor.Index = (uint)(i + 1);
+			if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var code)) break;
 			if (code == (byte)'-') { engineOn = false; i++; continue; }
 			if (code != (byte)'I')
 			{
@@ -14056,9 +14718,16 @@ public static class MuiCommonControlCore
 	{
 		result = default;
 		result.Kind = MuiImageSpecKind.Invalid;
-		if (length < 3 || !platform.IsMapped(text, (uint)start + 2) ||
-			platform.ReadUInt8(text, start + 1) != (byte)':') return false;
-		var lead = platform.ReadUInt8(text, start);
+		if (start < 0 || length < 3 ||
+			length > (int)MuiTextScanByteCursor.MaximumLength - start) return false;
+		var cursor = default(MuiTextScanByteCursor);
+		cursor.Text = text;
+		cursor.Index = (uint)(start + 1);
+		if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var separator) || separator != (byte)':') return false;
+		cursor.Index = (uint)start;
+		if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var lead)) return false;
 		if (lead < (byte)'0' || lead > (byte)'6') return false;
 		var kind = (MuiImageSpecKind)(lead - (byte)'0');
 		var valueStart = start + 2;
@@ -14067,8 +14736,11 @@ public static class MuiCommonControlCore
 		{
 			if (valueLength != 6 && valueLength != 24) return false;
 			for (var i = 0; i < valueLength; i++)
-				if (!TryReadHexNibble(platform.ReadUInt8(text, valueStart + i),
-					out _)) return false;
+			{
+				cursor.Index = (uint)(valueStart + i);
+				if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+					out var digit) || !TryReadHexNibble(digit, out _)) return false;
+			}
 			if (!TryReadInlineHexByte(ref platform, text, valueStart,
 				out result.Red) || !TryReadInlineHexByte(ref platform, text,
 				valueStart + (valueLength == 6 ? 2 : 8), out result.Green) ||
@@ -14092,7 +14764,9 @@ public static class MuiCommonControlCore
 		uint value = 0;
 		for (var i = 0; i < valueLength; i++)
 		{
-			var digit = platform.ReadUInt8(text, valueStart + i);
+			cursor.Index = (uint)(valueStart + i);
+			if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var digit)) return false;
 			if (digit < (byte)'0' || digit > (byte)'9') return false;
 			value = value * 10u + (uint)(digit - (byte)'0');
 		}
@@ -14101,13 +14775,22 @@ public static class MuiCommonControlCore
 		return true;
 	}
 
-	private static bool TryReadInlineHexByte<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadInlineHexByte<TPlatform>(ref TPlatform platform,
 		APTR text, int start, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryReadHexNibble(platform.ReadUInt8(text, start), out var high) ||
-			!TryReadHexNibble(platform.ReadUInt8(text, start + 1), out var low))
+		if (start < 0 || start >
+			(int)MuiTextScanByteCursor.MaximumLength - 2) return false;
+		var cursor = default(MuiTextScanByteCursor);
+		cursor.Text = text;
+		cursor.Index = (uint)start;
+		if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var highByte) || !TryReadHexNibble(highByte, out var high))
+			return false;
+		cursor.Index = (uint)(start + 1);
+		if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var lowByte) || !TryReadHexNibble(lowByte, out var low))
 			return false;
 		value = (high << 4) | low;
 		return true;
@@ -14212,20 +14895,31 @@ public static class MuiCommonControlCore
 			ref engineOn, ref atLineStart, ref align, ref frontPen);
 		AppendRender(ref platform, contents, buffer, Capacity, ref outIdx,
 			ref engineOn, ref atLineStart, ref align, ref frontPen);
-		platform.WriteUInt8(buffer, outIdx, 0);
+		var terminator = default(MuiTextRenderByteCursor);
+		terminator.Base = buffer;
+		terminator.Index = (uint)outIdx;
+		terminator.Length = (uint)Capacity;
+		MuiTextRenderByteCursorCodec.TryWriteByte(ref platform, terminator, 0);
 		return buffer;
 	}
 
-	private static void AppendRender<TPlatform>(ref TPlatform platform, APTR text,
+	internal static void AppendRender<TPlatform>(ref TPlatform platform, APTR text,
 		APTR buffer, int capacity, ref int outIdx, ref bool engineOn,
 		ref bool atLineStart, ref int align, ref uint frontPen)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (text.IsNull) return;
+		var source = default(MuiTextRenderByteCursor);
+		source.Base = text;
+		source.Length = MuiTextRenderByteCursor.MaximumLength;
+		var destination = default(MuiTextRenderByteCursor);
+		destination.Base = buffer;
+		destination.Length = capacity < 0 ? 0u : (uint)capacity;
 		for (var i = 0; i < 4096; i++)
 		{
-			if (!platform.IsMapped(text, (uint)i + 1)) break;
-			var ch = platform.ReadUInt8(text, i);
+			source.Index = (uint)i;
+			if (!MuiTextRenderByteCursorCodec.TryReadByte(ref platform, source,
+				out var ch)) break;
 			if (ch == 0) break;
 			if (engineOn && ch == TextEscape)
 			{
@@ -14236,24 +14930,37 @@ public static class MuiCommonControlCore
 			if (ch == (byte)'\n')
 			{
 				if (outIdx < capacity - 1)
-					platform.WriteUInt8(buffer, outIdx++, (byte)'\n');
+				{
+					destination.Index = (uint)outIdx;
+					if (MuiTextRenderByteCursorCodec.TryWriteByte(ref platform,
+						destination, (byte)'\n')) outIdx++;
+				}
 				atLineStart = true;
 				continue;
 			}
 			if (outIdx < capacity - 1)
 			{
-				platform.WriteUInt8(buffer, outIdx++, ch);
-				atLineStart = false;
+				destination.Index = (uint)outIdx;
+				if (MuiTextRenderByteCursorCodec.TryWriteByte(ref platform,
+					destination, ch))
+				{
+					outIdx++;
+					atLineStart = false;
+				}
 			}
 		}
 	}
 
-	private static int HandleEscapeForRender<TPlatform>(ref TPlatform platform,
+	internal static int HandleEscapeForRender<TPlatform>(ref TPlatform platform,
 		APTR text, int pos, ref bool engineOn, bool atLineStart, ref int align,
 		ref uint frontPen) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!platform.IsMapped(text, (uint)pos + 1)) return 0;
-		var c = platform.ReadUInt8(text, pos);
+		var cursor = default(MuiTextRenderByteCursor);
+		cursor.Base = text;
+		cursor.Index = pos < 0 ? uint.MaxValue : (uint)pos;
+		cursor.Length = MuiTextRenderByteCursor.MaximumLength;
+		if (!MuiTextRenderByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var c)) return 0;
 		if (c == 0) return 0;
 		switch (c)
 		{
@@ -14281,20 +14988,27 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (pos < 0 || pos >= limit ||
-			!platform.IsMapped(text, (uint)pos + 1)) return 0;
-		var c = platform.ReadUInt8(text, pos);
+			limit > (int)MuiTextScanByteCursor.MaximumLength) return 0;
+		var cursor = default(MuiTextScanByteCursor);
+		cursor.Text = text;
+		cursor.Index = (uint)pos;
+		if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var c)) return 0;
 		if (c == 0) return 0;
 		if (c == (byte)'-') { engineOn = false; return 1; }
 		if (c != (byte)'p' && c != (byte)'P' && c != (byte)'I') return 1;
 		var consumed = 1;
-		if (pos + 1 < limit && platform.IsMapped(text, (uint)pos + 2) &&
-			platform.ReadUInt8(text, pos + 1) == (byte)'[')
+		if (pos + 1 < limit)
 		{
+			cursor.Index = (uint)(pos + 1);
+			if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var opening) || opening != (byte)'[') return consumed;
 			consumed++;
 			for (var j = pos + 2; j < limit && j < pos + 2 + 64; j++)
 			{
-				if (!platform.IsMapped(text, (uint)j + 1)) break;
-				var d = platform.ReadUInt8(text, j);
+				cursor.Index = (uint)j;
+				if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+					out var d)) break;
 				consumed++;
 				if (d == (byte)']' || d == 0) break;
 			}
@@ -14313,15 +15027,33 @@ public static class MuiCommonControlCore
 		var lineHeight = platform.TextHeight(rastPort, font);
 		if (lineHeight <= 0) lineHeight = 8;
 		var total = StringLength(ref platform, render);
+		var renderCursor = default(MuiTextRenderByteCursor);
+		renderCursor.Base = render;
+		renderCursor.Length = total < 0 || total >=
+			(int)MuiTextRenderByteCursor.MaximumLength ? 0u : (uint)(total + 1);
 		var lineStart = 0;
 		var baseline = top + lineHeight;
 		for (var i = 0; i <= total; i++)
 		{
-			var ch = i < total ? platform.ReadUInt8(render, i) : (byte)0;
+			byte ch = 0;
+			if (i < total)
+			{
+				renderCursor.Index = (uint)i;
+				if (!MuiTextRenderByteCursorCodec.TryReadByte(ref platform,
+					renderCursor, out ch)) break;
+			}
 			if (i != total && ch != (byte)'\n') continue;
 			var lineByteLength = i - lineStart;
+			if (!TryGetTextRenderRange(ref platform, render,
+				unchecked((uint)lineStart), renderCursor.Length,
+				unchecked((uint)lineByteLength), out var lineSource))
+			{
+				baseline += lineHeight;
+				lineStart = i + 1;
+				continue;
+			}
 			var lineColumns = unicode ? Utf8ColumnCount(ref platform,
-				APTR.FromPointer(render.Raw + unchecked((uint)lineStart)),
+				lineSource,
 				lineByteLength) : lineByteLength;
 			var lineLen = lineByteLength;
 			if (cutoff && lineColumns > fitChars)
@@ -14330,24 +15062,30 @@ public static class MuiCommonControlCore
 				{
 					var prefixColumns = fitChars - 3;
 					var prefixBytes = unicode ? Utf8ByteOffsetForColumns(ref platform,
-						APTR.FromPointer(render.Raw + unchecked((uint)lineStart)),
+						lineSource,
 						lineByteLength, prefixColumns) : prefixColumns;
-					platform.WriteUInt8(render, lineStart + prefixBytes, (byte)'.');
-					platform.WriteUInt8(render, lineStart + prefixBytes + 1, (byte)'.');
-					platform.WriteUInt8(render, lineStart + prefixBytes + 2, (byte)'.');
-					lineLen = prefixBytes + 3;
+					renderCursor.Index = (uint)(lineStart + prefixBytes);
+					var dotsWritten = MuiTextRenderByteCursorCodec.TryWriteByte(
+						ref platform, renderCursor, (byte)'.');
+					renderCursor.Index = (uint)(lineStart + prefixBytes + 1);
+					dotsWritten = MuiTextRenderByteCursorCodec.TryWriteByte(
+						ref platform, renderCursor, (byte)'.') && dotsWritten;
+					renderCursor.Index = (uint)(lineStart + prefixBytes + 2);
+					dotsWritten = MuiTextRenderByteCursorCodec.TryWriteByte(
+						ref platform, renderCursor, (byte)'.') && dotsWritten;
+					lineLen = dotsWritten ? prefixBytes + 3 : 0;
 				}
 				else
 				{
 					var visibleColumns = fitChars < 0 ? 0 : fitChars;
 					lineLen = unicode ? Utf8ByteOffsetForColumns(ref platform,
-						APTR.FromPointer(render.Raw + unchecked((uint)lineStart)),
+						lineSource,
 						lineByteLength, visibleColumns) : visibleColumns;
 				}
 			}
 			if (lineLen > 0)
 			{
-				var lineText = APTR.FromPointer(render.Raw + (uint)lineStart);
+				var lineText = lineSource;
 				var textWidth = platform.TextWidth(rastPort, font, lineText, lineLen);
 				var textLeft = left;
 				if (align == 1) textLeft = left + (width - textWidth) / 2;
@@ -14358,9 +15096,14 @@ public static class MuiCommonControlCore
 				if (hiChar != 0)
 				{
 					var match = -1;
+					var lineCursor = default(MuiTextRenderByteCursor);
+					lineCursor.Base = lineText;
+					lineCursor.Length = lineLen < 0 ? 0u : (uint)lineLen;
 					for (var index = 0; index < lineLen; index++)
 					{
-						var candidate = platform.ReadUInt8(lineText, index);
+						lineCursor.Index = (uint)index;
+						if (!MuiTextRenderByteCursorCodec.TryReadByte(ref platform,
+							lineCursor, out var candidate)) break;
 						if (Lower(candidate) == Lower(hiChar))
 						{
 							match = index;
@@ -14370,7 +15113,12 @@ public static class MuiCommonControlCore
 					if (match >= 0)
 					{
 						var before = platform.TextWidth(rastPort, font, lineText, match);
-						var glyph = APTR.FromPointer(lineText.Raw + (uint)match);
+						var glyphCursor = default(MuiTextRenderByteCursor);
+						glyphCursor.Base = lineText;
+						glyphCursor.Index = (uint)match;
+						glyphCursor.Length = (uint)lineLen;
+						if (!MuiTextRenderByteCursorCodec.TryGetRange(ref platform,
+							glyphCursor, 1, out var glyph)) continue;
 						var glyphWidth = platform.TextWidth(rastPort, font, glyph, 1);
 						if (glyphWidth <= 0) glyphWidth = 1;
 						platform.SetPen(rastPort, 3);
@@ -14831,14 +15579,18 @@ public static class MuiCommonControlCore
 			length);
 	}
 
-	private static int CStringLength<TPlatform>(ref TPlatform platform, APTR text)
+	internal static int CStringLength<TPlatform>(ref TPlatform platform, APTR text)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (text.IsNull) return 0;
+		var cursor = default(MuiStringLengthByteCursor);
+		cursor.Text = text;
 		for (var index = 0; index < 4096; index++)
 		{
-			if (!platform.IsMapped(text, (uint)index + 1)) return index;
-			if (platform.ReadUInt8(text, index) == 0) return index;
+			cursor.Index = (uint)index;
+			if (!MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var value)) return index;
+			if (value == 0) return index;
 		}
 		return 4096;
 	}
@@ -15371,6 +16123,18 @@ public static class MuiCommonControlCore
 		}
 	}
 
+	private static bool TryGetTextRenderRange<TPlatform>(ref TPlatform platform,
+		APTR source, uint index, uint length, uint byteCount, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiTextRenderByteCursor);
+		cursor.Base = source;
+		cursor.Index = index;
+		cursor.Length = length;
+		return MuiTextRenderByteCursorCodec.TryGetRange(ref platform, cursor,
+			byteCount, out address);
+	}
+
 	private static void DrawStringContent<TPlatform>(ref TPlatform platform,
 		APTR state, APTR obj, APTR rastPort, int left, int top, int width,
 		int height, APTR font) where TPlatform : struct, IMuiLayoutPlatform
@@ -15440,14 +16204,21 @@ public static class MuiCommonControlCore
 			if (drawnColumns > visibleColumns) drawnColumns = unchecked((int)visibleColumns);
 		}
 		if (drawLength <= 0 || drawnColumns <= 0) return;
+		var sourceByteLength = drawLength > 0 ? unchecked((uint)drawLength) : 0u;
+		if (unicode && !secret)
+		{
+			if (!CStringCodec.TryReadLength(ref platform, drawText, 65536,
+				out sourceByteLength)) return;
+		}
+		if (!TryGetTextRenderRange(ref platform, drawText, drawStart,
+			sourceByteLength, unchecked((uint)drawLength), out var drawSpan)) return;
 
 		// MUIA_String_Format aligns the visible text within the gadget. For UTF-8
 		// the width is based on logical columns, while DrawText receives the
 		// original byte span so the guest renderer can decode it.
 		var format = hasPresentation ? presentation.Format : StringFormatLeft;
 		var textWidth = unicode && !secret ? drawnColumns * 8 :
-			platform.TextWidth(rastPort, font, APTR.FromPointer(drawText.Raw + drawStart),
-				drawLength);
+			platform.TextWidth(rastPort, font, drawSpan, drawLength);
 		var textLeft = left;
 		if (format == StringFormatCenter)
 			textLeft = left + (width - textWidth) / 2;
@@ -15455,10 +16226,10 @@ public static class MuiCommonControlCore
 			textLeft = left + width - textWidth;
 		if (textLeft < left) textLeft = left;
 		platform.DrawText(rastPort, font, textLeft, top + height,
-			APTR.FromPointer(drawText.Raw + drawStart), drawLength);
+			drawSpan, drawLength);
 	}
 
-	private static void DrawStringMultilineContent<TPlatform>(
+	internal static void DrawStringMultilineContent<TPlatform>(
 		ref TPlatform platform, APTR state, APTR obj, APTR rastPort, APTR font,
 		APTR drawText, int left, int top, int width, int height, int format,
 		bool unicode, bool secret) where TPlatform : struct, IMuiLayoutPlatform
@@ -15479,10 +16250,19 @@ public static class MuiCommonControlCore
 		var bottom = top + height;
 		var line = default(MuiStringLineSpan);
 		var lineIndex = 0u;
+		var cursor = default(MuiTextRenderByteCursor);
+		cursor.Base = drawText;
+		cursor.Length = totalBytes < (int)MuiTextRenderByteCursor.MaximumLength
+			? (uint)(totalBytes + 1) : MuiTextRenderByteCursor.MaximumLength;
 		for (var index = 0; index <= totalBytes; index++)
 		{
-			var ch = index < totalBytes ? platform.ReadUInt8(drawText, index) :
-				(byte)0;
+			byte ch = 0;
+			if (index < totalBytes)
+			{
+				cursor.Index = (uint)index;
+				if (!MuiTextRenderByteCursorCodec.TryReadByte(ref platform, cursor,
+					out ch)) break;
+			}
 			if (index < totalBytes && ch != (byte)'\n') continue;
 			line.ByteLength = unchecked((uint)index) - line.ByteStart;
 			if (lineIndex >= scrollLine && baseline <= bottom)
@@ -15501,7 +16281,9 @@ public static class MuiCommonControlCore
 		bool secret, uint scrollLeft) where TPlatform : struct, IMuiLayoutPlatform
 	{
 		if (line.ByteLength == 0) return;
-		var lineText = APTR.FromPointer(drawText.Raw + line.ByteStart);
+		if (!TryGetTextRenderRange(ref platform, drawText, line.ByteStart,
+			MuiTextRenderByteCursor.MaximumLength, line.ByteLength,
+			out var lineText)) return;
 		var lineLength = unchecked((int)line.ByteLength);
 		var lineColumns = unicode && !secret ? StringLineColumns(ref platform,
 			lineText, line.ByteLength) : line.ByteLength;
@@ -15509,15 +16291,16 @@ public static class MuiCommonControlCore
 		if (skipColumns >= lineColumns) return;
 		var startByte = StringLineByteOffsetForColumns(ref platform, lineText,
 			line.ByteLength, unicode && !secret, skipColumns);
-		var drawTextStart = APTR.FromPointer(lineText.Raw + startByte);
 		var remainingBytes = line.ByteLength - startByte;
 		var visibleColumns = width > 0 ? unchecked((uint)(width / 8)) : 0u;
 		if (visibleColumns == 0) return;
 		var drawColumns = lineColumns - skipColumns;
 		if (drawColumns > visibleColumns) drawColumns = visibleColumns;
 		var drawBytes = StringLineByteOffsetForColumns(ref platform,
-			drawTextStart, remainingBytes, unicode && !secret, drawColumns);
+			lineText, remainingBytes, unicode && !secret, drawColumns);
 		if (drawBytes == 0) return;
+		if (!TryGetTextRenderRange(ref platform, lineText, startByte,
+			line.ByteLength, drawBytes, out var drawTextStart)) return;
 		var drawLength = unchecked((int)drawBytes);
 		var textWidth = platform.TextWidth(rastPort, font, lineText, lineLength);
 		if (unicode && !secret)
@@ -15907,34 +16690,46 @@ public static class MuiCommonControlCore
 	{
 		uint input = 0;
 		uint output = 0;
+		var sourceCursor = default(MuiByteRunByteCursor);
+		sourceCursor.Base = source;
+		sourceCursor.Length = MuiByteRunByteCursor.MaximumLength;
+		var destinationCursor = default(MuiByteRunByteCursor);
+		destinationCursor.Base = destination;
+		destinationCursor.Length = outputSize;
 		while (output < outputSize)
 		{
-			if (source.Raw > uint.MaxValue - input ||
-				!platform.IsMapped(APTR.FromPointer(source.Raw + input), 1)) return false;
-			var control = platform.ReadUInt8(source, unchecked((int)input));
+			sourceCursor.Index = input;
+			if (!MuiByteRunByteCursorCodec.TryReadByte(ref platform,
+				sourceCursor, out var control)) return false;
 			input++;
 			if (control == 128) continue;
 			if (control < 128)
 			{
 				var count = (uint)control + 1;
-				if (count > outputSize - output || source.Raw > uint.MaxValue - input ||
-					destination.Raw > uint.MaxValue - output) return false;
-				var from = APTR.FromPointer(source.Raw + input);
-				var to = APTR.FromPointer(destination.Raw + output);
-				if (!platform.IsMapped(from, count) || !platform.IsMapped(to, count))
-					return false;
+				if (count > outputSize - output) return false;
+				sourceCursor.Index = input;
+				destinationCursor.Index = output;
+				if (!MuiByteRunByteCursorCodec.TryGetRange(ref platform,
+					sourceCursor, count, out var from) ||
+					!MuiByteRunByteCursorCodec.TryGetRange(ref platform,
+						destinationCursor, count, out var to)) return false;
 				platform.Copy(from, to, count);
 				input += count;
 				output += count;
 				continue;
 			}
 			var repeat = 257u - control;
-			if (repeat > outputSize - output || source.Raw > uint.MaxValue - input ||
-				!platform.IsMapped(APTR.FromPointer(source.Raw + input), 1)) return false;
-			var value = platform.ReadUInt8(source, unchecked((int)input));
+			if (repeat > outputSize - output) return false;
+			sourceCursor.Index = input;
+			if (!MuiByteRunByteCursorCodec.TryReadByte(ref platform,
+				sourceCursor, out var value)) return false;
 			input++;
 			for (uint index = 0; index < repeat; index++)
-				platform.WriteUInt8(destination, unchecked((int)(output + index)), value);
+			{
+				destinationCursor.Index = output + index;
+				if (!MuiByteRunByteCursorCodec.TryWriteByte(ref platform,
+					destinationCursor, value)) return false;
+			}
 			output += repeat;
 		}
 		return true;
@@ -15946,11 +16741,16 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (entries.IsNull) return 0;
+		var entryCursor = default(MuiChoiceEntryCursor);
+		entryCursor.Base = entries;
+		entryCursor.Index = 0;
 		for (var count = 0; count < 4096; count++)
 		{
-			if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entries,
-				unchecked((uint)count), out var text)) return 0;
+			if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entryCursor,
+				out var text)) return 0;
 			if (text == 0) return count;
+			if (count + 1 < 4096 &&
+				!MuiChoiceEntryVectorCodec.TryAdvance(ref entryCursor, 1)) return 0;
 		}
 		return 0;
 	}
@@ -15958,7 +16758,10 @@ public static class MuiCommonControlCore
 	private static APTR ChoiceEntry<TPlatform>(ref TPlatform platform,
 		APTR entries, uint active) where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entries, active,
+		var entryCursor = default(MuiChoiceEntryCursor);
+		entryCursor.Base = entries;
+		entryCursor.Index = active;
+		return MuiChoiceEntryVectorCodec.TryReadValue(ref platform, entryCursor,
 			out var text) ? APTR.FromPointer(text) : APTR.Null;
 	}
 
@@ -16008,16 +16811,21 @@ public static class MuiCommonControlCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		var length = 0;
+		var cursor = default(MuiImageSpecByteCursor);
+		cursor.Base = spec;
+		cursor.Length = MuiImageSpecByteCursor.MaximumLength;
 		while (length <= 24)
 		{
 			var offset = 2 + length;
-			if (!platform.IsMapped(spec, (uint)(offset + 1))) break;
-			var ch = platform.ReadUInt8(spec, offset);
+			cursor.Index = (uint)offset;
+			if (!MuiImageSpecByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var ch)) break;
 			if (ch == 0 || HexNibble(ch) < 0) break;
 			length++;
 		}
-		if (!platform.IsMapped(spec, (uint)(2 + length + 1)) ||
-			platform.ReadUInt8(spec, 2 + length) != 0) return false;
+		cursor.Index = (uint)(2 + length);
+		if (!MuiImageSpecByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var terminator) || terminator != 0) return false;
 		uint red, green, blue;
 		if (length == 6)
 		{
@@ -16048,10 +16856,15 @@ public static class MuiCommonControlCore
 		APTR spec, MuiImageSpecKind kind, ref MuiImageSpec result)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiImageSpecByteCursor);
+		cursor.Base = spec;
+		cursor.Length = MuiImageSpecByteCursor.MaximumLength;
 		for (var length = 2; length < 258; length++)
 		{
-			if (!platform.IsMapped(spec, (uint)(length + 1))) return false;
-			if (platform.ReadUInt8(spec, length) == 0)
+			cursor.Index = (uint)length;
+			if (!MuiImageSpecByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var value)) return false;
+			if (value == 0)
 			{
 				if (length == 2) return false;
 				result.Kind = kind;
@@ -16067,24 +16880,38 @@ public static class MuiCommonControlCore
 	{
 		value = 0;
 		var digits = 0;
+		var cursor = default(MuiImageSpecByteCursor);
+		cursor.Base = spec;
+		cursor.Length = MuiImageSpecByteCursor.MaximumLength;
 		while (digits < 9)
 		{
 			var offset = 2 + digits;
-			if (!platform.IsMapped(spec, (uint)(offset + 1))) break;
-			var ch = platform.ReadUInt8(spec, offset);
+			cursor.Index = (uint)offset;
+			if (!MuiImageSpecByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var ch)) break;
 			if (ch < (byte)'0' || ch > (byte)'9') break;
 			value = value * 10u + (uint)(ch - (byte)'0');
 			digits++;
 		}
-		return digits > 0 && platform.IsMapped(spec, (uint)(2 + digits + 1)) &&
-			platform.ReadUInt8(spec, 2 + digits) == 0;
+		cursor.Index = (uint)(2 + digits);
+		return digits > 0 && MuiImageSpecByteCursorCodec.TryReadByte(
+			ref platform, cursor, out var terminator) && terminator == 0;
 	}
 
 	private static uint HexByte<TPlatform>(ref TPlatform platform, APTR spec,
 		int nibbleIndex) where TPlatform : struct, IMuiGuestMemory
 	{
-		var high = HexNibble(platform.ReadUInt8(spec, 2 + nibbleIndex));
-		var low = HexNibble(platform.ReadUInt8(spec, 2 + nibbleIndex + 1));
+		var cursor = default(MuiImageSpecByteCursor);
+		cursor.Base = spec;
+		cursor.Length = MuiImageSpecByteCursor.MaximumLength;
+		cursor.Index = unchecked((uint)(2 + nibbleIndex));
+		if (!MuiImageSpecByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var highByte)) return 0;
+		cursor.Index = unchecked((uint)(3 + nibbleIndex));
+		if (!MuiImageSpecByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var lowByte)) return 0;
+		var high = HexNibble(highByte);
+		var low = HexNibble(lowByte);
 		return (uint)((high << 4) | low);
 	}
 

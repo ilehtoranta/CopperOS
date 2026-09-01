@@ -22,6 +22,23 @@ internal static class MuiClassServiceLibraryPrefixRecordCodec
 {
 	internal const uint MuiSlash = 0x6D75692Fu; // "mui/"
 
+	// Resolve the variable class-id payload that follows the named four-byte
+	// loader prefix. The wire arithmetic stays inside this adapter; callers
+	// exchange the resulting bytes through a bounded string cursor.
+	internal static bool TryGetPayloadAddress<TPlatform>(ref TPlatform platform,
+		APTR address, out APTR payload)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		payload = APTR.Null;
+		if (address.IsNull || address.Raw >
+			uint.MaxValue - MuiClassServiceLibraryPrefixRecord.Size ||
+			!platform.IsMapped(address, MuiClassServiceLibraryPrefixRecord.Size))
+			return false;
+		payload = APTR.FromPointer(address.Raw +
+			MuiClassServiceLibraryPrefixRecord.Size);
+		return platform.IsMapped(payload, 1);
+	}
+
 	// CopperSharp's freestanding generic lowering has a known fault for a
 	// one-ULONG struct crossing a by-value call boundary. Keep the public
 	// named-record API, but expose scalar-safe cursor entry points for the

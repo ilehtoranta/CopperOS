@@ -133,11 +133,13 @@ public interface IShellPlatform : IAmigaGuestMemory
 
     /// <summary>
     /// Executes one script through the active Shell engine. The command
-    /// wrapper supplies only the bounded FILE/A path; script parsing and
-    /// nested execution stay in the Shell/DOS owner.
+    /// wrapper supplies the bounded FILE/A path and its untouched raw suffix;
+    /// the Shell/DOS owner copies the suffix before any pending return and
+    /// remains responsible for script argument interpretation.
     /// </summary>
     ShellScriptExecutionStatus TryExecuteScript(APTR cli, APTR file,
-        uint fileLength, out int result);
+        uint fileLength, APTR scriptArguments, uint scriptArgumentLength,
+        out int result);
 
     /// <summary>
     /// Resumes one DOS-owned script runner without waiting or spinning. A
@@ -252,6 +254,16 @@ public interface IShellPlatform : IAmigaGuestMemory
         APTR resultArray,
         uint resultBytes,
         out APTR rdArgs);
+
+    /// <summary>
+    /// Finds the raw byte boundary after the first DOS ReadItem in an explicit
+    /// command span. This preserves the original item grammar while allowing
+    /// a following owner to retain the unparsed suffix.
+    /// </summary>
+    bool TryReadScriptFilePrefix(
+        APTR argumentText,
+        uint argumentLength,
+        out uint consumed);
 
     /// <summary>Releases the DOS-owned allocations returned by ReadArgs.</summary>
     void FreeArgs(APTR rdArgs);

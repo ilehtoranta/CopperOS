@@ -738,6 +738,136 @@ public sealed class MuiDirlistVolumelistTests
 	}
 
 	[Fact]
+	public void DirlistEntryTailCursorOwnsVariableNameAndCommentRanges()
+	{
+		var platform = CreatePlatform(out _, out _, out _);
+		var cursor = new MuiDirlistEntryTailCursor
+		{
+			Entry = APTR.FromPointer(0x7000),
+			RecordSize = 64,
+			CommentOffset = 48,
+		};
+		Assert.True(MuiDirlistEntryTailCursorCodec.TryGetName(ref platform,
+			cursor, out var name, out var nameCapacity));
+		Assert.Equal(APTR.FromPointer(0x7024), name);
+		Assert.Equal(28u, nameCapacity);
+		Assert.True(MuiDirlistEntryTailCursorCodec.TryGetComment(ref platform,
+			cursor, out var comment, out var commentCapacity));
+		Assert.Equal(APTR.FromPointer(0x7030), comment);
+		Assert.Equal(16u, commentCapacity);
+		cursor.RecordSize = MuiDirlistEntryWireState.NameOffset;
+		Assert.False(MuiDirlistEntryTailCursorCodec.TryGetName(ref platform,
+			cursor, out _, out _));
+		cursor.Entry = APTR.FromPointer(0x80FF0u);
+		cursor.RecordSize = 64;
+		Assert.False(MuiDirlistEntryTailCursorCodec.TryGetName(ref platform,
+			cursor, out _, out _));
+	}
+
+	[Fact]
+	public void DirlistScanEntryTailCursorUsesFixedNamedRanges()
+	{
+		var platform = CreatePlatform(out _, out _, out _);
+		var cursor = new MuiDirlistScanEntryTailCursor
+		{
+			Scratch = APTR.FromPointer(0x7100),
+		};
+		Assert.True(MuiDirlistScanEntryTailCursorCodec.TryGetName(ref platform,
+			cursor, out var name));
+		Assert.Equal(APTR.FromPointer(0x711C), name);
+		Assert.True(MuiDirlistScanEntryTailCursorCodec.TryGetComment(ref platform,
+			cursor, out var comment));
+		Assert.Equal(APTR.FromPointer(0x7188), comment);
+		cursor.Scratch = APTR.FromPointer(0x80F24u);
+		Assert.False(MuiDirlistScanEntryTailCursorCodec.TryGetName(ref platform,
+			cursor, out _));
+	}
+
+	[Fact]
+	public void DirlistStringByteCursorBoundsByteAccess()
+	{
+		var platform = CreatePlatform(out _, out _, out _);
+		var cursor = new MuiDirlistStringByteCursor
+		{
+			Base = APTR.FromPointer(0x7100),
+			Index = 7,
+		};
+		Assert.True(MuiDirlistStringByteCursorCodec.TryGetByte(ref platform,
+			cursor, out var address));
+		Assert.Equal(0x7107u, address.Raw);
+		cursor.Index = 2;
+		Assert.True(MuiDirlistStringByteCursorCodec.TryWriteByte(ref platform,
+			cursor, 0xa5));
+		Assert.True(MuiDirlistStringByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value));
+		Assert.Equal(0xa5, value);
+
+		cursor.Index = MuiDirlistStringByteCursor.MaximumBytes - 1;
+		Assert.True(MuiDirlistStringByteCursorCodec.TryGetByte(ref platform,
+			cursor, out address));
+		Assert.Equal(0x71bbU, address.Raw);
+
+		cursor.Index = MuiDirlistStringByteCursor.MaximumBytes;
+		Assert.False(MuiDirlistStringByteCursorCodec.TryGetByte(ref platform,
+			cursor, out _));
+		cursor.Base = APTR.FromPointer(0x80fffu);
+		cursor.Index = 1;
+		Assert.False(MuiDirlistStringByteCursorCodec.TryGetByte(ref platform,
+			cursor, out _));
+	}
+
+	[Fact]
+	public void DirlistScanEntryWriterCopiesStringsThroughCursor()
+	{
+		var platform = CreatePlatform(out _, out _, out _);
+		var scratch = APTR.FromPointer(0x7200);
+		var sourceName = WriteString(ref platform, 0x7300, "abc");
+		var sourceComment = WriteString(ref platform, 0x7340, "xy");
+		var value = default(MuiDirlistScanEntryState);
+		value.Address = scratch;
+		value.Type = 2;
+		value.Name = sourceName;
+		value.NameLength = 3;
+		value.Comment = sourceComment;
+		value.CommentLength = 2;
+		Assert.True(MuiDirlistCore.WriteScanEntryState(ref platform, scratch,
+			value));
+		Assert.True(MuiDirlistCore.TryReadScanEntryState(ref platform, scratch,
+			out var written));
+		Assert.Equal("abc", ReadCString(ref platform, written.Name));
+		Assert.Equal("xy", ReadCString(ref platform, written.Comment));
+	}
+
+	[Fact]
+	public void DirlistPathByteCursorTracksBoundedBuffer()
+	{
+		var platform = CreatePlatform(out _, out _, out _);
+		var cursor = new MuiDirlistPathByteCursor
+		{
+			Base = APTR.FromPointer(0x7400),
+			Length = 8,
+			Index = 2,
+		};
+		Assert.True(MuiDirlistPathByteCursorCodec.TryWriteByte(ref platform,
+			cursor, (byte)'X'));
+		Assert.True(MuiDirlistPathByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value));
+		Assert.Equal((byte)'X', value);
+		cursor.Index = cursor.Length;
+		Assert.False(MuiDirlistPathByteCursorCodec.TryGetByte(ref platform,
+			cursor, out _));
+		cursor.Index = 0;
+		cursor.Length = MuiDirlistPathByteCursor.MaximumLength + 1;
+		Assert.False(MuiDirlistPathByteCursorCodec.TryGetByte(ref platform,
+			cursor, out _));
+		cursor.Base = APTR.FromPointer(0x80fffu);
+		cursor.Length = 2;
+		cursor.Index = 1;
+		Assert.False(MuiDirlistPathByteCursorCodec.TryGetByte(ref platform,
+			cursor, out _));
+	}
+
+	[Fact]
 	public void NamedDirlistScanEntryStateDecodesCapabilityScratch()
 	{
 		var platform = CreatePlatform(out _, out _, out _);
@@ -847,6 +977,19 @@ public sealed class MuiDirlistVolumelistTests
 			SortDirs, SortDirsLast));
 		Assert.Equal("alpha.txt", EntryName(ref platform, dirlist, 0));
 		Assert.Equal("drawerA", EntryName(ref platform, dirlist, 3));
+	}
+
+	[Fact]
+	public void DirlistNameComparatorUsesBoundedStringCursor()
+	{
+		var platform = CreatePlatform(out _, out _, out _);
+		var left = WriteString(ref platform, 0x6200, "Alpha");
+		var right = WriteString(ref platform, 0x6240, "alpha");
+		Assert.Equal(0, MuiDirlistCore.CompareStrings(ref platform, left, right));
+		var beta = WriteString(ref platform, 0x6280, "beta");
+		Assert.True(MuiDirlistCore.CompareStrings(ref platform, left, beta) < 0);
+		Assert.True(MuiDirlistCore.CompareStrings(ref platform, beta, left) > 0);
+		Assert.Equal(0, MuiDirlistCore.CompareStrings(ref platform, left, left));
 	}
 
 	[Fact]

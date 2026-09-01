@@ -483,7 +483,28 @@ internal static class MuiUDataTraversalFrameCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiUDataTraversalFrameVectorMemoryCodec.TryGetEntry(ref platform,
 			cursor.Base, cursor.Index, out address);
+
+	// Traversal consumers exchange complete frame records through the typed
+	// cursor. Stack-slot arithmetic remains private to the bounded adapter.
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiUDataTraversalCursor cursor, out MuiUDataTraversalFrame value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiUDataTraversalFrameRecordCodec.TryRead(ref platform, address,
+			out value);
 	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiUDataTraversalCursor cursor, MuiUDataTraversalFrame value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiUDataTraversalFrameRecordCodec.Write(ref platform, address,
+			value);
+	}
+}
 
 internal static class MuiNotifyUserDataRecords
 {
@@ -530,21 +551,20 @@ internal static class MuiNotifyUserDataCore
 		while (depth != 0)
 		{
 			if (!TryReadFrame(ref platform, state, stack, depth,
-				out var frameRaw, out var current, out var nextChild))
+				out var frameCursor, out var current, out var nextChild))
 				return Finish(ref platform, stack, stackBytes, APTR.Null);
-			var frame = APTR.FromPointer(frameRaw);
 			if (nextChild == NotVisited)
 			{
 				if (visited++ >= MuiHeadlessLayout.MaximumTraversal)
 					return Finish(ref platform, stack, stackBytes, APTR.Null);
 				if (Matches(ref platform, state, current, userData))
 					return Finish(ref platform, stack, stackBytes, current);
-				if (!MuiNotifyUserDataRecords.WriteFrame(ref platform, frame,
+				if (!MuiUDataTraversalFrameCodec.TryWrite(ref platform, frameCursor,
 					CreateFrame(current, 0)))
 					return Finish(ref platform, stack, stackBytes, APTR.Null);
 				continue;
 			}
-			if (!Descend(ref platform, state, current, frame, nextChild,
+			if (!Descend(ref platform, state, current, nextChild,
 				ref depth, stack))
 				return Finish(ref platform, stack, stackBytes, APTR.Null);
 		}
@@ -567,9 +587,8 @@ internal static class MuiNotifyUserDataCore
 		while (depth != 0)
 		{
 			if (!TryReadFrame(ref platform, state, stack, depth,
-				out var frameRaw, out var current, out var nextChild))
+				out var frameCursor, out var current, out var nextChild))
 				return Finish(ref platform, stack, stackBytes, false);
-			var frame = APTR.FromPointer(frameRaw);
 			if (nextChild == NotVisited)
 			{
 				if (visited++ >= MuiHeadlessLayout.MaximumTraversal)
@@ -584,12 +603,12 @@ internal static class MuiNotifyUserDataCore
 						return Finish(ref platform, stack, stackBytes, false);
 					return Finish(ref platform, stack, stackBytes, true);
 				}
-				if (!MuiNotifyUserDataRecords.WriteFrame(ref platform, frame,
+				if (!MuiUDataTraversalFrameCodec.TryWrite(ref platform, frameCursor,
 					CreateFrame(current, 0)))
 					return Finish(ref platform, stack, stackBytes, false);
 				continue;
 			}
-			if (!Descend(ref platform, state, current, frame, nextChild,
+			if (!Descend(ref platform, state, current, nextChild,
 				ref depth, stack))
 				return Finish(ref platform, stack, stackBytes, false);
 		}
@@ -610,9 +629,8 @@ internal static class MuiNotifyUserDataCore
 		while (depth != 0)
 		{
 			if (!TryReadFrame(ref platform, state, stack, depth,
-				out var frameRaw, out var current, out var nextChild))
+				out var frameCursor, out var current, out var nextChild))
 				return Finish(ref platform, stack, stackBytes, false);
-			var frame = APTR.FromPointer(frameRaw);
 			if (nextChild == NotVisited)
 			{
 				if (visited++ >= MuiHeadlessLayout.MaximumTraversal)
@@ -625,12 +643,12 @@ internal static class MuiNotifyUserDataCore
 					matched = true;
 					if (once) return Finish(ref platform, stack, stackBytes, true);
 				}
-				if (!MuiNotifyUserDataRecords.WriteFrame(ref platform, frame,
+				if (!MuiUDataTraversalFrameCodec.TryWrite(ref platform, frameCursor,
 					CreateFrame(current, 0)))
 					return Finish(ref platform, stack, stackBytes, false);
 				continue;
 			}
-			if (!Descend(ref platform, state, current, frame, nextChild,
+			if (!Descend(ref platform, state, current, nextChild,
 				ref depth, stack))
 				return Finish(ref platform, stack, stackBytes, false);
 		}
@@ -685,7 +703,10 @@ internal static class MuiNotifyUserDataCore
 		var stackBytes = MaximumDepth * MuiUDataTraversalFrame.Size;
 		var stack = MuiHeadlessMemory.Allocate(ref platform, stackBytes);
 		if (stack.IsNull) return 0;
-		if (!MuiNotifyUserDataRecords.WriteFrame(ref platform, stack,
+		var cursor = default(MuiUDataTraversalCursor);
+		cursor.Base = stack;
+		cursor.Index = 0;
+		if (!MuiUDataTraversalFrameCodec.TryWrite(ref platform, cursor,
 			CreateFrame(root, NotVisited)))
 		{
 			platform.Free(stack, stackBytes);
@@ -695,28 +716,28 @@ internal static class MuiNotifyUserDataCore
 	}
 
 	private static bool TryReadFrame<TPlatform>(ref TPlatform platform, APTR state,
-		APTR stack, uint depth, out uint frameRaw, out APTR current,
+		APTR stack, uint depth, out MuiUDataTraversalCursor frameCursor,
+		out APTR current,
 		out uint nextChild) where TPlatform : struct, IMuiHeadlessPlatform
 	{
-		frameRaw = 0;
+		frameCursor = default;
 		current = APTR.Null;
 		nextChild = 0;
 		if (depth == 0 || depth > MaximumDepth) return false;
-		if (!MuiUDataTraversalFrameVectorMemoryCodec.TryGetEntry(ref platform,
-			stack, depth - 1, out var frame)) return false;
+		frameCursor.Base = stack;
+		frameCursor.Index = depth - 1;
 		var frameRecord = default(MuiUDataTraversalFrame);
-		if (!MuiNotifyUserDataRecords.TryReadFrame(ref platform, frame,
-			ref frameRecord)) return false;
+		if (!MuiUDataTraversalFrameCodec.TryRead(ref platform, frameCursor,
+			out frameRecord)) return false;
 		current = frameRecord.Object;
 		nextChild = frameRecord.NextChild;
 		if (current.IsNull || MuiHeadlessObjectCore.FindObject(ref platform,
 			state, current).IsNull) return false;
-		frameRaw = frame.Raw;
 		return true;
 	}
 
 	private static bool Descend<TPlatform>(ref TPlatform platform, APTR state,
-		APTR current, APTR frame, uint nextChild, ref uint depth, APTR stack)
+		APTR current, uint nextChild, ref uint depth, APTR stack)
 		where TPlatform : struct, IMuiHeadlessPlatform
 	{
 		var child = MuiFamilyCore.GetChild(ref platform, state, current,
@@ -727,11 +748,13 @@ internal static class MuiNotifyUserDataCore
 			return true;
 		}
 		if (depth >= MaximumDepth || nextChild == uint.MaxValue) return false;
-		if (!MuiNotifyUserDataRecords.WriteFrame(ref platform, frame,
+		var cursor = default(MuiUDataTraversalCursor);
+		cursor.Base = stack;
+		cursor.Index = depth - 1;
+		if (!MuiUDataTraversalFrameCodec.TryWrite(ref platform, cursor,
 			CreateFrame(current, nextChild + 1))) return false;
-		if (!MuiUDataTraversalFrameVectorMemoryCodec.TryGetEntry(ref platform,
-			stack, depth, out var childFrame)) return false;
-		if (!MuiNotifyUserDataRecords.WriteFrame(ref platform, childFrame,
+		cursor.Index = depth;
+		if (!MuiUDataTraversalFrameCodec.TryWrite(ref platform, cursor,
 			CreateFrame(child, NotVisited))) return false;
 		depth++;
 		return true;

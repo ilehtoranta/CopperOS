@@ -78,6 +78,100 @@ public sealed class ShellScriptEngineTests
 	}
 
 	[Fact]
+	public void Pre_scan_keeps_a_no_dot_script_on_its_original_reader()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.ScriptText = "Echo direct\n";
+		APTR frame = InitializePreScanFrame(ref platform, APTR.Null, 0);
+		APTR sourcePath = platform.Store.PutAt(7700, "S:direct");
+		ShellScriptStepWorkspace workspace = CreateWorkspace();
+
+		var result = ShellScriptPreScanner.Prepare(ref platform, new APTR(8),
+			frame, new BPTR(1), sourcePath, 8, new APTR(7800), 64,
+			in workspace);
+
+		Assert.Equal(ShellScriptPreScanResult.Direct, result);
+		Assert.Equal(1, platform.Store.RedirectionOpenCount);
+		Assert.Equal(1, platform.Store.RedirectionCloseCount);
+		Assert.Equal(string.Empty, platform.Store.OutputText);
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var state));
+		Assert.Equal(0u, state.ScriptKeyTemplateLength);
+	}
+
+	[Fact]
+	public void Pre_scan_preserves_late_brackets_for_source_ordered_dispatch()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.AcceptScriptKeyTemplate = true;
+		platform.Store.ScriptText = ".KEY filename/A\nEcho {filename}\n.BRA {\n.KET }\n";
+		APTR arguments = platform.Store.PutAt(3500, " value");
+		APTR frame = InitializePreScanFrame(ref platform, arguments, 6);
+		APTR sourcePath = platform.Store.PutAt(7700, "S:dot");
+		APTR temporaryPath = new(7800);
+		ShellScriptStepWorkspace workspace = CreateWorkspace();
+
+		var result = ShellScriptPreScanner.Prepare(ref platform, new APTR(8),
+			frame, new BPTR(1), sourcePath, 5, temporaryPath, 64,
+			in workspace);
+
+		Assert.Equal(ShellScriptPreScanResult.Transformed, result);
+		Assert.Equal(".KEY filename/A\nEcho {filename}\n.BRA {\n.KET }\n",
+			platform.Store.OutputText);
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var state));
+		Assert.Equal(0u, state.ScriptKeyTemplateLength);
+	}
+
+	[Fact]
+	public void Pre_scan_short_write_deletes_the_unpublished_work_file()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.AcceptScriptKeyTemplate = true;
+		platform.Store.ShortWrite = true;
+		platform.Store.ScriptText = ".KEY filename/A\nEcho <filename>\n";
+		APTR arguments = platform.Store.PutAt(3500, " value");
+		APTR frame = InitializePreScanFrame(ref platform, arguments, 6);
+		APTR sourcePath = platform.Store.PutAt(7700, "S:short");
+		ShellScriptStepWorkspace workspace = CreateWorkspace();
+
+		var result = ShellScriptPreScanner.Prepare(ref platform, new APTR(8),
+			frame, new BPTR(1), sourcePath, 7, new APTR(7800), 64,
+			in workspace);
+
+		Assert.Equal(ShellScriptPreScanResult.Failed, result);
+		Assert.Equal(1, platform.Store.ScriptDeleteCount);
+		Assert.StartsWith("T:Execute.", platform.Store.LastDeletedScriptPath);
+		Assert.Equal(3, platform.Store.RedirectionCloseCount);
+	}
+
+	[Fact]
+	public void Pre_scan_preserves_a_late_default_for_source_ordered_dispatch()
+	{
+		EchoCommandTests.TestShellPlatform platform = new();
+		platform.Store.AcceptScriptKeyTemplate = true;
+		platform.Store.ScriptText = ".KEY filename\nEcho <filename>\n.DEF filename fallback\n";
+		APTR frame = InitializePreScanFrame(ref platform, APTR.Null, 0);
+		APTR sourcePath = platform.Store.PutAt(7700, "S:default");
+		ShellCommandWorkspace command = CreateCommandWorkspace();
+		ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+			new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+		ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+			new APTR(1400), 64, in command, in redirection);
+
+		var result = ShellScriptPreScanner.Prepare(ref platform, new APTR(8),
+			frame, new BPTR(1), sourcePath, 9, new APTR(7800), 64,
+			in workspace);
+
+		Assert.Equal(ShellScriptPreScanResult.Transformed, result);
+		Assert.Equal(".KEY filename\nEcho <filename>\n.DEF filename fallback\n",
+			platform.Store.OutputText);
+		Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+			out var state));
+		Assert.Equal(0u, state.ScriptKeyTemplateLength);
+	}
+
+	[Fact]
 	public void Foreground_external_line_yields_and_resumes_after_child_completion()
 	{
 		EchoCommandTests.TestShellPlatform platform = new();
@@ -110,6 +204,54 @@ public sealed class ShellScriptEngineTests
 		Assert.Equal(APTR.Null, afterChild.PendingCommand);
 		Assert.Equal(1, platform.Store.ContinuationReleaseCount);
 	}
+
+    [Fact]
+    public void Key_substitution_survives_a_pending_external_child()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptExternalPending = true;
+        platform.Store.ScriptExternalContinuation = new APTR(64);
+        platform.Store.ScriptText = ".KEY filename/A\nexternal <filename>\n";
+        APTR arguments = platform.Store.PutAt(3500, " value");
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptArguments = arguments,
+            ScriptArgumentLength = 6, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Waiting,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("external value", platform.Store.LastScriptExternalCommand);
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+            out var pending));
+        Assert.Equal("filename/A", platform.Store.ReadText(
+            pending.ScriptKeyTemplate, pending.ScriptKeyTemplateLength));
+
+        platform.Store.ScriptExternalPending = false;
+        platform.Store.ContinuationObservedState =
+            ShellProcessContinuationState.Completed;
+        platform.Store.ContinuationResult = 3;
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace,
+                out var resumed));
+        Assert.Equal(3, resumed.CommandResult);
+        Assert.Equal(1, platform.Store.ContinuationReleaseCount);
+    }
 
 	[Fact]
 	public void Run_stops_at_explicit_step_limit_and_preserves_frame()
@@ -163,6 +305,537 @@ public sealed class ShellScriptEngineTests
         Assert.Equal(ShellScriptStepStatus.EndOfFile, status);
         Assert.Equal(1, platform.Store.ScriptExecuteCount);
         Assert.Equal((int)ShellCommandResult.Ok, eof.CommandResult);
+    }
+
+    [Fact]
+    public void First_key_line_is_copied_and_validated_against_the_owned_tail()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename/A\nEcho later\n";
+        APTR arguments = platform.Store.PutAt(3500, " value");
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptArguments = arguments,
+            ScriptArgumentLength = 6, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellScriptStepWorkspace workspace = CreateWorkspace();
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.True(ShellScriptFrameCodec.TryRead(ref platform, frame,
+            out var state));
+        Assert.Equal("filename/A", platform.Store.ReadText(
+            state.ScriptKeyTemplate, state.ScriptKeyTemplateLength));
+        Assert.Equal(10u, state.ScriptKeyTemplateLength);
+        Assert.Equal(1, platform.Store.ReadArgsCount);
+        Assert.Equal(1, platform.Store.FreeArgsCount);
+    }
+
+    [Fact]
+    public void Key_template_substitutes_the_reparsed_tail_before_dispatch()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename/A\nEcho <filename>\n";
+        APTR arguments = platform.Store.PutAt(3500, " value");
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptArguments = arguments,
+            ScriptArgumentLength = 6, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("value\n", platform.Store.OutputText);
+        Assert.Equal(3, platform.Store.ReadArgsCount);
+        Assert.Equal(3, platform.Store.FreeArgsCount);
+    }
+
+    [Fact]
+    public void Def_supplies_a_default_when_key_argument_is_absent()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename\n.DEF filename \"fallback value\"\nEcho <filename>\n";
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("fallback value\n", platform.Store.OutputText);
+        Assert.Equal(3, platform.Store.ReadArgsCount);
+        Assert.Equal(3, platform.Store.FreeArgsCount);
+    }
+
+    [Fact]
+    public void Empty_equals_default_suppresses_the_expanded_line()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename\n.DEF filename=\nEcho \"X<filename>Y\"\nEcho AFTER\n";
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("AFTER\n", platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Whitespace_empty_default_suppresses_the_expanded_line()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename\n.DEF filename \nEcho \"X<filename>Y\"\nEcho AFTER\n";
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("AFTER\n", platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Whitespace_default_ignores_surplus_value_tokens()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename\n.DEF filename first second\nEcho VALUE:<filename>\n";
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("VALUE:first\n", platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Equals_default_ignores_surplus_value_tokens()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename\n.DEF filename=first second\nEcho VALUE:<filename>\n";
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("VALUE:first\n", platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Bare_default_is_a_noop()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename\n.DEF\nEcho SHOULD-RUN\n";
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("SHOULD-RUN\n", platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Empty_default_name_stops_the_script_with_error()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename\n.DEF =fallback\nEcho SHOULD-RUN\n";
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        var run = ShellScriptEngine.Run(ref platform, frame, in workspace, 8);
+
+        Assert.Equal(ShellScriptStepStatus.Malformed, run.Status);
+        Assert.Equal((int)ShellCommandResult.Error, run.Result);
+        Assert.Equal(string.Empty, platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Explicit_key_argument_overrides_an_equals_default()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename\n.DEF filename=fallback\nEcho <filename>\n";
+        APTR arguments = platform.Store.PutAt(3500, " explicit");
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptArguments = arguments,
+            ScriptArgumentLength = 9, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("explicit\n", platform.Store.OutputText);
+        Assert.Equal(3, platform.Store.ReadArgsCount);
+        Assert.Equal(3, platform.Store.FreeArgsCount);
+    }
+
+    [Fact]
+    public void Duplicate_def_keeps_the_first_value_and_runs_later_lines()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename\n.DEF filename first\n.DEF filename second\nEcho X<filename>\n";
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out var result));
+        Assert.Equal(ShellInternalCommand.Echo, result.Command);
+        Assert.Equal(3, platform.Store.ReadArgsCount);
+        Assert.Equal((int)ShellCommandResult.Ok, result.CommandResult);
+        Assert.Equal("Xfirst\n", platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Undeclared_def_is_ignored_and_later_lines_run()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename\n.DEF missing fallback\nEcho SHOULD-RUN\n";
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("SHOULD-RUN\n", platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Key_expansion_uses_a_directly_defined_nonempty_default()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        APTR template = platform.Store.PutAt(3600, "filename");
+        platform.WriteUInt8(template, 8, 0);
+        platform.Clear(new APTR(template.Raw + 9),
+            ShellScriptKeyExpansion.TemplateBufferCapacity - 9);
+        APTR name = platform.Store.PutAt(4200, "filename");
+        APTR value = platform.Store.PutAt(4300, "first");
+        APTR source = platform.Store.PutAt(1100, "Echo <filename>");
+
+        Assert.True(ShellScriptKeyExpansion.TryInitializeDirectiveState(
+            ref platform, template, 8));
+        Assert.True(ShellScriptKeyExpansion.TryDefineDefault(ref platform,
+            template, 8, name, 8, value, 5));
+        Assert.True(ShellScriptKeyExpansion.TryExpand(ref platform, source,
+            15, APTR.Null, 0, template, 8, new APTR(1000), 96,
+            new APTR(1600), 256, out var length));
+        Assert.Equal(10u, length);
+        Assert.Equal("Echo first", platform.Store.ReadText(new APTR(1600),
+            length));
+    }
+
+    [Fact]
+    public void Bra_and_ket_change_the_substitution_delimiters()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename/A\nEcho {filename}\n.BRA {\n.KET }\nEcho \"<literal>\" {filename}\n";
+        APTR arguments = platform.Store.PutAt(3500, " value");
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptArguments = arguments,
+            ScriptArgumentLength = 6, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("{filename}\n<literal> value\n", platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Dol_changes_the_per_reference_default_separator()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename\n.DOL #\nEcho <filename#fallback>\n";
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("fallback\n", platform.Store.OutputText);
+    }
+
+    [Fact]
+    public void Dot_changes_the_prefix_for_following_directives()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        platform.Store.AcceptScriptKeyTemplate = true;
+        platform.Store.ScriptText = ".KEY filename/A\n.DOT !\n!BRA {\n!KET }\nEcho {filename}\n";
+        APTR arguments = platform.Store.PutAt(3500, " value");
+        APTR template = new(3600);
+        APTR frame = new(3000);
+        ShellScriptFrameState initial = new()
+        {
+            Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+            Error = new BPTR(1), CurrentLine = 1,
+            Flags = ShellScriptFrameFlags.Active, ScriptArguments = arguments,
+            ScriptArgumentLength = 6, ScriptKeyTemplate = template,
+        };
+        Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+            in initial));
+        ShellCommandWorkspace command = CreateCommandWorkspace();
+        ShellRedirectionWorkspace redirection = new(new APTR(1600), 256,
+            new APTR(2200), 64, new APTR(2300), 64, new APTR(2400), 64);
+        ShellScriptAliasWorkspace alias = new(new APTR(1900), 256);
+        ShellScriptStepWorkspace workspace = new(new APTR(1100), 256,
+            new APTR(1400), 64, in command, in redirection, in alias);
+
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Empty,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal(ShellScriptStepStatus.Executed,
+            ShellScriptEngine.Step(ref platform, frame, in workspace, out _));
+        Assert.Equal("value\n", platform.Store.OutputText);
     }
 
     [Fact]
@@ -414,7 +1087,7 @@ public sealed class ShellScriptEngineTests
         Assert.Equal(before.CurrentLine, after.CurrentLine);
     }
 
-    private static APTR InitializeFrame(
+	private static APTR InitializeFrame(
         ref EchoCommandTests.TestShellPlatform platform,
         ShellScriptFrameFlags flags = ShellScriptFrameFlags.Active,
         APTR signalState = default)
@@ -433,7 +1106,24 @@ public sealed class ShellScriptEngineTests
         Assert.True(ShellScriptFrameCodec.Initialize(
             ref platform, frame, in state));
         return frame;
-    }
+	}
+
+	private static APTR InitializePreScanFrame(
+		ref EchoCommandTests.TestShellPlatform platform, APTR arguments,
+		uint argumentLength)
+	{
+		APTR frame = new(3000);
+		ShellScriptFrameState state = new()
+		{
+			Cli = new APTR(8), Input = new BPTR(1), Output = new BPTR(1),
+			Error = new BPTR(1), CurrentLine = 1,
+			Flags = ShellScriptFrameFlags.Active, ScriptArguments = arguments,
+			ScriptArgumentLength = argumentLength, ScriptKeyTemplate = new APTR(3600),
+		};
+		Assert.True(ShellScriptFrameCodec.Initialize(ref platform, frame,
+			in state));
+		return frame;
+	}
 
     private static ShellScriptStepWorkspace CreateWorkspace()
     {

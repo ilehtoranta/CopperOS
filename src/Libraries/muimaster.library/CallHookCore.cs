@@ -256,8 +256,13 @@ internal static class MuiCallHookMessageCodec
 	internal static bool TryGetFirstParameter<TPlatform>(
 		ref TPlatform platform, APTR message, out APTR parameter)
 		where TPlatform : struct, IMuiGuestMemory
-		=> MuiCallHookParameterMemoryCodec.TryGetEntry(ref platform, message, 0,
+	{
+		var cursor = default(MuiCallHookParameterCursor);
+		cursor.Message = message;
+		cursor.Index = 0;
+		return MuiCallHookParameterCursorCodec.TryGetEntry(ref platform, cursor,
 			out parameter);
+	}
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiCallHookMethodMessage packet)

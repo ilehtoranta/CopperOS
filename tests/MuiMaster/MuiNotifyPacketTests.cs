@@ -257,6 +257,40 @@ public sealed class MuiNotifyPacketTests
 	}
 
 	[Fact]
+	public void NotifyFollowParameterCursorExchangesCompleteSlots()
+	{
+		var platform = CreatePlatform(out _);
+		var cursor = new MuiNotifyFollowParameterVectorCursor
+		{
+			Base = APTR.FromPointer(0x1800),
+			Index = 0,
+		};
+		var expected = new MuiNotifyFollowParameterSlot
+		{
+			Value = 0xFEDCBA98u,
+		};
+
+		Assert.True(MuiNotifyFollowParameterVectorCodec.TryWrite(ref platform,
+			cursor, expected));
+		Assert.True(MuiNotifyFollowParameterVectorCodec.TryRead(ref platform,
+			cursor, out var actual));
+		Assert.Equal(expected.Value, actual.Value);
+		Assert.True(MuiNotifyFollowParameterVectorCodec.TryWrite(ref platform,
+			cursor, ref expected));
+		actual = default;
+		Assert.True(MuiNotifyFollowParameterVectorCodec.TryReadInto(ref platform,
+			cursor, ref actual));
+		Assert.Equal(expected.Value, actual.Value);
+		Assert.True(MuiNotifyFollowParameterVectorCodec.TryAdvance(ref cursor, 1));
+		Assert.Equal(1u, cursor.Index);
+		Assert.False(MuiNotifyFollowParameterVectorCodec.TryAdvance(ref cursor,
+			MuiNotifyFollowParameterVectorCursor.MaximumEntries));
+		cursor.Index = MuiNotifyFollowParameterVectorCursor.MaximumEntries;
+		Assert.False(MuiNotifyFollowParameterVectorCodec.TryRead(ref platform,
+			cursor, out _));
+	}
+
+	[Fact]
 	public void MultiSetTargetMemoryAdapterOwnsEntryBounds()
 	{
 		var platform = CreatePlatform(out _);

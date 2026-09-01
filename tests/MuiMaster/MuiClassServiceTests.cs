@@ -45,6 +45,47 @@ public sealed class MuiClassServiceTests
 			AreaName, APTR.Null, 8, APTR.FromPointer(0xC001));
 
 	[Fact]
+	public void ClassServiceStringByteCursorUsesBoundedNamedReads()
+	{
+		var platform = NewPlatform();
+		var cursor = default(MuiClassServiceStringByteCursor);
+		cursor.Text = FooId;
+		cursor.Index = 1;
+		Assert.True(MuiClassServiceStringByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value));
+		Assert.Equal((byte)'o', value);
+		Assert.True(MuiClassServiceStringByteCursorCodec.TryReadAt(ref platform,
+			FooId, 6, out value));
+		Assert.Equal((byte)'c', value);
+		Assert.False(MuiClassServiceStringByteCursorCodec.TryReadAt(ref platform,
+			FooId, -1, out _));
+		Assert.False(MuiClassServiceStringByteCursorCodec.TryReadAt(ref platform,
+			FooId, (int)MuiClassServiceStringByteCursor.MaximumLength, out _));
+		Assert.False(MuiClassServiceStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0x300000), 0, out _));
+		Assert.False(MuiClassServiceStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(uint.MaxValue - 1u), 2, out _));
+	}
+
+	[Fact]
+	public void ClassServiceStringByteCursorSupportsBoundedWritesAndPrefixPayload()
+	{
+		var platform = NewPlatform();
+		var writeCursor = default(MuiClassServiceStringByteCursor);
+		writeCursor.Text = LibNameFoo;
+		writeCursor.Index = 0;
+		Assert.True(MuiClassServiceStringByteCursorCodec.TryWriteByte(ref platform,
+			writeCursor, (byte)'M'));
+		Assert.Equal((byte)'M', platform.ReadUInt8(LibNameFoo, 0));
+		Assert.True(MuiClassServiceLibraryPrefixRecordCodec.TryGetPayloadAddress(
+			ref platform, LibNameFoo, out var payload));
+		Assert.Equal(LibNameFoo.Raw + MuiClassServiceLibraryPrefixRecord.Size,
+			payload.Raw);
+		Assert.False(MuiClassServiceLibraryPrefixRecordCodec.TryGetPayloadAddress(
+			ref platform, APTR.FromPointer(uint.MaxValue), out _));
+	}
+
+	[Fact]
 	public void ClassRecordFieldCursorUsesSemanticRecordKinds()
 	{
 		var platform = NewPlatform();

@@ -142,6 +142,47 @@ public sealed class MuiApplicationInputBufferedTests
 	}
 
 	[Fact]
+	public void ApplicationPushMethodParameterRangeUsesNamedCursor()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var message = APTR.FromPointer(0x1800);
+		var cursor = default(MuiApplicationPushMethodParameterCursor);
+		cursor.Message = message;
+		cursor.Index = 0;
+		Assert.True(MuiApplicationPushMethodParameterCursorCodec.TryGetEntry(
+			ref platform, cursor, out var expected));
+		Assert.True(MuiApplicationQueuePacketCodec.TryGetParameters(ref platform,
+			message, 3, out var actual));
+		Assert.Equal(expected, actual);
+		Assert.True(MuiApplicationPushMethodParameterCodec.WriteValue(ref platform,
+			actual, 0xF1234567u));
+		Assert.True(MuiApplicationPushMethodParameterCodec.TryReadValue(ref platform,
+			expected, out var value));
+		Assert.Equal(0xF1234567u, value);
+	}
+
+	[Fact]
+	public void ApplicationPushMethodParameterUsesSharedUlongRecordCodec()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var address = APTR.FromPointer(0x1C00);
+
+		Assert.True(MuiGuestUlongStorageCodec.WriteValue(ref platform, address,
+			0xF0E1D2C3u));
+		Assert.True(MuiApplicationPushMethodParameterCodec.TryReadValue(ref platform,
+			address, out var value));
+		Assert.Equal(0xF0E1D2C3u, value);
+
+		Assert.True(MuiApplicationPushMethodParameterCodec.WriteValue(ref platform,
+			address, 0x80706050u));
+		Assert.True(MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value));
+		Assert.Equal(0x80706050u, value);
+	}
+
+	[Fact]
 	public void ApplicationPushMethodParameterCursorUsesNamedEntryBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -234,6 +275,32 @@ public sealed class MuiApplicationInputBufferedTests
 			MuiApplicationPushMethodParameterCursor.MaximumEntries, out _));
 		Assert.False(MuiApplicationPushMethodParameterVectorCodec.TryWriteValue(
 			ref platform, APTR.FromPointer(0xFFFFFFF0), 0, expected.Value));
+	}
+
+	[Fact]
+	public void ApplicationPushMethodParameterVectorCursorExchangesNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var cursor = new MuiApplicationPushMethodParameterVectorCursor
+		{
+			Base = APTR.FromPointer(0x1900),
+			Index = 2,
+		};
+		var expected = new MuiApplicationPushMethodParameter
+		{
+			Value = 0xFEDCBA98u,
+		};
+		Assert.True(MuiApplicationPushMethodParameterVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+		Assert.True(MuiApplicationPushMethodParameterVectorCodec.TryRead(
+			ref platform, cursor, out var decoded));
+		Assert.Equal(expected.Value, decoded.Value);
+		cursor.Index = MuiApplicationPushMethodParameterVectorCursor.MaximumEntries;
+		Assert.False(MuiApplicationPushMethodParameterVectorCodec.TryRead(
+			ref platform, cursor, out _));
+		Assert.False(MuiApplicationPushMethodParameterVectorCodec.TryWrite(
+			ref platform, cursor, expected));
 	}
 
 	[Fact]

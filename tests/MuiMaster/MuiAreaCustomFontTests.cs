@@ -124,6 +124,31 @@ public sealed class MuiAreaCustomFontTests
 	}
 
 	[Fact]
+	public void CustomFontSpecStringByteCursorUsesBoundedNamedReads()
+	{
+		var platform = CreatePlatform(out _);
+		var text = APTR.FromPointer(0x1600);
+		platform.WriteCString(text, "Noto/20");
+		var cursor = default(MuiCustomFontSpecStringByteCursor);
+		cursor.Text = text;
+		cursor.Index = 2;
+		Assert.True(MuiCustomFontSpecStringByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value));
+		Assert.Equal((byte)'t', value);
+		Assert.True(MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+			text, 7, out value));
+		Assert.Equal(0, value);
+		Assert.False(MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+			text, -1, out _));
+		Assert.False(MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+			text, (int)MuiCustomFontSpecStringByteCursor.MaximumLength, out _));
+		Assert.False(MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(uint.MaxValue - 1u), 2, out _));
+		Assert.False(MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0x30000), 0, out _));
+	}
+
+	[Fact]
 	public void CustomFontAdmissionRequiresCanonicalPresenceGenerationAndLiveOwner()
 	{
 		var platform = CreatePlatform(out var areaClass);

@@ -891,6 +891,43 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void WindowCycleChainInlineVectorBridgeUsesNamedObjectSlot()
+	{
+		var platform = CreatePlatform(out _);
+		var cursor = new MuiWindowCycleChainInlineVectorCursor
+		{
+			Message = APTR.FromPointer(0x1800),
+			Index = 2,
+		};
+		var expected = new MuiApplicationWindowCycleChainSlot
+		{
+			Object = APTR.FromPointer(0xFEDCBA98u),
+		};
+
+		Assert.True(MuiWindowCycleChainInlineVectorCodec.TryWrite(ref platform,
+			cursor, expected));
+		Assert.True(MuiWindowCycleChainInlineVectorCodec.TryRead(ref platform,
+			cursor, out var actual));
+		Assert.Equal(expected.Object, actual.Object);
+		Assert.True(MuiWindowCycleChainInlineVectorCodec.TryReadValue(ref platform,
+			cursor, out var rawObject));
+		Assert.Equal(expected.Object.Raw, rawObject);
+		Assert.True(MuiWindowCycleChainInlineVectorCodec.TryWriteValue(ref platform,
+			cursor, 0x10203040u));
+		Assert.True(MuiWindowCycleChainInlineVectorCodec.TryReadValue(ref platform,
+			cursor, out rawObject));
+		Assert.Equal(0x10203040u, rawObject);
+
+		cursor.Index = MuiApplicationWindowCycleChainCursor.MaximumEntries;
+		Assert.False(MuiWindowCycleChainInlineVectorCodec.TryRead(ref platform,
+			cursor, out _));
+		cursor.Message = APTR.FromPointer(0xFFFFFFF0u);
+		cursor.Index = 0;
+		Assert.False(MuiWindowCycleChainInlineVectorCodec.TryWrite(ref platform,
+			cursor, expected));
+	}
+
+	[Fact]
 	public void WindowCycleChainCursorUsesNamedEntryBoundary()
 	{
 		var platform = CreatePlatform(out _);
@@ -958,6 +995,35 @@ public sealed class MuiApplicationWindowTests
 			MuiApplicationWindowCycleChainCursor.MaximumEntries, out _));
 		Assert.False(MuiApplicationWindowCycleChainVectorCodec.TryWriteValue(
 			ref platform, APTR.FromPointer(0x20FFE), 0, expected.Object.Raw));
+	}
+
+	[Fact]
+	public void WindowCycleChainVectorCursorExchangesNamedSlots()
+	{
+		var platform = CreatePlatform(out _);
+		var cursor = new MuiApplicationWindowCycleChainCursor
+		{
+			Base = APTR.FromPointer(0x1900),
+			Index = 0,
+		};
+		var expected = new MuiApplicationWindowCycleChainSlot
+		{
+			Object = APTR.FromPointer(0xFEDCBA98u),
+		};
+
+		Assert.True(MuiApplicationWindowCycleChainVectorCodec.TryWrite(ref platform,
+			cursor, expected));
+		Assert.True(MuiApplicationWindowCycleChainVectorCodec.TryRead(ref platform,
+			cursor, out var actual));
+		Assert.Equal(expected.Object.Raw, actual.Object.Raw);
+		Assert.True(MuiApplicationWindowCycleChainVectorCodec.TryAdvance(ref cursor,
+			1));
+		Assert.Equal(1u, cursor.Index);
+		Assert.False(MuiApplicationWindowCycleChainVectorCodec.TryAdvance(ref cursor,
+			MuiApplicationWindowCycleChainCursor.MaximumEntries));
+		cursor.Index = MuiApplicationWindowCycleChainCursor.MaximumEntries;
+		Assert.False(MuiApplicationWindowCycleChainVectorCodec.TryRead(ref platform,
+			cursor, out _));
 	}
 
 	[Fact]
@@ -5228,6 +5294,73 @@ public sealed class MuiApplicationWindowTests
 			ref platform, APTR.FromPointer(0xFFFFFFF0), 2, out _));
 		Assert.False(MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(
 			ref platform, APTR.Null, 0, out _));
+	}
+
+	[Fact]
+	public void ApplicationWindowListEntryVectorBridgeUsesNamedRecords()
+	{
+		var platform = CreatePlatform(out _);
+		var vector = APTR.FromPointer(0x1A00);
+		var expected = new MuiApplicationWindowListEntry
+		{
+			Next = APTR.FromPointer(0xFEDCBA98u),
+			Previous = APTR.FromPointer(0x80000001u),
+			Object = APTR.FromPointer(0x12345678u),
+			Reserved = APTR.FromPointer(MuiApplicationWindowListEntry.ProjectionMagic),
+		};
+
+		Assert.True(MuiApplicationWindowListEntryVectorCodec.TryWrite(
+			ref platform, vector, 2, expected));
+		Assert.True(MuiApplicationWindowListEntryVectorCodec.TryRead(
+			ref platform, vector, 2, out var decoded));
+		Assert.Equal(expected.Next, decoded.Next);
+		Assert.Equal(expected.Previous, decoded.Previous);
+		Assert.Equal(expected.Object, decoded.Object);
+		Assert.Equal(expected.Reserved, decoded.Reserved);
+		Assert.False(MuiApplicationWindowListEntryVectorCodec.TryRead(
+			ref platform, APTR.FromPointer(0x20FF1u), 0, out _));
+		Assert.False(MuiApplicationWindowListEntryVectorCodec.TryWrite(
+			ref platform, APTR.FromPointer(0xFFFFFFF0u), 2, expected));
+	}
+
+	[Fact]
+	public void ApplicationWindowListEntryVectorCursorExchangesCompleteNamedRecords()
+	{
+		var platform = CreatePlatform(out _);
+		var cursor = new MuiApplicationWindowListEntryCursor
+		{
+			Base = APTR.FromPointer(0x1A00),
+			Index = 2,
+		};
+		var expected = new MuiApplicationWindowListEntry
+		{
+			Next = APTR.FromPointer(0xFEDCBA98u),
+			Previous = APTR.FromPointer(0x80000001u),
+			Object = APTR.FromPointer(0x12345678u),
+			Reserved = APTR.FromPointer(MuiApplicationWindowListEntry.ProjectionMagic),
+		};
+
+		Assert.True(MuiApplicationWindowListEntryVectorCodec.TryWrite(
+			ref platform, cursor, expected));
+		Assert.True(MuiApplicationWindowListEntryVectorCodec.TryRead(
+			ref platform, cursor, out var decoded));
+		Assert.Equal(expected.Next, decoded.Next);
+		Assert.Equal(expected.Previous, decoded.Previous);
+		Assert.Equal(expected.Object, decoded.Object);
+		Assert.Equal(expected.Reserved, decoded.Reserved);
+		Assert.True(MuiApplicationWindowListEntryVectorCodec.TryAdvance(
+			ref cursor, 1));
+		Assert.Equal(3u, cursor.Index);
+		Assert.True(MuiApplicationWindowListEntryVectorCodec.TryGetEntry(
+			ref platform, cursor, out var nextAddress));
+		Assert.Equal(APTR.FromPointer(0x1A30), nextAddress);
+
+		var terminal = cursor;
+		terminal.Index = MuiApplicationWindowListEntryCursor.MaximumEntries;
+		Assert.False(MuiApplicationWindowListEntryVectorCodec.TryAdvance(
+			ref terminal, 1));
+		Assert.False(MuiApplicationWindowListEntryVectorCodec.TryAdvance(
+			ref cursor, 0));
 	}
 
 	[Fact]

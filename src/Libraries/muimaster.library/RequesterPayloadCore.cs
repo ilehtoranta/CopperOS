@@ -7,6 +7,60 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
+// Named bounded byte view for requester gadget and format strings.  The
+// payload validator uses the same adapter for each caller-owned text span so
+// address arithmetic and mapped-byte admission are not repeated inline.
+[System.Runtime.InteropServices.StructLayout(
+	System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 2)]
+internal struct MuiRequesterPayloadByteCursor
+{
+	internal const uint MaximumLength = 4096;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Length;
+}
+
+internal static class MuiRequesterPayloadByteCursorCodec
+{
+	internal static bool TryCreate<TPlatform>(ref TPlatform platform,
+		APTR baseAddress, uint length, out MuiRequesterPayloadByteCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		cursor = default;
+		if (baseAddress.IsNull || length == 0 ||
+			length > MuiRequesterPayloadByteCursor.MaximumLength)
+			return false;
+		cursor.Base = baseAddress;
+		cursor.Length = length;
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiRequesterPayloadByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (cursor.Length > MuiRequesterPayloadByteCursor.MaximumLength)
+			return false;
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiRequesterPayloadByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+}
+
 // Bounded validation for the caller-owned payload of MUI_RequestA and
 // MUI_RequestObjectA. The service verifies C-string termination in guest
 // memory, measures the gadget alternatives separated by '|', and checks the
@@ -42,11 +96,14 @@ public static class MuiRequesterPayloadCore
 		if (length == 0) return true;
 
 		count = 1;
+		if (!MuiRequesterPayloadByteCursorCodec.TryCreate(ref platform, gadgets,
+			length, out var cursor)) return false;
 		for (var index = 0u; index < length; index++)
 		{
-			if (gadgets.Raw > uint.MaxValue - index) return false;
-			if (platform.ReadUInt8(APTR.FromPointer(gadgets.Raw + index)) ==
-				(byte)'|') count++;
+			cursor.Index = index;
+			if (!MuiRequesterPayloadByteCursorCodec.TryReadByte(ref platform,
+				cursor, out var value)) return false;
+			if (value == (byte)'|') count++;
 		}
 		return true;
 	}
@@ -68,9 +125,7 @@ public static class MuiRequesterPayloadCore
 		var index = 0u;
 		while (index < length)
 		{
-			if (format.Raw > uint.MaxValue - index) return false;
-			if (platform.ReadUInt8(APTR.FromPointer(format.Raw + index)) !=
-				(byte)'%')
+			if (ReadFormatByte(ref platform, format, index) != (byte)'%')
 			{
 				index++;
 				continue;
@@ -165,8 +220,15 @@ public static class MuiRequesterPayloadCore
 
 	private static byte ReadFormatByte<TPlatform>(ref TPlatform platform,
 		APTR format, uint index)
-		where TPlatform : struct, IMuiHeadlessPlatform =>
-		platform.ReadUInt8(APTR.FromPointer(format.Raw + index));
+		where TPlatform : struct, IMuiHeadlessPlatform
+	{
+		var cursor = default(MuiRequesterPayloadByteCursor);
+		cursor.Base = format;
+		cursor.Length = MuiRequesterPayloadByteCursor.MaximumLength;
+		cursor.Index = index;
+		return MuiRequesterPayloadByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) ? value : (byte)0;
+	}
 
 	private static bool IsDigit(byte value) => value >= (byte)'0' &&
 		value <= (byte)'9';

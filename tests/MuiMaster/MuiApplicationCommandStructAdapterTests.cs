@@ -88,4 +88,39 @@ public sealed class MuiApplicationCommandStructAdapterTests
 		Assert.False(MuiApplicationCommandTableCodec.TryWrite(ref platform,
 			APTR.Null, 0, expected));
 	}
+
+	[Fact]
+	public void ApplicationCommandTableCursorExchangesNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var table = APTR.FromPointer(0x2D00);
+		var expected = default(MuiApplicationCommandRecord);
+		expected.Name = APTR.FromPointer(0xF1234500u);
+		expected.Template = APTR.FromPointer(0xE2345600u);
+		expected.Parameters = -11;
+		expected.Hook = APTR.FromPointer(0xD3456700u);
+		expected.Reserved4 = 0x55667788;
+		var cursor = default(MuiApplicationCommandTableCursor);
+		cursor.Base = table;
+		cursor.Index = 1;
+
+		Assert.True(MuiApplicationCommandTableCodec.TryWrite(ref platform, cursor,
+			expected));
+		Assert.True(MuiApplicationCommandTableCodec.TryRead(ref platform, cursor,
+			out var actual));
+		Assert.Equal(expected.Name, actual.Name);
+		Assert.Equal(expected.Template, actual.Template);
+		Assert.Equal(expected.Parameters, actual.Parameters);
+		Assert.Equal(expected.Hook, actual.Hook);
+		Assert.Equal(expected.Reserved4, actual.Reserved4);
+
+		cursor.Index = uint.MaxValue;
+		Assert.False(MuiApplicationCommandTableCodec.TryRead(ref platform, cursor,
+			out _));
+		cursor.Base = APTR.FromPointer(0x30FF0u);
+		cursor.Index = 0;
+		Assert.False(MuiApplicationCommandTableCodec.TryWrite(ref platform, cursor,
+			expected));
+	}
 }

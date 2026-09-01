@@ -40,6 +40,71 @@ public static class MuiNativeDispatchCaptureCodec
 	}
 }
 
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+public struct MuiNativeShortHelpProviderState
+{
+	public const uint Address = 0x0004F124;
+	public const uint Size = 12;
+	public uint Active;
+	public uint Enabled;
+	public APTR Object;
+}
+
+public static class MuiNativeShortHelpProviderStateCodec
+{
+	public static bool TryRead(ref MuiNativeHeadlessPlatform platform,
+		out MuiNativeShortHelpProviderState value)
+	{
+		value = default;
+		var address = APTR.FromPointer(MuiNativeShortHelpProviderState.Address);
+		value.Active = APTR.ReadUInt32(address, 0);
+		value.Enabled = APTR.ReadUInt32(address, 4);
+		value.Object = APTR.FromPointer(APTR.ReadUInt32(address, 8));
+		return true;
+	}
+
+	public static bool TryWrite(ref MuiNativeHeadlessPlatform platform,
+		MuiNativeShortHelpProviderState value)
+	{
+		var address = APTR.FromPointer(MuiNativeShortHelpProviderState.Address);
+		APTR.WriteUInt32(address, 0, value.Active);
+		APTR.WriteUInt32(address, 4, value.Enabled);
+		APTR.WriteUInt32(address, 8, value.Object.Raw);
+		return true;
+	}
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 1)]
+public struct MuiNativeShortHelpTextRecord
+{
+	public const uint Address = 0x0004F120;
+	public const uint Size = 2;
+	public byte First;
+	public byte Terminator;
+}
+
+public static class MuiNativeShortHelpTextRecordCodec
+{
+	public static bool TryRead(ref MuiNativeHeadlessPlatform platform,
+		out MuiNativeShortHelpTextRecord value)
+	{
+		value = default;
+		var address = APTR.FromPointer(MuiNativeShortHelpTextRecord.Address);
+		value.First = APTR.ReadUInt8(address, 0);
+		value.Terminator = APTR.ReadUInt8(address, 1);
+		return true;
+	}
+
+	public static bool TryWrite(ref MuiNativeHeadlessPlatform platform,
+		MuiNativeShortHelpTextRecord value)
+	{
+		var address = APTR.FromPointer(MuiNativeShortHelpTextRecord.Address);
+		APTR.WriteUInt8(address, 0, value.First);
+		APTR.WriteUInt8(address, 1, value.Terminator);
+		return true;
+	}
+}
+
 public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 	IMuiServicePlatform, IMuiIffCapability
 {
@@ -104,6 +169,10 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 	// integer metrics required by the headless graphics seam; no managed font
 	// object or guest-memory offset table is used.
 	private const uint CustomFontHandleTag = 0x7E000000u;
+	// Native ShortHelp provider fixture state.  The provider publishes one
+	// bounded two-byte guest C string and keeps its ownership marker in a named
+	// fixed-width state block.  The marker is disabled by default so existing
+	// fallback qualification roots continue to observe caller-owned static help.
 
 	public void Reset()
 	{
@@ -155,6 +224,10 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 		APTR.WriteUInt32(APTR.FromPointer(BackfillOffsetMarker), 0, 0);
 		APTR.WriteUInt32(APTR.FromPointer(BackfillBrightnessMarker), 0, 0);
 		APTR.WriteUInt32(APTR.FromPointer(BackfillFlagsMarker), 0, 0);
+		var shortHelpState = default(MuiNativeShortHelpProviderState);
+		MuiNativeShortHelpProviderStateCodec.TryWrite(ref this, shortHelpState);
+		MuiNativeShortHelpTextRecordCodec.TryWrite(ref this,
+			default(MuiNativeShortHelpTextRecord));
 	}
 
 	public void SetState(APTR state) => APTR.WriteUInt32(
@@ -444,9 +517,40 @@ public struct MuiNativeHeadlessPlatform : IMuiApplicationPlatform,
 		return true;
 	}
 	public bool ReadMuiKeyadjustInput(ref MuiKeyadjustInputSample input) => false;
-	public bool CreateMuiShortHelp(ref MuiShortHelpCreateSample sample) => false;
+	public bool CreateMuiShortHelp(ref MuiShortHelpCreateSample sample)
+	{
+		MuiNativeShortHelpProviderStateCodec.TryRead(ref this, out var state);
+		if (state.Enabled == 0 || sample.Object.IsNull || state.Active != 0)
+			return false;
+		var text = APTR.FromPointer(MuiNativeShortHelpTextRecord.Address);
+		var record = new MuiNativeShortHelpTextRecord
+		{
+			First = (byte)'?',
+			Terminator = 0,
+		};
+		MuiNativeShortHelpTextRecordCodec.TryWrite(ref this, record);
+		state.Active = 1;
+		state.Object = sample.Object;
+		MuiNativeShortHelpProviderStateCodec.TryWrite(ref this, state);
+		sample.Result = text;
+		return true;
+	}
 	public bool CheckMuiShortHelp(ref MuiShortHelpCheckSample sample) => false;
-	public bool DeleteMuiShortHelp(ref MuiShortHelpDeleteSample sample) => false;
+	public bool DeleteMuiShortHelp(ref MuiShortHelpDeleteSample sample)
+	{
+		MuiNativeShortHelpProviderStateCodec.TryRead(ref this, out var state);
+		var text = APTR.FromPointer(MuiNativeShortHelpTextRecord.Address);
+		if (state.Enabled == 0 || sample.Object.IsNull ||
+			sample.Object.Raw != state.Object.Raw || sample.Help.Raw != text.Raw ||
+			state.Active == 0)
+			return false;
+		MuiNativeShortHelpTextRecordCodec.TryWrite(ref this,
+			default(MuiNativeShortHelpTextRecord));
+		state.Active = 0;
+		state.Object = APTR.Null;
+		MuiNativeShortHelpProviderStateCodec.TryWrite(ref this, state);
+		return true;
+	}
 	public bool CreateMuiBubble(ref MuiBubbleCreateSample sample)
 	{
 		if (sample.Object.IsNull || sample.Text.IsNull) return false;

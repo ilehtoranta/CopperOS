@@ -137,6 +137,29 @@ public sealed class MuiChoiceAdmissionTests
 	}
 
 	[Fact]
+	public void ChoiceEntriesAdmissionUsesNamedVectorCursor()
+	{
+		var platform = CreatePlatform();
+		var cursor = new MuiChoiceEntryCursor
+		{
+			Base = APTR.FromPointer(0x1E40),
+			Index = 0,
+		};
+		Assert.True(MuiChoiceEntryVectorCodec.TryWrite(ref platform, cursor,
+			new MuiChoiceEntry { Text = APTR.FromPointer(0xFEDCBA98u) }));
+		cursor.Index = 1;
+		Assert.True(MuiChoiceEntryVectorCodec.TryWrite(ref platform, cursor,
+			new MuiChoiceEntry { Text = APTR.Null }));
+		cursor.Index = 0;
+		Assert.True(MuiChoiceEntryVectorCodec.TryReadValue(ref platform, cursor,
+			out var firstText));
+		Assert.Equal(0xFEDCBA98u, firstText);
+		cursor.Index = MuiChoiceEntryCursor.MaximumEntries;
+		Assert.False(MuiChoiceEntryVectorCodec.TryReadValue(ref platform, cursor,
+			out _));
+	}
+
+	[Fact]
 	public void MalformedChoiceMagicRemainsStructuralButFailsClosed()
 	{
 		var platform = CreatePlatform();

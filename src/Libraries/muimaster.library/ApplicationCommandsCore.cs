@@ -353,10 +353,12 @@ public static class MuiApplicationCommandsCore
 		APTR table) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (table.IsNull) return true;
-		var index = 0u;
-		while (index < MuiHeadlessLayout.MaximumTraversal)
+		var cursor = default(MuiApplicationCommandTableCursor);
+		cursor.Base = table;
+		cursor.Index = 0;
+		while (cursor.Index < MuiHeadlessLayout.MaximumTraversal)
 		{
-			if (!MuiApplicationCommandTableCodec.TryRead(ref platform, table, index,
+			if (!MuiApplicationCommandTableCodec.TryRead(ref platform, cursor,
 				out var command)) return false;
 			// A NULL name terminates the caller-owned command table.  The
 			// remaining fields are intentionally not interpreted at this boundary.
@@ -367,7 +369,7 @@ public static class MuiApplicationCommandsCore
 				command.Template.Raw != MagicTemplate &&
 				!CStringCodec.TryReadLength(ref platform, command.Template,
 					MaximumStringLength, out _)) return false;
-			index++;
+			cursor.Index++;
 		}
 		return false;
 	}
@@ -424,12 +426,38 @@ internal static class MuiApplicationCommandTableCodec
 		return true;
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiApplicationCommandTableCursor cursor,
+		out MuiApplicationCommandRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryGetEntry(ref platform, cursor, out var address) ||
+			!MuiApplicationCommandRecordCodec.TryRead(ref platform, address,
+				out value))
+		{
+			value = default;
+			return false;
+		}
+		return true;
+	}
+
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR table, uint index, MuiApplicationCommandRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiApplicationCommandTableMemoryCodec.TryGetEntry(ref platform,
 			table, index, out var address)) return false;
+		return MuiApplicationCommandRecordCodec.Write(ref platform, address,
+			value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiApplicationCommandTableCursor cursor,
+		MuiApplicationCommandRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
 		return MuiApplicationCommandRecordCodec.Write(ref platform, address,
 			value);
 	}

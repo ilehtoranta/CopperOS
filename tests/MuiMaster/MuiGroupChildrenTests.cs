@@ -478,6 +478,42 @@ public sealed class MuiGroupChildrenTests
 	}
 
 	[Fact]
+	public void ChildListEntryVectorBridgeUsesNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var cursor = new MuiGroupChildListEntryCursor
+		{
+			Base = APTR.FromPointer(0x1800),
+			Index = 1,
+		};
+		var expected = new MuiGroupChildListEntry
+		{
+			Next = APTR.FromPointer(0x1A00),
+			Previous = APTR.FromPointer(0x1B00),
+			Object = APTR.FromPointer(0x1C00),
+			Reserved = APTR.FromPointer(MuiGroupChildListEntry.ProjectionMagic),
+		};
+
+		Assert.True(MuiGroupChildListEntryVectorCodec.TryWrite(ref platform,
+			cursor, expected));
+		Assert.True(MuiGroupChildListEntryVectorCodec.TryRead(ref platform,
+			cursor, out var actual));
+		Assert.Equal(expected.Next, actual.Next);
+		Assert.Equal(expected.Previous, actual.Previous);
+		Assert.Equal(expected.Object, actual.Object);
+		Assert.Equal(expected.Reserved, actual.Reserved);
+
+		cursor.Base = APTR.FromPointer(0x20FF1);
+		cursor.Index = 0;
+		Assert.False(MuiGroupChildListEntryVectorCodec.TryWrite(ref platform,
+			cursor, expected));
+		cursor.Base = APTR.FromPointer(0xFFFFFFF0u);
+		Assert.False(MuiGroupChildListEntryVectorCodec.TryRead(ref platform,
+			cursor, out _));
+	}
+
+	[Fact]
 	public void ChildListPublishesTypedExecListAndNextObjectView()
 	{
 		var platform = CreateClasses(out var groupClass, out var areaClass);

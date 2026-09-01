@@ -8,6 +8,33 @@ public sealed class MuiHeadlessCollectionTests
 	private static readonly APTR State = APTR.FromPointer(0x1000);
 
 	[Fact]
+	public void ClassNameByteCursorUsesBoundedNamedBytes()
+	{
+		var platform = CreatePlatform(out _);
+		var cursor = new MuiClassNameByteCursor
+		{
+			Name = APTR.FromPointer(0x1200),
+			Index = 3,
+		};
+		Assert.True(MuiClassNameByteCursorCodec.TryWriteByte(ref platform,
+			cursor, (byte)'X'));
+		Assert.True(MuiClassNameByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value));
+		Assert.Equal((byte)'X', value);
+		cursor.Index = MuiClassNameByteCursor.MaximumLength;
+		Assert.False(MuiClassNameByteCursorCodec.TryGetByte(ref platform,
+			cursor, out _));
+		cursor.Name = APTR.FromPointer(0x40000);
+		cursor.Index = 1;
+		Assert.False(MuiClassNameByteCursorCodec.TryGetByte(ref platform,
+			cursor, out _));
+		cursor.Name = APTR.Null;
+		cursor.Index = 0;
+		Assert.False(MuiClassNameByteCursorCodec.TryGetByte(ref platform,
+			cursor, out _));
+	}
+
+	[Fact]
 	public void StoreIterationCounterUsesNamedOrdinal()
 	{
 		var platform = CreatePlatform(out _);
@@ -177,6 +204,27 @@ public sealed class MuiHeadlessCollectionTests
 	}
 
 	[Fact]
+	public void FamilyInlineVectorCursorReadsNamedObjectRecord()
+	{
+		var platform = CreatePlatform(out _);
+		var cursor = new MuiFamilyInlineVectorCursor
+		{
+			Message = APTR.FromPointer(0x1200),
+			ArrayOffset = 8,
+			Index = 2,
+		};
+		var expected = APTR.FromPointer(0xF1234567u);
+		Assert.True(MuiFamilyInlineVectorCursorCodec.TryWriteObject(ref platform,
+			cursor, expected));
+		Assert.True(MuiFamilyInlineVectorCursorCodec.TryReadObject(ref platform,
+			cursor, out var actual));
+		Assert.Equal(expected, actual);
+		cursor.Message = APTR.FromPointer(0x30FFEu);
+		Assert.False(MuiFamilyInlineVectorCursorCodec.TryReadObject(ref platform,
+			cursor, out _));
+	}
+
+	[Fact]
 	public void FamilyInlineVectorMemoryAdapterOwnsEntryBounds()
 	{
 		var platform = CreatePlatform(out _);
@@ -301,6 +349,47 @@ public sealed class MuiHeadlessCollectionTests
 		Assert.True(MuiHeadlessObjectCore.DisposeObject(ref platform, State,
 			second));
 		Assert.True(MuiHeadlessObjectCore.DeleteClass(ref platform, State, cl));
+	}
+
+	[Fact]
+	public void GroupOrderingConsumesNamedFamilyVectorRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x5000,
+			State);
+		var groupName = APTR.FromPointer(0x1100);
+		var childName = APTR.FromPointer(0x1140);
+		platform.WriteCString(groupName, "Group.mui");
+		platform.WriteCString(childName, "Notify.mui");
+		Assert.True(MuiHeadlessObjectCore.Initialize(ref platform, State));
+		var groupClass = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			State, groupName, APTR.Null, 0, APTR.FromPointer(1));
+		var childClass = MuiHeadlessObjectCore.RegisterBuiltinClass(ref platform,
+			State, childName, APTR.Null, 0, APTR.FromPointer(1));
+		var group = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			groupClass, APTR.Null);
+		var first = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			childClass, APTR.Null);
+		var second = MuiHeadlessObjectCore.CreateObjectA(ref platform, State,
+			childClass, APTR.Null);
+		Assert.True(group.IsNotNull && first.IsNotNull && second.IsNotNull);
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, group, first));
+		Assert.True(MuiFamilyCore.AddTail(ref platform, State, group, second));
+
+		var vector = APTR.FromPointer(0x1400);
+		Assert.True(MuiFamilyMutationVectorCodec.TryWriteObject(ref platform,
+			vector, 0, second));
+		Assert.True(MuiFamilyMutationVectorCodec.TryWriteObject(ref platform,
+			vector, 1, first));
+		Assert.True(MuiFamilyMutationVectorCodec.TryWriteObject(ref platform,
+			vector, 2, APTR.Null));
+		Assert.True(MuiGroupOperationsCore.Reorder(ref platform, State, group,
+			APTR.Null, vector));
+		Assert.Equal(second, MuiFamilyCore.GetChild(ref platform, State, group,
+			0, APTR.Null));
+		Assert.Equal(first, MuiFamilyCore.GetChild(ref platform, State, group,
+			1, APTR.Null));
+		Assert.False(MuiGroupOperationsCore.Reorder(ref platform, State, group,
+			APTR.Null, APTR.FromPointer(0x30FFEu)));
 	}
 
 	[Fact]

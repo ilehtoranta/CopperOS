@@ -484,6 +484,26 @@ public sealed class MuiStringscrollTests
 	}
 
 	[Fact]
+	public void StringscrollAutomaticScrollbarTagWriterUsesNamedCursor()
+	{
+		var platform = CreatePlatform(out _);
+		var tags = APTR.FromPointer(0x5D00);
+		Assert.True(MuiStringscrollCore.WriteAutomaticScrollbarTagRecords(
+			ref platform, tags, true));
+		var cursor = default(MuiAslTagItemCursor);
+		cursor.Base = tags;
+		cursor.Index = 0;
+		Assert.True(MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
+			out var group));
+		Assert.Equal(MuiCommonControlCore.GroupHoriz, group.Tag);
+		Assert.Equal(1u, group.Data);
+		Assert.True(MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1));
+		Assert.True(MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
+			out var done));
+		Assert.Equal(MuiAslTagListCore.TagDone, done.Tag);
+	}
+
+	[Fact]
 	public void ComposedScrollbarChildrenRouteArrowAndThumbInput()
 	{
 		var platform = CreatePlatform(out var stringClass);

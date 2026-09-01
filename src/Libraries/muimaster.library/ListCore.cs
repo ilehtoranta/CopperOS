@@ -25,6 +25,130 @@ public enum MuiCollectionClass
 	Stringscroll,
 }
 
+// Named cursor for the bounded class-name STRPTR used by collection and
+// Family classification. The consumer supplies only a logical byte index;
+// the adapter owns the 64-byte bound, overflow guard, and mapped-byte check.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiClassNameByteCursor
+{
+	internal const uint MaximumLength = 64;
+	internal APTR Name;
+	internal uint Index;
+}
+
+internal static class MuiClassNameByteCursorCodec
+{
+	internal static bool TryGetByte<TPlatform>(ref TPlatform platform,
+		MuiClassNameByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Name;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiClassNameByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiClassNameByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetByte(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiClassNameByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetByte(ref platform, cursor, out var address)) return false;
+		platform.WriteUInt8(address, 0, value);
+		return true;
+	}
+}
+
+// Named cursor for a bounded List FORMAT byte scan. The parser carries the
+// guest STRPTR and its already-validated length; all byte addressing and
+// mapped-memory checks stay inside this adapter.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiListFormatByteCursor
+{
+	internal const uint MaximumLength = 4096;
+	internal APTR Format;
+	internal uint Index;
+}
+
+internal static class MuiListFormatByteCursorCodec
+{
+	internal static bool TryReadAt<TPlatform>(ref TPlatform platform,
+		APTR format, int index, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (index < 0) return false;
+		var cursor = default(MuiListFormatByteCursor);
+		cursor.Format = format;
+		cursor.Index = (uint)index;
+		return TryReadByte(ref platform, cursor, out value);
+	}
+
+	internal static bool TryGetByte<TPlatform>(ref TPlatform platform,
+		MuiListFormatByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Format;
+		shared.Index = cursor.Index;
+		shared.Limit = MuiListFormatByteCursor.MaximumLength;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiListFormatByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetByte(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+}
+
+// Named bounded destination cursor for List FORMAT PREPARSE strings. The
+// preparser carries the allocated guest base, logical output index, and
+// capacity; all destination range and mapping checks stay in this adapter.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiListPreparseByteCursor
+{
+	internal const uint MaximumLength = MuiListFormatByteCursor.MaximumLength + 1;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Capacity;
+}
+
+internal static class MuiListPreparseByteCursorCodec
+{
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiListPreparseByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (cursor.Capacity == 0 || cursor.Capacity >
+			MuiListPreparseByteCursor.MaximumLength) return false;
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Capacity;
+		if (!MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out var address)) return false;
+		platform.WriteUInt8(address, 0, value);
+		return true;
+	}
+}
+
 // Fixed guest-owned List header. The slot array, capacity/count metadata, and
 // image-chain head travel together so List operations consume named fields
 // rather than repeating private header offsets.
@@ -958,6 +1082,50 @@ public static class MuiListCore
 		}
 	}
 
+	// Production bridge for the private List index vector. The bounded adapter
+	// owns slot address arithmetic; mutation and lookup paths exchange complete
+	// named entry/flag records.
+	internal static class MuiListSlotVectorCodec
+	{
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			MuiListSlotCursor cursor, out MuiListSlotState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiListSlotCursorCodec.TryGetEntry(ref platform, cursor,
+				out var address)) return false;
+			return MuiListSlotCodec.TryRead(ref platform, address, out value);
+		}
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			MuiListSlotCursor cursor, MuiListSlotState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiListSlotCursorCodec.TryGetEntry(ref platform, cursor,
+				out var address)) return false;
+			return MuiListSlotCodec.Write(ref platform, address, value);
+		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, out MuiListSlotState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform, vector,
+				index, out var address)) return false;
+			return MuiListSlotCodec.TryRead(ref platform, address, out value);
+		}
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, MuiListSlotState value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform, vector,
+				index, out var address)) return false;
+			return MuiListSlotCodec.Write(ref platform, address, value);
+		}
+	}
+
 	internal static class MuiListSlotCursorCodec
 	{
 		internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
@@ -1015,6 +1183,47 @@ public static class MuiListCore
 	// record (or its scalar APTR projection) instead of exposing slot addresses.
 	internal static class MuiListPointerVectorCodec
 	{
+		[MethodImpl(MethodImplOptions.NoInlining)]
+		internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+			MuiListPointerVectorCursor cursor, out uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = 0;
+			if (!MuiListPointerVectorCursorCodec.TryGetEntry(ref platform, cursor,
+				out var address)) return false;
+			return MuiListPointerSlotCodec.TryReadValue(ref platform, address,
+				out value);
+		}
+
+		[MethodImpl(MethodImplOptions.NoInlining)]
+		internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+			MuiListPointerVectorCursor cursor, uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiListPointerVectorCursorCodec.TryGetEntry(ref platform, cursor,
+				out var address)) return false;
+			return MuiListPointerSlotCodec.WriteValue(ref platform, address, value);
+		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			MuiListPointerVectorCursor cursor,
+			out MuiListPointerSlotRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!TryReadValue(ref platform, cursor, out var rawValue)) return false;
+			value.Value = APTR.FromPointer(rawValue);
+			return true;
+		}
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			MuiListPointerVectorCursor cursor,
+			MuiListPointerSlotRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			return TryWriteValue(ref platform, cursor, value.Value.Raw);
+		}
+
 		[MethodImpl(MethodImplOptions.NoInlining)]
 		internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 			APTR vector, uint index, out uint value)
@@ -1626,6 +1835,52 @@ public static class MuiListCore
 			if (vector.Raw > uint.MaxValue - offset) return false;
 			address = APTR.FromPointer(vector.Raw + offset);
 			return platform.IsMapped(address, MuiListColumnGeometry.Size);
+		}
+	}
+
+	// Production bridge for the cached List geometry vector. The bounded adapter
+	// owns index arithmetic; layout and edit-target consumers exchange complete
+	// named {offset,width} records.
+	internal static class MuiListColumnGeometryVectorCodec
+	{
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			MuiListColumnGeometryCursor cursor, out MuiListColumnGeometry value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiListColumnGeometryCursorCodec.TryGetEntry(ref platform, cursor,
+				out var address)) return false;
+			return MuiListColumnGeometryCodec.TryRead(ref platform, address,
+				out value);
+		}
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			MuiListColumnGeometryCursor cursor, MuiListColumnGeometry value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiListColumnGeometryCursorCodec.TryGetEntry(ref platform, cursor,
+				out var address)) return false;
+			return MuiListColumnGeometryCodec.Write(ref platform, address, value);
+		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, out MuiListColumnGeometry value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiListColumnGeometryVectorMemoryCodec.TryGetEntry(ref platform,
+				vector, index, out var address)) return false;
+			return MuiListColumnGeometryCodec.TryRead(ref platform, address,
+				out value);
+		}
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			APTR vector, uint index, MuiListColumnGeometry value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiListColumnGeometryVectorMemoryCodec.TryGetEntry(ref platform,
+				vector, index, out var address)) return false;
+			return MuiListColumnGeometryCodec.Write(ref platform, address, value);
 		}
 	}
 
@@ -2646,6 +2901,17 @@ public static class MuiListCore
 	internal static class MuiListColumnOrderByteVectorCodec
 	{
 		internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+			MuiListColumnOrderByteCursor cursor, out byte value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = 0;
+			if (!MuiListColumnOrderByteCursorCodec.TryGetEntry(ref platform,
+				cursor, out var address)) return false;
+			return MuiListColumnOrderByteRecordMemoryCodec.TryReadByte(ref platform,
+				address, MuiListColumnOrderByteField.Value, out value);
+		}
+
+		internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 			APTR vector, uint index, out byte value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -2667,6 +2933,18 @@ public static class MuiListCore
 			return true;
 		}
 
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			MuiListColumnOrderByteCursor cursor,
+			out MuiListColumnOrderByteRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!TryReadValue(ref platform, cursor, out var rawValue))
+				return false;
+			value.Value = rawValue;
+			return true;
+		}
+
 		internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
 			APTR vector, uint index, byte value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -2677,10 +2955,26 @@ public static class MuiListCore
 				address, MuiListColumnOrderByteField.Value, value);
 		}
 
+		internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+			MuiListColumnOrderByteCursor cursor, byte value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiListColumnOrderByteCursorCodec.TryGetEntry(ref platform,
+				cursor, out var address)) return false;
+			return MuiListColumnOrderByteRecordMemoryCodec.TryWriteByte(ref platform,
+				address, MuiListColumnOrderByteField.Value, value);
+		}
+
 		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 			APTR vector, uint index, MuiListColumnOrderByteRecord value)
 			where TPlatform : struct, IMuiGuestMemory
 			=> TryWriteValue(ref platform, vector, index, value.Value);
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			MuiListColumnOrderByteCursor cursor,
+			MuiListColumnOrderByteRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> TryWriteValue(ref platform, cursor, value.Value);
 	}
 
 	// Keep the one-byte record's field boundary named as well. Vector index
@@ -2840,6 +3134,34 @@ public static class MuiListCore
 	// exchanges only the named 40-byte descriptor.
 	internal static class MuiListFormatDescriptorVectorCodec
 	{
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			MuiListFormatDescriptorCursor cursor,
+			out MuiListFormatDescriptor value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!MuiListFormatDescriptorCursorCodec.TryGetEntry(ref platform,
+				cursor, out var address) ||
+				!MuiListFormatDescriptorCodec.TryRead(ref platform, address,
+					out value))
+			{
+				value = default;
+				return false;
+			}
+			return true;
+		}
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			MuiListFormatDescriptorCursor cursor,
+			MuiListFormatDescriptor value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiListFormatDescriptorCursorCodec.TryGetEntry(ref platform,
+				cursor, out var address)) return false;
+			return MuiListFormatDescriptorCodec.TryWrite(ref platform, address,
+				value);
+		}
+
 		internal static bool TryRead<TPlatform>(ref TPlatform platform,
 			APTR vector, uint index, out MuiListFormatDescriptor value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -3585,52 +3907,14 @@ public static class MuiListCore
 		internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 			APTR address, out uint value)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			value = 0;
-			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-				MuiListColumnMetricValue.Size, out var cursor)) return false;
-			APTR firstAddress;
-			APTR secondAddress;
-			APTR thirdAddress;
-			APTR fourthAddress;
-			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-				ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-				ref platform, ref cursor, 1, out thirdAddress) ||
-				!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-					out fourthAddress)) return false;
-			var first = platform.ReadUInt8(firstAddress, 0);
-			var second = platform.ReadUInt8(secondAddress, 0);
-			var third = platform.ReadUInt8(thirdAddress, 0);
-			var fourth = platform.ReadUInt8(fourthAddress, 0);
-			value = ((uint)first << 24) | ((uint)second << 16) |
-				((uint)third << 8) | fourth;
-			return MuiGuestStructCursor.IsComplete(cursor);
-		}
+			=> MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+				out value);
 
 		[MethodImpl(MethodImplOptions.NoInlining)]
 		internal static bool WriteValue<TPlatform>(ref TPlatform platform,
 			APTR address, uint value)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-				MuiListColumnMetricValue.Size, out var cursor)) return false;
-			APTR firstAddress;
-			APTR secondAddress;
-			APTR thirdAddress;
-			APTR fourthAddress;
-			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-				ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-				ref platform, ref cursor, 1, out thirdAddress) ||
-				!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-					out fourthAddress)) return false;
-			platform.WriteUInt8(firstAddress, 0, (byte)(value >> 24));
-			platform.WriteUInt8(secondAddress, 0, (byte)(value >> 16));
-			platform.WriteUInt8(thirdAddress, 0, (byte)(value >> 8));
-			platform.WriteUInt8(fourthAddress, 0, (byte)value);
-			return MuiGuestStructCursor.IsComplete(cursor);
-		}
+			=> MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
 
 		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListColumnMetricValue value)
@@ -3713,6 +3997,17 @@ public static class MuiListCore
 	internal static class MuiListColumnMetricVectorCodec
 	{
 		internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+			MuiListColumnMetricCursor cursor, out uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = 0;
+			if (!MuiListColumnMetricCursorCodec.TryGetEntry(ref platform, cursor,
+				out var address)) return false;
+			return MuiListColumnMetricCodec.TryReadValue(ref platform, address,
+				out value);
+		}
+
+		internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 			APTR vector, uint index, out uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
@@ -3737,6 +4032,18 @@ public static class MuiListCore
 			return true;
 		}
 
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			MuiListColumnMetricCursor cursor,
+			out MuiListColumnMetricValue value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!TryReadValue(ref platform, cursor, out var rawValue))
+				return false;
+			value.Value = rawValue;
+			return true;
+		}
+
 		internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
 			APTR vector, uint index, uint value)
 			where TPlatform : struct, IMuiGuestMemory
@@ -3747,10 +4054,26 @@ public static class MuiListCore
 				value);
 		}
 
+		internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+			MuiListColumnMetricCursor cursor, uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiListColumnMetricCursorCodec.TryGetEntry(ref platform, cursor,
+				out var address)) return false;
+			return MuiListColumnMetricCodec.WriteValue(ref platform, address,
+				value);
+		}
+
 		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 			APTR vector, uint index, MuiListColumnMetricValue value)
 			where TPlatform : struct, IMuiGuestMemory
 			=> TryWriteValue(ref platform, vector, index, value.Value);
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			MuiListColumnMetricCursor cursor,
+			MuiListColumnMetricValue value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> TryWriteValue(ref platform, cursor, value.Value);
 	}
 
 	internal static class MuiListColumnMetricCursorCodec
@@ -4829,6 +5152,43 @@ public static class MuiListCore
 	// named pointer-slot record (or its scalar APTR projection).
 	internal static class MuiListPointerSlotVectorCodec
 	{
+		[MethodImpl(MethodImplOptions.NoInlining)]
+		internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+			MuiListPointerSlotCursor cursor, out uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = 0;
+			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+				out var address)) return false;
+			return MuiListPointerSlotCodec.TryReadValue(ref platform, address,
+				out value);
+		}
+
+		internal static bool TryRead<TPlatform>(ref TPlatform platform,
+			MuiListPointerSlotCursor cursor, out MuiListPointerSlotRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			value = default;
+			if (!TryReadValue(ref platform, cursor, out var rawValue)) return false;
+			value.Value = APTR.FromPointer(rawValue);
+			return true;
+		}
+
+		[MethodImpl(MethodImplOptions.NoInlining)]
+		internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+			MuiListPointerSlotCursor cursor, uint value)
+			where TPlatform : struct, IMuiGuestMemory
+		{
+			if (!MuiListPointerSlotCursorCodec.TryGetEntry(ref platform, cursor,
+				out var address)) return false;
+			return MuiListPointerSlotCodec.WriteValue(ref platform, address, value);
+		}
+
+		internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+			MuiListPointerSlotCursor cursor, MuiListPointerSlotRecord value)
+			where TPlatform : struct, IMuiGuestMemory
+			=> TryWriteValue(ref platform, cursor, value.Value.Raw);
+
 		[MethodImpl(MethodImplOptions.NoInlining)]
 		internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 			APTR vector, uint index, out uint value)
@@ -7163,20 +7523,33 @@ public static class MuiListCore
 	{
 		if (name.IsNull) return MuiCollectionClass.Unknown;
 		uint hash = 2166136261u;
+		var cursor = default(MuiClassNameByteCursor);
+		cursor.Name = name;
 		var length = 0;
 		for (; length < 64; length++)
 		{
-			if (!platform.IsMapped(name, (uint)length + 1))
-				return MuiCollectionClass.Unknown;
-			var ch = platform.ReadUInt8(name, length);
+			cursor.Index = (uint)length;
+			if (!MuiClassNameByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var ch)) return MuiCollectionClass.Unknown;
 			if (ch == 0) break;
 			hash = (hash ^ Lower(ch)) * 16777619u;
 		}
-		if (length < 5 || length == 64 ||
-			platform.ReadUInt8(name, length - 4) != (byte)'.' ||
-			Lower(platform.ReadUInt8(name, length - 3)) != (byte)'m' ||
-			Lower(platform.ReadUInt8(name, length - 2)) != (byte)'u' ||
-			Lower(platform.ReadUInt8(name, length - 1)) != (byte)'i')
+		if (length < 5 || length == 64) return MuiCollectionClass.Unknown;
+		cursor.Index = (uint)(length - 4);
+		if (!MuiClassNameByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var suffix) || suffix != (byte)'.')
+			return MuiCollectionClass.Unknown;
+		cursor.Index = (uint)(length - 3);
+		if (!MuiClassNameByteCursorCodec.TryReadByte(ref platform, cursor,
+			out suffix) || Lower(suffix) != (byte)'m')
+			return MuiCollectionClass.Unknown;
+		cursor.Index = (uint)(length - 2);
+		if (!MuiClassNameByteCursorCodec.TryReadByte(ref platform, cursor,
+			out suffix) || Lower(suffix) != (byte)'u')
+			return MuiCollectionClass.Unknown;
+		cursor.Index = (uint)(length - 1);
+		if (!MuiClassNameByteCursorCodec.TryReadByte(ref platform, cursor,
+			out suffix) || Lower(suffix) != (byte)'i')
 			return MuiCollectionClass.Unknown;
 		switch (hash)
 		{
@@ -7663,8 +8036,11 @@ public static class MuiListCore
 		if (!TryReadColumnOrderState(ref platform, storage, out var value) ||
 			!IsValidColumnOrderValues(ref platform, value) ||
 			displayColumn >= value.Count) return fallback;
+		var cursor = default(MuiListColumnOrderByteCursor);
+		cursor.Base = value.Values;
+		cursor.Index = displayColumn;
 		return MuiListColumnOrderByteVectorCodec.TryReadValue(ref platform,
-			value.Values, displayColumn, out var resolved) ? resolved : fallback;
+			cursor, out var resolved) ? resolved : fallback;
 	}
 
 	// Create a List and normalize its construction. Class-aware defaults are
@@ -8876,12 +9252,18 @@ public static class MuiListCore
 			out var rightValue);
 		if (!leftValid || !rightValid) return leftValid == rightValid;
 		if (leftValue.Count != rightValue.Count) return false;
+		var leftCursor = default(MuiListColumnOrderByteCursor);
+		leftCursor.Base = leftValue.Values;
+		var rightCursor = default(MuiListColumnOrderByteCursor);
+		rightCursor.Base = rightValue.Values;
 		for (var index = 0u; index < leftValue.Count; index++)
 		{
+			leftCursor.Index = index;
+			rightCursor.Index = index;
 			if (!MuiListColumnOrderByteVectorCodec.TryReadValue(ref platform,
-				leftValue.Values, index, out var leftByte) ||
+				leftCursor, out var leftByte) ||
 				!MuiListColumnOrderByteVectorCodec.TryReadValue(ref platform,
-					rightValue.Values, index, out var rightByte) ||
+					rightCursor, out var rightByte) ||
 				leftByte != rightByte)
 				return false;
 		}
@@ -8900,10 +9282,13 @@ public static class MuiListCore
 		if (source.IsNull) return false;
 		var seen = default(MuiListHiddenColumns);
 		var copied = 0u;
+		var sourceCursor = default(MuiListColumnOrderByteCursor);
+		sourceCursor.Base = source;
 		for (var index = 0u; index < columns; index++)
 		{
+			sourceCursor.Index = index;
 			if (!MuiListColumnOrderByteVectorCodec.TryReadValue(ref platform,
-				source, index, out var value)) return false;
+				sourceCursor, out var value)) return false;
 			if (value == 0xFF) break;
 			if (value >= columns || IsHidden(seen, value)) return false;
 			Hide(ref seen, value);
@@ -9334,9 +9719,13 @@ public static class MuiListCore
 		if (!TryReadCStringLength(ref platform, format,
 			MaximumStringLength, out var length)) return false;
 		var scan = default(MuiListFormatScanState);
+		var formatCursor = default(MuiListFormatByteCursor);
+		formatCursor.Format = format;
 		for (var i = 0u; i < length; i++)
 		{
-			var value = platform.ReadUInt8(format, (int)i);
+			formatCursor.Index = i;
+			if (!MuiListFormatByteCursorCodec.TryReadByte(ref platform,
+				formatCursor, out var value)) return false;
 			if (scan.Quoted != 0)
 			{
 				// DOS ReadItem treats '*' specially only in a quoted item. The
@@ -9440,6 +9829,8 @@ public static class MuiListCore
 		var block = MuiHeadlessMemory.Allocate(ref platform,
 			safeCount * FormatDescriptorSize);
 		if (block.IsNull) return APTR.Null;
+		var descriptorCursor = default(MuiListFormatDescriptorCursor);
+		descriptorCursor.Base = block;
 		for (var i = 0u; i < safeCount; i++)
 		{
 			var value = default(MuiListFormatDescriptor);
@@ -9448,8 +9839,9 @@ public static class MuiListCore
 			value.MinWidth = unchecked((uint)-1);
 			value.MaxWidth = unchecked((uint)-1);
 			value.Column = i;
+			descriptorCursor.Index = i;
 			if (!MuiListFormatDescriptorVectorCodec.TryWrite(ref platform,
-				block, i, value))
+				descriptorCursor, value))
 			{
 				FreeFormatDescriptors(ref platform, block, safeCount);
 				return APTR.Null;
@@ -9465,12 +9857,20 @@ public static class MuiListCore
 		var start = 0;
 		var ordinal = 0u;
 		var scan = default(MuiListFormatScanState);
+		var formatCursor = default(MuiListFormatByteCursor);
+		formatCursor.Format = format;
 		for (var i = 0u; i <= length && ordinal < safeCount; i++)
 		{
 			var separator = i == length;
 			if (!separator)
 			{
-				var separatorByte = platform.ReadUInt8(format, (int)i);
+				formatCursor.Index = i;
+				if (!MuiListFormatByteCursorCodec.TryReadByte(ref platform,
+					formatCursor, out var separatorByte))
+				{
+					FreeFormatDescriptors(ref platform, block, safeCount);
+					return APTR.Null;
+				}
 				if (scan.Quoted != 0)
 				{
 					if (separatorByte == (byte)'*')
@@ -9505,8 +9905,9 @@ public static class MuiListCore
 			}
 			if (!separator) continue;
 			var value = default(MuiListFormatDescriptor);
-			if (!MuiListFormatDescriptorVectorCodec.TryRead(ref platform, block,
-				ordinal, out value))
+			descriptorCursor.Index = ordinal;
+			if (!MuiListFormatDescriptorVectorCodec.TryRead(ref platform,
+				descriptorCursor, out value))
 			{
 				FreeFormatDescriptors(ref platform, block, safeCount);
 				return APTR.Null;
@@ -9518,8 +9919,8 @@ public static class MuiListCore
 				FreeFormatDescriptors(ref platform, block, safeCount);
 				return APTR.Null;
 			}
-			if (!MuiListFormatDescriptorVectorCodec.TryWrite(ref platform, block,
-				ordinal, value))
+			if (!MuiListFormatDescriptorVectorCodec.TryWrite(ref platform,
+				descriptorCursor, value))
 			{
 				ReleaseFormatDescriptorValue(ref platform, ref value);
 				FreeFormatDescriptors(ref platform, block, safeCount);
@@ -9549,14 +9950,20 @@ public static class MuiListCore
 		APTR block, uint count)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		var currentCursor = default(MuiListFormatDescriptorCursor);
+		currentCursor.Base = block;
+		var previousCursor = default(MuiListFormatDescriptorCursor);
+		previousCursor.Base = block;
 		for (var current = 0u; current < count; current++)
 		{
-			if (!MuiListFormatDescriptorVectorCodec.TryRead(ref platform, block,
-				current, out var currentDescriptor)) return false;
+			currentCursor.Index = current;
+			if (!MuiListFormatDescriptorVectorCodec.TryRead(ref platform,
+				currentCursor, out var currentDescriptor)) return false;
 			for (var previous = 0u; previous < current; previous++)
 			{
-				if (!MuiListFormatDescriptorVectorCodec.TryRead(ref platform, block,
-					previous, out var previousDescriptor)) return false;
+				previousCursor.Index = previous;
+				if (!MuiListFormatDescriptorVectorCodec.TryRead(ref platform,
+					previousCursor, out var previousDescriptor)) return false;
 				if (previousDescriptor.Column == currentDescriptor.Column)
 					return false;
 			}
@@ -9572,31 +9979,55 @@ public static class MuiListCore
 		var cursor = start;
 		while (cursor < end)
 		{
-			while (cursor < end && IsSpace(platform.ReadUInt8(format, cursor)))
+			while (cursor < end)
+			{
+				if (!TryReadFormatByte(ref platform, format, cursor,
+					out var current)) return false;
+				if (!IsSpace(current)) break;
 				cursor++;
+			}
 			if (cursor >= end) break;
 			var keyEnd = cursor;
-			while (keyEnd < end && !IsSpace(platform.ReadUInt8(format, keyEnd)) &&
-				platform.ReadUInt8(format, keyEnd) != (byte)'=') keyEnd++;
+			while (keyEnd < end)
+			{
+				if (!TryReadFormatByte(ref platform, format, keyEnd,
+					out var keyByte)) return false;
+				if (IsSpace(keyByte) || keyByte == (byte)'=') break;
+				keyEnd++;
+			}
 			if (keyEnd == cursor) return false;
 			var afterKey = keyEnd;
-			while (afterKey < end && IsSpace(platform.ReadUInt8(format, afterKey)))
+			while (afterKey < end)
+			{
+				if (!TryReadFormatByte(ref platform, format, afterKey,
+					out var separatorByte)) return false;
+				if (!IsSpace(separatorByte)) break;
 				afterKey++;
+			}
 			var hasValue = false;
 			var valueStart = afterKey;
 			var valueEnd = afterKey;
 			var quotedValue = false;
-			if (afterKey < end && platform.ReadUInt8(format, afterKey) ==
-				(byte)'=')
+			if (afterKey < end)
 			{
+				if (!TryReadFormatByte(ref platform, format, afterKey,
+					out var equalsByte)) return false;
+				if (equalsByte == (byte)'=')
+				{
 				hasValue = true;
 				valueStart = afterKey + 1;
-				while (valueStart < end &&
-					IsSpace(platform.ReadUInt8(format, valueStart))) valueStart++;
+				while (valueStart < end)
+				{
+					if (!TryReadFormatByte(ref platform, format, valueStart,
+						out var valueSpace)) return false;
+					if (!IsSpace(valueSpace)) break;
+					valueStart++;
+				}
 				if (!TryReadFormatValueRange(ref platform, format, valueStart,
 					end, out valueEnd, out quotedValue)) return false;
+				}
 			}
-			else if (!IsFormatSwitch(ref platform, format, cursor, keyEnd))
+			if (!hasValue && !IsFormatSwitch(ref platform, format, cursor, keyEnd))
 			{
 				// ReadArgs keyword arguments may be written as KEY VALUE as
 				// well as KEY=VALUE.  Consume exactly one following item; a
@@ -9704,32 +10135,44 @@ public static class MuiListCore
 		valueEnd = start;
 		quoted = false;
 		if (start >= end) return false;
-		var first = platform.ReadUInt8(text, start);
+		if (!TryReadFormatByte(ref platform, text, start, out var first))
+			return false;
 		if (first == (byte)'"')
 		{
 			quoted = true;
 			var cursor = start + 1;
 			while (cursor < end)
 			{
-				var value = platform.ReadUInt8(text, cursor++);
+				if (!TryReadFormatByte(ref platform, text, cursor,
+					out var value)) return false;
+				cursor++;
 				if (value == (byte)'*')
 				{
 					if (cursor >= end) return false;
+					if (!TryReadFormatByte(ref platform, text, cursor,
+						out _)) return false;
 					cursor++;
 					continue;
 				}
 				if (value != (byte)'"') continue;
-				if (cursor < end && !IsSpace(platform.ReadUInt8(text, cursor)))
-					return false;
+				if (cursor < end)
+				{
+					if (!TryReadFormatByte(ref platform, text, cursor,
+						out var trailing)) return false;
+					if (!IsSpace(trailing)) return false;
+				}
 				valueEnd = cursor;
 				return true;
 			}
 			return false;
 		}
 		var unquoted = start;
-		while (unquoted < end && !IsSpace(platform.ReadUInt8(text, unquoted)))
+		while (unquoted < end)
 		{
-			if (platform.ReadUInt8(text, unquoted) == (byte)'"') return false;
+			if (!TryReadFormatByte(ref platform, text, unquoted,
+				out var current)) return false;
+			if (IsSpace(current)) break;
+			if (current == (byte)'"') return false;
 			unquoted++;
 		}
 		if (unquoted == start) return false;
@@ -9739,6 +10182,13 @@ public static class MuiListCore
 
 	private static bool IsSpace(byte value) => value == (byte)' ' ||
 		value == (byte)'\t';
+
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	private static bool TryReadFormatByte<TPlatform>(ref TPlatform platform,
+		APTR format, int index, out byte value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiListFormatByteCursorCodec.TryReadAt(ref platform, format, index,
+			out value);
 
 	private static bool IsColumn<TPlatform>(ref TPlatform platform, APTR text,
 		int start, int end) where TPlatform : struct, IMuiGuestMemory =>
@@ -9768,12 +10218,22 @@ public static class MuiListCore
 		IsToken1(ref platform, text, start, end, (byte)'O');
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
-	private static uint ReadGuestLongLower<TPlatform>(ref TPlatform platform,
-		APTR address, int offset) where TPlatform : struct, IMuiGuestMemory =>
-		((uint)Lower(platform.ReadUInt8(address, offset)) << 24) |
-		((uint)Lower(platform.ReadUInt8(address, offset + 1)) << 16) |
-		((uint)Lower(platform.ReadUInt8(address, offset + 2)) << 8) |
-		Lower(platform.ReadUInt8(address, offset + 3));
+	private static bool TryReadGuestLongLower<TPlatform>(ref TPlatform platform,
+		APTR address, int offset, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryReadFormatByte(ref platform, address, offset, out var first) ||
+			!TryReadFormatByte(ref platform, address, offset + 1, out var second) ||
+			!TryReadFormatByte(ref platform, address, offset + 2, out var third) ||
+			!TryReadFormatByte(ref platform, address, offset + 3, out var fourth))
+			return false;
+		value = ((uint)Lower(first) << 24) |
+			((uint)Lower(second) << 16) |
+			((uint)Lower(third) << 8) |
+			Lower(fourth);
+		return true;
+	}
 
 	// The descriptor wire format is a fixed sequence of big-endian ULONGs.
 	// Keeping this marshalling in one place lets all format/layout code use the
@@ -9797,13 +10257,16 @@ public static class MuiListCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		length = 0;
-		if (value.IsNull) return false;
+		if (value.IsNull || maximumLength == 0 || maximumLength >
+			MuiListFormatByteCursor.MaximumLength) return false;
+		var cursor = default(MuiListFormatByteCursor);
+		cursor.Format = value;
 		for (var index = 0u; index < maximumLength; index++)
 		{
-			if (value.Raw > uint.MaxValue - index) return false;
-			var address = APTR.FromPointer(value.Raw + index);
-			if (!platform.IsMapped(address, 1)) return false;
-			if (platform.ReadUInt8(address) != 0) continue;
+			cursor.Index = index;
+			if (!MuiListFormatByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var current)) return false;
+			if (current != 0) continue;
 			length = index;
 			return true;
 		}
@@ -9812,44 +10275,70 @@ public static class MuiListCore
 
 	private static bool IsToken3<TPlatform>(ref TPlatform platform, APTR text,
 		int start, int end, byte a, byte b, byte c)
-		where TPlatform : struct, IMuiGuestMemory => end - start == 3 &&
-		Lower(platform.ReadUInt8(text, start)) == Lower(a) &&
-		Lower(platform.ReadUInt8(text, start + 1)) == Lower(b) &&
-		Lower(platform.ReadUInt8(text, start + 2)) == Lower(c);
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (end - start != 3) return false;
+		return TryReadFormatByte(ref platform, text, start, out var first) &&
+			TryReadFormatByte(ref platform, text, start + 1, out var second) &&
+			TryReadFormatByte(ref platform, text, start + 2, out var third) &&
+			Lower(first) == Lower(a) && Lower(second) == Lower(b) &&
+			Lower(third) == Lower(c);
+	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static bool IsToken4<TPlatform>(ref TPlatform platform, APTR text,
 		int start, int end, byte a, byte b, byte c, byte d)
-		where TPlatform : struct, IMuiGuestMemory => end - start == 4 &&
-		Lower(platform.ReadUInt8(text, start)) == Lower(a) &&
-		Lower(platform.ReadUInt8(text, start + 1)) == Lower(b) &&
-		Lower(platform.ReadUInt8(text, start + 2)) == Lower(c) &&
-		Lower(platform.ReadUInt8(text, start + 3)) == Lower(d);
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (end - start != 4) return false;
+		return TryReadFormatByte(ref platform, text, start, out var first) &&
+			TryReadFormatByte(ref platform, text, start + 1, out var second) &&
+			TryReadFormatByte(ref platform, text, start + 2, out var third) &&
+			TryReadFormatByte(ref platform, text, start + 3, out var fourth) &&
+			Lower(first) == Lower(a) && Lower(second) == Lower(b) &&
+			Lower(third) == Lower(c) && Lower(fourth) == Lower(d);
+	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static bool IsToken1<TPlatform>(ref TPlatform platform, APTR text,
 		int start, int end, byte a)
-		where TPlatform : struct, IMuiGuestMemory => end - start == 1 &&
-		Lower(platform.ReadUInt8(text, start)) == Lower(a);
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (end - start != 1) return false;
+		return TryReadFormatByte(ref platform, text, start, out var value) &&
+			Lower(value) == Lower(a);
+	}
 
 	private static bool IsToken5<TPlatform>(ref TPlatform platform, APTR text,
 		int start, int end, byte a, byte b, byte c, byte d, byte e)
-		where TPlatform : struct, IMuiGuestMemory => end - start == 5 &&
-		Lower(platform.ReadUInt8(text, start)) == Lower(a) &&
-		Lower(platform.ReadUInt8(text, start + 1)) == Lower(b) &&
-		Lower(platform.ReadUInt8(text, start + 2)) == Lower(c) &&
-		Lower(platform.ReadUInt8(text, start + 3)) == Lower(d) &&
-		Lower(platform.ReadUInt8(text, start + 4)) == Lower(e);
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (end - start != 5) return false;
+		return TryReadFormatByte(ref platform, text, start, out var first) &&
+			TryReadFormatByte(ref platform, text, start + 1, out var second) &&
+			TryReadFormatByte(ref platform, text, start + 2, out var third) &&
+			TryReadFormatByte(ref platform, text, start + 3, out var fourth) &&
+			TryReadFormatByte(ref platform, text, start + 4, out var fifth) &&
+		Lower(first) == Lower(a) && Lower(second) == Lower(b) &&
+			Lower(third) == Lower(c) && Lower(fourth) == Lower(d) &&
+			Lower(fifth) == Lower(e);
+	}
 
 	private static bool IsToken6<TPlatform>(ref TPlatform platform, APTR text,
 		int start, int end, byte a, byte b, byte c, byte d, byte e, byte f)
-		where TPlatform : struct, IMuiGuestMemory => end - start == 6 &&
-		Lower(platform.ReadUInt8(text, start)) == Lower(a) &&
-		Lower(platform.ReadUInt8(text, start + 1)) == Lower(b) &&
-		Lower(platform.ReadUInt8(text, start + 2)) == Lower(c) &&
-		Lower(platform.ReadUInt8(text, start + 3)) == Lower(d) &&
-		Lower(platform.ReadUInt8(text, start + 4)) == Lower(e) &&
-		Lower(platform.ReadUInt8(text, start + 5)) == Lower(f);
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (end - start != 6) return false;
+		return TryReadFormatByte(ref platform, text, start, out var first) &&
+			TryReadFormatByte(ref platform, text, start + 1, out var second) &&
+			TryReadFormatByte(ref platform, text, start + 2, out var third) &&
+			TryReadFormatByte(ref platform, text, start + 3, out var fourth) &&
+			TryReadFormatByte(ref platform, text, start + 4, out var fifth) &&
+			TryReadFormatByte(ref platform, text, start + 5, out var sixth) &&
+			Lower(first) == Lower(a) && Lower(second) == Lower(b) &&
+			Lower(third) == Lower(c) && Lower(fourth) == Lower(d) &&
+			Lower(fifth) == Lower(e) && Lower(sixth) == Lower(f);
+	}
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	private static bool IsToken8<TPlatform>(ref TPlatform platform, APTR text,
@@ -9857,8 +10346,10 @@ public static class MuiListCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (end - start != 8) return false;
-		return ReadGuestLongLower(ref platform, text, start) == first &&
-			ReadGuestLongLower(ref platform, text, start + 4) == second;
+		return TryReadGuestLongLower(ref platform, text, start, out var firstValue) &&
+			TryReadGuestLongLower(ref platform, text, start + 4,
+				out var secondValue) && firstValue == first &&
+			secondValue == second;
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -9932,11 +10423,16 @@ public static class MuiListCore
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 	private static bool TokenValueEquals<TPlatform>(ref TPlatform platform,
 		APTR text, int start, int end, byte a, byte b, byte c, byte d)
-		where TPlatform : struct, IMuiGuestMemory => end - start == 4 &&
-		Lower(platform.ReadUInt8(text, start)) == Lower(a) &&
-		Lower(platform.ReadUInt8(text, start + 1)) == Lower(b) &&
-		Lower(platform.ReadUInt8(text, start + 2)) == Lower(c) &&
-		Lower(platform.ReadUInt8(text, start + 3)) == Lower(d);
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (end - start != 4) return false;
+		return TryReadFormatByte(ref platform, text, start, out var first) &&
+			TryReadFormatByte(ref platform, text, start + 1, out var second) &&
+			TryReadFormatByte(ref platform, text, start + 2, out var third) &&
+			TryReadFormatByte(ref platform, text, start + 3, out var fourth) &&
+			Lower(first) == Lower(a) && Lower(second) == Lower(b) &&
+			Lower(third) == Lower(c) && Lower(fourth) == Lower(d);
+	}
 
 	private static bool IsDescendingValue<TPlatform>(ref TPlatform platform,
 		APTR text, ref MuiListFormatValue value)
@@ -10015,14 +10511,18 @@ public static class MuiListCore
 	{
 		decoded = 0;
 		if (sourceCursor >= value.End) return false;
-		var current = platform.ReadUInt8(text, sourceCursor++);
+		if (!TryReadFormatByte(ref platform, text, sourceCursor,
+			out var current)) return false;
+		sourceCursor++;
 		if (value.Quoted == 0 || current != (byte)'*')
 		{
 			decoded = current;
 			return true;
 		}
 		if (sourceCursor >= value.End) return false;
-		current = platform.ReadUInt8(text, sourceCursor++);
+		if (!TryReadFormatByte(ref platform, text, sourceCursor,
+			out current)) return false;
+		sourceCursor++;
 		decoded = current switch
 		{
 			(byte)'e' or (byte)'E' => 0x1B,
@@ -10118,6 +10618,9 @@ public static class MuiListCore
 		if (storage.IsNull) return false;
 		var sourceCursor = value.Start;
 		var output = 0u;
+		var destinationCursor = default(MuiListPreparseByteCursor);
+		destinationCursor.Base = storage;
+		destinationCursor.Capacity = bytes;
 		while (output < value.DecodedLength)
 		{
 			if (!TryReadDecodedByte(ref platform, text, ref value,
@@ -10127,9 +10630,24 @@ public static class MuiListCore
 				platform.Free(storage, bytes);
 				return false;
 			}
-			platform.WriteUInt8(storage, (int)output++, decoded);
+			destinationCursor.Index = output;
+			if (!MuiListPreparseByteCursorCodec.TryWriteByte(ref platform,
+				destinationCursor, decoded))
+			{
+				platform.Clear(storage, bytes);
+				platform.Free(storage, bytes);
+				return false;
+			}
+			output++;
 		}
-		platform.WriteUInt8(storage, (int)output, 0);
+		destinationCursor.Index = output;
+		if (!MuiListPreparseByteCursorCodec.TryWriteByte(ref platform,
+			destinationCursor, 0))
+		{
+			platform.Clear(storage, bytes);
+			platform.Free(storage, bytes);
+			return false;
+		}
 		if (descriptor.PreparseStorage.IsNotNull)
 		{
 			var old = descriptor.PreparseStorage;
@@ -10170,10 +10688,13 @@ public static class MuiListCore
 		var size = safeCount * FormatDescriptorSize;
 		if (platform.IsMapped(block, size))
 		{
+			var cursor = default(MuiListFormatDescriptorCursor);
+			cursor.Base = block;
 			for (var column = 0u; column < safeCount; column++)
 			{
-				if (!MuiListFormatDescriptorVectorCodec.TryRead(ref platform, block,
-					column, out var value)) continue;
+				cursor.Index = column;
+				if (!MuiListFormatDescriptorVectorCodec.TryRead(ref platform, cursor,
+					out var value)) continue;
 				if (value.PreparseStorage.IsNull ||
 					value.PreparseStorageLength == 0) continue;
 				var storage = value.PreparseStorage;
@@ -10239,9 +10760,9 @@ public static class MuiListCore
 			sourceCursor.Index = column;
 			destinationCursor.Index = column;
 			if (!MuiListPointerSlotVectorCodec.TryRead(ref platform,
-				sourceCursor.Base, sourceCursor.Index, out var sourceValue) ||
+				sourceCursor, out var sourceValue) ||
 				!MuiListPointerSlotVectorCodec.TryWrite(ref platform,
-					destinationCursor.Base, destinationCursor.Index, sourceValue))
+					destinationCursor, sourceValue))
 			{
 				platform.Clear(pointers, pointerBytes);
 				platform.Free(pointers, pointerBytes);
@@ -10281,8 +10802,8 @@ public static class MuiListCore
 		for (var column = 0u; column <= MaximumColumns; column++)
 		{
 			cursor.Index = column;
-			if (!MuiListPointerSlotVectorCodec.TryRead(ref platform,
-				cursor.Base, cursor.Index, out var value)) return uint.MaxValue;
+			if (!MuiListPointerSlotVectorCodec.TryRead(ref platform, cursor,
+				out var value)) return uint.MaxValue;
 			if (value.Value.IsNull)
 				return column;
 		}
@@ -10703,14 +11224,14 @@ public static class MuiListCore
 		for (var column = 0u; column < value.Count; column++)
 		{
 			cursor.Index = column;
-			if (!MuiListPointerSlotVectorCodec.TryRead(ref platform,
-				cursor.Base, cursor.Index, out var entry) || entry.Value.IsNull ||
+			if (!MuiListPointerSlotVectorCodec.TryRead(ref platform, cursor,
+				out var entry) || entry.Value.IsNull ||
 				!TryReadCStringLength(ref platform, entry.Value,
 					MaximumStringLength, out _)) return false;
 		}
 		cursor.Index = value.Count;
-		if (!MuiListPointerSlotVectorCodec.TryRead(ref platform, cursor.Base,
-			cursor.Index, out var terminatorValue)) return false;
+		if (!MuiListPointerSlotVectorCodec.TryRead(ref platform, cursor,
+			out var terminatorValue)) return false;
 		return terminatorValue.Value.IsNull;
 	}
 
@@ -10876,10 +11397,13 @@ public static class MuiListCore
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		var seen = default(MuiListHiddenColumns);
+		var cursor = default(MuiListColumnOrderByteCursor);
+		cursor.Base = value.Values;
 		for (var index = 0u; index < value.Count; index++)
 		{
+			cursor.Index = index;
 			if (!MuiListColumnOrderByteVectorCodec.TryReadValue(ref platform,
-				value.Values, index, out var column)) return false;
+				cursor, out var column)) return false;
 			if (column >= value.Count || IsHidden(seen, column)) return false;
 			Hide(ref seen, column);
 		}
@@ -10905,10 +11429,13 @@ public static class MuiListCore
 	private static void ClearColumnOrderBytes<TPlatform>(ref TPlatform platform,
 		APTR values, uint count) where TPlatform : struct, IMuiGuestMemory
 	{
+		var cursor = default(MuiListColumnOrderByteCursor);
+		cursor.Base = values;
 		for (var index = 0u; index < count; index++)
 		{
+			cursor.Index = index;
 			if (!MuiListColumnOrderByteVectorCodec.TryWriteValue(ref platform,
-				values, index, 0)) return;
+				cursor, 0)) return;
 		}
 	}
 
@@ -10918,8 +11445,13 @@ public static class MuiListCore
 	private static bool WriteColumnOrderByte<TPlatform>(ref TPlatform platform,
 		APTR values, uint index, byte value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> MuiListColumnOrderByteVectorCodec.TryWriteValue(ref platform, values,
-			index, value);
+	{
+		var cursor = default(MuiListColumnOrderByteCursor);
+		cursor.Base = values;
+		cursor.Index = index;
+		return MuiListColumnOrderByteVectorCodec.TryWriteValue(ref platform,
+			cursor, value);
+	}
 
 	private static void FreeRedrawState<TPlatform>(ref TPlatform platform,
 		APTR block) where TPlatform : struct, IMuiHeadlessPlatform
@@ -11333,8 +11865,11 @@ public static class MuiListCore
 		if (!TryGetOrderedDescriptorColumn(ref platform, state, obj, column,
 			out var descriptorColumn) || descriptorColumn >= count) return false;
 		var value = default(MuiListFormatDescriptor);
-		return MuiListFormatDescriptorVectorCodec.TryRead(ref platform, block,
-			descriptorColumn, out value) &&
+		var cursor = default(MuiListFormatDescriptorCursor);
+		cursor.Base = block;
+		cursor.Index = descriptorColumn;
+		return MuiListFormatDescriptorVectorCodec.TryRead(ref platform, cursor,
+			out value) &&
 			MuiListFormatDescriptorCodec.TryWrite(ref platform, storage, value);
 	}
 
@@ -11401,13 +11936,11 @@ public static class MuiListCore
 						? remainingWeight - weight : 0;
 			}
 			cursor.Index = column;
-			if (!MuiListColumnGeometryVectorMemoryCodec.TryGetEntry(ref platform,
-				cursor.Base, cursor.Index,
-				out var record)) return false;
 			var geometry = default(MuiListColumnGeometry);
 			geometry.Offset = offset;
 			geometry.Width = columnWidth;
-			if (!MuiListColumnGeometryCodec.Write(ref platform, record, geometry))
+			if (!MuiListColumnGeometryVectorCodec.TryWrite(ref platform,
+				cursor, geometry))
 				return false;
 			if (columnWidth != 0)
 			{
@@ -11977,8 +12510,11 @@ public static class MuiListCore
 		if (!TryReadColumnOrderAdmission(ref platform, state, obj,
 			out var order, out var present)) return false;
 		if (!present || displayColumn >= order.Count) return true;
+		var cursor = default(MuiListColumnOrderByteCursor);
+		cursor.Base = order.Values;
+		cursor.Index = displayColumn;
 		if (!MuiListColumnOrderByteVectorCodec.TryReadValue(ref platform,
-			order.Values, displayColumn, out var resolved)) return false;
+			cursor, out var resolved)) return false;
 		descriptorColumn = resolved;
 		return true;
 	}
@@ -11999,8 +12535,11 @@ public static class MuiListCore
 		if (!TryGetOrderedDescriptorColumn(ref platform, state, obj, column,
 			out var descriptorColumn) || descriptorColumn >= count) return false;
 		var descriptor = default(MuiListFormatDescriptor);
-		if (!MuiListFormatDescriptorVectorCodec.TryRead(ref platform, block,
-			descriptorColumn, out descriptor)) return false;
+		var cursor = default(MuiListFormatDescriptorCursor);
+		cursor.Base = block;
+		cursor.Index = descriptorColumn;
+		if (!MuiListFormatDescriptorVectorCodec.TryRead(ref platform, cursor,
+			out descriptor)) return false;
 		switch (field)
 		{
 			case MuiListFormatField.Delta:
@@ -12123,7 +12662,9 @@ public static class MuiListCore
 			prefix.Second == (byte)'3' && prefix.Third == (byte)'3')
 			codeOffset = 3;
 		if (codeOffset < 0) return MuiListTextAlignment.Left;
-		return platform.ReadUInt8(preparse, codeOffset) switch
+		if (!MuiListFormatByteCursorCodec.TryReadAt(ref platform, preparse,
+			codeOffset, out var code)) return MuiListTextAlignment.Left;
+		return code switch
 		{
 			(byte)'c' => MuiListTextAlignment.Center,
 			(byte)'r' => MuiListTextAlignment.Right,
@@ -12613,14 +13154,9 @@ public static class MuiListCore
 		{
 			sourceCursor.Index = index;
 			scratchCursor.Index = index;
-			if (!MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
-				sourceCursor.Base, sourceCursor.Index,
-				out var sourceAddress) || !MuiListSlotCodec.TryRead(ref platform,
-					sourceAddress, out var value) ||
-				!MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
-					scratchCursor.Base, scratchCursor.Index,
-					out var scratchAddress) || !MuiListSlotCodec.Write(ref platform,
-					scratchAddress, value))
+			if (!MuiListSlotVectorCodec.TryRead(ref platform, sourceCursor,
+				out var value) ||
+				!MuiListSlotVectorCodec.TryWrite(ref platform, scratchCursor, value))
 			{
 				platform.Clear(scratch, bytes);
 				platform.Free(scratch, bytes);
@@ -12713,10 +13249,7 @@ public static class MuiListCore
 		var cursor = default(MuiListSlotCursor);
 		cursor.Base = scratch;
 		cursor.Index = index;
-		return MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
-			cursor.Base, cursor.Index,
-			out var address) && MuiListSlotCodec.TryRead(ref platform, address,
-			out value);
+		return MuiListSlotVectorCodec.TryRead(ref platform, cursor, out value);
 	}
 
 	private static bool WriteNextUnselected<TPlatform>(ref TPlatform platform,
@@ -12948,14 +13481,14 @@ public static class MuiListCore
 			if (column == sourceColumn)
 				value.Value = APTR.FromPointer(contentsRaw);
 			else if (!MuiListPointerSlotVectorCodec.TryRead(ref platform,
-				oldCursor.Base, oldCursor.Index, out value))
+				oldCursor, out value))
 			{
 				platform.Clear(source, tableSize);
 				platform.Free(source, tableSize);
 				return false;
 			}
 			if (!MuiListPointerSlotVectorCodec.TryWrite(ref platform,
-				sourceCursor.Base, sourceCursor.Index, value))
+				sourceCursor, value))
 			{
 				platform.Clear(source, tableSize);
 				platform.Free(source, tableSize);
@@ -12964,7 +13497,7 @@ public static class MuiListCore
 		}
 		sourceCursor.Index = columns;
 		if (!MuiListPointerSlotVectorCodec.TryWrite(ref platform,
-			sourceCursor.Base, sourceCursor.Index, default))
+			sourceCursor, default))
 		{
 			platform.Clear(source, tableSize);
 			platform.Free(source, tableSize);
@@ -13090,10 +13623,8 @@ public static class MuiListCore
 				for (var column = 0u; column < MaximumDrawColumns; column++)
 				{
 					cursor.Index = column;
-					if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-						cursor.Base, cursor.Index, out var address)) break;
-					if (!MuiListPointerSlotCodec.TryRead(ref platform, address,
-						out var slotValue)) break;
+					if (!MuiListPointerSlotVectorCodec.TryRead(ref platform,
+						cursor, out var slotValue)) break;
 					var text = slotValue.Value;
 					if (text.IsNull) break;
 					var lines = TextLineCount(ref platform, text);
@@ -13114,12 +13645,13 @@ public static class MuiListCore
 	{
 		if (text.IsNull) return 1;
 		var lines = 1u;
+		var cursor = default(MuiStringLengthByteCursor);
+		cursor.Text = text;
 		for (var index = 0u; index < MaximumStringLength; index++)
 		{
-			if (text.Raw > uint.MaxValue - index) break;
-			var address = APTR.FromPointer(text.Raw + index);
-			if (!platform.IsMapped(address, 1)) break;
-			var value = platform.ReadUInt8(address, 0);
+			cursor.Index = index;
+			if (!MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var value)) break;
 			if (value == 0) break;
 			if (value == (byte)'\n' && lines < MaximumAutoLines) lines++;
 		}
@@ -13188,25 +13720,15 @@ public static class MuiListCore
 		{
 			sourceCursor.Index = column;
 			destinationCursor.Index = column;
-			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-				sourceCursor.Base, sourceCursor.Index, out var sourceSlot) ||
-				!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-					destinationCursor.Base, destinationCursor.Index,
-					out var destinationSlot)) return false;
-			if (!MuiListPointerSlotCodec.TryRead(ref platform, sourceSlot,
-				out var sourceValue)) return false;
-			var destinationValue = default(MuiListPointerSlotRecord);
-			destinationValue.Value = sourceValue.Value;
-			if (!MuiListPointerSlotCodec.Write(ref platform, destinationSlot,
-				destinationValue)) return false;
+			if (!MuiListPointerSlotVectorCodec.TryRead(ref platform,
+				sourceCursor, out var sourceValue) ||
+				!MuiListPointerSlotVectorCodec.TryWrite(ref platform,
+					destinationCursor, sourceValue))
+				return false;
 		}
 		destinationCursor.Index = columns;
-		if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-			destinationCursor.Base, destinationCursor.Index,
-			out var terminator)) return false;
-		var terminatorValue = default(MuiListPointerSlotRecord);
-		if (!MuiListPointerSlotCodec.Write(ref platform, terminator,
-			terminatorValue)) return false;
+		if (!MuiListPointerSlotVectorCodec.TryWrite(ref platform,
+			destinationCursor, default)) return false;
 		return true;
 	}
 
@@ -13349,11 +13871,9 @@ public static class MuiListCore
 				var cursor = default(MuiListPointerSlotCursor);
 				cursor.Base = displayArray;
 				cursor.Index = sourceColumn;
-				if (MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-					cursor.Base, cursor.Index,
-					out var displaySlot) && MuiListPointerSlotCodec.TryRead(ref platform,
-					displaySlot,
-					out var displayValue)) text = displayValue.Value;
+				if (MuiListPointerSlotVectorCodec.TryRead(ref platform,
+					cursor, out var displayValue))
+					text = displayValue.Value;
 			}
 			if (text.IsNotNull)
 			{
@@ -13399,8 +13919,11 @@ public static class MuiListCore
 		var values = value.Values;
 		if (!platform.IsMapped(values, value.Columns *
 			MuiListColumnMetricValue.Size)) return 0;
-		return MuiListColumnMetricVectorCodec.TryReadValue(ref platform, values,
-			column, out var metric) ? metric : 0;
+		var cursor = default(MuiListColumnMetricCursor);
+		cursor.Base = values;
+		cursor.Index = column;
+		return MuiListColumnMetricVectorCodec.TryReadValue(ref platform, cursor,
+			out var metric) ? metric : 0;
 	}
 
 	// Publish the MorphOS List pixel viewport from the normalized guest row
@@ -13638,6 +14161,8 @@ public static class MuiListCore
 			return true;
 		}
 		var displayArray = displayStorage.Array;
+		var metricCursor = default(MuiListColumnMetricCursor);
+		metricCursor.Base = values;
 
 		var header = Header(ref platform, state, obj);
 		var count = header.IsNull ? 0u : ReadHeaderCount(ref platform, header);
@@ -13658,24 +14183,23 @@ public static class MuiListCore
 					var cursor = default(MuiListPointerSlotCursor);
 					cursor.Base = displayArray;
 					cursor.Index = sourceColumn;
-					if (MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-						cursor.Base, cursor.Index,
-						out var displaySlot) && MuiListPointerSlotCodec.TryRead(ref platform,
-						displaySlot,
-						out var displayValue)) text = displayValue.Value;
+					if (MuiListPointerSlotVectorCodec.TryRead(ref platform,
+						cursor, out var displayValue))
+						text = displayValue.Value;
 				}
 				if (text.IsNull || !TryReadCStringLength(ref platform, text,
 					MaximumStringLength, out var length)) continue;
 				var measured = platform.TextWidth(APTR.Null, font, text,
 					unchecked((int)length));
 				if (measured <= 0) continue;
+				metricCursor.Index = column;
 				if (!MuiListColumnMetricVectorCodec.TryReadValue(ref platform,
-					values, column, out var metric)) continue;
+					metricCursor, out var metric)) continue;
 				if (unchecked((uint)measured) > metric)
 				{
 					metric = unchecked((uint)measured);
 					if (!MuiListColumnMetricVectorCodec.TryWriteValue(ref platform,
-						values, column, metric)) return true;
+						metricCursor, metric)) return true;
 				}
 			}
 		}
@@ -14212,11 +14736,9 @@ public static class MuiListCore
 				var cursor = default(MuiListPointerSlotCursor);
 				cursor.Base = displayArray;
 				cursor.Index = sourceColumn;
-				if (MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-					cursor.Base, cursor.Index,
-					out var displaySlot) && MuiListPointerSlotCodec.TryRead(ref platform,
-					displaySlot,
-					out var displayValue)) text = displayValue.Value;
+				if (MuiListPointerSlotVectorCodec.TryRead(ref platform,
+					cursor, out var displayValue))
+					text = displayValue.Value;
 			}
 			var geometry = default(MuiListColumnGeometry);
 			var hasGeometry = layoutBlock.IsNotNull &&
@@ -14347,8 +14869,8 @@ public static class MuiListCore
 		for (var i = 0u; i < limit; i++)
 		{
 			cursor.Index = i;
-			if (!MuiListPointerVectorCodec.TryRead(ref platform,
-				cursor.Base, cursor.Index, out var slotValue))
+			if (!MuiListPointerVectorCodec.TryRead(ref platform, cursor,
+				out var slotValue))
 			{
 				RollbackTo(ref platform, state, obj, header, before);
 				return false;
@@ -14651,35 +15173,35 @@ public static class MuiListCore
 		while (count < MaximumEntries)
 		{
 			cursor.Index = count;
-			if (!MuiListPointerVectorCodec.TryRead(ref platform,
-				cursor.Base, cursor.Index, out var slotValue)) return false;
+			if (!MuiListPointerVectorCodec.TryRead(ref platform, cursor,
+				out var slotValue)) return false;
 			if (slotValue.Value.IsNull) break;
 			count++;
 		}
 		for (var i = 1u; i < count; i++)
 		{
 			cursor.Index = i;
-			if (!MuiListPointerVectorCodec.TryRead(ref platform,
-				cursor.Base, cursor.Index, out var entryValue)) return false;
+			if (!MuiListPointerVectorCodec.TryRead(ref platform, cursor,
+				out var entryValue)) return false;
 			var entry = entryValue.Value;
 			var j = i;
 			while (j > 0)
 			{
 				cursor.Index = j - 1;
-				if (!MuiListPointerVectorCodec.TryRead(ref platform,
-					cursor.Base, cursor.Index, out var previousValue)) return false;
+				if (!MuiListPointerVectorCodec.TryRead(ref platform, cursor,
+					out var previousValue)) return false;
 				if (CompareForSort(ref platform, state, obj, previousValue.Value,
 					entry, column) <= 0) break;
 				cursor.Index = j;
-				if (!MuiListPointerVectorCodec.TryWrite(ref platform,
-					cursor.Base, cursor.Index, previousValue)) return false;
+				if (!MuiListPointerVectorCodec.TryWrite(ref platform, cursor,
+					previousValue)) return false;
 				j--;
 			}
 			cursor.Index = j;
 			var destinationValue = default(MuiListPointerSlotRecord);
 			destinationValue.Value = entry;
-			if (!MuiListPointerVectorCodec.TryWrite(ref platform, cursor.Base,
-				cursor.Index, destinationValue)) return false;
+			if (!MuiListPointerVectorCodec.TryWrite(ref platform, cursor,
+				destinationValue)) return false;
 		}
 		return true;
 	}
@@ -14961,15 +15483,15 @@ public static class MuiListCore
 		{
 			var value = default(MuiListPointerSlotRecord);
 			value.Value = entry;
-			if (!MuiListPointerSlotCodec.Write(ref platform, array, value))
-				return false;
 			var cursor = default(MuiListPointerSlotCursor);
 			cursor.Base = array;
+			cursor.Index = 0;
+			if (!MuiListPointerSlotVectorCodec.TryWrite(ref platform, cursor,
+				value))
+				return false;
 			cursor.Index = 1;
-			return MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-				cursor.Base, cursor.Index,
-				out var terminator) && MuiListPointerSlotCodec.Write(ref platform,
-				terminator, default);
+			return MuiListPointerSlotVectorCodec.TryWrite(ref platform,
+				cursor, default);
 		}
 		if (hook == HookStringArray)
 			return CopyStringArrayPointers(ref platform, entry, array);
@@ -15102,10 +15624,8 @@ public static class MuiListCore
 		var cursor = default(MuiListColumnGeometryCursor);
 		cursor.Base = block;
 		cursor.Index = column;
-		return MuiListColumnGeometryVectorMemoryCodec.TryGetEntry(ref platform,
-			cursor.Base, cursor.Index,
-			out var record) && MuiListColumnGeometryCodec.TryRead(ref platform,
-			record, out geometry);
+		return MuiListColumnGeometryVectorCodec.TryRead(ref platform, cursor,
+			out geometry);
 	}
 
 	private static bool TryResolveEditTarget<TPlatform>(ref TPlatform platform,
@@ -15347,8 +15867,8 @@ public static class MuiListCore
 		for (var i = 0u; i < MaximumEntries; i++)
 		{
 			cursor.Index = i;
-			if (!MuiListPointerVectorCodec.TryRead(ref platform,
-				cursor.Base, cursor.Index, out var slotValue))
+			if (!MuiListPointerVectorCodec.TryRead(ref platform, cursor,
+				out var slotValue))
 			{
 				RollbackTo(ref platform, state, obj, header, before);
 				return false;
@@ -15371,10 +15891,7 @@ public static class MuiListCore
 		var cursor = default(MuiListSlotCursor);
 		cursor.Base = index;
 		cursor.Index = slot;
-		if (!MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
-			cursor.Base, cursor.Index,
-			out var address) || !MuiListSlotCodec.TryRead(ref platform, address,
-			out var value))
+		if (!MuiListSlotVectorCodec.TryRead(ref platform, cursor, out var value))
 			return;
 		var entry = value.Entry;
 		var flags = value.Flags;
@@ -15407,18 +15924,13 @@ public static class MuiListCore
 		while (count < MaximumArrayEntries)
 		{
 			cursor.Index = count;
-			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-				cursor.Base, cursor.Index,
-				out var slot) || !MuiListPointerSlotCodec.TryRead(ref platform, slot,
+			if (!MuiListPointerSlotVectorCodec.TryRead(ref platform, cursor,
 				out var value)) return false;
 			if (value.Value.IsNull) return true;
 			count++;
 		}
 		cursor.Index = count;
-		return MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-			cursor.Base, cursor.Index,
-			out var terminator) && MuiListPointerSlotCodec.TryRead(ref platform,
-			terminator,
+		return MuiListPointerSlotVectorCodec.TryRead(ref platform, cursor,
 			out var terminatorValue) && terminatorValue.Value.IsNull;
 	}
 
@@ -15435,10 +15947,8 @@ public static class MuiListCore
 		while (count < MaximumArrayEntries)
 		{
 			sourceCursor.Index = count;
-			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-				sourceCursor.Base, sourceCursor.Index, out var slot) ||
-				!MuiListPointerSlotCodec.TryRead(ref platform, slot,
-				out var value)) return APTR.Null;
+			if (!MuiListPointerSlotVectorCodec.TryRead(ref platform,
+				sourceCursor, out var value)) return APTR.Null;
 			var text = value.Value;
 			if (text.IsNull) break;
 			if (!TryReadCStringLength(ref platform, text,
@@ -15448,10 +15958,9 @@ public static class MuiListCore
 		if (count == MaximumArrayEntries)
 		{
 			sourceCursor.Index = count;
-			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-				sourceCursor.Base, sourceCursor.Index, out var terminator) ||
-				!MuiListPointerSlotCodec.TryRead(ref platform, terminator,
-				out var terminatorValue) || !terminatorValue.Value.IsNull)
+			if (!MuiListPointerSlotVectorCodec.TryRead(ref platform,
+				sourceCursor, out var terminatorValue) ||
+				!terminatorValue.Value.IsNull)
 				return APTR.Null;
 		}
 
@@ -15466,10 +15975,8 @@ public static class MuiListCore
 		{
 			sourceCursor.Index = i;
 			destinationCursor.Index = i;
-			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-				sourceCursor.Base, sourceCursor.Index, out var sourceSlot) ||
-				!MuiListPointerSlotCodec.TryRead(ref platform, sourceSlot,
-				out var sourceValue))
+			if (!MuiListPointerSlotVectorCodec.TryRead(ref platform,
+				sourceCursor, out var sourceValue))
 			{
 				FreeOwnedStringArray(ref platform, table, pool);
 				return APTR.Null;
@@ -15483,10 +15990,8 @@ public static class MuiListCore
 			}
 			var destinationValue = default(MuiListPointerSlotRecord);
 			destinationValue.Value = copy;
-			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-				destinationCursor.Base, destinationCursor.Index, out var destinationSlot) ||
-				!MuiListPointerSlotCodec.Write(ref platform, destinationSlot,
-					destinationValue))
+			if (!MuiListPointerSlotVectorCodec.TryWrite(ref platform,
+				destinationCursor, destinationValue))
 			{
 				// The copy is not reachable through the table when its destination
 				// slot cannot be published. Release it explicitly before rolling
@@ -15512,14 +16017,11 @@ public static class MuiListCore
 		{
 			sourceCursor.Index = i;
 			destinationCursor.Index = i;
-			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-				sourceCursor.Base, sourceCursor.Index, out var sourceSlot) ||
-				!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-					destinationCursor.Base, destinationCursor.Index, out var destinationSlot) ||
-				!MuiListPointerSlotCodec.TryRead(ref platform, sourceSlot,
-				out var sourceValue) ||
-				!MuiListPointerSlotCodec.Write(ref platform, destinationSlot,
-					sourceValue)) return false;
+			if (!MuiListPointerSlotVectorCodec.TryRead(ref platform,
+				sourceCursor, out var sourceValue) ||
+				!MuiListPointerSlotVectorCodec.TryWrite(ref platform,
+					destinationCursor, sourceValue))
+				return false;
 			if (sourceValue.Value.IsNull) return true;
 		}
 		return false;
@@ -15543,9 +16045,7 @@ public static class MuiListCore
 		for (var i = 0u; i <= column; i++)
 		{
 			cursor.Index = i;
-			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-				cursor.Base, cursor.Index,
-				out var slot) || !MuiListPointerSlotCodec.TryRead(ref platform, slot,
+			if (!MuiListPointerSlotVectorCodec.TryRead(ref platform, cursor,
 				out var value)) return APTR.Null;
 			if (i == column || value.Value.IsNull)
 				return i == column ? value.Value : APTR.Null;
@@ -15590,9 +16090,7 @@ public static class MuiListCore
 		while (count < MaximumArrayEntries)
 		{
 			cursor.Index = count;
-			if (!MuiListPointerSlotVectorMemoryCodec.TryGetEntry(ref platform,
-				cursor.Base, cursor.Index,
-				out var slot) || !MuiListPointerSlotCodec.TryRead(ref platform, slot,
+			if (!MuiListPointerSlotVectorCodec.TryRead(ref platform, cursor,
 				out var value)) break;
 			var text = value.Value;
 			if (text.IsNull) break;
@@ -15613,13 +16111,18 @@ public static class MuiListCore
 		if (left.Raw == right.Raw) return 0;
 		if (left.IsNull) return right.IsNull ? 0 : -1;
 		if (right.IsNull) return 1;
+		var leftCursor = default(MuiStringLengthByteCursor);
+		leftCursor.Text = left;
+		var rightCursor = default(MuiStringLengthByteCursor);
+		rightCursor.Text = right;
 		for (var i = 0u; i < MaximumStringLength; i++)
 		{
-			var la = APTR.FromPointer(left.Raw + i);
-			var ra = APTR.FromPointer(right.Raw + i);
-			if (!platform.IsMapped(la, 1) || !platform.IsMapped(ra, 1)) return 0;
-			var lb = platform.ReadUInt8(la, 0);
-			var rb = platform.ReadUInt8(ra, 0);
+			leftCursor.Index = i;
+			rightCursor.Index = i;
+			if (!MuiStringLengthByteCursorCodec.TryReadByte(ref platform,
+				leftCursor, out var lb) ||
+				!MuiStringLengthByteCursorCodec.TryReadByte(ref platform,
+					rightCursor, out var rb)) return 0;
 			if (lb != rb) return lb < rb ? -1 : 1;
 			if (lb == 0) return 0;
 		}
@@ -15744,10 +16247,7 @@ public static class MuiListCore
 		var cursor = default(MuiListSlotCursor);
 		cursor.Base = array;
 		cursor.Index = index;
-		return MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
-			cursor.Base, cursor.Index,
-			out var address) && MuiListSlotCodec.TryRead(ref platform, address,
-			out var value)
+		return MuiListSlotVectorCodec.TryRead(ref platform, cursor, out var value)
 			? value.Entry : APTR.Null;
 	}
 
@@ -15758,10 +16258,7 @@ public static class MuiListCore
 		var cursor = default(MuiListSlotCursor);
 		cursor.Base = array;
 		cursor.Index = index;
-		return MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
-			cursor.Base, cursor.Index,
-			out var address) && MuiListSlotCodec.TryRead(ref platform, address,
-			out var value)
+		return MuiListSlotVectorCodec.TryRead(ref platform, cursor, out var value)
 			? value.Flags : 0;
 	}
 
@@ -15773,13 +16270,10 @@ public static class MuiListCore
 		var cursor = default(MuiListSlotCursor);
 		cursor.Base = array;
 		cursor.Index = index;
-		if (!MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
-			cursor.Base, cursor.Index,
-			out var slot)) return;
 		var value = default(MuiListSlotState);
 		value.Entry = entry;
 		value.Flags = flags;
-		MuiListSlotCodec.Write(ref platform, slot, value);
+		MuiListSlotVectorCodec.TryWrite(ref platform, cursor, value);
 	}
 
 	private static bool TryWriteSlot<TPlatform>(ref TPlatform platform,
@@ -15790,9 +16284,7 @@ public static class MuiListCore
 		var cursor = default(MuiListSlotCursor);
 		cursor.Base = array;
 		cursor.Index = index;
-		return MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
-			cursor.Base, cursor.Index,
-			out var slot) && MuiListSlotCodec.Write(ref platform, slot, value);
+		return MuiListSlotVectorCodec.TryWrite(ref platform, cursor, value);
 	}
 
 	private static int ActiveIndex<TPlatform>(ref TPlatform platform, APTR state,

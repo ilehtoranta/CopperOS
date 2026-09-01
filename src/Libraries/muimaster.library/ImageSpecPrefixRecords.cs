@@ -18,6 +18,46 @@ internal struct MuiImageSpecPrefixRecord
 	internal byte Separator;
 }
 
+// Named bounded cursor for the variable payload following an Image.mui
+// `kind:` prefix. The parser carries a guest base, logical index, and span
+// length; payload range, overflow, and mapped-byte checks remain in this
+// value-type adapter.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiImageSpecByteCursor
+{
+	internal const uint MaximumLength = 512;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Length;
+}
+
+internal static class MuiImageSpecByteCursorCodec
+{
+	internal static bool TryGetRange<TPlatform>(ref TPlatform platform,
+		MuiImageSpecByteCursor cursor, uint byteCount, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (cursor.Length > MuiImageSpecByteCursor.MaximumLength) return false;
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryGetRange(ref platform, shared,
+			byteCount, out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiImageSpecByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetRange(ref platform, cursor, 1, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+}
+
 internal static class MuiImageSpecPrefixRecordCodec
 {
 	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,

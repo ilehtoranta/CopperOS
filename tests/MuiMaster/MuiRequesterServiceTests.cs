@@ -201,6 +201,39 @@ public sealed class MuiRequesterServiceTests
 	}
 
 	[Fact]
+	public void RequesterParameterCursorExchangesCompleteNamedSlots()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var cursor = default(MuiRequesterParameterCursor);
+		cursor.Base = Parameters;
+		cursor.Index = 2;
+		const uint expected = 0xFEDCBA98u;
+
+		Assert.True(MuiRequesterParameterCursorCodec.TryWriteValue(ref platform,
+			cursor, expected));
+		Assert.True(MuiRequesterParameterCursorCodec.TryReadValue(ref platform,
+			cursor, out var actual));
+		Assert.Equal(expected, actual);
+
+		var slot = default(MuiRequesterParameterSlot);
+		slot.Value = 0x10203040u;
+		Assert.True(MuiRequesterParameterCursorCodec.TryWrite(ref platform, cursor,
+			slot));
+		Assert.True(MuiRequesterParameterCursorCodec.TryRead(ref platform, cursor,
+			out var decoded));
+		Assert.Equal(slot.Value, decoded.Value);
+
+		cursor.Index = MuiRequesterParameterCursor.MaximumEntries;
+		Assert.False(MuiRequesterParameterCursorCodec.TryReadValue(ref platform,
+			cursor, out _));
+		cursor.Base = APTR.FromPointer(0xFFFFFFF0u);
+		cursor.Index = 1;
+		Assert.False(MuiRequesterParameterCursorCodec.TryWriteValue(ref platform,
+			cursor, expected));
+	}
+
+	[Fact]
 	public void RequestFormatCountsConversionsAndStarArguments()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

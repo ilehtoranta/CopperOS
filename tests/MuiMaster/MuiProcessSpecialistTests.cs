@@ -719,6 +719,41 @@ public sealed class MuiProcessSpecialistTests
 	}
 
 	[Fact]
+	public void ProcessArgumentCursorExchangesCompleteNamedSlots()
+	{
+		var p = NewPlatform();
+		var cursor = default(MuiProcessArgumentCursor);
+		cursor.Message = Packet;
+		cursor.Kind = MuiProcessArgumentVectorKind.DispatchPacket;
+		cursor.Index = 1;
+		cursor.Count = 2;
+		const uint expected = 0xFEDCBA98u;
+
+		Assert.True(MuiProcessArgumentCursorCodec.TryWriteValue(ref p, cursor,
+			expected));
+		Assert.True(MuiProcessArgumentCursorCodec.TryReadValue(ref p, cursor,
+			out var actual));
+		Assert.Equal(expected, actual);
+
+		var slot = default(MuiProcessDispatchArgumentSlot);
+		slot.Value = 0x10203040u;
+		Assert.True(MuiProcessArgumentCursorCodec.TryWrite(ref p, cursor, slot));
+		Assert.True(MuiProcessArgumentCursorCodec.TryRead(ref p, cursor,
+			out var decoded));
+		Assert.Equal(slot.Value, decoded.Value);
+
+		cursor.Index = cursor.Count;
+		Assert.False(MuiProcessArgumentCursorCodec.TryReadValue(ref p, cursor,
+			out _));
+		cursor.Message = APTR.FromPointer(0x40FFEu);
+		cursor.Index = 0;
+		cursor.Count = 1;
+		cursor.Kind = MuiProcessArgumentVectorKind.MethodMessage;
+		Assert.False(MuiProcessArgumentCursorCodec.TryWriteValue(ref p, cursor,
+			0x55AAu));
+	}
+
+	[Fact]
 	public void ProcessRecordFieldCursorUsesSemanticHeaderAndStateKinds()
 	{
 		var p = NewPlatform();

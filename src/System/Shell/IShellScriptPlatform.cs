@@ -94,5 +94,20 @@ public interface IShellScriptPlatform
         uint append,
         out BPTR handle);
 
+    /// <summary>
+    /// Closes the validated source reader and publishes a pre-opened Execute
+    /// work-file reader as one DOS-runner transaction.
+    /// </summary>
+    bool TryPublishScriptInput(
+        APTR cli,
+        APTR frame,
+        BPTR source,
+        BPTR replacement,
+        APTR temporaryPath,
+        uint temporaryPathLength);
+
+    /// <summary>Removes an unpublished Execute work-file after its handle closes.</summary>
+    bool TryDeleteScriptPath(APTR cli, APTR path, uint pathLength);
+
     bool TryCloseScriptRedirection(APTR cli, BPTR handle);
 }

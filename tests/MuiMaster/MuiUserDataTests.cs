@@ -242,6 +242,41 @@ public sealed class MuiUserDataTests
 	}
 
 	[Fact]
+	public void UserDataTraversalFrameVectorBridgeUsesNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x7000, 0x2000,
+			State);
+		var cursor = new MuiUDataTraversalCursor
+		{
+			Base = APTR.FromPointer(0x1800),
+			Index = 2,
+		};
+		var expected = new MuiUDataTraversalFrame
+		{
+			Object = APTR.FromPointer(0xFEDCBA98u),
+			NextChild = 0x10203040u,
+		};
+
+		Assert.True(MuiUDataTraversalFrameCodec.TryWrite(ref platform, cursor,
+			expected));
+		Assert.True(MuiUDataTraversalFrameCodec.TryRead(ref platform, cursor,
+			out var actual));
+		Assert.Equal(expected.Object, actual.Object);
+		Assert.Equal(expected.NextChild, actual.NextChild);
+
+		cursor.Base = APTR.FromPointer(0x7FF9);
+		Assert.False(MuiUDataTraversalFrameCodec.TryRead(ref platform, cursor,
+			out _));
+		cursor.Base = APTR.FromPointer(0xFFFFFFFFu);
+		Assert.False(MuiUDataTraversalFrameCodec.TryWrite(ref platform, cursor,
+			expected));
+		cursor.Base = APTR.FromPointer(0x1800);
+		cursor.Index = MuiUDataTraversalCursor.MaximumEntries;
+		Assert.False(MuiUDataTraversalFrameCodec.TryRead(ref platform, cursor,
+			out _));
+	}
+
+	[Fact]
 	public void UserDataMethodHeaderUsesNamedField()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x7000, 0x2000,

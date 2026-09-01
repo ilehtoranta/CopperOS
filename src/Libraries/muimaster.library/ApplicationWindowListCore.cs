@@ -250,6 +250,7 @@ internal struct MuiApplicationWindowListEntry
 internal struct MuiApplicationWindowListEntryCursor
 {
 	internal const uint EntrySize = MuiApplicationWindowListEntry.Size;
+	internal const uint MaximumEntries = MuiHeadlessLayout.MaximumTraversal;
 	internal APTR Base;
 	internal uint Index;
 }
@@ -366,11 +367,71 @@ internal static class MuiApplicationWindowListEntryRecordMemoryCodec
 
 internal static class MuiApplicationWindowListEntryVectorCodec
 {
+	internal static bool TryAdvance(ref MuiApplicationWindowListEntryCursor cursor,
+		uint items)
+	{
+		if (items == 0 || cursor.Index > uint.MaxValue - items)
+			return false;
+		var next = cursor.Index + items;
+		if (next > MuiApplicationWindowListEntryCursor.MaximumEntries)
+			return false;
+		cursor.Index = next;
+		return true;
+	}
+
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(ref platform,
+			vector, index, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, out MuiApplicationWindowListEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryGetEntry(ref platform, vector, index, out var address))
+			return false;
+		return MuiApplicationWindowListEntryCodec.TryRead(ref platform, address,
+			out value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		APTR vector, uint index, MuiApplicationWindowListEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, vector, index, out var address))
+			return false;
+		return MuiApplicationWindowListEntryCodec.Write(ref platform, address,
+			value);
+	}
+
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
 		MuiApplicationWindowListEntryCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(ref platform,
 			cursor.Base, cursor.Index, out address);
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiApplicationWindowListEntryCursor cursor,
+		out MuiApplicationWindowListEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiApplicationWindowListEntryCodec.TryRead(ref platform, address,
+			out value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiApplicationWindowListEntryCursor cursor,
+		MuiApplicationWindowListEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiApplicationWindowListEntryCodec.Write(ref platform, address,
+			value);
+	}
 }
 
 // Struct-first guest-memory adapter for the caller-owned WindowList entry
@@ -383,7 +444,7 @@ internal static class MuiApplicationWindowListEntryVectorMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (vector.IsNull || index >
+		if (vector.IsNull || index >= MuiApplicationWindowListEntryCursor.MaximumEntries || index >
 			(uint.MaxValue - vector.Raw) / MuiApplicationWindowListEntry.Size)
 			return false;
 		var offset = index * MuiApplicationWindowListEntry.Size;
@@ -544,8 +605,8 @@ public static class MuiApplicationWindowListCore
 			var cursor = default(MuiApplicationWindowListEntryCursor);
 			cursor.Base = entries;
 			cursor.Index = selected;
-			if (!MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(
-				ref platform, cursor.Base, cursor.Index, out var entry))
+			if (!MuiApplicationWindowListEntryVectorCodec.TryGetEntry(
+				ref platform, cursor, out var entry))
 			{
 				FreeProjection(ref platform, list, entries, entriesSize);
 				return APTR.Null;
@@ -553,9 +614,11 @@ public static class MuiApplicationWindowListCore
 			var next = APTR.Null;
 			if (selected + 1 < count)
 			{
-				cursor.Index++;
-				if (!MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(
-					ref platform, cursor.Base, cursor.Index, out next))
+				var nextCursor = cursor;
+				if (!MuiApplicationWindowListEntryVectorCodec.TryAdvance(
+					ref nextCursor, 1) ||
+					!MuiApplicationWindowListEntryVectorCodec.TryGetEntry(
+						ref platform, nextCursor, out next))
 				{
 					FreeProjection(ref platform, list, entries, entriesSize);
 					return APTR.Null;
@@ -567,8 +630,8 @@ public static class MuiApplicationWindowListCore
 			entryValue.Object = child;
 			entryValue.Reserved = APTR.FromPointer(
 				MuiApplicationWindowListEntry.ProjectionMagic);
-			if (!MuiApplicationWindowListEntryCodec.Write(ref platform, entry,
-				entryValue))
+			if (!MuiApplicationWindowListEntryVectorCodec.TryWrite(ref platform,
+				cursor, entryValue))
 			{
 				FreeProjection(ref platform, list, entries, entriesSize);
 				return APTR.Null;

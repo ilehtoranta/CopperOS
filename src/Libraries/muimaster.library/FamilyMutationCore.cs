@@ -763,6 +763,48 @@ internal static class MuiFamilyInlineVectorCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiFamilyInlineVectorMemoryCodec.TryGetEntry(ref platform,
 			cursor.Message, cursor.ArrayOffset, cursor.Index, out address);
+
+	internal static bool TryReadObject<TPlatform>(ref TPlatform platform,
+		MuiFamilyInlineVectorCursor cursor, out APTR value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = APTR.Null;
+		if (!TryReadObjectValue(ref platform, cursor, out var rawObject))
+			return false;
+		value = APTR.FromPointer(rawObject);
+		return true;
+	}
+
+	// The scalar form is a native-qualification aid for CopperSharp's current
+	// one-ULONG lowering. It still admits the complete named vector record before
+	// exposing its Object member; production callers should prefer TryReadObject.
+	internal static bool TryReadObjectValue<TPlatform>(ref TPlatform platform,
+		MuiFamilyInlineVectorCursor cursor, out uint rawObject)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		rawObject = 0;
+		if (!TryGetEntry(ref platform, cursor, out var address) ||
+			!MuiFamilyMutationVectorEntryStructCodec.TryReadObjectValue(
+				ref platform, address, out rawObject)) return false;
+		return true;
+	}
+
+	internal static bool TryWriteObjectValue<TPlatform>(ref TPlatform platform,
+		MuiFamilyInlineVectorCursor cursor, uint rawObject)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiFamilyMutationVectorEntry.Size, out var entryCursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref entryCursor,
+				rawObject)) return false;
+		return MuiGuestStructCursor.IsComplete(entryCursor);
+	}
+
+	internal static bool TryWriteObject<TPlatform>(ref TPlatform platform,
+		MuiFamilyInlineVectorCursor cursor, APTR value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteObjectValue(ref platform, cursor, value.Raw);
 }
 
 // A Family reorder/sort vector is an inline array of guest object pointers.
@@ -869,6 +911,28 @@ internal static class MuiFamilyMutationVectorEntryCodec
 // a cursor.  New production paths use the named entry codec directly.
 internal static class MuiFamilyMutationVectorCodec
 {
+	internal static bool TryReadObjectValue<TPlatform>(ref TPlatform platform,
+		MuiFamilyMutationVectorCursor cursor, out uint rawObject)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		rawObject = 0;
+		if (!TryGetEntry(ref platform, cursor, out var address) ||
+			!MuiFamilyMutationVectorEntryStructCodec.TryReadObjectValue(
+				ref platform, address, out rawObject)) return false;
+		return true;
+	}
+
+	internal static bool TryReadObject<TPlatform>(ref TPlatform platform,
+		MuiFamilyMutationVectorCursor cursor, out APTR value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = APTR.Null;
+		if (!TryReadObjectValue(ref platform, cursor, out var rawObject))
+			return false;
+		value = APTR.FromPointer(rawObject);
+		return true;
+	}
+
 	// Complete named-entry bridge for indexed Reorder/Sort consumers. The
 	// bounded adapter owns vector arithmetic; callers receive the semantic
 	// Object capability rather than a guest slot address.
@@ -906,6 +970,18 @@ internal static class MuiFamilyMutationVectorCodec
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				value.Raw)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteObject<TPlatform>(ref TPlatform platform,
+		MuiFamilyMutationVectorCursor cursor, APTR value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address) ||
+			!MuiGuestStructCursor.TryCreate(ref platform, address,
+				MuiFamilyMutationVectorEntry.Size, out var entryCursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref entryCursor,
+				value.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(entryCursor);
 	}
 
 	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
@@ -1009,11 +1085,12 @@ public static class MuiFamilyMutationCore
 		APTR message, uint offset, uint index, APTR value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiFamilyMutationMessageCodec.TryGetVectorEntry(ref platform,
-			message, offset, index, out var entry)) return false;
-		var record = default(MuiFamilyMutationVectorEntry);
-		record.Object = value;
-		return MuiFamilyMutationVectorEntryCodec.Write(ref platform, entry, record);
+		var cursor = default(MuiFamilyInlineVectorCursor);
+		cursor.Message = message;
+		cursor.ArrayOffset = offset;
+		cursor.Index = index;
+		return MuiFamilyInlineVectorCursorCodec.TryWriteObject(ref platform,
+			cursor, value);
 	}
 
 	public static uint Dispatch<TPlatform>(ref TPlatform platform, APTR state,
@@ -1346,11 +1423,12 @@ public static class MuiFamilyMutationCore
 		var predecessor = after;
 		for (var index = 0u; index < 65535; index++)
 		{
-			if (!MuiFamilyMutationMessageCodec.TryGetVectorEntry(ref platform,
-				message, vectorOffset, index, out var entry)) return false;
-			if (!MuiFamilyMutationVectorEntryCodec.TryRead(ref platform, entry,
-				out var vectorEntry)) return false;
-			var objectAddress = vectorEntry.Object;
+			var cursor = default(MuiFamilyInlineVectorCursor);
+			cursor.Message = message;
+			cursor.ArrayOffset = vectorOffset;
+			cursor.Index = index;
+			if (!MuiFamilyInlineVectorCursorCodec.TryReadObject(ref platform,
+				cursor, out var objectAddress)) return false;
 			if (objectAddress.IsNull) return true;
 			if (!MoveProjectionAfter(ref platform, list, objectAddress,
 				predecessor)) return false;

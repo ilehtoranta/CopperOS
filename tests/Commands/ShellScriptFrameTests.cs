@@ -35,8 +35,10 @@ public sealed class ShellScriptFrameTests
             ref platform, frame, 20));
         Assert.True(ShellScriptFrameCodec.TryAdvance(
             ref platform, frame, 7, 128));
+        Assert.True(ShellScriptFrameCodec.TryReplaceInput(
+            ref platform, frame, new BPTR(6)));
         Assert.True(ShellScriptFrameCodec.TrySetControlTop(
-            ref platform, frame, new APTR(3100)));
+            ref platform, frame, new APTR(3400)));
         Assert.True(ShellScriptFrameCodec.TryIncrementLabelCount(
             ref platform, frame));
         Assert.True(ShellScriptFrameCodec.TryRecordControl(
@@ -46,8 +48,9 @@ public sealed class ShellScriptFrameTests
             ref platform, frame, out var state));
         Assert.Equal(new APTR(100), state.Parent);
         Assert.Equal(new APTR(120), state.Cli);
-        Assert.Equal((uint)7, state.CurrentLine);
-        Assert.Equal((uint)128, state.CurrentOffset);
+        Assert.Equal((uint)1, state.CurrentLine);
+        Assert.Equal((uint)0, state.CurrentOffset);
+        Assert.Equal(new BPTR(6), state.Input);
         Assert.Equal((uint)20, state.FailureLimit);
         Assert.Equal(-5, state.LastResult);
         Assert.Equal(17, state.QuitResult);
@@ -57,7 +60,7 @@ public sealed class ShellScriptFrameTests
         Assert.True((state.Flags & ShellScriptFrameFlags.Skipping) != 0);
         Assert.True((state.Flags & ShellScriptFrameFlags.QuitRequested) != 0);
         Assert.True((state.Flags & ShellScriptFrameFlags.FailureLimitSet) != 0);
-        Assert.Equal(new APTR(3100), state.ControlTop);
+        Assert.Equal(new APTR(3400), state.ControlTop);
         Assert.Equal((uint)1, state.LabelCount);
     }
 
@@ -82,6 +85,27 @@ public sealed class ShellScriptFrameTests
             ref platform, frame, out _));
         Assert.False(ShellScriptFrameCodec.Initialize(
             ref platform, APTR.Null, in initial));
+    }
+
+    [Fact]
+    public void Temporary_path_is_unique_to_the_live_script_frame()
+    {
+        EchoCommandTests.TestShellPlatform platform = new();
+        APTR first = new(3000);
+        APTR second = new(4000);
+        APTR destination = new(5000);
+
+        Assert.True(ShellScriptTemporaryPath.TryBuild(ref platform, first,
+            destination, 32, out var length));
+        Assert.Equal(18u, length);
+        Assert.Equal("T:Execute.00000BB8", platform.Store.ReadText(destination,
+            length));
+        Assert.True(ShellScriptTemporaryPath.TryBuild(ref platform, second,
+            destination, 32, out var secondLength));
+        Assert.Equal("T:Execute.00000FA0", platform.Store.ReadText(destination,
+            secondLength));
+        Assert.False(ShellScriptTemporaryPath.TryBuild(ref platform, APTR.Null,
+            destination, 32, out _));
     }
 
     [Fact]
@@ -161,7 +185,7 @@ public sealed class ShellScriptFrameTests
         Assert.True(ShellScriptFrameCodec.Initialize(
             ref platform, frame, in initial));
 
-        APTR ifRecord = new(3100);
+        APTR ifRecord = new(3400);
         APTR skipRecord = new(3150);
         Assert.True(ShellScriptControlTransitions.TryOpen(
             ref platform, frame, ifRecord, ShellScriptBlockKind.If,
@@ -210,7 +234,7 @@ public sealed class ShellScriptFrameTests
         };
         Assert.True(ShellScriptFrameCodec.Initialize(
             ref platform, frame, in initial));
-        APTR record = new(3100);
+        APTR record = new(3400);
         Assert.True(ShellScriptControlTransitions.TryOpen(
             ref platform, frame, record, ShellScriptBlockKind.If,
             1, 0, 0));

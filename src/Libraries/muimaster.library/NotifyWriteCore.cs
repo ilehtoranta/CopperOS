@@ -9,6 +9,68 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
+// Named bounded byte span used by Notify's caller-owned string copy.  Source
+// and destination cursors carry the same guest length, while address
+// formation, overflow, and mapped-byte checks stay in this value-type adapter.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiNotifyWriteByteCursor
+{
+	internal const uint MaximumLength = 4096;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Length;
+}
+
+internal static class MuiNotifyWriteByteCursorCodec
+{
+	internal static bool TryCreate<TPlatform>(ref TPlatform platform,
+		APTR baseAddress, uint length, out MuiNotifyWriteByteCursor cursor)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		cursor = default;
+		if (baseAddress.IsNull || length == 0 ||
+			length > MuiNotifyWriteByteCursor.MaximumLength)
+			return false;
+		cursor.Base = baseAddress;
+		cursor.Length = length;
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		MuiNotifyWriteByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (cursor.Length > MuiNotifyWriteByteCursor.MaximumLength)
+			return false;
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiNotifyWriteByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		value = platform.ReadUInt8(address, 0);
+		return true;
+	}
+
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiNotifyWriteByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
+		platform.WriteUInt8(address, 0, value);
+		return true;
+	}
+}
+
 // MorphOS Notify superclass packets for the two bounded memory-write helpers.
 // The guest ABI is represented as named records so callers do not duplicate
 // packet offsets at each dispatch site.
@@ -428,12 +490,21 @@ public static class MuiNotifyWriteCore
 			!CStringCodec.TryReadLength(ref platform, source,
 				MaximumStringLength, out var length))
 			return false;
+		if (length == uint.MaxValue) return false;
 		var byteSize = length + 1;
-		if (memory.Raw > uint.MaxValue - byteSize ||
-			!platform.IsMapped(memory, byteSize)) return false;
+		if (!MuiNotifyWriteByteCursorCodec.TryCreate(ref platform, source,
+			byteSize, out var sourceCursor) ||
+			!MuiNotifyWriteByteCursorCodec.TryCreate(ref platform, memory,
+			byteSize, out var destinationCursor)) return false;
 		for (var index = 0u; index < byteSize; index++)
-			platform.WriteUInt8(APTR.FromPointer(memory.Raw + index), 0,
-				platform.ReadUInt8(APTR.FromPointer(source.Raw + index)));
+		{
+			sourceCursor.Index = index;
+			destinationCursor.Index = index;
+			if (!MuiNotifyWriteByteCursorCodec.TryReadByte(ref platform,
+				sourceCursor, out var value) ||
+				!MuiNotifyWriteByteCursorCodec.TryWriteByte(ref platform,
+					destinationCursor, value)) return false;
+		}
 		return true;
 	}
 

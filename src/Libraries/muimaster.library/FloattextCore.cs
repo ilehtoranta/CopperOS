@@ -8,6 +8,71 @@ using Amiga;
 
 namespace CopperOS.MuiMaster;
 
+// Named cursor for bounded Floattext guest-byte spans. A span carries its
+// guest base, logical index, and validated byte length; all source/scratch
+// reads and writes use this adapter so consumers never form indexed guest
+// addresses themselves.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiFloattextByteCursor
+{
+	internal const uint MaximumLength = 65536;
+	internal APTR Base;
+	internal uint Index;
+	internal uint Length;
+}
+
+internal static class MuiFloattextByteCursorCodec
+{
+	internal static bool TryReadAt<TPlatform>(ref TPlatform platform,
+		APTR baseAddress, uint length, int index, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (index < 0) return false;
+		var cursor = default(MuiFloattextByteCursor);
+		cursor.Base = baseAddress;
+		cursor.Index = (uint)index;
+		cursor.Length = length;
+		return TryReadByte(ref platform, cursor, out value);
+	}
+
+	internal static bool TryGetByte<TPlatform>(ref TPlatform platform,
+		MuiFloattextByteCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryGetAddress(ref platform, shared,
+			out address);
+	}
+
+	internal static bool TryReadByte<TPlatform>(ref TPlatform platform,
+		MuiFloattextByteCursor cursor, out byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryReadByte(ref platform, shared,
+			out value);
+	}
+
+	internal static bool TryWriteByte<TPlatform>(ref TPlatform platform,
+		MuiFloattextByteCursor cursor, byte value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var shared = default(MuiCStringByteCursor);
+		shared.Base = cursor.Base;
+		shared.Index = cursor.Index;
+		shared.Limit = cursor.Length;
+		return MuiCStringByteCursorCodec.TryWriteByte(ref platform, shared,
+			value);
+	}
+}
+
 // Floattext keeps its caller-facing policy and owned text pointers together
 // so parsing/rebuild paths consume one canonical record instead of rereading
 // individual attributes. The pointers refer to guest-owned dataspace copies.
@@ -654,12 +719,51 @@ public static class MuiFloattextCore
 
 		var scratch = MuiHeadlessMemory.Allocate(ref platform, total + 1);
 		if (scratch.IsNull) return false;
+		var scratchCursor = default(MuiFloattextByteCursor);
+		scratchCursor.Base = scratch;
+		scratchCursor.Length = total + 1;
+		var existingCursor = default(MuiFloattextByteCursor);
+		existingCursor.Base = existing;
+		existingCursor.Length = oldLength;
 		for (var i = 0u; i < oldLength; i++)
-			platform.WriteUInt8(scratch, (int)i, platform.ReadUInt8(existing, (int)i));
+		{
+			existingCursor.Index = i;
+			scratchCursor.Index = i;
+			if (!MuiFloattextByteCursorCodec.TryReadByte(ref platform,
+				existingCursor, out var oldValue) ||
+				!MuiFloattextByteCursorCodec.TryWriteByte(ref platform,
+					scratchCursor, oldValue))
+			{
+				platform.Clear(scratch, total + 1);
+				platform.Free(scratch, total + 1);
+				return false;
+			}
+		}
+		var appendCursor = default(MuiFloattextByteCursor);
+		appendCursor.Base = text;
+		appendCursor.Length = addLength;
 		for (var i = 0u; i < addLength; i++)
-			platform.WriteUInt8(scratch, (int)(oldLength + i),
-				platform.ReadUInt8(text, (int)i));
-		platform.WriteUInt8(scratch, (int)total, 0);
+		{
+			appendCursor.Index = i;
+			scratchCursor.Index = oldLength + i;
+			if (!MuiFloattextByteCursorCodec.TryReadByte(ref platform,
+				appendCursor, out var appendedValue) ||
+				!MuiFloattextByteCursorCodec.TryWriteByte(ref platform,
+					scratchCursor, appendedValue))
+			{
+				platform.Clear(scratch, total + 1);
+				platform.Free(scratch, total + 1);
+				return false;
+			}
+		}
+		scratchCursor.Index = total;
+		if (!MuiFloattextByteCursorCodec.TryWriteByte(ref platform,
+			scratchCursor, 0))
+		{
+			platform.Clear(scratch, total + 1);
+			platform.Free(scratch, total + 1);
+			return false;
+		}
 
 		var ok = MuiStoreCore.DataspaceAdd(ref platform, state, obj,
 			PendingTextKey, scratch, (int)(total + 1));
@@ -758,9 +862,14 @@ public static class MuiFloattextCore
 	{
 		var lineLen = 0;      // bytes currently in scratch (== visual column)
 		var lastSpace = -1;   // index in scratch of the most recent space
+		var textCursor = default(MuiFloattextByteCursor);
+		textCursor.Base = text;
+		textCursor.Length = textLength;
 		for (var i = 0u; i < textLength; i++)
 		{
-			var ch = platform.ReadUInt8(text, (int)i);
+			textCursor.Index = i;
+			if (!MuiFloattextByteCursorCodec.TryReadByte(ref platform,
+				textCursor, out var ch)) return false;
 			if (ch == (byte)'\r') continue;
 			if (InSkip(ref platform, skip, ch)) continue;
 			if (ch == (byte)'\n')
@@ -803,9 +912,21 @@ public static class MuiFloattextCore
 					wrapCols)) return false;
 				var carryStart = lastSpace + 1;
 				var carryLen = lineLen - carryStart;
+				var carrySource = default(MuiFloattextByteCursor);
+				carrySource.Base = scratch;
+				carrySource.Length = MaximumLineLength + 1;
+				var carryDestination = default(MuiFloattextByteCursor);
+				carryDestination.Base = scratch;
+				carryDestination.Length = MaximumLineLength + 1;
 				for (var k = 0; k < carryLen; k++)
-					platform.WriteUInt8(scratch, k,
-						platform.ReadUInt8(scratch, carryStart + k));
+				{
+					carrySource.Index = (uint)(carryStart + k);
+					carryDestination.Index = (uint)k;
+					if (!MuiFloattextByteCursorCodec.TryReadByte(ref platform,
+						carrySource, out var carryValue) ||
+						!MuiFloattextByteCursorCodec.TryWriteByte(ref platform,
+							carryDestination, carryValue)) return false;
+				}
 				lineLen = carryLen;
 				lastSpace = -1;
 			}
@@ -820,7 +941,12 @@ public static class MuiFloattextCore
 		}
 		if ((uint)lineLen < MaximumLineLength)
 		{
-			platform.WriteUInt8(scratch, lineLen, ch);
+			var cursor = default(MuiFloattextByteCursor);
+			cursor.Base = scratch;
+			cursor.Index = (uint)lineLen;
+			cursor.Length = MaximumLineLength + 1;
+			if (!MuiFloattextByteCursorCodec.TryWriteByte(ref platform, cursor, ch))
+				return false;
 			if (ch == (byte)' ') lastSpace = lineLen;
 			lineLen++;
 		}
@@ -848,6 +974,12 @@ public static class MuiFloattextCore
 
 		var buffer = MuiHeadlessMemory.Allocate(ref platform, (uint)outLength + 1);
 		if (buffer.IsNull) return false;
+		var scratchCursor = default(MuiFloattextByteCursor);
+		scratchCursor.Base = scratch;
+		scratchCursor.Length = MaximumLineLength + 1;
+		var bufferCursor = default(MuiFloattextByteCursor);
+		bufferCursor.Base = buffer;
+		bufferCursor.Length = (uint)outLength + 1;
 		if (gaps > 0)
 		{
 			var per = extra / gaps;
@@ -856,23 +988,77 @@ public static class MuiFloattextCore
 			var gapIndex = 0;
 			for (var i = 0; i < lineLength; i++)
 			{
-				var ch = platform.ReadUInt8(scratch, i);
-				platform.WriteUInt8(buffer, outIndex++, ch);
+				scratchCursor.Index = (uint)i;
+				if (!MuiFloattextByteCursorCodec.TryReadByte(ref platform,
+					scratchCursor, out var ch))
+				{
+					platform.Clear(buffer, (uint)outLength + 1);
+					platform.Free(buffer, (uint)outLength + 1);
+					return false;
+				}
+				bufferCursor.Index = (uint)outIndex++;
+				if (!MuiFloattextByteCursorCodec.TryWriteByte(ref platform,
+					bufferCursor, ch))
+				{
+					platform.Clear(buffer, (uint)outLength + 1);
+					platform.Free(buffer, (uint)outLength + 1);
+					return false;
+				}
 				if (ch == (byte)' ' && IsWordGap(ref platform, scratch, lineLength, i))
 				{
 					var add = per + (gapIndex < remainder ? 1 : 0);
 					gapIndex++;
 					for (var s = 0; s < add; s++)
-						platform.WriteUInt8(buffer, outIndex++, (byte)' ');
+					{
+						bufferCursor.Index = (uint)outIndex++;
+						if (!MuiFloattextByteCursorCodec.TryWriteByte(ref platform,
+							bufferCursor, (byte)' '))
+						{
+							platform.Clear(buffer, (uint)outLength + 1);
+							platform.Free(buffer, (uint)outLength + 1);
+							return false;
+						}
+					}
 				}
 			}
-			platform.WriteUInt8(buffer, outIndex, 0);
+			bufferCursor.Index = (uint)outIndex;
+			if (!MuiFloattextByteCursorCodec.TryWriteByte(ref platform,
+				bufferCursor, 0))
+			{
+				platform.Clear(buffer, (uint)outLength + 1);
+				platform.Free(buffer, (uint)outLength + 1);
+				return false;
+			}
 		}
 		else
 		{
 			for (var i = 0; i < lineLength; i++)
-				platform.WriteUInt8(buffer, i, platform.ReadUInt8(scratch, i));
-			platform.WriteUInt8(buffer, lineLength, 0);
+			{
+				scratchCursor.Index = (uint)i;
+				if (!MuiFloattextByteCursorCodec.TryReadByte(ref platform,
+					scratchCursor, out var ch) )
+				{
+					platform.Clear(buffer, (uint)outLength + 1);
+					platform.Free(buffer, (uint)outLength + 1);
+					return false;
+				}
+				bufferCursor.Index = (uint)i;
+				if (!MuiFloattextByteCursorCodec.TryWriteByte(ref platform,
+					bufferCursor, ch))
+				{
+					platform.Clear(buffer, (uint)outLength + 1);
+					platform.Free(buffer, (uint)outLength + 1);
+					return false;
+				}
+			}
+			bufferCursor.Index = (uint)lineLength;
+			if (!MuiFloattextByteCursorCodec.TryWriteByte(ref platform,
+				bufferCursor, 0))
+			{
+				platform.Clear(buffer, (uint)outLength + 1);
+				platform.Free(buffer, (uint)outLength + 1);
+				return false;
+			}
 		}
 		// On placement failure the buffer is destructed by the list backbone.
 		return MuiListCore.AppendOwnedString(ref platform, state, obj, buffer);
@@ -891,19 +1077,34 @@ public static class MuiFloattextCore
 	private static bool IsWordGap<TPlatform>(ref TPlatform platform, APTR scratch,
 		int length, int i) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (platform.ReadUInt8(scratch, i) != (byte)' ') return false;
+		var cursor = default(MuiFloattextByteCursor);
+		cursor.Base = scratch;
+		cursor.Length = MaximumLineLength + 1;
+		cursor.Index = (uint)i;
+		if (!MuiFloattextByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var current) || current != (byte)' ') return false;
 		if (i == 0 || i == length - 1) return false;
-		return platform.ReadUInt8(scratch, i - 1) != (byte)' ' &&
-			platform.ReadUInt8(scratch, i + 1) != (byte)' ';
+		cursor.Index = (uint)(i - 1);
+		if (!MuiFloattextByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var previous)) return false;
+		cursor.Index = (uint)(i + 1);
+		if (!MuiFloattextByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var next)) return false;
+		return previous != (byte)' ' && next != (byte)' ';
 	}
 
 	private static bool InSkip<TPlatform>(ref TPlatform platform, APTR skip,
 		byte ch) where TPlatform : struct, IMuiGuestMemory
 	{
 		if (skip.IsNull) return false;
+		var cursor = default(MuiFloattextByteCursor);
+		cursor.Base = skip;
+		cursor.Length = MaximumSkipLength;
 		for (var i = 0u; i < MaximumSkipLength; i++)
 		{
-			var value = platform.ReadUInt8(skip, (int)i);
+			cursor.Index = i;
+			if (!MuiFloattextByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var value)) return false;
 			if (value == 0) return false;
 			if (value == ch) return true;
 		}

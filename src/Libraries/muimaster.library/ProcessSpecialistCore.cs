@@ -633,6 +633,44 @@ internal static class MuiProcessArgumentCursorCodec
 		return MuiProcessArgumentVectorMemoryCodec.TryGetEntry(ref platform,
 			cursor.Message, cursor.Kind, cursor.Index, cursor.Count, out address);
 	}
+
+	// Process consumers exchange complete named argument slots through the
+	// semantic cursor. The one-ULONG value remains scalar only inside the slot
+	// codec so freestanding native lowering does not depend on managed padding.
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		MuiProcessArgumentCursor cursor, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiProcessDispatchArgumentSlotCodec.TryReadValue(ref platform,
+			address, out value);
+	}
+
+	internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+		MuiProcessArgumentCursor cursor, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiProcessDispatchArgumentSlotCodec.WriteValue(ref platform,
+			address, value);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiProcessArgumentCursor cursor,
+		out MuiProcessDispatchArgumentSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadValue(ref platform, cursor, out var rawValue)) return false;
+		value.Value = rawValue;
+		return true;
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiProcessArgumentCursor cursor, MuiProcessDispatchArgumentSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteValue(ref platform, cursor, value.Value);
 }
 
 // MUIM_Slave_Dispatch carries a fixed header followed by a bounded inline
@@ -707,9 +745,13 @@ internal static class MuiProcessDispatchPacketCodec
 			!platform.IsMapped(address, MuiProcessDispatchPacketHeader.Size +
 				packet.ArgumentCount * MuiProcessDispatchArgumentSlot.Size))
 			return false;
-		return MuiProcessArgumentVectorCodec.TryReadValue(ref platform, address,
-			MuiProcessArgumentVectorKind.DispatchPacket, index,
-			packet.ArgumentCount, out value);
+		var cursor = default(MuiProcessArgumentCursor);
+		cursor.Message = address;
+		cursor.Kind = MuiProcessArgumentVectorKind.DispatchPacket;
+		cursor.Index = index;
+		cursor.Count = packet.ArgumentCount;
+		return MuiProcessArgumentCursorCodec.TryReadValue(ref platform, cursor,
+			out value);
 	}
 }
 
@@ -1409,9 +1451,13 @@ public static class MuiProcessSpecialistCore
 					MuiSemaphoreCore.Release(ref platform, state, target);
 					return false;
 				}
-				if (!MuiProcessArgumentVectorCodec.TryWriteValue(ref platform,
-					message, MuiProcessArgumentVectorKind.MethodMessage, i,
-					argCount, argument))
+				var argumentCursor = default(MuiProcessArgumentCursor);
+				argumentCursor.Message = message;
+				argumentCursor.Kind = MuiProcessArgumentVectorKind.MethodMessage;
+				argumentCursor.Index = i;
+				argumentCursor.Count = argCount;
+				if (!MuiProcessArgumentCursorCodec.TryWriteValue(ref platform,
+					argumentCursor, argument))
 				{
 					platform.Clear(message, messageBytes);
 					platform.Free(message, messageBytes);
@@ -1785,8 +1831,16 @@ public static class MuiProcessSpecialistCore
 		var total = length + 1;
 		var b = MuiHeadlessMemory.Allocate(ref platform, total);
 		if (b.IsNull) return false;
-		for (var i = 0u; i < total; i++)
-			platform.WriteUInt8(b, (int)i, platform.ReadUInt8(source, (int)i));
+		var cursor = default(MuiGuestByteCopyCursor);
+		cursor.Source = source;
+		cursor.Destination = b;
+		cursor.Length = total;
+		for (cursor.Index = 0; cursor.Index < total; cursor.Index++)
+			if (!MuiGuestByteCopyCursorCodec.TryCopyByte(ref platform, cursor))
+			{
+				platform.Free(b, total);
+				return false;
+			}
 		block = b;
 		size = total;
 		return true;

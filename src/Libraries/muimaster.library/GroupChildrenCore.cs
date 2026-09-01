@@ -290,6 +290,26 @@ internal static class MuiGroupChildListEntryVectorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiGroupChildListEntryVectorMemoryCodec.TryGetEntry(ref platform,
 			cursor.Base, cursor.Index, out address);
+
+	// Complete projection entries cross the vector boundary as named records;
+	// slot-address arithmetic remains private to the bounded memory adapter.
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiGroupChildListEntryCursor cursor, out MuiGroupChildListEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiGroupChildListEntryCodec.TryRead(ref platform, address,
+			out value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiGroupChildListEntryCursor cursor, MuiGroupChildListEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiGroupChildListEntryCodec.Write(ref platform, address, value);
+	}
 }
 
 // Struct-first guest-memory adapter for the caller-owned Group child-list
@@ -913,11 +933,11 @@ public static class MuiGroupChildrenCore
 			MuiGroupChildListEntry.Size * 2)) return false;
 		var cursor = default(MuiGroupChildListEntryCursor);
 		cursor.Base = entriesStorage;
-		if (!MuiGroupChildListEntryVectorMemoryCodec.TryGetEntry(ref platform,
-			cursor.Base, cursor.Index, out var firstEntry)) return false;
+		if (!MuiGroupChildListEntryVectorCodec.TryGetEntry(ref platform, cursor,
+			out var firstEntry)) return false;
 		cursor.Index = 1;
-		if (!MuiGroupChildListEntryVectorMemoryCodec.TryGetEntry(ref platform,
-			cursor.Base, cursor.Index, out var secondEntry)) return false;
+		if (!MuiGroupChildListEntryVectorCodec.TryGetEntry(ref platform, cursor,
+			out var secondEntry)) return false;
 		WriteEntry(ref platform, firstEntry, secondEntry, APTR.Null, first);
 		WriteEntry(ref platform, secondEntry, APTR.Null, firstEntry, second);
 		var list = default(Amiga.List);
@@ -1076,8 +1096,8 @@ public static class MuiGroupChildrenCore
 			var cursor = default(MuiGroupChildListEntryCursor);
 			cursor.Base = entries;
 			cursor.Index = index;
-			if (!MuiGroupChildListEntryVectorMemoryCodec.TryGetEntry(ref platform,
-				cursor.Base, cursor.Index, out var entry))
+			if (!MuiGroupChildListEntryVectorCodec.TryGetEntry(ref platform, cursor,
+				out var entry))
 			{
 				FreeChildListProjection(ref platform, list, entries, entriesSize);
 				return APTR.Null;
@@ -1088,8 +1108,8 @@ public static class MuiGroupChildrenCore
 			if (index + 1 < count)
 			{
 				cursor.Index++;
-				if (!MuiGroupChildListEntryVectorMemoryCodec.TryGetEntry(ref platform,
-					cursor.Base, cursor.Index, out next))
+				if (!MuiGroupChildListEntryVectorCodec.TryGetEntry(ref platform,
+					cursor, out next))
 				{
 					FreeChildListProjection(ref platform, list, entries,
 						entriesSize);

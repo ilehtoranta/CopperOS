@@ -449,8 +449,253 @@ public static class ShellScriptEngine
             return step.Status;
         }
 
+        var directiveDot = (byte)'.';
+        if (state.ScriptKeyTemplateLength != 0 &&
+            !ShellScriptKeyExpansion.TryGetDot(ref platform,
+                state.ScriptKeyTemplate, state.ScriptKeyTemplateLength,
+                out directiveDot))
+            return FailAfterRead(ref platform, frame, state, lineLength,
+                out step);
+        if (!ShellScriptDirective.TryParse(ref platform, workspace.Line,
+                lineLength, directiveDot, out var directive,
+                out var directiveArgument))
+            return FailAfterRead(ref platform, frame, state, lineLength,
+                out step);
+        if (directive == ShellScriptDirectiveKind.Comment ||
+            (lineLength != 0 && platform.ReadUInt8(workspace.Line, 0) ==
+                (byte)';'))
+        {
+            if (!Advance(ref platform, frame, nextLine, nextOffset))
+                return FailAfterRead(ref platform, frame, state, lineLength,
+                    out step);
+            step = MakeStep(ShellScriptStepStatus.Empty,
+                ShellInternalCommand.Unknown, state.LastResult, nextLine,
+                nextOffset, lineLength);
+            return step.Status;
+        }
+        if (directive == ShellScriptDirectiveKind.Invalid)
+        {
+            RecordFailureAndAdvance(ref platform, frame, nextLine,
+                nextOffset, (int)ShellCommandResult.Error);
+            step = MakeStep(ShellScriptStepStatus.Malformed,
+                ShellInternalCommand.Unknown, (int)ShellCommandResult.Error,
+                nextLine, nextOffset, lineLength);
+            return step.Status;
+        }
+        if (directive == ShellScriptDirectiveKind.Key)
+        {
+            var templateLength = lineLength - directiveArgument;
+            if (state.CurrentLine != 1 || state.ScriptKeyTemplate.IsNull ||
+                state.ScriptKeyTemplateLength != 0 || templateLength == 0 ||
+                templateLength >= 4096 ||
+                !platform.IsMapped(state.ScriptKeyTemplate, 4096) ||
+                workspace.CommandWorkspace.ErrorCodes.IsNull ||
+                workspace.CommandWorkspace.ErrorCodeCapacity < 4)
+            {
+                RecordFailureAndAdvance(ref platform, frame, nextLine,
+                    nextOffset, (int)ShellCommandResult.Error);
+                step = MakeStep(ShellScriptStepStatus.Malformed,
+                    ShellInternalCommand.Unknown,
+                    (int)ShellCommandResult.Error, nextLine, nextOffset,
+                    lineLength);
+                return step.Status;
+            }
+            platform.Copy(APTR.FromPointer(workspace.Line.Raw +
+                directiveArgument), state.ScriptKeyTemplate, templateLength);
+            platform.WriteUInt8(state.ScriptKeyTemplate, (int)templateLength,
+                0);
+            platform.Clear(APTR.FromPointer(state.ScriptKeyTemplate.Raw +
+                templateLength + 1), ShellScriptKeyExpansion.TemplateBufferCapacity -
+                templateLength - 1);
+            if (!ShellScriptKeyExpansion.TryInitializeDirectiveState(ref platform,
+                    state.ScriptKeyTemplate, templateLength))
+                return FailAfterRead(ref platform, frame, state, lineLength,
+                    out step);
+            if (!platform.TryReadArgs(state.ScriptArguments,
+                    state.ScriptArgumentLength, state.ScriptKeyTemplate,
+                    templateLength, workspace.CommandWorkspace.ErrorCodes,
+                    workspace.CommandWorkspace.ErrorCodeCapacity, out var rdArgs) ||
+                rdArgs.IsNull)
+            {
+                RecordFailureAndAdvance(ref platform, frame, nextLine,
+                    nextOffset, (int)ShellCommandResult.Error);
+                step = MakeStep(ShellScriptStepStatus.Malformed,
+                    ShellInternalCommand.Unknown,
+                    (int)ShellCommandResult.Error, nextLine, nextOffset,
+                    lineLength);
+                return step.Status;
+            }
+            platform.FreeArgs(rdArgs);
+            if (!ShellScriptFrameCodec.TrySetScriptKeyTemplate(ref platform,
+                    frame, state.ScriptKeyTemplate, templateLength) ||
+                !Advance(ref platform, frame, nextLine, nextOffset))
+                return FailAfterRead(ref platform, frame, state, lineLength,
+                    out step);
+            step = MakeStep(ShellScriptStepStatus.Empty,
+                ShellInternalCommand.Unknown, state.LastResult, nextLine,
+                nextOffset, lineLength);
+            return step.Status;
+        }
+        if (directive is ShellScriptDirectiveKind.Bra or
+            ShellScriptDirectiveKind.Ket or ShellScriptDirectiveKind.Dollar or
+            ShellScriptDirectiveKind.Dot)
+        {
+            var delimiterCursor = new ShellTextCursor(APTR.FromPointer(
+                workspace.Line.Raw + directiveArgument),
+                lineLength - directiveArgument);
+            var delimiterResult = ShellTextParser.NextToken(ref platform,
+                ref delimiterCursor, workspace.CommandName,
+                workspace.CommandNameCapacity, out var delimiterLength, out _);
+            var endResult = ShellTextParser.NextToken(ref platform,
+                ref delimiterCursor, workspace.CommandWorkspace.Token,
+                workspace.CommandWorkspace.TokenCapacity, out _, out _);
+            if (state.ScriptKeyTemplateLength == 0 || delimiterLength != 1 ||
+                delimiterResult != (int)ShellTextTokenResult.Token ||
+                endResult != (int)ShellTextTokenResult.End ||
+                !(directive == ShellScriptDirectiveKind.Dot
+                    ? ShellScriptKeyExpansion.TrySetDot(ref platform,
+                        state.ScriptKeyTemplate, state.ScriptKeyTemplateLength,
+                        platform.ReadUInt8(workspace.CommandName, 0))
+                    : directive == ShellScriptDirectiveKind.Dollar
+                    ? ShellScriptKeyExpansion.TrySetDollar(ref platform,
+                        state.ScriptKeyTemplate, state.ScriptKeyTemplateLength,
+                        platform.ReadUInt8(workspace.CommandName, 0))
+                    : ShellScriptKeyExpansion.TrySetBracket(ref platform,
+                        state.ScriptKeyTemplate, state.ScriptKeyTemplateLength,
+                        directive == ShellScriptDirectiveKind.Bra ? 0u : 1u,
+                        platform.ReadUInt8(workspace.CommandName, 0))))
+            {
+                RecordFailureAndAdvance(ref platform, frame, nextLine,
+                    nextOffset, (int)ShellCommandResult.Error);
+                step = MakeStep(ShellScriptStepStatus.Malformed,
+                    ShellInternalCommand.Unknown, (int)ShellCommandResult.Error,
+                    nextLine, nextOffset, lineLength);
+                return step.Status;
+            }
+            if (!Advance(ref platform, frame, nextLine, nextOffset))
+                return FailAfterRead(ref platform, frame, state, lineLength,
+                    out step);
+            step = MakeStep(ShellScriptStepStatus.Empty,
+                ShellInternalCommand.Unknown, state.LastResult, nextLine,
+                nextOffset, lineLength);
+            return step.Status;
+        }
+        if (directive == ShellScriptDirectiveKind.Default)
+        {
+            var defaultsWorkspace = workspace.Redirection;
+            var defaultCursor = new ShellTextCursor(APTR.FromPointer(
+                workspace.Line.Raw + directiveArgument),
+                lineLength - directiveArgument);
+            var nameResult = ShellTextParser.NextToken(ref platform,
+                ref defaultCursor, workspace.CommandName,
+                workspace.CommandNameCapacity, out var nameLength, out _);
+            var valueResult = ShellTextParser.NextToken(ref platform,
+                ref defaultCursor, defaultsWorkspace.Command,
+                defaultsWorkspace.CommandCapacity, out var valueLength, out _);
+            if (nameResult == (int)ShellTextTokenResult.End &&
+                valueResult == (int)ShellTextTokenResult.End)
+            {
+                // Workbench 3.1 accepts a bare .DEF as a no-op.
+                if (!Advance(ref platform, frame, nextLine, nextOffset))
+                    return FailAfterRead(ref platform, frame, state, lineLength,
+                        out step);
+                step = MakeStep(ShellScriptStepStatus.Empty,
+                    ShellInternalCommand.Unknown, state.LastResult, nextLine,
+                    nextOffset, lineLength);
+                return step.Status;
+            }
+            var embeddedSeparator = FindByte(ref platform, workspace.CommandName,
+                nameLength, (byte)'=');
+            if (embeddedSeparator != uint.MaxValue)
+            {
+                var embeddedValueLength = nameLength - embeddedSeparator - 1;
+                if (embeddedSeparator == 0 ||
+                    embeddedValueLength >= defaultsWorkspace.CommandCapacity)
+                {
+                    RecordFailureAndAdvance(ref platform, frame, nextLine,
+                        nextOffset, (int)ShellCommandResult.Error);
+                    step = MakeStep(ShellScriptStepStatus.Malformed,
+                        ShellInternalCommand.Unknown, (int)ShellCommandResult.Error,
+                        nextLine, nextOffset, lineLength);
+                    return step.Status;
+                }
+                if (embeddedValueLength != 0)
+                    platform.Copy(APTR.FromPointer(workspace.CommandName.Raw +
+                        embeddedSeparator + 1), defaultsWorkspace.Command,
+                        embeddedValueLength);
+                platform.WriteUInt8(defaultsWorkspace.Command,
+                    (int)embeddedValueLength, 0);
+                nameLength = embeddedSeparator;
+                valueLength = embeddedValueLength;
+                valueResult = (int)ShellTextTokenResult.Token;
+            }
+            if (state.ScriptKeyTemplate.IsNull ||
+                state.ScriptKeyTemplateLength == 0 ||
+                !defaultsWorkspace.IsEnabled ||
+                nameResult != (int)ShellTextTokenResult.Token ||
+                (valueResult != (int)ShellTextTokenResult.Token &&
+                    valueResult != (int)ShellTextTokenResult.End) ||
+                // Workbench 3.1 accepts surplus .DEF tokens after either
+                // separator spelling and retains the first value.
+                !ShellScriptKeyExpansion.TryDefineDefault(ref platform,
+                    state.ScriptKeyTemplate, state.ScriptKeyTemplateLength,
+                    workspace.CommandName, nameLength, defaultsWorkspace.Command,
+                    valueResult == (int)ShellTextTokenResult.Token
+                        ? valueLength : 0))
+            {
+                RecordFailureAndAdvance(ref platform, frame, nextLine,
+                    nextOffset, (int)ShellCommandResult.Error);
+                step = MakeStep(ShellScriptStepStatus.Malformed,
+                    ShellInternalCommand.Unknown,
+                    (int)ShellCommandResult.Error, nextLine, nextOffset,
+                    lineLength);
+                return step.Status;
+            }
+            if (!Advance(ref platform, frame, nextLine, nextOffset))
+                return FailAfterRead(ref platform, frame, state, lineLength,
+                    out step);
+            step = MakeStep(ShellScriptStepStatus.Empty,
+                ShellInternalCommand.Unknown, state.LastResult, nextLine,
+                nextOffset, lineLength);
+            return step.Status;
+        }
+
         var commandSource = workspace.Line;
         var commandLength = lineLength;
+        if (state.ScriptKeyTemplateLength != 0)
+        {
+            var substitution = workspace.Redirection;
+            var aliasWorkspace = workspace.AliasExpansion;
+            if (!substitution.IsEnabled || !aliasWorkspace.IsEnabled ||
+                !ShellScriptKeyExpansion.TryExpand(ref platform,
+                    commandSource, commandLength, state.ScriptArguments,
+                    state.ScriptArgumentLength, state.ScriptKeyTemplate,
+                    state.ScriptKeyTemplateLength,
+                    workspace.CommandWorkspace.ErrorCodes,
+                    workspace.CommandWorkspace.ErrorCodeCapacity,
+                    substitution.Command, substitution.CommandCapacity,
+                    out commandLength))
+            {
+                RecordFailureAndAdvance(ref platform, frame, nextLine,
+                    nextOffset, (int)ShellCommandResult.Error);
+                step = MakeStep(ShellScriptStepStatus.Malformed,
+                    ShellInternalCommand.Unknown,
+                    (int)ShellCommandResult.Error, nextLine, nextOffset,
+                    lineLength);
+                return step.Status;
+            }
+            commandSource = substitution.Command;
+            if (commandLength == 0)
+            {
+                if (!Advance(ref platform, frame, nextLine, nextOffset))
+                    return FailAfterRead(ref platform, frame, state,
+                        lineLength, out step);
+                step = MakeStep(ShellScriptStepStatus.Empty,
+                    ShellInternalCommand.Unknown, state.LastResult, nextLine,
+                    nextOffset, lineLength);
+                return step.Status;
+            }
+        }
         if (workspace.AliasExpansion.IsEnabled && commandLength != 0)
         {
             var aliasWorkspace = workspace.AliasExpansion;
@@ -483,6 +728,24 @@ public static class ShellScriptEngine
             {
                 commandSource = aliasWorkspace.Line;
                 commandLength = expandedLength;
+            }
+            else if (state.ScriptKeyTemplateLength != 0)
+            {
+                if (commandLength >= aliasWorkspace.Capacity)
+                {
+                    RecordFailureAndAdvance(ref platform, frame, nextLine,
+                        nextOffset, (int)ShellCommandResult.Error);
+                    step = MakeStep(ShellScriptStepStatus.Malformed,
+                        ShellInternalCommand.Unknown,
+                        (int)ShellCommandResult.Error, nextLine, nextOffset,
+                        lineLength);
+                    return step.Status;
+                }
+                platform.Copy(commandSource, aliasWorkspace.Line,
+                    commandLength);
+                platform.WriteUInt8(aliasWorkspace.Line,
+                    (int)commandLength, 0);
+                commandSource = aliasWorkspace.Line;
             }
         }
 
@@ -871,4 +1134,12 @@ public static class ShellScriptEngine
             ShellScriptSignalFlags.CtrlC |
             ShellScriptSignalFlags.CtrlD |
             ShellScriptSignalFlags.Terminated)) == 0;
+
+    private static uint FindByte<TPlatform>(ref TPlatform platform, APTR value,
+        uint length, byte wanted) where TPlatform : struct, IShellPlatform
+    {
+        for (var offset = 0u; offset < length; offset++)
+            if (platform.ReadUInt8(value, (int)offset) == wanted) return offset;
+        return uint.MaxValue;
+    }
 }

@@ -41,7 +41,7 @@ public sealed class EchoCommandTests
     {
         TestShellPlatform platform = new();
         CommandInvocation invocation = CommandInvocation.ForOutput(
-            new APTR(4095),
+            new APTR(8191),
             4,
             new BPTR(1));
 
@@ -349,8 +349,9 @@ public sealed class EchoCommandTests
         }
 
         public bool IsMapped(APTR address, uint byteSize) =>
-            address.Raw <= Store.Memory.Length &&
-            byteSize <= (uint)(Store.Memory.Length - address.Raw);
+            Store.AssumeMemoryMapped ||
+            (address.Raw <= Store.Memory.Length &&
+             byteSize <= (uint)(Store.Memory.Length - address.Raw));
 
         public int Write(BPTR handle, APTR source, uint length)
         {
@@ -656,15 +657,21 @@ public sealed class EchoCommandTests
         }
 
         public ShellScriptExecutionStatus TryExecuteScript(APTR cli,
-            APTR file, uint fileLength, out int result)
+            APTR file, uint fileLength, APTR scriptArguments,
+            uint scriptArgumentLength, out int result)
         {
             if (cli.IsNull || Store.ExecuteFailure || file.IsNull ||
-                fileLength == 0 || !IsMapped(file, fileLength))
+                fileLength == 0 || !IsMapped(file, fileLength) ||
+                (scriptArgumentLength != 0 && (scriptArguments.IsNull ||
+                 !IsMapped(scriptArguments, scriptArgumentLength))))
             {
                 result = (int)ShellCommandResult.Fail;
                 return ShellScriptExecutionStatus.Failed;
             }
             Store.ExecutedScript = Store.ReadText(file, fileLength);
+            Store.ExecutedScriptArguments = scriptArgumentLength == 0
+                ? string.Empty
+                : Store.ReadText(scriptArguments, scriptArgumentLength);
             Store.ExecuteCount++;
             result = (int)ShellCommandResult.Ok;
             return ShellScriptExecutionStatus.Completed;
@@ -681,6 +688,23 @@ public sealed class EchoCommandTests
         public bool TryPrepareScriptWait(APTR cli) => false;
 
         public bool TryParkScriptWait(APTR cli, uint timeoutTicks) => false;
+
+        public bool TryReadScriptFilePrefix(APTR argumentText,
+            uint argumentLength, out uint consumed)
+        {
+            consumed = 0;
+            var cursor = new ShellTextCursor(argumentText, argumentLength);
+            var result = ShellTextParser.NextToken(ref this, ref cursor,
+                new APTR(3600), 256, out _, out _);
+            if (result != (int)ShellTextTokenResult.Token)
+                return false;
+            consumed = cursor.Position;
+            if (consumed != 0 && consumed <= argumentLength &&
+                ReadUInt8(argumentText, (int)consumed - 1) is (byte)' ' or
+                    (byte)'\t' or (byte)'\r' or (byte)'\n')
+                consumed--;
+            return true;
+        }
 
         public bool TryExpandScriptAlias(
             APTR cli,
@@ -882,6 +906,26 @@ public sealed class EchoCommandTests
             return true;
         }
 
+        public bool TryPublishScriptInput(
+            APTR cli,
+            APTR frame,
+            BPTR source,
+            BPTR replacement,
+            APTR temporaryPath,
+            uint temporaryPathLength) =>
+            cli.IsNotNull && frame.IsNotNull && source.IsNotNull &&
+            replacement.IsNotNull && temporaryPathLength != 0 &&
+            IsMapped(temporaryPath, temporaryPathLength + 1);
+
+        public bool TryDeleteScriptPath(APTR cli, APTR path, uint pathLength)
+        {
+            if (cli.IsNull || path.IsNull || pathLength == 0 ||
+                !IsMapped(path, pathLength + 1)) return false;
+            Store.ScriptDeleteCount++;
+            Store.LastDeletedScriptPath = Store.ReadText(path, pathLength);
+            return !Store.ScriptDeleteFailure;
+        }
+
         public bool TryCloseScriptRedirection(APTR cli, BPTR handle)
         {
             if (cli.IsNull || handle.IsNull)
@@ -1036,7 +1080,11 @@ public sealed class EchoCommandTests
             out APTR rdArgs)
         {
             rdArgs = APTR.Null;
+            Store.ReadArgsAttemptCount++;
+            Store.LastReadArgsResultArray = resultArray;
+            Store.LastReadArgsResultBytes = resultBytes;
             if (Store.ReadArgsFailure || template.IsNull || resultArray.IsNull ||
+                (resultArray.Raw & 1u) != 0 ||
                 (argumentLength != 0 && (argumentText.IsNull ||
                  !IsMapped(argumentText, argumentLength))) ||
                 !IsMapped(template, templateLength) ||
@@ -1044,6 +1092,7 @@ public sealed class EchoCommandTests
                 return false;
 
             string templateText = Store.ReadText(template, templateLength);
+            Store.LastReadArgsTemplate = templateText;
             if (string.Equals(templateText,
                     "MESSAGE/M,NOLINE/S,FIRST/N,LEN/N,TO/K",
                     StringComparison.OrdinalIgnoreCase))
@@ -1145,9 +1194,41 @@ public sealed class EchoCommandTests
                     StringComparison.OrdinalIgnoreCase))
                 return TryReadWindowFromArgs(argumentText, argumentLength,
                     resultArray, out rdArgs);
+            if (string.Equals(templateText,
+                    "VALUE1/A,OP,VALUE2/M,TO/K,LFORMAT/K",
+                    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(templateText,
+                    "VALUE1/A,OP,VALUE2/M,TO/K,LFORMAT/K,HEX/S",
+                    StringComparison.OrdinalIgnoreCase))
+                return TryReadEvalArgs(argumentText, argumentLength, resultArray,
+                    out rdArgs);
             if (templateText.Length == 0)
                 return TryReadEmptyArgs(argumentText, argumentLength,
                     out rdArgs);
+            if (Store.AcceptScriptKeyTemplate)
+            {
+                Clear(resultArray, resultBytes);
+                bool requiredFilename = string.Equals(templateText, "filename/A",
+                    StringComparison.OrdinalIgnoreCase);
+                if (requiredFilename || string.Equals(templateText, "filename",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    string keyText = Store.ReadText(argumentText,
+                        argumentLength).Trim();
+                    if (keyText.Length > 255 || (requiredFilename &&
+                        keyText.Length == 0))
+                        return false;
+                    if (keyText.Length != 0)
+                    {
+                        APTR keyValue = Store.PutAt(7900, keyText);
+                        WriteUInt8(keyValue, keyText.Length, 0);
+                        WriteUInt32(resultArray, 0, keyValue.Raw);
+                    }
+                }
+                rdArgs = new APTR(240);
+                Store.ReadArgsCount++;
+                return true;
+            }
             if (!string.Equals(templateText, "FILE/A",
                     StringComparison.OrdinalIgnoreCase))
                 return false;
@@ -2156,6 +2237,82 @@ public sealed class EchoCommandTests
             return true;
         }
 
+        private bool TryReadEvalArgs(APTR argumentText, uint argumentLength,
+            APTR resultArray, out APTR rdArgs)
+        {
+            rdArgs = APTR.Null;
+            string raw = Store.ReadText(argumentText, argumentLength).Trim();
+            if (raw.Length == 0) return false;
+            var positional = new List<string>();
+            string? format = null;
+            string? to = null;
+            bool hex = false;
+            foreach (string item in raw.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (string.Equals(item, "HEX", StringComparison.OrdinalIgnoreCase))
+                {
+                    hex = true;
+                    continue;
+                }
+                if (item.StartsWith("LFORMAT=", StringComparison.OrdinalIgnoreCase))
+                {
+                    format = item[8..];
+                    continue;
+                }
+                if (item.StartsWith("TO=", StringComparison.OrdinalIgnoreCase))
+                {
+                    to = item[3..];
+                    continue;
+                }
+                positional.Add(item);
+            }
+            if (positional.Count == 0) return false;
+            Clear(resultArray, 24);
+            APTR value = Store.PutAt(7600, positional[0]);
+            WriteUInt8(value, positional[0].Length, 0);
+            WriteUInt32(resultArray, 0, value.Raw);
+            if (positional.Count > 1)
+            {
+                APTR opValue = Store.PutAt(7700, positional[1]);
+                WriteUInt8(opValue, positional[1].Length, 0);
+                WriteUInt32(resultArray, 4, opValue.Raw);
+            }
+            if (positional.Count > 2)
+            {
+                const int vectorOffset = 7000;
+                var nextValueOffset = 7100;
+                for (var index = 2; index < positional.Count; index++)
+                {
+                    string item = positional[index];
+                    if (nextValueOffset + item.Length >= 7600 || index - 2 >= 16)
+                        return false;
+                    APTR itemValue = Store.PutAt(nextValueOffset, item);
+                    WriteUInt8(itemValue, item.Length, 0);
+                    WriteUInt32(new APTR(vectorOffset), (index - 2) * 4,
+                        itemValue.Raw);
+                    nextValueOffset += item.Length + 1;
+                }
+                WriteUInt32(new APTR(vectorOffset), (positional.Count - 2) * 4, 0);
+                WriteUInt32(resultArray, 8, vectorOffset);
+            }
+            if (format is not null)
+            {
+                APTR formatValue = Store.PutAt(7800, format);
+                WriteUInt8(formatValue, format.Length, 0);
+                WriteUInt32(resultArray, 16, formatValue.Raw);
+            }
+            if (to is not null)
+            {
+                APTR toValue = Store.PutAt(8000, to);
+                WriteUInt8(toValue, to.Length, 0);
+                WriteUInt32(resultArray, 12, toValue.Raw);
+            }
+            if (hex) WriteUInt32(resultArray, 20, 1);
+            rdArgs = new APTR(240);
+            Store.ReadArgsCount++;
+            return true;
+        }
+
         private bool TryReadEchoArgs(APTR argumentText, uint argumentLength,
             APTR resultArray, uint resultBytes, out APTR rdArgs)
         {
@@ -2444,7 +2601,7 @@ public sealed class EchoCommandTests
 
     public sealed class GuestStore
     {
-        public readonly byte[] Memory = new byte[4096];
+        public readonly byte[] Memory = new byte[8192];
         public readonly List<byte> Output = new();
         public bool ShortWrite;
         public string OpenedPath = string.Empty;
@@ -2548,6 +2705,9 @@ public sealed class EchoCommandTests
         public int RedirectionOpenCount;
         public int RedirectionCloseCount;
         public BPTR LastClosedRedirection;
+		public bool ScriptDeleteFailure;
+		public int ScriptDeleteCount;
+		public string LastDeletedScriptPath = string.Empty;
         public bool RunFailure;
         public string RunCommand = string.Empty;
         public uint RunDetach;
@@ -2593,8 +2753,17 @@ public sealed class EchoCommandTests
         public string ShellFrom = string.Empty;
         public int ShellLaunchCount;
         public bool ReadArgsFailure;
+        // A range-check test may claim a high guest span is mapped. Any actual
+        // access still uses Memory, exposing a missing pre-write bounds check.
+        public bool AssumeMemoryMapped;
+        public int ReadArgsAttemptCount;
+        public APTR LastReadArgsResultArray;
+        public uint LastReadArgsResultBytes;
+        public string LastReadArgsTemplate = string.Empty;
         public int ReadArgsCount;
+        public bool AcceptScriptKeyTemplate;
         public int FreeArgsCount;
+        public string ExecutedScriptArguments = string.Empty;
         public string LocalVariableName = string.Empty;
         public string LocalVariableValue = string.Empty;
         public bool LocalSetFailure;

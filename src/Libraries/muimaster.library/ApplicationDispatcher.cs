@@ -195,6 +195,19 @@ internal struct MuiApplicationPushMethodParameterCursor
 	internal uint Index;
 }
 
+// Named cursor for a standalone caller-owned parameter vector. Inline packet
+// tails use MuiApplicationPushMethodParameterCursor above; this variant keeps
+// Base/Index explicit when a vector is copied before dispatch.
+[StructLayout(LayoutKind.Sequential, Pack = 2)]
+internal struct MuiApplicationPushMethodParameterVectorCursor
+{
+	internal const uint EntrySize = MuiApplicationPushMethodParameter.Size;
+	internal const uint MaximumEntries =
+		MuiApplicationPushMethodMessage.MaximumParameterCount;
+	internal APTR Base;
+	internal uint Index;
+}
+
 // Struct-first adapter for the caller-owned parameter vector appended to a
 // MUIM_Application_PushMethod packet. The fixed packet header and selected
 // inline parameter record must both be completely mapped before an address is
@@ -207,7 +220,7 @@ internal static class MuiApplicationPushMethodParameterMemoryCodec
 	{
 		address = APTR.Null;
 		if (vector.IsNull || index >=
-			MuiApplicationPushMethodParameterCursor.MaximumEntries || index >
+			MuiApplicationPushMethodParameterVectorCursor.MaximumEntries || index >
 			(uint.MaxValue - vector.Raw) /
 			MuiApplicationPushMethodParameter.Size) return false;
 		var offset = index * MuiApplicationPushMethodParameter.Size;
@@ -243,13 +256,19 @@ internal static class MuiApplicationPushMethodParameterMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (source.IsNull || destination.IsNull || count == 0 || count >
-			MuiApplicationPushMethodParameterCursor.MaximumEntries) return false;
+			MuiApplicationPushMethodParameterVectorCursor.MaximumEntries) return false;
+		var sourceCursor = default(MuiApplicationPushMethodParameterVectorCursor);
+		sourceCursor.Base = source;
+		var destinationCursor = default(MuiApplicationPushMethodParameterVectorCursor);
+		destinationCursor.Base = destination;
 		for (var index = 0u; index < count; index++)
 		{
+			sourceCursor.Index = index;
+			destinationCursor.Index = index;
 			if (!MuiApplicationPushMethodParameterVectorCodec.TryReadValue(
-				ref platform, source, index, out var value) ||
+				ref platform, sourceCursor, out var value) ||
 				!MuiApplicationPushMethodParameterVectorCodec.TryWriteValue(
-					ref platform, destination, index, value)) return false;
+					ref platform, destinationCursor, value)) return false;
 		}
 		return true;
 	}
@@ -261,6 +280,17 @@ internal static class MuiApplicationPushMethodParameterMemoryCodec
 // ULONG values instead of slot addresses.
 internal static class MuiApplicationPushMethodParameterVectorCodec
 {
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		MuiApplicationPushMethodParameterVectorCursor cursor, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiApplicationPushMethodParameterVectorCursorCodec.TryGetEntry(
+			ref platform, cursor, out var address)) return false;
+		return MuiApplicationPushMethodParameterCodec.TryReadValue(ref platform,
+			address, out value);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR vector,
 		uint index, out MuiApplicationPushMethodParameter value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -288,6 +318,17 @@ internal static class MuiApplicationPushMethodParameterVectorCodec
 			address, out value);
 	}
 
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiApplicationPushMethodParameterVectorCursor cursor,
+		out MuiApplicationPushMethodParameter value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadValue(ref platform, cursor, out var rawValue)) return false;
+		value.Value = rawValue;
+		return true;
+	}
+
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform, APTR vector,
 		uint index, MuiApplicationPushMethodParameter value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -307,6 +348,22 @@ internal static class MuiApplicationPushMethodParameterVectorCodec
 		return MuiApplicationPushMethodParameterCodec.WriteValue(ref platform,
 			address, value);
 	}
+
+	internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+		MuiApplicationPushMethodParameterVectorCursor cursor, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiApplicationPushMethodParameterVectorCursorCodec.TryGetEntry(
+			ref platform, cursor, out var address)) return false;
+		return MuiApplicationPushMethodParameterCodec.WriteValue(ref platform,
+			address, value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiApplicationPushMethodParameterVectorCursor cursor,
+		MuiApplicationPushMethodParameter value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteValue(ref platform, cursor, value.Value);
 }
 
 internal static class MuiApplicationPushMethodParameterCodec
@@ -315,52 +372,14 @@ internal static class MuiApplicationPushMethodParameterCodec
 	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 		APTR address, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiApplicationPushMethodParameter.Size, out var cursor)) return false;
-		APTR firstAddress;
-		APTR secondAddress;
-		APTR thirdAddress;
-		APTR fourthAddress;
-		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-			ref platform, ref cursor, 1, out thirdAddress) ||
-			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out fourthAddress)) return false;
-		var first = platform.ReadUInt8(firstAddress, 0);
-		var second = platform.ReadUInt8(secondAddress, 0);
-		var third = platform.ReadUInt8(thirdAddress, 0);
-		var fourth = platform.ReadUInt8(fourthAddress, 0);
-		value = ((uint)first << 24) | ((uint)second << 16) |
-			((uint)third << 8) | fourth;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value);
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
 		APTR address, uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiApplicationPushMethodParameter.Size, out var cursor)) return false;
-		APTR firstAddress;
-		APTR secondAddress;
-		APTR thirdAddress;
-		APTR fourthAddress;
-		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-			ref platform, ref cursor, 1, out thirdAddress) ||
-			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out fourthAddress)) return false;
-		platform.WriteUInt8(firstAddress, 0, (byte)(value >> 24));
-		platform.WriteUInt8(secondAddress, 0, (byte)(value >> 16));
-		platform.WriteUInt8(thirdAddress, 0, (byte)(value >> 8));
-		platform.WriteUInt8(fourthAddress, 0, (byte)value);
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiApplicationPushMethodParameter value)
@@ -387,6 +406,15 @@ internal static class MuiApplicationPushMethodParameterCursorCodec
 		return MuiApplicationPushMethodParameterMemoryCodec.TryGetEntry(
 			ref platform, cursor.Message, cursor.Index, out address);
 	}
+}
+
+internal static class MuiApplicationPushMethodParameterVectorCursorCodec
+{
+	internal static bool TryGetEntry<TPlatform>(ref TPlatform platform,
+		MuiApplicationPushMethodParameterVectorCursor cursor, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiApplicationPushMethodParameterMemoryCodec.TryGetStandaloneEntry(
+			ref platform, cursor.Base, cursor.Index, out address);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -792,6 +820,47 @@ internal static class MuiWindowCycleChainInlineVectorCodec
 		return MuiWindowCycleChainInlineVectorMemoryCodec.TryGetEntry(
 			ref platform, cursor.Message, cursor.Index, out address);
 	}
+
+	// Keep the inline vector's one-field element as the same named record used
+	// by the Window core. Callers that need the value do not have to interpret
+	// the packet tail through a raw ULONG or an unexplained offset.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		MuiWindowCycleChainInlineVectorCursor cursor, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiApplicationWindowCycleChainSlotCodec.TryReadValue(ref platform,
+			address, out value);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiWindowCycleChainInlineVectorCursor cursor,
+		out MuiApplicationWindowCycleChainSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadValue(ref platform, cursor, out var rawObject)) return false;
+		value.Object = APTR.FromPointer(rawObject);
+		return true;
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+		MuiWindowCycleChainInlineVectorCursor cursor, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiApplicationWindowCycleChainSlotCodec.WriteValue(ref platform,
+			address, value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiWindowCycleChainInlineVectorCursor cursor,
+		MuiApplicationWindowCycleChainSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteValue(ref platform, cursor, value.Object.Raw);
 }
 
 internal enum MuiApplicationInputPacketKind : byte
@@ -1243,8 +1312,11 @@ internal static class MuiApplicationQueuePacketCodec
 			parameterCount > MuiApplicationPushMethodMessage.MaximumParameterCount ||
 			!platform.IsMapped(address, MuiApplicationPushMethodMessage.Size))
 			return false;
-		if (!MuiApplicationPushMethodParameterMemoryCodec.TryGetEntry(
-			ref platform, address, 0, out var tail)) return false;
+		var parameterCursor = default(MuiApplicationPushMethodParameterCursor);
+		parameterCursor.Message = address;
+		parameterCursor.Index = 0;
+		if (!MuiApplicationPushMethodParameterCursorCodec.TryGetEntry(
+			ref platform, parameterCursor, out var tail)) return false;
 		var parameterBytes = parameterCount *
 			MuiApplicationPushMethodParameter.Size;
 		if (tail.Raw > uint.MaxValue - parameterBytes ||
@@ -2118,8 +2190,11 @@ internal static class MuiWindowCycleChainPacketCodec
 		APTR address, out APTR vector)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiWindowCycleChainInlineVectorMemoryCodec.TryGetEntry(
-			ref platform, address, 0, out vector);
+		var cursor = default(MuiWindowCycleChainInlineVectorCursor);
+		cursor.Message = address;
+		cursor.Index = 0;
+		return MuiWindowCycleChainInlineVectorCodec.TryGetEntry(ref platform,
+			cursor, out vector);
 	}
 }
 

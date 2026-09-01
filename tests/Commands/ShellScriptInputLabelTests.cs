@@ -59,10 +59,10 @@ public sealed class ShellScriptInputLabelTests
         APTR middleName = platform.Store.PutAt(120, "middle");
         APTR endName = platform.Store.PutAt(140, "end");
         APTR duplicateName = platform.Store.PutAt(160, "MIDDLE");
-        APTR startRecord = new(3100);
-        APTR middleRecord = new(3140);
-        APTR endRecord = new(3180);
-        APTR duplicateRecord = new(3220);
+        APTR startRecord = new(3400);
+        APTR middleRecord = new(3440);
+        APTR endRecord = new(3480);
+        APTR duplicateRecord = new(3520);
 
         Assert.True(ShellScriptLabelTransitions.TryDefine(
             ref platform, frame, startRecord, startName, 5, 1, 0));

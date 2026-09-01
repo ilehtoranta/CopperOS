@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="..\..\CopperOS.Portable.props" />
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>CopperOS.Commands.NativeExecution</AssemblyName>
+    <RootNamespace>CopperOS.Commands.NativeExecution</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Same released instruction executor as CopperSharp's native tests. -->
+    <PackageReference Include="Copper68k" Version="1.4.0" />
+  </ItemGroup>
+</Project>

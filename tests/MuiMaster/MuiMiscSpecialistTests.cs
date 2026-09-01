@@ -998,6 +998,36 @@ public sealed class MuiMiscSpecialistTests
 	}
 
 	[Fact]
+	public void TitlePageVectorBridgeUsesNamedRecords()
+	{
+		var p = NewPlatform();
+		var cursor = new MuiTitlePageCursor
+		{
+			Base = APTR.FromPointer(0x1800),
+			Index = 1,
+		};
+		var expected = new MuiTitlePageRecord
+		{
+			Handle = 0x12345678u,
+			Flags = 0xA5A5A5A5u,
+		};
+
+		Assert.True(MuiTitlePageCursorCodec.TryWrite(ref p, cursor, expected));
+		Assert.True(MuiTitlePageCursorCodec.TryRead(ref p, cursor,
+			out var actual));
+		Assert.Equal(expected.Handle, actual.Handle);
+		Assert.Equal(expected.Flags, actual.Flags);
+
+		cursor.Base = APTR.FromPointer(0x40FF8);
+		Assert.False(MuiTitlePageCursorCodec.TryRead(ref p, cursor, out _));
+		cursor.Base = APTR.FromPointer(0xFFFFFFF8u);
+		Assert.False(MuiTitlePageCursorCodec.TryWrite(ref p, cursor, expected));
+		cursor.Base = APTR.FromPointer(0x1800);
+		cursor.Index = MuiTitlePageCursor.MaximumEntries;
+		Assert.False(MuiTitlePageCursorCodec.TryRead(ref p, cursor, out _));
+	}
+
+	[Fact]
 	public void TitleNewRejectedWhenNotNewable()
 	{
 		var p = NewPlatform();
@@ -1103,6 +1133,48 @@ public sealed class MuiMiscSpecialistTests
 			APTR.FromPointer(0x40FE8), 1, out _));
 		Assert.False(MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref p,
 			APTR.FromPointer(0xFFFFFFE8), 1, out _));
+	}
+
+	[Fact]
+	public void MccprefsRegistryVectorBridgeUsesNamedRecords()
+	{
+		var p = NewPlatform();
+		var cursor = new MuiMccprefsRegistryCursor
+		{
+			Base = APTR.FromPointer(0x1800),
+			Index = 1,
+		};
+		var expected = new MuiMccprefsRegistryRecord
+		{
+			Gadget = APTR.FromPointer(0x1900),
+			Id = 0x10203040u,
+			Params = 0x50607080u,
+			Title = APTR.FromPointer(0x1A00),
+			Attr = 0x90A0B0C0u,
+			Label = APTR.FromPointer(0x1B00),
+		};
+
+		Assert.True(MuiMccprefsRegistryCursorCodec.TryWrite(ref p, cursor,
+			expected));
+		Assert.True(MuiMccprefsRegistryCursorCodec.TryRead(ref p, cursor,
+			out var actual));
+		Assert.Equal(expected.Gadget, actual.Gadget);
+		Assert.Equal(expected.Id, actual.Id);
+		Assert.Equal(expected.Params, actual.Params);
+		Assert.Equal(expected.Title, actual.Title);
+		Assert.Equal(expected.Attr, actual.Attr);
+		Assert.Equal(expected.Label, actual.Label);
+
+		cursor.Base = APTR.FromPointer(0x40FE8);
+		Assert.False(MuiMccprefsRegistryCursorCodec.TryRead(ref p, cursor,
+			out _));
+		cursor.Base = APTR.FromPointer(0xFFFFFFE8u);
+		Assert.False(MuiMccprefsRegistryCursorCodec.TryWrite(ref p, cursor,
+			expected));
+		cursor.Base = APTR.FromPointer(0x1800);
+		cursor.Index = MuiMccprefsRegistryCursor.MaximumEntries;
+		Assert.False(MuiMccprefsRegistryCursorCodec.TryRead(ref p, cursor,
+			out _));
 	}
 
 	// ---- Filepanel -----------------------------------------------------------
@@ -1262,6 +1334,40 @@ public sealed class MuiMiscSpecialistTests
 	}
 
 	[Fact]
+	public void FilepanelRowVectorBridgeUsesNamedRecords()
+	{
+		var p = NewPlatform();
+		var cursor = new MuiFilepanelRowCursor
+		{
+			Base = APTR.FromPointer(0x1800),
+			Index = 1,
+		};
+		var expected = new MuiFilepanelRowRecord
+		{
+			Label = APTR.FromPointer(0xFEDCBA98u),
+			Contents = APTR.FromPointer(0x10203040u),
+		};
+
+		Assert.True(MuiFilepanelRowCursorCodec.TryWrite(ref p, cursor,
+			expected));
+		Assert.True(MuiFilepanelRowCursorCodec.TryRead(ref p, cursor,
+			out var actual));
+		Assert.Equal(expected.Label, actual.Label);
+		Assert.Equal(expected.Contents, actual.Contents);
+
+		cursor.Base = APTR.FromPointer(0x40FF8);
+		Assert.False(MuiFilepanelRowCursorCodec.TryRead(ref p, cursor,
+			out _));
+		cursor.Base = APTR.FromPointer(0xFFFFFFF8u);
+		Assert.False(MuiFilepanelRowCursorCodec.TryWrite(ref p, cursor,
+			expected));
+		cursor.Base = APTR.FromPointer(0x1800);
+		cursor.Index = MuiFilepanelRowCursor.MaximumEntries;
+		Assert.False(MuiFilepanelRowCursorCodec.TryRead(ref p, cursor,
+			out _));
+	}
+
+	[Fact]
 	public void FilepanelBrowseIsFailureAtomic()
 	{
 		var p = NewPlatform();
@@ -1363,6 +1469,38 @@ public sealed class MuiMiscSpecialistTests
 			APTR.FromPointer(0x40FFC), 1, out _));
 		Assert.False(MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref p,
 			APTR.FromPointer(0xFFFFFFFC), 1, out _));
+	}
+
+	[Fact]
+	public void ScrmodelistModeVectorBridgeUsesNamedRecords()
+	{
+		var p = NewPlatform();
+		var cursor = new MuiScrmodelistModeCursor
+		{
+			Base = APTR.FromPointer(0x1800),
+			Index = 1,
+		};
+		var expected = new MuiScrmodelistModeRecord
+		{
+			ModeId = 0x87654321u,
+		};
+
+		Assert.True(MuiScrmodelistModeCursorCodec.TryWrite(ref p, cursor,
+			expected));
+		Assert.True(MuiScrmodelistModeCursorCodec.TryRead(ref p, cursor,
+			out var actual));
+		Assert.Equal(expected.ModeId, actual.ModeId);
+
+		cursor.Base = APTR.FromPointer(0x40FFC);
+		Assert.False(MuiScrmodelistModeCursorCodec.TryRead(ref p, cursor,
+			out _));
+		cursor.Base = APTR.FromPointer(0xFFFFFFFCu);
+		Assert.False(MuiScrmodelistModeCursorCodec.TryWrite(ref p, cursor,
+			expected));
+		cursor.Base = APTR.FromPointer(0x1800);
+		cursor.Index = MuiScrmodelistModeCursor.MaximumEntries;
+		Assert.False(MuiScrmodelistModeCursorCodec.TryRead(ref p, cursor,
+			out _));
 	}
 
 	// ---- Disposal ------------------------------------------------------------

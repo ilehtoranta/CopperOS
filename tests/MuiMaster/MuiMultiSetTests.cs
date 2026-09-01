@@ -80,6 +80,40 @@ public sealed class MuiMultiSetTests
 	}
 
 	[Fact]
+	public void MultiSetTargetCursorExchangesCompleteRecords()
+	{
+		var platform = CreatePlatform(out _);
+		var cursor = new MuiMultiSetTargetVectorCursor
+		{
+			Base = APTR.FromPointer(0x1800),
+			Index = 0,
+		};
+		var expected = new MuiMultiSetTargetEntry
+		{
+			Target = APTR.FromPointer(0xFEDCBA98u),
+		};
+
+		Assert.True(MuiMultiSetTargetVectorCodec.TryWrite(ref platform, cursor,
+			expected));
+		Assert.True(MuiMultiSetTargetVectorCodec.TryRead(ref platform, cursor,
+			out var actual));
+		Assert.Equal(expected.Target.Raw, actual.Target.Raw);
+		Assert.True(MuiMultiSetTargetVectorCodec.TryWrite(ref platform, cursor,
+			ref expected));
+		actual = default;
+		Assert.True(MuiMultiSetTargetVectorCodec.TryReadInto(ref platform, cursor,
+			ref actual));
+		Assert.Equal(expected.Target.Raw, actual.Target.Raw);
+		Assert.True(MuiMultiSetTargetVectorCodec.TryAdvance(ref cursor, 1));
+		Assert.Equal(1u, cursor.Index);
+		Assert.False(MuiMultiSetTargetVectorCodec.TryAdvance(ref cursor,
+			MuiMultiSetTargetVectorCursor.MaximumEntries));
+		cursor.Index = MuiMultiSetTargetVectorCursor.MaximumEntries;
+		Assert.False(MuiMultiSetTargetVectorCodec.TryRead(ref platform, cursor,
+			out _));
+	}
+
+	[Fact]
 	public void MultiSetPacketCodecUsesCompleteNamedRecord()
 	{
 		var platform = CreatePlatform(out _);

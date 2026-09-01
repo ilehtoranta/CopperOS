@@ -249,6 +249,68 @@ internal static class MuiMultiSetTargetVectorCodec
 		=> MuiMultiSetTargetVectorMemoryCodec.TryGetEntry(ref platform,
 			cursor.Base, cursor.Index, out address);
 
+	internal static bool TryAdvance(ref MuiMultiSetTargetVectorCursor cursor,
+		uint items)
+	{
+		if (items == 0 || items > uint.MaxValue /
+			MuiMultiSetTargetEntry.Size || cursor.Index > uint.MaxValue - items)
+			return false;
+		var next = cursor.Index + items;
+		if (next > MuiMultiSetTargetVectorCursor.MaximumEntries) return false;
+		cursor.Index = next;
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiMultiSetTargetVectorCursor cursor, out MuiMultiSetTargetEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadValue(ref platform, cursor, out var target)) return false;
+		value.Target = APTR.FromPointer(target);
+		return true;
+	}
+
+	internal static bool TryReadInto<TPlatform>(ref TPlatform platform,
+		MuiMultiSetTargetVectorCursor cursor, ref MuiMultiSetTargetEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryReadValue(ref platform, cursor, out var target)) return false;
+		value.Target = APTR.FromPointer(target);
+		return true;
+	}
+
+	// Scalar access is intentionally confined to the named one-field record
+	// adapter; semantic callers continue to exchange the typed cursor/record.
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		MuiMultiSetTargetVectorCursor cursor, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiMultiSetTargetEntryCodec.TryReadValue(ref platform, address,
+			out value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiMultiSetTargetVectorCursor cursor, MuiMultiSetTargetEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteValue(ref platform, cursor, value.Target.Raw);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiMultiSetTargetVectorCursor cursor, ref MuiMultiSetTargetEntry value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteValue(ref platform, cursor, value.Target.Raw);
+
+	internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+		MuiMultiSetTargetVectorCursor cursor, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiMultiSetTargetEntryCodec.WriteValue(ref platform, address,
+			value);
+	}
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR vector,
 		uint index, out MuiMultiSetTargetEntry value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -411,6 +473,72 @@ internal static class MuiNotifyFollowParameterVectorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiNotifyFollowParameterVectorMemoryCodec.TryGetEntry(ref platform,
 			cursor.Base, cursor.Index, out address);
+
+	internal static bool TryAdvance(ref MuiNotifyFollowParameterVectorCursor cursor,
+		uint items)
+	{
+		if (items == 0 || items > uint.MaxValue /
+			MuiNotifyFollowParameterSlot.Size || cursor.Index > uint.MaxValue - items)
+			return false;
+		var next = cursor.Index + items;
+		if (next > MuiNotifyFollowParameterVectorCursor.MaximumEntries) return false;
+		cursor.Index = next;
+		return true;
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiNotifyFollowParameterVectorCursor cursor,
+		out MuiNotifyFollowParameterSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryReadValue(ref platform, cursor, out var rawValue)) return false;
+		value.Value = rawValue;
+		return true;
+	}
+
+	internal static bool TryReadInto<TPlatform>(ref TPlatform platform,
+		MuiNotifyFollowParameterVectorCursor cursor,
+		ref MuiNotifyFollowParameterSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryReadValue(ref platform, cursor, out var rawValue)) return false;
+		value.Value = rawValue;
+		return true;
+	}
+
+	// Scalar access is intentionally confined to the named one-field record
+	// adapter; semantic callers continue to exchange the typed cursor/record.
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		MuiNotifyFollowParameterVectorCursor cursor, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiNotifyFollowParameterSlotCodec.TryReadValue(ref platform,
+			address, out value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiNotifyFollowParameterVectorCursor cursor,
+		MuiNotifyFollowParameterSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteValue(ref platform, cursor, value.Value);
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiNotifyFollowParameterVectorCursor cursor,
+		ref MuiNotifyFollowParameterSlot value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryWriteValue(ref platform, cursor, value.Value);
+
+	internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
+		MuiNotifyFollowParameterVectorCursor cursor, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiNotifyFollowParameterSlotCodec.WriteValue(ref platform, address,
+			value);
+	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR vector,
 		uint index, out MuiNotifyFollowParameterSlot value)
@@ -1252,8 +1380,11 @@ public static class MuiNotifyCore
 		if (MuiHeadlessObjectCore.FindObject(ref platform, state,
 			request.FirstObject).IsNull) return false;
 		var count = 1u;
-		if (!MuiMultiSetTargetVectorCodec.TryReadValue(ref platform,
-			request.Vector, 0, out var targetRaw)) return false;
+		var targetCursor = default(MuiMultiSetTargetVectorCursor);
+		targetCursor.Base = request.Vector;
+		targetCursor.Index = 0;
+		if (!MuiMultiSetTargetVectorCodec.TryReadValue(ref platform, targetCursor,
+			out var targetRaw)) return false;
 		var target = APTR.FromPointer(targetRaw);
 		if (target.IsNotNull)
 		{
@@ -1262,8 +1393,10 @@ public static class MuiNotifyCore
 			count = 2;
 			while (count <= MaximumMultiSetTargets)
 			{
+				if (!MuiMultiSetTargetVectorCodec.TryAdvance(ref targetCursor, 1))
+					return false;
 				if (!MuiMultiSetTargetVectorCodec.TryReadValue(ref platform,
-					request.Vector, count - 1, out targetRaw)) return false;
+					targetCursor, out targetRaw)) return false;
 				target = APTR.FromPointer(targetRaw);
 				if (target.IsNull) break;
 				if (count == MaximumMultiSetTargets ||
@@ -1277,15 +1410,19 @@ public static class MuiNotifyCore
 			!SetMultiSetAttribute(ref platform, state, request.FirstObject,
 				request.Attribute, request.Value, true))
 			return false;
+		targetCursor.Index = 0;
 		for (var index = 1u; index < count; index++)
 		{
 			if (!MuiMultiSetTargetVectorCodec.TryReadValue(ref platform,
-				request.Vector, index - 1, out targetRaw) || targetRaw == 0)
+				targetCursor, out targetRaw) || targetRaw == 0)
 				return false;
 			var mutationTarget = APTR.FromPointer(targetRaw);
 			if (mutationTarget.Raw != request.Executor.Raw &&
 				!SetMultiSetAttribute(ref platform, state, mutationTarget,
 					request.Attribute, request.Value, true)) return false;
+			if (index + 1 < count &&
+				!MuiMultiSetTargetVectorCodec.TryAdvance(ref targetCursor, 1))
+				return false;
 		}
 		return true;
 	}
@@ -1321,7 +1458,10 @@ public static class MuiNotifyCore
 		if (MuiHeadlessObjectCore.FindObject(ref platform, dispatch.State,
 			firstObject).IsNull) return false;
 		var count = 1u;
-		if (!MuiMultiSetTargetVectorCodec.TryReadValue(ref platform, vector, 0,
+		var targetCursor = default(MuiMultiSetTargetVectorCursor);
+		targetCursor.Base = vector;
+		targetCursor.Index = 0;
+		if (!MuiMultiSetTargetVectorCodec.TryReadValue(ref platform, targetCursor,
 			out var targetRaw)) return false;
 		var target = APTR.FromPointer(targetRaw);
 		if (target.IsNotNull)
@@ -1331,8 +1471,10 @@ public static class MuiNotifyCore
 			count = 2;
 			while (count <= MaximumMultiSetTargets)
 			{
-				if (!MuiMultiSetTargetVectorCodec.TryReadValue(ref platform, vector,
-					count - 1, out targetRaw)) return false;
+				if (!MuiMultiSetTargetVectorCodec.TryAdvance(ref targetCursor, 1))
+					return false;
+				if (!MuiMultiSetTargetVectorCodec.TryReadValue(ref platform,
+					targetCursor, out targetRaw)) return false;
 				target = APTR.FromPointer(targetRaw);
 				if (target.IsNull) break;
 				if (count == MaximumMultiSetTargets ||
@@ -1345,14 +1487,18 @@ public static class MuiNotifyCore
 		if (firstObject.Raw != dispatch.Executor.Raw &&
 			!SetMultiSetAttribute(ref platform, dispatch.State, firstObject,
 				packet.Attribute, packet.Value, true)) return false;
+		targetCursor.Index = 0;
 		for (var index = 1u; index < count; index++)
 		{
-			if (!MuiMultiSetTargetVectorCodec.TryReadValue(ref platform, vector,
-				index - 1, out targetRaw) || targetRaw == 0) return false;
+			if (!MuiMultiSetTargetVectorCodec.TryReadValue(ref platform,
+				targetCursor, out targetRaw) || targetRaw == 0) return false;
 			var mutationTarget = APTR.FromPointer(targetRaw);
 			if (mutationTarget.Raw != dispatch.Executor.Raw &&
 				!SetMultiSetAttribute(ref platform, dispatch.State, mutationTarget,
 					packet.Attribute, packet.Value, true)) return false;
+			if (index + 1 < count &&
+				!MuiMultiSetTargetVectorCodec.TryAdvance(ref targetCursor, 1))
+				return false;
 		}
 		return true;
 	}
@@ -1647,28 +1793,34 @@ public static class MuiNotifyCore
 			var bytes = followCount * 4u;
 			if (!MuiHeadlessNotificationCodec.TryGetPayload(ref platform, item,
 				bytes, out var payload)) continue;
+			var followCursor = default(MuiNotifyFollowParameterVectorCursor);
+			followCursor.Base = payload;
+			followCursor.Index = 0;
 			if (suppressedMethod != 0 &&
-				MuiNotifyFollowParameterVectorCodec.TryReadValue(ref platform, payload,
-					0, out var methodValue) && methodValue == suppressedMethod)
+				MuiNotifyFollowParameterVectorCodec.TryReadValue(ref platform,
+					followCursor, out var methodValue) && methodValue == suppressedMethod)
 				continue;
 			var message = MuiHeadlessMemory.Allocate(ref platform, bytes);
 			if (message.IsNull) continue;
 			platform.Copy(payload, message, bytes);
+			var messageCursor = default(MuiNotifyFollowParameterVectorCursor);
+			messageCursor.Base = message;
+			messageCursor.Index = 0;
 			for (var index = 0u; index < followCount; index++)
 			{
-				if (!MuiNotifyFollowParameterVectorCodec.TryRead(ref platform,
-					message, index, out var slot)) continue;
-				if (slot.Value == TriggerValue)
+				if (index != 0 && !MuiNotifyFollowParameterVectorCodec.TryAdvance(
+					ref messageCursor, 1)) continue;
+				if (!MuiNotifyFollowParameterVectorCodec.TryReadValue(ref platform,
+					messageCursor, out var slotValue)) continue;
+				if (slotValue == TriggerValue)
 				{
-					slot.Value = value;
-					MuiNotifyFollowParameterVectorCodec.TryWrite(ref platform,
-						message, index, slot);
+					MuiNotifyFollowParameterVectorCodec.TryWriteValue(ref platform,
+						messageCursor, value);
 				}
-				else if (slot.Value == NotTriggerValue)
+				else if (slotValue == NotTriggerValue)
 				{
-					slot.Value = value == 0 ? 1u : 0u;
-					MuiNotifyFollowParameterVectorCodec.TryWrite(ref platform,
-						message, index, slot);
+					MuiNotifyFollowParameterVectorCodec.TryWriteValue(ref platform,
+						messageCursor, value == 0 ? 1u : 0u);
 				}
 			}
 			platform.DoMethod(destination, message);

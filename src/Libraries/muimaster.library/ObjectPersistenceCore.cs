@@ -132,23 +132,36 @@ public static class MuiObjectPersistenceCore
 		if (record.IsNull) return false;
 		if (!MuiHeadlessClassCodec.TryRead(ref platform, record,
 			out var classValue)) return false;
-		var name = classValue.Name;
-		var length = group ? 9u : 8u;
+		return MatchesNamedClass(ref platform, classValue.Name, group);
+	}
+
+	// Match the small set of class names needed by persistence through the
+	// shared named class-name cursor. Keeping this helper separate lets the
+	// bounded byte consumer be qualified without manufacturing a full object
+	// registry in the native smoke root.
+	internal static bool MatchesNamedClass<TPlatform>(ref TPlatform platform,
+		APTR name, bool group) where TPlatform : struct, IMuiGuestMemory
+	{
+		var length = 8u;
+		if (group) length = 9u;
+		var cursor = default(MuiCommonControlClassNameByteCursor);
+		cursor.Text = name;
 		for (var index = 0u; index <= length; index++)
 		{
-			if (name.Raw > uint.MaxValue - index ||
-				!platform.IsMapped(APTR.FromPointer(name.Raw + index), 1))
-				return false;
-			var actual = platform.ReadUInt8(name, (int)index);
+			cursor.Index = index;
+			if (!MuiCommonControlClassNameByteCursorCodec.TryReadByte(ref platform,
+				cursor, out var actual)) return false;
 			if (index == length) return actual == 0;
-			var expected = group
-				? index switch
+			byte expected;
+			if (group)
+				expected = index switch
 				{
 					0 => (byte)'g', 1 => (byte)'r', 2 => (byte)'o',
 					3 => (byte)'u', 4 => (byte)'p', 5 => (byte)'.',
 					6 => (byte)'m', 7 => (byte)'u', _ => (byte)'i'
-				}
-				: index switch
+				};
+			else
+				expected = index switch
 				{
 					0 => (byte)'a', 1 => (byte)'r', 2 => (byte)'e',
 					3 => (byte)'a', 4 => (byte)'.', 5 => (byte)'m',
@@ -159,6 +172,30 @@ public static class MuiObjectPersistenceCore
 			if (actual != expected) return false;
 		}
 		return false;
+	}
+
+	internal static bool WriteEmptyPersistenceString<TPlatform>(
+		ref TPlatform platform, APTR empty)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		var cursor = default(MuiStringEditByteCursor);
+		cursor.Base = empty;
+		cursor.Length = 1;
+		return MuiStringEditByteCursorCodec.TryWriteByte(ref platform, cursor, 0);
+	}
+
+	internal static bool TryReadPersistenceTerminator<TPlatform>(
+		ref TPlatform platform, APTR data, int length)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (data.IsNull || length <= 0 || length >
+			(int)MuiStringLengthByteCursor.MaximumLength ||
+			!platform.IsMapped(data, (uint)length)) return false;
+		var cursor = default(MuiStringLengthByteCursor);
+		cursor.Text = data;
+		cursor.Index = unchecked((uint)(length - 1));
+		return MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var terminator) && terminator == 0;
 	}
 
 	private static bool ExportScalar<TPlatform>(ref TPlatform platform,
@@ -193,7 +230,12 @@ public static class MuiObjectPersistenceCore
 		{
 			var empty = MuiHeadlessMemory.Allocate(ref platform, 1);
 			if (empty.IsNull) return false;
-			platform.WriteUInt8(empty, 0, 0);
+			if (!WriteEmptyPersistenceString(ref platform, empty))
+			{
+				platform.Clear(empty, 1);
+				platform.Free(empty, 1);
+				return false;
+			}
 			var result = MuiStoreCore.DataspaceAdd(ref platform, state, dataspace,
 				objectId, empty, 1);
 			platform.Clear(empty, 1);
@@ -216,8 +258,7 @@ public static class MuiObjectPersistenceCore
 		if (length <= 0 || length > 4096) return false;
 		var data = MuiStoreCore.DataspaceFind(ref platform, state, dataspace,
 			objectId);
-		if (data.IsNull || !platform.IsMapped(data, (uint)length) ||
-			platform.ReadUInt8(data, length - 1) != 0) return false;
+		if (!TryReadPersistenceTerminator(ref platform, data, length)) return false;
 		return MuiCommonControlCore.SetPersistenceContents(ref platform, state, obj,
 			attribute, data);
 	}

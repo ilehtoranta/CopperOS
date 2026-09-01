@@ -93,6 +93,32 @@ public static class MuiNativeHookCallRecordCodec
 
 public static class MuiNativeRoots
 {
+	// MG2091: qualify the local Layers fallback through its named packed Exec
+	// List record without pulling the large application graph into this root.
+	public static uint LayersExecListStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x0004F200);
+		var expected = new Amiga.List
+		{
+			Head = APTR.FromPointer(0x0004F300),
+			Tail = APTR.FromPointer(0x0004F304),
+			TailPred = APTR.FromPointer(0x0004F308),
+			Type = NodeType.Library,
+			Padding = 0x5A,
+		};
+		if (!LayersExecListCodec.Write(ref platform, address, expected))
+			return 1;
+		if (!LayersExecListCodec.TryRead(ref platform, address,
+			out var actual)) return 2;
+		if (actual.Head != expected.Head) return 3;
+		if (actual.Tail != expected.Tail) return 4;
+		if (actual.TailPred != expected.TailPred) return 5;
+		if (actual.Type != expected.Type) return 6;
+		return 42;
+	}
+
 	public static uint HeadlessCoreRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
@@ -243,6 +269,43 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Focused qualification for the sequential named-record headless message
+	// codecs. The method header, OM_SET, and OM_UPDATE shapes are all exercised
+	// through the production declaration-order bridge, including bounds checks.
+	public static uint HeadlessMessageStructPacketCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050F20);
+		if (!MuiHeadlessMessageStructCodec.TryWriteMethod(ref platform, packet,
+			0x80420001u) ||
+			!MuiHeadlessMessageStructCodec.TryReadMethodIdValue(ref platform, packet,
+				out var method) || method != 0x80420001u) return 1;
+		var set = default(MuiHeadlessOmSetMessage);
+		set.Attributes = APTR.FromPointer(0x00050D00);
+		set.GadgetInfo = APTR.FromPointer(0x00050D20);
+		if (!MuiHeadlessMessageStructCodec.TryWriteOmSet(ref platform, packet, set) ||
+			!MuiHeadlessMessageStructCodec.TryReadOmSet(ref platform, packet,
+				out var setRead) || setRead.Attributes.Raw != 0x00050D00 ||
+			setRead.GadgetInfo.Raw != 0x00050D20) return 2;
+		var update = default(MuiHeadlessOmUpdateMessage);
+		update.Attributes = APTR.FromPointer(0x00050D40);
+		update.GadgetInfo = APTR.FromPointer(0x00050D60);
+		update.Flags = 0xA5A5u;
+		if (!MuiHeadlessMessageStructCodec.TryWriteOmUpdate(ref platform, packet,
+			update) || !MuiHeadlessMessageStructCodec.TryReadOmUpdate(ref platform,
+			packet, out var updateRead) || updateRead.Attributes.Raw != 0x00050D40 ||
+			updateRead.GadgetInfo.Raw != 0x00050D60 ||
+			updateRead.Flags != 0xA5A5u) return 3;
+		if (MuiHeadlessMessageStructCodec.TryReadOmSet(ref platform,
+			APTR.FromPointer(0x00050FFC), out _) ||
+			MuiHeadlessMessageStructCodec.TryReadOmUpdate(ref platform,
+				APTR.FromPointer(0x00050FF8), out _) ||
+			MuiHeadlessMessageStructCodec.TryReadMethodIdValue(ref platform,
+				APTR.Null, out _)) return 4;
+		return 42;
+	}
+
 	// Focused MorphOS MUIM_Family_GetChild closure. The fixed packet is
 	// decoded into a named struct and all selector forms use the guest Family
 	// topology without managed iteration.
@@ -325,6 +388,79 @@ public static class MuiNativeRoots
 			return 2;
 		if (MuiFamilyGetChildMessageCodec.TryRead(ref platform,
 			APTR.FromPointer(0x00050FFF), out _)) return 3;
+		return 42;
+	}
+
+	// MG1891 native ABI proof for the complete Family fixed-record family.
+	// DoChildMethods, GetChild, mutation headers, the projection list, and
+	// vector entries all use declaration-ordered sequential struct codecs.
+	public static uint FamilyMessageStructPacketCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050F20);
+		const uint objectAddress = 0x00050D00;
+		const uint predecessor = 0x00050D20;
+		if (!MuiFamilyDoChildMethodsMessageStructCodec.TryWrite(ref platform,
+			packet, MuiFamilyDoChildMethodsMessageCodec.Method) ||
+			!MuiFamilyDoChildMethodsMessageStructCodec.TryReadMethodIdValue(
+				ref platform, packet, out var doMethod) ||
+			doMethod != MuiFamilyDoChildMethodsMessageCodec.Method) return 1;
+		if (!MuiFamilyGetChildMessageStructCodec.TryWrite(ref platform, packet,
+			MuiFamilyGetChildMessageCodec.Method, -2,
+			APTR.FromPointer(objectAddress)) ||
+			!MuiFamilyGetChildMessageStructCodec.TryRead(ref platform, packet,
+				out var getChild) || getChild.MethodId != MuiFamilyGetChildMessageCodec.Method ||
+			getChild.Number != -2 || getChild.Reference.Raw != objectAddress) return 2;
+		if (!MuiFamilyMutationMessageStructCodec.TryWriteChild(ref platform, packet,
+			MuiFamilyMutationCore.AddTailMethod, APTR.FromPointer(objectAddress)) ||
+			!MuiFamilyMutationMessageStructCodec.TryReadChild(ref platform, packet,
+				out var child) || child.MethodId != MuiFamilyMutationCore.AddTailMethod ||
+			child.Object.Raw != objectAddress) return 3;
+		if (!MuiFamilyMutationMessageStructCodec.TryWriteInsert(ref platform, packet,
+			MuiFamilyMutationCore.InsertMethod, APTR.FromPointer(objectAddress),
+			APTR.FromPointer(predecessor)) ||
+			!MuiFamilyMutationMessageStructCodec.TryReadInsert(ref platform, packet,
+				out var insert) || insert.MethodId != MuiFamilyMutationCore.InsertMethod ||
+			insert.Object.Raw != objectAddress || insert.Predecessor.Raw != predecessor)
+			return 4;
+		if (!MuiFamilyMutationMessageStructCodec.TryWriteTransfer(ref platform, packet,
+			MuiFamilyMutationCore.TransferMethod, APTR.FromPointer(objectAddress)) ||
+			!MuiFamilyMutationMessageStructCodec.TryReadTransfer(ref platform, packet,
+				out var transfer) || transfer.MethodId != MuiFamilyMutationCore.TransferMethod ||
+			transfer.Family.Raw != objectAddress) return 5;
+		if (!MuiFamilyMutationMessageStructCodec.TryWriteReorder(ref platform, packet,
+			MuiFamilyMutationCore.ReorderMethod, APTR.FromPointer(predecessor)) ||
+			!MuiFamilyMutationMessageStructCodec.TryReadReorder(ref platform, packet,
+				out var reorder) || reorder.MethodId != MuiFamilyMutationCore.ReorderMethod ||
+			reorder.After.Raw != predecessor) return 6;
+		if (!MuiFamilyMutationMessageStructCodec.TryWriteSort(ref platform, packet,
+			MuiFamilyMutationCore.SortMethod) ||
+			!MuiFamilyMutationMessageStructCodec.TryReadMethodIdValue(ref platform,
+				packet, out var sortMethod) || sortMethod != MuiFamilyMutationCore.SortMethod)
+			return 7;
+		var list = APTR.FromPointer(0x00050F40);
+		var listRecord = default(MuiFamilyMutationListRecord);
+		listRecord.Head = APTR.FromPointer(objectAddress);
+		listRecord.Tail = APTR.FromPointer(predecessor);
+		if (!MuiFamilyMutationListStructCodec.TryWrite(ref platform, list, listRecord) ||
+			!MuiFamilyMutationListStructCodec.TryRead(ref platform, list,
+				out var listRead) || listRead.Head.Raw != objectAddress ||
+			listRead.Tail.Raw != predecessor) return 8;
+		var entry = APTR.FromPointer(0x00050F50);
+		var vectorCursor = default(MuiFamilyMutationVectorCursor);
+		vectorCursor.Base = entry;
+		vectorCursor.Index = 0;
+		if (!MuiFamilyMutationVectorCodec.TryWriteObject(ref platform,
+			vectorCursor, APTR.FromPointer(objectAddress)) ||
+			!MuiFamilyMutationVectorCodec.TryReadObjectValue(ref platform,
+				vectorCursor, out var objectRead) || objectRead != objectAddress) return 9;
+		if (MuiFamilyGetChildMessageStructCodec.TryRead(ref platform,
+				APTR.FromPointer(0x00050FF8), out _) ||
+			MuiFamilyMutationMessageStructCodec.TryReadChild(ref platform,
+				APTR.FromPointer(0x00050FFC), out _) ||
+			MuiFamilyMutationMessageStructCodec.TryReadInsert(ref platform,
+				APTR.FromPointer(0x00050FF8), out _)) return 10;
 		return 42;
 	}
 
@@ -570,8 +706,8 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1374 native struct-first Family mutation-vector closure. Complete named
-	// object-pointer records are admitted through the bounded adapter; the
+	// MG1956 native struct-first Family mutation-vector closure. Complete named
+	// object-pointer records are exchanged through the bounded adapter; the
 	// compatibility cursor is verified to forward to the same boundary.
 	public static uint FamilyMutationVectorStructCodecRoot()
 	{
@@ -581,8 +717,10 @@ public static class MuiNativeRoots
 		if (!MuiFamilyMutationVectorMemoryCodec.TryGetEntry(ref platform, vector,
 			2, out var address) || address.Raw != vector.Raw +
 			(2 * MuiFamilyMutationVectorEntry.Size)) return 1;
-		APTR.WriteUInt32(address, 0, 0x00050A00);
-		if (APTR.ReadUInt32(address, 0) != 0x00050A00) return 2;
+		var expected = APTR.FromPointer(0xFEDCBA98u);
+		if (!MuiFamilyMutationVectorCodec.TryWriteObject(ref platform, vector, 2,
+			expected) || !MuiFamilyMutationVectorCodec.TryReadObjectValue(
+			ref platform, vector, 2, out var actual) || actual != expected.Raw) return 2;
 		var cursor = default(MuiFamilyMutationVectorCursor);
 		cursor.Base = vector;
 		cursor.Index = 2;
@@ -597,6 +735,51 @@ public static class MuiNativeRoots
 			MuiFamilyMutationVectorCursor.MaximumEntries, out _) ||
 			MuiFamilyMutationVectorMemoryCodec.TryGetEntry(ref platform,
 				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 5;
+		return 42;
+	}
+
+	// MG2017 native struct-first Group ordering vector closure.  The production
+	// GroupOperations path consumes a named family-mutation cursor, preserving
+	// full 32-bit APTR values while rejecting malformed guest bounds.
+	public static uint GroupOrderingVectorCursorStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var cursor = default(MuiFamilyMutationVectorCursor);
+		cursor.Base = APTR.FromPointer(0x0004F000);
+		cursor.Index = 1;
+		var expected = APTR.FromPointer(0xF1234567u);
+		if (!MuiFamilyMutationVectorCodec.TryWriteObject(ref platform, cursor,
+			expected) || !MuiFamilyMutationVectorCodec.TryReadObject(ref platform,
+			cursor, out var actual) || actual.Raw != expected.Raw) return 1;
+		cursor.Index = MuiFamilyMutationVectorCursor.MaximumEntries;
+		if (MuiFamilyMutationVectorCodec.TryReadObject(ref platform, cursor,
+			out _)) return 2;
+		cursor.Base = APTR.FromPointer(0x00050FFEu);
+		cursor.Index = 0;
+		if (MuiFamilyMutationVectorCodec.TryReadObject(ref platform, cursor,
+			out _)) return 3;
+		return 42;
+	}
+
+	// MG2018 native struct-first Family projection vector closure.  The inline
+	// packet cursor resolves a complete named object record before projection
+	// code consumes its APTR value, including high-bit pointer preservation.
+	public static uint FamilyProjectionVectorCursorStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var cursor = default(MuiFamilyInlineVectorCursor);
+		cursor.Message = APTR.FromPointer(0x0004F000);
+		cursor.ArrayOffset = MuiFamilyReorderMessage.ArrayOffset;
+		cursor.Index = 1;
+		const uint expected = 0xE2345678u;
+		if (!MuiFamilyInlineVectorCursorCodec.TryWriteObjectValue(ref platform,
+			cursor, expected) || !MuiFamilyInlineVectorCursorCodec.TryReadObjectValue(
+			ref platform, cursor, out var actual) || actual != expected) return 1;
+		cursor.Message = APTR.FromPointer(0x00050FFEu);
+		if (MuiFamilyInlineVectorCursorCodec.TryReadObjectValue(ref platform,
+			cursor, out _)) return 2;
 		return 42;
 	}
 
@@ -685,6 +868,10 @@ public static class MuiNativeRoots
 		if (!MuiStoreMessageCodec.TryReadMethodIdValue(ref platform, address,
 			out var objectmapMethod) || objectmapMethod != MuiStoreMessageCore.ObjectmapFindMethod)
 			return 2;
+		APTR.WriteUInt32(address, 0, MuiStoreMessageCore.DatamapClearMethod);
+		if (!MuiStoreMessageCodec.TryReadMethodIdValue(ref platform, address,
+			out var clearMethod) || clearMethod != MuiStoreMessageCore.DatamapClearMethod)
+			return 4;
 		if (MuiStoreMessageCodec.TryReadMethodIdValue(ref platform,
 			APTR.FromPointer(0x00050FFE), out _)) return 3;
 		return 42;
@@ -834,14 +1021,16 @@ public static class MuiNativeRoots
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var packet = APTR.FromPointer(0x00050100);
-		if (!MuiCallHookParameterMemoryCodec.TryGetEntry(ref platform, packet, 1,
+		var cursor = default(MuiCallHookParameterCursor);
+		cursor.Message = packet;
+		cursor.Index = 1;
+		if (!MuiCallHookParameterCursorCodec.TryGetEntry(ref platform, cursor,
 			out var address) || address.Raw != packet.Raw +
 			MuiCallHookMessage.Param1Offset +
 			MuiCallHookParameterRecord.Size) return 1;
-		var parameter = new MuiCallHookParameterRecord { Value = 0xCAFEBABEu };
-		if (!MuiCallHookParameterRecordCodec.Write(ref platform, address,
-			parameter) || !MuiCallHookParameterRecordCodec.TryRead(ref platform,
-			address, out var roundTrip) || roundTrip.Value != parameter.Value) return 2;
+		if (!MuiCallHookParameterRecordCodec.WriteValue(ref platform, address,
+			0xCAFEBABEu) || !MuiCallHookParameterRecordCodec.TryReadValue(
+			ref platform, address, out var value) || value != 0xCAFEBABEu) return 2;
 		if (MuiCallHookParameterMemoryCodec.TryGetEntry(ref platform,
 			APTR.FromPointer(0x00050FF8), 0, out _) ||
 			MuiCallHookParameterMemoryCodec.TryGetEntry(ref platform,
@@ -978,6 +1167,60 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Focused qualification for the sequential named-record Dataspace codecs.
+	// Every fixed packet shape is round-tripped through the production struct
+	// bridge; the final checks prove truncated guest records are rejected before
+	// any payload member is consumed.
+	public static uint DataspaceMessageStructPacketCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint data = 0x00050D00;
+		const uint storage = 0x00050E00;
+		var packet = APTR.FromPointer(packetAddress);
+		var add = default(MuiDataspaceAddMessage);
+		add.Data = APTR.FromPointer(data);
+		add.Length = -4;
+		add.Id = 19;
+		if (!MuiDataspaceMessageStructCodec.TryWriteAdd(ref platform, packet,
+			add) || !MuiDataspaceMessageStructCodec.TryReadAdd(ref platform,
+			packet, out var decodedAdd) || decodedAdd.Data.Raw != data ||
+			decodedAdd.Length != -4 || decodedAdd.Id != 19) return 1;
+		var find = default(MuiDataspaceFindMessage);
+		find.Id = 19;
+		if (!MuiDataspaceMessageStructCodec.TryWriteFind(ref platform, packet,
+			find) || !MuiDataspaceMessageStructCodec.TryReadFind(ref platform,
+			packet, out var decodedFind) || decodedFind.Id != 19) return 2;
+		var get = default(MuiDataspaceGetMessage);
+		get.Id = 19;
+		get.SizeStorage = APTR.FromPointer(storage);
+		if (!MuiDataspaceMessageStructCodec.TryWriteGet(ref platform, packet,
+			get) || !MuiDataspaceMessageStructCodec.TryReadGet(ref platform,
+			packet, out var decodedGet) || decodedGet.Id != 19 ||
+			decodedGet.SizeStorage.Raw != storage) return 3;
+		var merge = default(MuiDataspaceMergeMessage);
+		merge.Dataspace = APTR.FromPointer(data);
+		if (!MuiDataspaceMessageStructCodec.TryWriteMerge(ref platform, packet,
+			merge) || !MuiDataspaceMessageStructCodec.TryReadMerge(ref platform,
+			packet, out var decodedMerge) || decodedMerge.Dataspace.Raw != data)
+			return 4;
+		var remove = default(MuiDataspaceRemoveMessage);
+		remove.Id = 19;
+		if (!MuiDataspaceMessageStructCodec.TryWriteRemove(ref platform, packet,
+			remove) || !MuiDataspaceMessageStructCodec.TryReadRemove(ref platform,
+			packet, out var decodedRemove) || decodedRemove.Id != 19) return 5;
+		var clear = default(MuiDataspaceClearMessage);
+		if (!MuiDataspaceMessageStructCodec.TryWriteClear(ref platform, packet,
+			clear) || !MuiDataspaceMessageStructCodec.TryReadClear(ref platform,
+			packet, out _)) return 6;
+		if (MuiDataspaceMessageStructCodec.TryReadAdd(ref platform,
+			APTR.FromPointer(0x00050FF5), out _) ||
+			MuiDataspaceMessageStructCodec.TryReadGet(ref platform,
+				APTR.FromPointer(0x00050FFA), out _)) return 7;
+		return 42;
+	}
+
 	// Focused ABI proof for the struct-first Dataspace guest-memory adapter.
 	// Each payload field admits its complete named packet record; the method
 	// header remains a 4-byte record for selector probing.
@@ -1044,24 +1287,24 @@ public static class MuiNativeRoots
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		const uint packet = 0x00050F20;
-		const uint handle = 0x00050D00;
+		const uint handle = 0xF00DCAFE;
 		var read = default(MuiDataspaceReadIffMessage);
 		read.MethodId = MuiDataspaceIffMessageCodec.ReadIffMethod;
 		read.Handle = APTR.FromPointer(handle);
 		if (!MuiDataspaceIffMessageCodec.TryWriteReadIff(ref platform,
 			APTR.FromPointer(packet), read) ||
 			!MuiDataspaceIffMessageCodec.TryReadReadIff(ref platform,
-			APTR.FromPointer(packet), out var decodedRead) ||
+				APTR.FromPointer(packet), out var decodedRead) ||
 			decodedRead.Handle.Raw != handle) return 1;
 		var write = default(MuiDataspaceWriteIffMessage);
 		write.MethodId = MuiDataspaceIffMessageCodec.WriteIffMethod;
 		write.Handle = APTR.FromPointer(handle);
-		write.Type = 0x464F524D;
-		write.Id = 0x44415441;
+		write.Type = 0x80420001;
+		write.Id = 0xFEEDBEEF;
 		if (!MuiDataspaceIffMessageCodec.TryWriteWriteIff(ref platform,
 			APTR.FromPointer(packet), write) ||
 			!MuiDataspaceIffMessageCodec.TryReadWriteIff(ref platform,
-			APTR.FromPointer(packet), out var decodedWrite) ||
+				APTR.FromPointer(packet), out var decodedWrite) ||
 			decodedWrite.Handle.Raw != handle ||
 			decodedWrite.Type != write.Type || decodedWrite.Id != write.Id) return 2;
 		if (MuiDataspaceIffMessageCodec.TryReadWriteIff(ref platform,
@@ -1103,6 +1346,30 @@ public static class MuiNativeRoots
 				(MuiDataspaceWriteIffField)255, out _) ||
 			MuiDataspaceReadIffMessageMemoryCodec.TryGetAddress(ref platform,
 				APTR.Null, MuiDataspaceReadIffField.Handle, out _)) return 3;
+		return 42;
+	}
+
+	// MG1924 Dataspace IFF entry-header closure. The fixed two-ULONG chunk
+	// header is transferred in declaration order through its named struct
+	// cursor, including a high-bit length value; an incomplete tail is rejected
+	// before either field is touched.
+	public static uint DataspaceIffEntryHeaderStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x00050F80);
+		var expected = default(MuiDataspaceIffEntryHeader);
+		expected.Id = 0x44415441;
+		expected.Length = 0x80420000;
+		if (!MuiDataspaceIffEntryHeaderCodec.Write(ref platform, address,
+			expected)) return 1;
+		if (!MuiDataspaceIffEntryHeaderCodec.TryRead(ref platform, address,
+			out var actual) || actual.Id != expected.Id ||
+			actual.Length != expected.Length) return 2;
+		var tail = APTR.FromPointer(0x00050FFC);
+		if (MuiDataspaceIffEntryHeaderCodec.TryRead(ref platform, tail,
+			out _) || MuiDataspaceIffEntryHeaderCodec.Write(ref platform, tail,
+			default)) return 3;
 		return 42;
 	}
 
@@ -1222,6 +1489,11 @@ public static class MuiNativeRoots
 			writeStringMethod != MuiNotifyWriteMessageCodec.WriteStringMethod) return 2;
 		if (MuiNotifyWriteMessageCodec.TryReadMethodIdValue(ref platform,
 			APTR.FromPointer(0x00050FFE), out _)) return 3;
+		var shortHeader = APTR.FromPointer(0x00050FFC);
+		APTR.WriteUInt32(shortHeader, 0, MuiNotifyWriteMessageCodec.WriteStringMethod);
+		if (!MuiNotifyWriteMessageCodec.TryReadMethodIdValue(ref platform,
+			shortHeader, out var shortMethod) || shortMethod !=
+			MuiNotifyWriteMessageCodec.WriteStringMethod) return 4;
 		return 42;
 	}
 
@@ -1243,11 +1515,16 @@ public static class MuiNativeRoots
 			APTR.FromPointer(packet), MuiSetAsStringPacketField.Value,
 			MuiSetAsStringMessage.Size, out var valueAddress) ||
 			valueAddress.Raw != packet + MuiSetAsStringMessage.ValueOffset) return 2;
+		if (!MuiSetAsStringMessageCodec.TryGetValueAddress(ref platform,
+			APTR.FromPointer(packet), out var structValueAddress) ||
+			structValueAddress.Raw != packet + MuiSetAsStringMessage.ValueOffset) return 2;
 		const uint truncated = 0x00050FFC;
 		APTR.WriteUInt32(APTR.FromPointer(truncated), 0,
 			MuiNotifySetAsStringCore.Method);
+		if (MuiSetAsStringMessageCodec.TryGetValueAddress(ref platform,
+			APTR.FromPointer(truncated), out _)) return 3;
 		if (MuiNotifySetAsStringCore.DispatchRecord(ref platform,
-			APTR.FromPointer(truncated)) != 0) return 3;
+			APTR.FromPointer(truncated)) != 0) return 4;
 		return 42;
 	}
 
@@ -1267,6 +1544,9 @@ public static class MuiNativeRoots
 		};
 		if (!MuiFindUDataMessageCodec.Write(ref platform, message, findMessage))
 			return 1;
+		if (!MuiNotifyUserDataMessageCodec.TryReadMethodIdValue(ref platform,
+			message, out var admittedMethod) || admittedMethod !=
+			MuiNotifyUserDataCore.FindUData) return 1;
 		if (!MuiNotifyUserDataCore.TryReadFind(ref platform, message,
 			MuiNotifyUserDataCore.FindUData, out var find) ||
 			find.MethodId != MuiNotifyUserDataCore.FindUData || find.UserData !=
@@ -1300,6 +1580,30 @@ public static class MuiNativeRoots
 		if (MuiNotifyUserDataCore.TryReadFind(ref platform,
 			APTR.FromPointer(0x00050FFF), MuiNotifyUserDataCore.FindUData,
 			out _)) return 4;
+		return 42;
+	}
+
+	// Focused ABI proof for the fixed UserData traversal frame.  The production
+	// record wrappers now use a complete sequential named codec; stack-vector
+	// index arithmetic remains covered separately by UserDataTraversalFrameVectorStructCodecRoot.
+	public static uint UserDataTraversalFrameRecordCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint frameAddress = 0x00050F40;
+		var frame = new MuiUDataTraversalFrame
+		{
+			Object = APTR.FromPointer(0x00050A00),
+			NextChild = 3,
+		};
+		if (!MuiNotifyUserDataRecords.WriteFrame(ref platform,
+			APTR.FromPointer(frameAddress), frame)) return 1;
+		var decoded = default(MuiUDataTraversalFrame);
+		if (!MuiNotifyUserDataRecords.TryReadFrame(ref platform,
+			APTR.FromPointer(frameAddress), ref decoded) ||
+			decoded.Object.Raw != 0x00050A00 || decoded.NextChild != 3) return 2;
+		if (MuiNotifyUserDataRecords.TryReadFrame(ref platform,
+			APTR.FromPointer(0x00050FFF), ref decoded)) return 3;
 		return 42;
 	}
 
@@ -1342,28 +1646,39 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1365 UserData traversal-stack closure. The bounded 8-byte frame vector
-	// is resolved through its named record adapter before frame-field access;
-	// no traversal consumer reconstructs a stack offset.
+	// MG1981 UserData traversal-stack closure. The bounded 8-byte frame vector
+	// is exchanged as a named record through a typed cursor; stack-slot address
+	// arithmetic remains private to the vector adapter.
 	public static uint UserDataTraversalFrameVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x0004F000);
-		if (!MuiUDataTraversalFrameVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, 0, out var first)) return 1;
-		APTR.WriteUInt32(first, 0, 0x00050A00);
-		APTR.WriteUInt32(first, 4, 3);
-		if (APTR.ReadUInt32(first, 0) != 0x00050A00 ||
-			APTR.ReadUInt32(first, 4) != 3) return 2;
-		if (!MuiUDataTraversalFrameVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, 1, out _) ||
-			!MuiUDataTraversalFrameVectorMemoryCodec.TryGetEntry(ref platform,
-				vector, 255, out _)) return 3;
-		if (MuiUDataTraversalFrameVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, MuiUDataTraversalCursor.MaximumEntries, out _) ||
-			MuiUDataTraversalFrameVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 4;
+		var cursor = default(MuiUDataTraversalCursor);
+		cursor.Base = vector;
+		cursor.Index = 0;
+		var expected = default(MuiUDataTraversalFrame);
+		expected.Object = APTR.FromPointer(0x00050A00);
+		expected.NextChild = 3;
+		if (!MuiUDataTraversalFrameCodec.TryWrite(ref platform, cursor, expected) ||
+			!MuiUDataTraversalFrameCodec.TryRead(ref platform, cursor,
+				out var actual) || actual.Object.Raw != expected.Object.Raw ||
+			actual.NextChild != expected.NextChild) return 1;
+		cursor.Index = 1;
+		var lastCursor = default(MuiUDataTraversalCursor);
+		lastCursor.Base = vector;
+		lastCursor.Index = 255;
+		if (!MuiUDataTraversalFrameCodec.TryGetEntry(ref platform, cursor,
+			out _) ||
+			!MuiUDataTraversalFrameCodec.TryGetEntry(ref platform,
+				lastCursor, out _)) return 2;
+		cursor.Index = MuiUDataTraversalCursor.MaximumEntries;
+		if (MuiUDataTraversalFrameCodec.TryGetEntry(ref platform, cursor,
+			out _)) return 3;
+		cursor.Base = APTR.FromPointer(0xFFFFFFFF);
+		cursor.Index = 1;
+		if (MuiUDataTraversalFrameCodec.TryGetEntry(ref platform, cursor,
+			out _)) return 4;
 		return 42;
 	}
 
@@ -1476,6 +1791,294 @@ public static class MuiNativeRoots
 			0x80420000u, 1, 2)) return 9;
 		if (MuiExternalWrapperMessageCodec.IsValidMethod(ref platform, packet,
 			0x80420000u)) return 10;
+		return 42;
+	}
+
+	// Focused qualification for the sequential named-record ExternalWrapper
+	// codecs. Every fixed Boopsi/Dtpic wrapper packet shape is exercised through
+	// the production declaration-order bridge, with no callback or state-machine
+	// dependency in this closure.
+	public static uint ExternalWrapperMessageStructPacketCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050E00);
+		if (!MuiExternalWrapperMessageStructCodec.TryWriteUpdate(ref platform,
+			packet, 0x00050D00, 0x00050D20, 3) ||
+			!MuiExternalWrapperMessageStructCodec.TryReadUpdate(ref platform, packet,
+				out var update) || update.AttributeList != 0x00050D00 ||
+			update.GadgetInfo != 0x00050D20 || update.Flags != 3) return 1;
+		if (!MuiExternalWrapperMessageStructCodec.TryWriteGet(ref platform, packet,
+			7, 0x00050F00) ||
+			!MuiExternalWrapperMessageStructCodec.TryReadGet(ref platform, packet,
+				out var get) || get.Attribute != 7 || get.Storage != 0x00050F00)
+			return 2;
+		if (!MuiExternalWrapperMessageStructCodec.TryWriteSet(ref platform, packet,
+			MuiExternalWrapperMessageCodec.MethodSet, 9, 11) ||
+			!MuiExternalWrapperMessageStructCodec.TryReadSet(ref platform, packet,
+				out var set) || set.Attribute != 9 || set.Value != 11) return 3;
+		if (!MuiExternalWrapperMessageStructCodec.TryWriteMethod(ref platform,
+			packet, MuiExternalWrapperMessageCodec.Draw) ||
+			!MuiExternalWrapperMessageStructCodec.TryReadMethodIdValue(ref platform,
+				packet, out var method) || method != MuiExternalWrapperMessageCodec.Draw)
+			return 4;
+		if (!MuiExternalWrapperMessageStructCodec.TryWriteRenderInfo(ref platform,
+			packet, MuiExternalWrapperMessageCodec.Setup, 0x00050D40) ||
+			!MuiExternalWrapperMessageStructCodec.TryReadRenderInfo(ref platform,
+				packet, out var renderInfo) || renderInfo.RenderInfo != 0x00050D40)
+			return 5;
+		if (!MuiExternalWrapperMessageStructCodec.TryWriteAskMinMax(ref platform,
+			packet, 0x00050F80) ||
+			!MuiExternalWrapperMessageStructCodec.TryReadAskMinMax(ref platform,
+				packet, out var askMinMax) || askMinMax.Storage != 0x00050F80)
+			return 6;
+		if (!MuiExternalWrapperMessageStructCodec.TryWriteLayout(ref platform,
+			packet, 1, 2, 80, 40) ||
+			!MuiExternalWrapperMessageStructCodec.TryReadLayout(ref platform, packet,
+				out var layout) || layout.Left != 1 || layout.Top != 2 ||
+			layout.Width != 80 || layout.Height != 40) return 7;
+		if (MuiExternalWrapperMessageStructCodec.TryReadLayout(ref platform,
+			APTR.FromPointer(0x00050FED), out _) ||
+			MuiExternalWrapperMessageStructCodec.TryReadMethodIdValue(ref platform,
+				APTR.Null, out _)) return 8;
+		return 42;
+	}
+
+	// MG1933 struct-first proof for the fixed seven-word Boopsi geometry
+	// record embedded in the external-wrapper instance. Production geometry
+	// reads and writes walk the named record in declaration order; the legacy
+	// per-field adapter remains covered separately for compatibility callers.
+	public static uint ExternalBoopsiGeometryStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var instance = APTR.FromPointer(0x00050DE0);
+		var expected = new MuiExternalBoopsiGeometryState
+		{
+			MinWidth = 0xF00DCAFE,
+			MinHeight = 0xCAFEF00D,
+			MaxWidth = 0x80030280,
+			MaxHeight = 0x800301E0,
+			TagWindow = 0x80030001,
+			TagScreen = 0x80030002,
+			TagDrawInfo = 0x80030003,
+		};
+		if (!MuiExternalBoopsiGeometryCodec.Write(ref platform, instance,
+			expected) || !MuiExternalBoopsiGeometryCodec.TryRead(ref platform,
+			instance, out var actual) || actual.MinWidth != expected.MinWidth ||
+			actual.MinHeight != expected.MinHeight ||
+			actual.MaxWidth != expected.MaxWidth ||
+			actual.MaxHeight != expected.MaxHeight ||
+			actual.TagWindow != expected.TagWindow ||
+			actual.TagScreen != expected.TagScreen ||
+			actual.TagDrawInfo != expected.TagDrawInfo) return 1;
+		var truncated = APTR.FromPointer(0x00050FE1);
+		if (MuiExternalBoopsiGeometryCodec.TryRead(ref platform, truncated,
+			out _) || MuiExternalBoopsiGeometryCodec.Write(ref platform, truncated,
+			expected)) return 2;
+		return 42;
+	}
+
+	// MG1934 struct-first proof for the fixed five-pointer Boopsi resource
+	// state embedded in the external-wrapper instance. Pointer values are
+	// intentionally high-bit guest addresses to verify ULONG preservation.
+	public static uint ExternalBoopsiResourceStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var instance = APTR.FromPointer(0x00050DE0);
+		var expected = new MuiExternalBoopsiResourceState
+		{
+			PrivateClass = APTR.FromPointer(0xF00DCAFE),
+			ClassId = APTR.FromPointer(0xCAFEF00D),
+			OpenedClass = APTR.FromPointer(0x80032A00),
+			BoopsiObject = APTR.FromPointer(0x80032A20),
+			CreationTags = APTR.FromPointer(0x80032300),
+		};
+		if (!MuiExternalBoopsiResourceCodec.Write(ref platform, instance,
+			expected) || !MuiExternalBoopsiResourceCodec.TryRead(ref platform,
+			instance, out var actual) || actual.PrivateClass.Raw !=
+			expected.PrivateClass.Raw || actual.ClassId.Raw != expected.ClassId.Raw ||
+			actual.OpenedClass.Raw != expected.OpenedClass.Raw ||
+			actual.BoopsiObject.Raw != expected.BoopsiObject.Raw ||
+			actual.CreationTags.Raw != expected.CreationTags.Raw) return 1;
+		var truncated = APTR.FromPointer(0x00050FE1);
+		if (MuiExternalBoopsiResourceCodec.TryRead(ref platform, truncated,
+			out _) || MuiExternalBoopsiResourceCodec.Write(ref platform, truncated,
+			expected)) return 2;
+		return 42;
+	}
+
+	// MG1935 struct-first proof for the fixed external-wrapper scratch state.
+	// RememberBuffer, RememberCount, and WorkBuffer are consumed as one named
+	// declaration-order record rather than independent field offsets.
+	public static uint ExternalScratchStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var instance = APTR.FromPointer(0x00050DE0);
+		var expected = new MuiExternalScratchState
+		{
+			RememberBuffer = APTR.FromPointer(0xF00DCAFE),
+			RememberCount = 0xCAFEF00D,
+			WorkBuffer = APTR.FromPointer(0x80032B40),
+		};
+		if (!MuiExternalScratchStateCodec.Write(ref platform, instance, expected) ||
+			!MuiExternalScratchStateCodec.TryRead(ref platform, instance,
+				out var actual) || actual.RememberBuffer.Raw !=
+				expected.RememberBuffer.Raw || actual.RememberCount !=
+				expected.RememberCount || actual.WorkBuffer.Raw !=
+				expected.WorkBuffer.Raw) return 1;
+		var truncated = APTR.FromPointer(0x00050FB0);
+		if (MuiExternalScratchStateCodec.TryRead(ref platform, truncated,
+			out _) || MuiExternalScratchStateCodec.Write(ref platform, truncated,
+			expected)) return 2;
+		return 42;
+	}
+
+	// MG1936 struct-first proof for the fixed nine-field Dtpic state record.
+	// Pointer and scalar ULONG values are intentionally high-bit values so the
+	// complete declaration-order transfer is checked without narrowing.
+	public static uint ExternalDtpicStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var instance = APTR.FromPointer(0x00050DE0);
+		var expected = new MuiExternalDtpicState
+		{
+			CallerName = APTR.FromPointer(0xF00DCAFE),
+			OwnedName = APTR.FromPointer(0xCAFEF00D),
+			OwnedNameSize = 0x80030011,
+			PictureObject = APTR.FromPointer(0x80032C40),
+			Alpha = 0x800300FF,
+			MinWidth = 0x80030020,
+			MinHeight = 0x80030018,
+			PicWidth = 0x80030280,
+			PicHeight = 0x800301E0,
+		};
+		if (!MuiExternalDtpicStateCodec.Write(ref platform, instance, expected) ||
+			!MuiExternalDtpicStateCodec.TryRead(ref platform, instance,
+				out var actual) || actual.CallerName.Raw != expected.CallerName.Raw ||
+			actual.OwnedName.Raw != expected.OwnedName.Raw ||
+			actual.OwnedNameSize != expected.OwnedNameSize ||
+			actual.PictureObject.Raw != expected.PictureObject.Raw ||
+			actual.Alpha != expected.Alpha || actual.MinWidth != expected.MinWidth ||
+			actual.MinHeight != expected.MinHeight ||
+			actual.PicWidth != expected.PicWidth ||
+			actual.PicHeight != expected.PicHeight) return 1;
+		var truncated = APTR.FromPointer(0x00050F89);
+		if (MuiExternalDtpicStateCodec.TryRead(ref platform, truncated,
+			out _) || MuiExternalDtpicStateCodec.Write(ref platform, truncated,
+			expected)) return 2;
+		return 42;
+	}
+
+	// MG1937 struct-first proof for the fixed external-wrapper notification
+	// state. Attribute, value, and count are transferred as one named record.
+	public static uint ExternalNotificationStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var instance = APTR.FromPointer(0x00050DE0);
+		var expected = new MuiExternalNotificationState
+		{
+			Attribute = 0x8042BFA3,
+			Value = 0xF00DCAFE,
+			Count = 0xCAFEF00D,
+		};
+		if (!MuiExternalNotificationStateCodec.Write(ref platform, instance,
+			expected) || !MuiExternalNotificationStateCodec.TryRead(ref platform,
+			instance, out var actual) || actual.Attribute != expected.Attribute ||
+			actual.Value != expected.Value || actual.Count != expected.Count) return 1;
+		var truncated = APTR.FromPointer(0x00050F7D);
+		if (MuiExternalNotificationStateCodec.TryRead(ref platform, truncated,
+			out _) || MuiExternalNotificationStateCodec.Write(ref platform, truncated,
+			expected)) return 2;
+		return 42;
+	}
+
+	// MG1938 struct-first proof for the fixed three-pointer display environment
+	// record used by external-wrapper setup.
+	public static uint ExternalDisplayEnvironmentStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x00050DE0);
+		var expected = new MuiExternalDisplayEnvironmentRecord
+		{
+			Window = APTR.FromPointer(0xF00DCAFE),
+			Screen = APTR.FromPointer(0xCAFEF00D),
+			DrawInfo = APTR.FromPointer(0x80032940),
+		};
+		if (!MuiExternalDisplayEnvironmentCodec.Write(ref platform, address,
+			expected) || !MuiExternalDisplayEnvironmentCodec.TryRead(ref platform,
+			address, out var actual) || actual.Window.Raw != expected.Window.Raw ||
+			actual.Screen.Raw != expected.Screen.Raw ||
+			actual.DrawInfo.Raw != expected.DrawInfo.Raw) return 1;
+		var truncated = APTR.FromPointer(0x00050FF5);
+		if (MuiExternalDisplayEnvironmentCodec.TryRead(ref platform, truncated,
+			out _) || MuiExternalDisplayEnvironmentCodec.Write(ref platform,
+			truncated, expected)) return 2;
+		return 42;
+	}
+
+	// MG1939 struct-first proof for the fixed four-byte external RastPort slot.
+	// Scalar-safe helpers keep the one-word struct lowering seam out of the
+	// native path while preserving the named slot record for callers.
+	public static uint ExternalRastPortSlotStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x00050DE0);
+		var expected = APTR.FromPointer(0xF00DCAFE);
+		if (!MuiExternalRastPortSlotCodec.WriteValue(ref platform, address,
+			expected) || !MuiExternalRastPortSlotCodec.TryReadValue(ref platform,
+			address, out var actual) || actual.Raw != expected.Raw) return 1;
+		var truncated = APTR.FromPointer(0x00050FFD);
+		if (MuiExternalRastPortSlotCodec.TryReadValue(ref platform, truncated,
+			out _) || MuiExternalRastPortSlotCodec.WriteValue(ref platform,
+			truncated, expected)) return 2;
+		return 42;
+	}
+
+	// MG1940 struct-first proof for the fixed caller-owned Dtpic layout result.
+	// The two output ULONGs are consumed in declaration order with complete
+	// record admission before either value is returned.
+	public static uint ExternalDtpicLayoutResultStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x00050DE0);
+		APTR.WriteUInt32(address, 0, 0xF00DCAFE);
+		APTR.WriteUInt32(address, 4, 0xCAFEF00D);
+		if (!MuiExternalDtpicLayoutResultCodec.TryRead(ref platform, address,
+			out var value) || value.Width != 0xF00DCAFE ||
+			value.Height != 0xCAFEF00D) return 1;
+		var truncated = APTR.FromPointer(0x00050FFD);
+		if (MuiExternalDtpicLayoutResultCodec.TryRead(ref platform, truncated,
+			out _)) return 2;
+		return 42;
+	}
+
+	// MG1941 struct-first proof for the fixed four-pointer RenderInfo input
+	// record supplied during external-wrapper setup.
+	public static uint ExternalRenderInfoStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x00050DE0);
+		APTR.WriteUInt32(address, 0, 0xF00DCAFE);
+		APTR.WriteUInt32(address, 4, 0xCAFEF00D);
+		APTR.WriteUInt32(address, 8, 0x80032940);
+		APTR.WriteUInt32(address, 12, 0x80032960);
+		if (!MuiExternalRenderInfoCodec.TryRead(ref platform, address,
+			out var value) || value.Screen.Raw != 0xF00DCAFE ||
+			value.Window.Raw != 0xCAFEF00D ||
+			value.DrawInfo.Raw != 0x80032940 ||
+			value.RastPort.Raw != 0x80032960) return 1;
+		var truncated = APTR.FromPointer(0x00050FF1);
+		if (MuiExternalRenderInfoCodec.TryRead(ref platform, truncated,
+			out _)) return 2;
 		return 42;
 	}
 
@@ -1656,6 +2259,37 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG1942 struct-first proof for one complete fixed BOOPSI operation record.
+	// The OpSet packet is admitted and exchanged as one named declaration-order
+	// struct; high-bit pointer words survive unchanged and truncated records are
+	// rejected before any field is observed. The sibling packet records are
+	// covered by host tests and share this same cursor discipline.
+	public static uint ExternalBoopsiPacketStructCodecsRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x00050DE0);
+		var opSet = new MuiExternalBoopsiOpSetMessage
+		{
+			MethodId = MuiExternalBoopsiPacketCodec.OmSet,
+			AttributeList = APTR.FromPointer(0xF00DCAFE),
+			GadgetInfo = APTR.FromPointer(0xCAFEF00D),
+		};
+		if (!MuiExternalBoopsiOpSetMessageStructCodec.Write(ref platform,
+			address, opSet)) return 1;
+		if (!MuiExternalBoopsiOpSetMessageStructCodec.TryRead(ref platform,
+			address, out var opSetActual)) return 2;
+		if (opSetActual.MethodId != opSet.MethodId) return 3;
+		if (opSetActual.AttributeList.Raw != opSet.AttributeList.Raw) return 4;
+		if (opSetActual.GadgetInfo.Raw != opSet.GadgetInfo.Raw) return 5;
+
+		var truncated = APTR.FromPointer(0x00050FFD);
+		if (MuiExternalBoopsiOpSetMessageStructCodec.TryRead(ref platform,
+			truncated, out _) || MuiExternalBoopsiOpSetMessageStructCodec.Write(
+			ref platform, truncated, opSet)) return 6;
+		return 42;
+	}
+
 	// MG602 external BOOPSI scratch packet closure. OM_SET, OM_GET, GM_RENDER,
 	// inline TagItem, and result-word data stay represented by named records;
 	// only the packet cursor codec knows their packed guest boundaries.
@@ -1709,29 +2343,34 @@ public static class MuiNativeRoots
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		const uint packet = 0x00037F00;
-		const uint first = 0x00038100;
-		const uint last = 0x00038200;
+		const uint first = 0xF00DCAFE;
+		const uint last = 0xFEEDBEEF;
 		const uint cfgId = 0x8042BEEF;
 		if (!MuiUpdateConfigCore.WriteRecord(ref platform,
-			APTR.FromPointer(packet), cfgId, 2) ||
-			!MuiUpdateConfigCore.WriteEntry(ref platform,
-				APTR.FromPointer(packet), 0, APTR.FromPointer(first), 0x11) ||
-			!MuiUpdateConfigCore.WriteEntry(ref platform,
-				APTR.FromPointer(packet), 63, APTR.FromPointer(last), 0xA5) ||
-			MuiUpdateConfigCore.DispatchRecord(ref platform,
-				APTR.FromPointer(packet)) != cfgId) return 1;
-		if (!MuiUpdateConfigCore.TryRead(ref platform,
-			APTR.FromPointer(packet), out var update) ||
-			update.CfgId != cfgId || update.RedrawCount != 2 ||
-			update.RedrawObjects.Object00.Raw != first ||
-			update.RedrawObjects.Object63.Raw != last ||
-			update.RedrawFlags.Flag00 != 0x11 ||
-			update.RedrawFlags.Flag63 != 0xA5) return 2;
+			APTR.FromPointer(packet), cfgId, 2)) return 11;
+		if (!MuiUpdateConfigCore.WriteEntry(ref platform,
+			APTR.FromPointer(packet), 0, APTR.FromPointer(first), 0x11)) return 12;
+		if (!MuiUpdateConfigCore.WriteEntry(ref platform,
+			APTR.FromPointer(packet), 63, APTR.FromPointer(last), 0xA5)) return 13;
+		if (MuiUpdateConfigCore.DispatchRecord(ref platform,
+			APTR.FromPointer(packet)) != cfgId) return 14;
+		if (!MuiUpdateConfigCore.TryReadSummary(ref platform,
+			APTR.FromPointer(packet), out var updateCfgId,
+			out var updateRedrawCount) || updateCfgId != cfgId ||
+			updateRedrawCount != 2) return 15;
+		if (MuiUpdateConfigCore.ReadObjectEntry(ref platform,
+			APTR.FromPointer(packet), 0).Raw != first ||
+			MuiUpdateConfigCore.ReadObjectEntry(ref platform,
+				APTR.FromPointer(packet), 63).Raw != last) return 16;
+		if (MuiUpdateConfigCore.ReadFlagEntry(ref platform,
+			APTR.FromPointer(packet), 0) != 0x11 ||
+			MuiUpdateConfigCore.ReadFlagEntry(ref platform,
+				APTR.FromPointer(packet), 63) != 0xA5) return 17;
 		const uint truncated = 0x00050FFC;
 		APTR.WriteUInt32(APTR.FromPointer(truncated), 0,
 			MuiUpdateConfigCore.Method);
 		if (MuiUpdateConfigCore.DispatchRecord(ref platform,
-			APTR.FromPointer(truncated)) != 0) return 3;
+			APTR.FromPointer(truncated)) != 0) return 18;
 		return 42;
 	}
 
@@ -1756,29 +2395,171 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1375 native struct-first UpdateConfig table-vector closure. The inline
-	// object-pointer and byte tables use separate named adapters, preserving
-	// their wire widths and the shared 64-entry bound.
+	// MG1983 native struct-first UpdateConfig table-vector closure. The inline
+	// object-pointer and byte tables use separate typed cursors and complete
+	// named records, preserving their wire widths and shared 64-entry bound.
 	public static uint UpdateConfigTableVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
-		var objectVector = APTR.FromPointer(0x00037F0C);
-		var flagVector = APTR.FromPointer(0x0003800C);
-		if (!MuiUpdateConfigObjectVectorMemoryCodec.TryGetEntry(ref platform,
-			objectVector, 63, out var objectAddress)) return 1;
-		APTR.WriteUInt32(objectAddress, 0, 0x00050A00);
-		if (APTR.ReadUInt32(objectAddress, 0) != 0x00050A00) return 2;
-		if (!MuiUpdateConfigFlagVectorMemoryCodec.TryGetEntry(ref platform,
-			flagVector, 63, out var flagAddress)) return 3;
-		APTR.WriteUInt8(flagAddress, 0, 0xA5);
-		if (APTR.ReadUInt8(flagAddress, 0) != 0xA5) return 4;
-		if (MuiUpdateConfigObjectVectorMemoryCodec.TryGetEntry(ref platform,
-			objectVector, MuiUpdateConfigObjectCursor.MaximumEntries, out _) ||
-			MuiUpdateConfigFlagVectorMemoryCodec.TryGetEntry(ref platform,
-				flagVector, MuiUpdateConfigFlagCursor.MaximumEntries, out _) ||
-			MuiUpdateConfigObjectVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 5;
+		const uint message = 0x00037F00;
+		if (!MuiUpdateConfigCore.WriteRecord(ref platform,
+			APTR.FromPointer(message), 7, 0)) return 1;
+		if (!MuiUpdateConfigTableCursorCodec.TryGetObjectCursor(ref platform,
+			APTR.FromPointer(message), 63, out var objectCursor)) return 2;
+		const uint objectValue = 0x00050A00;
+		if (!MuiUpdateConfigObjectCursorCodec.TryWriteValue(ref platform,
+			objectCursor, objectValue) ||
+			!MuiUpdateConfigObjectCursorCodec.TryReadValue(ref platform, objectCursor,
+				out var decodedObject) || decodedObject != objectValue) return 3;
+		if (!MuiUpdateConfigTableCursorCodec.TryGetFlagCursor(ref platform,
+			APTR.FromPointer(message), 63, out var flagCursor)) return 4;
+		const byte flagValue = 0xA5;
+		if (!MuiUpdateConfigFlagCursorCodec.TryWriteValue(ref platform,
+			flagCursor, flagValue) ||
+			!MuiUpdateConfigFlagCursorCodec.TryReadValue(ref platform, flagCursor,
+				out var decodedFlag) || decodedFlag != flagValue) return 5;
+		objectCursor.Index = MuiUpdateConfigObjectCursor.MaximumEntries;
+		if (MuiUpdateConfigObjectCursorCodec.TryGetEntry(ref platform,
+			objectCursor, out _) ||
+			MuiUpdateConfigTableCursorCodec.TryGetObjectCursor(ref platform,
+				APTR.FromPointer(0xFFFFFFFF), 0, out _)) return 6;
+		return 42;
+	}
+
+	// MG1884 native CommonControl packet closure. Every fixed numeric, event,
+	// attribute, and AskMinMax envelope crosses the freestanding boundary as a
+	// named sequential record; layout/text packets remain a separate seam.
+	public static uint CommonControlPacketStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packet = 0x00039000;
+		const uint storage = 0x00039100;
+		const uint inputMessage = 0x00039200;
+		const uint eventHandler = 0x00039300;
+		if (!MuiCommonControlPacketCore.WriteMethod(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.NumericDecrease) ||
+			!MuiCommonControlPacketCore.TryReadMethodIdValue(ref platform,
+				APTR.FromPointer(packet), out var methodId) ||
+			methodId != MuiCommonControlPacketCore.NumericDecrease) return 1;
+		if (!MuiCommonControlPacketCore.WriteSigned(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.PropIncrease, -7) ||
+			!MuiCommonControlPacketCore.TryReadSigned(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.PropIncrease,
+				out var signed) || signed.Value != -7) return 2;
+		if (!MuiCommonControlPacketCore.WriteScaleToValue(ref platform,
+			APTR.FromPointer(packet), -10, 100, 25) ||
+			!MuiCommonControlPacketCore.TryReadScaleToValue(ref platform,
+				APTR.FromPointer(packet), out var scale) || scale.Min != -10 ||
+			scale.Max != 100 || scale.Value != 25) return 3;
+		if (!MuiCommonControlPacketCore.WriteValueToScale(ref platform,
+			APTR.FromPointer(packet), -20, 200) ||
+			!MuiCommonControlPacketCore.TryReadValueToScale(ref platform,
+				APTR.FromPointer(packet), out var valueToScale) ||
+			valueToScale.Min != -20 || valueToScale.Max != 200) return 4;
+		if (!MuiCommonControlPacketCore.WriteStringify(ref platform,
+			APTR.FromPointer(packet), -123) ||
+			!MuiCommonControlPacketCore.TryReadStringify(ref platform,
+				APTR.FromPointer(packet), out var stringify) ||
+			stringify.Value != -123) return 5;
+		if (!MuiCommonControlPacketCore.WriteHandleEvent(ref platform,
+			APTR.FromPointer(packet), inputMessage, -9, eventHandler) ||
+			!MuiCommonControlPacketCore.TryReadHandleEvent(ref platform,
+				APTR.FromPointer(packet), out var handleEvent) ||
+			handleEvent.InputMessage != inputMessage || handleEvent.MuiKey != -9 ||
+			handleEvent.EventHandlerNode != eventHandler) return 6;
+		if (!MuiCommonControlPacketCore.WriteGet(ref platform,
+			APTR.FromPointer(packet), 0x80420030, APTR.FromPointer(storage)) ||
+			!MuiCommonControlPacketCore.TryReadGet(ref platform,
+				APTR.FromPointer(packet), out var get) || get.Attribute != 0x80420030 ||
+			get.Storage != storage) return 7;
+		if (!MuiCommonControlPacketCore.WriteAttribute(ref platform,
+			APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+			0x80420030, 0xCAFE) ||
+			!MuiCommonControlPacketCore.TryReadAttribute(ref platform,
+				APTR.FromPointer(packet), MuiCommonControlPacketCore.Set,
+				out var attribute) || attribute.Attribute != 0x80420030 ||
+			attribute.Value != 0xCAFE) return 8;
+		if (!MuiCommonControlPacketCore.WriteAskMinMax(ref platform,
+			APTR.FromPointer(packet), APTR.FromPointer(storage)) ||
+			!MuiCommonControlPacketCore.TryReadAskMinMax(ref platform,
+				APTR.FromPointer(packet), out var askMinMax) ||
+			askMinMax.Storage != storage) return 9;
+		return 42;
+	}
+
+	// MG1885 native Layout packet closure. The fixed layout, rectangle, text,
+	// render-info, flags, and text-dimensions envelopes use named sequential
+	// codecs for both reads and writes; malformed end-of-memory admission is
+	// retained as an explicit boundary check.
+	public static uint LayoutPacketStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packet = 0x0003A000;
+		const uint storage = 0x0003A100;
+		const uint text = 0x0003A200;
+		const uint renderInfo = 0x0003A300;
+		if (!MuiLayoutPacketCore.WriteMethod(ref platform,
+			APTR.FromPointer(packet), MuiLayoutPacketCore.Cleanup) ||
+			!MuiLayoutPacketCodec.TryReadMethodIdValue(ref platform,
+				APTR.FromPointer(packet), out var methodId) ||
+			methodId != MuiLayoutPacketCore.Cleanup) return 1;
+		if (!MuiLayoutPacketCore.WriteAskMinMax(ref platform,
+			APTR.FromPointer(packet), APTR.FromPointer(storage)) ||
+			!MuiLayoutPacketCore.TryReadAskMinMax(ref platform,
+				APTR.FromPointer(packet), out var ask) || ask.Storage != storage) return 2;
+		if (!MuiLayoutPacketCore.WriteRelayout(ref platform,
+			APTR.FromPointer(packet), 0xA5A5A5A5) ||
+			!MuiLayoutPacketCore.TryReadRelayout(ref platform,
+				APTR.FromPointer(packet), out var relayout) ||
+			relayout.Flags != 0xA5A5A5A5) return 3;
+		if (!MuiLayoutPacketCore.WriteRectangle(ref platform,
+			APTR.FromPointer(packet), MuiLayoutPacketCore.DrawBackground, 1, 2,
+			80, 16, 0x11, 0x22, 0x33) ||
+			!MuiLayoutPacketCore.TryReadRectangle(ref platform,
+				APTR.FromPointer(packet), MuiLayoutPacketCore.DrawBackground,
+				out var rectangle) || rectangle.Left != 1 || rectangle.Top != 2 ||
+			rectangle.RightOrWidth != 80 || rectangle.BottomOrHeight != 16 ||
+			rectangle.Reserved2 != 0x33) return 4;
+		if (!MuiLayoutPacketCore.WriteText(ref platform,
+			APTR.FromPointer(packet), 3, 4, 90, 20, APTR.FromPointer(text), 7,
+			0x44, 0x55) ||
+			!MuiLayoutPacketCore.TryReadText(ref platform,
+				APTR.FromPointer(packet), out var textPacket) ||
+			textPacket.Left != 3 || textPacket.Top != 4 ||
+			textPacket.Width != 90 || textPacket.Height != 20 ||
+			textPacket.Text != text || textPacket.Length != 7 ||
+			textPacket.PreParse != 0x44 || textPacket.Flags != 0x55) return 5;
+		if (!MuiLayoutPacketCore.WriteRenderInfo(ref platform,
+			APTR.FromPointer(packet), MuiLayoutPacketCore.Setup,
+			APTR.FromPointer(renderInfo)) ||
+			!MuiLayoutPacketCodec.TryReadRenderInfo(ref platform,
+				APTR.FromPointer(packet), MuiLayoutPacketCore.Setup,
+				out var render) || render.RenderInfo != renderInfo) return 6;
+		if (!MuiLayoutPacketCore.WriteFlags(ref platform,
+			APTR.FromPointer(packet), MuiLayoutPacketCore.Draw, 0x55AA55AA) ||
+			!MuiLayoutPacketCodec.TryReadFlags(ref platform,
+				APTR.FromPointer(packet), MuiLayoutPacketCore.Draw,
+				out var flags) || flags.Flags != 0x55AA55AA) return 7;
+		if (!MuiLayoutPacketCore.WriteTextDimensions(ref platform,
+			APTR.FromPointer(packet), APTR.FromPointer(text), 9, 0x66, 0x77) ||
+			!MuiLayoutPacketCodec.TryReadTextDimensions(ref platform,
+				APTR.FromPointer(packet), out var dimensions) ||
+			dimensions.Text != text || dimensions.Length != 9 ||
+			dimensions.PreParse != 0x66 || dimensions.Flags != 0x77) return 8;
+		if (!MuiLayoutPacketCore.WriteLayout(ref platform,
+			APTR.FromPointer(packet), 4, 5, 90, 20, 0x88) ||
+			!MuiLayoutPacketCodec.TryReadLayout(ref platform,
+				APTR.FromPointer(packet), out var layout) || layout.Left != 4 ||
+			layout.Top != 5 || layout.Width != 90 || layout.Height != 20 ||
+			layout.Flags != 0x88) return 9;
+		const uint truncated = 0x00050FFC;
+		APTR.WriteUInt32(APTR.FromPointer(truncated), 0,
+			MuiLayoutPacketCore.AskMinMax);
+		if (MuiLayoutPacketCodec.TryReadAskMinMax(ref platform,
+			APTR.FromPointer(truncated), out _)) return 10;
 		return 42;
 	}
 
@@ -2653,6 +3434,40 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG2039 Area frame-title C-string measurement uses a named bounded byte
+	// cursor.  The root exercises mapped reads and rejects NULL, overflow,
+	// unmapped, and out-of-bound indices.
+	public static uint AreaLayoutCStringCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		platform.WriteUInt8(text, 0, (byte)'T');
+		var cursor = new MuiAreaLayoutCStringByteCursor
+		{
+			Text = text,
+			Index = 0
+		};
+		if (!MuiAreaLayoutCStringByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != (byte)'T') return 1;
+		cursor.Index = MuiAreaLayoutCStringByteCursor.MaximumLength;
+		if (MuiAreaLayoutCStringByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 2;
+		cursor.Text = APTR.Null;
+		cursor.Index = 0;
+		if (MuiAreaLayoutCStringByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 3;
+		cursor.Text = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiAreaLayoutCStringByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 4;
+		cursor.Text = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiAreaLayoutCStringByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 5;
+		return 42;
+	}
+
 	// MG765 focused native proof for the MorphOS MUIA_Text_Copy [ISG] policy.
 	// The attribute packet is decoded by the common dispatcher, while the
 	// normalized BOOL is retained and read back through its named guest record.
@@ -3113,8 +3928,10 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG611 focused MultiSet target-vector codec closure. MG612 separately
-	// qualifies the full packet-facing mutation route in MultiSetRoot().
+	// MG611/MG1963 focused MultiSet target-vector codec closure. MG612
+	// separately qualifies the full packet-facing mutation route in
+	// MultiSetRoot(); this root also exercises the production named-record
+	// bridge without exposing target slot addresses.
 	public static uint MultiSetTargetVectorCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
@@ -3132,6 +3949,9 @@ public static class MuiNativeRoots
 		if (!MuiMultiSetTargetEntryCodec.TryRead(ref platform,
 			APTR.FromPointer(0x00036200), out var first) ||
 			first.Target.Raw != 0x00036300) return 3;
+		if (!MuiMultiSetTargetVectorCodec.TryWriteValue(ref platform, vector, 0,
+			0x12345678u) || !MuiMultiSetTargetVectorCodec.TryReadValue(ref platform,
+			vector, 0, out var bridged) || bridged != 0x12345678u) return 8;
 		cursor.Index = 2;
 		if (!MuiMultiSetTargetVectorCodec.TryGetEntry(ref platform, cursor,
 			out _)) return 4;
@@ -3146,7 +3966,8 @@ public static class MuiNativeRoots
 		cursor.Base = APTR.FromPointer(0xFFFFFFF0);
 		cursor.Index = 1;
 		if (MuiMultiSetTargetVectorCodec.TryGetEntry(ref platform, cursor,
-			out _)) return 7;
+			out _) || MuiMultiSetTargetVectorCodec.TryReadValue(ref platform,
+			cursor.Base, cursor.Index, out _)) return 7;
 		return 42;
 	}
 
@@ -3177,19 +3998,37 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1346 native struct-first caller-owned Notify and MultiSet vector
-	// closures. Each selected typed ULONG record is bounded independently.
+	// MG1346/MG1962/MG1986 native struct-first caller-owned Notify and MultiSet
+	// vector closures. Each selected typed record is bounded independently; the
+	// production cursor bridges are exercised without exposing slot addresses.
 	public static uint NotifyTargetVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x00050100);
-		if (!MuiNotifyFollowParameterVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, 2, out var follow) || follow.Raw != vector.Raw +
+		var followCursor = default(MuiNotifyFollowParameterVectorCursor);
+		followCursor.Base = vector;
+		followCursor.Index = 2;
+		if (!MuiNotifyFollowParameterVectorCodec.TryGetEntry(ref platform,
+			followCursor, out var follow) || follow.Raw != vector.Raw +
 			(2 * MuiNotifyFollowParameterSlot.Size)) return 1;
-		if (!MuiMultiSetTargetVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			2, out var target) || target.Raw != vector.Raw +
+		if (!MuiNotifyFollowParameterVectorCodec.TryWriteValue(ref platform,
+			followCursor, 0x12345678u)) return 4;
+		if (!MuiNotifyFollowParameterVectorCodec.TryReadValue(ref platform,
+			followCursor, out var bridged) || bridged != 0x12345678u) return 4;
+		var targetCursor = default(MuiMultiSetTargetVectorCursor);
+		targetCursor.Base = vector;
+		targetCursor.Index = 2;
+		if (!MuiMultiSetTargetVectorCodec.TryGetEntry(ref platform, targetCursor,
+			out var target) || target.Raw != vector.Raw +
 			(2 * MuiMultiSetTargetEntry.Size)) return 2;
+		if (!MuiMultiSetTargetVectorCodec.TryWriteValue(ref platform, targetCursor,
+			0x00051234u)) return 5;
+		if (!MuiMultiSetTargetVectorCodec.TryReadValue(ref platform, targetCursor,
+			out var targetDecoded) || targetDecoded != 0x00051234u) return 5;
+		if (!MuiNotifyFollowParameterVectorCodec.TryAdvance(ref followCursor, 1) ||
+			followCursor.Index != 3 || !MuiMultiSetTargetVectorCodec.TryAdvance(
+				ref targetCursor, 1) || targetCursor.Index != 3) return 6;
 		if (MuiNotifyFollowParameterVectorMemoryCodec.TryGetEntry(ref platform,
 			vector, MuiNotifyFollowParameterVectorCursor.MaximumEntries, out _) ||
 			MuiMultiSetTargetVectorMemoryCodec.TryGetEntry(ref platform, vector,
@@ -3197,7 +4036,9 @@ public static class MuiNativeRoots
 			MuiNotifyFollowParameterVectorMemoryCodec.TryGetEntry(ref platform,
 			APTR.FromPointer(0x00050FFE), 0, out _) ||
 			MuiMultiSetTargetVectorMemoryCodec.TryGetEntry(ref platform, APTR.Null,
-			0, out _)) return 3;
+			0, out _) ||
+			MuiNotifyFollowParameterVectorCodec.TryReadValue(ref platform,
+				APTR.FromPointer(0x00050FFE), 0, out _)) return 3;
 		return 42;
 	}
 
@@ -3844,6 +4685,37 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Native ABI proof for the declaration-ordered Export/Import record. The
+	// production codec reads and writes the complete {MethodID, dataspace}
+	// struct sequentially; the legacy field adapter is not involved.
+	public static uint ObjectPersistenceMessageStructPacketCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint packetAddress = 0x00050F20;
+		const uint dataspace = 0x00050D00;
+		var packet = APTR.FromPointer(packetAddress);
+		if (!MuiObjectPersistenceMessageStructCodec.TryWrite(ref platform,
+			packet, MuiObjectPersistenceMessageCodec.ExportMethod,
+			APTR.FromPointer(dataspace)) ||
+			!MuiObjectPersistenceMessageStructCodec.TryRead(ref platform, packet,
+				out var export) ||
+			export.MethodId != MuiObjectPersistenceMessageCodec.ExportMethod ||
+			export.Dataspace.Raw != dataspace) return 1;
+		if (!MuiObjectPersistenceMessageStructCodec.TryWrite(ref platform,
+			packet, MuiObjectPersistenceMessageCodec.ImportMethod,
+			APTR.FromPointer(dataspace)) ||
+			!MuiObjectPersistenceMessageStructCodec.TryRead(ref platform, packet,
+				out var import) ||
+			import.MethodId != MuiObjectPersistenceMessageCodec.ImportMethod ||
+			import.Dataspace.Raw != dataspace) return 2;
+		if (MuiObjectPersistenceMessageStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FFD), out _) ||
+			MuiObjectPersistenceMessageStructCodec.TryReadMethodIdValue(ref platform,
+				APTR.Null, out _)) return 3;
+		return 42;
+	}
+
 	// MorphOS MUIM_Export/MUIM_Import packet closure. The exact packet is
 	// {MethodID, dataspace}; the Notify superclass requires a non-zero
 	// MUIA_ObjectID and rejects dead objects before the native payload seam.
@@ -4064,23 +4936,67 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1352 native struct-first persistence-frame-vector closure. The bounded
-	// guest stack exposes only complete named frame records to the walker.
+	// MG1892 native ABI proof for the complete Application Save/Load traversal
+	// frame. The production walker exchanges Object, NextChild, and VisitMarker
+	// through one declaration-ordered sequential record.
+	public static uint ApplicationPersistenceFrameStateStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var frame = APTR.FromPointer(0x00050F40);
+		var value = default(MuiApplicationPersistenceFrameState);
+		value.Object = APTR.FromPointer(0x00050A00);
+		value.NextChild = 3;
+		value.VisitMarker = 17;
+		if (!MuiApplicationPersistenceFrameStateStructCodec.Write(ref platform,
+			frame, value) ||
+			!MuiApplicationPersistenceFrameStateStructCodec.TryRead(ref platform,
+				frame, out var decoded) || decoded.Object.Raw != 0x00050A00u ||
+			decoded.NextChild != 3 || decoded.VisitMarker != 17) return 1;
+		if (MuiApplicationPersistenceFrameStateStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FF5u), out _) ||
+			MuiApplicationPersistenceFrameStateStructCodec.Write(ref platform,
+				APTR.Null, value)) return 2;
+		return 42;
+	}
+
+	// MG1955/MG1988 native struct-first persistence-frame-vector closure. The
+	// bounded guest stack exchanges complete named frame records through the
+	// semantic cursor used by the walker.
 	public static uint ApplicationPersistenceFrameVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var stack = APTR.FromPointer(0x00050100);
-		if (!MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetEntry(
-			ref platform, stack, 2, out var address) || address.Raw != stack.Raw +
-			(2 * MuiApplicationPersistenceFrameState.Size)) return 1;
+		var expected = new MuiApplicationPersistenceFrameState
+		{
+			Object = APTR.FromPointer(0x00050A00u),
+			NextChild = 3,
+			VisitMarker = 17,
+		};
+		var cursor = default(MuiApplicationPersistenceFrameCursor);
+		cursor.Base = stack;
+		cursor.Index = 2;
+		if (!MuiApplicationPersistenceFrameCursorCodec.TryWrite(ref platform,
+			cursor, expected) ||
+			!MuiApplicationPersistenceFrameCursorCodec.TryRead(ref platform, cursor,
+				out var actual) || actual.Object.Raw != expected.Object.Raw ||
+			actual.NextChild != expected.NextChild ||
+			actual.VisitMarker != expected.VisitMarker) return 1;
+		cursor.Index = 3;
+		if (!MuiApplicationPersistenceFrameVectorCodec.TryWrite(ref platform,
+			cursor, expected) || !MuiApplicationPersistenceFrameVectorCodec.TryRead(
+				ref platform, cursor, out actual) || actual.Object.Raw !=
+				expected.Object.Raw) return 3;
 		if (MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetEntry(
 			ref platform, stack,
 			MuiApplicationPersistenceFrameCursor.MaximumEntries, out _) ||
 			MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetEntry(ref platform,
 				APTR.FromPointer(0x00050FF5u), 0, out _) ||
 			MuiApplicationPersistenceFrameVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFF0u), 2, out _)) return 2;
+				APTR.FromPointer(0xFFFFFFF0u), 2, out _) ||
+			MuiApplicationPersistenceFrameVectorCodec.TryRead(ref platform,
+				APTR.FromPointer(0x00050FF5u), 0, out _)) return 2;
 		return 42;
 	}
 
@@ -4474,6 +5390,45 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG1894 sequential ASL record codecs. The live state and lease structs are
+	// consumed in declaration order; malformed/null guest ranges fail closed
+	// before any field is observed.
+	public static uint AslServiceSequentialStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var stateAddress = APTR.FromPointer(0x00050E20);
+		var leaseAddress = APTR.FromPointer(0x00050E40);
+		var state = default(MuiAslServiceStateRecord);
+		state.Magic = MuiAslServiceLayout.Magic;
+		state.Head = APTR.FromPointer(0x00051100);
+		state.Generation = 23;
+		if (!MuiAslServiceStateStructCodec.Write(ref platform, stateAddress,
+			state) || !MuiAslServiceStateStructCodec.TryRead(ref platform,
+			stateAddress, out var actualState) || actualState.Magic != state.Magic ||
+			actualState.Head.Raw != state.Head.Raw ||
+			actualState.Generation != state.Generation) return 1;
+		var lease = default(MuiAslRequestLeaseRecord);
+		lease.Next = APTR.FromPointer(0x00051040);
+		lease.Requester = APTR.FromPointer(0x00051200);
+		lease.Type = 7;
+		lease.Tags = APTR.FromPointer(0x00051300);
+		if (!MuiAslRequestLeaseStructCodec.Write(ref platform, leaseAddress,
+			lease) || !MuiAslRequestLeaseStructCodec.TryRead(ref platform,
+			leaseAddress, out var actualLease) || actualLease.Next.Raw != lease.Next.Raw ||
+			actualLease.Requester.Raw != lease.Requester.Raw ||
+			actualLease.Type != lease.Type || actualLease.Tags.Raw != lease.Tags.Raw)
+			return 2;
+		var crossing = APTR.FromPointer(0x00050FF8);
+		if (MuiAslServiceStateStructCodec.TryRead(ref platform, crossing,
+			out _) || MuiAslRequestLeaseStructCodec.TryRead(ref platform, crossing,
+				out _)) return 3;
+		if (MuiAslServiceStateStructCodec.Write(ref platform, APTR.Null, state) ||
+			MuiAslRequestLeaseStructCodec.Write(ref platform, APTR.Null, lease))
+			return 4;
+		return 42;
+	}
+
 	// MG09 bounded ASL TagItem control closure. It exercises MORE/SKIP/IGNORE
 	// traversal and forwards the original guest list to the requester seam.
 	public static uint AslTagServiceRoot()
@@ -4557,13 +5512,23 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1349 native struct-first indexed TagItem-vector closure. The complete
-	// named 8-byte record must be mapped before an indexed address is exposed.
+	// MG1949 native struct-first indexed TagItem-vector closure. The complete
+	// named 8-byte record is exchanged through the bounded vector bridge;
+	// production callers do not reproduce indexed slot arithmetic.
 	public static uint AslTagItemVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x00050100);
+		var expected = new MuiAslTagItemRecord
+		{
+			Tag = 0xF00DCAFEu,
+			Data = 0x87654321u,
+		};
+		if (!MuiAslTagItemVectorCodec.TryWrite(ref platform, vector, 2,
+			expected) || !MuiAslTagItemVectorCodec.TryRead(ref platform, vector, 2,
+			out var actual) || actual.Tag != expected.Tag ||
+			actual.Data != expected.Data) return 1;
 		if (!MuiAslTagItemVectorMemoryCodec.TryGetEntry(ref platform, vector, 2,
 			out var address) || address.Raw != vector.Raw +
 			(2 * MuiAslTagItemRecord.Size)) return 1;
@@ -4638,21 +5603,35 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1355 native struct-first requester-parameter-vector closure. The
-	// bounded ULONG slot adapter rejects null, overflowing, and truncated input.
+	// MG1985 native struct-first requester-parameter-vector closure. The bounded
+	// ULONG slot adapter rejects null, overflowing, and truncated input; the
+	// production formatter bridge is exercised through the named cursor without
+	// exposing a slot address to formatting consumers.
 	public static uint RequesterParameterVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x000361E0);
-		if (!MuiRequesterParameterVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, 2, out var address) || address.Raw != vector.Raw + 8) return 1;
-		if (MuiRequesterParameterVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, MuiRequesterParameterCursor.MaximumEntries, out _) ||
-			MuiRequesterParameterVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0x00050FFEu), 0, out _) ||
-			MuiRequesterParameterVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFF0u), 4, out _)) return 2;
+		var cursor = default(MuiRequesterParameterCursor);
+		cursor.Base = vector;
+		cursor.Index = 2;
+		if (!MuiRequesterParameterCursorCodec.TryGetEntry(ref platform, cursor,
+			out var address) || address.Raw != vector.Raw + 8) return 1;
+		if (!MuiRequesterParameterCursorCodec.TryWriteValue(ref platform, cursor,
+			0x12345678u) ||
+			!MuiRequesterParameterCursorCodec.TryReadValue(ref platform, cursor,
+				out var bridged) || bridged != 0x12345678u) return 3;
+		cursor.Index = MuiRequesterParameterCursor.MaximumEntries;
+		if (MuiRequesterParameterCursorCodec.TryGetEntry(ref platform, cursor,
+			out _)) return 2;
+		cursor.Base = APTR.FromPointer(0x00050FFE);
+		cursor.Index = 0;
+		if (MuiRequesterParameterCursorCodec.TryGetEntry(ref platform, cursor,
+			out _)) return 4;
+		cursor.Base = APTR.FromPointer(0xFFFFFFF0);
+		cursor.Index = 4;
+		if (MuiRequesterParameterCursorCodec.TryReadValue(ref platform, cursor,
+			out _)) return 5;
 		return 42;
 	}
 
@@ -4676,6 +5655,46 @@ public static class MuiNativeRoots
 		if (MuiRequesterParameterSlotMemoryCodec.TryGetAddress(ref platform,
 			APTR.FromPointer(0x00050FFE), MuiRequesterParameterSlotField.Value,
 			out _)) return 5;
+		return 42;
+	}
+
+	// MG1896 sequential requester record closure. The service state and each
+	// caller-owned ULONG slot are exchanged as complete named records; null and
+	// end-of-mapped-range packets fail closed before formatting consumes them.
+	public static uint RequesterSequentialStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var stateAddress = APTR.FromPointer(0x00050E80);
+		var state = default(MuiRequesterServiceStateRecord);
+		state.Magic = MuiRequesterServiceLayout.Magic;
+		state.Generation = 31;
+		if (!MuiRequesterServiceStateStructCodec.Write(ref platform, stateAddress,
+			state) || !MuiRequesterServiceStateStructCodec.TryRead(ref platform,
+			stateAddress, out var actualState) || actualState.Magic != state.Magic ||
+			actualState.Generation != state.Generation) return 1;
+		var slotAddress = APTR.FromPointer(0x00050EA0);
+		var slot = default(MuiRequesterParameterSlot);
+		slot.Value = 0x00040000u;
+		if (!MuiRequesterParameterSlotStructCodec.Write(ref platform, slotAddress,
+			slot) || !MuiRequesterParameterSlotStructCodec.TryRead(ref platform,
+			slotAddress, out var actualSlot) || actualSlot.Value != slot.Value)
+			return 2;
+		if (!MuiRequesterParameterSlotStructCodec.TryWriteValue(ref platform,
+			slotAddress, 0xFEDCBA98u) ||
+			!MuiRequesterParameterSlotStructCodec.TryReadValue(ref platform,
+				slotAddress, out var highValue) || highValue != 0xFEDCBA98u)
+			return 3;
+		var stateCrossing = APTR.FromPointer(0x00050FFC);
+		var slotCrossing = APTR.FromPointer(0x00050FFE);
+		if (MuiRequesterServiceStateStructCodec.TryRead(ref platform, stateCrossing,
+			out _) || MuiRequesterServiceStateStructCodec.Write(ref platform,
+				stateCrossing, state) || MuiRequesterParameterSlotStructCodec.TryRead(
+				ref platform, slotCrossing, out _) || MuiRequesterParameterSlotStructCodec.Write(
+				ref platform, slotCrossing, slot)) return 4;
+		if (MuiRequesterServiceStateStructCodec.TryRead(ref platform, APTR.Null,
+			out _) || MuiRequesterParameterSlotStructCodec.TryRead(ref platform,
+				APTR.Null, out _)) return 5;
 		return 42;
 	}
 
@@ -5605,10 +6624,9 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// Focused MG1356 proof that both caller packet and generated method-message
-	// argument vectors resolve through the named struct-first memory adapter.
-	// The adapter owns the two header boundaries and rejects malformed or
-	// truncated guest slots before any scalar read occurs.
+	// Focused MG1984 proof that both caller packet and generated method-message
+	// argument vectors retain their bounded header boundaries through the named
+	// semantic cursor and scalar-safe slot codec.
 	public static uint ProcessArgumentVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
@@ -5621,42 +6639,67 @@ public static class MuiNativeRoots
 		APTR.WriteUInt32(dispatchAddress, 4, 0x8042AAAAu);
 		APTR.WriteUInt32(dispatchAddress, 8, 0x1111u);
 		APTR.WriteUInt32(dispatchAddress, 12, 0x2222u);
-		if (!MuiProcessArgumentVectorMemoryCodec.TryGetEntry(ref platform,
-			dispatchAddress, MuiProcessArgumentVectorKind.DispatchPacket, 1, 2,
-			out var dispatchSlot) || APTR.ReadUInt32(dispatchSlot, 0) != 0x2222u)
-			return 1;
+		var cursor = default(MuiProcessArgumentCursor);
+		cursor.Message = dispatchAddress;
+		cursor.Kind = MuiProcessArgumentVectorKind.DispatchPacket;
+		cursor.Index = 1;
+		cursor.Count = 2;
+		if (!MuiProcessArgumentCursorCodec.TryReadValue(ref platform, cursor,
+			out var bridged) || bridged != 0x2222u) return 1;
 		APTR.WriteUInt32(methodAddress, 0, 0x8042BBBBu);
 		APTR.WriteUInt32(methodAddress, 4, 0x3333u);
 		APTR.WriteUInt32(methodAddress, 8, 0x4444u);
-		if (!MuiProcessArgumentVectorMemoryCodec.TryGetEntry(ref platform,
-			methodAddress, MuiProcessArgumentVectorKind.MethodMessage, 0, 2,
-			out var methodSlot) || APTR.ReadUInt32(methodSlot, 0) != 0x3333u)
-			return 2;
-		if (MuiProcessArgumentVectorMemoryCodec.TryGetEntry(ref platform,
-			APTR.Null, MuiProcessArgumentVectorKind.MethodMessage, 0, 1,
-			out _) || MuiProcessArgumentVectorMemoryCodec.TryGetEntry(
-			ref platform, APTR.FromPointer(0x00050FFEu),
-			MuiProcessArgumentVectorKind.MethodMessage, 0, 1, out _)) return 3;
+		cursor.Message = methodAddress;
+		cursor.Kind = MuiProcessArgumentVectorKind.MethodMessage;
+		cursor.Index = 0;
+		cursor.Count = 2;
+		if (!MuiProcessArgumentCursorCodec.TryReadValue(ref platform, cursor,
+			out bridged) || bridged != 0x3333u) return 2;
+		cursor.Message = APTR.Null;
+		cursor.Count = 1;
+		if (MuiProcessArgumentCursorCodec.TryGetEntry(ref platform, cursor,
+			out _)) return 3;
+		cursor.Message = APTR.FromPointer(0x00050FFE);
+		if (MuiProcessArgumentCursorCodec.TryGetEntry(ref platform, cursor,
+			out _)) return 4;
 		return 42;
 	}
 
-	// Focused MG1391 proof that the generated BOOPSI method-message prefix is
-	// exchanged through its named struct codec rather than a consumer offset.
+	// Focused MG1926 proof for the one-ULONG dispatch argument slot. The slot
+	// remains a named packed struct, while scalar-safe cursor entry points keep
+	// the known one-field by-value lowering seam out of the native call graph.
+	public static uint ProcessDispatchArgumentSlotStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x00036DC0);
+		platform.WriteUInt16(address, 0, 0x8042);
+		platform.WriteUInt16(address, 2, 0xAAAA);
+		if (!MuiProcessDispatchArgumentSlotCodec.TryReadValue(ref platform,
+			address, out var value) || value != 0x8042AAAAu) return 1;
+		if (MuiProcessDispatchArgumentSlotCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x00050FFE), out _)) return 2;
+		if (!MuiProcessDispatchArgumentSlotCodec.WriteValue(ref platform, address,
+			0xC001D00Du) || !MuiProcessDispatchArgumentSlotCodec.TryReadValue(
+			ref platform, address, out value) || value != 0xC001D00Du) return 3;
+		return 42;
+	}
+
+	// Focused MG1877 proof that the generated BOOPSI method-message prefix is
+	// exchanged through its named sequential struct codec rather than a consumer
+	// offset. The scalar helpers keep the one-ULONG native ABI local and avoid
+	// materializing a temporary one-field struct in the native compiler.
 	public static uint ProcessMethodMessageHeaderStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var address = APTR.FromPointer(0x00036D80);
-		var header = default(MuiProcessMethodMessageHeader);
-		header.MethodId = 0x8042BBBBu;
-		if (!MuiProcessMethodMessageHeaderCodec.Write(ref platform, address,
-			header))
-		{
-			return 1;
-		}
-		if (!MuiProcessMethodMessageHeaderCodec.TryRead(ref platform, address,
-			out var roundTrip) || roundTrip.MethodId != 0x8042BBBBu) return 2;
-		if (MuiProcessMethodMessageHeaderCodec.TryRead(ref platform,
+		if (!MuiProcessMethodMessageHeaderStructCodec.TryWriteMethodIdValue(
+			ref platform, address, 0x8042BBBBu) ||
+			!MuiProcessMethodMessageHeaderStructCodec.TryReadMethodIdValue(
+				ref platform, address, out var methodId) ||
+			methodId != 0x8042BBBBu) return 1;
+		if (MuiProcessMethodMessageHeaderStructCodec.TryReadMethodIdValue(ref platform,
 			APTR.FromPointer(0x00050FFEu), out _)) return 3;
 		return 42;
 	}
@@ -5797,6 +6840,105 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG2037 requester-format text exchange uses the named bounded byte cursor.
+	// This closure exercises format/source reads plus declared-length and
+	// address-admission failures without relying on managed formatting.
+	public static uint RequesterFormatByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		platform.WriteUInt8(text, 0, (byte)'%');
+		if (!MuiRequesterFormatByteCursorCodec.TryCreate(ref platform, text, 1,
+			out var cursor)) return 1;
+		if (!MuiRequesterFormatByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != (byte)'%') return 2;
+		cursor.Index = cursor.Length;
+		if (MuiRequesterFormatByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 3;
+		if (MuiRequesterFormatByteCursorCodec.TryCreate(ref platform, text, 0,
+			out _)) return 4;
+		if (MuiRequesterFormatByteCursorCodec.TryCreate(ref platform, text,
+			MuiRequesterFormatByteCursor.MaximumLength + 1, out _)) return 5;
+		if (!MuiRequesterFormatByteCursorCodec.TryCreate(ref platform,
+			APTR.FromPointer(uint.MaxValue), 1, out var overflowCursor) ||
+			MuiRequesterFormatByteCursorCodec.TryReadByte(ref platform,
+				overflowCursor, out _)) return 6;
+		if (!MuiRequesterFormatByteCursorCodec.TryCreate(ref platform,
+			APTR.FromPointer(0x00070000), 1, out var unmappedCursor) ||
+			MuiRequesterFormatByteCursorCodec.TryReadByte(ref platform,
+				unmappedCursor, out _)) return 7;
+		return 42;
+	}
+
+	// MG2063 requester printf materialization writes through the named bounded
+	// output cursor. The closure checks a mapped byte and rejects capacity,
+	// NULL, overflow, and unmapped destination cases on freestanding MC68000.
+	public static uint RequesterOutputByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var output = APTR.FromPointer(0x00050F80);
+		var cursor = default(MuiRequesterOutputByteCursor);
+		cursor.Base = output;
+		cursor.Capacity = 4;
+		if (!MuiRequesterOutputByteCursorCodec.TryWriteByte(ref platform, cursor,
+			(byte)'R') || APTR.ReadUInt8(output, 0) != (byte)'R') return 1;
+		cursor.Index = 4;
+		if (MuiRequesterOutputByteCursorCodec.TryWriteByte(ref platform, cursor, 0))
+			return 2;
+		cursor.Index = 0;
+		cursor.Capacity = MuiRequesterOutputByteCursor.MaximumLength + 1;
+		if (MuiRequesterOutputByteCursorCodec.TryWriteByte(ref platform, cursor, 0))
+			return 3;
+		cursor.Capacity = 4;
+		cursor.Base = APTR.Null;
+		if (MuiRequesterOutputByteCursorCodec.TryWriteByte(ref platform, cursor, 0))
+			return 4;
+		cursor.Base = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiRequesterOutputByteCursorCodec.TryWriteByte(ref platform, cursor, 0))
+			return 5;
+		cursor.Base = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiRequesterOutputByteCursorCodec.TryWriteByte(ref platform, cursor, 0))
+			return 6;
+		return 42;
+	}
+
+	// MG2038 requester payload gadget/format bytes use the named bounded
+	// cursor.  The closure proves a mapped read and rejects declared-length,
+	// over-limit, overflow, and NULL-base cases.
+	public static uint RequesterPayloadByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		platform.WriteUInt8(text, 0, (byte)'A');
+		if (!MuiRequesterPayloadByteCursorCodec.TryCreate(ref platform, text, 1,
+			out var cursor)) return 1;
+		if (!MuiRequesterPayloadByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != (byte)'A') return 2;
+		cursor.Index = cursor.Length;
+		if (MuiRequesterPayloadByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 3;
+		if (MuiRequesterPayloadByteCursorCodec.TryCreate(ref platform, text, 0,
+			out _)) return 4;
+		if (MuiRequesterPayloadByteCursorCodec.TryCreate(ref platform, text,
+			MuiRequesterPayloadByteCursor.MaximumLength + 1, out _)) return 5;
+		if (!MuiRequesterPayloadByteCursorCodec.TryCreate(ref platform,
+			APTR.FromPointer(uint.MaxValue), 1, out var overflowCursor) ||
+			MuiRequesterPayloadByteCursorCodec.TryReadByte(ref platform,
+				overflowCursor, out _)) return 6;
+		if (!MuiRequesterPayloadByteCursorCodec.TryCreate(ref platform,
+			APTR.FromPointer(0x00070000), 1, out var unmappedCursor) ||
+			MuiRequesterPayloadByteCursorCodec.TryReadByte(ref platform,
+				unmappedCursor, out _)) return 7;
+		if (MuiRequesterPayloadByteCursorCodec.TryCreate(ref platform, APTR.Null,
+			1, out _)) return 8;
+		return 42;
+	}
+
 	// Final-MG09 Misc family service closure. The family-neutral standalone
 	// route must claim a Keyadjust packet without exposing the Misc dispatcher
 	// as a separate public selection to callers.
@@ -5855,6 +6997,53 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG2089 native Keyadjust HandleInput closure.  A complete named
+	// MUIP_HandleInput record is dispatched through the Keyadjust specialist;
+	// the platform's typed RAWKEY adapter supplies the printable character and
+	// the resulting class-owned C string is checked through the shared bounded
+	// cursor.  A non-RAWKEY message is rejected without publishing a new key.
+	public static uint KeyadjustHandleInputStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var instance = APTR.FromPointer(0x00036300);
+		var packet = APTR.FromPointer(0x00036200);
+		var intuiMessage = APTR.FromPointer(0x00036580);
+		if (!MuiMiscSpecialistCore.Create(ref platform, instance,
+			MuiMiscSpecialistClass.Keyadjust)) return 1;
+		if (!MuiIntuiMessageCodec.WriteRawKey(ref platform, intuiMessage,
+			MuiIntuiMessageCodec.RawKeyClass, (ushort)'Q', 0x0200)) return 2;
+		if (!MuiMiscSpecialistMessageCodec.WriteHandleInput(ref platform, packet,
+			intuiMessage.Raw, -1)) return 3;
+		if (!MuiMiscSpecialistCore.HandleInput(ref platform, instance,
+			intuiMessage, -1)) return 4;
+		if (!MuiMiscSpecialistCore.GetAttribute(ref platform, instance,
+			MuiMiscAttributes.Keyadjust_Key, out var keyText) || keyText == 0)
+			return 5;
+		var keyAddress = APTR.FromPointer(keyText);
+		if (!platform.IsMapped(keyAddress, 2)) return 60;
+		var rawCharacter = APTR.ReadUInt8(keyAddress, 0);
+		if (rawCharacter != (byte)'Q') return 61;
+		var cursor = new MuiCStringByteCursor
+		{
+			Base = keyAddress,
+			Index = 0,
+			Limit = 2,
+		};
+		if (!MuiCStringByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var character) || character != (byte)'Q') return 6;
+		cursor.Index = 1;
+		if (!MuiCStringByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var terminator) || terminator != 0) return 7;
+		if (!MuiIntuiMessageCodec.WriteRawKey(ref platform, intuiMessage,
+			0x12345678u, (ushort)'X', 0x0200)) return 8;
+		if (!MuiMiscSpecialistMessageCodec.WriteHandleInput(ref platform, packet,
+			intuiMessage.Raw, -1)) return 9;
+		if (MuiMiscSpecialistCore.HandleInput(ref platform, instance,
+			intuiMessage, -1)) return 10;
+		return 42;
+	}
+
 	// MG548 native ShortHelp check closure. The fixed MorphOS packet is built
 	// and decoded through its named codec; semantic provider/fallback behavior
 	// remains covered by the host dispatcher suite.
@@ -5869,6 +7058,58 @@ public static class MuiNativeRoots
 		if (!MuiAreaShortHelpMessageCodec.TryReadCheck(ref platform, packet,
 			out var check) || check.Help != previousHelp || check.MouseX != -18 ||
 			check.MouseY != 29) return 2;
+		return 42;
+	}
+
+	// MG2090 native ShortHelp provider closure. The provider uses the named
+	// MorphOS create/delete samples to publish and retire one bounded guest
+	// C-string. The production packet core is host-covered; this freestanding
+	// root keeps the native qualification focused on the provider ABI itself.
+	public static uint AreaShortHelpDynamicProviderRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var obj = APTR.FromPointer(0x00035F00);
+		var staticHelp = APTR.FromPointer(0x00036000);
+		var current = default(MuiShortHelpCreateSample);
+		current.Object = obj;
+		current.CurrentHelp = staticHelp;
+		current.MouseX = -7;
+		current.MouseY = 23;
+		current.Result = staticHelp;
+		// Enable only this root's provider path; all other native roots retain
+		// the documented static-help fallback.
+		MuiNativeShortHelpProviderStateCodec.TryRead(ref platform, out var providerState);
+		providerState.Enabled = 1;
+		MuiNativeShortHelpProviderStateCodec.TryWrite(ref platform, providerState);
+		if (!platform.CreateMuiShortHelp(ref current) ||
+			current.Object != obj || current.CurrentHelp != staticHelp ||
+			current.MouseX != -7 || current.MouseY != 23 ||
+			current.Result.Raw != MuiNativeShortHelpTextRecord.Address ||
+			!MuiNativeShortHelpTextRecordCodec.TryRead(ref platform,
+				out var textRecord) || textRecord.First != (byte)'?' ||
+			textRecord.Terminator != 0) return 1;
+		var wrongDelete = default(MuiShortHelpDeleteSample);
+		wrongDelete.Object = obj;
+		wrongDelete.Help = APTR.FromPointer(0x0004F100);
+		if (platform.DeleteMuiShortHelp(ref wrongDelete) ||
+			MuiNativeShortHelpProviderStateCodec.TryRead(ref platform, out providerState) &&
+			providerState.Active == 0) return 2;
+		var wrongObjectDelete = default(MuiShortHelpDeleteSample);
+		wrongObjectDelete.Object = APTR.FromPointer(0x00035F04);
+		wrongObjectDelete.Help = current.Result;
+		if (platform.DeleteMuiShortHelp(ref wrongObjectDelete) ||
+			!MuiNativeShortHelpProviderStateCodec.TryRead(ref platform, out providerState) ||
+			providerState.Active == 0) return 3;
+		var delete = default(MuiShortHelpDeleteSample);
+		delete.Object = obj;
+		delete.Help = current.Result;
+		if (!platform.DeleteMuiShortHelp(ref delete) ||
+			!MuiNativeShortHelpProviderStateCodec.TryRead(ref platform, out providerState) ||
+			providerState.Active != 0 ||
+			!MuiNativeShortHelpTextRecordCodec.TryRead(ref platform,
+				out textRecord) || textRecord.First != 0 ||
+			textRecord.Terminator != 0) return 4;
 		return 42;
 	}
 
@@ -5945,6 +7186,45 @@ public static class MuiNativeRoots
 			decodedNode.Flags != node.Flags || decodedNode.Object != node.Object ||
 			decodedNode.Class != node.Class || decodedNode.Events != node.Events)
 			return 11;
+		return 42;
+	}
+
+	// MG1893 native ABI proof for the complete mixed-width handled-events state
+	// record. Production state exchange uses one sequential named struct rather
+	// than repeating field offsets; malformed end-of-memory records fail closed.
+	public static uint AreaHandledEventsStateStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var state = APTR.FromPointer(0x00050F40);
+		var record = default(MuiAreaHandledEventsStateRecord);
+		record.Signature = MuiAreaHandledEventsStateRecord.Magic;
+		record.Events = 0x00000200;
+		record.Window = APTR.FromPointer(0x00050D00);
+		record.Handler = APTR.FromPointer(0x00050D20);
+		record.Generation = 7;
+		record.HandlerFlags = 0x0003;
+		record.Priority = -7;
+		record.Reserved = 0x5A;
+		if (!MuiAreaHandledEventsStateStructCodec.Write(ref platform, state,
+			record)) return 11;
+		if (APTR.ReadUInt16(state, 20) != record.HandlerFlags ||
+			APTR.ReadUInt8(state, 22) != unchecked((byte)record.Priority) ||
+			APTR.ReadUInt8(state, 23) != record.Reserved) return 21;
+		if (!MuiAreaHandledEventsStateStructCodec.TryRead(ref platform, state,
+			out var decoded)) return 12;
+		if (decoded.Signature != record.Signature) return 13;
+		if (decoded.Events != record.Events) return 14;
+		if (decoded.Window.Raw != record.Window.Raw) return 15;
+		if (decoded.Handler.Raw != record.Handler.Raw) return 16;
+		if (decoded.Generation != record.Generation) return 17;
+		if (decoded.HandlerFlags != record.HandlerFlags) return 18;
+		if (decoded.Priority != record.Priority) return 19;
+		if (decoded.Reserved != record.Reserved) return 20;
+		if (MuiAreaHandledEventsStateStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FE9), out _) ||
+			MuiAreaHandledEventsStateStructCodec.Write(ref platform, APTR.Null,
+				record)) return 2;
 		return 42;
 	}
 
@@ -6687,6 +7967,39 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG2030 Area FixedText sample-string cursor closure. The bounded adapter
+	// validates an interior byte and terminator, rejects negative/upper-bound
+	// indices, and fails closed for overflow/unmapped guest strings.
+	public static uint AreaFixedTextStringByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00036100);
+		APTR.WriteUInt8(text, 0, (byte)'w');
+		APTR.WriteUInt8(text, 1, (byte)'i');
+		APTR.WriteUInt8(text, 2, (byte)'d');
+		APTR.WriteUInt8(text, 3, (byte)'e');
+		APTR.WriteUInt8(text, 4, 0);
+		var cursor = default(MuiAreaFixedTextStringByteCursor);
+		cursor.Text = text;
+		cursor.Index = 1;
+		if (!MuiAreaFixedTextStringByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value) || value != (byte)'i') return 1;
+		if (!MuiAreaFixedTextStringByteCursorCodec.TryReadAt(ref platform, text,
+			4, out value) || value != 0) return 2;
+		if (MuiAreaFixedTextStringByteCursorCodec.TryReadAt(ref platform, text,
+			-1, out _)) return 3;
+		if (MuiAreaFixedTextStringByteCursorCodec.TryReadAt(ref platform, text,
+			(int)MuiAreaFixedTextStringByteCursor.MaximumLength, out _)) return 4;
+		if (MuiAreaFixedTextStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0x00060000), 0, out _)) return 5;
+		if (MuiAreaFixedTextStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0xFFFFFFFEu), 2, out _)) return 6;
+		if (MuiAreaFixedTextStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.Null, 0, out _)) return 7;
+		return 42;
+	}
+
 	// MG1002 Area FixedText admission proof. Owned sample pointers are optional,
 	// while the cookie and generation remain canonical record fields.
 	public static uint AreaFixedTextAdmissionRoot()
@@ -7314,6 +8627,48 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG2033 ByteRun1 span cursor closure. Exercises compressed-source and
+	// decoded-destination byte/range exchange plus signed/span-bound,
+	// overflow/unmapped, and null-pointer rejection on MC68000.
+	public static uint ByteRunCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var source = APTR.FromPointer(0x00036100);
+		APTR.WriteUInt8(source, 0, 0x02);
+		APTR.WriteUInt8(source, 1, 0x11);
+		APTR.WriteUInt8(source, 2, 0x22);
+		APTR.WriteUInt8(source, 3, 0x33);
+		var cursor = default(MuiByteRunByteCursor);
+		cursor.Base = source;
+		cursor.Length = 4;
+		cursor.Index = 1;
+		if (!MuiByteRunByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != 0x11) return 1;
+		cursor.Index = 1;
+		if (!MuiByteRunByteCursorCodec.TryGetRange(ref platform, cursor, 3,
+			out var range) || range.Raw != source.Raw + 1) return 2;
+		var destination = APTR.FromPointer(0x00036140);
+		cursor.Base = destination;
+		cursor.Length = 4;
+		cursor.Index = 2;
+		if (!MuiByteRunByteCursorCodec.TryWriteByte(ref platform, cursor,
+			0x7F) || APTR.ReadUInt8(destination, 2) != 0x7F) return 3;
+		if (MuiByteRunByteCursorCodec.TryReadAt(ref platform, source, 4,
+			-1, out _)) return 4;
+		if (MuiByteRunByteCursorCodec.TryReadAt(ref platform, source, 4,
+			4, out _)) return 5;
+		if (MuiByteRunByteCursorCodec.TryReadAt(ref platform, source,
+			MuiByteRunByteCursor.MaximumLength + 1, 0, out _)) return 6;
+		if (MuiByteRunByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0x00060000), 4, 0, out _)) return 7;
+		if (MuiByteRunByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0xFFFFFFFEu), 4, 2, out _)) return 8;
+		if (MuiByteRunByteCursorCodec.TryReadAt(ref platform,
+			APTR.Null, 4, 0, out _)) return 9;
+		return 42;
+	}
+
 	// MG1033 Image old-image admission proof. The caller-owned graphics Image
 	// pointer is NULL or mapped guest memory behind one named fixed-width record.
 	public static uint ImageOldImageAdmissionRoot()
@@ -7689,6 +9044,42 @@ public static class MuiNativeRoots
 			parsed.TextColor != 0x00112233u ||
 			(parsed.StyleFlags & MuiCustomFontSpecFlags.Outline) == 0)
 			return 2;
+		return 42;
+	}
+
+	// MG2031 CustomFont specification cursor closure. Exercises a bounded
+	// interior byte and terminator read plus negative/upper-bound,
+	// overflow/unmapped, and null-pointer rejection on MC68000.
+	public static uint CustomFontSpecStringByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00036100);
+		APTR.WriteUInt8(text, 0, (byte)'N');
+		APTR.WriteUInt8(text, 1, (byte)'o');
+		APTR.WriteUInt8(text, 2, (byte)'t');
+		APTR.WriteUInt8(text, 3, (byte)'o');
+		APTR.WriteUInt8(text, 4, (byte)'/');
+		APTR.WriteUInt8(text, 5, (byte)'2');
+		APTR.WriteUInt8(text, 6, (byte)'0');
+		APTR.WriteUInt8(text, 7, 0);
+		var cursor = default(MuiCustomFontSpecStringByteCursor);
+		cursor.Text = text;
+		cursor.Index = 2;
+		if (!MuiCustomFontSpecStringByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value) || value != (byte)'t') return 1;
+		if (!MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform, text,
+			7, out value) || value != 0) return 2;
+		if (MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform, text,
+			-1, out _)) return 3;
+		if (MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform, text,
+			(int)MuiCustomFontSpecStringByteCursor.MaximumLength, out _)) return 4;
+		if (MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0x00060000), 0, out _)) return 5;
+		if (MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0xFFFFFFFEu), 2, out _)) return 6;
+		if (MuiCustomFontSpecStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.Null, 0, out _)) return 7;
 		return 42;
 	}
 
@@ -8213,6 +9604,39 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG2043 MakeObject control-character label scanning uses the named bounded
+	// cursor.  The closure exercises the underscore look-ahead byte and rejects
+	// limit, NULL, overflow, and unmapped addresses.
+	public static uint MakeObjectControlCharCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		platform.WriteUInt8(text, 0, (byte)'_');
+		platform.WriteUInt8(text, 1, (byte)'X');
+		var cursor = default(MuiMakeObjectControlCharByteCursor);
+		cursor.Text = text;
+		cursor.Index = 1;
+		if (!MuiMakeObjectControlCharByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value) || value != (byte)'X') return 1;
+		cursor.Index = MuiMakeObjectControlCharByteCursor.MaximumLength;
+		if (MuiMakeObjectControlCharByteCursorCodec.TryReadByte(ref platform,
+			cursor, out _)) return 2;
+		cursor.Text = APTR.Null;
+		cursor.Index = 0;
+		if (MuiMakeObjectControlCharByteCursorCodec.TryReadByte(ref platform,
+			cursor, out _)) return 3;
+		cursor.Text = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiMakeObjectControlCharByteCursorCodec.TryReadByte(ref platform,
+			cursor, out _)) return 4;
+		cursor.Text = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiMakeObjectControlCharByteCursorCodec.TryReadByte(ref platform,
+			cursor, out _)) return 5;
+		return 42;
+	}
+
 	// Focused proof that Stringscroll's fixed scrollbar class-name scratch
 	// string retains its exact fourteen-byte packed record representation.
 	public static uint StringscrollClassNameStructCodecRoot()
@@ -8235,6 +9659,99 @@ public static class MuiNativeRoots
 			roundTrip.Terminator != value.Terminator) return 2;
 		if (MuiStringscrollScrollbarClassNameRecordCodec.TryReadRecord(ref platform,
 			APTR.FromPointer(0x00050FF3), out _)) return 3;
+		return 42;
+	}
+
+	// MG2000 Stringscroll automatic-scrollbar construction emits its two
+	// caller-owned TagItem records through the shared named cursor writer.
+	public static uint StringscrollAutomaticScrollbarTagCursorRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var tags = APTR.FromPointer(0x00050FC0);
+		if (!MuiStringscrollCore.WriteAutomaticScrollbarTagRecords(ref platform,
+			tags, true)) return 1;
+		var cursor = default(MuiAslTagItemCursor);
+		cursor.Base = tags;
+		cursor.Index = 0;
+		if (!MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
+			out var group) || group.Tag != MuiCommonControlCore.GroupHoriz ||
+			group.Data != 1) return 2;
+		if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1) ||
+			!MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
+				out var done) || done.Tag != MuiAslTagListCore.TagDone ||
+			done.Data != 0) return 3;
+		cursor.Base = APTR.FromPointer(0xFFFFFFFF);
+		cursor.Index = 0;
+		if (MuiAslTagItemVectorCodec.TryRead(ref platform, cursor, out _)) return 4;
+		return 42;
+	}
+
+	// MG2035 Stringscroll text bytes are admitted through a named bounded
+	// cursor.  The root exercises declared-length, overflow, and unmapped-byte
+	// rejection without depending on managed strings or exception paths.
+	public static uint StringscrollTextCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		platform.WriteUInt8(text, 0, (byte)'A');
+		platform.WriteUInt8(text, 1, 0xC3);
+		platform.WriteUInt8(text, 2, 0xA4);
+		platform.WriteUInt8(text, 3, (byte)'Z');
+		if (!MuiStringscrollTextByteCursorCodec.TryCreate(ref platform, text,
+			4, out var cursor)) return 1;
+		if (!MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform, cursor,
+			0, out var first) || first != (byte)'A') return 2;
+		if (!MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform, cursor,
+			2, out var third) || third != 0xA4) return 3;
+		if (MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform, cursor,
+			4, out _)) return 4;
+		if (MuiStringscrollTextByteCursorCodec.TryCreate(ref platform, text,
+			MuiStringscrollTextByteCursor.MaximumLength + 1, out _)) return 5;
+		if (!MuiStringscrollTextByteCursorCodec.TryCreate(ref platform,
+			APTR.FromPointer(uint.MaxValue), 1, out var overflowCursor) ||
+			MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform,
+				overflowCursor, 0, out _)) return 6;
+		if (!MuiStringscrollTextByteCursorCodec.TryCreate(ref platform,
+			APTR.FromPointer(0x00070000), 1, out var unmappedCursor) ||
+			MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform,
+				unmappedCursor, 0, out _)) return 7;
+		return 42;
+	}
+
+	// MG2036 Notify string-copy bytes use two named bounded cursors.  The
+	// focused root proves source/destination exchange and rejects zero-length,
+	// over-limit, overflow, and NULL bases without managed helpers.
+	public static uint NotifyWriteByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var source = APTR.FromPointer(0x00050F80);
+		var destination = APTR.FromPointer(0x00050FA0);
+		platform.WriteUInt8(source, 0, (byte)'X');
+		if (!MuiNotifyWriteByteCursorCodec.TryCreate(ref platform, source, 1,
+			out var sourceCursor) ||
+			!MuiNotifyWriteByteCursorCodec.TryCreate(ref platform, destination, 1,
+				out var destinationCursor)) return 1;
+		if (!MuiNotifyWriteByteCursorCodec.TryReadByte(ref platform, sourceCursor,
+			out var value) || value != (byte)'X') return 2;
+		if (!MuiNotifyWriteByteCursorCodec.TryWriteByte(ref platform,
+			destinationCursor, value) || platform.ReadUInt8(destination, 0) !=
+			(byte)'X') return 3;
+		if (MuiNotifyWriteByteCursorCodec.TryCreate(ref platform, source, 0,
+			out _)) return 4;
+		if (MuiNotifyWriteByteCursorCodec.TryCreate(ref platform, source,
+			MuiNotifyWriteByteCursor.MaximumLength + 1, out _)) return 5;
+		sourceCursor.Index = sourceCursor.Length;
+		if (MuiNotifyWriteByteCursorCodec.TryReadByte(ref platform, sourceCursor,
+			out _)) return 6;
+		if (!MuiNotifyWriteByteCursorCodec.TryCreate(ref platform,
+			APTR.FromPointer(uint.MaxValue), 1, out var overflowCursor) ||
+			MuiNotifyWriteByteCursorCodec.TryReadByte(ref platform, overflowCursor,
+				out _)) return 7;
+		if (MuiNotifyWriteByteCursorCodec.TryCreate(ref platform, APTR.Null, 1,
+			out _)) return 8;
 		return 42;
 	}
 
@@ -8577,6 +10094,48 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG2044 ExternalWrapper Dtpic name bytes use the named bounded text cursor.
+	// The closure proves source/destination exchange and rejects length, limit,
+	// overflow, and NULL-base cases on MC68000.
+	public static uint ExternalTextCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var source = APTR.FromPointer(0x00050F80);
+		var destination = APTR.FromPointer(0x00050FA0);
+		platform.WriteUInt8(source, 0, (byte)'D');
+		var sourceCursor = default(MuiExternalTextByteCursor);
+		sourceCursor.Base = source;
+		sourceCursor.Index = 0;
+		sourceCursor.Length = 1;
+		var destinationCursor = default(MuiExternalTextByteCursor);
+		destinationCursor.Base = destination;
+		destinationCursor.Index = 0;
+		destinationCursor.Length = 1;
+		if (!MuiExternalTextByteCursorCodec.TryReadByte(ref platform, sourceCursor,
+			out var value) || value != (byte)'D') return 1;
+		if (!MuiExternalTextByteCursorCodec.TryWriteByte(ref platform,
+			destinationCursor, value) || platform.ReadUInt8(destination, 0) !=
+			(byte)'D') return 2;
+		sourceCursor.Index = sourceCursor.Length;
+		if (MuiExternalTextByteCursorCodec.TryReadByte(ref platform, sourceCursor,
+			out _)) return 3;
+		sourceCursor.Length = MuiExternalTextByteCursor.MaximumLength + 1;
+		sourceCursor.Index = 0;
+		if (MuiExternalTextByteCursorCodec.TryReadByte(ref platform, sourceCursor,
+			out _)) return 4;
+		sourceCursor.Length = 1;
+		sourceCursor.Base = APTR.FromPointer(uint.MaxValue);
+		sourceCursor.Index = 1;
+		if (MuiExternalTextByteCursorCodec.TryReadByte(ref platform, sourceCursor,
+			out _)) return 5;
+		sourceCursor.Base = APTR.Null;
+		sourceCursor.Index = 0;
+		if (MuiExternalTextByteCursorCodec.TryReadByte(ref platform, sourceCursor,
+			out _)) return 6;
+		return 42;
+	}
+
 	// Focused proof that the Menu.mui, Menustrip.mui and Menuitem.mui class
 	// identities retain their exact fixed packed C-string representations.
 	public static uint MenuSpecialistClassNameStructCodecRoot()
@@ -8742,9 +10301,9 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// Focused MUI_MakeObjectA generated-TagItem qualification. The button
-	// shape is emitted through the same named-record writer used by the live
-	// service; the native closure validates each generated Tag/Data pair and
+	// MG1999 focused MUI_MakeObjectA generated-TagItem qualification. The button
+	// shape is emitted through the same named-record cursor writer used by the
+	// live service; the native closure validates each generated Tag/Data pair and
 	// the final TAG_DONE record without entering object allocation or dispatch.
 	public static uint MakeObjectGeneratedTagCodecRoot()
 	{
@@ -8757,33 +10316,29 @@ public static class MuiNativeRoots
 			APTR.FromPointer(tags), text, APTR.FromPointer(preParse))) return 1;
 		var cursor = default(MuiAslTagItemCursor);
 		cursor.Base = APTR.FromPointer(tags);
-		if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
-			out var entry) || !MuiAslTagItemCodec.TryRead(ref platform, entry,
+		cursor.Index = 0;
+		if (!MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
 			out var record) || record.Tag != 0x8042AC64u || record.Data != 1) return 2;
-		cursor.Index = 1;
-		if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
-			out entry) || !MuiAslTagItemCodec.TryRead(ref platform, entry,
-			out record) || record.Tag != 0x8042BE50u || record.Data != 0xFFFFFFF9u) return 3;
-		cursor.Index = 2;
-		if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
-			out entry) || !MuiAslTagItemCodec.TryRead(ref platform, entry,
-			out record) || record.Tag != 0x8042F8DCu || record.Data != text) return 4;
-		cursor.Index = 3;
-		if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
-			out entry) || !MuiAslTagItemCodec.TryRead(ref platform, entry,
-			out record) || record.Tag != 0x8042566Du || record.Data != preParse) return 5;
-		cursor.Index = 4;
-		if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
-			out entry) || !MuiAslTagItemCodec.TryRead(ref platform, entry,
-			out record) || record.Tag != 0x8042FB04u || record.Data != 1) return 6;
-		cursor.Index = 5;
-		if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
-			out entry) || !MuiAslTagItemCodec.TryRead(ref platform, entry,
-			out record) || record.Tag != 0x8042545Bu || record.Data != 2) return 7;
-		cursor.Index = 6;
-		if (!MuiAslTagItemVectorCodec.TryGetEntry(ref platform, cursor,
-			out entry) || !MuiAslTagItemCodec.TryRead(ref platform, entry,
-			out record) || record.Tag != MuiAslTagListCore.TagDone || record.Data != 0) return 8;
+		if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1) ||
+			!MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
+				out record) || record.Tag != 0x8042BE50u ||
+			record.Data != 0xFFFFFFF9u) return 3;
+		if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1) ||
+			!MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
+				out record) || record.Tag != 0x8042F8DCu || record.Data != text) return 4;
+		if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1) ||
+			!MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
+				out record) || record.Tag != 0x8042566Du || record.Data != preParse) return 5;
+		if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1) ||
+			!MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
+				out record) || record.Tag != 0x8042FB04u || record.Data != 1) return 6;
+		if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1) ||
+			!MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
+				out record) || record.Tag != 0x8042545Bu || record.Data != 2) return 7;
+		if (!MuiAslTagItemVectorCodec.TryAdvance(ref cursor, 1) ||
+			!MuiAslTagItemVectorCodec.TryRead(ref platform, cursor,
+				out record) || record.Tag != MuiAslTagListCore.TagDone ||
+			record.Data != 0) return 8;
 		return 42;
 	}
 
@@ -8872,6 +10427,42 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG2045 menu-trigger title copy closure. The bounded source and
+	// destination ranges use the named packed byte cursor; null, length and
+	// address-overflow cases reject without exposing raw indexed guest reads.
+	public static uint MenuItemTriggerStringCursorRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var source = APTR.FromPointer(0x00037B00);
+		var destination = APTR.FromPointer(0x00037B40);
+		APTR.WriteUInt8(source, 0, (byte)'M');
+		var sourceCursor = default(MuiMenuItemTriggerStringByteCursor);
+		sourceCursor.Base = source;
+		sourceCursor.Length = 1;
+		var destinationCursor = default(MuiMenuItemTriggerStringByteCursor);
+		destinationCursor.Base = destination;
+		destinationCursor.Length = 1;
+		if (!MuiMenuItemTriggerStringByteCursorCodec.TryReadByte(ref platform,
+			sourceCursor, out var value) || value != (byte)'M' ||
+			!MuiMenuItemTriggerStringByteCursorCodec.TryWriteByte(ref platform,
+				destinationCursor, value) ||
+			APTR.ReadUInt8(destination, 0) != (byte)'M') return 1;
+		sourceCursor.Index = sourceCursor.Length;
+		if (MuiMenuItemTriggerStringByteCursorCodec.TryReadByte(ref platform,
+			sourceCursor, out _)) return 2;
+		sourceCursor.Index = 0;
+		sourceCursor.Length = MuiMenuItemTriggerStringByteCursor.MaximumLength + 1;
+		if (MuiMenuItemTriggerStringByteCursorCodec.TryReadByte(ref platform,
+			sourceCursor, out _)) return 3;
+		sourceCursor.Length = 1;
+		sourceCursor.Base = APTR.FromPointer(uint.MaxValue);
+		sourceCursor.Index = 1;
+		if (MuiMenuItemTriggerStringByteCursorCodec.TryReadByte(ref platform,
+			sourceCursor, out _)) return 4;
+		return 42;
+	}
+
 	// Focused NewMenu record qualification. The packed 20-byte GadTools entry
 	// is decoded into a named record, including its pointer-sized fields and
 	// flags, while an entry crossing the mapped boundary is rejected.
@@ -8897,26 +10488,78 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1364 NewMenu vector closure. Each packed 20-byte entry is resolved via
-	// the named record adapter before guest access; no consumer reproduces the
-	// vector offset arithmetic. NewMenu field decoding is covered by its
-	// separate record-codec root.
+	// MG1948/MG1993 NewMenu vector closure. Each packed 20-byte entry is
+	// admitted by the bounded cursor bridge and exchanged as a complete named
+	// record; production consumers do not reproduce vector slot arithmetic.
 	public static uint NewMenuVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x00050F20);
-		if (!MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform, vector, 0,
-			out var entry)) return 1;
-		APTR.WriteUInt32(entry, 0, 0x11223344);
-		if (APTR.ReadUInt32(entry, 0) != 0x11223344) return 2;
-		if (!MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform, vector, 1,
-			out var second) || second.Raw != vector.Raw + MuiNewMenuRecord.Size)
+		var cursor = default(MuiNewMenuCursor);
+		cursor.Base = vector;
+		cursor.Index = 0;
+		var expected = new MuiNewMenuRecord
+		{
+			Type = 2,
+			Padding = 0xA5,
+			Label = 0xF00DCAFEu,
+			CommandKey = 0xEEDDCCBBu,
+			Flags = 0xBEEF,
+			MutualExclude = 0x87654321u,
+			UserData = 0xCAFEBABEu,
+		};
+		if (!MuiNewMenuVectorCodec.TryWrite(ref platform, cursor, expected) ||
+			!MuiNewMenuVectorCodec.TryRead(ref platform, cursor,
+				out var actual) || actual.Type != expected.Type ||
+			actual.Padding != expected.Padding || actual.Label != expected.Label ||
+			actual.CommandKey != expected.CommandKey ||
+			actual.Flags != expected.Flags ||
+			actual.MutualExclude != expected.MutualExclude ||
+			actual.UserData != expected.UserData) return 2;
+		if (!MuiNewMenuVectorCodec.TryAdvance(ref cursor, 1) ||
+			!MuiNewMenuCursorCodec.TryGetEntry(ref platform, cursor,
+				out var second) || second.Raw != vector.Raw + MuiNewMenuRecord.Size)
 			return 3;
-		if (MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiNewMenuCursor.MaximumEntries, out _) ||
-			MuiNewMenuVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 4;
+		cursor.Index = MuiNewMenuCursor.MaximumEntries;
+		if (MuiNewMenuVectorCodec.TryRead(ref platform, cursor, out _) ||
+			MuiNewMenuCursorCodec.TryGetEntry(ref platform, cursor, out _)) return 4;
+		cursor.Base = APTR.FromPointer(0xFFFFFFFF);
+		cursor.Index = 1;
+		if (MuiNewMenuVectorCodec.TryRead(ref platform, cursor, out _)) return 5;
+		return 42;
+	}
+
+	// MG1994 NewMenu validation consumes title/item/end records through the
+	// bounded named cursor. The focused root keeps menu semantics separate from
+	// the larger MakeObject service closure so the cursor walker is qualified
+	// without pulling unrelated controls into the native compiler.
+	public static uint NewMenuValidationCursorRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var vector = APTR.FromPointer(0x00050F20);
+		var title = APTR.FromPointer(0x00036000);
+		var item = APTR.FromPointer(0x00036020);
+		WriteNativeCString(title, 'P', 'r', 'o', 'j', 'e', 'c', 't');
+		WriteNativeCString(item, 'O', 'p', 'e', 'n', 0, 0, 0);
+		var cursor = default(MuiNewMenuCursor);
+		cursor.Base = vector;
+		cursor.Index = 0;
+		if (!MuiNewMenuVectorCodec.TryWrite(ref platform, cursor,
+			new MuiNewMenuRecord { Type = MuiNewMenuTypeRecord.Title,
+				Label = title.Raw })) return 1;
+		if (!MuiNewMenuVectorCodec.TryAdvance(ref cursor, 1)) return 2;
+		if (!MuiNewMenuVectorCodec.TryWrite(ref platform, cursor,
+			new MuiNewMenuRecord { Type = MuiNewMenuTypeRecord.Item,
+				Label = item.Raw })) return 3;
+		if (!MuiNewMenuVectorCodec.TryAdvance(ref cursor, 1)) return 4;
+		if (!MuiNewMenuVectorCodec.TryWrite(ref platform, cursor,
+			new MuiNewMenuRecord { Type = MuiNewMenuTypeRecord.End })) return 5;
+		if (MuiMakeObjectServiceCore.ValidateNewMenuCode(ref platform, vector,
+			0) != 0) return 6;
+		if (MuiMakeObjectServiceCore.ValidateNewMenuCode(ref platform,
+			APTR.FromPointer(0xFFFFFFFF), 0) != 2) return 7;
 		return 42;
 	}
 
@@ -9628,6 +11271,34 @@ public static class MuiNativeRoots
 				(MuiErrorServiceStateField)255, out _) ||
 			MuiErrorServiceStateMemoryCodec.TryGetAddress(ref platform, APTR.Null,
 				MuiErrorServiceStateField.Error, out _)) return 3;
+		return 42;
+	}
+
+	// MG1895 sequential error-state record closure. The live error service now
+	// exchanges the complete named record in declaration order; null and
+	// end-of-mapped-range packets fail closed.
+	public static uint ErrorServiceSequentialStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var stateAddress = APTR.FromPointer(0x00050E80);
+		var state = default(MuiErrorServiceStateRecord);
+		state.Magic = MuiErrorServiceLayout.Magic;
+		state.Version = MuiErrorServiceLayout.Version;
+		state.Error = 0xFFFFFFFEu;
+		state.Sequence = 17;
+		if (!MuiErrorServiceStateStructCodec.Write(ref platform, stateAddress,
+			state) || !MuiErrorServiceStateStructCodec.TryRead(ref platform,
+			stateAddress, out var actual) || actual.Magic != state.Magic ||
+			actual.Version != state.Version || actual.Error != state.Error ||
+			actual.Sequence != state.Sequence) return 1;
+		var crossing = APTR.FromPointer(0x00050FF8);
+		if (MuiErrorServiceStateStructCodec.TryRead(ref platform, crossing,
+			out _) || MuiErrorServiceStateStructCodec.Write(ref platform,
+				crossing, state)) return 2;
+		if (MuiErrorServiceStateStructCodec.TryRead(ref platform, APTR.Null,
+			out _) || MuiErrorServiceStateStructCodec.Write(ref platform,
+				APTR.Null, state)) return 3;
 		return 42;
 	}
 
@@ -11791,6 +13462,50 @@ public static class MuiNativeRoots
 			out _)) return 4;
 		if (MuiImageSpecPrefixRecordCodec.TryReadRecord(ref platform,
 			APTR.Null, out _)) return 5;
+		return 42;
+	}
+
+	// MG2058 Image.mui variable-spec closure. Colour, decimal, and named
+	// payload scans use the named bounded image-spec cursor; malformed guest
+	// ranges fail closed before interpretation.
+	public static uint ImageSpecPayloadCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var spec = APTR.FromPointer(0x00050F80);
+		APTR.WriteUInt8(spec, 0, (byte)'2');
+		APTR.WriteUInt8(spec, 1, (byte)':');
+		APTR.WriteUInt8(spec, 2, (byte)'f');
+		APTR.WriteUInt8(spec, 3, (byte)'f');
+		APTR.WriteUInt8(spec, 4, (byte)'8');
+		APTR.WriteUInt8(spec, 5, (byte)'0');
+		APTR.WriteUInt8(spec, 6, (byte)'4');
+		APTR.WriteUInt8(spec, 7, (byte)'0');
+		APTR.WriteUInt8(spec, 8, 0);
+		if (!MuiCommonControlCore.TryParseImageSpec(ref platform, spec,
+			out var parsed) || parsed.Kind != MuiImageSpecKind.Color ||
+			parsed.Value != 0x00FF8040u) return 1;
+		var cursor = default(MuiImageSpecByteCursor);
+		cursor.Base = spec;
+		cursor.Index = 2;
+		cursor.Length = MuiImageSpecByteCursor.MaximumLength;
+		if (!MuiImageSpecByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != (byte)'f') return 2;
+		cursor.Index = MuiImageSpecByteCursor.MaximumLength;
+		if (MuiImageSpecByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 3;
+		cursor.Base = APTR.Null;
+		cursor.Index = 0;
+		if (MuiImageSpecByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 4;
+		cursor.Base = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiImageSpecByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 5;
+		cursor.Base = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiImageSpecByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 6;
 		return 42;
 	}
 
@@ -14208,6 +15923,111 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG2032 Floattext byte-span cursor closure. Exercises source and scratch
+	// span reads/writes plus signed-index, span-bound, overflow, unmapped, and
+	// null-pointer rejection on the freestanding MC68000 seam.
+	public static uint FloattextByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var source = APTR.FromPointer(0x00036100);
+		APTR.WriteUInt8(source, 0, (byte)'F');
+		APTR.WriteUInt8(source, 1, (byte)'l');
+		APTR.WriteUInt8(source, 2, (byte)'o');
+		APTR.WriteUInt8(source, 3, (byte)'a');
+		APTR.WriteUInt8(source, 4, (byte)'t');
+		APTR.WriteUInt8(source, 5, 0);
+		var cursor = default(MuiFloattextByteCursor);
+		cursor.Base = source;
+		cursor.Length = 6;
+		cursor.Index = 2;
+		if (!MuiFloattextByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != (byte)'o') return 1;
+		if (!MuiFloattextByteCursorCodec.TryReadAt(ref platform, source, 6,
+			5, out value) || value != 0) return 2;
+		var destination = APTR.FromPointer(0x00036140);
+		cursor.Base = destination;
+		cursor.Length = 4;
+		cursor.Index = 1;
+		if (!MuiFloattextByteCursorCodec.TryWriteByte(ref platform, cursor,
+			(byte)'x') || APTR.ReadUInt8(destination, 1) != (byte)'x') return 3;
+		if (MuiFloattextByteCursorCodec.TryReadAt(ref platform, source, 6,
+			-1, out _)) return 4;
+		if (MuiFloattextByteCursorCodec.TryReadAt(ref platform, source, 6,
+			6, out _)) return 5;
+		if (MuiFloattextByteCursorCodec.TryReadAt(ref platform, source,
+			MuiFloattextByteCursor.MaximumLength + 1, 0, out _)) return 6;
+		if (MuiFloattextByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0x00060000), 4, 0, out _)) return 7;
+		if (MuiFloattextByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0xFFFFFFFEu), 4, 2, out _)) return 8;
+		if (MuiFloattextByteCursorCodec.TryReadAt(ref platform,
+			APTR.Null, 4, 0, out _)) return 9;
+		return 42;
+	}
+
+	// MG2066 shared C-string cursor closure.  CStringCodec now delegates all
+	// bounded length/equality/ordering scans to the named packed cursor, so the
+	// common helper itself has a freestanding MC68000 proof rather than relying
+	// on ad-hoc address arithmetic at each caller.
+	public static uint CStringCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var left = APTR.FromPointer(0x00036100);
+		var right = APTR.FromPointer(0x00036140);
+		var later = APTR.FromPointer(0x00036180);
+		APTR.WriteUInt8(left, 0, (byte)'C');
+		APTR.WriteUInt8(left, 1, (byte)'o');
+		APTR.WriteUInt8(left, 2, (byte)'p');
+		APTR.WriteUInt8(left, 3, (byte)'p');
+		APTR.WriteUInt8(left, 4, (byte)'e');
+		APTR.WriteUInt8(left, 5, (byte)'r');
+		APTR.WriteUInt8(left, 6, 0);
+		APTR.WriteUInt8(right, 0, (byte)'C');
+		APTR.WriteUInt8(right, 1, (byte)'o');
+		APTR.WriteUInt8(right, 2, (byte)'p');
+		APTR.WriteUInt8(right, 3, (byte)'p');
+		APTR.WriteUInt8(right, 4, (byte)'e');
+		APTR.WriteUInt8(right, 5, (byte)'r');
+		APTR.WriteUInt8(right, 6, 0);
+		APTR.WriteUInt8(later, 0, (byte)'C');
+		APTR.WriteUInt8(later, 1, (byte)'o');
+		APTR.WriteUInt8(later, 2, (byte)'p');
+		APTR.WriteUInt8(later, 3, (byte)'p');
+		APTR.WriteUInt8(later, 4, (byte)'e');
+		APTR.WriteUInt8(later, 5, (byte)'r');
+		APTR.WriteUInt8(later, 6, (byte)'O');
+		APTR.WriteUInt8(later, 7, 0);
+		if (!CStringCodec.TryReadLength(ref platform, left, 64,
+			out var length) || length != 6) return 1;
+		if (!CStringCodec.TryEquals(ref platform, left, right, 64,
+			out var equal) || !equal) return 2;
+		if (!CStringCodec.TryEquals(ref platform, left, later, 64,
+			out equal) || equal) return 3;
+		if (!CStringCodec.TryCompare(ref platform, left, later, 64,
+			out var comparison) || comparison != -1) return 4;
+		if (!CStringCodec.TryCompare(ref platform, later, left, 64,
+			out comparison) || comparison != 1) return 5;
+		var cursor = default(MuiCStringByteCursor);
+		cursor.Base = left;
+		cursor.Limit = 7;
+		cursor.Index = 6;
+		if (!MuiCStringByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var terminator) || terminator != 0) return 6;
+		cursor.Index = 7;
+		if (MuiCStringByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 7;
+		cursor.Base = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiCStringByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 8;
+		if (CStringCodec.TryReadLength(ref platform, left, 0, out _)) return 9;
+		if (CStringCodec.TryReadLength(ref platform, left,
+			MuiCStringByteCursor.MaximumLength + 1, out _)) return 10;
+		return 42;
+	}
+
 	// MG1099 List backbone admission proof.  Owner linkage, horizontal policy,
 	// and image-chain state remain named fixed-width records; structural reads
 	// retain malformed cookies while strict consumers fail closed.
@@ -15563,7 +17383,7 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG970 Choice entries admission proof. The caller-owned STRPTR vector is
+	// MG970/MG2007 Choice entries admission proof. The caller-owned STRPTR vector is
 	// bounded and NUL-terminated; invalid guest pointers are rejected.
 	public static uint ChoiceEntriesAdmissionRoot()
 	{
@@ -15575,8 +17395,14 @@ public static class MuiNativeRoots
 		APTR.WriteUInt8(text, 2, (byte)'I');
 		APTR.WriteUInt8(text, 3, 0);
 		var entries = APTR.FromPointer(0x4D000);
-		APTR.WriteUInt32(entries, 0, text.Raw);
-		APTR.WriteUInt32(entries, 4, 0);
+		var cursor = default(MuiChoiceEntryCursor);
+		cursor.Base = entries;
+		cursor.Index = 0;
+		if (!MuiChoiceEntryVectorCodec.TryWriteValue(ref platform, cursor,
+			text.Raw)) return 1;
+		cursor.Index = 1;
+		if (!MuiChoiceEntryVectorCodec.TryWriteValue(ref platform, cursor, 0))
+			return 1;
 		var value = default(MuiChoiceEntriesStateRecord);
 		value.Magic = MuiChoiceEntriesStateRecord.Cookie;
 		value.Entries = entries;
@@ -18270,34 +20096,48 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1354 native struct-first Group child-list-vector closure. Complete
-	// named 16-byte projection entries are admitted before list-link writes.
+	// MG1976 native struct-first Group child-list-vector closure. Complete
+	// named 16-byte projection entries are exchanged through the typed cursor
+	// bridge before list-link writes.
 	public static uint GroupChildListVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x00036820);
-		if (!MuiGroupChildListEntryVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, 1, out var address) || address.Raw != vector.Raw +
+		var cursor = new MuiGroupChildListEntryCursor
+		{
+			Base = vector,
+			Index = 1,
+		};
+		if (!MuiGroupChildListEntryVectorCodec.TryGetEntry(ref platform, cursor,
+			out var address) || address.Raw != vector.Raw +
 			MuiGroupChildListEntry.Size) return 1;
-		if (MuiGroupChildListEntryVectorMemoryCodec.TryGetEntry(ref platform,
-			APTR.FromPointer(0x00050FF1u), 0, out _) ||
-			MuiGroupChildListEntryVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFF0u), 2, out _) ||
-			MuiGroupChildListEntryVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.Null, 0, out _)) return 2;
 		var entry = default(MuiGroupChildListEntry);
 		entry.Next = APTR.FromPointer(0x00036900);
 		entry.Previous = APTR.FromPointer(0x00036910);
 		entry.Object = APTR.FromPointer(0x00036920);
 		entry.Reserved = APTR.FromPointer(MuiGroupChildListEntry.ProjectionMagic);
-		if (!MuiGroupChildListEntryCodec.WriteRecord(ref platform, address, entry) ||
-			!MuiGroupChildListEntryCodec.TryReadRecord(ref platform, address,
-				out var decoded) || decoded.Next != entry.Next ||
+		if (!MuiGroupChildListEntryVectorCodec.TryWrite(ref platform, cursor,
+			entry) || !MuiGroupChildListEntryVectorCodec.TryRead(ref platform,
+			cursor, out var decoded) || decoded.Next != entry.Next ||
 			decoded.Previous != entry.Previous || decoded.Object != entry.Object ||
 			decoded.Reserved != entry.Reserved ||
 			!MuiGroupChildListEntryCodec.TryRead(ref platform, address,
 				out _)) return 3;
+		cursor.Base = APTR.FromPointer(0x00050FF1u);
+		cursor.Index = 0;
+		if (MuiGroupChildListEntryVectorCodec.TryGetEntry(ref platform, cursor,
+			out _) || MuiGroupChildListEntryVectorCodec.TryGetEntry(ref platform,
+			new MuiGroupChildListEntryCursor
+			{
+				Base = APTR.FromPointer(0xFFFFFFF0u),
+				Index = 2,
+			}, out _) || MuiGroupChildListEntryVectorCodec.TryGetEntry(ref platform,
+			new MuiGroupChildListEntryCursor
+			{
+				Base = APTR.Null,
+				Index = 0,
+			}, out _)) return 2;
 		return 42;
 	}
 
@@ -18743,6 +20583,56 @@ public static class MuiNativeRoots
 				out _) || MuiApplicationSettingsRecordMemoryCodec.TryGetAddress(
 				ref platform, record, (MuiApplicationSettingsRecordField)255, out _))
 			return 4;
+		return 42;
+	}
+
+	// MG1901 production-record proof. Complete settings headers and
+	// key/length records are transferred through declaration-ordered named
+	// structs; high-bit values ensure the 68k representation stays unsigned.
+	public static uint ApplicationSettingsSequentialStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var headerAddress = APTR.FromPointer(0x00050E20);
+		var recordAddress = APTR.FromPointer(0x00050E40);
+		var header = new MuiApplicationSettingsHeader
+		{
+			MagicValue = 0x4D554953u,
+			VersionValue = 0x80000001u,
+			RecordCount = 0xFEDCBA98u,
+			PayloadBytes = 0x81234567u,
+		};
+		if (!MuiApplicationSettingsHeaderStructCodec.Write(ref platform,
+			headerAddress, header) ||
+			!MuiApplicationSettingsHeaderStructCodec.TryRead(ref platform,
+				headerAddress, out var readHeader) ||
+			readHeader.MagicValue != header.MagicValue ||
+			readHeader.VersionValue != header.VersionValue ||
+			readHeader.RecordCount != header.RecordCount ||
+			readHeader.PayloadBytes != header.PayloadBytes) return 1;
+		var record = new MuiApplicationSettingsRecord
+		{
+			Key = 0xF1234567u,
+			Length = 0x80000011u,
+		};
+		if (!MuiApplicationSettingsRecordStructCodec.Write(ref platform,
+			recordAddress, record) ||
+			!MuiApplicationSettingsRecordStructCodec.TryRead(ref platform,
+				recordAddress, out var readRecord) ||
+			readRecord.Key != record.Key ||
+			readRecord.Length != record.Length) return 2;
+		if (!MuiApplicationSettingsHeaderCodec.TryRead(ref platform,
+			headerAddress, out var wrappedHeader) ||
+			wrappedHeader.PayloadBytes != header.PayloadBytes ||
+			!MuiApplicationSettingsRecordCodec.TryRead(ref platform,
+				recordAddress, out var wrappedRecord) ||
+			wrappedRecord.Key != record.Key) return 3;
+		if (MuiApplicationSettingsHeaderStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FF1), out _) ||
+			MuiApplicationSettingsRecordStructCodec.TryRead(ref platform,
+				APTR.FromPointer(0x00050FF9), out _) ||
+			MuiApplicationSettingsHeaderStructCodec.Write(ref platform,
+				APTR.Null, header)) return 4;
 		return 42;
 	}
 
@@ -20952,6 +22842,49 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG2034 String Integer64 text-span cursor closure. Exercises decimal
+	// source/destination byte exchange and signed/span-bound, overflow,
+	// unmapped, and null-pointer rejection on MC68000.
+	public static uint StringInteger64TextCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var source = APTR.FromPointer(0x00036100);
+		APTR.WriteUInt8(source, 0, (byte)'-');
+		APTR.WriteUInt8(source, 1, (byte)'1');
+		APTR.WriteUInt8(source, 2, (byte)'2');
+		APTR.WriteUInt8(source, 3, (byte)'3');
+		APTR.WriteUInt8(source, 4, 0);
+		var cursor = default(MuiStringInteger64TextByteCursor);
+		cursor.Base = source;
+		cursor.Length = 5;
+		cursor.Index = 1;
+		if (!MuiStringInteger64TextByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value) || value != (byte)'1') return 1;
+		if (!MuiStringInteger64TextByteCursorCodec.TryReadAt(ref platform, source,
+			5, 4, out value) || value != 0) return 2;
+		var destination = APTR.FromPointer(0x00036140);
+		cursor.Base = destination;
+		cursor.Length = 4;
+		cursor.Index = 0;
+		if (!MuiStringInteger64TextByteCursorCodec.TryWriteByte(ref platform,
+			cursor, (byte)'x') || APTR.ReadUInt8(destination, 0) != (byte)'x')
+			return 3;
+		if (MuiStringInteger64TextByteCursorCodec.TryReadAt(ref platform, source,
+			5, -1, out _)) return 4;
+		if (MuiStringInteger64TextByteCursorCodec.TryReadAt(ref platform, source,
+			5, 5, out _)) return 5;
+		if (MuiStringInteger64TextByteCursorCodec.TryReadAt(ref platform, source,
+			MuiStringInteger64TextByteCursor.MaximumLength + 1, 0, out _)) return 6;
+		if (MuiStringInteger64TextByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0x00060000), 4, 0, out _)) return 7;
+		if (MuiStringInteger64TextByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0xFFFFFFFEu), 4, 2, out _)) return 8;
+		if (MuiStringInteger64TextByteCursorCodec.TryReadAt(ref platform,
+			APTR.Null, 4, 0, out _)) return 9;
+		return 42;
+	}
+
 	// Focused ABI proof for the struct-first MorphOS QUAD memory adapter. The
 	// public value remains a named High/Low record; only this seam translates
 	// its bounded guest representation.
@@ -20976,6 +22909,31 @@ public static class MuiNativeRoots
 				MuiStringInteger64Field.High, out _) ||
 			MuiStringInteger64ValueMemoryCodec.TryGetAddress(ref platform, address,
 				(MuiStringInteger64Field)255, out _)) return 3;
+		return 42;
+	}
+
+	// MG1897 sequential QUAD record closure. High and Low ULONGs retain their
+	// full two's-complement bit patterns; the bounded codec rejects null and
+	// truncated guest records before exposing either member.
+	public static uint StringInteger64SequentialStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x00050E80);
+		var value = default(MuiStringInteger64Value);
+		value.High = 0x80000000u;
+		value.Low = 0x00000001u;
+		if (!MuiStringInteger64ValueStructCodec.Write(ref platform, address,
+			value) || !MuiStringInteger64ValueStructCodec.TryRead(ref platform,
+			address, out var actual) || actual.High != value.High ||
+			actual.Low != value.Low) return 1;
+		var crossing = APTR.FromPointer(0x00050FFC);
+		if (MuiStringInteger64ValueStructCodec.TryRead(ref platform, crossing,
+			out _) || MuiStringInteger64ValueStructCodec.Write(ref platform,
+				crossing, value)) return 2;
+		if (MuiStringInteger64ValueStructCodec.TryRead(ref platform, APTR.Null,
+			out _) || MuiStringInteger64ValueStructCodec.Write(ref platform,
+				APTR.Null, value)) return 3;
 		return 42;
 	}
 
@@ -21505,42 +23463,73 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1353 native struct-first List pointer-vector closure. Caller-owned
-	// pointer slots are exposed only after the complete slot record is mapped.
+	// MG1353/MG1970/MG2005 native struct-first List pointer-vector closure.
+	// Caller-owned pointer slots are exchanged through the named cursor bridge;
+	// slot addresses remain an implementation detail of the bounded adapter.
 	public static uint ListPointerVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x00037500);
-		if (!MuiListCore.MuiListPointerVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, 1, out var address) || address.Raw != vector.Raw +
-			MuiListCore.MuiListPointerSlotRecord.Size) return 1;
-		if (MuiListCore.MuiListPointerVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, MuiListCore.MuiListPointerVectorCursor.MaximumEntries, out _) ||
-			MuiListCore.MuiListPointerVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0x00050FFEu), 0, out _) ||
-			MuiListCore.MuiListPointerVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFF0u), 4, out _)) return 2;
+		var cursor = default(MuiListCore.MuiListPointerVectorCursor);
+		cursor.Base = vector;
+		cursor.Index = 1;
+		// Keep the native root on the scalar projection: CopperSharp's current
+		// one-ULONG lowering is not reliable when a one-field APTR record is
+		// passed by value, while the public bridge remains struct-first.
+		if (!MuiListCore.MuiListPointerVectorCodec.TryWriteValue(ref platform,
+			cursor, 0xFEDCBA98u) ||
+			!MuiListCore.MuiListPointerVectorCodec.TryReadValue(ref platform,
+			cursor, out var decoded) || decoded != 0xFEDCBA98u)
+			return 1;
+		cursor.Index = 2;
+		if (!MuiListCore.MuiListPointerVectorCodec.TryWriteValue(ref platform,
+			cursor, 0x80000001u) ||
+			!MuiListCore.MuiListPointerVectorCodec.TryReadValue(ref platform,
+			cursor, out var rawValue) || rawValue != 0x80000001u) return 2;
+		cursor.Index = MuiListCore.MuiListPointerVectorCursor.MaximumEntries;
+		if (MuiListCore.MuiListPointerVectorCodec.TryReadValue(ref platform,
+			cursor, out _) || MuiListCore.MuiListPointerVectorCodec.TryWriteValue(
+			ref platform, cursor, 0)) return 3;
+		if (MuiListCore.MuiListPointerVectorCodec.TryReadValue(ref platform,
+			vector, MuiListCore.MuiListPointerVectorCursor.MaximumEntries,
+			out _)) return 4;
+		if (MuiListCore.MuiListPointerVectorCodec.TryWriteValue(ref platform,
+			APTR.FromPointer(0x00050FFEu), 1, 0)) return 5;
+		if (MuiListCore.MuiListPointerVectorCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0xFFFFFFF0u), 4, out _)) return 6;
 		return 42;
 	}
 
-	// MG1357 native struct-first private List-slot-vector closure. Complete
-	// entry/flag records are exposed only by the dedicated memory adapter;
-	// cursor arithmetic remains behind its compatibility wrapper.
+	// MG1357/MG1972/MG2002 native struct-first private List-slot-vector closure.
+	// Complete entry/flag records are exchanged through the named bridge;
+	// cursor-based consumers keep slot arithmetic behind the adapter.
 	public static uint ListSlotVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x00037600);
-		if (!MuiListCore.MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, 2, out var address) || address.Raw != vector.Raw +
-			(2 * MuiListSlotState.Size)) return 1;
-		if (MuiListCore.MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, MuiListCore.MuiListSlotCursor.MaximumEntries, out _) ||
-			MuiListCore.MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0x00050FF9u), 0, out _) ||
-			MuiListCore.MuiListSlotVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFF0u), 4, out _)) return 2;
+		var cursor = default(MuiListCore.MuiListSlotCursor);
+		cursor.Base = vector;
+		cursor.Index = 2;
+		var expected = default(MuiListSlotState);
+		expected.Entry = APTR.FromPointer(0xFEDCBA98u);
+		expected.Flags = 0x80000001u;
+		if (!MuiListCore.MuiListSlotVectorCodec.TryWrite(ref platform, cursor,
+			expected) ||
+			!MuiListCore.MuiListSlotVectorCodec.TryRead(ref platform, cursor,
+			out var decoded) || decoded.Entry.Raw != 0xFEDCBA98u ||
+			decoded.Flags != 0x80000001u) return 1;
+		cursor.Index = MuiListCore.MuiListSlotCursor.MaximumEntries;
+		if (MuiListCore.MuiListSlotVectorCodec.TryRead(ref platform, cursor,
+			out _) || MuiListCore.MuiListSlotVectorCodec.TryWrite(ref platform,
+			cursor, expected)) return 2;
+		if (MuiListCore.MuiListSlotVectorCodec.TryRead(ref platform, vector,
+			MuiListCore.MuiListSlotCursor.MaximumEntries, out _)) return 3;
+		if (MuiListCore.MuiListSlotVectorCodec.TryWrite(ref platform,
+			APTR.FromPointer(0x00050FF9u), 0, expected)) return 4;
+		if (MuiListCore.MuiListSlotVectorCodec.TryRead(ref platform,
+			APTR.FromPointer(0xFFFFFFF0u), 4, out _)) return 5;
 		return 42;
 	}
 
@@ -21566,53 +23555,80 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1358 native struct-first List column-geometry-vector closure. Complete
-	// named {offset,width} records are admitted only within the 256-column bound.
+	// MG1358/MG1973/MG2003 native struct-first List column-geometry-vector
+	// closure. Complete named {offset,width} records are exchanged through a
+	// bounded cursor; indexed slot arithmetic remains adapter-owned.
 	public static uint ListColumnGeometryVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x00037700);
-		if (!MuiListCore.MuiListColumnGeometryVectorMemoryCodec.TryGetEntry(
-			ref platform, vector, 2, out var address) || address.Raw != vector.Raw +
-			(2 * MuiListCore.MuiListColumnGeometry.Size)) return 1;
-		if (MuiListCore.MuiListColumnGeometryVectorMemoryCodec.TryGetEntry(
-			ref platform, vector,
-			MuiListCore.MuiListColumnGeometryCursor.MaximumEntries, out _) ||
-			MuiListCore.MuiListColumnGeometryVectorMemoryCodec.TryGetEntry(
-				ref platform, APTR.FromPointer(0x00050FF9u), 0, out _) ||
-			MuiListCore.MuiListColumnGeometryVectorMemoryCodec.TryGetEntry(
-				ref platform, APTR.FromPointer(0xFFFFFFF0u), 4, out _)) return 2;
+		var cursor = default(MuiListCore.MuiListColumnGeometryCursor);
+		cursor.Base = vector;
+		cursor.Index = 2;
+		var expected = new MuiListCore.MuiListColumnGeometry
+		{
+			Offset = 0xFEDCBA98u,
+			Width = 0x80000001u,
+		};
+		if (!MuiListCore.MuiListColumnGeometryVectorCodec.TryWrite(ref platform,
+			cursor, expected) ||
+			!MuiListCore.MuiListColumnGeometryVectorCodec.TryRead(ref platform,
+			cursor, out var decoded) || decoded.Offset != expected.Offset ||
+			decoded.Width != expected.Width) return 1;
+		cursor.Index = MuiListCore.MuiListColumnGeometryCursor.MaximumEntries;
+		if (MuiListCore.MuiListColumnGeometryVectorCodec.TryRead(ref platform,
+			cursor, out _) || MuiListCore.MuiListColumnGeometryVectorCodec.TryWrite(
+			ref platform, cursor, expected)) return 2;
+		if (MuiListCore.MuiListColumnGeometryVectorCodec.TryRead(ref platform,
+			vector, MuiListCore.MuiListColumnGeometryCursor.MaximumEntries,
+			out _)) return 3;
+		if (MuiListCore.MuiListColumnGeometryVectorCodec.TryWrite(ref platform,
+			APTR.FromPointer(0x00050FF9u), 0, expected)) return 4;
+		if (MuiListCore.MuiListColumnGeometryVectorCodec.TryRead(ref platform,
+			APTR.FromPointer(0xFFFFFFF0u), 4, out _)) return 5;
 		return 42;
 	}
 
-	// MG1359 native struct-first List column-metric-vector closure. Complete
-	// measured-column records are admitted only within the 256-column bound.
+	// MG1359/MG1968/MG2010 native struct-first List column-metric-vector closure.
+	// Complete measured-column records are admitted only within the 256-column
+	// bound; production callers exchange values through the bounded cursor bridge.
 	public static uint ListColumnMetricVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x00037740);
-		if (!MuiListCore.MuiListColumnMetricVectorMemoryCodec.TryGetEntry(
-			ref platform, vector, 2, out var address) || address.Raw != vector.Raw +
-			(2 * MuiListCore.MuiListColumnMetricValue.Size)) return 1;
-		if (MuiListCore.MuiListColumnMetricVectorMemoryCodec.TryGetEntry(
-			ref platform, vector,
-			MuiListCore.MuiListColumnMetricCursor.MaximumEntries, out _) ||
-			MuiListCore.MuiListColumnMetricVectorMemoryCodec.TryGetEntry(
-				ref platform, APTR.FromPointer(0x00050FFEu), 0, out _) ||
-			MuiListCore.MuiListColumnMetricVectorMemoryCodec.TryGetEntry(
-				ref platform, APTR.FromPointer(0xFFFFFFF0u), 4, out _)) return 2;
+		var cursor = default(MuiListCore.MuiListColumnMetricCursor);
+		cursor.Base = vector;
+		cursor.Index = 2;
+		var metricValue = 0xFEDCBA98u;
+		if (!MuiListCore.MuiListColumnMetricVectorCodec.TryWriteValue(ref platform,
+			cursor, metricValue)) return 1;
+		if (!MuiListCore.MuiListColumnMetricVectorCodec.TryReadValue(ref platform,
+			cursor, out var bridgedMetric) ||
+			bridgedMetric != 0xFEDCBA98u) return 2;
+		cursor.Index = MuiListCore.MuiListColumnMetricCursor.MaximumEntries;
+		if (MuiListCore.MuiListColumnMetricVectorCodec.TryReadValue(ref platform,
+				cursor, out _) ||
+			MuiListCore.MuiListColumnMetricVectorCodec.TryWriteValue(ref platform,
+				APTR.FromPointer(0x00050FFEu), 0, metricValue) ||
+			MuiListCore.MuiListColumnMetricVectorCodec.TryReadValue(ref platform,
+				APTR.FromPointer(0xFFFFFFF0u), 4, out _)) return 3;
 		return 42;
 	}
 
-	// MG1360 native struct-first FORMAT descriptor-vector closure. Complete
-	// named 40-byte descriptors are admitted only within the 256-column bound.
+	// MG1360/MG1967/MG2008 native struct-first FORMAT descriptor-vector closure.
+	// Complete named 40-byte descriptors are admitted only within the
+	// 256-column bound; production callers exchange records through the
+	// bounded typed cursor bridge.
 	public static uint ListFormatDescriptorVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x00037780);
+		var cursor = default(MuiListCore.MuiListFormatDescriptorCursor);
+		cursor.Base = vector;
+		cursor.Index = 2;
 		if (!MuiListCore.MuiListFormatDescriptorVectorMemoryCodec.TryGetEntry(
 			ref platform, vector, 2, out var address) || address.Raw != vector.Raw +
 			(2 * MuiListCore.MuiListFormatDescriptor.Size)) return 1;
@@ -21634,6 +23650,16 @@ public static class MuiNativeRoots
 			readDescriptor.Weight != 2 || readDescriptor.Preparse.Raw !=
 			descriptor.Preparse.Raw || readDescriptor.PreparseStorageLength != 7)
 			return 2;
+		descriptor.Delta = 0xFEDCBA98u;
+		descriptor.MaxWidth = 0x80000001u;
+		if (!MuiListCore.MuiListFormatDescriptorVectorCodec.TryWrite(ref platform,
+			cursor, descriptor) ||
+			!MuiListCore.MuiListFormatDescriptorVectorCodec.TryRead(ref platform,
+				cursor, out var bridgedDescriptor) ||
+			bridgedDescriptor.Delta != 0xFEDCBA98u ||
+			bridgedDescriptor.MaxWidth != 0x80000001u ||
+			bridgedDescriptor.Preparse.Raw != descriptor.Preparse.Raw ||
+			bridgedDescriptor.PreparseStorageLength != 7) return 2;
 		if (!MuiListCore.MuiListFormatDescriptorFieldCursorCodec.TryWriteUInt32(
 			ref platform, address, MuiListCore.MuiListFormatDescriptorField.Weight,
 			3) || !MuiListCore.MuiListFormatDescriptorFieldCursorCodec.TryReadUInt32(
@@ -21652,27 +23678,126 @@ public static class MuiNativeRoots
 				ref platform, APTR.FromPointer(0x00050FD9u), 0, out _) ||
 			MuiListCore.MuiListFormatDescriptorVectorMemoryCodec.TryGetEntry(
 				ref platform, APTR.FromPointer(0xFFFFFFF0u), 4, out _)) return 4;
+		if (MuiListCore.MuiListFormatDescriptorVectorCodec.TryRead(ref platform,
+				default(MuiListCore.MuiListFormatDescriptorCursor), out _) ||
+			MuiListCore.MuiListFormatDescriptorVectorCodec.TryWrite(ref platform,
+				APTR.FromPointer(0xFFFFFFF0u), 4, descriptor)) return 4;
+		cursor.Index = MuiListCore.MuiListFormatDescriptorCursor.MaximumEntries;
+		if (MuiListCore.MuiListFormatDescriptorVectorCodec.TryRead(ref platform,
+				cursor, out _) ||
+			MuiListCore.MuiListFormatDescriptorVectorCodec.TryWrite(ref platform,
+				cursor, descriptor)) return 4;
 		return 42;
 	}
 
-	// MG1361 native struct-first internal List pointer-slot-vector closure.
-	// Complete 4-byte pointer records are admitted only within the display and
-	// title-array table bound; NULL termination remains a consumer concern.
+	// MG2025 native struct-first List FORMAT byte-scan closure. A bounded
+	// named cursor exposes only mapped bytes within the 4 KiB FORMAT limit.
+	public static uint ListFormatByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var cursor = new MuiListFormatByteCursor
+		{
+			Format = APTR.FromPointer(0x00050360),
+			Index = 2,
+		};
+		APTR.WriteUInt8(cursor.Format, 2, 0xA5);
+		if (!MuiListFormatByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != 0xA5) return 1;
+		cursor.Index = MuiListFormatByteCursor.MaximumLength;
+		if (MuiListFormatByteCursorCodec.TryGetByte(ref platform, cursor,
+			out _)) return 2;
+		cursor.Format = APTR.FromPointer(0x00050FFF);
+		cursor.Index = 1;
+		if (MuiListFormatByteCursorCodec.TryGetByte(ref platform, cursor,
+			out _)) return 3;
+		cursor.Format = APTR.Null;
+		cursor.Index = 0;
+		if (MuiListFormatByteCursorCodec.TryGetByte(ref platform, cursor,
+			out _)) return 4;
+		return 42;
+	}
+
+	// MG2064 List FORMAT PREPARSE output uses a named bounded destination
+	// cursor. This closure checks a mapped write and rejects index, capacity,
+	// and NULL-base violations on freestanding MC68000.
+	public static uint ListPreparseByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var storage = APTR.FromPointer(0x00050F80);
+		var cursor = default(MuiListPreparseByteCursor);
+		cursor.Base = storage;
+		cursor.Capacity = 4;
+		if (!MuiListPreparseByteCursorCodec.TryWriteByte(ref platform, cursor,
+			(byte)'P') || APTR.ReadUInt8(storage, 0) != (byte)'P') return 1;
+		cursor.Index = 4;
+		if (MuiListPreparseByteCursorCodec.TryWriteByte(ref platform, cursor, 0))
+			return 2;
+		cursor.Index = 0;
+		cursor.Capacity = MuiListPreparseByteCursor.MaximumLength + 1;
+		if (MuiListPreparseByteCursorCodec.TryWriteByte(ref platform, cursor, 0))
+			return 3;
+		cursor.Capacity = 4;
+		cursor.Base = APTR.Null;
+		if (MuiListPreparseByteCursorCodec.TryWriteByte(ref platform, cursor, 0))
+			return 4;
+		return 42;
+	}
+
+	// MG2026 native struct-first List FORMAT parser admission closure. The
+	// indexed helper keeps signed parser indices outside the guest-addressing
+	// path while preserving the bounded named cursor contract.
+	public static uint ListFormatParserByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var format = APTR.FromPointer(0x00050360);
+		APTR.WriteUInt8(format, 4, 0x5A);
+		if (!MuiListFormatByteCursorCodec.TryReadAt(ref platform, format, 4,
+			out var value) || value != 0x5A) return 1;
+		if (MuiListFormatByteCursorCodec.TryReadAt(ref platform, format, -1,
+			out _)) return 2;
+		if (MuiListFormatByteCursorCodec.TryReadAt(ref platform, format,
+			(int)MuiListFormatByteCursor.MaximumLength, out _)) return 3;
+		if (MuiListFormatByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0x00050FFF), 1, out _)) return 4;
+		return 42;
+	}
+
+	// MG1361/MG1971/MG2006 native struct-first internal List pointer-slot-vector
+	// closure. Complete 4-byte pointer records are exchanged through the named
+	// cursor bridge; NULL termination remains a consumer concern.
 	public static uint ListPointerSlotVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x000377C0);
-		if (!MuiListCore.MuiListPointerSlotVectorMemoryCodec.TryGetEntry(
-			ref platform, vector, 2, out var address) || address.Raw != vector.Raw +
-			(2 * MuiListCore.MuiListPointerSlotRecord.Size)) return 1;
-		if (MuiListCore.MuiListPointerSlotVectorMemoryCodec.TryGetEntry(
-			ref platform, vector,
-			MuiListCore.MuiListPointerSlotCursor.MaximumEntries, out _) ||
-			MuiListCore.MuiListPointerSlotVectorMemoryCodec.TryGetEntry(
-				ref platform, APTR.FromPointer(0x00050FFEu), 0, out _) ||
-			MuiListCore.MuiListPointerSlotVectorMemoryCodec.TryGetEntry(
-				ref platform, APTR.FromPointer(0xFFFFFFF0u), 4, out _)) return 2;
+		var cursor = default(MuiListCore.MuiListPointerSlotCursor);
+		cursor.Base = vector;
+		cursor.Index = 2;
+		// Keep the native root on the scalar projection: CopperSharp's current
+		// one-ULONG lowering is not reliable when a one-field APTR record is
+		// passed by value, while the public bridge remains struct-first.
+		if (!MuiListCore.MuiListPointerSlotVectorCodec.TryWriteValue(ref platform,
+			cursor, 0xFEDCBA98u) ||
+			!MuiListCore.MuiListPointerSlotVectorCodec.TryReadValue(ref platform,
+			cursor, out var rawValue) || rawValue != 0xFEDCBA98u) return 1;
+		cursor.Index = 3;
+		if (!MuiListCore.MuiListPointerSlotVectorCodec.TryWriteValue(ref platform,
+			cursor, 0x80000001u) ||
+			!MuiListCore.MuiListPointerSlotVectorCodec.TryReadValue(ref platform,
+			cursor, out var highValue) || highValue != 0x80000001u) return 2;
+		cursor.Index = MuiListCore.MuiListPointerSlotCursor.MaximumEntries;
+		if (MuiListCore.MuiListPointerSlotVectorCodec.TryReadValue(ref platform,
+			cursor, out _) || MuiListCore.MuiListPointerSlotVectorCodec.TryWriteValue(
+			ref platform, cursor, 0)) return 3;
+		if (MuiListCore.MuiListPointerSlotVectorCodec.TryReadValue(ref platform,
+			vector, MuiListCore.MuiListPointerSlotCursor.MaximumEntries, out _)) return 4;
+		if (MuiListCore.MuiListPointerSlotVectorCodec.TryWriteValue(ref platform,
+			APTR.FromPointer(0x00050FFEu), 0, 0)) return 5;
+		if (MuiListCore.MuiListPointerSlotVectorCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0xFFFFFFF0u), 4, out _)) return 6;
 		return 42;
 	}
 
@@ -21922,6 +24047,761 @@ public static class MuiNativeRoots
 			return 1;
 		return MuiCommonControlCore.ClassifyRecord(ref platform, classRecord) ==
 			MuiControlClass.Text ? 42u : 2u;
+	}
+
+	// MG2040 common-control class-name hashing/suffix admission uses the named
+	// bounded byte cursor, independently of the full class-record dispatcher.
+	public static uint CommonControlClassNameCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		platform.WriteUInt8(text, 0, (byte)'T');
+		var cursor = new MuiCommonControlClassNameByteCursor
+		{
+			Text = text,
+			Index = 0
+		};
+		if (!MuiCommonControlClassNameByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value) || value != (byte)'T') return 1;
+		cursor.Index = MuiCommonControlClassNameByteCursor.MaximumLength;
+		if (MuiCommonControlClassNameByteCursorCodec.TryReadByte(ref platform,
+			cursor, out _)) return 2;
+		cursor.Text = APTR.Null;
+		cursor.Index = 0;
+		if (MuiCommonControlClassNameByteCursorCodec.TryReadByte(ref platform,
+			cursor, out _)) return 3;
+		cursor.Text = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiCommonControlClassNameByteCursorCodec.TryReadByte(ref platform,
+			cursor, out _)) return 4;
+		cursor.Text = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiCommonControlClassNameByteCursorCodec.TryReadByte(ref platform,
+			cursor, out _)) return 5;
+		return 42;
+	}
+
+	// MG2041 Numeric.mui format-byte scanning uses the named bounded cursor.
+	// This focused closure checks mapped reads and rejects out-of-limit, NULL,
+	// overflow, and unmapped addresses on the freestanding MC68000 path.
+	public static uint NumericFormatCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var format = APTR.FromPointer(0x00050F80);
+		platform.WriteUInt8(format, 0, (byte)'%');
+		var cursor = default(MuiNumericFormatByteCursor);
+		cursor.Text = format;
+		cursor.Index = 0;
+		if (!MuiNumericFormatByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != (byte)'%') return 1;
+		cursor.Index = MuiNumericFormatByteCursor.MaximumLength;
+		if (MuiNumericFormatByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 2;
+		cursor.Text = APTR.Null;
+		cursor.Index = 0;
+		if (MuiNumericFormatByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 3;
+		cursor.Text = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiNumericFormatByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 4;
+		cursor.Text = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiNumericFormatByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG2060 Numeric.mui output buffers use the named bounded cursor for
+	// decimal conversion and byte writes. This focused closure exercises the
+	// conversion result plus capacity, NULL, overflow, and unmapped checks on
+	// the freestanding MC68000 path.
+	public static uint NumericOutputCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var buffer = APTR.FromPointer(0x00050F80);
+		if (MuiCommonControlCore.StringifyValue(ref platform, buffer, 8, -123) != 4 ||
+			APTR.ReadUInt8(buffer, 0) != (byte)'-' ||
+			APTR.ReadUInt8(buffer, 1) != (byte)'1' ||
+			APTR.ReadUInt8(buffer, 2) != (byte)'2' ||
+			APTR.ReadUInt8(buffer, 3) != (byte)'3' ||
+			APTR.ReadUInt8(buffer, 4) != 0) return 1;
+		if (MuiCommonControlCore.StringifyValue(ref platform, buffer, 1, 99) != 0 ||
+			APTR.ReadUInt8(buffer, 0) != 0) return 2;
+		var cursor = default(MuiNumericOutputByteCursor);
+		cursor.Base = buffer;
+		cursor.Capacity = 4;
+		if (!MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform, cursor,
+			(byte)'A')) return 3;
+		cursor.Index = 4;
+		if (MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform, cursor, 0)) return 4;
+		cursor.Capacity = MuiNumericOutputByteCursor.MaximumLength + 1;
+		if (MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform, cursor, 0)) return 5;
+		cursor.Capacity = 4;
+		cursor.Base = APTR.Null;
+		if (MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform, cursor, 0)) return 6;
+		cursor.Base = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform, cursor, 0)) return 7;
+		cursor.Base = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiNumericOutputByteCursorCodec.TryWriteByte(ref platform, cursor, 0)) return 8;
+		return 42;
+	}
+
+	// MG2061 specialist-owned C-string copies use a named source/destination
+	// cursor. This closure checks byte-for-byte copying and rejects malformed
+	// spans, NULL pointers, address overflow, and unmapped endpoints on the
+	// freestanding MC68000 path.
+	public static uint GuestByteCopyCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var source = APTR.FromPointer(0x00050F80);
+		var destination = APTR.FromPointer(0x00050FC0);
+		APTR.WriteUInt8(source, 0, (byte)'C');
+		APTR.WriteUInt8(source, 1, (byte)'o');
+		APTR.WriteUInt8(source, 2, (byte)'p');
+		APTR.WriteUInt8(source, 3, 0);
+		var cursor = new MuiGuestByteCopyCursor
+		{
+			Source = source,
+			Destination = destination,
+			Length = 4
+		};
+		for (cursor.Index = 0; cursor.Index < cursor.Length; cursor.Index++)
+			if (!MuiGuestByteCopyCursorCodec.TryCopyByte(ref platform, cursor)) return 1;
+		if (APTR.ReadUInt8(destination, 0) != (byte)'C' ||
+			APTR.ReadUInt8(destination, 1) != (byte)'o' ||
+			APTR.ReadUInt8(destination, 2) != (byte)'p' ||
+			APTR.ReadUInt8(destination, 3) != 0) return 2;
+		cursor.Index = 4;
+		if (MuiGuestByteCopyCursorCodec.TryCopyByte(ref platform, cursor)) return 3;
+		cursor.Length = MuiGuestByteCopyCursor.MaximumLength + 1;
+		cursor.Index = 0;
+		if (MuiGuestByteCopyCursorCodec.TryCopyByte(ref platform, cursor)) return 4;
+		cursor.Length = 4;
+		cursor.Source = APTR.Null;
+		if (MuiGuestByteCopyCursorCodec.TryCopyByte(ref platform, cursor)) return 5;
+		cursor.Source = source;
+		cursor.Destination = APTR.Null;
+		if (MuiGuestByteCopyCursorCodec.TryCopyByte(ref platform, cursor)) return 6;
+		cursor.Destination = destination;
+		cursor.Source = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiGuestByteCopyCursorCodec.TryCopyByte(ref platform, cursor)) return 7;
+		cursor.Source = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiGuestByteCopyCursorCodec.TryCopyByte(ref platform, cursor)) return 8;
+		cursor.Source = source;
+		cursor.Destination = APTR.FromPointer(0x00070000);
+		if (MuiGuestByteCopyCursorCodec.TryCopyByte(ref platform, cursor)) return 9;
+		return 42;
+	}
+
+	// MG2062 Object persistence class-name matching now consumes guest text via
+	// the shared named class-name cursor. This closure checks case folding for
+	// the Area name and malformed-name rejection on freestanding MC68000;
+	// Group-name parity is covered by the host matcher tests.
+	public static uint ObjectPersistenceClassNameCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var name = APTR.FromPointer(0x00050F80);
+		APTR.WriteUInt8(name, 0, (byte)'A');
+		APTR.WriteUInt8(name, 1, (byte)'R');
+		APTR.WriteUInt8(name, 2, (byte)'E');
+		APTR.WriteUInt8(name, 3, (byte)'A');
+		APTR.WriteUInt8(name, 4, (byte)'.');
+		APTR.WriteUInt8(name, 5, (byte)'M');
+		APTR.WriteUInt8(name, 6, (byte)'U');
+		APTR.WriteUInt8(name, 7, (byte)'I');
+		APTR.WriteUInt8(name, 8, 0);
+		if (!MuiObjectPersistenceCore.MatchesNamedClass(ref platform, name, false))
+			return 1;
+		if (MuiObjectPersistenceCore.MatchesNamedClass(ref platform,
+			APTR.Null, false) || MuiObjectPersistenceCore.MatchesNamedClass(
+			ref platform, APTR.FromPointer(0x00070000), false)) return 3;
+		var empty = APTR.FromPointer(0x00050FA0);
+		if (!MuiObjectPersistenceCore.WriteEmptyPersistenceString(ref platform,
+			empty) || !MuiObjectPersistenceCore.TryReadPersistenceTerminator(
+			ref platform, empty, 1) || APTR.ReadUInt8(empty, 0) != 0) return 4;
+		APTR.WriteUInt8(empty, 0, (byte)'x');
+		if (MuiObjectPersistenceCore.TryReadPersistenceTerminator(ref platform,
+			empty, 1)) return 5;
+		return 42;
+	}
+
+	// MG2047 String.mui integer parsing uses the named bounded byte cursor.
+	// This focused closure checks the signed prefix, terminator, limit, NULL,
+	// overflow, and unmapped cases on the freestanding MC68000 path.
+	public static uint StringIntegerParseCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		APTR.WriteUInt8(text, 0, (byte)'-');
+		APTR.WriteUInt8(text, 1, (byte)'4');
+		APTR.WriteUInt8(text, 2, (byte)'2');
+		APTR.WriteUInt8(text, 3, 0);
+		var cursor = default(MuiStringIntegerParseByteCursor);
+		cursor.Text = text;
+		cursor.Index = 0;
+		if (!MuiStringIntegerParseByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value) || value != (byte)'-') return 1;
+		cursor.Index = 3;
+		if (!MuiStringIntegerParseByteCursorCodec.TryReadByte(ref platform,
+			cursor, out value) || value != 0) return 2;
+		cursor.Index = MuiStringIntegerParseByteCursor.MaximumLength;
+		if (MuiStringIntegerParseByteCursorCodec.TryReadByte(ref platform,
+			cursor, out _)) return 3;
+		cursor.Text = APTR.Null;
+		cursor.Index = 0;
+		if (MuiStringIntegerParseByteCursorCodec.TryReadByte(ref platform,
+			cursor, out _)) return 4;
+		cursor.Text = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiStringIntegerParseByteCursorCodec.TryReadByte(ref platform,
+			cursor, out _)) return 5;
+		cursor.Text = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiStringIntegerParseByteCursorCodec.TryReadByte(ref platform,
+			cursor, out _)) return 6;
+		return 42;
+	}
+
+	// MG2049 String filter membership scans use the named bounded byte cursor.
+	// The focused closure checks a matching byte, the C-string terminator, the
+	// limit, NULL, overflow, and unmapped guest ranges.
+	public static uint StringFilterCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		APTR.WriteUInt8(text, 0, (byte)'a');
+		APTR.WriteUInt8(text, 1, (byte)'b');
+		APTR.WriteUInt8(text, 2, 0);
+		var cursor = default(MuiStringFilterByteCursor);
+		cursor.Text = text;
+		cursor.Index = 0;
+		if (!MuiStringFilterByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != (byte)'a') return 1;
+		cursor.Index = 2;
+		if (!MuiStringFilterByteCursorCodec.TryReadByte(ref platform, cursor,
+			out value) || value != 0) return 2;
+		cursor.Index = MuiStringFilterByteCursor.MaximumLength;
+		if (MuiStringFilterByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 3;
+		cursor.Text = APTR.Null;
+		cursor.Index = 0;
+		if (MuiStringFilterByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 4;
+		cursor.Text = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiStringFilterByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 5;
+		cursor.Text = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiStringFilterByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 6;
+		return 42;
+	}
+
+	// MG2050 String.mui length measurement uses the named bounded byte cursor.
+	// The focused closure checks a mapped byte, terminator, scan limit, NULL,
+	// overflow, and unmapped guest ranges.
+	public static uint StringLengthCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		APTR.WriteUInt8(text, 0, (byte)'a');
+		APTR.WriteUInt8(text, 1, (byte)'b');
+		APTR.WriteUInt8(text, 2, (byte)'c');
+		APTR.WriteUInt8(text, 3, 0);
+		var cursor = default(MuiStringLengthByteCursor);
+		cursor.Text = text;
+		cursor.Index = 0;
+		if (!MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != (byte)'a') return 1;
+		cursor.Index = 3;
+		if (!MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+			out value) || value != 0) return 2;
+		cursor.Index = MuiStringLengthByteCursor.MaximumLength;
+		if (MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 3;
+		cursor.Text = APTR.Null;
+		cursor.Index = 0;
+		if (MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 4;
+		cursor.Text = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 5;
+		cursor.Text = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 6;
+		return 42;
+	}
+
+	// MG2051 Text.mui bracketed payload parsing uses the named bounded cursor.
+	// The closure checks opening-bracket admission, payload length/terminator,
+	// the cursor limit, NULL, overflow, unmapped ranges, and bad positions.
+	public static uint TextBracketCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		APTR.WriteUInt8(text, 0, (byte)'I');
+		APTR.WriteUInt8(text, 1, (byte)'[');
+		APTR.WriteUInt8(text, 2, (byte)'a');
+		APTR.WriteUInt8(text, 3, (byte)'b');
+		APTR.WriteUInt8(text, 4, (byte)'c');
+		APTR.WriteUInt8(text, 5, (byte)']');
+		APTR.WriteUInt8(text, 6, 0);
+		if (!MuiCommonControlCore.TryReadBracketedPayload(ref platform, text, 0,
+			out var start, out var length) || start != 2 || length != 3) return 1;
+		if (MuiCommonControlCore.ConsumeBracketedSpec(ref platform, text, 0) != 6 ||
+			MuiCommonControlCore.ConsumeBracketedSpec(ref platform, text, -1) != 0)
+			return 2;
+		var cursor = default(MuiTextBracketByteCursor);
+		cursor.Text = text;
+		cursor.Index = 1;
+		if (!MuiTextBracketByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != (byte)'[') return 3;
+		cursor.Index = MuiTextBracketByteCursor.MaximumLength;
+		if (MuiTextBracketByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 4;
+		cursor.Text = APTR.Null;
+		cursor.Index = 0;
+		if (MuiTextBracketByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 5;
+		cursor.Text = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiTextBracketByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 6;
+		cursor.Text = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiTextBracketByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 7;
+		if (MuiCommonControlCore.TryReadBracketedPayload(ref platform, text, -2,
+			out _, out _)) return 8;
+		return 42;
+	}
+
+	// MG2052 Text.mui visible scans use the named bounded byte cursor. The
+	// closure checks mapped bytes, terminators, line metrics, escape skipping,
+	// cursor-limit, NULL, overflow, and unmapped guest ranges.
+	public static uint TextScanCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		APTR.WriteUInt8(text, 0, (byte)'a');
+		APTR.WriteUInt8(text, 1, (byte)'b');
+		APTR.WriteUInt8(text, 2, (byte)'c');
+		APTR.WriteUInt8(text, 3, (byte)'\n');
+		APTR.WriteUInt8(text, 4, (byte)'x');
+		APTR.WriteUInt8(text, 5, (byte)'y');
+		APTR.WriteUInt8(text, 6, 0);
+		if (!MuiCommonControlCore.TryMeasureTextSpan(ref platform, APTR.Null,
+			text, 6, false, out var maxColumns, out var lineCount) ||
+			maxColumns != 3 || lineCount != 2) return 1;
+		APTR.WriteUInt8(text, 0, 0x1B);
+		APTR.WriteUInt8(text, 1, (byte)'I');
+		APTR.WriteUInt8(text, 2, (byte)'[');
+		APTR.WriteUInt8(text, 3, (byte)'a');
+		APTR.WriteUInt8(text, 4, (byte)'b');
+		APTR.WriteUInt8(text, 5, (byte)'c');
+		APTR.WriteUInt8(text, 6, (byte)']');
+		APTR.WriteUInt8(text, 7, (byte)'x');
+		APTR.WriteUInt8(text, 8, (byte)'y');
+		APTR.WriteUInt8(text, 9, 0);
+		if (!MuiCommonControlCore.TryMeasureTextSpan(ref platform, APTR.Null,
+			text, 9, false, out maxColumns, out lineCount) ||
+			maxColumns != 2 || lineCount != 1) return 2;
+		var cursor = default(MuiTextScanByteCursor);
+		cursor.Text = text;
+		cursor.Index = 9;
+		if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != 0) return 3;
+		cursor.Index = MuiTextScanByteCursor.MaximumLength;
+		if (MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 4;
+		cursor.Text = APTR.Null;
+		cursor.Index = 0;
+		if (MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 5;
+		cursor.Text = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 6;
+		cursor.Text = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 7;
+		if (MuiCommonControlCore.TryMeasureTextSpan(ref platform, APTR.Null,
+			text, -1, false, out _, out _)) return 8;
+		return 42;
+	}
+
+	// MG2053 Text.mui leading style, inline-colour, and inline-image directives
+	// use the named bounded scan cursor. The closure checks directive decoding,
+	// hex admission, cursor bounds, NULL, overflow, and unmapped guest ranges.
+	public static uint TextDirectiveCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		APTR.WriteUInt8(text, 0, 0x1B);
+		APTR.WriteUInt8(text, 1, (byte)'s');
+		APTR.WriteUInt8(text, 2, 0x1B);
+		APTR.WriteUInt8(text, 3, (byte)'o');
+		APTR.WriteUInt8(text, 4, 0);
+		if (!MuiCommonControlCore.TryReadLeadingTextStyle(ref platform, text,
+			out var styleFlags) || styleFlags !=
+			(MuiCustomFontSpecFlags.Shadow | MuiCustomFontSpecFlags.Outline)) return 1;
+		APTR.WriteUInt8(text, 0, 0x1B);
+		APTR.WriteUInt8(text, 1, (byte)'P');
+		APTR.WriteUInt8(text, 2, (byte)'[');
+		APTR.WriteUInt8(text, 3, (byte)'A');
+		APTR.WriteUInt8(text, 4, (byte)'A');
+		APTR.WriteUInt8(text, 5, (byte)'B');
+		APTR.WriteUInt8(text, 6, (byte)'B');
+		APTR.WriteUInt8(text, 7, (byte)'C');
+		APTR.WriteUInt8(text, 8, (byte)'C');
+		APTR.WriteUInt8(text, 9, (byte)'D');
+		APTR.WriteUInt8(text, 10, (byte)'D');
+		APTR.WriteUInt8(text, 11, (byte)']');
+		APTR.WriteUInt8(text, 12, 0);
+		if (!MuiCommonControlCore.TryReadLeadingTextInlineColor(ref platform,
+			text, out var color, out var alpha, out var colorFlags) ||
+			color != 0x00BBCCDDu || alpha != 0xAAu || colorFlags !=
+			(MuiTextInlineColorFlags.HasColor | MuiTextInlineColorFlags.HasAlpha)) return 2;
+		APTR.WriteUInt8(text, 0, 0x1B);
+		APTR.WriteUInt8(text, 1, (byte)'I');
+		APTR.WriteUInt8(text, 2, (byte)'[');
+		APTR.WriteUInt8(text, 3, (byte)'2');
+		APTR.WriteUInt8(text, 4, (byte)':');
+		APTR.WriteUInt8(text, 5, (byte)'1');
+		APTR.WriteUInt8(text, 6, (byte)'1');
+		APTR.WriteUInt8(text, 7, (byte)'2');
+		APTR.WriteUInt8(text, 8, (byte)'2');
+		APTR.WriteUInt8(text, 9, (byte)'3');
+		APTR.WriteUInt8(text, 10, (byte)'3');
+		APTR.WriteUInt8(text, 11, (byte)']');
+		APTR.WriteUInt8(text, 12, 0);
+		if (!MuiCommonControlCore.TryReadLeadingTextInlineImage(ref platform,
+			text, out var spec) || spec.Kind != MuiImageSpecKind.Color ||
+			spec.Value != 0x00112233u || spec.Red != 0x11u ||
+			spec.Green != 0x22u || spec.Blue != 0x33u) return 3;
+		APTR.WriteUInt8(text, 0, (byte)'A');
+		APTR.WriteUInt8(text, 1, (byte)'A');
+		APTR.WriteUInt8(text, 2, (byte)'B');
+		APTR.WriteUInt8(text, 3, (byte)'B');
+		APTR.WriteUInt8(text, 4, (byte)'C');
+		APTR.WriteUInt8(text, 5, (byte)'C');
+		APTR.WriteUInt8(text, 6, (byte)'D');
+		APTR.WriteUInt8(text, 7, (byte)'D');
+		if (!MuiCommonControlCore.TryParseHex(ref platform, text, 0, 8,
+			out var parsed) || parsed != 0xAABBCCDDu) return 4;
+		var cursor = default(MuiTextScanByteCursor);
+		cursor.Text = text;
+		cursor.Index = MuiTextScanByteCursor.MaximumLength;
+		if (MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 5;
+		cursor.Text = APTR.Null;
+		cursor.Index = 0;
+		if (MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 6;
+		cursor.Text = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 7;
+		cursor.Text = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiTextScanByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 8;
+		return 42;
+	}
+
+	// MG2054/MG2055 Text.mui render-buffer traversal and String C-string length
+	// use named bounded cursors for source reads and destination writes. The
+	// closure checks escape stripping, newline preservation, alignment, length,
+	// cursor bounds, NULL, overflow, and unmapped guest ranges.
+	public static uint TextRenderCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		var buffer = APTR.FromPointer(0x00050FC0);
+		APTR.WriteUInt8(text, 0, 0x1B);
+		APTR.WriteUInt8(text, 1, (byte)'r');
+		APTR.WriteUInt8(text, 2, (byte)'H');
+		APTR.WriteUInt8(text, 3, (byte)'i');
+		APTR.WriteUInt8(text, 4, (byte)'\n');
+		APTR.WriteUInt8(text, 5, (byte)'X');
+		APTR.WriteUInt8(text, 6, 0);
+		var outIndex = 0;
+		var engineOn = true;
+		var atLineStart = true;
+		var align = 0;
+		var frontPen = uint.MaxValue;
+		MuiCommonControlCore.AppendRender(ref platform, text, buffer, 32,
+			ref outIndex, ref engineOn, ref atLineStart, ref align, ref frontPen);
+		if (outIndex != 4 || align != 2 ||
+			APTR.ReadUInt8(buffer, 0) != (byte)'H' ||
+			APTR.ReadUInt8(buffer, 1) != (byte)'i' ||
+			APTR.ReadUInt8(buffer, 2) != (byte)'\n' ||
+			APTR.ReadUInt8(buffer, 3) != (byte)'X') return 1;
+		APTR.WriteUInt8(text, 0, 0x1B);
+		APTR.WriteUInt8(text, 1, (byte)'I');
+		APTR.WriteUInt8(text, 2, (byte)'[');
+		APTR.WriteUInt8(text, 3, (byte)'a');
+		APTR.WriteUInt8(text, 4, (byte)'b');
+		APTR.WriteUInt8(text, 5, (byte)'c');
+		APTR.WriteUInt8(text, 6, (byte)']');
+		APTR.WriteUInt8(text, 7, (byte)'Z');
+		APTR.WriteUInt8(text, 8, 0);
+		outIndex = 0;
+		engineOn = true;
+		atLineStart = true;
+		align = 0;
+		frontPen = uint.MaxValue;
+		MuiCommonControlCore.AppendRender(ref platform, text, buffer, 32,
+			ref outIndex, ref engineOn, ref atLineStart, ref align, ref frontPen);
+		if (outIndex != 1 || APTR.ReadUInt8(buffer, 0) != (byte)'Z') return 2;
+		APTR.WriteUInt8(text, 0, (byte)'a');
+		APTR.WriteUInt8(text, 1, (byte)'b');
+		APTR.WriteUInt8(text, 2, (byte)'c');
+		APTR.WriteUInt8(text, 3, 0);
+		if (MuiCommonControlCore.CStringLength(ref platform, text) != 3) return 3;
+		var cursor = default(MuiTextRenderByteCursor);
+		cursor.Base = buffer;
+		cursor.Index = 0;
+		cursor.Length = 32;
+		if (!MuiTextRenderByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != (byte)'Z') return 4;
+		cursor.Index = MuiTextRenderByteCursor.MaximumLength;
+		if (MuiTextRenderByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 5;
+		cursor.Base = APTR.Null;
+		cursor.Index = 0;
+		if (MuiTextRenderByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 6;
+		cursor.Base = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiTextRenderByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 7;
+		cursor.Base = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiTextRenderByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 8;
+		return 42;
+	}
+
+	// MG2067 qualifies Text.mui render subspan derivation through the named
+	// bounded cursor range adapter.  The closure keeps source/index/length
+	// state in the struct and checks valid subspans plus count, bound, overflow,
+	// NULL, and unmapped-range rejection on the freestanding 68000 path.
+	public static uint TextRenderSpanStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var source = APTR.FromPointer(0x00036100);
+		APTR.WriteUInt8(source, 0, (byte)'a');
+		APTR.WriteUInt8(source, 1, (byte)'b');
+		APTR.WriteUInt8(source, 2, (byte)'c');
+		APTR.WriteUInt8(source, 3, (byte)'d');
+		APTR.WriteUInt8(source, 4, (byte)'e');
+		APTR.WriteUInt8(source, 5, (byte)'f');
+		APTR.WriteUInt8(source, 6, (byte)'g');
+		APTR.WriteUInt8(source, 7, (byte)'h');
+		var cursor = default(MuiTextRenderByteCursor);
+		cursor.Base = source;
+		cursor.Index = 2;
+		cursor.Length = 8;
+		if (!MuiTextRenderByteCursorCodec.TryGetRange(ref platform, cursor,
+			3, out var range) || range.Raw != source.Raw + 2 ||
+			!MuiTextRenderByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != (byte)'c') return 1;
+		cursor.Index = 7;
+		if (MuiTextRenderByteCursorCodec.TryGetRange(ref platform, cursor,
+			2, out _)) return 2;
+		cursor.Index = 8;
+		if (MuiTextRenderByteCursorCodec.TryGetRange(ref platform, cursor,
+			1, out _)) return 3;
+		cursor.Index = 0;
+		cursor.Length = MuiTextRenderByteCursor.MaximumLength + 1;
+		if (MuiTextRenderByteCursorCodec.TryGetRange(ref platform, cursor,
+			0, out _)) return 4;
+		cursor.Length = 8;
+		cursor.Base = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiTextRenderByteCursorCodec.TryGetRange(ref platform, cursor,
+			0, out _)) return 5;
+		cursor.Base = APTR.Null;
+		cursor.Index = 0;
+		if (MuiTextRenderByteCursorCodec.TryGetRange(ref platform, cursor,
+			0, out _)) return 6;
+		cursor.Base = APTR.FromPointer(0x00070000);
+		if (MuiTextRenderByteCursorCodec.TryGetRange(ref platform, cursor,
+			0, out _)) return 7;
+		return 42;
+	}
+
+	// MG2072 qualifies the common Text/Index cursor wrappers after they were
+	// consolidated onto MuiCStringByteCursor. Each consumer keeps its own
+	// compatibility bound while sharing the same freestanding range checks.
+	public static uint CommonCStringCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00036100);
+		APTR.WriteUInt8(text, 0, (byte)'x');
+		APTR.WriteUInt8(text, 1, 0);
+
+		var className = default(MuiCommonControlClassNameByteCursor);
+		className.Text = text;
+		className.Index = 0;
+		if (!MuiCommonControlClassNameByteCursorCodec.TryReadByte(ref platform,
+			className, out var value) || value != (byte)'x') return 1;
+		className.Index = MuiCommonControlClassNameByteCursor.MaximumLength;
+		if (MuiCommonControlClassNameByteCursorCodec.TryReadByte(ref platform,
+			className, out _)) return 2;
+
+		var numeric = default(MuiNumericFormatByteCursor);
+		numeric.Text = text;
+		numeric.Index = 0;
+		if (!MuiNumericFormatByteCursorCodec.TryReadByte(ref platform, numeric,
+			out value) || value != (byte)'x') return 3;
+
+		var integer = default(MuiStringIntegerParseByteCursor);
+		integer.Text = text;
+		integer.Index = 0;
+		if (!MuiStringIntegerParseByteCursorCodec.TryReadByte(ref platform,
+			integer, out value) || value != (byte)'x') return 4;
+
+		var filter = default(MuiStringFilterByteCursor);
+		filter.Text = text;
+		filter.Index = 0;
+		if (!MuiStringFilterByteCursorCodec.TryReadByte(ref platform, filter,
+			out value) || value != (byte)'x') return 5;
+
+		var length = default(MuiStringLengthByteCursor);
+		length.Text = text;
+		length.Index = 1;
+		if (!MuiStringLengthByteCursorCodec.TryReadByte(ref platform, length,
+			out value) || value != 0) return 6;
+
+		var bracket = default(MuiTextBracketByteCursor);
+		bracket.Text = text;
+		bracket.Index = 0;
+		if (!MuiTextBracketByteCursorCodec.TryReadByte(ref platform, bracket,
+			out value) || value != (byte)'x') return 7;
+
+		var scan = default(MuiTextScanByteCursor);
+		scan.Text = text;
+		scan.Index = 0;
+		if (!MuiTextScanByteCursorCodec.TryReadByte(ref platform, scan,
+			out value) || value != (byte)'x') return 8;
+		scan.Text = APTR.Null;
+		if (MuiTextScanByteCursorCodec.TryReadByte(ref platform, scan,
+			out _)) return 9;
+		return 42;
+	}
+
+	// MG2073 qualifies bounded Stringscroll and String Integer64 spans after
+	// their adapters were layered over MuiCStringByteCursor. Explicit lengths
+	// remain caller-owned state; the shared adapter supplies range, overflow,
+	// and mapped-byte admission on the freestanding 68000 path.
+	public static uint StringSpanCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var source = APTR.FromPointer(0x00036100);
+		APTR.WriteUInt8(source, 0, (byte)'a');
+		APTR.WriteUInt8(source, 1, (byte)'b');
+		APTR.WriteUInt8(source, 2, (byte)'c');
+		APTR.WriteUInt8(source, 3, 0);
+
+		if (!MuiStringscrollTextByteCursorCodec.TryCreate(ref platform, source,
+			4, out var scroll) ||
+			!MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform, scroll,
+			1, out var value) || value != (byte)'b') return 1;
+		if (MuiStringscrollTextByteCursorCodec.TryReadAt(ref platform, scroll,
+			4, out _)) return 2;
+		if (MuiStringscrollTextByteCursorCodec.TryCreate(ref platform, source,
+			MuiStringscrollTextByteCursor.MaximumLength + 1, out _)) return 3;
+
+		var integer = default(MuiStringInteger64TextByteCursor);
+		integer.Base = source;
+		integer.Length = 4;
+		integer.Index = 2;
+		if (!MuiStringInteger64TextByteCursorCodec.TryReadByte(ref platform,
+			integer, out value) || value != (byte)'c') return 4;
+		var destination = APTR.FromPointer(0x00036120);
+		integer.Base = destination;
+		integer.Length = 4;
+		integer.Index = 1;
+		if (!MuiStringInteger64TextByteCursorCodec.TryWriteByte(ref platform,
+			integer, (byte)'X') || APTR.ReadUInt8(destination, 1) != (byte)'X')
+			return 5;
+		if (MuiStringInteger64TextByteCursorCodec.TryReadAt(ref platform, source,
+			4, 4, out _)) return 6;
+		if (MuiStringInteger64TextByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(uint.MaxValue - 1u), 4, 2, out _)) return 7;
+		if (MuiStringInteger64TextByteCursorCodec.TryReadAt(ref platform,
+			APTR.Null, 4, 0, out _)) return 8;
+		return 42;
+	}
+
+	// MG2074 qualifies the collection/class-name and MakeObject control-label
+	// readers after their byte admission was consolidated onto the shared named
+	// CString cursor. The individual 64-byte/4 KiB bounds remain explicit.
+	public static uint CollectionAndMakeObjectCStringCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00036100);
+		APTR.WriteUInt8(text, 0, (byte)'m');
+		APTR.WriteUInt8(text, 1, 0);
+
+		var className = default(MuiClassNameByteCursor);
+		className.Name = text;
+		className.Index = 0;
+		if (!MuiClassNameByteCursorCodec.TryReadByte(ref platform, className,
+			out var value) || value != (byte)'m') return 1;
+		className.Index = MuiClassNameByteCursor.MaximumLength;
+		if (MuiClassNameByteCursorCodec.TryReadByte(ref platform, className,
+			out _)) return 2;
+
+		var tree = default(MuiListtreeStringByteCursor);
+		tree.Text = text;
+		tree.Index = 0;
+		if (!MuiListtreeStringByteCursorCodec.TryReadByte(ref platform, tree,
+			out value) || value != (byte)'m') return 3;
+		tree.Index = MuiListtreeStringByteCursor.MaximumLength;
+		if (MuiListtreeStringByteCursorCodec.TryReadByte(ref platform, tree,
+			out _)) return 4;
+
+		var control = default(MuiMakeObjectControlCharByteCursor);
+		control.Text = text;
+		control.Index = 0;
+		if (!MuiMakeObjectControlCharByteCursorCodec.TryReadByte(ref platform,
+			control, out value) || value != (byte)'m') return 5;
+		control.Index = MuiMakeObjectControlCharByteCursor.MaximumLength;
+		if (MuiMakeObjectControlCharByteCursorCodec.TryReadByte(ref platform,
+			control, out _)) return 6;
+		control.Text = APTR.Null;
+		control.Index = 0;
+		if (MuiMakeObjectControlCharByteCursorCodec.TryReadByte(ref platform,
+			control, out _)) return 7;
+		return 42;
 	}
 
 	public static uint CommonControlEventPacketRoot()
@@ -23601,29 +26481,38 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// Focused MG1362 ColumnOrder vector closure. Each guest BYTE is admitted
-	// through the named byte-record adapter; no caller-facing byte offset or
-	// word-alignment arithmetic is reproduced in the native root.
+	// Focused MG1362/MG1969/MG2009 ColumnOrder vector closure. Each guest BYTE
+	// is admitted through the named cursor bridge; no caller-facing byte offset
+	// or word-alignment arithmetic is reproduced in the native root.
 	public static uint ListColumnOrderByteVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		const uint order = 0x00038180;
 		var vector = APTR.FromPointer(order);
-		if (!MuiListCore.MuiListColumnOrderByteVectorMemoryCodec.TryGetEntry(
-			ref platform, vector, 0, out var first)) return 1;
-		APTR.WriteUInt8(first, 0, 2);
-		if (!MuiListCore.MuiListColumnOrderByteVectorMemoryCodec.TryGetEntry(
-			ref platform, vector, 1, out var second)) return 2;
-		APTR.WriteUInt8(second, 0, 0);
-		if (!MuiListCore.MuiListColumnOrderByteVectorMemoryCodec.TryGetEntry(
-			ref platform, vector, 2, out var third)) return 3;
-		APTR.WriteUInt8(third, 0, 1);
-		if (APTR.ReadUInt8(first, 0) != 2 || APTR.ReadUInt8(second, 0) != 0 ||
-			APTR.ReadUInt8(third, 0) != 1) return 4;
-		if (MuiListCore.MuiListColumnOrderByteVectorMemoryCodec.TryGetEntry(
-			ref platform, vector,
-			MuiListCore.MuiListColumnOrderByteCursor.MaximumEntries, out _)) return 5;
+		var cursor = default(MuiListCore.MuiListColumnOrderByteCursor);
+		cursor.Base = vector;
+		cursor.Index = 0;
+		if (!MuiListCore.MuiListColumnOrderByteVectorCodec.TryWriteValue(
+			ref platform, cursor, 0xFE) ||
+			!MuiListCore.MuiListColumnOrderByteVectorCodec.TryReadValue(
+				ref platform, cursor, out var bridged) || bridged != 0xFE)
+			return 7;
+		cursor.Index = 1;
+		if (!MuiListCore.MuiListColumnOrderByteVectorCodec.TryWriteValue(
+			ref platform, cursor, 0)) return 4;
+		cursor.Index = 2;
+		if (!MuiListCore.MuiListColumnOrderByteVectorCodec.TryWriteValue(
+			ref platform, cursor, 1)) return 4;
+		cursor.Index = 1;
+		if (!MuiListCore.MuiListColumnOrderByteVectorCodec.TryReadValue(
+			ref platform, cursor, out var second) || second != 0) return 4;
+		cursor.Index = 2;
+		if (!MuiListCore.MuiListColumnOrderByteVectorCodec.TryReadValue(
+			ref platform, cursor, out var third) || third != 1) return 4;
+		cursor.Index = MuiListCore.MuiListColumnOrderByteCursor.MaximumEntries;
+		if (MuiListCore.MuiListColumnOrderByteVectorCodec.TryWriteValue(
+			ref platform, cursor, 0)) return 5;
 		return 42;
 	}
 
@@ -24404,6 +27293,59 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// Focused qualification for the sequential named-record Dirlist codecs.
+	// All fixed operation shapes are round-tripped through the production
+	// declaration-order bridge, with an incomplete record rejected at the end.
+	public static uint DirlistMessageStructPacketCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var packet = APTR.FromPointer(0x00050F20);
+		if (!MuiDirlistMessageStructCodec.TryWriteMethod(ref platform, packet,
+			MuiDirlistMessageCodec.ReRead)) return 11;
+		if (!MuiDirlistMessageStructCodec.TryReadMethodIdValue(ref platform,
+			packet, out var method) || method != MuiDirlistMessageCodec.ReRead)
+			return 12;
+		var set = default(MuiDirlistSetMessage);
+		set.MethodId = MuiDirlistMessageCodec.Set;
+		set.Attribute = 7;
+		set.Value = 9;
+		if (!MuiDirlistMessageStructCodec.TryWriteSet(ref platform, packet, set) ||
+			!MuiDirlistMessageStructCodec.TryReadSet(ref platform, packet,
+				out var setRead) || setRead.Attribute != 7 || setRead.Value != 9)
+			return 2;
+		var rename = default(MuiDirlistRenameMessage);
+		rename.MethodId = MuiDirlistMessageCodec.Rename;
+		rename.Entry = 3;
+		rename.Name = 0x00050D00;
+		if (!MuiDirlistMessageStructCodec.TryWriteRename(ref platform, packet,
+			rename) || !MuiDirlistMessageStructCodec.TryReadRename(ref platform,
+			packet, out var renameRead) || renameRead.Entry != 3 ||
+			renameRead.Name != 0x00050D00) return 3;
+		var protection = default(MuiDirlistProtectionMessage);
+		protection.MethodId = MuiDirlistMessageCodec.SetProtection;
+		protection.Entry = 4;
+		protection.Protection = 0x12345678;
+		if (!MuiDirlistMessageStructCodec.TryWriteProtection(ref platform, packet,
+			protection) || !MuiDirlistMessageStructCodec.TryReadProtection(
+			ref platform, packet, out var protectionRead) ||
+			protectionRead.Protection != protection.Protection) return 4;
+		var getEntry = default(MuiDirlistGetEntryMessage);
+		getEntry.MethodId = MuiDirlistMessageCodec.ListGetEntry;
+		getEntry.Position = unchecked((uint)-2);
+		getEntry.Storage = 0x00050E00;
+		if (!MuiDirlistMessageStructCodec.TryWriteGetEntry(ref platform, packet,
+			getEntry) || !MuiDirlistMessageStructCodec.TryReadGetEntry(ref platform,
+			packet, out var getEntryRead) ||
+			getEntryRead.Position != unchecked((uint)-2) ||
+			getEntryRead.Storage != 0x00050E00) return 5;
+		if (MuiDirlistMessageStructCodec.TryReadSet(ref platform,
+			APTR.FromPointer(0x00050FFF), out _) ||
+			MuiDirlistMessageStructCodec.TryReadMethodIdValue(ref platform,
+				APTR.Null, out _)) return 6;
+		return 42;
+	}
+
 	// Focused ABI proof for the struct-first Dirlist packet adapter. Operation
 	// fields are admitted only when the complete named record is mapped.
 	public static uint DirlistMessageStructRecordCodecRoot()
@@ -24488,6 +27430,334 @@ public static class MuiNativeRoots
 		if (!MuiDirlistStateAdmission.ValidateScan(scan)) return 5;
 		scan.Status = MuiDirlistCore.StatusValid + 1;
 		if (MuiDirlistStateAdmission.ValidateScan(scan)) return 6;
+		return 42;
+	}
+
+	// MG1918 focused Dirlist fixed-wire struct proof. The byte-total QUAD,
+	// owned-entry header, and transient ExAll header all travel through named
+	// declaration-ordered records; incomplete guest ranges are rejected before
+	// any field is consumed or written.
+	public static uint DirlistFixedWireStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var totalAddress = APTR.FromPointer(0x50300);
+		var entryAddress = APTR.FromPointer(0x50320);
+		var scanAddress = APTR.FromPointer(0x50360);
+		var total = new MuiDirlistByteTotalState
+		{
+			High = 2,
+			Low = 0x12345678,
+		};
+		var entry = new MuiDirlistEntryWireState
+		{
+			RecordSize = 64,
+			Type = -3,
+			SizeLow = 0x1234,
+			SizeHigh = 2,
+			Protection = 0xF0,
+			Days = 10,
+			Mins = 20,
+			Ticks = 30,
+			CommentOffset = 48,
+		};
+		var scan = new MuiDirlistScanEntryWireState
+		{
+			Type = 2,
+			SizeLow = 0x5678,
+			SizeHigh = 4,
+			Protection = 7,
+			Days = 11,
+			Mins = 22,
+			Ticks = 33,
+		};
+		if (!MuiDirlistByteTotalCodec.Write(ref platform, totalAddress,
+			total) || !MuiDirlistEntryWireCodec.Write(ref platform,
+			entryAddress, entry) || !MuiDirlistScanEntryWireCodec.Write(
+			ref platform, scanAddress, scan)) return 1;
+		if (!MuiDirlistByteTotalCodec.TryRead(ref platform, totalAddress,
+			out var readTotal) || readTotal.High != total.High ||
+			readTotal.Low != total.Low) return 2;
+		if (!MuiDirlistEntryWireCodec.TryRead(ref platform, entryAddress,
+			out var readEntry) || readEntry.RecordSize != entry.RecordSize ||
+			readEntry.Type != entry.Type || readEntry.CommentOffset !=
+			entry.CommentOffset) return 3;
+		if (!MuiDirlistScanEntryWireCodec.TryRead(ref platform, scanAddress,
+			out var readScan) || readScan.Type != scan.Type ||
+			readScan.Ticks != scan.Ticks) return 4;
+		if (MuiDirlistByteTotalCodec.TryRead(ref platform,
+			APTR.FromPointer(0x50FFC), out _) ||
+			MuiDirlistByteTotalCodec.Write(ref platform,
+				APTR.FromPointer(0x50FFC), total) ||
+			MuiDirlistEntryWireCodec.TryRead(ref platform,
+				APTR.FromPointer(0x50FDE), out _) ||
+			MuiDirlistEntryWireCodec.Write(ref platform,
+				APTR.FromPointer(0x50FDE), entry) ||
+			MuiDirlistScanEntryWireCodec.TryRead(ref platform,
+				APTR.FromPointer(0x50FE8), out _) ||
+			MuiDirlistScanEntryWireCodec.Write(ref platform,
+				APTR.FromPointer(0x50FE8), scan)) return 5;
+		return 42;
+	}
+
+	// MG2019 native struct-first Dirlist variable-tail closure.  The owned
+	// entry header supplies a named tail cursor; name/comment ranges are
+	// resolved and mapped by that cursor before any string consumer runs.
+	public static uint DirlistEntryTailCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var cursor = default(MuiDirlistEntryTailCursor);
+		cursor.Entry = APTR.FromPointer(0x00050320);
+		cursor.RecordSize = 64;
+		cursor.CommentOffset = 48;
+		if (!MuiDirlistEntryTailCursorCodec.TryGetName(ref platform, cursor,
+			out var name, out var nameCapacity) || name.Raw != 0x00050344 ||
+			nameCapacity != 28) return 1;
+		if (!MuiDirlistEntryTailCursorCodec.TryGetComment(ref platform, cursor,
+			out var comment, out var commentCapacity) ||
+			comment.Raw != 0x00050350 || commentCapacity != 16) return 2;
+		cursor.Entry = APTR.FromPointer(0x00050FFEu);
+		if (MuiDirlistEntryTailCursorCodec.TryGetName(ref platform, cursor,
+			out _, out _)) return 3;
+		return 42;
+	}
+
+	// MG2020 native struct-first Dirlist scan-tail closure.  The fixed
+	// ExAll-like scratch payload exposes its name/comment arrays only through
+	// the named tail cursor and complete mapped ranges.
+	public static uint DirlistScanEntryTailCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var cursor = new MuiDirlistScanEntryTailCursor
+		{
+			Scratch = APTR.FromPointer(0x00050360),
+		};
+		if (!MuiDirlistScanEntryTailCursorCodec.TryGetName(ref platform, cursor,
+			out var name) || name.Raw != 0x0005037C) return 1;
+		if (!MuiDirlistScanEntryTailCursorCodec.TryGetComment(ref platform, cursor,
+			out var comment) || comment.Raw != 0x000503E8) return 2;
+		cursor.Scratch = APTR.FromPointer(0x00050F40);
+		if (MuiDirlistScanEntryTailCursorCodec.TryGetName(ref platform, cursor,
+			out _)) return 3;
+		return 42;
+	}
+
+	// MG2021 native struct-first Dirlist string-byte closure. The comparison
+	// cursor exposes only bounded single-byte addresses and rejects both the
+	// logical limit and an address that crosses the mapped guest boundary.
+	public static uint DirlistStringByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var cursor = new MuiDirlistStringByteCursor
+		{
+			Base = APTR.FromPointer(0x00050360),
+			Index = 7,
+		};
+		if (!MuiDirlistStringByteCursorCodec.TryGetByte(ref platform, cursor,
+			out var address) || address.Raw != 0x00050367) return 1;
+		cursor.Index = 2;
+		if (!MuiDirlistStringByteCursorCodec.TryWriteByte(ref platform, cursor,
+			0xA5)) return 5;
+		if (!MuiDirlistStringByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != 0xA5) return 6;
+		cursor.Index = MuiDirlistStringByteCursor.MaximumBytes - 1;
+		if (!MuiDirlistStringByteCursorCodec.TryGetByte(ref platform, cursor,
+			out address) || address.Raw != 0x0005041B) return 2;
+		cursor.Index = MuiDirlistStringByteCursor.MaximumBytes;
+		if (MuiDirlistStringByteCursorCodec.TryGetByte(ref platform, cursor,
+			out _)) return 3;
+		cursor.Base = APTR.FromPointer(0x00050FFF);
+		cursor.Index = 1;
+		if (MuiDirlistStringByteCursorCodec.TryGetByte(ref platform, cursor,
+			out _)) return 4;
+		return 42;
+	}
+
+	// MG2042 Dirlist matching bytes use a measured named cursor.  The focused
+	// closure checks a mapped byte and rejects declared-length, over-limit,
+	// overflow, NULL, and unmapped cases.
+	public static uint DirlistMatchByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		platform.WriteUInt8(text, 0, (byte)'A');
+		var cursor = default(MuiDirlistMatchByteCursor);
+		cursor.Base = text;
+		cursor.Index = 0;
+		cursor.Length = 1;
+		if (!MuiDirlistMatchByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != (byte)'A') return 1;
+		cursor.Index = cursor.Length;
+		if (MuiDirlistMatchByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 2;
+		cursor.Length = MuiDirlistMatchByteCursor.MaximumLength + 1;
+		cursor.Index = 0;
+		if (MuiDirlistMatchByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 3;
+		cursor.Length = 1;
+		cursor.Base = APTR.Null;
+		if (MuiDirlistMatchByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 4;
+		cursor.Base = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiDirlistMatchByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 5;
+		cursor.Base = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiDirlistMatchByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 6;
+		return 42;
+	}
+
+	// MG2048 Dirlist name comparison consumes both operands through the named
+	// string-byte cursor. Case-folding and malformed guest ranges remain in the
+	// comparator while no raw indexed byte reads escape the adapter.
+	public static uint DirlistStringCompareCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var left = APTR.FromPointer(0x00050F80);
+		var right = APTR.FromPointer(0x00050FC0);
+		APTR.WriteUInt8(left, 0, (byte)'A');
+		APTR.WriteUInt8(left, 1, (byte)'l');
+		APTR.WriteUInt8(left, 2, (byte)'p');
+		APTR.WriteUInt8(left, 3, (byte)'h');
+		APTR.WriteUInt8(left, 4, (byte)'a');
+		APTR.WriteUInt8(left, 5, 0);
+		APTR.WriteUInt8(right, 0, (byte)'a');
+		APTR.WriteUInt8(right, 1, (byte)'L');
+		APTR.WriteUInt8(right, 2, (byte)'P');
+		APTR.WriteUInt8(right, 3, (byte)'H');
+		APTR.WriteUInt8(right, 4, (byte)'A');
+		APTR.WriteUInt8(right, 5, 0);
+		if (MuiDirlistCore.CompareStrings(ref platform, left, right) != 0)
+			return 1;
+		var beta = APTR.FromPointer(0x00050F40);
+		APTR.WriteUInt8(beta, 0, (byte)'b');
+		APTR.WriteUInt8(beta, 1, (byte)'e');
+		APTR.WriteUInt8(beta, 2, (byte)'t');
+		APTR.WriteUInt8(beta, 3, (byte)'a');
+		APTR.WriteUInt8(beta, 4, 0);
+		if (MuiDirlistCore.CompareStrings(ref platform, left, beta) >= 0 ||
+			MuiDirlistCore.CompareStrings(ref platform, beta, left) <= 0) return 2;
+		if (MuiDirlistCore.CompareStrings(ref platform, left, left) != 0) return 3;
+		return 42;
+	}
+
+	// MG2022 native struct-first Dirlist string-copy closure. The scan-entry
+	// writer exchanges source and destination bytes through the named cursor,
+	// including the explicit NUL terminators.
+	public static uint DirlistStringCopyCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var scratch = APTR.FromPointer(0x00050360);
+		var sourceName = APTR.FromPointer(0x00050C00);
+		var sourceComment = APTR.FromPointer(0x00050C20);
+		APTR.WriteUInt8(sourceName, 0, (byte)'a');
+		APTR.WriteUInt8(sourceName, 1, (byte)'b');
+		APTR.WriteUInt8(sourceName, 2, (byte)'c');
+		APTR.WriteUInt8(sourceName, 3, 0);
+		APTR.WriteUInt8(sourceComment, 0, (byte)'x');
+		APTR.WriteUInt8(sourceComment, 1, (byte)'y');
+		APTR.WriteUInt8(sourceComment, 2, 0);
+		var value = default(MuiDirlistScanEntryState);
+		value.Address = scratch;
+		value.Type = 2;
+		value.Name = sourceName;
+		value.NameLength = 3;
+		value.Comment = sourceComment;
+		value.CommentLength = 2;
+		if (!MuiDirlistCore.WriteScanEntryState(ref platform, scratch, value))
+			return 1;
+		var tail = default(MuiDirlistScanEntryTailCursor);
+		tail.Scratch = scratch;
+		if (!MuiDirlistScanEntryTailCursorCodec.TryGetName(ref platform, tail,
+			out var name)) return 2;
+		var nameCursor = default(MuiDirlistStringByteCursor);
+		nameCursor.Base = name;
+		nameCursor.Index = 0;
+		if (!MuiDirlistStringByteCursorCodec.TryReadByte(ref platform,
+			nameCursor, out var first) || first != (byte)'a') return 3;
+		nameCursor.Index = 3;
+		if (!MuiDirlistStringByteCursorCodec.TryReadByte(ref platform,
+			nameCursor, out var nameEnd) || nameEnd != 0) return 4;
+		if (!MuiDirlistScanEntryTailCursorCodec.TryGetComment(ref platform, tail,
+			out var comment)) return 5;
+		var commentCursor = default(MuiDirlistStringByteCursor);
+		commentCursor.Base = comment;
+		commentCursor.Index = 1;
+		if (!MuiDirlistStringByteCursorCodec.TryReadByte(ref platform,
+			commentCursor, out var second) || second != (byte)'y') return 6;
+		commentCursor.Index = 2;
+		if (!MuiDirlistStringByteCursorCodec.TryReadByte(ref platform,
+			commentCursor, out var commentEnd) || commentEnd != 0) return 7;
+		return 42;
+	}
+
+	// MG2023 native struct-first Dirlist path-byte closure. The path buffer
+	// cursor carries its bounded length and rejects both logical and mapped
+	// boundary violations while preserving byte read/write semantics.
+	public static uint DirlistPathByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var cursor = new MuiDirlistPathByteCursor
+		{
+			Base = APTR.FromPointer(0x00050360),
+			Length = 8,
+			Index = 2,
+		};
+		if (!MuiDirlistPathByteCursorCodec.TryWriteByte(ref platform, cursor,
+			0xA5)) return 1;
+		if (!MuiDirlistPathByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != 0xA5) return 2;
+		cursor.Index = cursor.Length;
+		if (MuiDirlistPathByteCursorCodec.TryGetByte(ref platform, cursor,
+			out _)) return 3;
+		cursor.Length = MuiDirlistPathByteCursor.MaximumLength + 1;
+		cursor.Index = 0;
+		if (MuiDirlistPathByteCursorCodec.TryGetByte(ref platform, cursor,
+			out _)) return 4;
+		cursor.Base = APTR.FromPointer(0x00050FFF);
+		cursor.Length = 2;
+		cursor.Index = 1;
+		if (MuiDirlistPathByteCursorCodec.TryGetByte(ref platform, cursor,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG2024 native struct-first collection class-name closure. The shared
+	// class-name cursor bounds one-byte reads/writes and rejects null, logical,
+	// and mapped-boundary violations.
+	public static uint ClassNameByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var cursor = new MuiClassNameByteCursor
+		{
+			Name = APTR.FromPointer(0x00050360),
+			Index = 3,
+		};
+		if (!MuiClassNameByteCursorCodec.TryWriteByte(ref platform, cursor,
+			0xA5)) return 1;
+		if (!MuiClassNameByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != 0xA5) return 2;
+		cursor.Index = MuiClassNameByteCursor.MaximumLength;
+		if (MuiClassNameByteCursorCodec.TryGetByte(ref platform, cursor,
+			out _)) return 3;
+		cursor.Name = APTR.FromPointer(0x00050FFF);
+		cursor.Index = 1;
+		if (MuiClassNameByteCursorCodec.TryGetByte(ref platform, cursor,
+			out _)) return 4;
+		cursor.Name = APTR.Null;
+		cursor.Index = 0;
+		if (MuiClassNameByteCursorCodec.TryGetByte(ref platform, cursor,
+			out _)) return 5;
 		return 42;
 	}
 
@@ -25855,6 +29125,152 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG2027 native Listtree FORMAT parser closure. The external Listtree
+	// object consumes a MAXWIDTH/WEIGHT format through the shared named FORMAT
+	// byte cursor; a pointer hit then proves the parsed width reached geometry.
+	public static uint CollectionListtreeFormatCursorRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		const uint privateRoot = 0x00035F00;
+		const uint state = 0x00036000;
+		const uint className = 0x00036100;
+		const uint boopsi = 0x00036220;
+		const uint nodeName = 0x00036240;
+		const uint format = 0x00036260;
+		const uint intui = 0x00036300;
+		WriteWord(nodeName, (byte)'r', (byte)'o', (byte)'o', (byte)'t', 0);
+		var classNameAddress = APTR.FromPointer(className);
+		APTR.WriteUInt8(classNameAddress, 0, (byte)'L');
+		APTR.WriteUInt8(classNameAddress, 1, (byte)'i');
+		APTR.WriteUInt8(classNameAddress, 2, (byte)'s');
+		APTR.WriteUInt8(classNameAddress, 3, (byte)'t');
+		APTR.WriteUInt8(classNameAddress, 4, (byte)'t');
+		APTR.WriteUInt8(classNameAddress, 5, (byte)'r');
+		APTR.WriteUInt8(classNameAddress, 6, (byte)'e');
+		APTR.WriteUInt8(classNameAddress, 7, (byte)'e');
+		APTR.WriteUInt8(classNameAddress, 8, (byte)'.');
+		APTR.WriteUInt8(classNameAddress, 9, (byte)'m');
+		APTR.WriteUInt8(classNameAddress, 10, (byte)'c');
+		APTR.WriteUInt8(classNameAddress, 11, (byte)'c');
+		APTR.WriteUInt8(classNameAddress, 12, 0);
+		var formatAddress = APTR.FromPointer(format);
+		APTR.WriteUInt8(formatAddress, 0, (byte)'A');
+		APTR.WriteUInt8(formatAddress, 1, (byte)' ');
+		APTR.WriteUInt8(formatAddress, 2, (byte)'M');
+		APTR.WriteUInt8(formatAddress, 3, (byte)'A');
+		APTR.WriteUInt8(formatAddress, 4, (byte)'X');
+		APTR.WriteUInt8(formatAddress, 5, (byte)'W');
+		APTR.WriteUInt8(formatAddress, 6, (byte)'I');
+		APTR.WriteUInt8(formatAddress, 7, (byte)'D');
+		APTR.WriteUInt8(formatAddress, 8, (byte)'T');
+		APTR.WriteUInt8(formatAddress, 9, (byte)'H');
+		APTR.WriteUInt8(formatAddress, 10, (byte)'=');
+		APTR.WriteUInt8(formatAddress, 11, (byte)'2');
+		APTR.WriteUInt8(formatAddress, 12, (byte)'0');
+		APTR.WriteUInt8(formatAddress, 13, (byte)'p');
+		APTR.WriteUInt8(formatAddress, 14, (byte)'x');
+		APTR.WriteUInt8(formatAddress, 15, (byte)' ');
+		APTR.WriteUInt8(formatAddress, 16, (byte)'W');
+		APTR.WriteUInt8(formatAddress, 17, (byte)'E');
+		APTR.WriteUInt8(formatAddress, 18, (byte)'I');
+		APTR.WriteUInt8(formatAddress, 19, (byte)'G');
+		APTR.WriteUInt8(formatAddress, 20, (byte)'H');
+		APTR.WriteUInt8(formatAddress, 21, (byte)'T');
+		APTR.WriteUInt8(formatAddress, 22, (byte)'=');
+		APTR.WriteUInt8(formatAddress, 23, (byte)'1');
+		APTR.WriteUInt8(formatAddress, 24, (byte)',');
+		APTR.WriteUInt8(formatAddress, 25, (byte)'B');
+		APTR.WriteUInt8(formatAddress, 26, (byte)' ');
+		APTR.WriteUInt8(formatAddress, 27, (byte)'W');
+		APTR.WriteUInt8(formatAddress, 28, (byte)'E');
+		APTR.WriteUInt8(formatAddress, 29, (byte)'I');
+		APTR.WriteUInt8(formatAddress, 30, (byte)'G');
+		APTR.WriteUInt8(formatAddress, 31, (byte)'H');
+		APTR.WriteUInt8(formatAddress, 32, (byte)'T');
+		APTR.WriteUInt8(formatAddress, 33, (byte)'=');
+		APTR.WriteUInt8(formatAddress, 34, (byte)'1');
+		APTR.WriteUInt8(formatAddress, 35, 0);
+		if (!MuiMasterLifecycleCore.Create(ref platform,
+			APTR.FromPointer(privateRoot), APTR.FromPointer(state))) return 1;
+		var classRecord = MuiListtreeCore.RegisterListtreeExternalClass(ref platform,
+			APTR.FromPointer(state), classNameAddress, APTR.FromPointer(boopsi),
+			APTR.Null);
+		if (classRecord.IsNull) return 2;
+		var tree = MuiListtreeCore.CreateListtree(ref platform,
+			APTR.FromPointer(state), classRecord, APTR.Null);
+		if (tree.IsNull) return 3;
+		var root = MuiListtreeCore.Insert(ref platform, APTR.FromPointer(state),
+			tree, APTR.FromPointer(nodeName), APTR.Null, APTR.FromPointer(0),
+			APTR.FromPointer(0xFFFFFFFFu), 0);
+		if (root.IsNull || !MuiListtreeCore.SetAttribute(ref platform,
+			APTR.FromPointer(state), tree, MuiListtreeCore.Format,
+			formatAddress.Raw, false) || !MuiListtreeCore.Layout(ref platform,
+			APTR.FromPointer(state), tree, 0, 0, 100, 16)) return 4;
+		if (!MuiIntuiMessageCodec.WritePointer(ref platform, APTR.FromPointer(intui),
+			1u << 3, 0x0069, 0, 0, 30, 4) ||
+			!MuiListtreeCore.HandleInput(ref platform, APTR.FromPointer(state), tree,
+				APTR.FromPointer(intui), -1) ||
+			!MuiListtreeCore.TryGetClickColumnStateRecord(ref platform,
+				APTR.FromPointer(state), tree, out var click) || click.LastColumn != 1)
+			return 5;
+		if (!MuiCollectionLifecycle.DisposeObject(ref platform,
+			APTR.FromPointer(state), tree) || !MuiMasterLifecycleCore.Dispose(ref platform,
+			APTR.FromPointer(privateRoot))) return 6;
+		return 42;
+	}
+
+	// MG2027 focused native Listtree FORMAT-byte adapter closure. This root
+	// calls the production Listtree helper directly, exercising the shared
+	// named cursor without pulling unrelated Listtree dispatch code into the
+	// freestanding reachability set.
+	public static uint ListtreeFormatByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var format = APTR.FromPointer(0x00050360);
+		APTR.WriteUInt8(format, 4, 0x5A);
+		if (!MuiListtreeCore.TryReadListtreeFormatByte(ref platform, format, 4,
+			out var value) || value != 0x5A) return 1;
+		if (MuiListtreeCore.TryReadListtreeFormatByte(ref platform, format, -1,
+			out _)) return 2;
+		if (MuiListtreeCore.TryReadListtreeFormatByte(ref platform, format,
+			(int)MuiListFormatByteCursor.MaximumLength, out _)) return 3;
+		if (MuiListtreeCore.TryReadListtreeFormatByte(ref platform,
+			APTR.FromPointer(0x00050FFF), 1, out _)) return 4;
+		return 42;
+	}
+
+	// MG2028 native struct-first Listtree node-name byte cursor closure. The
+	// production string adapter exposes a bounded indexed read while rejecting
+	// signed indices, the limit, unmapped pointers, and NULL text pointers.
+	public static uint ListtreeStringByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050360);
+		APTR.WriteUInt8(text, 5, 0x4E);
+		var cursor = new MuiListtreeStringByteCursor
+		{
+			Text = text,
+			Index = 5,
+		};
+		if (!MuiListtreeStringByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != 0x4E) return 1;
+		if (!MuiListtreeStringByteCursorCodec.TryReadAt(ref platform, text, 5,
+			out value) || value != 0x4E) return 2;
+		cursor.Index = MuiListtreeStringByteCursor.MaximumLength;
+		if (MuiListtreeStringByteCursorCodec.TryGetByte(ref platform, cursor,
+			out _)) return 3;
+		if (MuiListtreeStringByteCursorCodec.TryReadAt(ref platform, text, -1,
+			out _)) return 4;
+		if (MuiListtreeStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0x00050FFF), 1, out _)) return 5;
+		if (MuiListtreeStringByteCursorCodec.TryReadAt(ref platform, APTR.Null,
+			0, out _)) return 6;
+		return 42;
+	}
+
 	// MG638 focused native Listtree viewport Draw closure. The named surface
 	// record is laid out to one row, Active moves to the child, and the single
 	// DisplayHook call must receive that child through the named viewport origin.
@@ -27180,18 +30596,59 @@ public static class MuiNativeRoots
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var address = APTR.FromPointer(0x0004F200);
-		var value = new MuiStringEditCommandRecord
-		{
-			Command = MuiStringEditWorkCodec.CommandKey,
-		};
-		if (!MuiStringEditCommandCodec.Write(ref platform, address, value))
+		const uint value = MuiStringEditWorkCodec.CommandKey;
+		if (!MuiStringEditCommandCodec.WriteValue(ref platform, address, value))
 			return 1;
-		if (!MuiStringEditCommandCodec.TryRead(ref platform, address,
-			out var decoded) || decoded.Command != value.Command) return 2;
+		if (!MuiStringEditCommandCodec.TryReadValue(ref platform, address,
+			out var decoded) || decoded != value) return 2;
 		if (MuiStringEditCommandCodec.TryGetAddress(ref platform,
 			APTR.FromPointer(0x00051000 - 2), out _)) return 3;
 		if (MuiStringEditCommandCodec.TryRead(ref platform, APTR.Null,
 			out _)) return 4;
+		return 42;
+	}
+
+	// MG1906 struct-first String.mui SGWork closure. The mixed-width 44-byte
+	// edit-hook record is exchanged in declaration order, including signed
+	// cursor fields, and truncated guest storage is rejected.
+	public static uint StringEditWorkStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x0004F300);
+		var value = new MuiStringEditWorkRecord
+		{
+			Gadget = APTR.FromPointer(0x11111111),
+			StringInfo = APTR.FromPointer(0x22222222),
+			WorkBuffer = APTR.FromPointer(0x33333333),
+			PrevBuffer = APTR.FromPointer(0x44444444),
+			Modes = 0x55555555,
+			InputEvent = APTR.FromPointer(0x66666666),
+			Code = 0x1234,
+			BufferPos = -12,
+			NumChars = 34,
+			Actions = 0x77777777,
+			LongInt = -45,
+			GadgetInfo = APTR.FromPointer(0x88888888),
+			EditOp = 0x4321,
+		};
+		if (!MuiStringEditWorkCodec.Write(ref platform, address, value) ||
+			!MuiStringEditWorkCodec.TryRead(ref platform, address,
+				out var decoded) || decoded.Gadget != value.Gadget ||
+			decoded.StringInfo != value.StringInfo ||
+			decoded.WorkBuffer != value.WorkBuffer ||
+			decoded.PrevBuffer != value.PrevBuffer ||
+			decoded.Modes != value.Modes ||
+			decoded.InputEvent != value.InputEvent || decoded.Code != 0x1234 ||
+			decoded.BufferPos != value.BufferPos ||
+			decoded.NumChars != value.NumChars ||
+			decoded.Actions != value.Actions || decoded.LongInt != value.LongInt ||
+			decoded.GadgetInfo != value.GadgetInfo ||
+			decoded.EditOp != value.EditOp) return 1;
+		if (MuiStringEditWorkCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00051000 - 2), out _) ||
+			MuiStringEditWorkCodec.Write(ref platform,
+				APTR.FromPointer(0x00051000 - 2), value)) return 2;
 		return 42;
 	}
 
@@ -27581,6 +31038,74 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG1903 production-record proof. Class-service state, lease ownership,
+	// and the seven-pointer MUI_CustomClass record use declaration-ordered
+	// sequential structs, including full-width flags and counters.
+	public static uint ClassServiceSequentialStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var stateAddress = APTR.FromPointer(0x00050C00);
+		var leaseAddress = APTR.FromPointer(0x00050C20);
+		var customAddress = APTR.FromPointer(0x00050C60);
+		var state = new MuiClassServiceStateRecord
+		{
+			Magic = MuiClassServiceLayout.Magic,
+			Head = leaseAddress,
+			Headless = APTR.FromPointer(0x00050CA0),
+			Generation = 0xFEDCBA98u,
+		};
+		if (!MuiClassServiceStateStructCodec.Write(ref platform, stateAddress,
+			state) || !MuiClassServiceStateStructCodec.TryRead(ref platform,
+			stateAddress, out var readState) ||
+			readState.Head != state.Head || readState.Headless != state.Headless ||
+			readState.Generation != state.Generation) return 1;
+		var lease = new MuiClassServiceLeaseRecord
+		{
+			Next = stateAddress,
+			Flags = 0x80000011u,
+			ClassId = APTR.FromPointer(0x00050CC0),
+			Boopsi = APTR.FromPointer(0x00050CE0),
+			LibraryBase = APTR.FromPointer(0x00050D00),
+			RefCount = 0xFEDCBA98u,
+			HeadlessClass = APTR.FromPointer(0x00050D20),
+			CustomClass = customAddress,
+			SuperService = stateAddress,
+			ObjectCount = 0x81234567u,
+			ChildCount = 7,
+		};
+		if (!MuiClassServiceLeaseStructCodec.Write(ref platform, leaseAddress,
+			lease) || !MuiClassServiceLeaseStructCodec.TryRead(ref platform,
+			leaseAddress, out var readLease) ||
+			readLease.Flags != lease.Flags || readLease.Boopsi != lease.Boopsi ||
+			readLease.ObjectCount != lease.ObjectCount ||
+			readLease.ChildCount != lease.ChildCount) return 2;
+		var custom = new MuiCustomClassRecord
+		{
+			UserData = APTR.FromPointer(0x00050D40),
+			UtilityBase = APTR.FromPointer(0x00050D60),
+			DosBase = APTR.FromPointer(0x00050D80),
+			GfxBase = APTR.FromPointer(0x00050DA0),
+			IntuitionBase = APTR.FromPointer(0x00050DC0),
+			Super = APTR.FromPointer(0x00050DE0),
+			Class = APTR.FromPointer(0x00050E00),
+		};
+		if (!MuiCustomClassStructCodec.Write(ref platform, customAddress, custom) ||
+			!MuiCustomClassStructCodec.TryRead(ref platform, customAddress,
+				out var readCustom) || readCustom.UserData != custom.UserData ||
+			readCustom.Class != custom.Class) return 3;
+		if (!MuiClassServiceLeaseCodec.TryRead(ref platform, leaseAddress,
+			out var wrappedLease) || wrappedLease.RefCount != lease.RefCount ||
+			!MuiCustomClassCodec.TryRead(ref platform, customAddress,
+				out var wrappedCustom) || wrappedCustom.Super != custom.Super) return 4;
+		if (MuiClassServiceLeaseStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FF0), out _) ||
+			MuiClassServiceStateStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FF1), out _) ||
+			MuiCustomClassStructCodec.Write(ref platform, APTR.Null, custom)) return 5;
+		return 42;
+	}
+
 	// MG1780 native proof for the fixed ClassService "mui/" loader prefix.
 	// The complete named ULONG record is read through its sequential adapter and
 	// rejects a truncated guest range; host coverage exercises the write path.
@@ -27589,8 +31114,12 @@ public static class MuiNativeRoots
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var address = APTR.FromPointer(0x00050F80);
-		if (!MuiClassServiceLibraryPrefixRecordCodec.TryReadRecord(ref platform,
-			address, out var roundTrip) || roundTrip.Prefix != 0) return 1;
+		// Seed the guest record a word at a time so this proof does not cross
+		// CopperSharp's one-ULONG struct-by-value ABI seam.
+		platform.WriteUInt16(address, 0, 0x8042);
+		platform.WriteUInt16(address, 2, 0x0000);
+		if (!MuiClassServiceLibraryPrefixRecordCodec.TryReadPrefix(ref platform,
+			address, out var prefix) || prefix != 0x80420000u) return 1;
 		if (MuiClassServiceLibraryPrefixRecordCodec.TryReadRecord(ref platform,
 			APTR.FromPointer(0x00050FFE), out _)) return 2;
 		return 42;
@@ -27707,6 +31236,91 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG1900 native sequential-record proof. All fixed Datamap/Objectmap
+	// packets are exchanged through declaration-ordered named structs; the
+	// compatibility field adapter above remains diagnostic-only.
+	public static uint StorePacketSequentialStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var message = APTR.FromPointer(0x50D00);
+		APTR.WriteUInt32(message, 0, MuiStoreMessageCore.DatamapGetMethod);
+		if (!MuiStorePacketSequentialStructCodec.TryReadMethodIdValue(
+			ref platform, message, out var methodDecoded) ||
+			methodDecoded != MuiStoreMessageCore.DatamapGetMethod) return 1;
+
+		APTR.WriteUInt32(message, 0, MuiStoreMessageCore.ObjectmapClearMethod);
+		if (!MuiStorePacketSequentialStructCodec.TryReadClearMethodIdValue(
+			ref platform, message, out var clearDecoded) ||
+			clearDecoded != MuiStoreMessageCore.ObjectmapClearMethod) return 2;
+
+		var key = new MuiStoreKeyMessage
+		{
+			MethodId = MuiStoreMessageCore.DatamapFindMethod,
+			Key = APTR.FromPointer(0x00036A00),
+		};
+		if (!MuiStorePacketSequentialStructCodec.WriteKey(ref platform, message,
+			key) || !MuiStorePacketCodec.TryReadKey(ref platform, message,
+			out var keyDecoded) || keyDecoded.MethodId != key.MethodId ||
+			keyDecoded.Key != key.Key) return 3;
+
+		var counter = new MuiStoreCounterMessage
+		{
+			MethodId = MuiStoreMessageCore.ObjectmapIterateMethod,
+			Counter = APTR.FromPointer(0x00036A20),
+		};
+		if (!MuiStorePacketSequentialStructCodec.WriteCounter(ref platform, message,
+			counter) || !MuiStorePacketCodec.TryReadCounter(ref platform, message,
+			out var counterDecoded) || counterDecoded.MethodId != counter.MethodId ||
+			counterDecoded.Counter != counter.Counter) return 4;
+
+		var set = new MuiDatamapSetMessage
+		{
+			MethodId = MuiStoreMessageCore.DatamapSetMethod,
+			Data = APTR.FromPointer(0x00036A40),
+			Length = -17,
+			Key = APTR.FromPointer(0x00036A60),
+		};
+		if (!MuiStorePacketSequentialStructCodec.WriteDatamapSet(ref platform,
+			message, set) || !MuiStorePacketCodec.TryReadDatamapSet(ref platform,
+			message, out var setDecoded) || setDecoded.MethodId != set.MethodId ||
+			setDecoded.Data != set.Data || setDecoded.Length != set.Length ||
+			setDecoded.Key != set.Key) return 5;
+
+		var get = new MuiDatamapGetMessage
+		{
+			MethodId = MuiStoreMessageCore.DatamapGetMethod,
+			Key = APTR.FromPointer(0x00036A80),
+			SizeStorage = APTR.FromPointer(0x00036AA0),
+		};
+		if (!MuiStorePacketSequentialStructCodec.WriteDatamapGet(ref platform,
+			message, get) || !MuiStorePacketCodec.TryReadDatamapGet(ref platform,
+			message, out var getDecoded) || getDecoded.MethodId != get.MethodId ||
+			getDecoded.Key != get.Key || getDecoded.SizeStorage != get.SizeStorage)
+			return 6;
+
+		var objectmap = new MuiObjectmapSetMessage
+		{
+			MethodId = MuiStoreMessageCore.ObjectmapSetMethod,
+			Object = APTR.FromPointer(0x00036AC0),
+			Key = APTR.FromPointer(0x00036AE0),
+		};
+		if (!MuiStorePacketSequentialStructCodec.WriteObjectmapSet(ref platform,
+			message, objectmap) ||
+			!MuiStorePacketCodec.TryReadObjectmapSet(ref platform, message,
+				out var objectDecoded) || objectDecoded.MethodId != objectmap.MethodId ||
+			objectDecoded.Object != objectmap.Object ||
+			objectDecoded.Key != objectmap.Key) return 7;
+
+		if (MuiStorePacketSequentialStructCodec.TryReadDatamapSet(ref platform,
+			APTR.FromPointer(0x50FF1), out _) ||
+			MuiStorePacketSequentialStructCodec.TryReadKey(ref platform,
+				APTR.FromPointer(0x50FF9), out _) ||
+			MuiStorePacketSequentialStructCodec.TryReadMethod(ref platform,
+				APTR.FromPointer(0x50FFF), out _)) return 8;
+		return 42;
+	}
+
 	// MG1330 struct-first Store/Dataspace ownership record closure. The linked
 	// record now admits only complete named layouts before field access.
 	public static uint StoreRecordStructCodecRoot()
@@ -27725,6 +31339,94 @@ public static class MuiNativeRoots
 			APTR.FromPointer(0x00050FF0), MuiStoreRecordField.Generation, out _) ||
 			MuiStoreRecordMemoryCodec.TryGetAddress(ref platform, record,
 				(MuiStoreRecordField)255, out _)) return 3;
+		return 42;
+	}
+
+	// MG2056 struct-first Store cleanup closure. Owned-key release spans are
+	// measured through the named bounded String length cursor, including the
+	// terminating NUL and malformed guest-pointer handling.
+	public static uint StoreOwnedKeyCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var key = APTR.FromPointer(0x00050F80);
+		APTR.WriteUInt8(key, 0, (byte)'S');
+		APTR.WriteUInt8(key, 1, (byte)'t');
+		APTR.WriteUInt8(key, 2, (byte)'o');
+		APTR.WriteUInt8(key, 3, (byte)'r');
+		APTR.WriteUInt8(key, 4, (byte)'e');
+		APTR.WriteUInt8(key, 5, 0);
+		if (MuiStoreCore.OwnedKeyLength(ref platform, key) != 6) return 1;
+		if (MuiStoreCore.OwnedKeyLength(ref platform, APTR.Null) != 0 ||
+			MuiStoreCore.OwnedKeyLength(ref platform,
+				APTR.FromPointer(0x00070000)) != 1) return 2;
+		var cursor = default(MuiStringLengthByteCursor);
+		cursor.Text = key;
+		cursor.Index = 5;
+		if (!MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != 0) return 3;
+		cursor.Index = MuiStringLengthByteCursor.MaximumLength;
+		if (MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 4;
+		cursor.Text = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 5;
+		return 42;
+	}
+
+	// MG2057 String.mui editing-byte closure. Mutable contents and code-point
+	// reads use the named bounded edit cursor; malformed ranges fail closed.
+	public static uint StringEditCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00050F80);
+		APTR.WriteUInt8(text, 0, (byte)'a');
+		APTR.WriteUInt8(text, 1, (byte)'b');
+		APTR.WriteUInt8(text, 2, (byte)'c');
+		APTR.WriteUInt8(text, 3, 0);
+		if (!MuiCommonControlCore.TryReadStringCodePoint(ref platform, text, 1,
+			3, false, out var codePoint, out var bytes) || codePoint != (uint)'b' ||
+			bytes != 1) return 1;
+		var encoded = default(MuiCommonControlCore.MuiUtf8Character);
+		encoded.Length = 4;
+		encoded.First = 0xF0;
+		encoded.Second = 0x9F;
+		encoded.Third = 0x98;
+		encoded.Fourth = 0x80;
+		MuiCommonControlCore.WriteUtf8Character(ref platform, text, 4, encoded);
+		if (APTR.ReadUInt8(text, 4) != 0xF0 ||
+			APTR.ReadUInt8(text, 5) != 0x9F ||
+			APTR.ReadUInt8(text, 6) != 0x98 ||
+			APTR.ReadUInt8(text, 7) != 0x80) return 2;
+		var cursor = default(MuiStringEditByteCursor);
+		cursor.Base = text;
+		cursor.Index = 1;
+		cursor.Length = 4;
+		if (!MuiStringEditByteCursorCodec.TryReadByte(ref platform, cursor,
+			out var value) || value != (byte)'b') return 3;
+		cursor.Index = 3;
+		if (!MuiStringEditByteCursorCodec.TryWriteByte(ref platform, cursor,
+			(byte)'X') || APTR.ReadUInt8(text, 3) != (byte)'X') return 4;
+		cursor.Index = 4;
+		if (MuiStringEditByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 5;
+		cursor.Length = MuiStringEditByteCursor.MaximumLength + 1;
+		if (MuiStringEditByteCursorCodec.TryWriteByte(ref platform, cursor, 0)) return 6;
+		cursor.Length = 4;
+		cursor.Base = APTR.Null;
+		cursor.Index = 0;
+		if (MuiStringEditByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 7;
+		cursor.Base = APTR.FromPointer(uint.MaxValue);
+		cursor.Index = 1;
+		if (MuiStringEditByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 8;
+		cursor.Base = APTR.FromPointer(0x00070000);
+		cursor.Index = 0;
+		if (MuiStringEditByteCursorCodec.TryReadByte(ref platform, cursor,
+			out _)) return 9;
 		return 42;
 	}
 
@@ -27776,24 +31478,26 @@ public static class MuiNativeRoots
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var record = APTR.FromPointer(0x00050A00);
+		const uint expected = 9;
+		if (!MuiStoreIterationCounterCodec.WriteValue(ref platform, record,
+			expected) || !MuiStoreIterationCounterCodec.TryReadValue(ref platform,
+			record, out var decoded) || decoded != expected) return 1;
 		if (!MuiStoreIterationCounterMemoryCodec.TryGetAddress(ref platform,
 			record, MuiStoreIterationCounterField.Ordinal, out var ordinal) ||
-			ordinal != record) return 1;
-		if (!MuiStoreIterationCounterMemoryCodec.TryWriteUInt32(ref platform,
-			record, MuiStoreIterationCounterField.Ordinal, 9) ||
-			!MuiStoreIterationCounterMemoryCodec.TryReadUInt32(ref platform, record,
-				MuiStoreIterationCounterField.Ordinal, out var value) || value != 9)
-			return 2;
+			ordinal != record) return 2;
 		if (MuiStoreIterationCounterMemoryCodec.TryGetAddress(ref platform,
 			APTR.FromPointer(0x00050FFF), MuiStoreIterationCounterField.Ordinal,
 			out _) || MuiStoreIterationCounterMemoryCodec.TryGetAddress(ref platform,
-			record, (MuiStoreIterationCounterField)255, out _)) return 3;
+			record, (MuiStoreIterationCounterField)255, out _) ||
+			MuiStoreIterationCounterCodec.TryRead(ref platform,
+				APTR.FromPointer(0x00050FFF), out _)) return 3;
 		return 42;
 	}
 
-	// MG1332 struct-first caller-owned ULONG result-slot closure. The shared
+	// MG1932 struct-first caller-owned ULONG result-slot closure. The shared
 	// four-byte storage record admits only its complete named layout before
-	// scalar access.
+	// scalar access; production value helpers use the bounded declaration-order
+	// cursor, while the field adapter remains a compatibility proof.
 	public static uint GuestUlongStorageStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
@@ -27808,10 +31512,18 @@ public static class MuiNativeRoots
 			!MuiGuestUlongStorageMemoryCodec.TryRead(ref platform, storage,
 				MuiGuestUlongStorageField.Value, out var value) ||
 			value != 0xCAFEBABE) return 2;
+		if (!MuiGuestUlongStorageCodec.WriteValue(ref platform, storage,
+			0xF00DCAFE) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, storage,
+				out var rawValue) || rawValue != 0xF00DCAFE) return 3;
 		if (MuiGuestUlongStorageMemoryCodec.TryGetAddress(ref platform,
 			APTR.FromPointer(0x00050FFF), MuiGuestUlongStorageField.Value,
 			out _) || MuiGuestUlongStorageMemoryCodec.TryGetAddress(ref platform,
-			storage, (MuiGuestUlongStorageField)255, out _)) return 3;
+			storage, (MuiGuestUlongStorageField)255, out _) ||
+			MuiGuestUlongStorageCodec.TryReadValue(ref platform,
+				APTR.FromPointer(0x00050FFD), out _) ||
+			MuiGuestUlongStorageCodec.WriteValue(ref platform,
+				APTR.FromPointer(0x00050FFD), 0xF00DCAFE)) return 4;
 		return 42;
 	}
 
@@ -27976,6 +31688,55 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG2029 class-id cursor closure. Exercises the bounded named byte adapter
+	// on the freestanding guest-memory seam, including an interior byte, the
+	// NUL terminator, negative/out-of-range indices, and unmapped/null strings.
+	public static uint ClassServiceStringByteCursorStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var text = APTR.FromPointer(0x00036100);
+		APTR.WriteUInt8(text, 0, (byte)'F');
+		APTR.WriteUInt8(text, 1, (byte)'o');
+		APTR.WriteUInt8(text, 2, (byte)'o');
+		APTR.WriteUInt8(text, 3, (byte)'.');
+		APTR.WriteUInt8(text, 4, (byte)'m');
+		APTR.WriteUInt8(text, 5, (byte)'c');
+		APTR.WriteUInt8(text, 6, (byte)'c');
+		APTR.WriteUInt8(text, 7, 0);
+		var cursor = default(MuiClassServiceStringByteCursor);
+		cursor.Text = text;
+		cursor.Index = 1;
+		if (!MuiClassServiceStringByteCursorCodec.TryReadByte(ref platform,
+			cursor, out var value) || value != (byte)'o') return 1;
+		if (!MuiClassServiceStringByteCursorCodec.TryReadAt(ref platform, text,
+			7, out value) || value != 0) return 2;
+		if (MuiClassServiceStringByteCursorCodec.TryReadAt(ref platform, text,
+			-1, out _)) return 3;
+		if (MuiClassServiceStringByteCursorCodec.TryReadAt(ref platform, text,
+			(int)MuiClassServiceStringByteCursor.MaximumLength, out _)) return 4;
+		if (MuiClassServiceStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0x00060000), 0, out _)) return 5;
+		if (MuiClassServiceStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.FromPointer(0xFFFFFFFEu), 2, out _)) return 6;
+		if (MuiClassServiceStringByteCursorCodec.TryReadAt(ref platform,
+			APTR.Null, 0, out _)) return 7;
+		var writeCursor = default(MuiClassServiceStringByteCursor);
+		writeCursor.Text = text;
+		writeCursor.Index = 0;
+		if (!MuiClassServiceStringByteCursorCodec.TryWriteByte(ref platform,
+			writeCursor, (byte)'M') || APTR.ReadUInt8(text, 0) != (byte)'M') return 8;
+		var prefix = APTR.FromPointer(0x00036140);
+		if (!MuiClassServiceLibraryPrefixRecordCodec.WritePrefix(ref platform,
+			prefix, MuiClassServiceLibraryPrefixRecordCodec.MuiSlash) ||
+			!MuiClassServiceLibraryPrefixRecordCodec.TryGetPayloadAddress(
+				ref platform, prefix, out var payload) ||
+			payload.Raw != prefix.Raw + MuiClassServiceLibraryPrefixRecord.Size) return 9;
+		if (MuiClassServiceLibraryPrefixRecordCodec.TryGetPayloadAddress(ref platform,
+			APTR.FromPointer(uint.MaxValue), out _)) return 10;
+		return 42;
+	}
+
 	// MG09 drawing-service gateway closure. Exercises nested strict-LIFO
 	// rectangle clipping and clip regions, refresh flags==0 validation with
 	// REFRESHMODE set/restore and balanced BeginUpdate/EndUpdate, and pen
@@ -28120,6 +31881,95 @@ public static class MuiNativeRoots
 			MuiDrawingRecordField.Flags, out _) ||
 			MuiDrawingRecordMemoryCodec.TryGetAddress(ref platform, state,
 				(MuiDrawingRecordKind)255, MuiDrawingRecordField.PenHead, out _)) return 7;
+		return 42;
+	}
+
+	// MG1902 production-record proof. Drawing-service state, ownership stacks,
+	// render-info, and raster-port records all cross the guest boundary through
+	// declaration-ordered named structs; the one-field raster-port pointer is
+	// additionally read through its scalar native-safe helper.
+	public static uint DrawingServiceSequentialStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var stateAddress = APTR.FromPointer(0x00050C00);
+		var clipAddress = APTR.FromPointer(0x00050C20);
+		var refreshAddress = APTR.FromPointer(0x00050C40);
+		var penAddress = APTR.FromPointer(0x00050C60);
+		var renderInfoAddress = APTR.FromPointer(0x00050C80);
+		var rasterPortAddress = APTR.FromPointer(0x00050CA0);
+		var state = new MuiDrawingServiceStateRecord
+		{
+			Magic = 0x4D554944u,
+			ClipHead = clipAddress,
+			RefreshHead = refreshAddress,
+			PenHead = penAddress,
+			Generation = 0xFEDCBA98u,
+		};
+		if (!MuiDrawingServiceStateStructCodec.Write(ref platform, stateAddress,
+			state) || !MuiDrawingServiceStateStructCodec.TryRead(ref platform,
+			stateAddress, out var readState) ||
+			readState.ClipHead != state.ClipHead ||
+			readState.PenHead != state.PenHead ||
+			readState.Generation != state.Generation) return 1;
+		var clip = new MuiDrawingClipRecord
+		{
+			Next = stateAddress,
+			Kind = MuiDrawingServiceLayout.ClipKindRegion,
+			Layer = APTR.FromPointer(0x00050CC0),
+			Token = APTR.FromPointer(0x00050CE0),
+		};
+		if (!MuiDrawingClipStructCodec.Write(ref platform, clipAddress, clip) ||
+			!MuiDrawingClipStructCodec.TryRead(ref platform, clipAddress,
+				out var readClip) || readClip.Token != clip.Token) return 2;
+		var refresh = new MuiDrawingRefreshRecord
+		{
+			Next = stateAddress,
+			RenderInfo = renderInfoAddress,
+			Layer = clip.Layer,
+			SavedFlags = 0x80000011u,
+		};
+		if (!MuiDrawingRefreshStructCodec.Write(ref platform, refreshAddress,
+			refresh) || !MuiDrawingRefreshStructCodec.TryRead(ref platform,
+			refreshAddress, out var readRefresh) ||
+			readRefresh.SavedFlags != refresh.SavedFlags) return 3;
+		var pen = new MuiDrawingPenRecord
+		{
+			Next = stateAddress,
+			RenderInfo = renderInfoAddress,
+			Token = 0xF1234567u,
+		};
+		if (!MuiDrawingPenStructCodec.Write(ref platform, penAddress, pen) ||
+			!MuiDrawingPenStructCodec.TryRead(ref platform, penAddress,
+				out var readPen) || readPen.Token != pen.Token) return 4;
+		var renderInfo = new MuiDrawingRenderInfoRecord
+		{
+			WindowObject = APTR.FromPointer(0x00050D00),
+			Screen = APTR.FromPointer(0x00050D20),
+			DrawInfo = APTR.FromPointer(0x00050D40),
+			Pens = APTR.FromPointer(0x00050D60),
+			Window = APTR.FromPointer(0x00050D80),
+			RastPort = rasterPortAddress,
+			Flags = 0xFEDCBA98u,
+		};
+		if (!MuiDrawingRenderInfoStructCodec.Write(ref platform,
+			renderInfoAddress, renderInfo) ||
+			!MuiDrawingRenderInfoStructCodec.TryRead(ref platform,
+				renderInfoAddress, out var readRenderInfo) ||
+			readRenderInfo.RastPort != renderInfo.RastPort ||
+			readRenderInfo.Flags != renderInfo.Flags) return 5;
+		if (!MuiDrawingRasterPortStructCodec.Write(ref platform,
+			rasterPortAddress, new MuiDrawingRasterPortRecord
+			{
+				Layer = clip.Layer,
+			}) || !MuiDrawingRasterPortCodec.TryReadLayerValue(ref platform,
+				rasterPortAddress, out var layer) || layer != clip.Layer.Raw) return 6;
+		if (MuiDrawingServiceStateStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x00050FF1), out _) ||
+			MuiDrawingRenderInfoStructCodec.TryRead(ref platform,
+				APTR.FromPointer(0x00050FF0), out _) ||
+			MuiDrawingRasterPortStructCodec.TryRead(ref platform, APTR.Null,
+				out _)) return 7;
 		return 42;
 	}
 
@@ -28541,20 +32391,18 @@ public static class MuiNativeRoots
 
 		var sourceCursor = default(MuiPoplistArrayCursor);
 		sourceCursor.Base = source;
-		if (!MuiPoplistArrayCursorCodec.TryGetEntry(ref platform,
-			sourceCursor, out var address) ||
-			!MuiPoplistArrayEntryCodec.Write(ref platform, address,
-				new MuiPoplistArrayEntry { Value = textA })) return 1;
+		var sourceEntry = default(MuiPoplistArrayEntry);
+		sourceEntry.Value = textA;
+		if (!MuiPoplistArrayCursorCodec.TryWrite(ref platform,
+			sourceCursor, sourceEntry)) return 1;
 		sourceCursor.Index = 1;
-		if (!MuiPoplistArrayCursorCodec.TryGetEntry(ref platform,
-			sourceCursor, out address) ||
-			!MuiPoplistArrayEntryCodec.Write(ref platform, address,
-				new MuiPoplistArrayEntry { Value = textB })) return 2;
+		sourceEntry.Value = textB;
+		if (!MuiPoplistArrayCursorCodec.TryWrite(ref platform,
+			sourceCursor, sourceEntry)) return 2;
 		sourceCursor.Index = 2;
-		if (!MuiPoplistArrayCursorCodec.TryGetEntry(ref platform,
-			sourceCursor, out address) ||
-			!MuiPoplistArrayEntryCodec.Write(ref platform, address,
-				default)) return 3;
+		sourceEntry.Value = APTR.Null;
+		if (!MuiPoplistArrayCursorCodec.TryWrite(ref platform,
+			sourceCursor, sourceEntry)) return 3;
 
 		if (!MuiPopSpecialistCore.Create(ref platform, instance,
 			MuiPopSpecialistClass.Poplist, stringChild, buttonChild)) return 4;
@@ -28566,20 +32414,17 @@ public static class MuiNativeRoots
 		var materializedCursor = default(MuiPoplistArrayCursor);
 		materializedCursor.Base = state.MaterializedArray;
 		materializedCursor.Index = 0;
-		if (!MuiPoplistArrayCursorCodec.TryGetEntry(ref platform,
-			materializedCursor, out address) ||
-			!MuiPoplistArrayEntryCodec.TryRead(ref platform, address,
-				out var first) || first.Value.Raw != textA.Raw) return 7;
+		if (!MuiPoplistArrayCursorCodec.TryRead(ref platform,
+			materializedCursor, out var first) || first.Value.Raw != textA.Raw)
+			return 7;
 		materializedCursor.Index = 1;
-		if (!MuiPoplistArrayCursorCodec.TryGetEntry(ref platform,
-			materializedCursor, out address) ||
-			!MuiPoplistArrayEntryCodec.TryRead(ref platform, address,
-				out var second) || second.Value.Raw != textB.Raw) return 8;
+		if (!MuiPoplistArrayCursorCodec.TryRead(ref platform,
+			materializedCursor, out var second) || second.Value.Raw != textB.Raw)
+			return 8;
 		materializedCursor.Index = 2;
-		if (!MuiPoplistArrayCursorCodec.TryGetEntry(ref platform,
-			materializedCursor, out address) ||
-			!MuiPoplistArrayEntryCodec.TryRead(ref platform, address,
-				out var terminator) || !terminator.Value.IsNull) return 9;
+		if (!MuiPoplistArrayCursorCodec.TryRead(ref platform,
+			materializedCursor, out var terminator) || !terminator.Value.IsNull)
+			return 9;
 
 		if (!MuiPopSpecialistCore.SelectEntry(ref platform, instance, 1) ||
 			MuiPopSpecialistCore.SelectedEntry(ref platform, instance) != textB.Raw ||
@@ -28597,119 +32442,185 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1367 Poplist pointer-vector closure. Each caller-owned or materialized
-	// 4-byte pointer slot is admitted through the named entry adapter; the native
-	// root verifies the 1024-entry bound without reproducing vector arithmetic.
+	// MG1982 Poplist pointer-vector closure. Each caller-owned or materialized
+	// 4-byte pointer slot is exchanged as a complete named record through the
+	// typed cursor; the native root verifies the 1024-entry bound without
+	// reproducing vector arithmetic.
 	public static uint PoplistArrayVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x0004F000);
-		if (!MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, vector, 0,
-			out var first)) return 1;
-		if (!MuiListtreeCore.MuiListtreeDisplayColumnMemoryCodec.TryWriteUInt32(
-			ref platform, first, MuiListtreeCore.MuiListtreeDisplayColumnField.Text,
-			0x00050A00) ||
-			!MuiListtreeCore.MuiListtreeDisplayColumnMemoryCodec.TryReadUInt32(
-				ref platform, first,
-				MuiListtreeCore.MuiListtreeDisplayColumnField.Text,
-				out var firstText) || firstText != 0x00050A00) return 2;
-		if (!MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, vector, 1,
+		var cursor = default(MuiPoplistArrayCursor);
+		cursor.Base = vector;
+		cursor.Index = 0;
+		var expected = default(MuiPoplistArrayEntry);
+		expected.Value = APTR.FromPointer(0x00050A00);
+		if (!MuiPoplistArrayCursorCodec.TryWrite(ref platform, cursor, expected) ||
+			!MuiPoplistArrayCursorCodec.TryRead(ref platform, cursor,
+				out var actual) || actual.Value.Raw != expected.Value.Raw) return 1;
+		cursor.Index = 1;
+		if (!MuiPoplistArrayCursorCodec.TryGetEntry(ref platform, cursor,
 			out var second) || second.Raw != vector.Raw + MuiPoplistArrayEntry.Size)
-			return 3;
-		if (!MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiPoplistArrayCursor.MaximumEntries - 1, out _)) return 4;
-		if (MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiPoplistArrayCursor.MaximumEntries, out _) ||
-			MuiPoplistArrayVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 5;
+			return 2;
+		cursor.Index = MuiPoplistArrayCursor.MaximumEntries - 1;
+		if (!MuiPoplistArrayCursorCodec.TryGetEntry(ref platform, cursor,
+			out _)) return 3;
+		cursor.Index = MuiPoplistArrayCursor.MaximumEntries;
+		if (MuiPoplistArrayCursorCodec.TryGetEntry(ref platform, cursor, out _))
+			return 4;
+		cursor.Base = APTR.FromPointer(0xFFFFFFFF);
+		cursor.Index = 1;
+		if (MuiPoplistArrayCursorCodec.TryGetEntry(ref platform, cursor, out _))
+			return 5;
 		return 42;
 	}
 
-	// MG1368 Mccprefs registry-vector closure. Each caller-owned 24-byte
-	// registration record is admitted through its named adapter; native
+	// MG1978 Mccprefs registry-vector closure. Each caller-owned 24-byte
+	// registration record is exchanged through the typed cursor bridge; native
 	// qualification verifies the fixed 64-slot bound and overflow rejection.
 	public static uint MccprefsRegistryVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x0004F000);
-		if (!MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			0, out var first)) return 1;
-		APTR.WriteUInt32(first, 0, 0x00050A00);
-		APTR.WriteUInt32(first, 4, 7);
-		if (APTR.ReadUInt32(first, 0) != 0x00050A00 ||
-			APTR.ReadUInt32(first, 4) != 7) return 2;
-		if (!MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			1, out var second) ||
-			second.Raw != vector.Raw + MuiMccprefsRegistryRecord.Size) return 3;
-		if (!MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiMccprefsRegistryCursor.MaximumEntries - 1, out _)) return 4;
-		if (MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiMccprefsRegistryCursor.MaximumEntries, out _) ||
-			MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 5;
+		var cursor = new MuiMccprefsRegistryCursor
+		{
+			Base = vector,
+			Index = 0,
+		};
+		var expected = new MuiMccprefsRegistryRecord
+		{
+			Gadget = APTR.FromPointer(0x00050A00),
+			Id = 0x10203040u,
+			Params = 0x50607080u,
+			Title = APTR.FromPointer(0x00050B00),
+			Attr = 0x90A0B0C0u,
+			Label = APTR.FromPointer(0x00050C00),
+		};
+		if (!MuiMccprefsRegistryCursorCodec.TryWrite(ref platform, cursor,
+			expected) || !MuiMccprefsRegistryCursorCodec.TryRead(ref platform,
+			cursor, out var decoded) || decoded.Gadget != expected.Gadget ||
+			decoded.Id != expected.Id || decoded.Params != expected.Params ||
+			decoded.Title != expected.Title || decoded.Attr != expected.Attr ||
+			decoded.Label != expected.Label) return 1;
+		cursor.Index = 1;
+		if (!MuiMccprefsRegistryCursorCodec.TryGetEntry(ref platform, cursor,
+			out var second) || second.Raw != vector.Raw +
+			MuiMccprefsRegistryRecord.Size) return 2;
+		cursor.Index = MuiMccprefsRegistryCursor.MaximumEntries - 1;
+		if (!MuiMccprefsRegistryCursorCodec.TryGetEntry(ref platform, cursor,
+			out _)) return 3;
+		cursor.Index = MuiMccprefsRegistryCursor.MaximumEntries;
+		if (MuiMccprefsRegistryCursorCodec.TryGetEntry(ref platform, cursor,
+			out _)) return 4;
+		cursor.Base = APTR.FromPointer(0xFFFFFFFF);
+		cursor.Index = 1;
+		if (MuiMccprefsRegistryCursorCodec.TryRead(ref platform, cursor,
+			out _)) return 5;
 		return 42;
 	}
 
-	// MG1369 private Scrmodelist mode-vector closure. The four-byte mode record
-	// is admitted through its named adapter, with the 256-mode bound and address
-	// overflow checks kept out of the native consumer.
+	// MG1979 private Scrmodelist mode-vector closure. The four-byte mode record
+	// is exchanged through its typed cursor bridge, with the 256-mode bound and
+	// address overflow checks kept out of the native consumer.
 	public static uint ScrmodelistModeVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x0004F000);
+		var cursor = new MuiScrmodelistModeCursor
+		{
+			Base = vector,
+			Index = 0,
+		};
+		var expected = new MuiScrmodelistModeRecord
+		{
+			ModeId = 0x00021000u,
+		};
+		// The current compiler lowers a one-ULONG record passed through a
+		// generic cursor bridge unreliably on 68k. Keep the qualification
+		// struct-first by admitting the slot with the typed cursor, then use the
+		// already native-safe named record codec for the scalar transfer.
 		if (!MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			0, out var first)) return 1;
-		APTR.WriteUInt32(first, 0, 0x00021000);
-		if (APTR.ReadUInt32(first, 0) != 0x00021000) return 2;
-		if (!MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			1, out var second) ||
-			second.Raw != vector.Raw + MuiScrmodelistModeRecord.Size) return 3;
-		if (!MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiScrmodelistModeCursor.MaximumEntries - 1, out _)) return 4;
-		if (MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiScrmodelistModeCursor.MaximumEntries, out _) ||
-			MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 5;
+			0, out var first) || !MuiScrmodelistModeCodec.Write(ref platform, first,
+			expected) || !MuiScrmodelistModeCodec.TryRead(ref platform, first,
+			out var decoded) || decoded.ModeId != expected.ModeId) return 1;
+		cursor.Index = 1;
+		if (!MuiScrmodelistModeCursorCodec.TryGetEntry(ref platform, cursor,
+			out var second) || second.Raw != vector.Raw +
+			MuiScrmodelistModeRecord.Size) return 2;
+		cursor.Index = MuiScrmodelistModeCursor.MaximumEntries - 1;
+		if (!MuiScrmodelistModeCursorCodec.TryGetEntry(ref platform, cursor,
+			out _)) return 3;
+		cursor.Index = MuiScrmodelistModeCursor.MaximumEntries;
+		if (MuiScrmodelistModeCursorCodec.TryGetEntry(ref platform, cursor,
+			out _)) return 4;
+		cursor.Base = APTR.FromPointer(0xFFFFFFFF);
+		cursor.Index = 1;
+		if (MuiScrmodelistModeCursorCodec.TryRead(ref platform, cursor,
+			out _)) return 5;
 		return 42;
 	}
 
-	// MG1370 Filepanel row-vector closure. Each adopted row is admitted through
-	// the named 8-byte record adapter; the native root verifies the 256-row
-	// bound and truncated-record rejection without consumer-side offsets.
+	// MG1980 Filepanel row-vector closure. Each adopted row is exchanged through
+	// the typed 8-byte record cursor; the native root verifies the 256-row bound
+	// and truncated-record rejection without consumer-side offsets.
 	public static uint FilepanelRowVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x0004F000);
-		if (!MuiFilepanelRowVectorMemoryCodec.TryGetEntry(ref platform, vector, 0,
-			out var first)) return 1;
-		APTR.WriteUInt32(first, 0, 0x00050A00);
-		APTR.WriteUInt32(first, 4, 0x00050A20);
-		if (APTR.ReadUInt32(first, 0) != 0x00050A00 ||
-			APTR.ReadUInt32(first, 4) != 0x00050A20) return 2;
-		if (!MuiFilepanelRowVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			1, out var second) || second.Raw != vector.Raw + MuiFilepanelRowRecord.Size)
+		var cursor = new MuiFilepanelRowCursor
+		{
+			Base = vector,
+			Index = 0,
+		};
+		var expected = new MuiFilepanelRowRecord
+		{
+			Label = APTR.FromPointer(0x00050A00),
+			Contents = APTR.FromPointer(0x00050A20),
+		};
+		if (!MuiFilepanelRowCursorCodec.TryWrite(ref platform, cursor, expected) ||
+			!MuiFilepanelRowCursorCodec.TryRead(ref platform, cursor,
+				out var decoded) || decoded.Label != expected.Label ||
+			decoded.Contents != expected.Contents) return 1;
+		cursor.Index = 1;
+		if (!MuiFilepanelRowCursorCodec.TryGetEntry(ref platform, cursor,
+			out var second) || second.Raw != vector.Raw + MuiFilepanelRowRecord.Size)
+			return 2;
+		cursor.Index = MuiFilepanelRowCursor.MaximumEntries - 1;
+		if (!MuiFilepanelRowCursorCodec.TryGetEntry(ref platform, cursor, out _))
 			return 3;
-		if (!MuiFilepanelRowVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiFilepanelRowCursor.MaximumEntries - 1, out _)) return 4;
-		if (MuiFilepanelRowVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiFilepanelRowCursor.MaximumEntries, out _) ||
-			MuiFilepanelRowVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 5;
+		cursor.Index = MuiFilepanelRowCursor.MaximumEntries;
+		if (MuiFilepanelRowCursorCodec.TryGetEntry(ref platform, cursor, out _))
+			return 4;
+		cursor.Base = APTR.FromPointer(0xFFFFFFFF);
+		cursor.Index = 1;
+		if (MuiFilepanelRowCursorCodec.TryRead(ref platform, cursor, out _))
+			return 5;
 		return 42;
 	}
 
-	// MG1371/MG1863 Listtree DisplayHook column-vector closure. Complete named
-	// four-byte pointer records are exchanged through the production struct
-	// codec; vector bounds and cursor forwarding remain in the bounded adapter.
+	// MG1371/MG1863/MG1965/MG2012 Listtree DisplayHook column-vector closure.
+	// Complete four-byte pointer records are exchanged through the production
+	// cursor bridge; vector bounds and cursor forwarding remain in the adapter.
 	public static uint ListtreeDisplayColumnVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x0004F000);
+		var vectorCursor = default(MuiListtreeCore.MuiListtreeDisplayColumnCursor);
+		vectorCursor.Base = vector;
+		vectorCursor.Index = 0;
+		if (!MuiListtreeCore.MuiListtreeDisplayColumnVectorCodec.TryWriteTextValue(
+			ref platform, vectorCursor, 0x12345678u) ||
+			!MuiListtreeCore.MuiListtreeDisplayColumnVectorCodec.TryReadTextValue(
+				ref platform, vectorCursor, out var bridged) || bridged != 0x12345678u)
+			return 7;
+		vectorCursor.Index = MuiListtreeCore.MuiListtreeDisplayColumnCursor.MaximumEntries;
+		if (MuiListtreeCore.MuiListtreeDisplayColumnVectorCodec.TryReadTextValue(
+			ref platform, vectorCursor, out _)) return 8;
 		if (!MuiListtreeCore.MuiListtreeDisplayColumnVectorMemoryCodec.TryGetEntry(ref platform,
 			vector, 0, out var first)) return 1;
 		var firstRecord = new MuiListtreeCore.MuiListtreeDisplayColumnRecord
@@ -28734,18 +32645,37 @@ public static class MuiNativeRoots
 		if (MuiListtreeCore.MuiListtreeDisplayColumnVectorMemoryCodec.TryGetEntry(ref platform,
 			vector, MuiListtreeCore.MuiListtreeDisplayColumnCursor.MaximumEntries, out _) ||
 			MuiListtreeCore.MuiListtreeDisplayColumnVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 6;
+				APTR.FromPointer(0xFFFFFFFF), 1, out _) ||
+			MuiListtreeCore.MuiListtreeDisplayColumnVectorCodec.TryReadTextValue(
+				ref platform, APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 6;
 		return 42;
 	}
 
-	// MG1372 Listtree FORMAT geometry-vector closure. Complete named 24-byte
-	// records are admitted through the bounded adapter; the native root checks
-	// the 256-column bound, cursor forwarding, and address overflow rejection.
+	// MG1372/MG1966/MG2004 Listtree FORMAT geometry-vector closure. Complete
+	// named 24-byte records are exchanged through the production cursor bridge;
+	// the native root checks the 256-column bound and overflow rejection.
 	public static uint ListtreeColumnGeometryVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x0004F000);
+		var cursor = default(MuiListtreeCore.MuiListtreeColumnGeometryCursor);
+		cursor.Base = vector;
+		cursor.Index = 0;
+		var bridgedGeometry = new MuiListtreeCore.MuiListtreeColumnGeometryRecord
+		{
+			Width = 320,
+			Delta = 4,
+			Weight = 100,
+			MinWidth = 16,
+			MaxWidth = 640,
+			Flags = MuiListtreeCore.MuiListtreeColumnGeometryRecord.MinPixel,
+		};
+		if (!MuiListtreeCore.MuiListtreeColumnGeometryVectorCodec.TryWrite(
+			ref platform, cursor, bridgedGeometry) ||
+			!MuiListtreeCore.MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform,
+				cursor, out var bridgedRead) || bridgedRead.Width != 320 ||
+			bridgedRead.Flags != bridgedGeometry.Flags) return 7;
 		if (!MuiListtreeCore.MuiListtreeColumnGeometryVectorMemoryCodec.TryGetEntry(ref platform,
 			vector, 0, out var first)) return 1;
 		var geometry = default(MuiListtreeCore.MuiListtreeColumnGeometryRecord);
@@ -28771,101 +32701,172 @@ public static class MuiNativeRoots
 		if (!MuiListtreeCore.MuiListtreeColumnGeometryVectorMemoryCodec.TryGetEntry(ref platform,
 			vector, 1, out var second) ||
 			second.Raw != vector.Raw + MuiListtreeCore.MuiListtreeColumnGeometryRecord.Size) return 3;
-		var cursor = default(MuiListtreeCore.MuiListtreeColumnGeometryCursor);
-		cursor.Base = vector;
 		cursor.Index = 1;
 		if (!MuiListtreeCore.MuiListtreeColumnGeometryCursorCodec.TryGetEntry(ref platform,
 			cursor, out var cursorAddress) || cursorAddress != second) return 4;
+		cursor.Index = MuiListtreeCore.MuiListtreeColumnGeometryCursor.MaximumEntries;
+		if (MuiListtreeCore.MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform,
+			cursor, out _) || MuiListtreeCore.MuiListtreeColumnGeometryVectorCodec.TryWrite(
+			ref platform, cursor, bridgedGeometry)) return 5;
 		if (!MuiListtreeCore.MuiListtreeColumnGeometryVectorMemoryCodec.TryGetEntry(ref platform,
 			vector, MuiListtreeCore.MuiListtreeColumnGeometryCursor.MaximumEntries - 1, out _)) return 5;
 		if (MuiListtreeCore.MuiListtreeColumnGeometryVectorMemoryCodec.TryGetEntry(ref platform,
 			vector, MuiListtreeCore.MuiListtreeColumnGeometryCursor.MaximumEntries, out _) ||
 			MuiListtreeCore.MuiListtreeColumnGeometryVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 6;
+				APTR.FromPointer(0xFFFFFFFF), 1, out _) ||
+			MuiListtreeCore.MuiListtreeColumnGeometryVectorCodec.TryRead(ref platform,
+				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 7;
 		return 42;
 	}
 
-	// MG1373 caller-owned external TagItem-vector closure. The complete named
-	// 8-byte records are admitted through the bounded adapter, while the legacy
-	// cursor remains covered as a forwarding compatibility surface.
+	// MG1950/MG1997 caller-owned external TagItem-vector closure. Complete
+	// named 8-byte records are exchanged through the bounded cursor bridge;
+	// production FillCreationTags does not reproduce vector slot arithmetic.
 	public static uint ExternalTagListVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x0004F000);
-		if (!MuiExternalTagListVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			0, out var first)) return 1;
-		APTR.WriteUInt32(first, 0, 0x80030001);
-		APTR.WriteUInt32(first, 4, 77);
-		if (APTR.ReadUInt32(first, 0) != 0x80030001 ||
-			APTR.ReadUInt32(first, 4) != 77) return 2;
-		if (!MuiExternalTagListVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiExternalTagListCursor.MaximumEntries - 1, out var last)) return 3;
 		var cursor = default(MuiExternalTagListCursor);
 		cursor.Base = vector;
-		cursor.Index = 1;
+		cursor.Index = 0;
+		var expected = new MuiAslTagItemRecord
+		{
+			Tag = 0xF00DCAFEu,
+			Data = 0x87654321u,
+		};
+		if (!MuiExternalTagListVectorCodec.TryWrite(ref platform, cursor,
+			expected) || !MuiExternalTagListVectorCodec.TryRead(ref platform,
+			cursor, out var actual) || actual.Tag != expected.Tag ||
+			actual.Data != expected.Data) return 2;
+		if (!MuiExternalTagListVectorCodec.TryAdvance(ref cursor, 1)) return 3;
 		if (!MuiExternalTagListCursorCodec.TryGetEntry(ref platform, cursor,
 			out var cursorAddress) || cursorAddress.Raw != vector.Raw +
 			MuiExternalTagListCursor.EntrySize) return 4;
-		if (MuiExternalTagListVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiExternalTagListCursor.MaximumEntries, out _) ||
-			MuiExternalTagListVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _) || last.IsNull) return 5;
+		cursor.Index = MuiExternalTagListCursor.MaximumEntries;
+		if (MuiExternalTagListVectorCodec.TryRead(ref platform, cursor, out _) ||
+			MuiExternalTagListCursorCodec.TryGetEntry(ref platform, cursor,
+				out _)) return 5;
+		cursor.Base = APTR.FromPointer(0xFFFFFFFF);
+		cursor.Index = 1;
+		if (MuiExternalTagListVectorCodec.TryRead(ref platform, cursor,
+			out _)) return 6;
 		return 42;
 	}
 
-	// MG1373 wrapper-owned remember-buffer vector closure. The five-entry
+	// MG1998 OM_UPDATE attribute-list traversal uses the named TagItem cursor
+	// and notification state records. The root initializes only the wrapper
+	// header/state needed by HandleUpdate, keeping the production walk focused.
+	public static uint ExternalHandleUpdateCursorRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var instance = APTR.FromPointer(0x00036000);
+		var attrList = APTR.FromPointer(0x00036100);
+		var header = default(MuiExternalWrapperHeader);
+		header.Magic = MuiExternalWrapperHeader.Cookie;
+		header.Class = MuiExternalWrapperClass.Boopsi;
+		if (!MuiExternalWrapperHeaderCodec.Write(ref platform, instance, header))
+			return 1;
+		var scratch = default(MuiExternalScratchState);
+		scratch.RememberBuffer = APTR.FromPointer(0x00036200);
+		scratch.WorkBuffer = APTR.FromPointer(0x00036240);
+		if (!MuiExternalScratchStateCodec.Write(ref platform, instance, scratch))
+			return 2;
+		if (!MuiExternalDtpicStateCodec.Write(ref platform, instance,
+			default)) return 3;
+		if (!MuiExternalBoopsiResourceCodec.Write(ref platform, instance,
+			default)) return 4;
+		var notification = default(MuiExternalNotificationState);
+		if (!MuiExternalNotificationStateCodec.Write(ref platform, instance,
+			notification)) return 5;
+		var cursor = default(MuiExternalTagListCursor);
+		cursor.Base = attrList;
+		cursor.Index = 0;
+		if (!MuiExternalTagListVectorCodec.TryWrite(ref platform, cursor,
+			new MuiAslTagItemRecord { Tag = 0x80421234u, Data = 77 })) return 6;
+		if (!MuiExternalTagListVectorCodec.TryAdvance(ref cursor, 1)) return 7;
+		if (!MuiExternalTagListVectorCodec.TryWrite(ref platform, cursor,
+			new MuiAslTagItemRecord { Tag = 0x80425678u, Data = 88 })) return 8;
+		if (!MuiExternalTagListVectorCodec.TryAdvance(ref cursor, 1)) return 9;
+		if (!MuiExternalTagListVectorCodec.TryWrite(ref platform, cursor,
+			default)) return 10;
+		var mapped = MuiExternalWrapperCore.HandleUpdate(ref platform, instance,
+			attrList);
+		if (mapped != 2) return 11;
+		if (MuiExternalWrapperCore.NotificationCount(ref platform, instance) != 2 ||
+			MuiExternalWrapperCore.LastNotifiedAttribute(ref platform, instance) !=
+				0x80425678u) return 12;
+		return 42;
+	}
+
+	// MG1950/MG1995 wrapper-owned remember-buffer vector closure. The five-entry
 	// MorphOS limit and complete 8-byte TagItem records are enforced by the
-	// dedicated adapter rather than by consumer-side offsets.
+	// dedicated named cursor rather than by consumer-side offsets.
 	public static uint ExternalRememberVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x0004F000);
-		if (!MuiExternalRememberVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiExternalRememberCursor.MaximumEntries - 1, out var last)) return 1;
-		APTR.WriteUInt32(last, 0, 0xD101);
-		APTR.WriteUInt32(last, 4, 42);
-		if (APTR.ReadUInt32(last, 0) != 0xD101 || APTR.ReadUInt32(last, 4) != 42)
-			return 2;
 		var cursor = default(MuiExternalRememberCursor);
 		cursor.Base = vector;
 		cursor.Index = 0;
+		var expected = new MuiAslTagItemRecord
+		{
+			Tag = 0xF00DCAFEu,
+			Data = 0x87654321u,
+		};
+		if (!MuiExternalRememberVectorCodec.TryWrite(ref platform, cursor, expected) ||
+			!MuiExternalRememberVectorCodec.TryRead(ref platform, cursor,
+				out var actual) ||
+			actual.Tag != expected.Tag || actual.Data != expected.Data) return 2;
+		if (!MuiExternalRememberVectorCodec.TryAdvance(ref cursor, 1)) return 3;
 		if (!MuiExternalRememberCursorCodec.TryGetEntry(ref platform, cursor,
-			out var first) || first.Raw != vector.Raw) return 3;
-		if (MuiExternalRememberVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiExternalRememberCursor.MaximumEntries, out _) ||
-			MuiExternalRememberVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 4;
+			out var second) || second.Raw != vector.Raw +
+			MuiExternalRememberCursor.EntrySize) return 4;
+		cursor.Index = MuiExternalRememberCursor.MaximumEntries;
+		if (MuiExternalRememberVectorCodec.TryRead(ref platform, cursor,
+			out _) || MuiExternalRememberCursorCodec.TryGetEntry(ref platform,
+				cursor, out _)) return 5;
+		cursor.Base = APTR.FromPointer(0xFFFFFFFF);
+		cursor.Index = 1;
+		if (MuiExternalRememberVectorCodec.TryRead(ref platform, cursor,
+			out _)) return 6;
 		return 42;
 	}
 
-	// MG1373 inline BOOPSI TagItem-vector closure. The fixed inline capacity is
-	// kept as a named record bound and both direct and cursor access are checked
-	// without exposing raw consumer-side vector arithmetic.
+	// MG1951/MG1996 inline BOOPSI TagItem-vector closure. The fixed inline
+	// capacity is kept as a named record bound and production exchange uses the
+	// cursor value bridge without exposing raw consumer-side vector arithmetic.
 	public static uint ExternalBoopsiTagVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x0004F000);
-		if (!MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			0, out var first)) return 1;
-		APTR.WriteUInt32(first, 0, 0x80030001);
-		APTR.WriteUInt32(first, 4, 88);
-		if (APTR.ReadUInt32(first, 0) != 0x80030001 ||
-			APTR.ReadUInt32(first, 4) != 88) return 2;
 		var cursor = default(MuiExternalBoopsiTagCursor);
 		cursor.Base = vector;
-		cursor.Index = 1;
+		cursor.Index = 0;
+		var expected = new MuiExternalBoopsiTagItem
+		{
+			Tag = 0xF00DCAFEu,
+			Data = 0x87654321u,
+		};
+		if (!MuiExternalBoopsiTagVectorCodec.TryWrite(ref platform, cursor,
+			expected) || !MuiExternalBoopsiTagVectorCodec.TryRead(ref platform,
+			cursor, out var actual) || actual.Tag != expected.Tag ||
+			actual.Data != expected.Data) return 2;
+		if (!MuiExternalBoopsiTagVectorCodec.TryAdvance(ref cursor, 1)) return 3;
 		if (!MuiExternalBoopsiTagCursorCodec.TryGetEntry(ref platform, cursor,
 			out var second) || second.Raw != vector.Raw +
-			MuiExternalBoopsiTagCursor.EntrySize) return 3;
-		if (!MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiExternalBoopsiTagCursor.MaximumEntries - 1, out _)) return 4;
-		if (MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiExternalBoopsiTagCursor.MaximumEntries, out _) ||
-			MuiExternalBoopsiTagVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 5;
+			MuiExternalBoopsiTagCursor.EntrySize) return 4;
+		cursor.Index = MuiExternalBoopsiTagCursor.MaximumEntries;
+		if (MuiExternalBoopsiTagVectorCodec.TryRead(ref platform, cursor,
+			out _) || MuiExternalBoopsiTagCursorCodec.TryGetEntry(ref platform,
+				cursor, out _)) return 5;
+		cursor.Base = APTR.FromPointer(0xFFFFFFFF);
+		cursor.Index = 1;
+		if (MuiExternalBoopsiTagVectorCodec.TryRead(ref platform, cursor,
+			out _)) return 6;
 		return 42;
 	}
 
@@ -29295,29 +33296,304 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1366 Title page-vector closure. Each caller-owned 8-byte page slot is
-	// admitted through the named page-record adapter; native qualification keeps
-	// the page-table bound and overflow checks in one struct-first seam.
+	// MG1977 Title page-vector closure. Each caller-owned 8-byte page slot is
+	// exchanged through the named page-record cursor bridge; native qualification
+	// keeps the page-table bound and overflow checks in one struct-first seam.
 	public static uint TitlePageVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x0004F000);
-		if (!MuiTitlePageVectorMemoryCodec.TryGetEntry(ref platform, vector, 0,
-			out var first)) return 1;
-		APTR.WriteUInt32(first, 0, 0x12345678u);
-		APTR.WriteUInt32(first, 4, 0xA5A5A5A5u);
-		if (APTR.ReadUInt32(first, 0) != 0x12345678u ||
-			APTR.ReadUInt32(first, 4) != 0xA5A5A5A5u) return 2;
-		if (!MuiTitlePageVectorMemoryCodec.TryGetEntry(ref platform, vector, 1,
+		var cursor = new MuiTitlePageCursor
+		{
+			Base = vector,
+			Index = 0,
+		};
+		var expected = new MuiTitlePageRecord
+		{
+			Handle = 0x12345678u,
+			Flags = 0xA5A5A5A5u,
+		};
+		if (!MuiTitlePageCursorCodec.TryWrite(ref platform, cursor, expected) ||
+			!MuiTitlePageCursorCodec.TryRead(ref platform, cursor,
+				out var decoded) || decoded.Handle != expected.Handle ||
+			decoded.Flags != expected.Flags) return 1;
+		cursor.Index = 1;
+		if (!MuiTitlePageCursorCodec.TryGetEntry(ref platform, cursor,
 			out var second) || second.Raw != vector.Raw + MuiTitlePageRecord.Size)
+			return 2;
+		cursor.Index = MuiTitlePageCursor.MaximumEntries - 1;
+		if (!MuiTitlePageCursorCodec.TryGetEntry(ref platform, cursor, out _))
 			return 3;
-		if (!MuiTitlePageVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiTitlePageCursor.MaximumEntries - 1, out _)) return 4;
-		if (MuiTitlePageVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiTitlePageCursor.MaximumEntries, out _) ||
-			MuiTitlePageVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 5;
+		cursor.Index = MuiTitlePageCursor.MaximumEntries;
+		if (MuiTitlePageCursorCodec.TryGetEntry(ref platform, cursor, out _))
+			return 4;
+		cursor.Base = APTR.FromPointer(0xFFFFFFFF);
+		cursor.Index = 1;
+		if (MuiTitlePageCursorCodec.TryRead(ref platform, cursor, out _))
+			return 5;
+		return 42;
+	}
+
+	// MG1919 Title fixed-record closure. The 32-byte Title state and each
+	// 8-byte page entry are consumed in declaration order through named
+	// struct cursors; malformed tail addresses must be rejected before any
+	// scalar access reaches the guest boundary.
+	public static uint MiscTitleStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var stateAddress = APTR.FromPointer(0x00050C00);
+		var expected = default(MuiMiscTitleState);
+		expected.Pages = APTR.FromPointer(0x00050D00);
+		expected.PageCount = 3;
+		expected.ActivePage = 2;
+		expected.PageSequence = 9;
+		expected.Position = -1;
+		expected.EventPriority = 4;
+		expected.OnLastClose = 1;
+		expected.Clickable = -5;
+		if (!MuiMiscTitleStateCodec.Write(ref platform, stateAddress,
+			expected)) return 1;
+		if (!MuiMiscTitleStateCodec.TryRead(ref platform, stateAddress,
+			out var actual)) return 2;
+		if (actual.Pages.Raw != expected.Pages.Raw ||
+			actual.PageCount != expected.PageCount ||
+			actual.ActivePage != expected.ActivePage ||
+			actual.PageSequence != expected.PageSequence ||
+			actual.Position != expected.Position ||
+			actual.EventPriority != expected.EventPriority ||
+			actual.OnLastClose != expected.OnLastClose ||
+			actual.Clickable != expected.Clickable) return 3;
+
+		var pageAddress = APTR.FromPointer(0x00050C40);
+		var page = default(MuiTitlePageRecord);
+		page.Handle = 0x12345678;
+		page.Flags = 0xA5A5A5A5;
+		if (!MuiTitlePageCodec.Write(ref platform, pageAddress, page))
+			return 4;
+		if (!MuiTitlePageCodec.TryRead(ref platform, pageAddress,
+			out var decoded) || decoded.Handle != page.Handle ||
+			decoded.Flags != page.Flags) return 5;
+
+		var stateTail = APTR.FromPointer(0x00050FE1);
+		if (MuiMiscTitleStateCodec.TryRead(ref platform, stateTail,
+			out _) || MuiMiscTitleStateCodec.Write(ref platform, stateTail,
+			default)) return 6;
+		var pageTail = APTR.FromPointer(0x00050FFC);
+		if (MuiTitlePageCodec.TryRead(ref platform, pageTail, out _) ||
+			MuiTitlePageCodec.Write(ref platform, pageTail, default)) return 7;
+		return 42;
+	}
+
+	// MG1920 Filepanel fixed-record closure. Service state, owned-string
+	// slots, and adopted rows all exchange their named fields through bounded
+	// declaration-ordered cursors; malformed tail addresses are rejected before
+	// any guest scalar access.
+	public static uint MiscFilepanelStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var serviceAddress = APTR.FromPointer(0x00050B00);
+		var service = default(MuiMiscFilepanelServiceState);
+		service.FilterFunc = APTR.FromPointer(0x00050B80);
+		service.AslState = APTR.FromPointer(0x00050BC0);
+		service.Rows = APTR.FromPointer(0x00050C00);
+		service.RowCount = 5;
+		service.HookMsg = APTR.FromPointer(0x00050C40);
+		if (!MuiMiscFilepanelServiceStateCodec.Write(ref platform,
+			serviceAddress, service)) return 1;
+		if (!MuiMiscFilepanelServiceStateCodec.TryRead(ref platform,
+			serviceAddress, out var serviceRead) ||
+			serviceRead.FilterFunc.Raw != service.FilterFunc.Raw ||
+			serviceRead.AslState.Raw != service.AslState.Raw ||
+			serviceRead.Rows.Raw != service.Rows.Raw ||
+			serviceRead.RowCount != service.RowCount ||
+			serviceRead.HookMsg.Raw != service.HookMsg.Raw) return 2;
+
+		var slotAddress = APTR.FromPointer(0x00050B20);
+		var slot = default(MuiMiscOwnedStringSlot);
+		slot.Value = APTR.FromPointer(0x00050D00);
+		slot.AllocationSize = 17;
+		if (!MuiMiscOwnedStringSlotCodec.Write(ref platform, slotAddress,
+			slot)) return 3;
+		if (!MuiMiscOwnedStringSlotCodec.TryRead(ref platform, slotAddress,
+			out var slotRead) || slotRead.Value.Raw != slot.Value.Raw ||
+			slotRead.AllocationSize != slot.AllocationSize) return 4;
+
+		var rowAddress = APTR.FromPointer(0x00050B40);
+		var row = default(MuiFilepanelRowRecord);
+		row.Label = APTR.FromPointer(0x00050D40);
+		row.Contents = APTR.FromPointer(0x00050D80);
+		if (!MuiFilepanelRowCodec.Write(ref platform, rowAddress, row))
+			return 5;
+		if (!MuiFilepanelRowCodec.TryRead(ref platform, rowAddress,
+			out var rowRead) || rowRead.Label.Raw != row.Label.Raw ||
+			rowRead.Contents.Raw != row.Contents.Raw) return 6;
+
+		var serviceTail = APTR.FromPointer(0x00050FED);
+		if (MuiMiscFilepanelServiceStateCodec.TryRead(ref platform,
+			serviceTail, out _) || MuiMiscFilepanelServiceStateCodec.Write(
+			ref platform, serviceTail, default)) return 7;
+		var slotTail = APTR.FromPointer(0x00050FFC);
+		if (MuiMiscOwnedStringSlotCodec.TryRead(ref platform, slotTail,
+			out _) || MuiMiscOwnedStringSlotCodec.Write(ref platform, slotTail,
+			default)) return 8;
+		var rowTail = APTR.FromPointer(0x00050FFC);
+		if (MuiFilepanelRowCodec.TryRead(ref platform, rowTail, out _) ||
+			MuiFilepanelRowCodec.Write(ref platform, rowTail, default))
+			return 9;
+		return 42;
+	}
+
+	// MG1921 Mccprefs fixed-record closure. The specialist state and six-field
+	// registry entries exchange all members in declaration order through named
+	// cursors; malformed tail addresses are rejected before guest access.
+	public static uint MiscMccprefsStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var stateAddress = APTR.FromPointer(0x00050A00);
+		var state = default(MuiMiscMccprefsState);
+		state.Registry = APTR.FromPointer(0x00050B00);
+		state.RegistryCount = 6;
+		state.RegistryConfig = APTR.FromPointer(0x00050B40);
+		state.RegistryOriginator = APTR.FromPointer(0x00050B80);
+		if (!MuiMiscMccprefsStateCodec.Write(ref platform, stateAddress,
+			state)) return 1;
+		if (!MuiMiscMccprefsStateCodec.TryRead(ref platform, stateAddress,
+			out var stateRead) || stateRead.Registry.Raw != state.Registry.Raw ||
+			stateRead.RegistryCount != state.RegistryCount ||
+			stateRead.RegistryConfig.Raw != state.RegistryConfig.Raw ||
+			stateRead.RegistryOriginator.Raw != state.RegistryOriginator.Raw)
+			return 2;
+
+		var registryAddress = APTR.FromPointer(0x00050A40);
+		var registry = default(MuiMccprefsRegistryRecord);
+		registry.Gadget = APTR.FromPointer(0x00050C00);
+		registry.Id = 7;
+		registry.Params = 8;
+		registry.Title = APTR.FromPointer(0x00050C40);
+		registry.Attr = 0x80420000;
+		registry.Label = APTR.FromPointer(0x00050C80);
+		if (!MuiMccprefsRegistryCodec.Write(ref platform, registryAddress,
+			registry)) return 3;
+		if (!MuiMccprefsRegistryCodec.TryRead(ref platform, registryAddress,
+			out var registryRead) || registryRead.Gadget.Raw !=
+			registry.Gadget.Raw || registryRead.Id != registry.Id ||
+			registryRead.Params != registry.Params || registryRead.Title.Raw !=
+			registry.Title.Raw || registryRead.Attr != registry.Attr ||
+			registryRead.Label.Raw != registry.Label.Raw) return 4;
+
+		var stateTail = APTR.FromPointer(0x00050FF1);
+		if (MuiMiscMccprefsStateCodec.TryRead(ref platform, stateTail,
+			out _) || MuiMiscMccprefsStateCodec.Write(ref platform, stateTail,
+			default)) return 5;
+		var registryTail = APTR.FromPointer(0x00050FE9);
+		if (MuiMccprefsRegistryCodec.TryRead(ref platform, registryTail,
+			out _) || MuiMccprefsRegistryCodec.Write(ref platform,
+			registryTail, default)) return 6;
+		return 42;
+	}
+
+	// MG1922 private Scrmodelist fixed-record closure. The 12-byte state and
+	// four-byte mode entries use named declaration-ordered cursors; malformed
+	// tail addresses are rejected before a scalar reaches guest memory.
+	public static uint MiscScrmodelistStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var stateAddress = APTR.FromPointer(0x00050A00);
+		var state = default(MuiMiscScrmodelistState);
+		state.Modes = APTR.FromPointer(0x00050B00);
+		state.ModeCount = 4;
+		state.ActiveMode = 2;
+		if (!MuiMiscScrmodelistStateCodec.Write(ref platform, stateAddress,
+			state)) return 1;
+		if (!MuiMiscScrmodelistStateCodec.TryRead(ref platform, stateAddress,
+			out var stateRead) || stateRead.Modes.Raw != state.Modes.Raw ||
+			stateRead.ModeCount != state.ModeCount ||
+			stateRead.ActiveMode != state.ActiveMode) return 2;
+
+		var modeAddress = APTR.FromPointer(0x00050A40);
+		var mode = default(MuiScrmodelistModeRecord);
+		mode.ModeId = 0x00021000;
+		if (!MuiScrmodelistModeCodec.Write(ref platform, modeAddress, mode))
+			return 3;
+		if (!MuiScrmodelistModeCodec.TryRead(ref platform, modeAddress,
+			out var modeRead) || modeRead.ModeId != mode.ModeId) return 4;
+
+		var stateTail = APTR.FromPointer(0x00050FF5);
+		if (MuiMiscScrmodelistStateCodec.TryRead(ref platform, stateTail,
+			out _) || MuiMiscScrmodelistStateCodec.Write(ref platform, stateTail,
+			default)) return 5;
+		var modeTail = APTR.FromPointer(0x00050FFD);
+		if (MuiScrmodelistModeCodec.TryRead(ref platform, modeTail, out _) ||
+			MuiScrmodelistModeCodec.Write(ref platform, modeTail, default))
+			return 6;
+		return 42;
+	}
+
+	// MG1923 small shared-record closure. Keyadjust policy, WindowPanel,
+	// FSProtectionBits, and Fontdisplay natural size all use named sequential
+	// cursors; tail addresses are rejected before guest scalar access.
+	public static uint MiscSmallStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+
+		var keyAddress = APTR.FromPointer(0x00050A00);
+		var key = default(MuiKeyadjustPolicyStateRecord);
+		const uint keyValue = 0x80420000;
+		key.ForceKeyCode = keyValue;
+		if (!MuiKeyadjustPolicyStateCodec.TryWriteUInt32(ref platform,
+			keyAddress, keyValue) ||
+			!MuiKeyadjustPolicyStateCodec.TryReadUInt32(ref platform, keyAddress,
+				out var keyRaw) || keyRaw != keyValue)
+			return 1;
+
+		var windowAddress = APTR.FromPointer(0x00050A20);
+		var window = default(MuiMiscWindowPanelState);
+		window.Application = APTR.FromPointer(0x00050B00);
+		window.PanelWindow = APTR.FromPointer(0x00050B40);
+		if (!MuiMiscWindowPanelStateCodec.Write(ref platform, windowAddress,
+			window) || !MuiMiscWindowPanelStateCodec.TryRead(ref platform,
+			windowAddress, out var windowRead) || windowRead.Application.Raw !=
+			window.Application.Raw || windowRead.PanelWindow.Raw !=
+			window.PanelWindow.Raw) return 2;
+
+		var protectionAddress = APTR.FromPointer(0x00050A40);
+		var protection = default(MuiMiscProtectionState);
+		const uint protectionValue = 0xA5A55A5A;
+		protection.Flags = protectionValue;
+		if (!MuiMiscProtectionStateCodec.TryWriteUInt32(ref platform,
+			protectionAddress, protectionValue) ||
+			!MuiMiscProtectionStateCodec.TryReadUInt32(ref platform,
+				protectionAddress, out var protectionRaw) ||
+			protectionRaw != protectionValue) return 3;
+
+		var fontAddress = APTR.FromPointer(0x00050A60);
+		var font = default(MuiMiscFontdisplaySize);
+		font.Width = 640;
+		font.Height = 480;
+		if (!MuiMiscFontdisplaySizeCodec.Write(ref platform, fontAddress,
+			font) || !MuiMiscFontdisplaySizeCodec.TryRead(ref platform,
+			fontAddress, out var fontRead) || fontRead.Width != font.Width ||
+			fontRead.Height != font.Height) return 4;
+
+		var scalarTail = APTR.FromPointer(0x00050FFD);
+		if (MuiKeyadjustPolicyStateCodec.TryReadUInt32(ref platform,
+			scalarTail, out _) || MuiKeyadjustPolicyStateCodec.TryWriteUInt32(
+			ref platform, scalarTail, 0) ||
+			MuiMiscProtectionStateCodec.TryReadUInt32(ref platform, scalarTail,
+				out _) || MuiMiscProtectionStateCodec.TryWriteUInt32(ref platform,
+				scalarTail, 0)) return 5;
+		var pairTail = APTR.FromPointer(0x00050FFC);
+		if (MuiMiscWindowPanelStateCodec.TryRead(ref platform, pairTail,
+			out _) || MuiMiscWindowPanelStateCodec.Write(ref platform, pairTail,
+			default) || MuiMiscFontdisplaySizeCodec.TryRead(ref platform,
+			pairTail, out _) || MuiMiscFontdisplaySizeCodec.Write(ref platform,
+			pairTail, default)) return 6;
 		return 42;
 	}
 
@@ -32548,25 +36824,49 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1342 native struct-first SetCycleChain inline-vector closure. The fixed
+	// MG1975 native struct-first SetCycleChain inline-vector closure. The fixed
 	// packet header and selected object slot are exposed only when both guest
-	// ranges are completely mapped.
+	// ranges are completely mapped; the slot value is exchanged through the
+	// named one-field record bridge.
 	public static uint WindowCycleChainInlineVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var message = APTR.FromPointer(0x00050100);
-		if (!MuiWindowCycleChainInlineVectorMemoryCodec.TryGetEntry(
-			ref platform, message, 2, out var address) ||
+		var cursor = new MuiWindowCycleChainInlineVectorCursor
+		{
+			Message = message,
+			Index = 2,
+		};
+		if (!MuiWindowCycleChainInlineVectorCodec.TryGetEntry(
+			ref platform, cursor, out var address) ||
 			address.Raw != message.Raw + MuiWindowCycleChainMessage.VectorOffset +
 			(2 * MuiApplicationWindowCycleChainSlot.Size)) return 1;
-		if (MuiWindowCycleChainInlineVectorMemoryCodec.TryGetEntry(
-			ref platform, message,
-			MuiApplicationWindowCycleChainCursor.MaximumEntries, out _) ||
-			MuiWindowCycleChainInlineVectorMemoryCodec.TryGetEntry(
-			ref platform, APTR.FromPointer(0x00050FFC), 0, out _) ||
-			MuiWindowCycleChainInlineVectorMemoryCodec.TryGetEntry(
-			ref platform, APTR.Null, 0, out _)) return 2;
+		const uint expected = 0xFEDCBA98;
+		if (!MuiWindowCycleChainInlineVectorCodec.TryWriteValue(ref platform,
+			cursor, expected) || !MuiWindowCycleChainInlineVectorCodec.TryReadValue(
+			ref platform, cursor, out var rawObject) || rawObject != expected)
+			return 2;
+		if (!MuiWindowCycleChainInlineVectorCodec.TryRead(ref platform, cursor,
+			out var slot) || slot.Object.Raw != expected) return 3;
+		if (MuiWindowCycleChainInlineVectorCodec.TryGetEntry(ref platform,
+			new MuiWindowCycleChainInlineVectorCursor
+			{
+				Message = message,
+				Index = MuiApplicationWindowCycleChainCursor.MaximumEntries,
+			}, out _) ||
+			MuiWindowCycleChainInlineVectorCodec.TryGetEntry(ref platform,
+			new MuiWindowCycleChainInlineVectorCursor
+			{
+				Message = APTR.FromPointer(0x00050FFC),
+				Index = 0,
+			}, out _) ||
+			MuiWindowCycleChainInlineVectorCodec.TryGetEntry(ref platform,
+			new MuiWindowCycleChainInlineVectorCursor
+			{
+				Message = APTR.Null,
+				Index = 0,
+			}, out _)) return 4;
 		return 42;
 	}
 
@@ -32737,22 +37037,67 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1351 native struct-first WindowList-entry-vector closure. Complete
-	// named 16-byte Exec-style entries are admitted before projection writes.
+	// MG1351/MG1974 native struct-first WindowList-entry-vector closure.
+	// Complete named 16-byte Exec-style entries are exchanged through the
+	// bounded record bridge before projection writes.
 	public static uint ApplicationWindowListEntryVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x00050100);
-		if (!MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, 2, out var address) || address.Raw != vector.Raw +
-			(2 * MuiApplicationWindowListEntry.Size)) return 1;
-		if (MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(ref platform,
+		var expected = new MuiApplicationWindowListEntry
+		{
+			Next = APTR.FromPointer(0xFEDCBA98u),
+			Previous = APTR.FromPointer(0x80000001u),
+			Object = APTR.FromPointer(0x12345678u),
+			Reserved = APTR.FromPointer(MuiApplicationWindowListEntry.ProjectionMagic),
+		};
+		if (!MuiApplicationWindowListEntryVectorCodec.TryWrite(ref platform,
+			vector, 2, expected) ||
+			!MuiApplicationWindowListEntryVectorCodec.TryRead(ref platform,
+			vector, 2, out var decoded) || decoded.Next.Raw != expected.Next.Raw ||
+			decoded.Previous.Raw != expected.Previous.Raw ||
+			decoded.Object.Raw != expected.Object.Raw ||
+			decoded.Reserved.Raw != expected.Reserved.Raw) return 1;
+		if (MuiApplicationWindowListEntryVectorCodec.TryRead(ref platform,
 			APTR.FromPointer(0x00050FF1u), 0, out _) ||
-			MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFF0u), 2, out _) ||
-			MuiApplicationWindowListEntryVectorMemoryCodec.TryGetEntry(ref platform,
+			MuiApplicationWindowListEntryVectorCodec.TryWrite(ref platform,
+				APTR.FromPointer(0xFFFFFFF0u), 2, expected) ||
+			MuiApplicationWindowListEntryVectorCodec.TryGetEntry(ref platform,
 				APTR.Null, 0, out _)) return 2;
+		return 42;
+	}
+
+	// MG2001 native struct-first WindowList cursor closure. The projection
+	// writer exchanges complete named entries through a bounded cursor; indexed
+	// slot arithmetic remains confined to the vector adapter.
+	public static uint ApplicationWindowListEntryCursorStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var cursor = default(MuiApplicationWindowListEntryCursor);
+		cursor.Base = APTR.FromPointer(0x00050100);
+		cursor.Index = 2;
+		var expected = default(MuiApplicationWindowListEntry);
+		expected.Next = APTR.FromPointer(0xFEDCBA98u);
+		expected.Previous = APTR.FromPointer(0x80000001u);
+		expected.Object = APTR.FromPointer(0x12345678u);
+		expected.Reserved = APTR.FromPointer(
+			MuiApplicationWindowListEntry.ProjectionMagic);
+		if (!MuiApplicationWindowListEntryVectorCodec.TryWrite(ref platform,
+			cursor, expected) ||
+			!MuiApplicationWindowListEntryVectorCodec.TryRead(ref platform, cursor,
+				out var decoded) || decoded.Next.Raw != expected.Next.Raw ||
+			decoded.Previous.Raw != expected.Previous.Raw ||
+			decoded.Object.Raw != expected.Object.Raw ||
+			decoded.Reserved.Raw != expected.Reserved.Raw) return 1;
+		if (!MuiApplicationWindowListEntryVectorCodec.TryAdvance(ref cursor, 1) ||
+			cursor.Index != 3) return 2;
+		var terminal = cursor;
+		terminal.Index = MuiApplicationWindowListEntryCursor.MaximumEntries;
+		if (MuiApplicationWindowListEntryVectorCodec.TryAdvance(ref terminal, 1) ||
+			MuiApplicationWindowListEntryVectorCodec.TryAdvance(ref cursor, 0))
+			return 3;
 		return 42;
 	}
 
@@ -33051,7 +37396,7 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1641 native struct-first Area drag closure. DragBegin, DoDrag, DragDrop,
+	// MG1874 native struct-first Area drag closure. DragBegin, DoDrag, DragDrop,
 	// DragQuery, DragFinish, DragReport, DragEvent, and the create/delete image
 	// packets use complete named records; remaining drag variants stay bounded.
 	public static uint AreaDragMessageStructRecordCodecRoot()
@@ -33067,7 +37412,10 @@ public static class MuiNativeRoots
 		if (!MuiAreaDragBeginMessageCodec.Write(ref platform, beginAddress,
 			begin) || !MuiAreaDragMessageCodec.TryReadBegin(ref platform,
 			beginAddress, out var decodedBegin) ||
-			decodedBegin.Object != begin.Object) return 1;
+			decodedBegin.Object != begin.Object ||
+			!MuiAreaDragMessageCodec.TryReadMethodIdValue(ref platform,
+				beginAddress, out var beginMethod) ||
+			beginMethod != MuiAreaDragMessageCodec.DragBegin) return 1;
 		var doDragAddress = APTR.FromPointer(0x00050E00);
 		var doDrag = new MuiAreaDoDragMessage
 		{
@@ -34549,22 +38897,64 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1350 native struct-first indexed UsedClasses-vector closure. The
-	// complete named 4-byte pointer entry must be mapped before it is exposed.
+	// MG1953/MG1987 native struct-first UsedClasses-vector closure. Complete
+	// named pointer entries preserve the full 32-bit class-name capability;
+	// cursor advancement, slot arithmetic, and mapping remain inside the
+	// bounded adapters.
 	public static uint ApplicationUsedClassesVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x00050100);
-		if (!MuiApplicationUsedClassesVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, 2, out var address) || address.Raw != vector.Raw +
-			(2 * MuiApplicationUsedClassesVectorEntry.Size)) return 1;
+		var expected = new MuiApplicationUsedClassesVectorEntry
+		{
+			Name = APTR.FromPointer(0xFEDCBA98u),
+		};
+		var cursor = default(MuiApplicationUsedClassesVectorCursor);
+		cursor.Base = vector;
+		cursor.Index = 2;
+		if (!MuiApplicationUsedClassesVectorCodec.TryGetEntry(ref platform,
+			cursor, out var slot) || slot.Raw != 0x00050108u) return slot.Raw;
+		if (!MuiApplicationUsedClassesVectorCodec.TryWriteName(ref platform, cursor,
+			expected.Name.Raw)) return 1;
+		if (!MuiApplicationUsedClassesVectorCodec.TryReadName(ref platform, cursor,
+			out var actualName)) return 2;
+		if (actualName != expected.Name.Raw) return actualName;
+		if (!MuiApplicationUsedClassesVectorCodec.TryAdvance(ref cursor, 1) ||
+			cursor.Index != 3) return 3;
 		if (MuiApplicationUsedClassesVectorMemoryCodec.TryGetEntry(ref platform,
 			APTR.FromPointer(0x00050FFEu), 0, out _) ||
 			MuiApplicationUsedClassesVectorMemoryCodec.TryGetEntry(ref platform,
 				APTR.FromPointer(0xFFFFFFF0u), 4, out _) ||
 			MuiApplicationUsedClassesVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.Null, 0, out _)) return 2;
+				APTR.Null, 0, out _) ||
+			MuiApplicationUsedClassesVectorCodec.TryReadName(ref platform,
+				APTR.FromPointer(0x00050FFEu), 0, out _)) return 2;
+		return 42;
+	}
+
+	// MG1899 native sequential-record proof. Each caller-owned UsedClasses
+	// vector element is a complete named STRPTR slot; the legacy field adapter
+	// remains available only for compatibility diagnostics.
+	public static uint ApplicationUsedClassesVectorEntrySequentialStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var address = APTR.FromPointer(0x50F80);
+		var value = new MuiApplicationUsedClassesVectorEntry
+		{
+			Name = APTR.FromPointer(0x3600),
+		};
+		if (!MuiApplicationUsedClassesVectorEntryStructCodec.Write(ref platform,
+			address, value)) return 1;
+		if (!MuiApplicationUsedClassesVectorEntryStructCodec.TryRead(ref platform,
+			address, out var decoded) || decoded.Name != value.Name) return 2;
+		if (!MuiApplicationUsedClassesVectorEntryCodec.TryRead(ref platform,
+			address, out var validated) || validated.Name != value.Name) return 3;
+		if (MuiApplicationUsedClassesVectorEntryStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x50FFF), out _) ||
+			MuiApplicationUsedClassesVectorEntryStructCodec.Write(ref platform,
+				APTR.Null, value)) return 4;
 		return 42;
 	}
 
@@ -35081,15 +39471,18 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1363 Choice/Radio entry-vector closure. The caller-owned STRPTR table
-	// is indexed through a named 4-byte entry record; the native root does not
-	// reproduce vector offsets or terminate traversal by raw arithmetic.
+	// MG1947/MG1989 Choice/Radio entry-vector closure. The caller-owned STRPTR
+	// table is indexed through a named cursor and 4-byte entry record; production
+	// callers use the bounded vector bridge rather than reproducing slot offsets.
 	public static uint ChoiceEntryVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x00050F00);
-		if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, vector, 0,
+		var cursor = default(MuiChoiceEntryCursor);
+		cursor.Base = vector;
+		cursor.Index = 0;
+		if (!MuiChoiceEntryVectorCodec.TryGetEntry(ref platform, cursor,
 			out var first)) return 1;
 		var expected = new MuiChoiceEntry { Text = APTR.FromPointer(0x51100) };
 		if (!MuiChoiceEntryMemoryCodec.TryGetAddress(ref platform, first,
@@ -35098,13 +39491,116 @@ public static class MuiNativeRoots
 		if (!MuiChoiceEntryCodec.Write(ref platform, first, expected) ||
 			!MuiChoiceEntryCodec.TryRead(ref platform, first, out var actual) ||
 			actual.Text != expected.Text) return 3;
-		if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, vector, 1,
-			out var second)) return 4;
-		if (second.Raw != vector.Raw + MuiChoiceEntry.Size) return 5;
+		if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, cursor,
+			out var vectorText) || vectorText != expected.Text.Raw) return 4;
+		if (!MuiChoiceEntryCodec.WriteValue(ref platform, first, 0xF00DCAFE) ||
+			!MuiChoiceEntryCodec.TryReadValue(ref platform, first,
+				out var highBitText) || highBitText != 0xF00DCAFE) return 5;
+		if (!MuiChoiceEntryVectorCodec.TryAdvance(ref cursor, 1) ||
+			cursor.Index != 1 || !MuiChoiceEntryVectorCodec.TryGetEntry(ref platform,
+			cursor, out var second)) return 6;
+		if (second.Raw != vector.Raw + MuiChoiceEntry.Size) return 7;
 		if (MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, vector,
-			MuiChoiceEntryCursor.MaximumEntries, out _) ||
-			MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
-				APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 6;
+			MuiChoiceEntryCursor.MaximumEntries, out _)) return 70;
+		if (MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform,
+			APTR.FromPointer(0xFFFFFFFF), 1, out _)) return 71;
+		if (MuiChoiceEntryVectorCodec.TryReadValue(ref platform, vector,
+			MuiChoiceEntryCursor.MaximumEntries, out _)) return 72;
+		if (MuiChoiceEntryCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x50FFD), out _)) return 73;
+		if (MuiChoiceEntryCodec.WriteValue(ref platform,
+			APTR.FromPointer(0x50FFD), 0xF00DCAFE)) return 74;
+		return 42;
+	}
+
+	// MG1957 Choice/Radio admission now consumes complete named vector
+	// entries through the bounded bridge. High-bit STRPTR values remain
+	// opaque capabilities; malformed vector ranges fail closed.
+	public static uint ChoiceEntriesVectorAdmissionStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var vector = APTR.FromPointer(0x00050F00);
+		// Seed the caller-owned records through the named entry codec; the
+		// qualification target is the production validator's vector-bridge
+		// read path.
+		if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, vector, 0,
+			out var first) || !MuiChoiceEntryCodec.WriteValue(ref platform, first,
+			0xFEDCBA98)) return 10;
+		if (!MuiChoiceEntryVectorMemoryCodec.TryGetEntry(ref platform, vector, 1,
+			out var second) || !MuiChoiceEntryCodec.WriteValue(ref platform, second,
+			0)) return 11;
+		if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, vector, 0,
+			out var firstText) || firstText != 0xFEDCBA98) return 12;
+		if (!MuiChoiceEntryVectorCodec.TryReadValue(ref platform, vector, 1,
+			out var terminator) || terminator != 0) return 13;
+		var value = new MuiChoiceEntriesStateRecord
+		{
+			Magic = MuiChoiceEntriesStateRecord.Cookie,
+			Entries = vector,
+		};
+		if (!MuiChoiceEntriesStateAdmission.Validate(ref platform, value)) return 1;
+		value.Entries = APTR.FromPointer(0xFFFFFFFF);
+		if (MuiChoiceEntriesStateAdmission.Validate(ref platform, value)) return 2;
+		return 42;
+	}
+
+	// MG1958/MG1992 MUI_MakeObjectA Cycle/Radio entry validation now consumes
+	// the named ChoiceEntry cursor rather than exposing vector slot addresses.
+	// Valid CString contents and malformed vector ranges are both fail-closed.
+	public static uint MakeObjectChoiceVectorAdmissionStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var vector = APTR.FromPointer(0x0004D000);
+		var text = APTR.FromPointer(0x0004D100);
+		var cursor = default(MuiChoiceEntryCursor);
+		cursor.Base = vector;
+		cursor.Index = 0;
+		if (!MuiChoiceEntryVectorCodec.TryWrite(ref platform, cursor,
+			new MuiChoiceEntry { Text = text })) return 1;
+		if (!MuiChoiceEntryVectorCodec.TryAdvance(ref cursor, 1)) return 2;
+		if (!MuiChoiceEntryVectorCodec.TryWrite(ref platform, cursor,
+			new MuiChoiceEntry { Text = APTR.Null })) return 3;
+		platform.WriteUInt8(text, 0, (byte)'C');
+		platform.WriteUInt8(text, 1, (byte)'y');
+		platform.WriteUInt8(text, 2, (byte)'c');
+		platform.WriteUInt8(text, 3, (byte)'l');
+		platform.WriteUInt8(text, 4, (byte)'e');
+		platform.WriteUInt8(text, 5, 0);
+		if (!MuiMakeObjectServiceCore.ValidEntryVector(ref platform, vector.Raw,
+			true)) return 4;
+		if (MuiMakeObjectServiceCore.ValidEntryVector(ref platform, 0xFFFFFFFF,
+			true)) return 5;
+		return 42;
+	}
+
+	// MG1959/MG1990 Window SetCycleChain now reads caller-owned object slots
+	// through a named cursor and one-field struct bridge. Full-width object
+	// capabilities and vector bounds are retained without exposing slot
+	// addresses to the copy loop.
+	public static uint WindowCycleChainVectorBridgeStructRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var vector = APTR.FromPointer(0x0004D000);
+		var cursor = default(MuiApplicationWindowCycleChainCursor);
+		cursor.Base = vector;
+		cursor.Index = 0;
+		const uint expected = 0xFEDCBA98;
+		if (!MuiApplicationWindowCycleChainVectorCodec.TryWriteValue(ref platform,
+			cursor, expected)) return 1;
+		if (!MuiApplicationWindowCycleChainVectorCodec.TryReadValue(ref platform,
+			cursor, out var rawObject) || rawObject != expected) return 2;
+		if (!MuiApplicationWindowCycleChainVectorCodec.TryRead(ref platform, cursor,
+			out var slot) || slot.Object.Raw != expected) return 3;
+		if (!MuiApplicationWindowCycleChainVectorCodec.TryAdvance(ref cursor, 1) ||
+			cursor.Index != 1) return 6;
+		if (MuiApplicationWindowCycleChainVectorCodec.TryReadValue(ref platform,
+			vector, MuiApplicationWindowCycleChainCursor.MaximumEntries, out _))
+			return 4;
+		if (MuiApplicationWindowCycleChainVectorCodec.TryWriteValue(ref platform,
+			APTR.FromPointer(0xFFFFFFFF), 0, expected)) return 5;
 		return 42;
 	}
 
@@ -35120,8 +39616,8 @@ public static class MuiNativeRoots
 		{
 			LeftEdge = -11,
 			TopEdge = 7,
-			Width = 640,
-			Height = 480,
+			Width = 0xF00D,
+			Height = 0xCAFE,
 		};
 		if (!MuiImageGeometryCodec.Write(ref platform, address, value)) return 1;
 		if (!MuiImageGeometryMemoryCodec.TryGetAddress(ref platform, address,
@@ -35135,11 +39631,15 @@ public static class MuiNativeRoots
 			MuiImageGeometryField.Width, 320) ||
 			!MuiImageGeometryCodec.TryRead(ref platform, address, out var decoded) ||
 			decoded.Width != 320 || decoded.Height != value.Height) return 4;
+		if (MuiImageGeometryCodec.TryRead(ref platform,
+			APTR.FromPointer(0x50FFC), out _) ||
+			MuiImageGeometryCodec.Write(ref platform, APTR.FromPointer(0x50FFC),
+				value)) return 5;
 		if (MuiImageGeometryMemoryCodec.TryGetAddress(ref platform, address,
 			(MuiImageGeometryField)255, out _) ||
 			MuiImageGeometryMemoryCodec.TryGetAddress(ref platform, APTR.Null,
-			MuiImageGeometryField.Height, out _) ||
-			MuiImageGeometryCodec.TryRead(ref platform, APTR.Null, out _)) return 5;
+				MuiImageGeometryField.Height, out _) ||
+			MuiImageGeometryCodec.TryRead(ref platform, APTR.Null, out _)) return 6;
 		return 42;
 	}
 
@@ -36527,6 +41027,37 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
+	// MG1898 native sequential-record proof. The effective-font projection is
+	// exchanged as one declaration-ordered named struct; this closure also
+	// exercises the public validation wrapper and complete-record rejection.
+	public static uint ControlFontResolutionSequentialStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		var record = APTR.FromPointer(0x50D80);
+		var value = new MuiControlFontResolutionRecord
+		{
+			Magic = MuiControlFontResolutionRecord.Cookie,
+			Present = 1,
+			Inherited = 1,
+			Depth = 2,
+			Font = APTR.FromPointer(0x50DC0),
+		};
+		if (!MuiControlFontResolutionRecordStructCodec.Write(ref platform, record,
+			value)) return 1;
+		if (!MuiControlFontResolutionRecordStructCodec.TryRead(ref platform, record,
+			out var decoded)) return 2;
+		if (decoded.Magic != value.Magic || decoded.Present != value.Present ||
+			decoded.Inherited != value.Inherited || decoded.Depth != value.Depth ||
+			decoded.Font != value.Font) return 3;
+		if (!MuiControlFontResolutionRecordCodec.TryRead(ref platform, record,
+			out _)) return 4;
+		if (MuiControlFontResolutionRecordStructCodec.TryRead(ref platform,
+			APTR.FromPointer(0x50FF0), out _) ||
+			MuiControlFontResolutionRecordStructCodec.Write(ref platform, APTR.Null,
+				value)) return 5;
+		return 42;
+	}
+
 	// MG1211 layout-message struct-codec proof. Mixed-width min/max fields,
 	// nested layout dimensions, and child pointers are exposed as named
 	// semantic fields; only the bounded adapter knows guest field positions.
@@ -36579,26 +41110,80 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1340 struct-first application-command table closure. Indexed entries
-	// are exposed only when the complete fixed command record is mapped.
+	// MG1954 struct-first application-command table closure. Indexed entries
+	// exchange complete named command records while the bounded adapter retains
+	// slot arithmetic and complete-record range checks.
 	public static uint ApplicationCommandTableStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var table = APTR.FromPointer(0x00050100);
-		if (!MuiApplicationCommandTableMemoryCodec.TryGetEntry(ref platform,
-			table, 2, out var address) || address.Raw != table.Raw +
-			(2 * MuiApplicationCommandTableCursor.EntrySize)) return 1;
+		var expected = new MuiApplicationCommandRecord
+		{
+			Name = APTR.FromPointer(0x00003600u),
+			Template = APTR.FromPointer(0x00003620u),
+			Parameters = -7,
+			Hook = APTR.FromPointer(0x00003640u),
+			Reserved0 = 1,
+			Reserved1 = -2,
+			Reserved2 = 3,
+			Reserved3 = -4,
+			Reserved4 = 5,
+		};
+		if (!MuiApplicationCommandTableCodec.TryWrite(ref platform, table, 2,
+			expected) || !MuiApplicationCommandTableCodec.TryRead(ref platform,
+			table, 2, out var actual) || actual.Name.Raw != expected.Name.Raw ||
+			actual.Template.Raw != expected.Template.Raw ||
+			actual.Parameters != expected.Parameters ||
+			actual.Hook.Raw != expected.Hook.Raw ||
+			actual.Reserved4 != expected.Reserved4) return 1;
 		if (MuiApplicationCommandTableMemoryCodec.TryGetEntry(ref platform,
 			APTR.FromPointer(0x00050FFC), 0, out _) ||
 			MuiApplicationCommandTableMemoryCodec.TryGetEntry(ref platform, table,
-				uint.MaxValue, out _)) return 2;
+				uint.MaxValue, out _) ||
+			MuiApplicationCommandTableCodec.TryRead(ref platform,
+				APTR.FromPointer(0x00050FFC), 0, out _)) return 2;
 		return 42;
 	}
 
-	// MG1341 struct-first PushMethod parameter-tail closure. The fixed packet
-	// header and selected inline parameter record are admitted only when their
-	// complete guest ranges are mapped.
+	// MG2014 struct-first application-command table cursor closure. Production
+	// validation walks the NULL-terminated table through this named cursor;
+	// complete record admission and slot arithmetic remain in the adapters.
+	public static uint ApplicationCommandTableCursorStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var table = APTR.FromPointer(0x00050100);
+		var cursor = default(MuiApplicationCommandTableCursor);
+		cursor.Base = table;
+		cursor.Index = 1;
+		var expected = default(MuiApplicationCommandRecord);
+		expected.Name = APTR.FromPointer(0x00003600u);
+		expected.Template = APTR.FromPointer(0x00003620u);
+		expected.Parameters = -11;
+		expected.Hook = APTR.FromPointer(0x00003640u);
+		expected.Reserved4 = 0x55667788;
+		if (!MuiApplicationCommandTableCodec.TryWrite(ref platform, cursor,
+			expected) || !MuiApplicationCommandTableCodec.TryRead(ref platform,
+			cursor, out var actual) || actual.Name.Raw != expected.Name.Raw ||
+			actual.Template.Raw != expected.Template.Raw ||
+			actual.Parameters != expected.Parameters ||
+			actual.Hook.Raw != expected.Hook.Raw ||
+			actual.Reserved4 != expected.Reserved4) return 1;
+		cursor.Index = uint.MaxValue;
+		if (MuiApplicationCommandTableCodec.TryRead(ref platform, cursor,
+			out _)) return 2;
+		cursor.Base = APTR.FromPointer(0x00050FFCu);
+		cursor.Index = 0;
+		if (MuiApplicationCommandTableCodec.TryWrite(ref platform, cursor,
+			expected)) return 3;
+		return 42;
+	}
+
+	// MG1341/MG1964/MG2013 struct-first PushMethod parameter-tail closure. The fixed
+	// packet header and selected inline parameter record are admitted only when
+	// their complete guest ranges are mapped; standalone parameter copies also
+	// use the named cursor bridge without exposing slot addresses.
 	public static uint ApplicationPushMethodParameterStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
@@ -36609,13 +41194,51 @@ public static class MuiNativeRoots
 			address.Raw != message.Raw +
 			MuiApplicationPushMethodMessage.ParametersOffset +
 			(2 * MuiApplicationPushMethodParameter.Size)) return 1;
+		var vector = APTR.FromPointer(0x000361E0);
+		var vectorCursor = default(MuiApplicationPushMethodParameterVectorCursor);
+		vectorCursor.Base = vector;
+		vectorCursor.Index = 2;
+		if (!MuiApplicationPushMethodParameterVectorCodec.TryWriteValue(ref platform,
+			vectorCursor, 0x12345678u) ||
+			!MuiApplicationPushMethodParameterVectorCodec.TryReadValue(ref platform,
+				vectorCursor, out var bridged) || bridged != 0x12345678u) return 3;
+		vectorCursor.Index = MuiApplicationPushMethodParameterVectorCursor.MaximumEntries;
+		if (MuiApplicationPushMethodParameterVectorCodec.TryReadValue(ref platform,
+			vectorCursor, out _)) return 4;
 		if (MuiApplicationPushMethodParameterMemoryCodec.TryGetEntry(
 			ref platform, message,
 			MuiApplicationPushMethodParameterCursor.MaximumEntries, out _) ||
 			MuiApplicationPushMethodParameterMemoryCodec.TryGetEntry(
 			ref platform, APTR.FromPointer(0x00050FFC), 0, out _) ||
 			MuiApplicationPushMethodParameterMemoryCodec.TryGetEntry(
-			ref platform, APTR.Null, 0, out _)) return 2;
+				ref platform, APTR.Null, 0, out _)) return 2;
+		if (MuiApplicationPushMethodParameterVectorCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x00050FFEu), 0, out _)) return 5;
+		return 42;
+	}
+
+	// MG2016 struct-first queue parameter-range closure. The queue helper now
+	// resolves the inline tail through the named packet cursor before exposing
+	// the complete caller-owned parameter range.
+	public static uint ApplicationQueueParameterCursorStructCodecRoot()
+	{
+		var platform = new MuiNativeHeadlessPlatform();
+		platform.Reset();
+		var message = APTR.FromPointer(0x00050100);
+		var cursor = default(MuiApplicationPushMethodParameterCursor);
+		cursor.Message = message;
+		cursor.Index = 0;
+		if (!MuiApplicationPushMethodParameterCursorCodec.TryGetEntry(ref platform,
+			cursor, out var expected) ||
+			!MuiApplicationQueuePacketCodec.TryGetParameters(ref platform, message, 3,
+				out var actual) || actual.Raw != expected.Raw) return 1;
+		if (!MuiApplicationPushMethodParameterCodec.WriteValue(ref platform, actual,
+			0xF1234567u) || !MuiApplicationPushMethodParameterCodec.TryReadValue(
+			ref platform, expected, out var value) || value != 0xF1234567u) return 2;
+		if (MuiApplicationQueuePacketCodec.TryGetParameters(ref platform,
+			APTR.FromPointer(0x00050FF0u), 2, out _) ||
+			MuiApplicationQueuePacketCodec.TryGetParameters(ref platform, message, 0,
+				out _)) return 3;
 		return 42;
 	}
 
@@ -36785,22 +41408,37 @@ public static class MuiNativeRoots
 		return 42;
 	}
 
-	// MG1348 native struct-first AppMessage argument-vector closure. Indexed
-	// named argument records are exposed only within the MorphOS count bound.
+	// MG1952/MG1991 native struct-first AppMessage argument-vector closure.
+	// Indexed named argument records preserve high-bit BPTR/STRPTR values while
+	// the semantic cursor and bounded adapter retain slot ownership.
 	public static uint WorkbenchArgumentVectorStructCodecRoot()
 	{
 		var platform = new MuiNativeHeadlessPlatform();
 		platform.Reset();
 		var vector = APTR.FromPointer(0x00050100);
-		if (!MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(ref platform,
-			vector, 2, out var address) || address.Raw != vector.Raw +
-			(2 * MuiWorkbenchArgumentRecord.Size)) return 1;
+		var expected = new MuiWorkbenchArgumentRecord
+		{
+			Lock = BPTR.FromRaw(0xF1234567u),
+			Name = STRPTR.FromPointer(0xE2345678u),
+		};
+		var cursor = default(MuiWorkbenchArgumentVectorCursor);
+		cursor.Base = vector;
+		cursor.Index = 2;
+		if (!MuiWorkbenchArgumentVectorCodec.TryWrite(ref platform, cursor,
+			expected) ||
+			!MuiWorkbenchArgumentVectorCodec.TryRead(ref platform, cursor,
+				out var actual) || actual.Lock.Raw != expected.Lock.Raw ||
+			actual.Name.Raw != expected.Name.Raw) return 1;
+		if (!MuiWorkbenchArgumentVectorCodec.TryAdvance(ref cursor, 1) ||
+			cursor.Index != 3) return 3;
 		if (MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(ref platform,
 			vector, MuiWorkbenchArgumentVectorCursor.MaximumEntries, out _) ||
 			MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(ref platform,
 			APTR.FromPointer(0x00050FFC), 0, out _) ||
 			MuiWorkbenchArgumentVectorMemoryCodec.TryGetEntry(ref platform,
-			APTR.Null, 0, out _)) return 2;
+			APTR.Null, 0, out _) ||
+			MuiWorkbenchArgumentVectorCodec.TryRead(ref platform,
+				APTR.FromPointer(0x00050FFC), 0, out _)) return 2;
 		return 42;
 	}
 
@@ -36952,13 +41590,13 @@ public static class MuiNativeRoots
 		create.MethodId = MuiCollectionEditMessageCodec.CreateEditObject;
 		create.Row = -2;
 		create.Column = 3;
-		create.Entry = 0x00050D00;
+		create.Entry = 0xF00DCAFE;
 		if (!MuiCollectionEditStructPacketCodec.TryWriteCreateEditObject(
 			ref platform, createAddress, create) ||
 			!MuiCollectionEditStructPacketCodec.TryReadCreateEditObject(ref platform,
 				createAddress, out var decodedCreate) ||
 			decodedCreate.MethodId != create.MethodId || decodedCreate.Row != -2 ||
-			decodedCreate.Column != 3 || decodedCreate.Entry != create.Entry) return 1;
+		decodedCreate.Column != 3 || decodedCreate.Entry != create.Entry) return 1;
 
 		var editAddress = APTR.FromPointer(0x00050F60);
 		var edit = default(MuiCollectionEditMessage);
@@ -36976,8 +41614,8 @@ public static class MuiNativeRoots
 		done.MethodId = MuiCollectionEditMessageCodec.EditDone;
 		done.Row = 6;
 		done.Column = -7;
-		done.Entry = 0x00050D20;
-		done.EditObject = 0x00050D40;
+		done.Entry = 0xF00DCAFE;
+		done.EditObject = 0x80032940;
 		if (!MuiCollectionEditStructPacketCodec.TryWriteEditDone(ref platform,
 			doneAddress, done) ||
 			!MuiCollectionEditStructPacketCodec.TryReadEditDone(ref platform,
@@ -36995,6 +41633,13 @@ public static class MuiNativeRoots
 			!MuiCollectionEditStructPacketCodec.TryReadEndEdit(ref platform,
 				endAddress, out var decodedEnd) || decodedEnd.MethodId != end.MethodId ||
 			decodedEnd.Mode != end.Mode) return 4;
+		var truncated = APTR.FromPointer(0x00050FFC);
+		if (MuiCollectionEditStructPacketCodec.TryReadEditDone(ref platform,
+			truncated, out _) || MuiCollectionEditStructPacketCodec.TryWriteEditDone(
+			ref platform, truncated, done) ||
+			MuiCollectionEditStructPacketCodec.TryReadEndEdit(ref platform,
+				truncated, out _) || MuiCollectionEditStructPacketCodec.TryWriteEndEdit(
+				ref platform, truncated, end)) return 5;
 		return 42;
 	}
 

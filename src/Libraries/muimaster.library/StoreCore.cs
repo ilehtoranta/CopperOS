@@ -1328,9 +1328,7 @@ public static class MuiStoreCore
 		if ((flags & OwnsKey) != 0)
 		{
 			var key = APTR.FromPointer(itemRecord.Key);
-			uint length = 1;
-			while (length < 4096 && platform.ReadUInt8(key, (int)(length - 1)) != 0)
-				length++;
+			var length = OwnedKeyLength(ref platform, key);
 			FreeStoreMemory(ref platform, pool, key, length,
 				(flags & KeyUsesPool) != 0);
 		}
@@ -1341,6 +1339,26 @@ public static class MuiStoreCore
 		}
 		FreeStoreMemory(ref platform, pool, item, MuiStoreRecord.Size,
 			(flags & RecordUsesPool) != 0);
+	}
+
+	// Owned store keys include their terminating NUL in the release span. Keep
+	// the bounded guest walk in the named String length cursor so cleanup never
+	// dereferences an unvalidated guest byte.
+	internal static uint OwnedKeyLength<TPlatform>(ref TPlatform platform,
+		APTR key) where TPlatform : struct, IMuiGuestMemory
+	{
+		if (key.IsNull) return 0;
+		var cursor = default(MuiStringLengthByteCursor);
+		cursor.Text = key;
+		var length = 1u;
+		while (length < MuiStringLengthByteCursor.MaximumLength)
+		{
+			cursor.Index = length - 1;
+			if (!MuiStringLengthByteCursorCodec.TryReadByte(ref platform, cursor,
+				out var value) || value == 0) break;
+			length++;
+		}
+		return length;
 	}
 }
 

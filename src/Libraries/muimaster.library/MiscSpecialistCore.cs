@@ -1548,6 +1548,25 @@ internal static class MuiTitlePageCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiTitlePageVectorMemoryCodec.TryGetEntry(ref platform, cursor.Base,
 			cursor.Index, out address);
+
+	// Title page-table consumers exchange the complete named page record;
+	// indexed address arithmetic remains private to the bounded adapter.
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiTitlePageCursor cursor, out MuiTitlePageRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiTitlePageCodec.TryRead(ref platform, address, out value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiTitlePageCursor cursor, MuiTitlePageRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiTitlePageCodec.Write(ref platform, address, value);
+	}
 }
 
 // Mccprefs keeps caller-owned gadget registrations in a fixed six-field table
@@ -1659,6 +1678,26 @@ internal static class MuiMccprefsRegistryCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref platform,
 			cursor.Base, cursor.Index, out address);
+
+	// Registration consumers exchange complete named records through the
+	// bounded cursor; indexed slot arithmetic remains private to the memory
+	// adapter and is not repeated by update/remove paths.
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiMccprefsRegistryCursor cursor, out MuiMccprefsRegistryRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiMccprefsRegistryCodec.TryRead(ref platform, address, out value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiMccprefsRegistryCursor cursor, MuiMccprefsRegistryRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiMccprefsRegistryCodec.Write(ref platform, address, value);
+	}
 }
 
 // Scrmodelist is private but still owns a bounded guest table of mode IDs.
@@ -1737,6 +1776,25 @@ internal static class MuiScrmodelistModeCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref platform, cursor.Base,
 			cursor.Index, out address);
+
+	// Private mode-table consumers exchange the complete named mode record;
+	// index arithmetic remains owned by the bounded cursor adapter.
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiScrmodelistModeCursor cursor, out MuiScrmodelistModeRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiScrmodelistModeCodec.TryRead(ref platform, address, out value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiScrmodelistModeCursor cursor, MuiScrmodelistModeRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiScrmodelistModeCodec.Write(ref platform, address, value);
+	}
 }
 
 // Filepanel adopts each row's two object pointers in a fixed guest-resident
@@ -1822,6 +1880,25 @@ internal static class MuiFilepanelRowCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiFilepanelRowVectorMemoryCodec.TryGetEntry(ref platform, cursor.Base,
 			cursor.Index, out address);
+
+	// Adopted rows cross the bounded vector boundary as complete named records;
+	// the row index and wire arithmetic stay private to the cursor adapter.
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		MuiFilepanelRowCursor cursor, out MuiFilepanelRowRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiFilepanelRowCodec.TryRead(ref platform, address, out value);
+	}
+
+	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
+		MuiFilepanelRowCursor cursor, MuiFilepanelRowRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryGetEntry(ref platform, cursor, out var address)) return false;
+		return MuiFilepanelRowCodec.Write(ref platform, address, value);
+	}
 }
 
 public static class MuiMiscSpecialistCore
@@ -2698,13 +2775,14 @@ public static class MuiMiscSpecialistCore
 			if (block.IsNull) return false;   // atomic: nothing adopted
 			filepanelState.Rows = block;
 		}
-		if (!MuiFilepanelRowVectorMemoryCodec.TryGetEntry(ref platform, block,
-			count,
-			out var rowAddress)) return false;
+		var cursor = default(MuiFilepanelRowCursor);
+		cursor.Base = block;
+		cursor.Index = count;
 		var row = default(MuiFilepanelRowRecord);
 		row.Label = label;
 		row.Contents = contents;
-		if (!MuiFilepanelRowCodec.Write(ref platform, rowAddress, row)) return false;
+		if (!MuiFilepanelRowCursorCodec.TryWrite(ref platform, cursor, row))
+			return false;
 		filepanelState.RowCount = count + 1;
 		return WriteFilepanelServiceState(ref platform, instance, filepanelState);
 	}
@@ -2793,19 +2871,24 @@ public static class MuiMiscSpecialistCore
 		{
 			// Unregister the record whose gadget matches.
 			if (block.IsNull || gadget.IsNull) return false;
+			var cursor = default(MuiMccprefsRegistryCursor);
+			cursor.Base = block;
 			for (var i = 0u; i < count; i++)
 			{
-				if (!MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref platform,
-					block, i, out var address)) return false;
-				if (!MuiMccprefsRegistryCodec.TryRead(ref platform, address,
+				cursor.Index = i;
+				if (!MuiMccprefsRegistryCursorCodec.TryRead(ref platform, cursor,
 					out var record) || record.Gadget != gadget) continue;
-				if (!MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref platform,
-					block, count - 1, out var lastAddress)) return false;
-				if (address != lastAddress &&
-					(!MuiMccprefsRegistryCodec.TryRead(ref platform, lastAddress,
-						out var last) || !MuiMccprefsRegistryCodec.Write(ref platform,
-						address, last))) return false;
-				if (!MuiMccprefsRegistryCodec.Write(ref platform, lastAddress,
+				if (i != count - 1)
+				{
+					cursor.Index = count - 1;
+					if (!MuiMccprefsRegistryCursorCodec.TryRead(ref platform, cursor,
+						out var last)) return false;
+					cursor.Index = i;
+					if (!MuiMccprefsRegistryCursorCodec.TryWrite(ref platform, cursor,
+						last)) return false;
+				}
+				cursor.Index = count - 1;
+				if (!MuiMccprefsRegistryCursorCodec.TryWrite(ref platform, cursor,
 					default)) return false;
 				mccprefsState.RegistryCount = count - 1;
 				return WriteMccprefsState(ref platform, instance, mccprefsState);
@@ -2823,22 +2906,22 @@ public static class MuiMiscSpecialistCore
 			mccprefsState.Registry = block;
 		}
 		// Update an existing record for the same gadget in place.
+		var updateCursor = default(MuiMccprefsRegistryCursor);
+		updateCursor.Base = block;
 		for (var i = 0u; i < count; i++)
 		{
-			if (!MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref platform,
-				block, i, out var address)) return false;
-			if (!MuiMccprefsRegistryCodec.TryRead(ref platform, address,
+			updateCursor.Index = i;
+			if (!MuiMccprefsRegistryCursorCodec.TryRead(ref platform, updateCursor,
 				out var existing) || existing.Gadget != gadget) continue;
 			existing.Id = id;
 			existing.Params = paramsValue;
 			existing.Title = title;
 			existing.Attr = attr;
 			existing.Label = label;
-			return MuiMccprefsRegistryCodec.Write(ref platform, address, existing);
+			return MuiMccprefsRegistryCursorCodec.TryWrite(ref platform,
+				updateCursor, existing);
 		}
 		if (count >= MuiMiscSpecialistLayout.MaximumRegistry) return false;
-		if (!MuiMccprefsRegistryVectorMemoryCodec.TryGetEntry(ref platform, block,
-			count, out var newAddress)) return false;
 		var newRecord = default(MuiMccprefsRegistryRecord);
 		newRecord.Gadget = gadget;
 		newRecord.Id = id;
@@ -2846,7 +2929,9 @@ public static class MuiMiscSpecialistCore
 		newRecord.Title = title;
 		newRecord.Attr = attr;
 		newRecord.Label = label;
-		if (!MuiMccprefsRegistryCodec.Write(ref platform, newAddress, newRecord))
+		updateCursor.Index = count;
+		if (!MuiMccprefsRegistryCursorCodec.TryWrite(ref platform, updateCursor,
+			newRecord))
 			return false;
 		mccprefsState.RegistryCount = count + 1;
 		return WriteMccprefsState(ref platform, instance, mccprefsState);
@@ -2924,11 +3009,12 @@ public static class MuiMiscSpecialistCore
 			titleState.Pages = block;
 		}
 		var handle = titleState.PageSequence + 1;
-		if (!MuiTitlePageVectorMemoryCodec.TryGetEntry(ref platform, block, count,
-			out var pageAddress)) return 0;
+		var cursor = default(MuiTitlePageCursor);
+		cursor.Base = block;
+		cursor.Index = count;
 		var page = default(MuiTitlePageRecord);
 		page.Handle = handle;
-		if (!MuiTitlePageCodec.Write(ref platform, pageAddress, page)) return 0;
+		if (!MuiTitlePageCursorCodec.TryWrite(ref platform, cursor, page)) return 0;
 		titleState.PageSequence = handle;
 		titleState.PageCount = count + 1;
 		titleState.ActivePage = count;
@@ -2954,26 +3040,26 @@ public static class MuiMiscSpecialistCore
 		var count = titleState.PageCount;
 		var block = titleState.Pages;
 		if (block.IsNull || count == 0) return false;
+		var cursor = default(MuiTitlePageCursor);
+		cursor.Base = block;
 		for (var i = 0u; i < count; i++)
 		{
-			if (!MuiTitlePageVectorMemoryCodec.TryGetEntry(ref platform, block, i,
-				out var pageAddress)) return false;
-			if (!MuiTitlePageCodec.TryRead(ref platform, pageAddress,
+			cursor.Index = i;
+			if (!MuiTitlePageCursorCodec.TryRead(ref platform, cursor,
 				out var page) || page.Handle != handle) continue;
 			// Compact by shifting subsequent records down one slot.
 			for (var j = i; j < count - 1; j++)
 			{
-				if (!MuiTitlePageVectorMemoryCodec.TryGetEntry(ref platform, block, j,
-					out var destination)) return false;
-				if (!MuiTitlePageVectorMemoryCodec.TryGetEntry(ref platform, block, j + 1,
-					out var source)) return false;
-				if (!MuiTitlePageCodec.TryRead(ref platform, source,
-					out var next) || !MuiTitlePageCodec.Write(ref platform,
-					destination, next)) return false;
+				cursor.Index = j + 1;
+				if (!MuiTitlePageCursorCodec.TryRead(ref platform, cursor,
+					out var next)) return false;
+				cursor.Index = j;
+				if (!MuiTitlePageCursorCodec.TryWrite(ref platform, cursor, next))
+					return false;
 			}
-			if (!MuiTitlePageVectorMemoryCodec.TryGetEntry(ref platform, block, count - 1,
-				out var last)) return false;
-			if (!MuiTitlePageCodec.Write(ref platform, last, default)) return false;
+			cursor.Index = count - 1;
+			if (!MuiTitlePageCursorCodec.TryWrite(ref platform, cursor, default))
+				return false;
 			titleState.PageCount = count - 1;
 			var active = titleState.ActivePage;
 			if (active >= count - 1 && count >= 2)
@@ -2997,11 +3083,12 @@ public static class MuiMiscSpecialistCore
 		var count = titleState.PageCount;
 		var block = titleState.Pages;
 		if (block.IsNull) return 0xFFFFFFFFu;
+		var cursor = default(MuiTitlePageCursor);
+		cursor.Base = block;
 		for (var i = 0u; i < count; i++)
 		{
-			if (!MuiTitlePageVectorMemoryCodec.TryGetEntry(ref platform, block, i,
-				out var pageAddress)) return 0xFFFFFFFFu;
-			if (MuiTitlePageCodec.TryRead(ref platform, pageAddress,
+			cursor.Index = i;
+			if (MuiTitlePageCursorCodec.TryRead(ref platform, cursor,
 				out var page) && page.Handle == handle) return i;
 		}
 		return 0xFFFFFFFFu;
@@ -3036,12 +3123,12 @@ public static class MuiMiscSpecialistCore
 			if (block.IsNull) return false;
 			scrmodelistState.Modes = block;
 		}
-		if (!MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref platform, block,
-			count,
-			out var address)) return false;
+		var cursor = default(MuiScrmodelistModeCursor);
+		cursor.Base = block;
+		cursor.Index = count;
 		var record = default(MuiScrmodelistModeRecord);
 		record.ModeId = modeId;
-		if (!MuiScrmodelistModeCodec.Write(ref platform, address, record))
+		if (!MuiScrmodelistModeCursorCodec.TryWrite(ref platform, cursor, record))
 			return false;
 		scrmodelistState.ModeCount = count + 1;
 		return WriteScrmodelistState(ref platform, instance, scrmodelistState);
@@ -3065,11 +3152,11 @@ public static class MuiMiscSpecialistCore
 		if (index >= count) return 0;
 		var block = scrmodelistState.Modes;
 		if (block.IsNull) return 0;
-		if (!MuiScrmodelistModeVectorMemoryCodec.TryGetEntry(ref platform, block,
-			index,
-			out var address)) return 0;
-		return MuiScrmodelistModeCodec.TryRead(ref platform,
-			address, out var record) ? record.ModeId : 0;
+		var cursor = default(MuiScrmodelistModeCursor);
+		cursor.Base = block;
+		cursor.Index = index;
+		return MuiScrmodelistModeCursorCodec.TryRead(ref platform, cursor,
+			out var record) ? record.ModeId : 0;
 	}
 
 	// ---- Fontdisplay minmax / draw (documented state only) -------------------
@@ -3144,11 +3231,12 @@ public static class MuiMiscSpecialistCore
 		if (rows.IsNotNull)
 		{
 			var rowCount = filepanelState.RowCount;
+			var cursor = default(MuiFilepanelRowCursor);
+			cursor.Base = rows;
 			for (var i = 0u; i < rowCount; i++)
 			{
-				if (!MuiFilepanelRowVectorMemoryCodec.TryGetEntry(ref platform, rows, i,
-					out var rowAddress)) break;
-				if (!MuiFilepanelRowCodec.TryRead(ref platform, rowAddress,
+				cursor.Index = i;
+				if (!MuiFilepanelRowCursorCodec.TryRead(ref platform, cursor,
 					out var row)) break;
 				if (row.Contents.IsNotNull) platform.DisposeObject(row.Contents);
 				if (row.Label.IsNotNull) platform.DisposeObject(row.Label);
@@ -3574,8 +3662,16 @@ public static class MuiMiscSpecialistCore
 		var total = length + 1;
 		var b = MuiHeadlessMemory.Allocate(ref platform, total);
 		if (b.IsNull) return false;
-		for (var i = 0u; i < total; i++)
-			platform.WriteUInt8(b, (int)i, platform.ReadUInt8(source, (int)i));
+		var cursor = default(MuiGuestByteCopyCursor);
+		cursor.Source = source;
+		cursor.Destination = b;
+		cursor.Length = total;
+		for (cursor.Index = 0; cursor.Index < total; cursor.Index++)
+			if (!MuiGuestByteCopyCursorCodec.TryCopyByte(ref platform, cursor))
+			{
+				platform.Free(b, total);
+				return false;
+			}
 		block = b;
 		size = total;
 		return true;
