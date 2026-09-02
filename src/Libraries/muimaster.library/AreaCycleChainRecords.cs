@@ -97,20 +97,18 @@ internal static class MuiAreaCycleChainStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaCycleChainStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaCycleChainStateField.Magic)
+			offset = MuiAreaCycleChainStateRecord.MagicOffset;
+		else if (field == MuiAreaCycleChainStateField.Value)
+			offset = MuiAreaCycleChainStateRecord.ValueOffset;
+		else if (field == MuiAreaCycleChainStateField.Generation)
+			offset = MuiAreaCycleChainStateRecord.GenerationOffset;
+		else
 		{
-			case MuiAreaCycleChainStateField.Magic:
-				offset = MuiAreaCycleChainStateRecord.MagicOffset;
-				return true;
-			case MuiAreaCycleChainStateField.Value:
-				offset = MuiAreaCycleChainStateRecord.ValueOffset;
-				return true;
-			case MuiAreaCycleChainStateField.Generation:
-				offset = MuiAreaCycleChainStateRecord.GenerationOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -131,9 +129,15 @@ internal static class MuiAreaCycleChainStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaCycleChainStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaCycleChainStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaCycleChainStateField.Value)
+			value = unchecked((uint)state.Value);
+		else if (field == MuiAreaCycleChainStateField.Generation)
+			value = state.Generation;
+		else return false;
 		return true;
 	}
 
@@ -141,10 +145,17 @@ internal static class MuiAreaCycleChainStateRecordMemoryCodec
 		APTR record, MuiAreaCycleChainStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaCycleChainStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaCycleChainStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaCycleChainStateField.Value)
+			state.Value = unchecked((int)value);
+		else if (field == MuiAreaCycleChainStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiAreaCycleChainStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

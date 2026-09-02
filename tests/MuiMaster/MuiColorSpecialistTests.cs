@@ -781,6 +781,22 @@ public sealed class MuiColorSpecialistTests
 	}
 
 	[Fact]
+	public void ColorSpecialistMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var p = NewPlatform();
+		const uint methodId = 0xC2468ACEu;
+		Assert.True(MuiColorSpecialistMethodHeaderCodec.WriteValue(ref p,
+			Packet, methodId));
+		Assert.True(MuiColorSpecialistMethodHeaderCodec.TryReadValue(ref p,
+			Packet, out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiColorSpecialistMethodHeaderCodec.TryReadValue(ref p,
+			APTR.FromPointer(Base + (uint)Size - 1), out _));
+		Assert.False(MuiColorSpecialistMethodHeaderCodec.WriteValue(ref p,
+			APTR.Null, methodId));
+	}
+
+	[Fact]
 	public void ColorSpecialistMessageAdapterOwnsStructBounds()
 	{
 		var p = NewPlatform();

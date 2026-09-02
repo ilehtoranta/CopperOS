@@ -55,15 +55,35 @@ public sealed class MuiGaugeInfoTextAdmissionTests
 		Assert.True(MuiGaugeInfoTextStateRecordCodec.TryRead(ref platform, address,
 			out _));
 		Assert.True(MuiGaugeInfoTextStateRecordMemoryCodec.TryGetAddress(
-			ref platform, address, 4, out var infoTextField));
+			ref platform, address, MuiGaugeInfoTextStateField.InfoText,
+			out var infoTextField));
 		Assert.Equal(address.Raw + 4, infoTextField.Raw);
 		Assert.True(MuiGaugeInfoTextStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 4, out var infoTextRaw));
+			ref platform, address, MuiGaugeInfoTextStateField.InfoText,
+			out var infoTextRaw));
 		Assert.Equal(value.InfoText.Raw, infoTextRaw);
+		Assert.True(MuiGaugeInfoTextStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiGaugeInfoTextStateField.InfoText,
+			infoText.Raw));
+		Assert.True(MuiGaugeInfoTextStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiGaugeInfoTextStateField.Magic,
+			out var preservedMagic));
+		Assert.Equal(value.Magic, preservedMagic);
+		Assert.True(MuiGaugeInfoTextStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiGaugeInfoTextStateField.InfoText,
+			out var typedInfoTextRaw));
+		Assert.Equal(value.InfoText.Raw, typedInfoTextRaw);
+		Assert.False(MuiGaugeInfoTextStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiGaugeInfoTextStateField)0xFF, out _));
+		// The raw-offset overload remains bounded for legacy diagnostics.
+		Assert.True(MuiGaugeInfoTextStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiGaugeInfoTextStateRecord.InfoTextOffset,
+			out var legacyInfoTextRaw));
+		Assert.Equal(value.InfoText.Raw, legacyInfoTextRaw);
 		Assert.False(MuiGaugeInfoTextStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiGaugeInfoTextStateRecord.Size, out _));
 		Assert.False(MuiGaugeInfoTextStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiGaugeInfoTextStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

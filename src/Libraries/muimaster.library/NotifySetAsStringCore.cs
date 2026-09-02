@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -155,6 +156,38 @@ internal static class MuiSetAsStringMessageCodec
 	internal const uint Method = 0x80422590;
 	internal const uint ParameterSize = 4;
 
+	// Scalar-safe codec for the method-only SetAsString header. The complete
+	// packet continues to use MuiSetAsStringMessage; this helper owns only the
+	// bounded four-byte named header representation.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodHeaderValue<TPlatform>(
+		ref TPlatform platform, APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiSetAsStringMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteMethodHeaderValue<TPlatform>(
+		ref TPlatform platform, APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiSetAsStringMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	// Return the address of the trailing Value ULONG by walking the complete
 	// named record.  This is the live payload boundary used by MUIM_SetAsString;
 	// the compatibility field adapter below remains available for legacy callers.
@@ -215,9 +248,7 @@ internal static class MuiSetAsStringMessageCodec
 		}
 		if (message.IsNull || !platform.IsMapped(message,
 			MuiSetAsStringMethodMessage.Size)) return false;
-		return MuiSetAsStringMessageMemoryCodec.TryReadUInt32(ref platform,
-			message, MuiSetAsStringPacketField.MethodId,
-			MuiSetAsStringMethodMessage.Size, out methodId);
+		return TryReadMethodHeaderValue(ref platform, message, out methodId);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR message,

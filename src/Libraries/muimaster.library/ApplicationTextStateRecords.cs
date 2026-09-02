@@ -132,9 +132,15 @@ internal static class MuiApplicationTextStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationTextStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationTextStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationTextStateField.HelpFile)
+			value = state.HelpFile.Raw;
+		else if (field == MuiApplicationTextStateField.IconifyTitle)
+			value = state.IconifyTitle.Raw;
+		else return false;
 		return true;
 	}
 
@@ -142,10 +148,17 @@ internal static class MuiApplicationTextStateRecordMemoryCodec
 		APTR record, MuiApplicationTextStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationTextStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationTextStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationTextStateField.HelpFile)
+			state.HelpFile = APTR.FromPointer(value);
+		else if (field == MuiApplicationTextStateField.IconifyTitle)
+			state.IconifyTitle = APTR.FromPointer(value);
+		else return false;
+		return MuiApplicationTextStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

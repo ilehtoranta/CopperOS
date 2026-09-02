@@ -1516,6 +1516,23 @@ public sealed class MuiListtreeTests
 	}
 
 	[Fact]
+	public void ListtreeMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var p = CreatePlatform(out _);
+		var packet = APTR.FromPointer(0x2D00);
+		const uint methodId = 0xC2468ACEu;
+		Assert.True(MuiListtreeMethodHeaderCodec.WriteValue(ref p, packet,
+			methodId));
+		Assert.True(MuiListtreeMethodHeaderCodec.TryReadValue(ref p, packet,
+			out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiListtreeMethodHeaderCodec.TryReadValue(ref p,
+			APTR.FromPointer(0x200FFF), out _));
+		Assert.False(MuiListtreeMethodHeaderCodec.WriteValue(ref p,
+			APTR.Null, methodId));
+	}
+
+	[Fact]
 	public void ListtreeTypedReadersUseNamedMethodHeader()
 	{
 		var p = CreatePlatform(out _);

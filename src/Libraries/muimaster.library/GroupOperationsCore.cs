@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -77,6 +78,41 @@ internal struct MuiGroupOrderingPacketFieldCursor
 	internal APTR Message;
 	internal MuiGroupOrderingPacketKind Packet;
 	internal MuiGroupOrderingPacketField Field;
+}
+
+// Struct-first codec for the method-only Group ordering header. The shared
+// ULONG storage helper keeps the packed one-field record address explicit for
+// freestanding lowering while callers still receive the named message type.
+internal static class MuiGroupOrderingMethodHeaderCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupOrderingMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupOrderingMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
 }
 
 internal static class MuiGroupOrderingPacketMemoryCodec
@@ -180,13 +216,8 @@ internal static class MuiGroupOrderingPacketMemoryCodec
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiGroupOrderingMethodMessage.Size, out var cursor)) return false;
-		return MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-			out value) && MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiGroupOrderingMethodHeaderCodec.TryReadValue(ref platform, message,
+			out value);
 }
 
 // Compatibility wrapper retained for callers that still construct the typed

@@ -90,11 +90,24 @@ public sealed class MuiGaugeInfoRateTests
 				Field = MuiGaugeInfoRateStateField.InfoRate,
 			}, out var infoRateAddress));
 		Assert.Equal(0x1804u, infoRateAddress.Raw);
+		Assert.True(MuiGaugeInfoRateStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiGaugeInfoRateStateField.InfoRate,
+			unchecked((uint)-7)));
+		Assert.True(MuiGaugeInfoRateStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiGaugeInfoRateStateField.Magic,
+			out var preservedMagic));
+		Assert.Equal(record.Magic, preservedMagic);
+		Assert.True(MuiGaugeInfoRateStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiGaugeInfoRateStateField.InfoRate,
+			out var infoRateRaw));
+		Assert.Equal(unchecked((uint)-7), infoRateRaw);
 		Assert.True(MuiGaugeInfoRateStateRecordCodec.TryReadStructural(ref platform,
 			address, out var read));
-		Assert.Equal(-123, read.InfoRate);
+		Assert.Equal(-7, read.InfoRate);
 		Assert.False(MuiGaugeInfoRateStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
+		Assert.False(MuiGaugeInfoRateStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiGaugeInfoRateStateField)0xFF, out _));
 		Assert.False(MuiGaugeInfoRateStateFieldCursorCodec.TryGetAddress(
 			ref platform, new MuiGaugeInfoRateStateFieldCursor
 			{

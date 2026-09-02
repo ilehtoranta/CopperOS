@@ -78,6 +78,18 @@ public sealed class MuiConfigItemTests
 			packet, out var header));
 		Assert.Equal(MuiNotifyConfigMessageCore.GetConfigItemMethod,
 			header.MethodId);
+		Assert.True(MuiGetConfigItemMessageCodec.TryReadMethodHeaderValue(ref
+			platform, packet, out var methodId));
+		Assert.Equal(MuiNotifyConfigMessageCore.GetConfigItemMethod, methodId);
+		Assert.True(MuiGetConfigItemMessageCodec.WriteMethodHeaderValue(ref
+			platform, packet, 0xF1234567u));
+		Assert.True(MuiGetConfigItemMessageCodec.TryReadMethodHeaderValue(ref
+			platform, packet, out methodId));
+		Assert.Equal(0xF1234567u, methodId);
+		Assert.False(MuiGetConfigItemMessageCodec.TryReadMethodHeaderValue(ref
+			platform, APTR.FromPointer(0x5FFEu), out _));
+		Assert.False(MuiGetConfigItemMessageCodec.WriteMethodHeaderValue(ref
+			platform, APTR.Null, 1));
 		Assert.False(MuiGetConfigItemMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}

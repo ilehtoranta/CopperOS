@@ -21,6 +21,10 @@ public struct MuiScrollbarLayoutState
 internal struct MuiScrollbarLayoutStateRecord
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint HorizontalOffset = 4;
+	internal const uint TypeOffset = 8;
 	internal const uint Cookie = 0x4D534C59u; // 'MSLY'
 
 	internal uint Magic;
@@ -47,14 +51,18 @@ internal static class MuiScrollbarLayoutStateFieldCursorCodec
 	private static bool TryResolve(MuiScrollbarLayoutStateField field,
 		out uint offset)
 	{
-		offset = field switch
+		if (field == MuiScrollbarLayoutStateField.Magic)
+			offset = MuiScrollbarLayoutStateRecord.MagicOffset;
+		else if (field == MuiScrollbarLayoutStateField.Horizontal)
+			offset = MuiScrollbarLayoutStateRecord.HorizontalOffset;
+		else if (field == MuiScrollbarLayoutStateField.Type)
+			offset = MuiScrollbarLayoutStateRecord.TypeOffset;
+		else
 		{
-			MuiScrollbarLayoutStateField.Magic => 0,
-			MuiScrollbarLayoutStateField.Horizontal => 4,
-			MuiScrollbarLayoutStateField.Type => 8,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -66,7 +74,7 @@ internal static class MuiScrollbarLayoutStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 			cursor.Record, MuiScrollbarLayoutStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiScrollbarLayoutStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -99,16 +107,77 @@ internal static class MuiScrollbarLayoutStateFieldCursorCodec
 // semantic fields; fixed guest-layout translation is bounded to this adapter.
 internal static class MuiScrollbarLayoutStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiScrollbarLayoutStateField field,
+		out uint offset)
+	{
+		if (field == MuiScrollbarLayoutStateField.Magic)
+			offset = MuiScrollbarLayoutStateRecord.MagicOffset;
+		else if (field == MuiScrollbarLayoutStateField.Horizontal)
+			offset = MuiScrollbarLayoutStateRecord.HorizontalOffset;
+		else if (field == MuiScrollbarLayoutStateField.Type)
+			offset = MuiScrollbarLayoutStateRecord.TypeOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiScrollbarLayoutStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiScrollbarLayoutStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiScrollbarLayoutStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiScrollbarLayoutStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiScrollbarLayoutStateField.Horizontal)
+			value = state.Horizontal;
+		else if (field == MuiScrollbarLayoutStateField.Type)
+			value = state.Type;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiScrollbarLayoutStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiScrollbarLayoutStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiScrollbarLayoutStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiScrollbarLayoutStateField.Horizontal)
+			state.Horizontal = value;
+		else if (field == MuiScrollbarLayoutStateField.Type)
+			state.Type = value;
+		else return false;
+		return MuiScrollbarLayoutStateRecordCodec.WriteRecord(ref platform, record,
+			state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiScrollbarLayoutStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiScrollbarLayoutStateRecord.Size -
+			MuiScrollbarLayoutStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiScrollbarLayoutStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiScrollbarLayoutStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

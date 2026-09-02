@@ -900,6 +900,22 @@ public sealed class MuiMenuSpecialistTests
 	}
 
 	[Fact]
+	public void MenuSpecialistMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var p = NewPlatform();
+		const uint methodId = 0xA2468BDFu;
+		Assert.True(MuiMenuSpecialistMethodHeaderCodec.WriteValue(ref p, Packet,
+			methodId));
+		Assert.True(MuiMenuSpecialistMethodHeaderCodec.TryReadValue(ref p, Packet,
+			out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiMenuSpecialistMethodHeaderCodec.TryReadValue(ref p,
+			APTR.FromPointer(Base + (uint)Size - 1), out _));
+		Assert.False(MuiMenuSpecialistMethodHeaderCodec.WriteValue(ref p,
+			APTR.Null, methodId));
+	}
+
+	[Fact]
 	public void MenuSpecialistFieldCursorUsesNamedMixedPacketBoundaries()
 	{
 		var p = NewPlatform();

@@ -72,4 +72,36 @@ public sealed class MuiApplicationTextStructAdapterTests
 		Assert.False(MuiApplicationTextStateRecordCodec.TryReadRecord(
 			ref platform, crossingEnd, out _));
 	}
+
+	[Fact]
+	public void ApplicationTextFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationTextStateRecord
+		{
+			Magic = 0x10203040u,
+			HelpFile = APTR.FromPointer(0x50607080u),
+			IconifyTitle = APTR.FromPointer(0x90A0B0C0u),
+		};
+
+		Assert.True(MuiApplicationTextStateRecordCodec.WriteRecord(ref platform,
+			address, initial));
+		Assert.True(MuiApplicationTextStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationTextStateField.IconifyTitle,
+			0xF1020304u));
+		Assert.True(MuiApplicationTextStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiApplicationTextStateField.HelpFile,
+			out var helpFile));
+		Assert.Equal(initial.HelpFile.Raw, helpFile);
+		Assert.True(MuiApplicationTextStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(initial.HelpFile, updated.HelpFile);
+		Assert.Equal(APTR.FromPointer(0xF1020304u), updated.IconifyTitle);
+		Assert.False(MuiApplicationTextStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiApplicationTextStateField)255), 1));
+	}
 }

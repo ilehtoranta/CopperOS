@@ -15,6 +15,9 @@ namespace CopperOS.MuiMaster;
 internal struct MuiStringAcknowledgeStateRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint ContentsOffset = 4;
 	internal const uint Cookie = 0x4D534143u; // 'MSAC'
 
 	internal uint Magic;
@@ -58,13 +61,16 @@ internal static class MuiStringAcknowledgeStateFieldCursorCodec
 	private static bool TryResolve(MuiStringAcknowledgeStateField field,
 		out uint offset)
 	{
-		offset = field switch
+		if (field == MuiStringAcknowledgeStateField.Magic)
+			offset = MuiStringAcknowledgeStateRecord.MagicOffset;
+		else if (field == MuiStringAcknowledgeStateField.Contents)
+			offset = MuiStringAcknowledgeStateRecord.ContentsOffset;
+		else
 		{
-			MuiStringAcknowledgeStateField.Magic => 0,
-			MuiStringAcknowledgeStateField.Contents => 4,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -76,7 +82,7 @@ internal static class MuiStringAcknowledgeStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 				cursor.Record, MuiStringAcknowledgeStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiStringAcknowledgeStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -111,16 +117,71 @@ internal static class MuiStringAcknowledgeStateFieldCursorCodec
 // compatibility and malformed-state diagnostics.
 internal static class MuiStringAcknowledgeStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiStringAcknowledgeStateField field,
+		out uint offset)
+	{
+		if (field == MuiStringAcknowledgeStateField.Magic)
+			offset = MuiStringAcknowledgeStateRecord.MagicOffset;
+		else if (field == MuiStringAcknowledgeStateField.Contents)
+			offset = MuiStringAcknowledgeStateRecord.ContentsOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringAcknowledgeStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringAcknowledgeStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiStringAcknowledgeStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringAcknowledgeStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiStringAcknowledgeStateField.Contents)
+			value = state.Contents.Raw;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringAcknowledgeStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiStringAcknowledgeStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringAcknowledgeStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiStringAcknowledgeStateField.Contents)
+			state.Contents = APTR.FromPointer(value);
+		else return false;
+		return MuiStringAcknowledgeStateRecordCodec.WriteRecord(ref platform,
+			record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiStringAcknowledgeStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiStringAcknowledgeStateRecord.Size -
+			MuiStringAcknowledgeStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiStringAcknowledgeStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiStringAcknowledgeStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

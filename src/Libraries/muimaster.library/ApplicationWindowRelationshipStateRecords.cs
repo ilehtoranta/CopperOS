@@ -104,20 +104,18 @@ internal static class MuiApplicationWindowRelationshipStateRecordMemoryCodec
 	private static bool TryResolve(
 		MuiApplicationWindowRelationshipStateField field, out uint offset)
 	{
-		switch (field)
+		if (field == MuiApplicationWindowRelationshipStateField.Magic)
+			offset = MuiApplicationWindowRelationshipStateRecord.MagicOffset;
+		else if (field == MuiApplicationWindowRelationshipStateField.LastWindow)
+			offset = MuiApplicationWindowRelationshipStateRecord.LastWindowOffset;
+		else if (field == MuiApplicationWindowRelationshipStateField.AddedCount)
+			offset = MuiApplicationWindowRelationshipStateRecord.AddedCountOffset;
+		else
 		{
-			case MuiApplicationWindowRelationshipStateField.Magic:
-				offset = MuiApplicationWindowRelationshipStateRecord.MagicOffset;
-				return true;
-			case MuiApplicationWindowRelationshipStateField.LastWindow:
-				offset = MuiApplicationWindowRelationshipStateRecord.LastWindowOffset;
-				return true;
-			case MuiApplicationWindowRelationshipStateField.AddedCount:
-				offset = MuiApplicationWindowRelationshipStateRecord.AddedCountOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -142,9 +140,15 @@ internal static class MuiApplicationWindowRelationshipStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiApplicationWindowRelationshipStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationWindowRelationshipStateField.LastWindow)
+			value = state.LastWindow.Raw;
+		else if (field == MuiApplicationWindowRelationshipStateField.AddedCount)
+			value = state.AddedCount;
+		else return false;
 		return true;
 	}
 
@@ -153,10 +157,17 @@ internal static class MuiApplicationWindowRelationshipStateRecordMemoryCodec
 		uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiApplicationWindowRelationshipStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationWindowRelationshipStateField.LastWindow)
+			state.LastWindow = APTR.FromPointer(value);
+		else if (field == MuiApplicationWindowRelationshipStateField.AddedCount)
+			state.AddedCount = value;
+		else return false;
+		return MuiApplicationWindowRelationshipStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

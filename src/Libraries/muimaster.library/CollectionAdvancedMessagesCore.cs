@@ -4,6 +4,7 @@
 */
 
 using Amiga;
+using System.Runtime.CompilerServices;
 
 namespace CopperOS.MuiMaster;
 
@@ -286,6 +287,40 @@ internal static class MuiCollectionAdvancedFieldCursorCodec
 // Live List advanced packets are exchanged as declaration-order named
 // structs. The field/offset adapter above is retained for compatibility and
 // malformed-packet diagnostics only.
+// The method-only header gets a scalar-safe entry point so its named packed
+// record does not cross the freestanding ABI as a one-field struct.
+internal static class MuiCollectionAdvancedMethodHeaderCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCollectionMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR message, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiCollectionMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 internal static class MuiCollectionAdvancedStructPacketCodec
 {
 	private static bool TryCreate<TPlatform>(ref TPlatform platform,
@@ -299,19 +334,16 @@ internal static class MuiCollectionAdvancedStructPacketCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		return TryCreate(ref platform, message, MuiCollectionMethodMessage.Size,
-			out var cursor) &&
-			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out packet.MethodId) && MuiGuestStructCursor.IsComplete(cursor);
+		if (!MuiCollectionAdvancedMethodHeaderCodec.TryReadValue(ref platform,
+			message, out packet.MethodId)) return false;
+		return true;
 	}
 
 	internal static bool TryWriteMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory =>
-		TryCreate(ref platform, message, MuiCollectionMethodMessage.Size,
-			out var cursor) &&
-		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, method) &&
-		MuiGuestStructCursor.IsComplete(cursor);
+		MuiCollectionAdvancedMethodHeaderCodec.WriteValue(ref platform, message,
+			method);
 
 	internal static bool TryReadInsertSingle<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiCollectionInsertSingleMessage packet)

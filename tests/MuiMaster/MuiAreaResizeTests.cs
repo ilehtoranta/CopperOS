@@ -27,6 +27,18 @@ public sealed class MuiAreaResizeTests
 		Assert.True(MuiAreaResizeMessageCodec.TryReadExit(ref platform, packet,
 			out var exit));
 		Assert.Equal(MuiAreaResizeMessageCodec.ExitResize, exit.MethodId);
+		Assert.True(MuiAreaExitResizeMethodHeaderCodec.TryReadValue(ref platform,
+			packet, out var methodId));
+		Assert.Equal(MuiAreaResizeMessageCodec.ExitResize, methodId);
+		Assert.True(MuiAreaExitResizeMethodHeaderCodec.WriteValue(ref platform,
+			packet, 0xF1234567u));
+		Assert.True(MuiAreaExitResizeMethodHeaderCodec.TryReadValue(ref platform,
+			packet, out methodId));
+		Assert.Equal(0xF1234567u, methodId);
+		Assert.False(MuiAreaExitResizeMethodHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFEu), out _));
+		Assert.False(MuiAreaExitResizeMethodHeaderCodec.WriteValue(ref platform,
+			APTR.Null, 1));
 		Assert.False(MuiAreaResizeMessageCodec.TryReadInit(ref platform,
 			APTR.FromPointer(0x20FFCu), out _));
 	}

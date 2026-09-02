@@ -229,9 +229,23 @@ internal static class MuiAreaGeometryStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetFieldAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaGeometryStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaGeometryStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaGeometryStateField.Left)
+			value = unchecked((uint)state.Left);
+		else if (field == MuiAreaGeometryStateField.Top)
+			value = unchecked((uint)state.Top);
+		else if (field == MuiAreaGeometryStateField.Width)
+			value = unchecked((uint)state.Width);
+		else if (field == MuiAreaGeometryStateField.Height)
+			value = unchecked((uint)state.Height);
+		else if (field == MuiAreaGeometryStateField.Right)
+			value = unchecked((uint)state.Right);
+		else if (field == MuiAreaGeometryStateField.Bottom)
+			value = unchecked((uint)state.Bottom);
+		else return false;
 		return true;
 	}
 
@@ -271,10 +285,25 @@ internal static class MuiAreaGeometryStateRecordMemoryCodec
 		APTR record, MuiAreaGeometryStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetFieldAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaGeometryStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaGeometryStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaGeometryStateField.Left)
+			state.Left = unchecked((int)value);
+		else if (field == MuiAreaGeometryStateField.Top)
+			state.Top = unchecked((int)value);
+		else if (field == MuiAreaGeometryStateField.Width)
+			state.Width = unchecked((int)value);
+		else if (field == MuiAreaGeometryStateField.Height)
+			state.Height = unchecked((int)value);
+		else if (field == MuiAreaGeometryStateField.Right)
+			state.Right = unchecked((int)value);
+		else if (field == MuiAreaGeometryStateField.Bottom)
+			state.Bottom = unchecked((int)value);
+		else return false;
+		return MuiAreaGeometryStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 
 	internal static bool TryWriteInt32<TPlatform>(ref TPlatform platform,

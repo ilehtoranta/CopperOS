@@ -81,17 +81,16 @@ internal static class MuiChoiceActiveStateRecordMemoryCodec
 	private static bool TryResolve(MuiChoiceActiveStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiChoiceActiveStateField.Magic)
+			offset = MuiChoiceActiveStateRecord.MagicOffset;
+		else if (field == MuiChoiceActiveStateField.Active)
+			offset = MuiChoiceActiveStateRecord.ActiveOffset;
+		else
 		{
-			case MuiChoiceActiveStateField.Magic:
-				offset = MuiChoiceActiveStateRecord.MagicOffset;
-				return true;
-			case MuiChoiceActiveStateField.Active:
-				offset = MuiChoiceActiveStateRecord.ActiveOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -111,8 +110,13 @@ internal static class MuiChoiceActiveStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiChoiceActiveStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiChoiceActiveStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiChoiceActiveStateField.Active)
+			value = state.Active;
+		else return false;
 		return true;
 	}
 
@@ -120,9 +124,15 @@ internal static class MuiChoiceActiveStateRecordMemoryCodec
 		APTR record, MuiChoiceActiveStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiChoiceActiveStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiChoiceActiveStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiChoiceActiveStateField.Active)
+			state.Active = value;
+		else return false;
+		return MuiChoiceActiveStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

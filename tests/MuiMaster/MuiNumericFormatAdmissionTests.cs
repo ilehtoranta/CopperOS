@@ -97,10 +97,24 @@ public sealed class MuiNumericFormatAdmissionTests
 		Assert.True(MuiNumericFormatStateRecordCodec.TryReadRecord(ref platform,
 			address, out var updated));
 		Assert.True(updated.Format.IsNull);
+		Assert.True(MuiNumericFormatStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiNumericFormatStateField.Format, out var typedFormat));
+		Assert.Equal(address.Raw + MuiNumericFormatStateRecord.FormatOffset,
+			typedFormat.Raw);
+		Assert.True(MuiNumericFormatStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiNumericFormatStateField.Format, source.Raw));
+		Assert.True(MuiNumericFormatStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiNumericFormatStateField.Magic, out var typedMagic));
+		Assert.Equal(record.Magic, typedMagic);
+		Assert.True(MuiNumericFormatStateRecordCodec.TryReadStructural(ref platform,
+			address, out var typedStructural));
+		Assert.Equal(source.Raw, typedStructural.Format.Raw);
+		Assert.False(MuiNumericFormatStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, (MuiNumericFormatStateField)0xFF, out _));
 		Assert.False(MuiNumericFormatStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiNumericFormatStateRecord.Size, out _));
 		Assert.False(MuiNumericFormatStateRecordMemoryCodec.TryGetAddress(ref platform,
-			APTR.Null, 0, out _));
+			APTR.Null, (uint)0, out _));
 		Assert.False(MuiNumericFormatStateRecordCodec.TryReadRecord(ref platform,
 			APTR.Null, out _));
 	}

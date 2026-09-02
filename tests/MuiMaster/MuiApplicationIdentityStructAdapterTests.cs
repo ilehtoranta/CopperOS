@@ -84,4 +84,44 @@ public sealed class MuiApplicationIdentityStructAdapterTests
 		Assert.False(MuiApplicationIdentityStateRecordCodec.TryReadRecord(
 			ref platform, crossingEnd, out _));
 	}
+
+	[Fact]
+	public void ApplicationIdentityFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationIdentityStateRecord
+		{
+			Magic = 0x10203040u,
+			Author = APTR.FromPointer(0x50607080u),
+			Base = APTR.FromPointer(0x90A0B0C0u),
+			Copyright = APTR.FromPointer(0x01020304u),
+			Description = APTR.FromPointer(0x11223344u),
+			Title = APTR.FromPointer(0x55667788u),
+			Version = APTR.FromPointer(0xDDEEFF00u),
+		};
+
+		Assert.True(MuiApplicationIdentityStateRecordCodec.WriteRecord(
+			ref platform, address, initial));
+		Assert.True(MuiApplicationIdentityStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationIdentityStateField.Title,
+			0xF1020304u));
+		Assert.True(MuiApplicationIdentityStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiApplicationIdentityStateField.Version,
+			out var version));
+		Assert.Equal(initial.Version.Raw, version);
+		Assert.True(MuiApplicationIdentityStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(initial.Author, updated.Author);
+		Assert.Equal(initial.Base, updated.Base);
+		Assert.Equal(initial.Copyright, updated.Copyright);
+		Assert.Equal(initial.Description, updated.Description);
+		Assert.Equal(APTR.FromPointer(0xF1020304u), updated.Title);
+		Assert.Equal(initial.Version, updated.Version);
+		Assert.False(MuiApplicationIdentityStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiApplicationIdentityStateField)255), 1));
+	}
 }

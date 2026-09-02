@@ -102,16 +102,24 @@ public sealed class MuiGadgetAdmissionTests
 		Assert.Equal(value.ShowSelState, structural.ShowSelState);
 		Assert.True(MuiGadgetInteractionStateRecordCodec.TryRead(ref platform,
 			address, out _));
+		Assert.True(MuiGadgetInteractionStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiGadgetInteractionStateField.Pressed, 1));
+		Assert.True(MuiGadgetInteractionStateRecordCodec.TryReadStructural(
+			ref platform, address, out var typedDecoded));
+		Assert.Equal(value.Magic, typedDecoded.Magic);
+		Assert.Equal(value.InputMode, typedDecoded.InputMode);
+		Assert.Equal(1u, typedDecoded.Pressed);
+		Assert.Equal(value.ShowSelState, typedDecoded.ShowSelState);
 		Assert.True(MuiGadgetInteractionStateRecordMemoryCodec.TryGetAddress(
-			ref platform, address, 16, out var showSelField));
+			ref platform, address, 16u, out var showSelField));
 		Assert.Equal(address.Raw + 16, showSelField.Raw);
 		Assert.True(MuiGadgetInteractionStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 4, out var inputMode));
+			ref platform, address, 4u, out var inputMode));
 		Assert.Equal(value.InputMode, inputMode);
 		Assert.False(MuiGadgetInteractionStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiGadgetInteractionStateRecord.Size, out _));
 		Assert.False(MuiGadgetInteractionStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, 0u, out _));
 		Assert.False(MuiGadgetInteractionStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

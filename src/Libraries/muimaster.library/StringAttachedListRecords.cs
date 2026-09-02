@@ -119,8 +119,13 @@ internal static class MuiStringAttachedListStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiStringAttachedListStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringAttachedListStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiStringAttachedListStateField.Listview)
+			value = state.Listview.Raw;
+		else return false;
 		return true;
 	}
 
@@ -128,9 +133,15 @@ internal static class MuiStringAttachedListStateRecordMemoryCodec
 		APTR record, MuiStringAttachedListStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiStringAttachedListStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringAttachedListStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiStringAttachedListStateField.Listview)
+			state.Listview = APTR.FromPointer(value);
+		else return false;
+		return MuiStringAttachedListStateRecordCodec.WriteStructural(ref platform,
+			record, state);
 	}
 }
 
@@ -168,7 +179,13 @@ internal static class MuiStringAttachedListStateRecordCodec
 		MuiStringAttachedListStateRecord value)
 	where TPlatform : struct, IMuiGuestMemory
 		=> MuiStringAttachedListStateAdmission.Validate(value) &&
-		MuiGuestStructCursor.TryCreate(ref platform, address,
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiStringAttachedListStateRecord value)
+	where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiStringAttachedListStateRecord.Size, out var cursor) &&
 		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 			value.Magic) &&

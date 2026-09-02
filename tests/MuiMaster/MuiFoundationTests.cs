@@ -176,6 +176,26 @@ public sealed class MuiFoundationTests
 	}
 
 	[Fact]
+	public void GuestUlongStorageMemoryAdapterUsesNamedValueCodec()
+	{
+		var state = APTR.FromPointer(0x1000);
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			state);
+		var storage = APTR.FromPointer(0x2340);
+		const uint highBitValue = 0xF1020304u;
+
+		Assert.True(MuiGuestUlongStorageMemoryCodec.TryWrite(ref platform, storage,
+			MuiGuestUlongStorageField.Value, highBitValue));
+		Assert.True(MuiGuestUlongStorageMemoryCodec.TryRead(ref platform, storage,
+			MuiGuestUlongStorageField.Value, out var value));
+		Assert.Equal(highBitValue, value);
+		Assert.False(MuiGuestUlongStorageMemoryCodec.TryWrite(ref platform, storage,
+			unchecked((MuiGuestUlongStorageField)255), 1));
+		Assert.False(MuiGuestUlongStorageMemoryCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFD), MuiGuestUlongStorageField.Value, out _));
+	}
+
+	[Fact]
 	public void EmptyRootAndErrorMutationAreDeterministic()
 	{
 		var root = MuiMasterState.CreateEmptyRoot();

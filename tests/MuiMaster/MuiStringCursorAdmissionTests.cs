@@ -90,6 +90,21 @@ public sealed class MuiStringCursorAdmissionTests
 		Assert.True(MuiStringCursorStateRecordCodec.Write(ref platform,
 			recordAddress, value));
 		Assert.True(MuiStringCursorStateRecordMemoryCodec.TryGetAddress(ref platform,
+			recordAddress, MuiStringCursorStateField.DisplayPos,
+			out var typedDisplayAddress));
+		Assert.Equal(0x1D28u, typedDisplayAddress.Raw);
+		Assert.True(MuiStringCursorStateRecordMemoryCodec.TryReadInt32(ref platform,
+			recordAddress, MuiStringCursorStateField.BufferPos, out var typedBuffer));
+		Assert.Equal(12, typedBuffer);
+		Assert.True(MuiStringCursorStateRecordMemoryCodec.TryWriteInt32(ref platform,
+			recordAddress, MuiStringCursorStateField.DisplayPos, 0));
+		Assert.True(MuiStringCursorStateRecordCodec.TryReadStructural(ref platform,
+			recordAddress, out var typedUpdated));
+		Assert.Equal(0, typedUpdated.DisplayPos);
+		Assert.Equal(value.BufferPos, typedUpdated.BufferPos);
+		Assert.False(MuiStringCursorStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			recordAddress, (MuiStringCursorStateField)255, out _));
+		Assert.True(MuiStringCursorStateRecordMemoryCodec.TryGetAddress(ref platform,
 			recordAddress, 4, out var bufferAddress));
 		Assert.Equal(0x1D24u, bufferAddress.Raw);
 		Assert.True(MuiStringCursorStateRecordMemoryCodec.TryReadInt32(ref platform,
@@ -103,7 +118,7 @@ public sealed class MuiStringCursorAdmissionTests
 		Assert.False(MuiStringCursorStateRecordMemoryCodec.TryGetAddress(ref platform,
 			recordAddress, MuiStringCursorStateRecord.Size, out _));
 		Assert.False(MuiStringCursorStateRecordMemoryCodec.TryGetAddress(ref platform,
-			APTR.Null, 0, out _));
+			APTR.Null, (uint)0, out _));
 		Assert.False(MuiStringCursorStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

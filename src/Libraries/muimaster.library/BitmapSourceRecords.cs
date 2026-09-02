@@ -20,6 +20,9 @@ public struct MuiBitmapSourceState
 internal struct MuiBitmapSourceStateRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint SourceOffset = 4;
 	internal const uint Cookie = 0x4D42534Fu; // 'MBSO'
 
 	internal uint Magic;
@@ -41,28 +44,12 @@ internal struct MuiBitmapSourceStateFieldCursor
 
 internal static class MuiBitmapSourceStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiBitmapSourceStateField field,
-		out uint offset)
-	{
-		offset = field switch
-		{
-			MuiBitmapSourceStateField.Magic => 0,
-			MuiBitmapSourceStateField.Source => 4,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiBitmapSourceStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-			cursor.Record, MuiBitmapSourceStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiBitmapSourceStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -70,24 +57,16 @@ internal static class MuiBitmapSourceStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiBitmapSourceStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiBitmapSourceStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiBitmapSourceStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiBitmapSourceStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		return MuiBitmapSourceStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
 	}
 }
 
@@ -97,16 +76,77 @@ internal static class MuiBitmapSourceStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiBitmapSourceStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiBitmapSourceStateField field,
+		out uint offset)
+	{
+		if (field == MuiBitmapSourceStateField.Magic)
+			offset = MuiBitmapSourceStateRecord.MagicOffset;
+		else if (field == MuiBitmapSourceStateField.Source)
+			offset = MuiBitmapSourceStateRecord.SourceOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiBitmapSourceStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset)
+			return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiBitmapSourceStateRecord.Size) &&
+			platform.IsMapped(address, MuiBitmapSourceStateRecord.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiBitmapSourceStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiBitmapSourceStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiBitmapSourceStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiBitmapSourceStateField.Source)
+			value = state.Source.Raw;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiBitmapSourceStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiBitmapSourceStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiBitmapSourceStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiBitmapSourceStateField.Source)
+			state.Source = APTR.FromPointer(value);
+		else return false;
+		return MuiBitmapSourceStateRecordCodec.WriteRecord(ref platform, record,
+			state);
+	}
+
+	// Legacy raw-offset adapter retained for bounded diagnostics and older
+	// callers. Typed field access above is the preferred API.
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiBitmapSourceStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiBitmapSourceStateRecord.Size -
+			MuiBitmapSourceStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiBitmapSourceStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiBitmapSourceStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

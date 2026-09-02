@@ -74,4 +74,38 @@ public sealed class MuiApplicationPolicyStructAdapterTests
 		Assert.False(MuiApplicationPolicyStateRecordCodec.TryReadRecord(
 			ref platform, crossingEnd, out _));
 	}
+
+	[Fact]
+	public void ApplicationPolicyFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationPolicyStateRecord
+		{
+			Magic = 0x10203040u,
+			UseRexx = 1,
+			UseCommodities = 0,
+			UseScreenNotify = 1,
+		};
+
+		Assert.True(MuiApplicationPolicyStateRecordCodec.WriteRecord(
+			ref platform, address, initial));
+		Assert.True(MuiApplicationPolicyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationPolicyStateField.UseCommodities,
+			1));
+		Assert.True(MuiApplicationPolicyStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiApplicationPolicyStateField.UseRexx,
+			out var useRexx));
+		Assert.Equal(initial.UseRexx, useRexx);
+		Assert.True(MuiApplicationPolicyStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(initial.UseRexx, updated.UseRexx);
+		Assert.Equal(1u, updated.UseCommodities);
+		Assert.Equal(initial.UseScreenNotify, updated.UseScreenNotify);
+		Assert.False(MuiApplicationPolicyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiApplicationPolicyStateField)255), 1));
+	}
 }

@@ -101,7 +101,11 @@ public sealed class MuiStringAttachedListAdmissionTests
 			ref platform, recordAddress, MuiStringAttachedListStateField.Listview, 0));
 		Assert.True(MuiStringAttachedListStateRecordCodec.TryReadStructural(
 			ref platform, recordAddress, out var decoded));
+		Assert.Equal(MuiStringAttachedListStateRecord.Cookie, decoded.Magic);
 		Assert.True(decoded.Listview.IsNull);
+		Assert.False(MuiStringAttachedListStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, (MuiStringAttachedListStateField)255,
+			out _));
 		Assert.False(MuiStringAttachedListStateRecordMemoryCodec.TryGetAddress(
 			ref platform, recordAddress,
 			(MuiStringAttachedListStateField)255, out _));

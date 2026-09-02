@@ -82,4 +82,43 @@ public sealed class MuiApplicationLifecycleStructAdapterTests
 		Assert.False(MuiApplicationLifecycleStateRecordCodec.TryReadRecord(
 			ref platform, crossingEnd, out _));
 	}
+
+	[Fact]
+	public void ApplicationLifecycleFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationLifecycleStateRecord
+		{
+			Magic = 0x10203040u,
+			Initialized = 1,
+			Iconified = 0,
+			Active = 1,
+			SingleTask = 0,
+			DoubleStart = 1,
+			ForceQuit = 0,
+		};
+
+		Assert.True(MuiApplicationLifecycleStateRecordCodec.WriteRecord(
+			ref platform, address, initial));
+		Assert.True(MuiApplicationLifecycleStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationLifecycleStateField.ForceQuit, 1));
+		Assert.True(MuiApplicationLifecycleStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiApplicationLifecycleStateField.Active,
+			out var active));
+		Assert.Equal(initial.Active, active);
+		Assert.True(MuiApplicationLifecycleStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(initial.Initialized, updated.Initialized);
+		Assert.Equal(initial.Iconified, updated.Iconified);
+		Assert.Equal(initial.Active, updated.Active);
+		Assert.Equal(initial.SingleTask, updated.SingleTask);
+		Assert.Equal(initial.DoubleStart, updated.DoubleStart);
+		Assert.Equal(1u, updated.ForceQuit);
+		Assert.False(MuiApplicationLifecycleStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiApplicationLifecycleStateField)255), 1));
+	}
 }

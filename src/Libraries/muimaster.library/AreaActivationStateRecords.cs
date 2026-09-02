@@ -93,23 +93,20 @@ internal static class MuiAreaActivationStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaActivationStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaActivationStateField.Signature)
+			offset = MuiAreaActivationStateRecord.SignatureOffset;
+		else if (field == MuiAreaActivationStateField.Active)
+			offset = MuiAreaActivationStateRecord.ActiveOffset;
+		else if (field == MuiAreaActivationStateField.Flags)
+			offset = MuiAreaActivationStateRecord.FlagsOffset;
+		else if (field == MuiAreaActivationStateField.Generation)
+			offset = MuiAreaActivationStateRecord.GenerationOffset;
+		else
 		{
-			case MuiAreaActivationStateField.Signature:
-				offset = MuiAreaActivationStateRecord.SignatureOffset;
-				return true;
-			case MuiAreaActivationStateField.Active:
-				offset = MuiAreaActivationStateRecord.ActiveOffset;
-				return true;
-			case MuiAreaActivationStateField.Flags:
-				offset = MuiAreaActivationStateRecord.FlagsOffset;
-				return true;
-			case MuiAreaActivationStateField.Generation:
-				offset = MuiAreaActivationStateRecord.GenerationOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -130,9 +127,17 @@ internal static class MuiAreaActivationStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaActivationStateCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiAreaActivationStateField.Signature)
+			value = state.Signature;
+		else if (field == MuiAreaActivationStateField.Active)
+			value = state.Active;
+		else if (field == MuiAreaActivationStateField.Flags)
+			value = state.Flags;
+		else if (field == MuiAreaActivationStateField.Generation)
+			value = state.Generation;
+		else return false;
 		return true;
 	}
 
@@ -140,10 +145,18 @@ internal static class MuiAreaActivationStateRecordMemoryCodec
 		APTR record, MuiAreaActivationStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaActivationStateCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiAreaActivationStateField.Signature)
+			state.Signature = value;
+		else if (field == MuiAreaActivationStateField.Active)
+			state.Active = value;
+		else if (field == MuiAreaActivationStateField.Flags)
+			state.Flags = value;
+		else if (field == MuiAreaActivationStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiAreaActivationStateCodec.WriteRecord(ref platform, record, state);
 	}
 }
 

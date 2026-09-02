@@ -88,11 +88,31 @@ public sealed class MuiStringPlaceholderAdmissionTests
 		Assert.True(MuiStringPlaceholderStateRecordCodec.Write(ref platform, address,
 			record));
 		Assert.True(MuiStringPlaceholderStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiStringPlaceholderStateField.Contents,
+			out var typedContentsAddress));
+		Assert.Equal(0x1D84u, typedContentsAddress.Raw);
+		Assert.True(MuiStringPlaceholderStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiStringPlaceholderStateField.Contents,
+			out var typedContents));
+		Assert.Equal(source.Raw, typedContents);
+		Assert.True(MuiStringPlaceholderStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, 4, out var contentsAddress));
 		Assert.Equal(0x1D84u, contentsAddress.Raw);
 		Assert.True(MuiStringPlaceholderStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, address, 4, out var contents));
 		Assert.Equal(source.Raw, contents);
+		Assert.True(MuiStringPlaceholderStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiStringPlaceholderStateField.Contents, 0));
+		Assert.True(MuiStringPlaceholderStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiStringPlaceholderStateField.Magic,
+			out var typedMagic));
+		Assert.Equal(MuiStringPlaceholderStateRecord.Cookie, typedMagic);
+		Assert.False(MuiStringPlaceholderStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiStringPlaceholderStateField)255, out _));
+		Assert.True(MuiStringPlaceholderStateRecordCodec.TryReadStructural(ref platform,
+			address, out var typedUpdated));
+		Assert.Equal(MuiStringPlaceholderStateRecord.Cookie, typedUpdated.Magic);
+		Assert.True(typedUpdated.Contents.IsNull);
 		Assert.True(MuiStringPlaceholderStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, 4, 0));
 		Assert.True(MuiStringPlaceholderStateRecordCodec.TryReadStructural(ref platform,
@@ -101,7 +121,7 @@ public sealed class MuiStringPlaceholderAdmissionTests
 		Assert.False(MuiStringPlaceholderStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiStringPlaceholderStateRecord.Size, out _));
 		Assert.False(MuiStringPlaceholderStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiStringPlaceholderStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

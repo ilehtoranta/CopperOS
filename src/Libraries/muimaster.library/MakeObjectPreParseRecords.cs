@@ -16,6 +16,10 @@ internal struct MuiMakeObjectPreParseRecord
 {
 	internal const uint Size = 4;
 	internal const uint FieldSize = 1;
+	internal const uint EscapeOffset = 0;
+	internal const uint CommandOffset = 1;
+	internal const uint TerminatorOffset = 2;
+	internal const uint ReservedOffset = 3;
 
 	internal byte Escape;
 	internal byte Command;
@@ -43,24 +47,20 @@ internal static class MuiMakeObjectPreParseRecordMemoryCodec
 	private static bool TryResolve(MuiMakeObjectPreParseField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiMakeObjectPreParseField.Escape)
+			offset = MuiMakeObjectPreParseRecord.EscapeOffset;
+		else if (field == MuiMakeObjectPreParseField.Command)
+			offset = MuiMakeObjectPreParseRecord.CommandOffset;
+		else if (field == MuiMakeObjectPreParseField.Terminator)
+			offset = MuiMakeObjectPreParseRecord.TerminatorOffset;
+		else if (field == MuiMakeObjectPreParseField.Reserved)
+			offset = MuiMakeObjectPreParseRecord.ReservedOffset;
+		else
 		{
-			case MuiMakeObjectPreParseField.Escape:
-				offset = 0;
-				return true;
-			case MuiMakeObjectPreParseField.Command:
-				offset = 1;
-				return true;
-			case MuiMakeObjectPreParseField.Terminator:
-				offset = 2;
-				return true;
-			case MuiMakeObjectPreParseField.Reserved:
-				offset = 3;
-				return true;
-			default:
-				offset = 0;
-				return false;
+			offset = 0;
+			return false;
 		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -81,11 +81,17 @@ internal static class MuiMakeObjectPreParseRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiMakeObjectPreParseFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt8(address, 0);
+		if (!MuiMakeObjectPreParseRecordCodec.TryReadRecord(ref platform, record,
+			out var state)) return false;
+		if (field == MuiMakeObjectPreParseField.Escape)
+			value = state.Escape;
+		else if (field == MuiMakeObjectPreParseField.Command)
+			value = state.Command;
+		else if (field == MuiMakeObjectPreParseField.Terminator)
+			value = state.Terminator;
+		else if (field == MuiMakeObjectPreParseField.Reserved)
+			value = state.Reserved;
+		else return false;
 		return true;
 	}
 
@@ -93,12 +99,18 @@ internal static class MuiMakeObjectPreParseRecordMemoryCodec
 		APTR record, MuiMakeObjectPreParseField field, byte value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiMakeObjectPreParseFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt8(address, 0, value);
-		return true;
+		if (!MuiMakeObjectPreParseRecordCodec.TryReadRecord(ref platform, record,
+			out var state)) return false;
+		if (field == MuiMakeObjectPreParseField.Escape)
+			state.Escape = value;
+		else if (field == MuiMakeObjectPreParseField.Command)
+			state.Command = value;
+		else if (field == MuiMakeObjectPreParseField.Terminator)
+			state.Terminator = value;
+		else if (field == MuiMakeObjectPreParseField.Reserved)
+			state.Reserved = value;
+		else return false;
+		return MuiMakeObjectPreParseRecordCodec.WriteRecord(ref platform, record, state);
 	}
 }
 

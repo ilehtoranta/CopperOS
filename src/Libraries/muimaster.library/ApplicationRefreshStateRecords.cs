@@ -124,9 +124,15 @@ internal static class MuiApplicationRefreshStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationRefreshStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationRefreshStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationRefreshStateField.Checks)
+			value = state.Checks;
+		else if (field == MuiApplicationRefreshStateField.RefreshedWindows)
+			value = state.RefreshedWindows;
+		else return false;
 		return true;
 	}
 
@@ -134,10 +140,17 @@ internal static class MuiApplicationRefreshStateRecordMemoryCodec
 		APTR record, MuiApplicationRefreshStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationRefreshStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationRefreshStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationRefreshStateField.Checks)
+			state.Checks = value;
+		else if (field == MuiApplicationRefreshStateField.RefreshedWindows)
+			state.RefreshedWindows = value;
+		else return false;
+		return MuiApplicationRefreshStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

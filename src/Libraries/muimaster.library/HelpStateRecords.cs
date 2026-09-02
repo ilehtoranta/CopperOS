@@ -49,6 +49,11 @@ public struct MuiHelpTriggerInput
 internal struct MuiHelpStateRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint NodeOffset = 4;
+	internal const uint LineOffset = 8;
+	internal const uint GenerationOffset = 12;
 	internal const uint Cookie = 0x48454C50u; // 'HELP'
 
 	internal uint Magic;
@@ -88,24 +93,20 @@ internal static class MuiHelpStateFieldCursorCodec
 {
 	private static bool TryResolve(MuiHelpStateField field, out uint offset)
 	{
-		switch (field)
+		if (field == MuiHelpStateField.Magic)
+			offset = MuiHelpStateRecord.MagicOffset;
+		else if (field == MuiHelpStateField.Node)
+			offset = MuiHelpStateRecord.NodeOffset;
+		else if (field == MuiHelpStateField.Line)
+			offset = MuiHelpStateRecord.LineOffset;
+		else if (field == MuiHelpStateField.Generation)
+			offset = MuiHelpStateRecord.GenerationOffset;
+		else
 		{
-			case MuiHelpStateField.Magic:
-				offset = 0;
-				return true;
-			case MuiHelpStateField.Node:
-				offset = 4;
-				return true;
-			case MuiHelpStateField.Line:
-				offset = 8;
-				return true;
-			case MuiHelpStateField.Generation:
-				offset = 12;
-				return true;
-			default:
-				offset = 0;
-				return false;
+			offset = 0;
+			return false;
 		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -118,7 +119,7 @@ internal static class MuiHelpStateFieldCursorCodec
 			!platform.IsMapped(cursor.Record, MuiHelpStateRecord.Size))
 			return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiHelpStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -152,16 +153,81 @@ internal static class MuiHelpStateFieldCursorCodec
 // is isolated here.
 internal static class MuiHelpStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiHelpStateField field, out uint offset)
+	{
+		if (field == MuiHelpStateField.Magic)
+			offset = MuiHelpStateRecord.MagicOffset;
+		else if (field == MuiHelpStateField.Node)
+			offset = MuiHelpStateRecord.NodeOffset;
+		else if (field == MuiHelpStateField.Line)
+			offset = MuiHelpStateRecord.LineOffset;
+		else if (field == MuiHelpStateField.Generation)
+			offset = MuiHelpStateRecord.GenerationOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiHelpStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiHelpStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiHelpStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiHelpStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiHelpStateField.Node)
+			value = state.Node.Raw;
+		else if (field == MuiHelpStateField.Line)
+			value = state.Line;
+		else if (field == MuiHelpStateField.Generation)
+			value = state.Generation;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiHelpStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiHelpStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiHelpStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiHelpStateField.Node)
+			state.Node = APTR.FromPointer(value);
+		else if (field == MuiHelpStateField.Line)
+			state.Line = value;
+		else if (field == MuiHelpStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiHelpStateRecordCodec.WriteRecord(ref platform, record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiHelpStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiHelpStateRecord.Size -
+			MuiHelpStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiHelpStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiHelpStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

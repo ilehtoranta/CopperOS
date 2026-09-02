@@ -72,4 +72,40 @@ public sealed class MuiAreaCustomFontRuntimeStructAdapterTests
 		Assert.False(MuiAreaCustomFontRuntimeRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
 	}
+
+	[Fact]
+	public void CustomFontRuntimeFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiAreaCustomFontRuntimeRecord
+		{
+			Magic = 0x10203040u,
+			Font = APTR.FromPointer(0x50607080u),
+			Spec = APTR.FromPointer(0x90A0B0C0u),
+			Generation = 0xDDEEFF00u,
+			Active = 1,
+		};
+
+		Assert.True(MuiAreaCustomFontRuntimeRecordCodec.WriteRecord(ref platform,
+			address, initial));
+		Assert.True(MuiAreaCustomFontRuntimeRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaCustomFontRuntimeField.Font,
+			0xF1020304u));
+		Assert.True(MuiAreaCustomFontRuntimeRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaCustomFontRuntimeField.Spec,
+			out var spec));
+		Assert.Equal(initial.Spec.Raw, spec);
+		Assert.True(MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(APTR.FromPointer(0xF1020304u), updated.Font);
+		Assert.Equal(initial.Spec, updated.Spec);
+		Assert.Equal(initial.Generation, updated.Generation);
+		Assert.Equal(initial.Active, updated.Active);
+		Assert.False(MuiAreaCustomFontRuntimeRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiAreaCustomFontRuntimeField)255), 1));
+	}
 }

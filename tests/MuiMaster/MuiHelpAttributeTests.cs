@@ -50,6 +50,23 @@ public sealed class MuiHelpAttributeTests
 		};
 		Assert.True(MuiHelpStateRecordCodec.Write(ref platform, address, record));
 		Assert.True(MuiHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiHelpStateField.Node, out var typedNodeAddress));
+		Assert.Equal(0x1D04u, typedNodeAddress.Raw);
+		Assert.True(MuiHelpStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiHelpStateField.Line, out var typedLine));
+		Assert.Equal(unchecked((uint)-7), typedLine);
+		Assert.True(MuiHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiHelpStateField.Generation, 4));
+		Assert.True(MuiHelpStateRecordCodec.TryReadStructural(ref platform, address,
+			out var typedUpdated));
+		Assert.Equal(4u, typedUpdated.Generation);
+		Assert.Equal(record.Node, typedUpdated.Node);
+		Assert.Equal(record.Line, typedUpdated.Line);
+		Assert.False(MuiHelpStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, (MuiHelpStateField)255, out _));
+		Assert.True(MuiHelpStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiHelpStateField.Generation, record.Generation));
+		Assert.True(MuiHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, 8, out var lineAddress));
 		Assert.Equal(0x1D08u, lineAddress.Raw);
 		Assert.True(MuiHelpStateRecordMemoryCodec.TryReadUInt32(ref platform,
@@ -63,7 +80,7 @@ public sealed class MuiHelpAttributeTests
 		Assert.False(MuiHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiHelpStateRecord.Size, out _));
 		Assert.False(MuiHelpStateRecordMemoryCodec.TryGetAddress(ref platform,
-			APTR.Null, 0, out _));
+			APTR.Null, (uint)0, out _));
 		Assert.False(MuiHelpStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

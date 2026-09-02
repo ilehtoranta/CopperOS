@@ -93,6 +93,24 @@ public sealed class MuiStringInteractionAdmissionTests
 		Assert.True(MuiStringInteractionStateRecordCodec.Write(ref platform,
 			recordAddress, value));
 		Assert.True(MuiStringInteractionStateRecordMemoryCodec.TryGetAddress(
+			ref platform, recordAddress, MuiStringInteractionStateField.Multiline,
+			out var typedMultilineAddress));
+		Assert.Equal(0x1D2Cu, typedMultilineAddress.Raw);
+		Assert.True(MuiStringInteractionStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, MuiStringInteractionStateField.Editable,
+			out var typedEditable));
+		Assert.Equal(1u, typedEditable);
+		Assert.True(MuiStringInteractionStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, recordAddress, MuiStringInteractionStateField.Multiline, 0));
+		Assert.True(MuiStringInteractionStateRecordCodec.TryReadStructural(
+			ref platform, recordAddress, out var typedUpdated));
+		Assert.Equal(0u, typedUpdated.Multiline);
+		Assert.Equal(value.Editable, typedUpdated.Editable);
+		Assert.Equal(value.AdvanceOnCR, typedUpdated.AdvanceOnCR);
+		Assert.False(MuiStringInteractionStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, (MuiStringInteractionStateField)255,
+			out _));
+		Assert.True(MuiStringInteractionStateRecordMemoryCodec.TryGetAddress(
 			ref platform, recordAddress, 12, out var multilineAddress));
 		Assert.Equal(0x1D2Cu, multilineAddress.Raw);
 		Assert.True(MuiStringInteractionStateRecordMemoryCodec.TryReadUInt32(
@@ -107,7 +125,7 @@ public sealed class MuiStringInteractionAdmissionTests
 			ref platform, recordAddress, MuiStringInteractionStateRecord.Size,
 			out _));
 		Assert.False(MuiStringInteractionStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiStringInteractionStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

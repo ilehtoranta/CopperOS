@@ -653,19 +653,14 @@ internal static class MuiListtreeStructPacketCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		return TryCreate(ref platform, message, MuiListtreeMethodMessage.Size,
-			out var cursor) &&
-			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out packet.MethodId) && MuiGuestStructCursor.IsComplete(cursor);
+		return MuiListtreeMethodHeaderCodec.TryReadValue(ref platform, message,
+			out packet.MethodId);
 	}
 
 	internal static bool TryWriteMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory =>
-		TryCreate(ref platform, message, MuiListtreeMethodMessage.Size,
-			out var cursor) &&
-		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, method) &&
-		MuiGuestStructCursor.IsComplete(cursor);
+		MuiListtreeMethodHeaderCodec.WriteValue(ref platform, message, method);
 
 	internal static bool TryReadSet<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeSetMessage packet)
@@ -1067,6 +1062,41 @@ internal static class MuiListtreeStructPacketCodec
 			packet.Result) && MuiGuestStructCursor.IsComplete(cursor);
 }
 
+// Struct-first codec for the method-only Listtree header. The named
+// one-ULONG record remains the ABI contract; shared guest storage keeps the
+// selector boundary free of direct scalar lowering in freestanding 68k code.
+internal static class MuiListtreeMethodHeaderCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiListtreeMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiListtreeMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 internal static class MuiListtreeMethodMessageCodec
 {
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -1302,16 +1332,8 @@ internal static class MuiListtreeMessageCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiListtreeMethodMessageCodec.TryRead(ref platform, message,
-			out var packet))
-		{
-			methodId = 0;
-			return false;
-		}
-		methodId = packet.MethodId;
-		return true;
-	}
+		=> MuiListtreeMethodHeaderCodec.TryReadValue(ref platform, message,
+			out methodId);
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiListtreeMethodMessage packet)

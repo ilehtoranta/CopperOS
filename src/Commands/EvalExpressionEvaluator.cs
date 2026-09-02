@@ -66,13 +66,9 @@ public static class EvalExpressionEvaluator
         var cursor = new Cursor(sourceLength);
         if (!TryParseWorkbench31Arithmetic(ref memory, source, ref cursor, out value,
                 out status)) return false;
-        SkipWhitespace(ref memory, source, ref cursor);
-        if (cursor.Position != sourceLength)
-        {
-            status = EvalExpressionStatus.Malformed;
-            value = 0;
-            return false;
-        }
+        // Workbench 3.1 accepts the evaluated prefix: captured `2^3`,
+        // `2 junk`, and `2+3junk` return 2, 2, and 5 respectively. Do not
+        // apply the strict whole-span requirement used by the MorphOS parser.
         status = EvalExpressionStatus.Success;
         return true;
     }
@@ -104,7 +100,7 @@ public static class EvalExpressionEvaluator
                     return false;
                 }
             }
-            else
+            else if (op == Operator.Divide || op == Operator.Modulo)
             {
                 if (IsZero(right))
                 {
@@ -118,6 +114,24 @@ public static class EvalExpressionEvaluator
                 }
                 value = DivideOrRemainder(value, right, op == Operator.Modulo);
             }
+            else if (op == Operator.And) value = And(value, right);
+            else if (op == Operator.Or) value = Or(value, right);
+            else if (op == Operator.Xor) value = Xor(value, right);
+            else if (op == Operator.Equivalence) value = Not(Xor(value, right));
+            else if (!TryGetShiftAmount(right, out var amount))
+            {
+                status = EvalExpressionStatus.InvalidShift;
+                return false;
+            }
+            else if (op == Operator.LeftShift)
+            {
+                if (!TryShiftLeft(value, amount, out value))
+                {
+                    status = EvalExpressionStatus.Overflow;
+                    return false;
+                }
+            }
+            else value = ShiftRight(value, amount);
         }
         return true;
     }
@@ -138,6 +152,13 @@ public static class EvalExpressionEvaluator
                 return false;
             }
             value = Negated(value);
+            return true;
+        }
+        if (TryConsume(ref memory, source, ref cursor, (byte)'~'))
+        {
+            if (!TryParseWorkbench31Primary(ref memory, source, ref cursor,
+                    out value, out status)) return false;
+            value = Not(value);
             return true;
         }
         if (TryConsume(ref memory, source, ref cursor, (byte)'('))
@@ -163,7 +184,9 @@ public static class EvalExpressionEvaluator
         if (TryReadOperator(ref memory, source, ref cursor, out op) &&
             (op == Operator.Add || op == Operator.Subtract ||
              op == Operator.Multiply || op == Operator.Divide ||
-             op == Operator.Modulo)) return true;
+             op == Operator.Modulo || op == Operator.And || op == Operator.Or ||
+             op == Operator.Xor || op == Operator.Equivalence ||
+             op == Operator.LeftShift || op == Operator.RightShift)) return true;
         cursor = checkpoint;
         op = Operator.None;
         return false;

@@ -233,6 +233,18 @@ public sealed class MuiAreaActivationTests
 		Assert.True(MuiAreaActivationMessageCodec.TryReadMethodId(ref platform,
 			packet, out var header));
 		Assert.Equal(MuiAreaActivationMessageCodec.GoActive, header.MethodId);
+		Assert.True(MuiAreaActivationMethodMessageCodec.TryReadValue(ref platform,
+			packet, out var scalarMethodId));
+		Assert.Equal(MuiAreaActivationMessageCodec.GoActive, scalarMethodId);
+		Assert.True(MuiAreaActivationMethodMessageCodec.WriteValue(ref platform,
+			packet, 0xF1234567u));
+		Assert.True(MuiAreaActivationMethodMessageCodec.TryReadValue(ref platform,
+			packet, out scalarMethodId));
+		Assert.Equal(0xF1234567u, scalarMethodId);
+		Assert.False(MuiAreaActivationMethodMessageCodec.WriteValue(ref platform,
+			APTR.Null, 1));
+		Assert.False(MuiAreaActivationMethodMessageCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
 		Assert.False(MuiAreaActivationMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}

@@ -25,6 +25,13 @@ public struct MuiImageRenderState
 internal struct MuiImageRenderStateRecord
 {
 	internal const uint Size = 24;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint ImageStateOffset = 4;
+	internal const uint SelectedOffset = 8;
+	internal const uint FreeHorizOffset = 12;
+	internal const uint FreeVertOffset = 16;
+	internal const uint ShowSelStateOffset = 20;
 	internal const uint Cookie = 0x4D495253u; // 'MIRS'
 
 	internal uint Magic;
@@ -57,17 +64,24 @@ internal static class MuiImageRenderStateFieldCursorCodec
 	private static bool TryResolve(MuiImageRenderStateField field,
 		out uint offset)
 	{
-		offset = field switch
+		if (field == MuiImageRenderStateField.Magic)
+			offset = MuiImageRenderStateRecord.MagicOffset;
+		else if (field == MuiImageRenderStateField.ImageState)
+			offset = MuiImageRenderStateRecord.ImageStateOffset;
+		else if (field == MuiImageRenderStateField.Selected)
+			offset = MuiImageRenderStateRecord.SelectedOffset;
+		else if (field == MuiImageRenderStateField.FreeHoriz)
+			offset = MuiImageRenderStateRecord.FreeHorizOffset;
+		else if (field == MuiImageRenderStateField.FreeVert)
+			offset = MuiImageRenderStateRecord.FreeVertOffset;
+		else if (field == MuiImageRenderStateField.ShowSelState)
+			offset = MuiImageRenderStateRecord.ShowSelStateOffset;
+		else
 		{
-			MuiImageRenderStateField.Magic => 0,
-			MuiImageRenderStateField.ImageState => 4,
-			MuiImageRenderStateField.Selected => 8,
-			MuiImageRenderStateField.FreeHoriz => 12,
-			MuiImageRenderStateField.FreeVert => 16,
-			MuiImageRenderStateField.ShowSelState => 20,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -79,7 +93,7 @@ internal static class MuiImageRenderStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 				cursor.Record, MuiImageRenderStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiImageRenderStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -114,16 +128,95 @@ internal static class MuiImageRenderStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiImageRenderStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiImageRenderStateField field,
+		out uint offset)
+	{
+		if (field == MuiImageRenderStateField.Magic)
+			offset = MuiImageRenderStateRecord.MagicOffset;
+		else if (field == MuiImageRenderStateField.ImageState)
+			offset = MuiImageRenderStateRecord.ImageStateOffset;
+		else if (field == MuiImageRenderStateField.Selected)
+			offset = MuiImageRenderStateRecord.SelectedOffset;
+		else if (field == MuiImageRenderStateField.FreeHoriz)
+			offset = MuiImageRenderStateRecord.FreeHorizOffset;
+		else if (field == MuiImageRenderStateField.FreeVert)
+			offset = MuiImageRenderStateRecord.FreeVertOffset;
+		else if (field == MuiImageRenderStateField.ShowSelState)
+			offset = MuiImageRenderStateRecord.ShowSelStateOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiImageRenderStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiImageRenderStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiImageRenderStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiImageRenderStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiImageRenderStateField.ImageState)
+			value = state.ImageState;
+		else if (field == MuiImageRenderStateField.Selected)
+			value = state.Selected;
+		else if (field == MuiImageRenderStateField.FreeHoriz)
+			value = state.FreeHoriz;
+		else if (field == MuiImageRenderStateField.FreeVert)
+			value = state.FreeVert;
+		else if (field == MuiImageRenderStateField.ShowSelState)
+			value = state.ShowSelState;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiImageRenderStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiImageRenderStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiImageRenderStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiImageRenderStateField.ImageState)
+			state.ImageState = value;
+		else if (field == MuiImageRenderStateField.Selected)
+			state.Selected = value;
+		else if (field == MuiImageRenderStateField.FreeHoriz)
+			state.FreeHoriz = value;
+		else if (field == MuiImageRenderStateField.FreeVert)
+			state.FreeVert = value;
+		else if (field == MuiImageRenderStateField.ShowSelState)
+			state.ShowSelState = value;
+		else return false;
+		return MuiImageRenderStateRecordCodec.WriteRecord(ref platform, record,
+			state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiImageRenderStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiImageRenderStateRecord.Size -
+			MuiImageRenderStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiImageRenderStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiImageRenderStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

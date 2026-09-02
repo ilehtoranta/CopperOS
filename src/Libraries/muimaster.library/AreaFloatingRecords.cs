@@ -96,20 +96,18 @@ internal static class MuiAreaFloatingStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaFloatingStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaFloatingStateField.Magic)
+			offset = MuiAreaFloatingStateRecord.MagicOffset;
+		else if (field == MuiAreaFloatingStateField.Enabled)
+			offset = MuiAreaFloatingStateRecord.EnabledOffset;
+		else if (field == MuiAreaFloatingStateField.Generation)
+			offset = MuiAreaFloatingStateRecord.GenerationOffset;
+		else
 		{
-			case MuiAreaFloatingStateField.Magic:
-				offset = MuiAreaFloatingStateRecord.MagicOffset;
-				return true;
-			case MuiAreaFloatingStateField.Enabled:
-				offset = MuiAreaFloatingStateRecord.EnabledOffset;
-				return true;
-			case MuiAreaFloatingStateField.Generation:
-				offset = MuiAreaFloatingStateRecord.GenerationOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -130,9 +128,15 @@ internal static class MuiAreaFloatingStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaFloatingStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaFloatingStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaFloatingStateField.Enabled)
+			value = state.Enabled;
+		else if (field == MuiAreaFloatingStateField.Generation)
+			value = state.Generation;
+		else return false;
 		return true;
 	}
 
@@ -140,10 +144,17 @@ internal static class MuiAreaFloatingStateRecordMemoryCodec
 		APTR record, MuiAreaFloatingStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaFloatingStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaFloatingStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaFloatingStateField.Enabled)
+			state.Enabled = value;
+		else if (field == MuiAreaFloatingStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiAreaFloatingStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

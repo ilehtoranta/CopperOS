@@ -92,17 +92,16 @@ internal static class MuiAreaWeightStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaWeightStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaWeightStateField.Magic)
+			offset = MuiAreaWeightStateRecord.MagicOffset;
+		else if (field == MuiAreaWeightStateField.Weight)
+			offset = MuiAreaWeightStateRecord.WeightOffset;
+		else
 		{
-			case MuiAreaWeightStateField.Magic:
-				offset = MuiAreaWeightStateRecord.MagicOffset;
-				return true;
-			case MuiAreaWeightStateField.Weight:
-				offset = MuiAreaWeightStateRecord.WeightOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -123,9 +122,13 @@ internal static class MuiAreaWeightStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaWeightStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiAreaWeightStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaWeightStateField.Weight)
+			value = state.Weight;
+		else return false;
 		return true;
 	}
 
@@ -133,10 +136,14 @@ internal static class MuiAreaWeightStateRecordMemoryCodec
 		APTR record, MuiAreaWeightStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaWeightStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiAreaWeightStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaWeightStateField.Weight)
+			state.Weight = value;
+		else return false;
+		return MuiAreaWeightStateRecordCodec.WriteRecord(ref platform, record, state);
 	}
 }
 

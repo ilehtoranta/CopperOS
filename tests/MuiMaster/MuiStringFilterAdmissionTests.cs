@@ -94,6 +94,31 @@ public sealed class MuiStringFilterAdmissionTests
 		};
 		Assert.True(MuiStringFilterStateRecordCodec.Write(ref platform,
 			recordAddress, value));
+		Assert.True(MuiStringFilterStateRecordMemoryCodec.TryGetAddress(
+			ref platform, recordAddress, MuiStringFilterStateField.Accept,
+			out var typedAcceptAddress));
+		Assert.Equal(0x1D64u, typedAcceptAddress.Raw);
+		Assert.True(MuiStringFilterStateRecordMemoryCodec.TryGetAddress(
+			ref platform, recordAddress, MuiStringFilterStateField.Reject,
+			out var typedRejectAddress));
+		Assert.Equal(0x1D68u, typedRejectAddress.Raw);
+		Assert.True(MuiStringFilterStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, MuiStringFilterStateField.Accept,
+			out var typedAccept));
+		Assert.Equal(0x1DC0u, typedAccept);
+		Assert.True(MuiStringFilterStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, recordAddress, MuiStringFilterStateField.Reject, 0));
+		Assert.True(MuiStringFilterStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, MuiStringFilterStateField.Reject,
+			out var typedReject));
+		Assert.Equal(0u, typedReject);
+		Assert.False(MuiStringFilterStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, (MuiStringFilterStateField)255, out _));
+		Assert.True(MuiStringFilterStateRecordCodec.TryReadStructural(ref platform,
+			recordAddress, out var typedUpdated));
+		Assert.Equal(MuiStringFilterStateRecord.Cookie, typedUpdated.Magic);
+		Assert.Equal(0x1DC0u, typedUpdated.Accept.Raw);
+		Assert.True(typedUpdated.Reject.IsNull);
 		Assert.True(MuiStringFilterStateRecordMemoryCodec.TryGetAddress(ref platform,
 			recordAddress, 8, out var rejectAddress));
 		Assert.Equal(0x1D68u, rejectAddress.Raw);
@@ -109,7 +134,7 @@ public sealed class MuiStringFilterAdmissionTests
 		Assert.False(MuiStringFilterStateRecordMemoryCodec.TryGetAddress(ref platform,
 			recordAddress, MuiStringFilterStateRecord.Size, out _));
 		Assert.False(MuiStringFilterStateRecordMemoryCodec.TryGetAddress(ref platform,
-			APTR.Null, 0, out _));
+			APTR.Null, (uint)0, out _));
 		Assert.False(MuiStringFilterStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

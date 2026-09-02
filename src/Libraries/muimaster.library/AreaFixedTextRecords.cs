@@ -147,23 +147,20 @@ internal static class MuiAreaFixedTextStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaFixedTextStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaFixedTextStateField.Magic)
+			offset = MuiAreaFixedTextStateRecord.MagicOffset;
+		else if (field == MuiAreaFixedTextStateField.WidthText)
+			offset = MuiAreaFixedTextStateRecord.WidthTextOffset;
+		else if (field == MuiAreaFixedTextStateField.HeightText)
+			offset = MuiAreaFixedTextStateRecord.HeightTextOffset;
+		else if (field == MuiAreaFixedTextStateField.Generation)
+			offset = MuiAreaFixedTextStateRecord.GenerationOffset;
+		else
 		{
-			case MuiAreaFixedTextStateField.Magic:
-				offset = MuiAreaFixedTextStateRecord.MagicOffset;
-				return true;
-			case MuiAreaFixedTextStateField.WidthText:
-				offset = MuiAreaFixedTextStateRecord.WidthTextOffset;
-				return true;
-			case MuiAreaFixedTextStateField.HeightText:
-				offset = MuiAreaFixedTextStateRecord.HeightTextOffset;
-				return true;
-			case MuiAreaFixedTextStateField.Generation:
-				offset = MuiAreaFixedTextStateRecord.GenerationOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -184,9 +181,17 @@ internal static class MuiAreaFixedTextStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaFixedTextStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaFixedTextStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaFixedTextStateField.WidthText)
+			value = state.WidthText.Raw;
+		else if (field == MuiAreaFixedTextStateField.HeightText)
+			value = state.HeightText.Raw;
+		else if (field == MuiAreaFixedTextStateField.Generation)
+			value = state.Generation;
+		else return false;
 		return true;
 	}
 
@@ -194,10 +199,19 @@ internal static class MuiAreaFixedTextStateRecordMemoryCodec
 		APTR record, MuiAreaFixedTextStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaFixedTextStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaFixedTextStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaFixedTextStateField.WidthText)
+			state.WidthText = APTR.FromPointer(value);
+		else if (field == MuiAreaFixedTextStateField.HeightText)
+			state.HeightText = APTR.FromPointer(value);
+		else if (field == MuiAreaFixedTextStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiAreaFixedTextStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

@@ -20,6 +20,9 @@ public struct MuiBalancePolicyState
 internal struct MuiBalancePolicyStateRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint QuietOffset = 4;
 	internal const uint Cookie = 0x42414C4Eu; // 'BALN'
 
 	internal uint Magic;
@@ -41,34 +44,12 @@ internal struct MuiBalancePolicyStateFieldCursor
 
 internal static class MuiBalancePolicyStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiBalancePolicyStateField field,
-		out uint offset)
-	{
-		switch (field)
-		{
-			case MuiBalancePolicyStateField.Magic:
-				offset = 0;
-				return true;
-			case MuiBalancePolicyStateField.Quiet:
-				offset = 4;
-				return true;
-			default:
-				offset = 0;
-				return false;
-		}
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiBalancePolicyStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset ||
-			!platform.IsMapped(cursor.Record, MuiBalancePolicyStateRecord.Size))
-			return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return MuiBalancePolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -76,24 +57,16 @@ internal static class MuiBalancePolicyStateFieldCursorCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiBalancePolicyStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiBalancePolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiBalancePolicyStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiBalancePolicyStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		return MuiBalancePolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
 	}
 }
 
@@ -103,16 +76,77 @@ internal static class MuiBalancePolicyStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiBalancePolicyStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiBalancePolicyStateField field,
+		out uint offset)
+	{
+		if (field == MuiBalancePolicyStateField.Magic)
+			offset = MuiBalancePolicyStateRecord.MagicOffset;
+		else if (field == MuiBalancePolicyStateField.Quiet)
+			offset = MuiBalancePolicyStateRecord.QuietOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiBalancePolicyStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset)
+			return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(record, MuiBalancePolicyStateRecord.Size) &&
+			platform.IsMapped(address, MuiBalancePolicyStateRecord.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiBalancePolicyStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiBalancePolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiBalancePolicyStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiBalancePolicyStateField.Quiet)
+			value = state.Quiet;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiBalancePolicyStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiBalancePolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiBalancePolicyStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiBalancePolicyStateField.Quiet)
+			state.Quiet = value;
+		else return false;
+		return MuiBalancePolicyStateRecordCodec.WriteRecord(ref platform, record,
+			state);
+	}
+
+	// Legacy raw-offset adapter retained for bounded diagnostics and older
+	// callers. Typed field access above is the preferred API.
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiBalancePolicyStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiBalancePolicyStateRecord.Size -
+			MuiBalancePolicyStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiBalancePolicyStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiBalancePolicyStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

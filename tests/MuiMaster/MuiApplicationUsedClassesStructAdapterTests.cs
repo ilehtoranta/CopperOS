@@ -65,6 +65,36 @@ public sealed class MuiApplicationUsedClassesStructAdapterTests
 	}
 
 	[Fact]
+	public void ApplicationUsedClassesFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationUsedClassesStateRecord
+		{
+			Magic = 0x10203040u,
+			Vector = APTR.FromPointer(0x50607080u),
+		};
+
+		Assert.True(MuiApplicationUsedClassesStateRecordCodec.WriteRecord(
+			ref platform, address, initial));
+		Assert.True(MuiApplicationUsedClassesStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationUsedClassesStateField.Magic,
+			0xF1020304u));
+		Assert.True(MuiApplicationUsedClassesStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiApplicationUsedClassesStateField.Vector,
+			out var vector));
+		Assert.Equal(initial.Vector.Raw, vector);
+		Assert.True(MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(0xF1020304u, updated.Magic);
+		Assert.Equal(initial.Vector, updated.Vector);
+		Assert.False(MuiApplicationUsedClassesStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiApplicationUsedClassesStateField)255), 1));
+	}
+
+	[Fact]
 	public void ApplicationUsedClassesVectorEntryUsesNamedRecordBounds()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
@@ -91,6 +121,29 @@ public sealed class MuiApplicationUsedClassesStructAdapterTests
 		Assert.False(MuiApplicationUsedClassesVectorEntryMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null,
 			(MuiApplicationUsedClassesVectorEntryField)255, out _));
+	}
+
+	[Fact]
+	public void ApplicationUsedClassesVectorEntryFieldUsesSequentialRecordCodec()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x36C0);
+		const uint highBitName = 0xF1020304u;
+
+		Assert.True(MuiApplicationUsedClassesVectorEntryMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiApplicationUsedClassesVectorEntryField.Name, highBitName));
+		Assert.True(MuiApplicationUsedClassesVectorEntryMemoryCodec.TryReadUInt32(
+			ref platform, address,
+			MuiApplicationUsedClassesVectorEntryField.Name, out var rawName));
+		Assert.Equal(highBitName, rawName);
+		Assert.False(MuiApplicationUsedClassesVectorEntryMemoryCodec.TryReadUInt32(
+			ref platform, address,
+			(MuiApplicationUsedClassesVectorEntryField)255, out _));
+		Assert.False(MuiApplicationUsedClassesVectorEntryMemoryCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(0x30FFF),
+			MuiApplicationUsedClassesVectorEntryField.Name, highBitName));
 	}
 
 	[Fact]

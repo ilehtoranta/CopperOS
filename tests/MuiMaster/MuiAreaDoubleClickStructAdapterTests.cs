@@ -65,4 +65,33 @@ public sealed class MuiAreaDoubleClickStructAdapterTests
 		Assert.False(MuiAreaDoubleClickStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
 	}
+
+	[Fact]
+	public void AreaDoubleClickFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3B00);
+		var value = new MuiAreaDoubleClickStateRecord
+		{
+			Magic = MuiAreaDoubleClickStateRecord.Cookie,
+			Value = -17,
+			Generation = 23,
+		};
+
+		Assert.True(MuiAreaDoubleClickStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaDoubleClickStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaDoubleClickStateField.Value,
+			unchecked((uint)29)));
+		Assert.True(MuiAreaDoubleClickStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaDoubleClickStateField.Generation,
+			out var generation));
+		Assert.Equal(value.Generation, generation);
+		Assert.True(MuiAreaDoubleClickStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(29, decoded.Value);
+		Assert.Equal(value.Generation, decoded.Generation);
+		Assert.Equal(value.Magic, decoded.Magic);
+	}
 }

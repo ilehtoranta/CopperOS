@@ -241,14 +241,8 @@ internal static class MuiStoreMessageCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 	where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiStoreMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out methodId)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiStorePacketSequentialStructCodec.TryReadMethodIdValue(ref platform,
+			message, out methodId);
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiStoreMethodMessage packet)
@@ -263,22 +257,31 @@ internal static class MuiStoreMessageCodec
 }
 
 // Sequential codecs for the complete MorphOS Datamap/Objectmap packet family.
-// Every packet is consumed as one declaration-ordered named struct; byte-
-// preserving ULONG helpers retain method IDs and pointers with bit 31 set.
+// Every packet is consumed as one declaration-ordered named struct; the
+// shared ULONG record codec retains method IDs and pointers with bit 31 set.
 internal static class MuiStorePacketSequentialStructCodec
 {
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	private static bool TryReadUlong<TPlatform>(ref TPlatform platform,
 		ref MuiGuestStructCursor cursor, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+	{
+		value = 0;
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiGuestUlongStorage.Size, out var address)) return false;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
 			out value);
+	}
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	private static bool TryWriteUlong<TPlatform>(ref TPlatform platform,
 		ref MuiGuestStructCursor cursor, uint value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, value);
+	{
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiGuestUlongStorage.Size, out var address)) return false;
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
+	}
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
@@ -288,8 +291,7 @@ internal static class MuiStorePacketSequentialStructCodec
 		methodId = 0;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
 			MuiStoreMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out methodId)) return false;
+			!TryReadUlong(ref platform, ref cursor, out methodId)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
@@ -335,8 +337,7 @@ internal static class MuiStorePacketSequentialStructCodec
 		methodId = 0;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
 			MuiStoreClearMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out methodId)) return false;
+			!TryReadUlong(ref platform, ref cursor, out methodId)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
@@ -352,8 +353,7 @@ internal static class MuiStorePacketSequentialStructCodec
 	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
 			MuiStoreClearMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				methodId)) return false;
+			!TryWriteUlong(ref platform, ref cursor, methodId)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 

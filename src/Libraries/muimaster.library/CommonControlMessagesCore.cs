@@ -527,32 +527,68 @@ internal static class MuiCommonFieldCursorCodec
 // Complete sequential codecs for the fixed CommonControl envelopes. Numeric
 // positions remain owned by the declaration order of each packed record; the
 // legacy field adapter above is retained only for compatibility diagnostics.
+internal static class MuiCommonMethodMessageHeaderCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiCommonMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiCommonMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiCommonMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!TryReadValue(ref platform, address, out var methodId)) return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform,
+		APTR address, MuiCommonMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> WriteValue(ref platform, address, packet.MethodId);
+}
+
 internal static class MuiCommonMessageStructCodec
 {
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiCommonMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out methodId)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiCommonMethodMessageHeaderCodec.TryReadValue(ref platform, message,
+			out methodId);
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryWriteMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiCommonMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				methodId)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiCommonMethodMessageHeaderCodec.WriteValue(ref platform, message,
+			methodId);
 
 	internal static bool TryReadSigned<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiCommonSignedValueMessage value)
@@ -832,17 +868,16 @@ internal static class MuiCommonMethodMessageCodec
 		APTR message, out MuiCommonMethodMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		packet = default;
-		return MuiCommonMessageStructCodec.TryReadMethodIdValue(ref platform,
-			message, out packet.MethodId);
+		return MuiCommonMethodMessageHeaderCodec.TryRead(ref platform, message,
+			out packet);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		return MuiCommonMessageStructCodec.TryWriteMethodIdValue(ref platform,
-			message, method);
+		return MuiCommonMethodMessageHeaderCodec.WriteValue(ref platform, message,
+			method);
 	}
 }
 

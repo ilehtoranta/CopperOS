@@ -1356,6 +1356,24 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void DataspaceIffMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1200);
+		const uint methodId = 0xC2468ACEu;
+		Assert.True(MuiDataspaceIffMethodHeaderCodec.WriteValue(ref platform,
+			packet, methodId));
+		Assert.True(MuiDataspaceIffMethodHeaderCodec.TryReadValue(ref platform,
+			packet, out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiDataspaceIffMethodHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFF), out _));
+		Assert.False(MuiDataspaceIffMethodHeaderCodec.WriteValue(ref platform,
+			APTR.Null, methodId));
+	}
+
+	[Fact]
 	public void DataspaceIffMethodFieldCursorUsesNamedBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -1721,11 +1739,23 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiNotifyWriteMessageCodec.TryReadMethodIdValue(ref platform,
 			packet, out var methodId));
 		Assert.Equal(MuiNotifyWriteCore.WriteLongMethod, methodId);
+		Assert.True(MuiNotifyWriteMethodMessageCodec.TryReadValue(ref platform,
+			packet, out methodId));
+		Assert.Equal(MuiNotifyWriteCore.WriteLongMethod, methodId);
 		Assert.True(MuiNotifyWritePacketMemoryCodec.TryReadUInt32(ref platform,
 			packet, MuiNotifyWritePacketKind.WriteLong,
 			MuiNotifyWritePacketField.MethodId, MuiNotifyWriteMethodMessage.Size,
 			out var directMethodId));
 		Assert.Equal(MuiNotifyWriteCore.WriteLongMethod, directMethodId);
+		Assert.True(MuiNotifyWriteMethodMessageCodec.WriteValue(ref platform,
+			packet, 0xF1234567u));
+		Assert.True(MuiNotifyWriteMethodMessageCodec.TryReadValue(ref platform,
+			packet, out methodId));
+		Assert.Equal(0xF1234567u, methodId);
+		Assert.False(MuiNotifyWriteMethodMessageCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFEu), out _));
+		Assert.False(MuiNotifyWriteMethodMessageCodec.WriteValue(ref platform,
+			APTR.Null, 1));
 		var shortHeaderAddress = APTR.FromPointer(0x1FFFCu);
 		var shortHeader = new MuiNotifyWriteMethodMessage
 		{
@@ -2095,6 +2125,18 @@ public sealed class MuiHeadlessDispatcherTests
 			packet, MuiSetAsStringPacketField.MethodId,
 			MuiSetAsStringMethodMessage.Size, out var directMethod));
 		Assert.Equal(MuiNotifySetAsStringCore.Method, directMethod);
+		Assert.True(MuiSetAsStringMessageCodec.TryReadMethodHeaderValue(ref
+			platform, packet, out directMethod));
+		Assert.Equal(MuiNotifySetAsStringCore.Method, directMethod);
+		Assert.True(MuiSetAsStringMessageCodec.WriteMethodHeaderValue(ref
+			platform, packet, 0xF1234567u));
+		Assert.True(MuiSetAsStringMessageCodec.TryReadMethodHeaderValue(ref
+			platform, packet, out directMethod));
+		Assert.Equal(0xF1234567u, directMethod);
+		Assert.False(MuiSetAsStringMessageCodec.TryReadMethodHeaderValue(ref
+			platform, APTR.FromPointer(0x20FFEu), out _));
+		Assert.False(MuiSetAsStringMessageCodec.WriteMethodHeaderValue(ref
+			platform, APTR.Null, 1));
 		Assert.False(MuiSetAsStringMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -2226,6 +2268,15 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiBoopsiQueryMessageCodec.TryReadMethodId(ref platform,
 			packet, out var header));
 		Assert.Equal(MuiBoopsiQueryCore.Method, header.MethodId);
+		Assert.True(MuiBoopsiQueryMessageCodec.WriteMethodIdValue(ref platform,
+			packet, 0xF1234567u));
+		Assert.True(MuiBoopsiQueryMessageCodec.TryReadMethodIdValue(ref platform,
+			packet, out var scalarMethodId));
+		Assert.Equal(0xF1234567u, scalarMethodId);
+		Assert.False(MuiBoopsiQueryMessageCodec.WriteMethodIdValue(ref platform,
+			APTR.Null, 1));
+		Assert.False(MuiBoopsiQueryMessageCodec.TryReadMethodIdValue(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
 		Assert.False(MuiBoopsiQueryMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}
@@ -2439,6 +2490,18 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.Equal(MuiCallHookCore.Method, header.MethodId);
 		Assert.False(MuiCallHookMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
+		Assert.True(MuiCallHookMethodMessageCodec.TryReadValue(ref platform,
+			packet, out var methodId));
+		Assert.Equal(MuiCallHookCore.Method, methodId);
+		Assert.True(MuiCallHookMethodMessageCodec.WriteValue(ref platform,
+			packet, 0xF1234567u));
+		Assert.True(MuiCallHookMethodMessageCodec.TryReadValue(ref platform,
+			packet, out methodId));
+		Assert.Equal(0xF1234567u, methodId);
+		Assert.False(MuiCallHookMethodMessageCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFF), out _));
+		Assert.False(MuiCallHookMethodMessageCodec.WriteValue(ref platform,
+			APTR.Null, 1));
 	}
 
 	[Fact]
@@ -2555,6 +2618,34 @@ public sealed class MuiHeadlessDispatcherTests
 			message, out var methodId));
 		Assert.Equal(MuiUpdateConfigCore.Method, methodId);
 		Assert.False(MuiUpdateConfigCore.TryReadMethodId(ref platform,
+			APTR.Null, out _));
+	}
+
+	[Fact]
+	public void UpdateConfigMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x4000,
+			State);
+		var address = APTR.FromPointer(0x2FFFC);
+		const uint methodId = 0xC2468ACEu;
+		platform.WriteUInt32(address, 0, methodId);
+
+		Assert.True(MuiUpdateConfigCore.TryReadMethodIdValue(ref platform,
+			address, out var decoded));
+		Assert.Equal(methodId, decoded);
+		Assert.True(MuiUpdateConfigCore.TryReadMethodId(ref platform, address,
+			out var header));
+		Assert.Equal(methodId, header.MethodId);
+
+		var nearEnd = APTR.FromPointer(0x40FFC);
+		platform.WriteUInt32(nearEnd, 0, methodId);
+		Assert.True(MuiUpdateConfigCore.TryReadMethodIdValue(ref platform,
+			nearEnd, out decoded));
+		Assert.Equal(methodId, decoded);
+		var truncated = APTR.FromPointer(0x40FFD);
+		Assert.False(MuiUpdateConfigCore.TryReadMethodIdValue(ref platform,
+			truncated, out _));
+		Assert.False(MuiUpdateConfigCore.TryReadMethodIdValue(ref platform,
 			APTR.Null, out _));
 	}
 
@@ -2926,6 +3017,24 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.Equal(MuiFamilyMutationCore.AddHeadMethod, methodId);
 		Assert.False(MuiFamilyMutationMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
+	}
+
+	[Fact]
+	public void FamilyMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1200);
+		const uint methodId = 0xD13579B3u;
+		Assert.True(MuiFamilyMethodHeaderCodec.WriteValue(ref platform, packet,
+			methodId));
+		Assert.True(MuiFamilyMethodHeaderCodec.TryReadValue(ref platform, packet,
+			out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiFamilyMethodHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiFamilyMethodHeaderCodec.WriteValue(ref platform,
+			APTR.Null, methodId));
 	}
 
 	[Fact]
@@ -3484,6 +3593,24 @@ public sealed class MuiHeadlessDispatcherTests
 	}
 
 	[Fact]
+	public void FamilyGetChildMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1200);
+		const uint methodId = 0xF1234567u;
+		Assert.True(MuiFamilyGetChildMethodHeaderCodec.WriteValue(ref platform,
+			packet, methodId));
+		Assert.True(MuiFamilyGetChildMethodHeaderCodec.TryReadValue(ref platform,
+			packet, out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiFamilyGetChildMethodHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiFamilyGetChildMethodHeaderCodec.WriteValue(ref platform,
+			APTR.Null, methodId));
+	}
+
+	[Fact]
 	public void FamilyGetChildPacketMemoryAdapterUsesNamedSignedBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -3588,6 +3715,24 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.Equal(MuiFamilyDoChildMethodsCore.Method, methodId);
 		Assert.False(MuiFamilyDoChildMethodsMessageCodec.TryReadMethodId(
 			ref platform, APTR.Null, out _));
+	}
+
+	[Fact]
+	public void FamilyDoChildMethodsMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1200);
+		const uint methodId = 0xE7654321u;
+		Assert.True(MuiFamilyDoChildMethodsMethodHeaderCodec.WriteValue(
+			ref platform, packet, methodId));
+		Assert.True(MuiFamilyDoChildMethodsMethodHeaderCodec.TryReadValue(
+			ref platform, packet, out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiFamilyDoChildMethodsMethodHeaderCodec.TryReadValue(
+			ref platform, APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiFamilyDoChildMethodsMethodHeaderCodec.WriteValue(
+			ref platform, APTR.Null, methodId));
 	}
 
 	[Fact]
@@ -3777,6 +3922,15 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiGroupChangeMessageCodec.TryReadMethodIdValue(ref platform,
 			packet, out var methodId));
 		Assert.Equal(MuiGroupChangeCore.InitChangeMethod, methodId);
+		Assert.True(MuiGroupChangeMessageCodec.WriteMethodIdValueStruct(ref
+			platform, packet, 0xF1234567u));
+		Assert.True(MuiGroupChangeMessageCodec.TryReadMethodIdValueStruct(ref
+			platform, packet, out methodId));
+		Assert.Equal(0xF1234567u, methodId);
+		Assert.False(MuiGroupChangeMessageCodec.TryReadMethodIdValueStruct(ref
+			platform, APTR.FromPointer(0x20FFEu), out _));
+		Assert.False(MuiGroupChangeMessageCodec.WriteMethodIdValueStruct(ref
+			platform, APTR.Null, 1));
 		Assert.True(MuiGroupChangeCore.WriteExitChange2Record(ref platform,
 			packet, 0xA5));
 		Assert.True(MuiGroupChangeMessageCodec.TryReadMethodId(ref platform,
@@ -3892,6 +4046,15 @@ public sealed class MuiHeadlessDispatcherTests
 		Assert.True(MuiGroupOrderingMessageCodec.TryReadMethodIdValue(ref platform,
 			packet, out var methodId));
 		Assert.Equal(MuiGroupOperationsCore.SortMethod, methodId);
+		Assert.True(MuiGroupOrderingMethodHeaderCodec.WriteValue(ref platform,
+			packet, 0xF1234567u));
+		Assert.True(MuiGroupOrderingMethodHeaderCodec.TryReadValue(ref platform,
+			packet, out methodId));
+		Assert.Equal(0xF1234567u, methodId);
+		Assert.False(MuiGroupOrderingMethodHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFEu), out _));
+		Assert.False(MuiGroupOrderingMethodHeaderCodec.WriteValue(ref platform,
+			APTR.Null, 1));
 		Assert.False(MuiGroupOrderingMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}

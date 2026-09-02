@@ -71,4 +71,36 @@ public sealed class MuiApplicationMenuStructAdapterTests
 		Assert.False(MuiApplicationMenuStateRecordCodec.TryReadRecord(
 			ref platform, crossingEnd, out _));
 	}
+
+	[Fact]
+	public void ApplicationMenuStateFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationMenuStateRecord
+		{
+			Magic = 0x10203040u,
+			MenuAction = 0x50607080u,
+			MenuHelp = 0x90A0B0C0u,
+		};
+
+		Assert.True(MuiApplicationMenuStateRecordCodec.WriteRecord(ref platform,
+			address, initial));
+		Assert.True(MuiApplicationMenuStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationMenuStateField.MenuAction,
+			0xF1020304u));
+		Assert.True(MuiApplicationMenuStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiApplicationMenuStateField.MenuHelp,
+			out var help));
+		Assert.Equal(initial.MenuHelp, help);
+		Assert.True(MuiApplicationMenuStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(0xF1020304u, updated.MenuAction);
+		Assert.Equal(initial.MenuHelp, updated.MenuHelp);
+		Assert.False(MuiApplicationMenuStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiApplicationMenuStateField)255), 1));
+	}
 }

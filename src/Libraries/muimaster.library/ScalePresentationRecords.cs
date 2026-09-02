@@ -108,8 +108,13 @@ internal static class MuiScalePresentationStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiScalePresentationStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiScalePresentationStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiScalePresentationStateField.Horizontal)
+			value = state.Horizontal;
+		else return false;
 		return true;
 	}
 
@@ -117,9 +122,15 @@ internal static class MuiScalePresentationStateRecordMemoryCodec
 		APTR record, MuiScalePresentationStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiScalePresentationStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiScalePresentationStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiScalePresentationStateField.Horizontal)
+			state.Horizontal = value;
+		else return false;
+		return MuiScalePresentationStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

@@ -51,4 +51,22 @@ public sealed class MuiDataspaceMessageStructCodecTests
 		Assert.False(MuiDataspaceMessageStructCodec.TryReadMethodIdValue(
 			ref platform, APTR.Null, out _));
 	}
+
+	[Fact]
+	public void DataspaceMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var packet = APTR.FromPointer(0x2400);
+		const uint methodId = 0xC2468ACEu;
+		Assert.True(MuiDataspaceMethodHeaderCodec.WriteValue(ref platform,
+			packet, methodId));
+		Assert.True(MuiDataspaceMethodHeaderCodec.TryReadValue(ref platform,
+			packet, out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiDataspaceMethodHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFF), out _));
+		Assert.False(MuiDataspaceMethodHeaderCodec.WriteValue(ref platform,
+			APTR.Null, methodId));
+	}
 }

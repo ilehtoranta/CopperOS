@@ -20,6 +20,9 @@ public struct MuiLevelmeterPresentationState
 internal struct MuiLevelmeterPresentationStateRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint HorizontalOffset = 4;
 	internal const uint Cookie = 0x4D4C564Cu; // 'MLVL'
 
 	internal uint Magic;
@@ -44,13 +47,16 @@ internal static class MuiLevelmeterPresentationStateFieldCursorCodec
 	private static bool TryResolve(MuiLevelmeterPresentationStateField field,
 		out uint offset)
 	{
-		offset = field switch
+		if (field == MuiLevelmeterPresentationStateField.Magic)
+			offset = MuiLevelmeterPresentationStateRecord.MagicOffset;
+		else if (field == MuiLevelmeterPresentationStateField.Horizontal)
+			offset = MuiLevelmeterPresentationStateRecord.HorizontalOffset;
+		else
 		{
-			MuiLevelmeterPresentationStateField.Magic => 0,
-			MuiLevelmeterPresentationStateField.Horizontal => 4,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -62,7 +68,7 @@ internal static class MuiLevelmeterPresentationStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 			cursor.Record, MuiLevelmeterPresentationStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiLevelmeterPresentationStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -97,16 +103,71 @@ internal static class MuiLevelmeterPresentationStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiLevelmeterPresentationStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiLevelmeterPresentationStateField field,
+		out uint offset)
+	{
+		if (field == MuiLevelmeterPresentationStateField.Magic)
+			offset = MuiLevelmeterPresentationStateRecord.MagicOffset;
+		else if (field == MuiLevelmeterPresentationStateField.Horizontal)
+			offset = MuiLevelmeterPresentationStateRecord.HorizontalOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiLevelmeterPresentationStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiLevelmeterPresentationStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiLevelmeterPresentationStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiLevelmeterPresentationStateField.Horizontal)
+			value = state.Horizontal;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiLevelmeterPresentationStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiLevelmeterPresentationStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiLevelmeterPresentationStateField.Horizontal)
+			state.Horizontal = value;
+		else return false;
+		return MuiLevelmeterPresentationStateRecordCodec.WriteRecord(ref platform,
+			record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiLevelmeterPresentationStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiLevelmeterPresentationStateRecord.Size -
+			MuiLevelmeterPresentationStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiLevelmeterPresentationStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiLevelmeterPresentationStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

@@ -209,18 +209,13 @@ internal static class MuiFamilyPacketMemoryCodec
 	}
 
 	// Keep method-header admission scalar in native lowering while the public
-	// decoder continues to expose the named method record.
+	// decoder continues to expose the named method record. The named header
+	// codec below owns the bounded guest-memory read.
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = 0;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiFamilyMethodMessage.Size)) return false;
-		value = platform.ReadUInt32(message,
-			(int)MuiFamilyMethodMessage.MethodIdOffset);
-		return true;
-	}
+		=> MuiFamilyMethodHeaderCodec.TryReadValue(ref platform, message,
+			out value);
 }
 
 // Compatibility wrapper retained for callers that still construct the typed
@@ -257,14 +252,8 @@ internal static class MuiFamilyMutationMessageStructCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiFamilyMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out methodId) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
-		return true;
-	}
+		=> MuiFamilyMethodHeaderCodec.TryReadValue(ref platform, message,
+			out methodId);
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiFamilyMethodMessage packet)
@@ -279,13 +268,7 @@ internal static class MuiFamilyMutationMessageStructCodec
 	internal static bool TryWriteMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiFamilyMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, methodId))
-			return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiFamilyMethodHeaderCodec.WriteValue(ref platform, message, methodId);
 
 	internal static bool TryReadChild<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiFamilyChildMessage packet)
@@ -414,6 +397,41 @@ internal static class MuiFamilyMutationMessageStructCodec
 		APTR message, uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 		=> TryWriteMethod(ref platform, message, methodId);
+}
+
+// Struct-first codec for the method-only Family mutation and sort headers.
+// Keep the named one-ULONG record as the ABI contract while using the shared
+// storage record to avoid direct scalar reads at the guest boundary.
+internal static class MuiFamilyMethodHeaderCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiFamilyMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiFamilyMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
 }
 
 // Central codec for the fixed MorphOS Family mutation packet family. The

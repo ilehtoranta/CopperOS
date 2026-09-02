@@ -102,23 +102,20 @@ internal static class MuiAreaTextColorStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaTextColorStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaTextColorStateField.Magic)
+			offset = MuiAreaTextColorStateRecord.MagicOffset;
+		else if (field == MuiAreaTextColorStateField.Color)
+			offset = MuiAreaTextColorStateRecord.ColorOffset;
+		else if (field == MuiAreaTextColorStateField.Active)
+			offset = MuiAreaTextColorStateRecord.ActiveOffset;
+		else if (field == MuiAreaTextColorStateField.Generation)
+			offset = MuiAreaTextColorStateRecord.GenerationOffset;
+		else
 		{
-			case MuiAreaTextColorStateField.Magic:
-				offset = MuiAreaTextColorStateRecord.MagicOffset;
-				return true;
-			case MuiAreaTextColorStateField.Color:
-				offset = MuiAreaTextColorStateRecord.ColorOffset;
-				return true;
-			case MuiAreaTextColorStateField.Active:
-				offset = MuiAreaTextColorStateRecord.ActiveOffset;
-				return true;
-			case MuiAreaTextColorStateField.Generation:
-				offset = MuiAreaTextColorStateRecord.GenerationOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -139,9 +136,17 @@ internal static class MuiAreaTextColorStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaTextColorStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaTextColorStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaTextColorStateField.Color)
+			value = state.Color;
+		else if (field == MuiAreaTextColorStateField.Active)
+			value = state.Active;
+		else if (field == MuiAreaTextColorStateField.Generation)
+			value = state.Generation;
+		else return false;
 		return true;
 	}
 
@@ -149,10 +154,19 @@ internal static class MuiAreaTextColorStateRecordMemoryCodec
 		APTR record, MuiAreaTextColorStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaTextColorStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaTextColorStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaTextColorStateField.Color)
+			state.Color = value;
+		else if (field == MuiAreaTextColorStateField.Active)
+			state.Active = value;
+		else if (field == MuiAreaTextColorStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiAreaTextColorStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

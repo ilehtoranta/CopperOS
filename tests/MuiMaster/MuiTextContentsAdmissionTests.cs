@@ -88,11 +88,31 @@ public sealed class MuiTextContentsAdmissionTests
 		Assert.True(MuiTextContentsStateRecordCodec.Write(ref platform, address,
 			record));
 		Assert.True(MuiTextContentsStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiTextContentsStateField.Contents,
+			out var typedContentsAddress));
+		Assert.Equal(0x1D04u, typedContentsAddress.Raw);
+		Assert.True(MuiTextContentsStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiTextContentsStateField.Contents,
+			out var typedContents));
+		Assert.Equal(source.Raw, typedContents);
+		Assert.True(MuiTextContentsStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, 4, out var contentsAddress));
 		Assert.Equal(0x1D04u, contentsAddress.Raw);
 		Assert.True(MuiTextContentsStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, address, 4, out var contents));
 		Assert.Equal(source.Raw, contents);
+		Assert.True(MuiTextContentsStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiTextContentsStateField.Contents, 0));
+		Assert.True(MuiTextContentsStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiTextContentsStateField.Magic,
+			out var typedMagic));
+		Assert.Equal(MuiTextContentsStateRecord.Cookie, typedMagic);
+		Assert.False(MuiTextContentsStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiTextContentsStateField)255, out _));
+		Assert.True(MuiTextContentsStateRecordCodec.TryReadStructural(ref platform,
+			address, out var typedUpdated));
+		Assert.Equal(MuiTextContentsStateRecord.Cookie, typedUpdated.Magic);
+		Assert.True(typedUpdated.Contents.IsNull);
 		Assert.True(MuiTextContentsStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, 4, 0));
 		Assert.True(MuiTextContentsStateRecordCodec.TryReadStructural(ref platform,
@@ -101,7 +121,7 @@ public sealed class MuiTextContentsAdmissionTests
 		Assert.False(MuiTextContentsStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiTextContentsStateRecord.Size, out _));
 		Assert.False(MuiTextContentsStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiTextContentsStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

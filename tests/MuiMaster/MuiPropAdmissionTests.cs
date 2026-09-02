@@ -160,10 +160,25 @@ public sealed class MuiPropAdmissionTests
 		Assert.True(MuiPropPolicyStateRecordCodec.TryReadStructural(ref platform,
 			address, out var updated));
 		Assert.Equal(0u, updated.Slider);
+		Assert.True(MuiPropPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiPropPolicyStateField.DeltaFactor, out var typedDelta));
+		Assert.Equal(address.Raw + MuiPropPolicyStateRecord.DeltaFactorOffset,
+			typedDelta.Raw);
+		Assert.True(MuiPropPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiPropPolicyStateField.UseWinBorder, 1));
+		Assert.True(MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiPropPolicyStateField.Magic, out var typedMagic));
+		Assert.Equal(record.Magic, typedMagic);
+		Assert.True(MuiPropPolicyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var typedUpdated));
+		Assert.Equal(1u, typedUpdated.UseWinBorder);
+		Assert.Equal(updated.Horizontal, typedUpdated.Horizontal);
+		Assert.False(MuiPropPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, (MuiPropPolicyStateField)0xFF, out _));
 		Assert.False(MuiPropPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiPropPolicyStateRecord.Size, out _));
 		Assert.False(MuiPropPolicyStateRecordMemoryCodec.TryGetAddress(ref platform,
-			APTR.Null, 0, out _));
+			APTR.Null, (uint)0, out _));
 		Assert.False(MuiPropPolicyStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}
@@ -192,10 +207,25 @@ public sealed class MuiPropAdmissionTests
 		Assert.True(MuiPropRangeStateRecordCodec.TryReadStructural(ref platform,
 			address, out var updated));
 		Assert.Equal(7u, updated.First);
+		Assert.True(MuiPropRangeStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiPropRangeStateField.Visible, out var typedVisible));
+		Assert.Equal(address.Raw + MuiPropRangeStateRecord.VisibleOffset,
+			typedVisible.Raw);
+		Assert.True(MuiPropRangeStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiPropRangeStateField.Entries, 120));
+		Assert.True(MuiPropRangeStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiPropRangeStateField.Magic, out var typedMagic));
+		Assert.Equal(record.Magic, typedMagic);
+		Assert.True(MuiPropRangeStateRecordCodec.TryReadStructural(ref platform,
+			address, out var typedUpdated));
+		Assert.Equal(120u, typedUpdated.Entries);
+		Assert.Equal(updated.First, typedUpdated.First);
+		Assert.False(MuiPropRangeStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, (MuiPropRangeStateField)0xFF, out _));
 		Assert.False(MuiPropRangeStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiPropRangeStateRecord.Size, out _));
 		Assert.False(MuiPropRangeStateRecordMemoryCodec.TryGetAddress(ref platform,
-			APTR.Null, 0, out _));
+			APTR.Null, (uint)0, out _));
 		Assert.False(MuiPropRangeStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

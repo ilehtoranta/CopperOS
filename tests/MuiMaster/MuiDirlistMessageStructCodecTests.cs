@@ -87,4 +87,22 @@ public sealed class MuiDirlistMessageStructCodecTests
 		Assert.False(MuiDirlistMessageStructCodec.TryReadMethodIdValue(
 			ref platform, APTR.Null, out _));
 	}
+
+	[Fact]
+	public void DirlistMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x80000, 0x8000,
+			APTR.FromPointer(0x1000));
+		var packet = APTR.FromPointer(0x2C00);
+		const uint methodId = 0xC2468ACEu;
+		Assert.True(MuiDirlistMethodHeaderCodec.WriteValue(ref platform,
+			packet, methodId));
+		Assert.True(MuiDirlistMethodHeaderCodec.TryReadValue(ref platform,
+			packet, out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiDirlistMethodHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x80FFF), out _));
+		Assert.False(MuiDirlistMethodHeaderCodec.WriteValue(ref platform,
+			APTR.Null, methodId));
+	}
 }

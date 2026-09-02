@@ -124,9 +124,15 @@ internal static class MuiApplicationMenuStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationMenuStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationMenuStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationMenuStateField.MenuAction)
+			value = state.MenuAction;
+		else if (field == MuiApplicationMenuStateField.MenuHelp)
+			value = state.MenuHelp;
+		else return false;
 		return true;
 	}
 
@@ -134,10 +140,17 @@ internal static class MuiApplicationMenuStateRecordMemoryCodec
 		APTR record, MuiApplicationMenuStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationMenuStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationMenuStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationMenuStateField.MenuAction)
+			state.MenuAction = value;
+		else if (field == MuiApplicationMenuStateField.MenuHelp)
+			state.MenuHelp = value;
+		else return false;
+		return MuiApplicationMenuStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

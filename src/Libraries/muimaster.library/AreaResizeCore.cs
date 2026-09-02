@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -163,11 +164,8 @@ internal static class MuiAreaExitResizeMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiAreaExitResizeMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var methodId) ||
-			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		if (!MuiAreaExitResizeMethodHeaderCodec.TryReadValue(ref platform,
+			address, out var methodId)) return false;
 		value.MethodId = methodId;
 		return true;
 	}
@@ -175,11 +173,41 @@ internal static class MuiAreaExitResizeMessageCodec
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaExitResizeMessage value)
 		where TPlatform : struct, IMuiGuestMemory
+		=> MuiAreaExitResizeMethodHeaderCodec.WriteValue(ref platform, address,
+			value.MethodId);
+}
+
+// Struct-first codec for the method-only exitResize header. Scalar-safe entry
+// points keep the packed one-ULONG record address explicit for freestanding
+// native lowering while reusing the shared guest storage representation.
+internal static class MuiAreaExitResizeMethodHeaderCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiAreaExitResizeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiAreaExitResizeMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				value.MethodId)) return false;
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }
@@ -229,28 +257,15 @@ internal static class MuiAreaResizeMessageCodec
 
 	internal static bool WriteExit<TPlatform>(ref TPlatform platform,
 		APTR message) where TPlatform : struct, IMuiGuestMemory
-	{
-		// Keep this one-field packet on the sequential cursor path. The
-		// compiler's by-value ABI for a single-LONG managed struct is not a
-		// guest pointer, so passing the record through a helper would lose the
-		// record address in freestanding native code.
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiAreaExitResizeMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				ExitResize)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiAreaExitResizeMethodHeaderCodec.WriteValue(ref platform, message,
+			ExitResize);
 
 	internal static bool TryReadExitMethod<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiAreaExitResizeMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out methodId) || !MuiGuestStructCursor.IsComplete(cursor) ||
-			methodId != ExitResize)
+		if (!MuiAreaExitResizeMethodHeaderCodec.TryReadValue(ref platform,
+			message, out methodId) || methodId != ExitResize)
 		{
 			methodId = 0;
 			return false;

@@ -31,6 +31,23 @@ public sealed class MuiNotifyPacketTests
 	}
 
 	[Fact]
+	public void NotifyMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var platform = CreatePlatform(out _);
+		var packet = APTR.FromPointer(0x1200);
+		const uint methodId = 0xC2468ACEu;
+		Assert.True(MuiNotifyMethodHeaderCodec.WriteValue(ref platform, packet,
+			methodId));
+		Assert.True(MuiNotifyMethodHeaderCodec.TryReadValue(ref platform, packet,
+			out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiNotifyMethodHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+		Assert.False(MuiNotifyMethodHeaderCodec.WriteValue(ref platform,
+			APTR.Null, methodId));
+	}
+
+	[Fact]
 	public void NotifyTypedReadersUseNamedMethodHeader()
 	{
 		var platform = CreatePlatform(out _);

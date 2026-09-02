@@ -174,8 +174,27 @@ internal static class MuiGroupGridStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiGroupGridStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiGroupGridStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiGroupGridStateField.Columns)
+			value = state.Columns;
+		else if (field == MuiGroupGridStateField.Rows)
+			value = state.Rows;
+		else if (field == MuiGroupGridStateField.HorizontalSpacing)
+			value = state.HorizontalSpacing;
+		else if (field == MuiGroupGridStateField.VerticalSpacing)
+			value = state.VerticalSpacing;
+		else if (field == MuiGroupGridStateField.SameWidth)
+			value = state.SameWidth;
+		else if (field == MuiGroupGridStateField.SameHeight)
+			value = state.SameHeight;
+		else if (field == MuiGroupGridStateField.HorizontalCenter)
+			value = state.HorizontalCenter;
+		else if (field == MuiGroupGridStateField.VerticalCenter)
+			value = state.VerticalCenter;
+		else return false;
 		return true;
 	}
 
@@ -183,9 +202,28 @@ internal static class MuiGroupGridStateRecordMemoryCodec
 		APTR record, MuiGroupGridStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiGroupGridStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiGroupGridStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiGroupGridStateField.Columns)
+			state.Columns = value;
+		else if (field == MuiGroupGridStateField.Rows)
+			state.Rows = value;
+		else if (field == MuiGroupGridStateField.HorizontalSpacing)
+			state.HorizontalSpacing = value;
+		else if (field == MuiGroupGridStateField.VerticalSpacing)
+			state.VerticalSpacing = value;
+		else if (field == MuiGroupGridStateField.SameWidth)
+			state.SameWidth = value;
+		else if (field == MuiGroupGridStateField.SameHeight)
+			state.SameHeight = value;
+		else if (field == MuiGroupGridStateField.HorizontalCenter)
+			state.HorizontalCenter = value;
+		else if (field == MuiGroupGridStateField.VerticalCenter)
+			state.VerticalCenter = value;
+		else return false;
+		return MuiGroupGridStateRecordCodec.WriteRecord(ref platform, record, state);
 	}
 }
 

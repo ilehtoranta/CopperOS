@@ -286,6 +286,18 @@ public sealed class MuiUserDataTests
 		Assert.True(MuiNotifyUserDataMessageCodec.TryReadMethodId(ref platform,
 			packet, out var header));
 		Assert.Equal(FindUData, header.MethodId);
+		Assert.True(MuiNotifyUserDataMessageCodec.TryReadValue(ref platform,
+			packet, out var methodId));
+		Assert.Equal(FindUData, methodId);
+		Assert.True(MuiNotifyUserDataMessageCodec.WriteValue(ref platform,
+			packet, 0xF1234567u));
+		Assert.True(MuiNotifyUserDataMessageCodec.TryReadValue(ref platform,
+			packet, out methodId));
+		Assert.Equal(0xF1234567u, methodId);
+		Assert.False(MuiNotifyUserDataMessageCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x7FFEu), out _));
+		Assert.False(MuiNotifyUserDataMessageCodec.WriteValue(ref platform,
+			APTR.Null, 1));
 		Assert.False(MuiNotifyUserDataMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}

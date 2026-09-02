@@ -90,6 +90,24 @@ public sealed class MuiRectangleScrollbarAdmissionTests
 		Assert.True(MuiRectanglePresentationStateRecordCodec.WriteRecord(ref platform,
 			address, record));
 		Assert.True(MuiRectanglePresentationStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiRectanglePresentationStateField.VerticalBar,
+			out var typedVerticalAddress));
+		Assert.Equal(0x1A48u, typedVerticalAddress.Raw);
+		Assert.True(MuiRectanglePresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiRectanglePresentationStateField.HorizontalBar,
+			out var typedHorizontal));
+		Assert.Equal(1u, typedHorizontal);
+		Assert.True(MuiRectanglePresentationStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiRectanglePresentationStateField.HorizontalBar, 0));
+		Assert.True(MuiRectanglePresentationStateRecordCodec.TryReadStructural(
+			ref platform, address, out var typedUpdated));
+		Assert.Equal(0u, typedUpdated.HorizontalBar);
+		Assert.Equal(record.VerticalBar, typedUpdated.VerticalBar);
+		Assert.True(MuiRectanglePresentationStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiRectanglePresentationStateField.HorizontalBar, 1));
+		Assert.False(MuiRectanglePresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiRectanglePresentationStateField)0xFF, out _));
+		Assert.True(MuiRectanglePresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, 8, out var verticalAddress));
 		Assert.Equal(0x1A48u, verticalAddress.Raw);
 		Assert.True(MuiRectanglePresentationStateRecordMemoryCodec.TryReadUInt32(
@@ -103,7 +121,7 @@ public sealed class MuiRectangleScrollbarAdmissionTests
 		Assert.False(MuiRectanglePresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiRectanglePresentationStateRecord.Size, out _));
 		Assert.False(MuiRectanglePresentationStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiRectanglePresentationStateRecordCodec.TryReadRecord(
 			ref platform, APTR.Null, out _));
 	}
@@ -132,10 +150,27 @@ public sealed class MuiRectangleScrollbarAdmissionTests
 		Assert.True(MuiScrollbarLayoutStateRecordCodec.TryReadStructural(ref platform,
 			address, out var updated));
 		Assert.Equal(0u, updated.Type);
+		Assert.True(MuiScrollbarLayoutStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiScrollbarLayoutStateField.Horizontal,
+			out var typedHorizontal));
+		Assert.Equal(address.Raw + MuiScrollbarLayoutStateRecord.HorizontalOffset,
+			typedHorizontal.Raw);
+		Assert.True(MuiScrollbarLayoutStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiScrollbarLayoutStateField.Type, 2));
+		Assert.True(MuiScrollbarLayoutStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiScrollbarLayoutStateField.Magic,
+			out var typedMagic));
+		Assert.Equal(record.Magic, typedMagic);
+		Assert.True(MuiScrollbarLayoutStateRecordCodec.TryReadStructural(ref platform,
+			address, out var typedUpdated));
+		Assert.Equal(2u, typedUpdated.Type);
+		Assert.Equal(updated.Horizontal, typedUpdated.Horizontal);
+		Assert.False(MuiScrollbarLayoutStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiScrollbarLayoutStateField)0xFF, out _));
 		Assert.False(MuiScrollbarLayoutStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiScrollbarLayoutStateRecord.Size, out _));
 		Assert.False(MuiScrollbarLayoutStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiScrollbarLayoutStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

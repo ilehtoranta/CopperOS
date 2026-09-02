@@ -31,6 +31,19 @@ public sealed class MuiKeyadjustTextStructAdapterTests
 			out var decoded));
 		Assert.Equal(value.Character, decoded.Character);
 		Assert.Equal(value.Terminator, decoded.Terminator);
+		Assert.True(MuiKeyadjustTextRecordMemoryCodec.TryReadByte(ref platform,
+			address, MuiKeyadjustTextField.Character, out var character));
+		Assert.Equal(value.Character, character);
+		Assert.True(MuiKeyadjustTextRecordMemoryCodec.TryWriteByte(ref platform,
+			address, MuiKeyadjustTextField.Character, (byte)'B'));
+		Assert.True(MuiKeyadjustTextRecordCodec.TryReadRecord(ref platform, address,
+			out var typedUpdated));
+		Assert.Equal((byte)'B', typedUpdated.Character);
+		Assert.Equal(value.Terminator, typedUpdated.Terminator);
+		Assert.True(MuiKeyadjustTextRecordMemoryCodec.TryWriteByte(ref platform,
+			address, MuiKeyadjustTextField.Character, value.Character));
+		Assert.False(MuiKeyadjustTextRecordMemoryCodec.TryReadByte(ref platform,
+			address, (MuiKeyadjustTextField)255, out _));
 
 		var cursor = default(MuiKeyadjustTextFieldCursor);
 		cursor.Record = address;

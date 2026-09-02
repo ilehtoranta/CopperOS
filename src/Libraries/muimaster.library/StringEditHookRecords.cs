@@ -15,6 +15,10 @@ namespace CopperOS.MuiMaster;
 internal struct MuiStringEditHookStateRecord
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint EditHookOffset = 4;
+	internal const uint LonelyEditHookOffset = 8;
 	internal const uint Cookie = 0x4D534548u; // 'MSEH'
 	internal const uint HookSize = 20;
 
@@ -57,14 +61,18 @@ internal static class MuiStringEditHookStateFieldCursorCodec
 	private static bool TryResolve(MuiStringEditHookStateField field,
 		out uint offset)
 	{
-		offset = field switch
+		if (field == MuiStringEditHookStateField.Magic)
+			offset = MuiStringEditHookStateRecord.MagicOffset;
+		else if (field == MuiStringEditHookStateField.EditHook)
+			offset = MuiStringEditHookStateRecord.EditHookOffset;
+		else if (field == MuiStringEditHookStateField.LonelyEditHook)
+			offset = MuiStringEditHookStateRecord.LonelyEditHookOffset;
+		else
 		{
-			MuiStringEditHookStateField.Magic => 0,
-			MuiStringEditHookStateField.EditHook => 4,
-			MuiStringEditHookStateField.LonelyEditHook => 8,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -76,7 +84,7 @@ internal static class MuiStringEditHookStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 				cursor.Record, MuiStringEditHookStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiStringEditHookStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -109,16 +117,77 @@ internal static class MuiStringEditHookStateFieldCursorCodec
 // fields; this bounded adapter owns fixed guest-layout translation.
 internal static class MuiStringEditHookStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiStringEditHookStateField field,
+		out uint offset)
+	{
+		if (field == MuiStringEditHookStateField.Magic)
+			offset = MuiStringEditHookStateRecord.MagicOffset;
+		else if (field == MuiStringEditHookStateField.EditHook)
+			offset = MuiStringEditHookStateRecord.EditHookOffset;
+		else if (field == MuiStringEditHookStateField.LonelyEditHook)
+			offset = MuiStringEditHookStateRecord.LonelyEditHookOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringEditHookStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringEditHookStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiStringEditHookStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringEditHookStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiStringEditHookStateField.EditHook)
+			value = state.EditHook.Raw;
+		else if (field == MuiStringEditHookStateField.LonelyEditHook)
+			value = state.LonelyEditHook;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringEditHookStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiStringEditHookStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringEditHookStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiStringEditHookStateField.EditHook)
+			state.EditHook = APTR.FromPointer(value);
+		else if (field == MuiStringEditHookStateField.LonelyEditHook)
+			state.LonelyEditHook = value;
+		else return false;
+		return MuiStringEditHookStateRecordCodec.WriteStructural(ref platform,
+			record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiStringEditHookStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiStringEditHookStateRecord.Size -
+			MuiStringEditHookStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiStringEditHookStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiStringEditHookStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -177,7 +246,13 @@ internal static class MuiStringEditHookStateRecordCodec
 		MuiStringEditHookStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiStringEditHookStateAdmission.Validate(value) &&
-		MuiGuestStructCursor.TryCreate(ref platform, address,
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiStringEditHookStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiStringEditHookStateRecord.Size, out var cursor) &&
 		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 			value.Magic) &&

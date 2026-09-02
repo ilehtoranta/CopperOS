@@ -124,32 +124,26 @@ internal static class MuiBitmapPolicyStateRecordMemoryCodec
 	private static bool TryResolve(MuiBitmapPolicyStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiBitmapPolicyStateField.Magic)
+			offset = MuiBitmapPolicyStateRecord.MagicOffset;
+		else if (field == MuiBitmapPolicyStateField.Alpha)
+			offset = MuiBitmapPolicyStateRecord.AlphaOffset;
+		else if (field == MuiBitmapPolicyStateField.MappingTable)
+			offset = MuiBitmapPolicyStateRecord.MappingTableOffset;
+		else if (field == MuiBitmapPolicyStateField.Precision)
+			offset = MuiBitmapPolicyStateRecord.PrecisionOffset;
+		else if (field == MuiBitmapPolicyStateField.SourceColors)
+			offset = MuiBitmapPolicyStateRecord.SourceColorsOffset;
+		else if (field == MuiBitmapPolicyStateField.Transparent)
+			offset = MuiBitmapPolicyStateRecord.TransparentOffset;
+		else if (field == MuiBitmapPolicyStateField.UseFriend)
+			offset = MuiBitmapPolicyStateRecord.UseFriendOffset;
+		else
 		{
-			case MuiBitmapPolicyStateField.Magic:
-				offset = MuiBitmapPolicyStateRecord.MagicOffset;
-				return true;
-			case MuiBitmapPolicyStateField.Alpha:
-				offset = MuiBitmapPolicyStateRecord.AlphaOffset;
-				return true;
-			case MuiBitmapPolicyStateField.MappingTable:
-				offset = MuiBitmapPolicyStateRecord.MappingTableOffset;
-				return true;
-			case MuiBitmapPolicyStateField.Precision:
-				offset = MuiBitmapPolicyStateRecord.PrecisionOffset;
-				return true;
-			case MuiBitmapPolicyStateField.SourceColors:
-				offset = MuiBitmapPolicyStateRecord.SourceColorsOffset;
-				return true;
-			case MuiBitmapPolicyStateField.Transparent:
-				offset = MuiBitmapPolicyStateRecord.TransparentOffset;
-				return true;
-			case MuiBitmapPolicyStateField.UseFriend:
-				offset = MuiBitmapPolicyStateRecord.UseFriendOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -169,8 +163,23 @@ internal static class MuiBitmapPolicyStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiBitmapPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiBitmapPolicyStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiBitmapPolicyStateField.Alpha)
+			value = state.Alpha;
+		else if (field == MuiBitmapPolicyStateField.MappingTable)
+			value = state.MappingTable;
+		else if (field == MuiBitmapPolicyStateField.Precision)
+			value = state.Precision;
+		else if (field == MuiBitmapPolicyStateField.SourceColors)
+			value = state.SourceColors;
+		else if (field == MuiBitmapPolicyStateField.Transparent)
+			value = state.Transparent;
+		else if (field == MuiBitmapPolicyStateField.UseFriend)
+			value = state.UseFriend;
+		else return false;
 		return true;
 	}
 
@@ -178,9 +187,25 @@ internal static class MuiBitmapPolicyStateRecordMemoryCodec
 		APTR record, MuiBitmapPolicyStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiBitmapPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiBitmapPolicyStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiBitmapPolicyStateField.Alpha)
+			state.Alpha = value;
+		else if (field == MuiBitmapPolicyStateField.MappingTable)
+			state.MappingTable = value;
+		else if (field == MuiBitmapPolicyStateField.Precision)
+			state.Precision = value;
+		else if (field == MuiBitmapPolicyStateField.SourceColors)
+			state.SourceColors = value;
+		else if (field == MuiBitmapPolicyStateField.Transparent)
+			state.Transparent = value;
+		else if (field == MuiBitmapPolicyStateField.UseFriend)
+			state.UseFriend = value;
+		else return false;
+		return MuiBitmapPolicyStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

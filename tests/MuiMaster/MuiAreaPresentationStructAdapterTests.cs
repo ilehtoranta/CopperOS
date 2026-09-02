@@ -74,4 +74,37 @@ public sealed class MuiAreaPresentationStructAdapterTests
 		Assert.False(MuiAreaPresentationStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
 	}
+
+	[Fact]
+	public void AreaPresentationFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3F00);
+		var value = new MuiAreaPresentationStateRecord
+		{
+			Magic = MuiAreaPresentationStateRecord.Cookie,
+			Disabled = 1,
+			ShowMe = 0,
+			Background = 0x12345678u,
+			Frame = 0xCAFEBABEu,
+			CustomBackfill = 1,
+		};
+
+		Assert.True(MuiAreaPresentationStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaPresentationStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaPresentationStateField.Background,
+			0xFEEDBEEFu));
+		Assert.True(MuiAreaPresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaPresentationStateField.Frame,
+			out var frame));
+		Assert.Equal(value.Frame, frame);
+		Assert.True(MuiAreaPresentationStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(0xFEEDBEEFu, decoded.Background);
+		Assert.Equal(value.Frame, decoded.Frame);
+		Assert.Equal(value.Disabled, decoded.Disabled);
+		Assert.Equal(value.Magic, decoded.Magic);
+	}
 }

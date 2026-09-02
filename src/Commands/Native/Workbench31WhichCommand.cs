@@ -31,158 +31,155 @@ public static class Workbench31WhichCommand
 
         var result = DOS.RETURN_WARN;
         var buffer = APTR.Null;
-        try
+        if (!arguments.TryGetResult(0, out var fileAddress) ||
+            fileAddress == 0 ||
+            !arguments.TryGetResult(1, out var noResidents) ||
+            !arguments.TryGetResult(2, out var residentsOnly) ||
+            !arguments.TryGetResult(3, out var all))
         {
-            if (!arguments.TryGetResult(0, out var fileAddress) ||
-                fileAddress == 0 ||
-                !arguments.TryGetResult(1, out var noResidents) ||
-                !arguments.TryGetResult(2, out var residentsOnly) ||
-                !arguments.TryGetResult(3, out var all))
-            {
-                result = DOS.RETURN_ERROR;
-                ioError = (int)DOS.Error.BadTemplate;
-                return result;
-            }
+            result = DOS.RETURN_ERROR;
+            ioError = (int)DOS.Error.BadTemplate;
+            goto Cleanup;
+        }
 
-            buffer = Exec.AllocMem(BufferBytes,
-                Exec.MemoryFlags.Public | Exec.MemoryFlags.Clear);
-            if (buffer.IsNull)
-            {
-                result = DOS.RETURN_FAIL;
-                ioError = (int)DOS.Error.NoFreeStore;
-                return result;
-            }
+        buffer = Exec.AllocMem(BufferBytes,
+            Exec.MemoryFlags.Public | Exec.MemoryFlags.Clear);
+        if (buffer.IsNull)
+        {
+            result = DOS.RETURN_FAIL;
+            ioError = (int)DOS.Error.NoFreeStore;
+            goto Cleanup;
+        }
 
-            var file = CString.FromPointer(fileAddress);
-            var continueAfterMatch = all != 0;
-            var restrictToResidents = residentsOnly != 0;
-            var reportResidents = noResidents == 0;
-            var found = false;
-            var foundNonInternal = false;
+        var file = CString.FromPointer(fileAddress);
+        var continueAfterMatch = all != 0;
+        var restrictToResidents = residentsOnly != 0;
+        var reportResidents = noResidents == 0;
+        var found = false;
+        var foundNonInternal = false;
 
-            // System segments are the classic INTERNAL category. The direct
-            // segment result is never dereferenced after Permit, so this does
-            // not retain a resident-list reference while output may block.
-            if (reportResidents && IsSegmentPresent(file, 1))
-            {
-                if (!WriteCategory(fileAddress, buffer, true))
-                {
-                    result = DOS.RETURN_ERROR;
-                    ioError = (int)DOS.IoErr();
-                    return result;
-                }
-                found = true;
-                if (!continueAfterMatch) return DOS.RETURN_OK;
-            }
-
-            if (reportResidents && IsSegmentPresent(file, 0))
-            {
-                if (!WriteCategory(fileAddress, buffer, false))
-                {
-                    result = DOS.RETURN_ERROR;
-                    ioError = (int)DOS.IoErr();
-                    return result;
-                }
-                found = true;
-                foundNonInternal = true;
-                if (!continueAfterMatch) return DOS.RETURN_OK;
-            }
-
-            if (restrictToResidents)
-            {
-                if (found) return DOS.RETURN_OK;
-                result = DOS.RETURN_WARN;
-                // The observed NORES+RES conflict returns WARN without
-                // publishing ObjectNotFound, whether or not ALL is present.
-                ioError = noResidents != 0 ? 0 : (int)DOS.Error.ObjectNotFound;
-                return result;
-            }
-
-            var direct = ReportLockedPath(file, buffer);
-            if (direct < 0)
+        // System segments are the classic INTERNAL category. The direct
+        // segment result is never dereferenced after Permit, so this does
+        // not retain a resident-list reference while output may block.
+        if (reportResidents && IsSegmentPresent(file, 1))
+        {
+            if (!WriteCategory(fileAddress, buffer, true))
             {
                 result = DOS.RETURN_ERROR;
                 ioError = (int)DOS.IoErr();
-                return result;
+                goto Cleanup;
             }
-            if (direct != 0)
+            found = true;
+            if (!continueAfterMatch) { result = DOS.RETURN_OK; goto Cleanup; }
+        }
+
+        if (reportResidents && IsSegmentPresent(file, 0))
+        {
+            if (!WriteCategory(fileAddress, buffer, false))
+            {
+                result = DOS.RETURN_ERROR;
+                ioError = (int)DOS.IoErr();
+                goto Cleanup;
+            }
+            found = true;
+            foundNonInternal = true;
+            if (!continueAfterMatch) { result = DOS.RETURN_OK; goto Cleanup; }
+        }
+
+        if (restrictToResidents)
+        {
+            if (found) { result = DOS.RETURN_OK; goto Cleanup; }
+            result = DOS.RETURN_WARN;
+            // The observed NORES+RES conflict returns WARN without
+            // publishing ObjectNotFound, whether or not ALL is present.
+            ioError = noResidents != 0 ? 0 : (int)DOS.Error.ObjectNotFound;
+            goto Cleanup;
+        }
+
+        var direct = ReportLockedPath(file, buffer);
+        if (direct < 0)
+        {
+            result = DOS.RETURN_ERROR;
+            ioError = (int)DOS.IoErr();
+            goto Cleanup;
+        }
+        if (direct != 0)
+        {
+            found = true;
+            foundNonInternal = true;
+            if (!continueAfterMatch) { result = DOS.RETURN_OK; goto Cleanup; }
+        }
+
+        var cli = DOS.Cli();
+        var path = cli.IsNull
+            ? BPTR.Null
+            : BPTR.FromRaw(APTR.ReadUInt32(cli,
+                DosLayout.CommandLineInterface.CommandDirectory));
+        for (var index = 0u; path.IsNotNull && index < MaximumPathLocks;
+            index++)
+        {
+            var node = path.Address;
+            var directory = BPTR.FromRaw(APTR.ReadUInt32(node,
+                DosLayout.PathLock.Lock));
+            var next = BPTR.FromRaw(APTR.ReadUInt32(node,
+                DosLayout.PathLock.Next));
+            if (directory.IsNull ||
+                DOS.NameFromLock(directory, buffer, (int)BufferBytes) == 0 ||
+                DOS.AddPart(CString.FromPointer(buffer.Raw), file,
+                    BufferBytes) == 0)
+            {
+                result = DOS.RETURN_ERROR;
+                ioError = (int)DOS.IoErr();
+                goto Cleanup;
+            }
+
+            var match = ReportLockedPath(CString.FromPointer(buffer.Raw),
+                buffer);
+            if (match < 0)
+            {
+                result = DOS.RETURN_ERROR;
+                ioError = (int)DOS.IoErr();
+                goto Cleanup;
+            }
+            if (match != 0)
             {
                 found = true;
                 foundNonInternal = true;
-                if (!continueAfterMatch) return DOS.RETURN_OK;
+                if (!continueAfterMatch) { result = DOS.RETURN_OK; goto Cleanup; }
             }
-
-            var cli = DOS.Cli();
-            var path = cli.IsNull
-                ? BPTR.Null
-                : BPTR.FromRaw(APTR.ReadUInt32(cli,
-                    DosLayout.CommandLineInterface.CommandDirectory));
-            for (var index = 0u; path.IsNotNull && index < MaximumPathLocks;
-                index++)
-            {
-                var node = path.Address;
-                var directory = BPTR.FromRaw(APTR.ReadUInt32(node,
-                    DosLayout.PathLock.Lock));
-                var next = BPTR.FromRaw(APTR.ReadUInt32(node,
-                    DosLayout.PathLock.Next));
-                if (directory.IsNull ||
-                    DOS.NameFromLock(directory, buffer, (int)BufferBytes) == 0 ||
-                    DOS.AddPart(CString.FromPointer(buffer.Raw), file,
-                        BufferBytes) == 0)
-                {
-                    result = DOS.RETURN_ERROR;
-                    ioError = (int)DOS.IoErr();
-                    return result;
-                }
-
-                var match = ReportLockedPath(CString.FromPointer(buffer.Raw),
-                    buffer);
-                if (match < 0)
-                {
-                    result = DOS.RETURN_ERROR;
-                    ioError = (int)DOS.IoErr();
-                    return result;
-                }
-                if (match != 0)
-                {
-                    found = true;
-                    foundNonInternal = true;
-                    if (!continueAfterMatch) return DOS.RETURN_OK;
-                }
-                path = next;
-            }
-
-            if (path.IsNotNull)
-            {
-                result = DOS.RETURN_ERROR;
-                ioError = (int)DOS.Error.ObjectWrongType;
-                return result;
-            }
-            // The original 3.1 command reports an INTERNAL match during ALL,
-            // but still ends with WARN/ObjectNotFound when no resident or
-            // filesystem route succeeds. Preserve that observable result
-            // without treating the system-segment pointer as an owned object.
-            if (found && !foundNonInternal)
-            {
-                result = DOS.RETURN_WARN;
-                ioError = (int)DOS.Error.ObjectNotFound;
-                return result;
-            }
-            if (!found)
-            {
-                result = DOS.RETURN_WARN;
-                ioError = (int)DOS.Error.ObjectNotFound;
-                return result;
-            }
-            return DOS.RETURN_OK;
+            path = next;
         }
-        finally
+
+        if (path.IsNotNull)
         {
-            if (buffer.IsNotNull)
-                Exec.FreeMem(buffer, BufferBytes);
-            arguments.Release();
-            DOS.SetIoErr((DOS.Error)ioError);
+            result = DOS.RETURN_ERROR;
+            ioError = (int)DOS.Error.ObjectWrongType;
+            goto Cleanup;
         }
+        // The original 3.1 command reports an INTERNAL match during ALL,
+        // but still ends with WARN/ObjectNotFound when no resident or
+        // filesystem route succeeds. Preserve that observable result
+        // without treating the system-segment pointer as an owned object.
+        if (found && !foundNonInternal)
+        {
+            result = DOS.RETURN_WARN;
+            ioError = (int)DOS.Error.ObjectNotFound;
+            goto Cleanup;
+        }
+        if (!found)
+        {
+            result = DOS.RETURN_WARN;
+            ioError = (int)DOS.Error.ObjectNotFound;
+            goto Cleanup;
+        }
+        result = DOS.RETURN_OK;
+
+    Cleanup:
+        if (buffer.IsNotNull)
+            Exec.FreeMem(buffer, BufferBytes);
+        arguments.Release();
+        DOS.SetIoErr((DOS.Error)ioError);
+        return result;
     }
 
     private static bool IsSegmentPresent(CString name, int system)

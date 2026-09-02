@@ -64,4 +64,32 @@ public sealed class MuiAreaFloatingStructAdapterTests
 		Assert.False(MuiAreaFloatingStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
 	}
+
+	[Fact]
+	public void AreaFloatingFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3B00);
+		var value = new MuiAreaFloatingStateRecord
+		{
+			Magic = MuiAreaFloatingStateRecord.Cookie,
+			Enabled = 1,
+			Generation = 23,
+		};
+
+		Assert.True(MuiAreaFloatingStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaFloatingStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaFloatingStateField.Enabled, 0));
+		Assert.True(MuiAreaFloatingStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaFloatingStateField.Generation,
+			out var generation));
+		Assert.Equal(value.Generation, generation);
+		Assert.True(MuiAreaFloatingStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(0u, decoded.Enabled);
+		Assert.Equal(value.Generation, decoded.Generation);
+		Assert.Equal(value.Magic, decoded.Magic);
+	}
 }

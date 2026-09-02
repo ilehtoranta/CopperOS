@@ -18,5 +18,8 @@
     <Compile Include="..\..\src\Commands\QuoteForwardPipeline.cs" Link="QuoteForwardPipeline.cs" />
     <Compile Include="..\..\src\Commands\QuoteReversePipeline.cs" Link="QuoteReversePipeline.cs" />
     <Compile Include="..\..\src\Commands\QuoteRuleParser.cs" Link="QuoteRuleParser.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeCommandArguments.cs" Link="NativeCommandArguments.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeCommandStartup.cs" Link="NativeCommandStartup.cs" />
+    <Compile Include="..\..\src\Commands\Native\NativeMorphOSQuoteCommand.cs" Link="NativeMorphOSQuoteCommand.cs" />
   </ItemGroup>
 </Project>

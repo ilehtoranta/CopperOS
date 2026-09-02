@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -165,6 +166,35 @@ internal static class MuiGroupChangeRecordFieldCursorCodec
 
 internal static class MuiGroupChangeMessageCodec
 {
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodIdValueStruct<TPlatform>(
+		ref TPlatform platform, APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupChangeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteMethodIdValueStruct<TPlatform>(
+		ref TPlatform platform, APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGroupChangeMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	// The complete method envelope is decoded in declaration order.  The
 	// scalar selector helper below remains only for method admission, where a
 	// four-byte header is all the caller is allowed to provide.
@@ -173,23 +203,15 @@ internal static class MuiGroupChangeMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiGroupChangeMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out value.MethodId) ||
-			!MuiGuestStructCursor.IsComplete(cursor)) return false;
-		return true;
+		return TryReadMethodIdValueStruct(ref platform, address,
+			out value.MethodId);
 	}
 
 	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
 		APTR address, MuiGroupChangeMessage value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiGroupChangeMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				value.MethodId)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		return WriteMethodIdValueStruct(ref platform, address, value.MethodId);
 	}
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
@@ -207,24 +229,13 @@ internal static class MuiGroupChangeMessageCodec
 		APTR address, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiGroupChangeMessage.Size, out var cursor)) return false;
-		return MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-			out methodId) && MuiGuestStructCursor.IsComplete(cursor);
+		return TryReadMethodIdValueStruct(ref platform, address, out methodId);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		uint method) where TPlatform : struct, IMuiGuestMemory
 	{
-		// A one-ULONG packet is passed as a scalar by the native compiler. Keep
-		// this ABI seam cursor-based while the named record codec remains the
-		// canonical multi-field/host representation.
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiGroupChangeMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, method))
-			return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		return WriteMethodIdValueStruct(ref platform, address, method);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,

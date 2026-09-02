@@ -136,8 +136,12 @@ internal static class MuiStringInteger64ValueMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if ((field != MuiStringInteger64Field.High &&
+			field != MuiStringInteger64Field.Low) ||
+			!MuiStringInteger64ValueStructCodec.TryRead(ref platform, record,
+				out var valueRecord)) return false;
+		value = field == MuiStringInteger64Field.High ? valueRecord.High :
+			valueRecord.Low;
 		return true;
 	}
 
@@ -145,9 +149,14 @@ internal static class MuiStringInteger64ValueMemoryCodec
 		APTR record, MuiStringInteger64Field field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if ((field != MuiStringInteger64Field.High &&
+			field != MuiStringInteger64Field.Low) ||
+			!MuiStringInteger64ValueStructCodec.TryRead(ref platform, record,
+				out var valueRecord)) return false;
+		if (field == MuiStringInteger64Field.High) valueRecord.High = value;
+		else valueRecord.Low = value;
+		return MuiStringInteger64ValueStructCodec.Write(ref platform, record,
+			valueRecord);
 	}
 }
 
@@ -174,7 +183,7 @@ internal static class MuiStringInteger64FieldCursorCodec
 }
 
 // Sequential codec for the complete MorphOS QUAD record. The wire value is
-// two declaration-ordered ULONGs; byte-preserving scalar helpers retain the
+// two declaration-ordered ULONGs; the shared named ULONG codec retains the
 // full 32-bit range on the freestanding generic-interface path, including
 // signed values with bit 31 set.
 internal static class MuiStringInteger64ValueStructCodec
@@ -185,23 +194,10 @@ internal static class MuiStringInteger64ValueStructCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		APTR firstAddress;
-		APTR secondAddress;
-		APTR thirdAddress;
-		APTR fourthAddress;
-		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-			ref platform, ref cursor, 1, out thirdAddress) ||
-			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out fourthAddress)) return false;
-		var first = platform.ReadUInt8(firstAddress, 0);
-		var second = platform.ReadUInt8(secondAddress, 0);
-		var third = platform.ReadUInt8(thirdAddress, 0);
-		var fourth = platform.ReadUInt8(fourthAddress, 0);
-		value = ((uint)first << 24) | ((uint)second << 16) |
-			((uint)third << 8) | fourth;
-		return true;
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiGuestUlongStorage.Size, out var address)) return false;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value);
 	}
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
@@ -209,21 +205,9 @@ internal static class MuiStringInteger64ValueStructCodec
 		ref MuiGuestStructCursor cursor, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		APTR firstAddress;
-		APTR secondAddress;
-		APTR thirdAddress;
-		APTR fourthAddress;
-		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-			ref platform, ref cursor, 1, out thirdAddress) ||
-			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out fourthAddress)) return false;
-		platform.WriteUInt8(firstAddress, 0, (byte)(value >> 24));
-		platform.WriteUInt8(secondAddress, 0, (byte)(value >> 16));
-		platform.WriteUInt8(thirdAddress, 0, (byte)(value >> 8));
-		platform.WriteUInt8(fourthAddress, 0, (byte)value);
-		return true;
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiGuestUlongStorage.Size, out var address)) return false;
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,

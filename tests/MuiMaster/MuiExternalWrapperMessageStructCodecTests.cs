@@ -88,4 +88,22 @@ public sealed class MuiExternalWrapperMessageStructCodecTests
 		Assert.False(MuiExternalWrapperMessageStructCodec.TryReadMethodIdValue(
 			ref platform, APTR.Null, out _));
 	}
+
+	[Fact]
+	public void ExternalWrapperMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x10000,
+			APTR.FromPointer(0x1000));
+		var packet = APTR.FromPointer(0x2600);
+		const uint methodId = 0xC2468ACEu;
+		Assert.True(MuiExternalWrapperMethodHeaderCodec.WriteValue(ref platform,
+			packet, methodId));
+		Assert.True(MuiExternalWrapperMethodHeaderCodec.TryReadValue(ref platform,
+			packet, out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiExternalWrapperMethodHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x40FFF), out _));
+		Assert.False(MuiExternalWrapperMethodHeaderCodec.WriteValue(ref platform,
+			APTR.Null, methodId));
+	}
 }

@@ -23,6 +23,12 @@ public struct MuiPropPolicyState
 internal struct MuiPropPolicyStateRecord
 {
 	internal const uint Size = 20;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint HorizontalOffset = 4;
+	internal const uint DeltaFactorOffset = 8;
+	internal const uint SliderOffset = 12;
+	internal const uint UseWinBorderOffset = 16;
 	internal const uint Cookie = 0x4D50504Cu; // 'MPPL'
 
 	internal uint Magic;
@@ -54,16 +60,22 @@ internal static class MuiPropPolicyStateFieldCursorCodec
 		out uint offset)
 
 	{
-		offset = field switch
+		if (field == MuiPropPolicyStateField.Magic)
+			offset = MuiPropPolicyStateRecord.MagicOffset;
+		else if (field == MuiPropPolicyStateField.Horizontal)
+			offset = MuiPropPolicyStateRecord.HorizontalOffset;
+		else if (field == MuiPropPolicyStateField.DeltaFactor)
+			offset = MuiPropPolicyStateRecord.DeltaFactorOffset;
+		else if (field == MuiPropPolicyStateField.Slider)
+			offset = MuiPropPolicyStateRecord.SliderOffset;
+		else if (field == MuiPropPolicyStateField.UseWinBorder)
+			offset = MuiPropPolicyStateRecord.UseWinBorderOffset;
+		else
 		{
-			MuiPropPolicyStateField.Magic => 0,
-			MuiPropPolicyStateField.Horizontal => 4,
-			MuiPropPolicyStateField.DeltaFactor => 8,
-			MuiPropPolicyStateField.Slider => 12,
-			MuiPropPolicyStateField.UseWinBorder => 16,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -75,7 +87,7 @@ internal static class MuiPropPolicyStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 			cursor.Record, MuiPropPolicyStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiPropPolicyStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -108,16 +120,88 @@ internal static class MuiPropPolicyStateFieldCursorCodec
 // semantic fields; bounded fixed guest-layout translation lives here.
 internal static class MuiPropPolicyStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiPropPolicyStateField field,
+		out uint offset)
+	{
+		if (field == MuiPropPolicyStateField.Magic)
+			offset = MuiPropPolicyStateRecord.MagicOffset;
+		else if (field == MuiPropPolicyStateField.Horizontal)
+			offset = MuiPropPolicyStateRecord.HorizontalOffset;
+		else if (field == MuiPropPolicyStateField.DeltaFactor)
+			offset = MuiPropPolicyStateRecord.DeltaFactorOffset;
+		else if (field == MuiPropPolicyStateField.Slider)
+			offset = MuiPropPolicyStateRecord.SliderOffset;
+		else if (field == MuiPropPolicyStateField.UseWinBorder)
+			offset = MuiPropPolicyStateRecord.UseWinBorderOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiPropPolicyStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiPropPolicyStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiPropPolicyStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiPropPolicyStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiPropPolicyStateField.Horizontal)
+			value = state.Horizontal;
+		else if (field == MuiPropPolicyStateField.DeltaFactor)
+			value = state.DeltaFactor;
+		else if (field == MuiPropPolicyStateField.Slider)
+			value = state.Slider;
+		else if (field == MuiPropPolicyStateField.UseWinBorder)
+			value = state.UseWinBorder;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiPropPolicyStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiPropPolicyStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiPropPolicyStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiPropPolicyStateField.Horizontal)
+			state.Horizontal = value;
+		else if (field == MuiPropPolicyStateField.DeltaFactor)
+			state.DeltaFactor = value;
+		else if (field == MuiPropPolicyStateField.Slider)
+			state.Slider = value;
+		else if (field == MuiPropPolicyStateField.UseWinBorder)
+			state.UseWinBorder = value;
+		else return false;
+		return MuiPropPolicyStateRecordCodec.WriteRecord(ref platform, record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiPropPolicyStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiPropPolicyStateRecord.Size -
+			MuiPropPolicyStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiPropPolicyStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiPropPolicyStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

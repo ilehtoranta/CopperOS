@@ -53,15 +53,28 @@ public sealed class MuiBitmapGeometryAdmissionTests
 		Assert.True(MuiBitmapGeometryStateRecordCodec.TryRead(ref platform, address,
 			out _));
 		Assert.True(MuiBitmapGeometryStateRecordMemoryCodec.TryGetAddress(
-			ref platform, address, 8, out var lastField));
+			ref platform, address, MuiBitmapGeometryStateField.Height,
+			out var typedHeightAddress));
+		Assert.Equal(address.Raw + MuiBitmapGeometryStateRecord.HeightOffset,
+			typedHeightAddress.Raw);
+		Assert.True(MuiBitmapGeometryStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiBitmapGeometryStateField.Width,
+			0x12345678));
+		Assert.True(MuiBitmapGeometryStateRecordCodec.TryReadStructural(
+			ref platform, address, out var typedDecoded));
+		Assert.Equal(value.Magic, typedDecoded.Magic);
+		Assert.Equal(0x12345678u, typedDecoded.Width);
+		Assert.Equal(value.Height, typedDecoded.Height);
+		Assert.True(MuiBitmapGeometryStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, 8u, out var lastField));
 		Assert.Equal(address.Raw + 8, lastField.Raw);
 		Assert.True(MuiBitmapGeometryStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 4, out var width));
-		Assert.Equal(value.Width, width);
+			ref platform, address, 4u, out var width));
+		Assert.Equal(0x12345678u, width);
 		Assert.False(MuiBitmapGeometryStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiBitmapGeometryStateRecord.Size, out _));
 		Assert.False(MuiBitmapGeometryStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, 0u, out _));
 		Assert.False(MuiBitmapGeometryStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

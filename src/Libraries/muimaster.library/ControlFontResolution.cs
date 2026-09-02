@@ -65,21 +65,22 @@ internal static class MuiControlFontResolutionRecordMemoryCodec
 	private static bool TryResolve(MuiControlFontResolutionRecordField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiControlFontResolutionRecordField.Magic)
+			offset = MuiControlFontResolutionRecord.MagicOffset;
+		else if (field == MuiControlFontResolutionRecordField.Present)
+			offset = MuiControlFontResolutionRecord.PresentOffset;
+		else if (field == MuiControlFontResolutionRecordField.Inherited)
+			offset = MuiControlFontResolutionRecord.InheritedOffset;
+		else if (field == MuiControlFontResolutionRecordField.Depth)
+			offset = MuiControlFontResolutionRecord.DepthOffset;
+		else if (field == MuiControlFontResolutionRecordField.Font)
+			offset = MuiControlFontResolutionRecord.FontOffset;
+		else
 		{
-			case MuiControlFontResolutionRecordField.Magic:
-				offset = MuiControlFontResolutionRecord.MagicOffset; return true;
-			case MuiControlFontResolutionRecordField.Present:
-				offset = MuiControlFontResolutionRecord.PresentOffset; return true;
-			case MuiControlFontResolutionRecordField.Inherited:
-				offset = MuiControlFontResolutionRecord.InheritedOffset; return true;
-			case MuiControlFontResolutionRecordField.Depth:
-				offset = MuiControlFontResolutionRecord.DepthOffset; return true;
-			case MuiControlFontResolutionRecordField.Font:
-				offset = MuiControlFontResolutionRecord.FontOffset; return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -99,9 +100,19 @@ internal static class MuiControlFontResolutionRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiControlFontResolutionRecordStructCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiControlFontResolutionRecordField.Magic)
+			value = state.Magic;
+		else if (field == MuiControlFontResolutionRecordField.Present)
+			value = state.Present;
+		else if (field == MuiControlFontResolutionRecordField.Inherited)
+			value = state.Inherited;
+		else if (field == MuiControlFontResolutionRecordField.Depth)
+			value = state.Depth;
+		else if (field == MuiControlFontResolutionRecordField.Font)
+			value = state.Font.Raw;
+		else return false;
 		return true;
 	}
 
@@ -109,17 +120,28 @@ internal static class MuiControlFontResolutionRecordMemoryCodec
 		APTR record, MuiControlFontResolutionRecordField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiControlFontResolutionRecordStructCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiControlFontResolutionRecordField.Magic)
+			state.Magic = value;
+		else if (field == MuiControlFontResolutionRecordField.Present)
+			state.Present = value;
+		else if (field == MuiControlFontResolutionRecordField.Inherited)
+			state.Inherited = value;
+		else if (field == MuiControlFontResolutionRecordField.Depth)
+			state.Depth = value;
+		else if (field == MuiControlFontResolutionRecordField.Font)
+			state.Font = APTR.FromPointer(value);
+		else return false;
+		return MuiControlFontResolutionRecordStructCodec.Write(ref platform,
+			record, state);
 	}
 }
 
 // Sequential codec for the complete effective-font projection. The record is
-// five declaration-ordered ULONGs; scalar bytes are consumed explicitly so
-// the freestanding generic-interface path preserves the complete 32-bit
-// pointer range, including values with bit 31 set.
+// five declaration-ordered ULONGs; each member uses the shared named ULONG
+// record codec so the freestanding path preserves the complete 32-bit pointer
+// range, including values with bit 31 set.
 internal static class MuiControlFontResolutionRecordStructCodec
 {
 	[MethodImpl(MethodImplOptions.NoInlining)]
@@ -128,23 +150,10 @@ internal static class MuiControlFontResolutionRecordStructCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		APTR firstAddress;
-		APTR secondAddress;
-		APTR thirdAddress;
-		APTR fourthAddress;
-		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-			ref platform, ref cursor, 1, out thirdAddress) ||
-			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out fourthAddress)) return false;
-		var first = platform.ReadUInt8(firstAddress, 0);
-		var second = platform.ReadUInt8(secondAddress, 0);
-		var third = platform.ReadUInt8(thirdAddress, 0);
-		var fourth = platform.ReadUInt8(fourthAddress, 0);
-		value = ((uint)first << 24) | ((uint)second << 16) |
-			((uint)third << 8) | fourth;
-		return true;
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiGuestUlongStorage.Size, out var address)) return false;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value);
 	}
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
@@ -152,21 +161,9 @@ internal static class MuiControlFontResolutionRecordStructCodec
 		ref MuiGuestStructCursor cursor, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		APTR firstAddress;
-		APTR secondAddress;
-		APTR thirdAddress;
-		APTR fourthAddress;
-		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-			ref platform, ref cursor, 1, out thirdAddress) ||
-			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out fourthAddress)) return false;
-		platform.WriteUInt8(firstAddress, 0, (byte)(value >> 24));
-		platform.WriteUInt8(secondAddress, 0, (byte)(value >> 16));
-		platform.WriteUInt8(thirdAddress, 0, (byte)(value >> 8));
-		platform.WriteUInt8(fourthAddress, 0, (byte)value);
-		return true;
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiGuestUlongStorage.Size, out var address)) return false;
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -189,6 +186,11 @@ internal static class MuiControlFontResolutionRecordStructCodec
 		value.Font = APTR.FromPointer(font);
 		return true;
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiControlFontResolutionRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryRead(ref platform, address, out value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiControlFontResolutionRecord value)

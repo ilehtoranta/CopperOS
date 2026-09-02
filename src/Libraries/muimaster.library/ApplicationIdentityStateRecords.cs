@@ -115,32 +115,26 @@ internal static class MuiApplicationIdentityStateRecordMemoryCodec
 	private static bool TryResolve(MuiApplicationIdentityStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiApplicationIdentityStateField.Magic)
+			offset = MuiApplicationIdentityStateRecord.MagicOffset;
+		else if (field == MuiApplicationIdentityStateField.Author)
+			offset = MuiApplicationIdentityStateRecord.AuthorOffset;
+		else if (field == MuiApplicationIdentityStateField.Base)
+			offset = MuiApplicationIdentityStateRecord.BaseOffset;
+		else if (field == MuiApplicationIdentityStateField.Copyright)
+			offset = MuiApplicationIdentityStateRecord.CopyrightOffset;
+		else if (field == MuiApplicationIdentityStateField.Description)
+			offset = MuiApplicationIdentityStateRecord.DescriptionOffset;
+		else if (field == MuiApplicationIdentityStateField.Title)
+			offset = MuiApplicationIdentityStateRecord.TitleOffset;
+		else if (field == MuiApplicationIdentityStateField.Version)
+			offset = MuiApplicationIdentityStateRecord.VersionOffset;
+		else
 		{
-			case MuiApplicationIdentityStateField.Magic:
-				offset = MuiApplicationIdentityStateRecord.MagicOffset;
-				return true;
-			case MuiApplicationIdentityStateField.Author:
-				offset = MuiApplicationIdentityStateRecord.AuthorOffset;
-				return true;
-			case MuiApplicationIdentityStateField.Base:
-				offset = MuiApplicationIdentityStateRecord.BaseOffset;
-				return true;
-			case MuiApplicationIdentityStateField.Copyright:
-				offset = MuiApplicationIdentityStateRecord.CopyrightOffset;
-				return true;
-			case MuiApplicationIdentityStateField.Description:
-				offset = MuiApplicationIdentityStateRecord.DescriptionOffset;
-				return true;
-			case MuiApplicationIdentityStateField.Title:
-				offset = MuiApplicationIdentityStateRecord.TitleOffset;
-				return true;
-			case MuiApplicationIdentityStateField.Version:
-				offset = MuiApplicationIdentityStateRecord.VersionOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -161,9 +155,23 @@ internal static class MuiApplicationIdentityStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationIdentityStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationIdentityStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationIdentityStateField.Author)
+			value = state.Author.Raw;
+		else if (field == MuiApplicationIdentityStateField.Base)
+			value = state.Base.Raw;
+		else if (field == MuiApplicationIdentityStateField.Copyright)
+			value = state.Copyright.Raw;
+		else if (field == MuiApplicationIdentityStateField.Description)
+			value = state.Description.Raw;
+		else if (field == MuiApplicationIdentityStateField.Title)
+			value = state.Title.Raw;
+		else if (field == MuiApplicationIdentityStateField.Version)
+			value = state.Version.Raw;
+		else return false;
 		return true;
 	}
 
@@ -171,10 +179,25 @@ internal static class MuiApplicationIdentityStateRecordMemoryCodec
 		APTR record, MuiApplicationIdentityStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationIdentityStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationIdentityStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationIdentityStateField.Author)
+			state.Author = APTR.FromPointer(value);
+		else if (field == MuiApplicationIdentityStateField.Base)
+			state.Base = APTR.FromPointer(value);
+		else if (field == MuiApplicationIdentityStateField.Copyright)
+			state.Copyright = APTR.FromPointer(value);
+		else if (field == MuiApplicationIdentityStateField.Description)
+			state.Description = APTR.FromPointer(value);
+		else if (field == MuiApplicationIdentityStateField.Title)
+			state.Title = APTR.FromPointer(value);
+		else if (field == MuiApplicationIdentityStateField.Version)
+			state.Version = APTR.FromPointer(value);
+		else return false;
+		return MuiApplicationIdentityStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

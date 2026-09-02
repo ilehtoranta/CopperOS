@@ -58,15 +58,27 @@ public sealed class MuiControlFontAdmissionTests
 		Assert.True(MuiControlFontStateRecordCodec.TryRead(ref platform, address,
 			out _));
 		Assert.True(MuiControlFontStateRecordMemoryCodec.TryGetAddress(
-			ref platform, address, 8, out var fontField));
+			ref platform, address, MuiControlFontStateField.Font,
+			out var typedFontField));
+		Assert.Equal(address.Raw + MuiControlFontStateRecord.FontOffset,
+			typedFontField.Raw);
+		Assert.True(MuiControlFontStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiControlFontStateField.Present, 0));
+		Assert.True(MuiControlFontStateRecordCodec.TryReadStructural(
+			ref platform, address, out var typedDecoded));
+		Assert.Equal(value.Magic, typedDecoded.Magic);
+		Assert.Equal(0u, typedDecoded.Present);
+		Assert.Equal(value.Font, typedDecoded.Font);
+		Assert.True(MuiControlFontStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, 8u, out var fontField));
 		Assert.Equal(address.Raw + 8, fontField.Raw);
 		Assert.True(MuiControlFontStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 8, out var fontRaw));
+			ref platform, address, 8u, out var fontRaw));
 		Assert.Equal(value.Font.Raw, fontRaw);
 		Assert.False(MuiControlFontStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiControlFontStateRecord.Size, out _));
 		Assert.False(MuiControlFontStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, 0u, out _));
 		Assert.False(MuiControlFontStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

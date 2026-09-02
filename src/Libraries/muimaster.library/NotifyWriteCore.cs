@@ -111,17 +111,39 @@ internal struct MuiWriteStringMessage
 
 internal static class MuiNotifyWriteMethodMessageCodec
 {
-	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 		APTR address, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		methodId = 0;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiNotifyWriteMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
 				out methodId)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiNotifyWriteMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+		=> TryReadValue(ref platform, address, out methodId);
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -139,13 +161,7 @@ internal static class MuiNotifyWriteMethodMessageCodec
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiNotifyWriteMethodMessage value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiNotifyWriteMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				value.MethodId)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> WriteValue(ref platform, address, value.MethodId);
 }
 
 internal static class MuiWriteLongMessageCodec

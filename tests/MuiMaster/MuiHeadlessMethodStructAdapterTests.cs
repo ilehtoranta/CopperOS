@@ -47,4 +47,23 @@ public sealed class MuiHeadlessMethodStructAdapterTests
 		Assert.False(MuiHeadlessMethodMessageRecordCodec.TryRead(ref platform,
 			APTR.FromPointer(0x20FFE), out _));
 	}
+
+	[Fact]
+	public void HeadlessMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var state = APTR.FromPointer(0x1000);
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			state);
+		var address = APTR.FromPointer(0x2400);
+		const uint methodId = 0xC2468ACEu;
+		Assert.True(MuiHeadlessMethodHeaderCodec.WriteValue(ref platform,
+			address, methodId));
+		Assert.True(MuiHeadlessMethodHeaderCodec.TryReadValue(ref platform,
+			address, out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiHeadlessMethodHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFF), out _));
+		Assert.False(MuiHeadlessMethodHeaderCodec.WriteValue(ref platform,
+			APTR.Null, methodId));
+	}
 }

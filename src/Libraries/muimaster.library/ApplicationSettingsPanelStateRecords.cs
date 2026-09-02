@@ -104,23 +104,20 @@ internal static class MuiApplicationSettingsPanelStateRecordMemoryCodec
 	private static bool TryResolve(MuiApplicationSettingsPanelStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiApplicationSettingsPanelStateField.Magic)
+			offset = MuiApplicationSettingsPanelStateRecord.MagicOffset;
+		else if (field == MuiApplicationSettingsPanelStateField.Number)
+			offset = MuiApplicationSettingsPanelStateRecord.NumberOffset;
+		else if (field == MuiApplicationSettingsPanelStateField.Panel)
+			offset = MuiApplicationSettingsPanelStateRecord.PanelOffset;
+		else if (field == MuiApplicationSettingsPanelStateField.Requests)
+			offset = MuiApplicationSettingsPanelStateRecord.RequestsOffset;
+		else
 		{
-			case MuiApplicationSettingsPanelStateField.Magic:
-				offset = MuiApplicationSettingsPanelStateRecord.MagicOffset;
-				return true;
-			case MuiApplicationSettingsPanelStateField.Number:
-				offset = MuiApplicationSettingsPanelStateRecord.NumberOffset;
-				return true;
-			case MuiApplicationSettingsPanelStateField.Panel:
-				offset = MuiApplicationSettingsPanelStateRecord.PanelOffset;
-				return true;
-			case MuiApplicationSettingsPanelStateField.Requests:
-				offset = MuiApplicationSettingsPanelStateRecord.RequestsOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -143,9 +140,17 @@ internal static class MuiApplicationSettingsPanelStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiApplicationSettingsPanelStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationSettingsPanelStateField.Number)
+			value = state.Number;
+		else if (field == MuiApplicationSettingsPanelStateField.Panel)
+			value = state.Panel.Raw;
+		else if (field == MuiApplicationSettingsPanelStateField.Requests)
+			value = state.Requests;
+		else return false;
 		return true;
 	}
 
@@ -153,10 +158,19 @@ internal static class MuiApplicationSettingsPanelStateRecordMemoryCodec
 		APTR record, MuiApplicationSettingsPanelStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiApplicationSettingsPanelStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationSettingsPanelStateField.Number)
+			state.Number = value;
+		else if (field == MuiApplicationSettingsPanelStateField.Panel)
+			state.Panel = APTR.FromPointer(value);
+		else if (field == MuiApplicationSettingsPanelStateField.Requests)
+			state.Requests = value;
+		else return false;
+		return MuiApplicationSettingsPanelStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

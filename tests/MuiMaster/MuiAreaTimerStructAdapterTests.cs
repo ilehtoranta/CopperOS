@@ -63,4 +63,31 @@ public sealed class MuiAreaTimerStructAdapterTests
 		Assert.False(MuiAreaTimerStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
 	}
+
+	[Fact]
+	public void AreaTimerFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3F00);
+		var value = new MuiAreaTimerStateRecord
+		{
+			Magic = MuiAreaTimerStateRecord.Cookie,
+			Value = -17,
+			Generation = 23,
+		};
+
+		Assert.True(MuiAreaTimerStateRecordCodec.WriteRecord(ref platform, address,
+			value));
+		Assert.True(MuiAreaTimerStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaTimerStateField.Value, unchecked((uint)29)));
+		Assert.True(MuiAreaTimerStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiAreaTimerStateField.Generation, out var generation));
+		Assert.Equal(value.Generation, generation);
+		Assert.True(MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(29, decoded.Value);
+		Assert.Equal(value.Generation, decoded.Generation);
+		Assert.Equal(value.Magic, decoded.Magic);
+	}
 }

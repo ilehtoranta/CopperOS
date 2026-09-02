@@ -20,6 +20,9 @@ public struct MuiLevelmeterLabelState
 internal struct MuiLevelmeterLabelStateRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint LabelOffset = 4;
 	internal const uint Cookie = 0x4D4C424Cu; // 'MLBL'
 
 	internal uint Magic;
@@ -63,13 +66,16 @@ internal static class MuiLevelmeterLabelStateFieldCursorCodec
 	private static bool TryResolve(MuiLevelmeterLabelStateField field,
 		out uint offset)
 	{
-		offset = field switch
+		if (field == MuiLevelmeterLabelStateField.Magic)
+			offset = MuiLevelmeterLabelStateRecord.MagicOffset;
+		else if (field == MuiLevelmeterLabelStateField.Label)
+			offset = MuiLevelmeterLabelStateRecord.LabelOffset;
+		else
 		{
-			MuiLevelmeterLabelStateField.Magic => 0,
-			MuiLevelmeterLabelStateField.Label => 4,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -81,7 +87,7 @@ internal static class MuiLevelmeterLabelStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 			cursor.Record, MuiLevelmeterLabelStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiLevelmeterLabelStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -116,16 +122,71 @@ internal static class MuiLevelmeterLabelStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiLevelmeterLabelStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiLevelmeterLabelStateField field,
+		out uint offset)
+	{
+		if (field == MuiLevelmeterLabelStateField.Magic)
+			offset = MuiLevelmeterLabelStateRecord.MagicOffset;
+		else if (field == MuiLevelmeterLabelStateField.Label)
+			offset = MuiLevelmeterLabelStateRecord.LabelOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiLevelmeterLabelStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiLevelmeterLabelStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiLevelmeterLabelStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiLevelmeterLabelStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiLevelmeterLabelStateField.Label)
+			value = state.Label.Raw;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiLevelmeterLabelStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiLevelmeterLabelStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiLevelmeterLabelStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiLevelmeterLabelStateField.Label)
+			state.Label = APTR.FromPointer(value);
+		else return false;
+		return MuiLevelmeterLabelStateRecordCodec.WriteRecord(ref platform, record,
+			state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiLevelmeterLabelStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiLevelmeterLabelStateRecord.Size -
+			MuiLevelmeterLabelStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiLevelmeterLabelStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiLevelmeterLabelStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

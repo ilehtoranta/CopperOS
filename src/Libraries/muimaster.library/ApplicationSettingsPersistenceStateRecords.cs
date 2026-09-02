@@ -109,29 +109,24 @@ internal static class MuiApplicationSettingsPersistenceStateRecordMemoryCodec
 	private static bool TryResolve(
 		MuiApplicationSettingsPersistenceStateField field, out uint offset)
 	{
-		switch (field)
+		if (field == MuiApplicationSettingsPersistenceStateField.Magic)
+			offset = MuiApplicationSettingsPersistenceStateRecord.MagicOffset;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Operation)
+			offset = MuiApplicationSettingsPersistenceStateRecord.OperationOffset;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Name)
+			offset = MuiApplicationSettingsPersistenceStateRecord.NameOffset;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Requests)
+			offset = MuiApplicationSettingsPersistenceStateRecord.RequestsOffset;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Saves)
+			offset = MuiApplicationSettingsPersistenceStateRecord.SavesOffset;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Loads)
+			offset = MuiApplicationSettingsPersistenceStateRecord.LoadsOffset;
+		else
 		{
-			case MuiApplicationSettingsPersistenceStateField.Magic:
-				offset = MuiApplicationSettingsPersistenceStateRecord.MagicOffset;
-				return true;
-			case MuiApplicationSettingsPersistenceStateField.Operation:
-				offset = MuiApplicationSettingsPersistenceStateRecord.OperationOffset;
-				return true;
-			case MuiApplicationSettingsPersistenceStateField.Name:
-				offset = MuiApplicationSettingsPersistenceStateRecord.NameOffset;
-				return true;
-			case MuiApplicationSettingsPersistenceStateField.Requests:
-				offset = MuiApplicationSettingsPersistenceStateRecord.RequestsOffset;
-				return true;
-			case MuiApplicationSettingsPersistenceStateField.Saves:
-				offset = MuiApplicationSettingsPersistenceStateRecord.SavesOffset;
-				return true;
-			case MuiApplicationSettingsPersistenceStateField.Loads:
-				offset = MuiApplicationSettingsPersistenceStateRecord.LoadsOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -156,9 +151,21 @@ internal static class MuiApplicationSettingsPersistenceStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationSettingsPersistenceStateRecordCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiApplicationSettingsPersistenceStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Operation)
+			value = state.Operation;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Name)
+			value = state.Name.Raw;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Requests)
+			value = state.Requests;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Saves)
+			value = state.Saves;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Loads)
+			value = state.Loads;
+		else return false;
 		return true;
 	}
 
@@ -167,10 +174,23 @@ internal static class MuiApplicationSettingsPersistenceStateRecordMemoryCodec
 		uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationSettingsPersistenceStateRecordCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiApplicationSettingsPersistenceStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Operation)
+			state.Operation = value;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Name)
+			state.Name = APTR.FromPointer(value);
+		else if (field == MuiApplicationSettingsPersistenceStateField.Requests)
+			state.Requests = value;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Saves)
+			state.Saves = value;
+		else if (field == MuiApplicationSettingsPersistenceStateField.Loads)
+			state.Loads = value;
+		else return false;
+		return MuiApplicationSettingsPersistenceStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

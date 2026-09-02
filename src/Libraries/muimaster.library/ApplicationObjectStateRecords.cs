@@ -153,9 +153,17 @@ internal static class MuiApplicationObjectStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationObjectStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationObjectStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationObjectStateField.DiskObject)
+			value = state.DiskObject.Raw;
+		else if (field == MuiApplicationObjectStateField.DropObject)
+			value = state.DropObject.Raw;
+		else if (field == MuiApplicationObjectStateField.Menustrip)
+			value = state.Menustrip.Raw;
+		else return false;
 		return true;
 	}
 
@@ -163,10 +171,19 @@ internal static class MuiApplicationObjectStateRecordMemoryCodec
 		APTR record, MuiApplicationObjectStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationObjectStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationObjectStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationObjectStateField.DiskObject)
+			state.DiskObject = APTR.FromPointer(value);
+		else if (field == MuiApplicationObjectStateField.DropObject)
+			state.DropObject = APTR.FromPointer(value);
+		else if (field == MuiApplicationObjectStateField.Menustrip)
+			state.Menustrip = APTR.FromPointer(value);
+		else return false;
+		return MuiApplicationObjectStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

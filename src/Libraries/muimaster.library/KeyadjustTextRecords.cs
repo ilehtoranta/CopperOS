@@ -16,6 +16,8 @@ internal struct MuiKeyadjustTextRecord
 {
 	internal const uint Size = 2;
 	internal const uint FieldSize = 1;
+	internal const uint CharacterOffset = 0;
+	internal const uint TerminatorOffset = 1;
 
 	internal byte Character;
 	internal byte Terminator;
@@ -39,18 +41,16 @@ internal static class MuiKeyadjustTextRecordMemoryCodec
 	private static bool TryResolve(MuiKeyadjustTextField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiKeyadjustTextField.Character)
+			offset = MuiKeyadjustTextRecord.CharacterOffset;
+		else if (field == MuiKeyadjustTextField.Terminator)
+			offset = MuiKeyadjustTextRecord.TerminatorOffset;
+		else
 		{
-			case MuiKeyadjustTextField.Character:
-				offset = 0;
-				return true;
-			case MuiKeyadjustTextField.Terminator:
-				offset = 1;
-				return true;
-			default:
-				offset = 0;
-				return false;
+			offset = 0;
+			return false;
 		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -71,11 +71,13 @@ internal static class MuiKeyadjustTextRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiKeyadjustTextFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt8(address, 0);
+		if (!MuiKeyadjustTextRecordCodec.TryReadRecord(ref platform, record,
+			out var state)) return false;
+		if (field == MuiKeyadjustTextField.Character)
+			value = state.Character;
+		else if (field == MuiKeyadjustTextField.Terminator)
+			value = state.Terminator;
+		else return false;
 		return true;
 	}
 
@@ -83,12 +85,14 @@ internal static class MuiKeyadjustTextRecordMemoryCodec
 		APTR record, MuiKeyadjustTextField field, byte value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiKeyadjustTextFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt8(address, 0, value);
-		return true;
+		if (!MuiKeyadjustTextRecordCodec.TryReadRecord(ref platform, record,
+			out var state)) return false;
+		if (field == MuiKeyadjustTextField.Character)
+			state.Character = value;
+		else if (field == MuiKeyadjustTextField.Terminator)
+			state.Terminator = value;
+		else return false;
+		return MuiKeyadjustTextRecordCodec.WriteRecord(ref platform, record, state);
 	}
 }
 

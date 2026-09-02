@@ -62,4 +62,41 @@ public sealed class MuiCollectionAdvancedMessageStructAdapterTests
 			ref platform, APTR.Null, MuiCollectionAdvancedPacketKind.Method,
 			MuiCollectionAdvancedField.MethodId, out _));
 	}
+
+	[Fact]
+	public void CollectionAdvancedMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2FFFC);
+		const uint methodId = 0xC2468ACEu;
+
+		Assert.True(MuiCollectionAdvancedMethodHeaderCodec.WriteValue(
+			ref platform, address, methodId));
+		Assert.True(MuiCollectionAdvancedMethodHeaderCodec.TryReadValue(
+			ref platform, address, out var decoded));
+		Assert.Equal(methodId, decoded);
+		Assert.True(MuiCollectionAdvancedStructPacketCodec.TryReadMethod(
+			ref platform, address, out var packet));
+		Assert.Equal(methodId, packet.MethodId);
+		Assert.True(MuiCollectionAdvancedStructPacketCodec.TryWriteMethod(
+			ref platform, address, 0xF1020304u));
+		Assert.True(MuiCollectionAdvancedMessageCodec.TryReadMethodIdValue(
+			ref platform, address, out decoded));
+		Assert.Equal(0xF1020304u, decoded);
+
+		var nearEnd = APTR.FromPointer(0x40FFC);
+		Assert.True(MuiCollectionAdvancedMethodHeaderCodec.WriteValue(
+			ref platform, nearEnd, methodId));
+		Assert.True(MuiCollectionAdvancedMethodHeaderCodec.TryReadValue(
+			ref platform, nearEnd, out decoded));
+		Assert.Equal(methodId, decoded);
+		var truncated = APTR.FromPointer(0x40FFD);
+		Assert.False(MuiCollectionAdvancedMethodHeaderCodec.TryReadValue(
+			ref platform, truncated, out _));
+		Assert.False(MuiCollectionAdvancedMethodHeaderCodec.WriteValue(
+			ref platform, truncated, methodId));
+		Assert.False(MuiCollectionAdvancedMethodHeaderCodec.TryReadValue(
+			ref platform, APTR.Null, out _));
+	}
 }

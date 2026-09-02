@@ -35,6 +35,20 @@ public sealed class MuiMakeObjectPreParseStructAdapterTests
 		Assert.Equal(value.Command, decoded.Command);
 		Assert.Equal(value.Terminator, decoded.Terminator);
 		Assert.Equal(value.Reserved, decoded.Reserved);
+		Assert.True(MuiMakeObjectPreParseRecordMemoryCodec.TryReadByte(ref platform,
+			address, MuiMakeObjectPreParseField.Command, out var command));
+		Assert.Equal(value.Command, command);
+		Assert.True(MuiMakeObjectPreParseRecordMemoryCodec.TryWriteByte(ref platform,
+			address, MuiMakeObjectPreParseField.Command, (byte)'d'));
+		Assert.True(MuiMakeObjectPreParseRecordCodec.TryReadRecord(ref platform,
+			address, out var typedUpdated));
+		Assert.Equal((byte)'d', typedUpdated.Command);
+		Assert.Equal(value.Escape, typedUpdated.Escape);
+		Assert.Equal(value.Reserved, typedUpdated.Reserved);
+		Assert.True(MuiMakeObjectPreParseRecordMemoryCodec.TryWriteByte(ref platform,
+			address, MuiMakeObjectPreParseField.Command, value.Command));
+		Assert.False(MuiMakeObjectPreParseRecordMemoryCodec.TryReadByte(ref platform,
+			address, (MuiMakeObjectPreParseField)255, out _));
 
 		var cursor = default(MuiMakeObjectPreParseFieldCursor);
 		cursor.Record = address;

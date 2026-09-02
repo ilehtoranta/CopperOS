@@ -96,20 +96,18 @@ internal static class MuiAreaControlCharStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaControlCharStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaControlCharStateField.Magic)
+			offset = MuiAreaControlCharStateRecord.MagicOffset;
+		else if (field == MuiAreaControlCharStateField.Character)
+			offset = MuiAreaControlCharStateRecord.CharacterOffset;
+		else if (field == MuiAreaControlCharStateField.Generation)
+			offset = MuiAreaControlCharStateRecord.GenerationOffset;
+		else
 		{
-			case MuiAreaControlCharStateField.Magic:
-				offset = MuiAreaControlCharStateRecord.MagicOffset;
-				return true;
-			case MuiAreaControlCharStateField.Character:
-				offset = MuiAreaControlCharStateRecord.CharacterOffset;
-				return true;
-			case MuiAreaControlCharStateField.Generation:
-				offset = MuiAreaControlCharStateRecord.GenerationOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -130,9 +128,15 @@ internal static class MuiAreaControlCharStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaControlCharStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaControlCharStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaControlCharStateField.Character)
+			value = state.Character;
+		else if (field == MuiAreaControlCharStateField.Generation)
+			value = state.Generation;
+		else return false;
 		return true;
 	}
 
@@ -140,10 +144,17 @@ internal static class MuiAreaControlCharStateRecordMemoryCodec
 		APTR record, MuiAreaControlCharStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaControlCharStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaControlCharStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaControlCharStateField.Character)
+			state.Character = value;
+		else if (field == MuiAreaControlCharStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiAreaControlCharStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

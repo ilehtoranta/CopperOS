@@ -21,6 +21,21 @@ public sealed class MuiLevelmeterLabelAdmissionTests
 		Assert.True(MuiLevelmeterLabelStateAdmission.ValidateLive(ref platform, State,
 			levelmeter, valid));
 
+		var block = MuiStoreCore.DataspaceFind(ref platform, State, levelmeter,
+			StateKey);
+		Assert.True(MuiLevelmeterLabelStateRecordMemoryCodec.TryGetAddress(
+			ref platform, block, MuiLevelmeterLabelStateField.Label,
+			out var labelField));
+		Assert.Equal(block.Raw + MuiLevelmeterLabelStateRecord.LabelOffset,
+			labelField.Raw);
+		Assert.True(MuiLevelmeterLabelStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, block, MuiLevelmeterLabelStateField.Label, source.Raw));
+		Assert.True(MuiLevelmeterLabelStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, block, MuiLevelmeterLabelStateField.Magic, out var magic));
+		Assert.Equal(MuiLevelmeterLabelStateRecord.Cookie, magic);
+		Assert.False(MuiLevelmeterLabelStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, block, (MuiLevelmeterLabelStateField)0xFF, out _));
+
 		var malformed = valid;
 		malformed.Label = APTR.FromPointer(0x30000);
 		Assert.True(MuiLevelmeterLabelStateAdmission.Validate(malformed));

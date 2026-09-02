@@ -41,6 +41,56 @@ internal enum MuiCallHookPacketField : byte
 	Param1,
 }
 
+// Struct-first codec for the fixed four-byte MUIM_CallHook method header.
+// Keeping this envelope explicit prevents selector reads from depending on
+// anonymous offsets while still using the shared bounded ULONG representation.
+internal static class MuiCallHookMethodMessageCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiCallHookMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiCallHookMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiCallHookMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!TryReadValue(ref platform, address, out var methodId)) return false;
+		packet.MethodId = methodId;
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform,
+		APTR address, MuiCallHookMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+		=> WriteValue(ref platform, address, packet.MethodId);
+}
+
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiCallHookPacketFieldCursor
 {
@@ -151,10 +201,9 @@ internal struct MuiCallHookParameterRecord
 // use this codec without reaching through an anonymous ULONG offset.
 internal static class MuiCallHookParameterRecordCodec
 {
-	// CopperSharp's freestanding generic lowering has a known fault for a
-	// one-ULONG struct crossing a by-value call boundary. Keep the named record
-	// API, but expose scalar-safe cursor entry points for hook implementations
-	// that only need the parameter value.
+	// Keep the named one-ULONG record API while routing the guest exchange
+	// through the shared bounded ULONG codec. Hook implementations that need
+	// only the scalar value still use these cursor entry points.
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 		APTR address, out uint value)
@@ -163,13 +212,10 @@ internal static class MuiCallHookParameterRecordCodec
 		value = 0;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiCallHookParameterRecord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
-				out var high) ||
-			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
-				out var low) || !MuiGuestStructCursor.IsComplete(cursor))
-			return false;
-		value = ((uint)high << 16) | low;
-		return true;
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress)) return false;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+			out value) && MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
@@ -179,11 +225,10 @@ internal static class MuiCallHookParameterRecordCodec
 	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiCallHookParameterRecord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
-				(ushort)(value >> 16)) ||
-			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
-				(ushort)value)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress)) return false;
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+			value) && MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
@@ -269,11 +314,8 @@ internal static class MuiCallHookMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		uint methodId;
-		if (!TryReadMethodIdValue(ref platform, message, out methodId))
-			return false;
-		packet.MethodId = methodId;
-		return true;
+		return MuiCallHookMethodMessageCodec.TryRead(ref platform, message,
+			out packet);
 	}
 
 	// Method admission remains scalar for callers that only need the selector,
@@ -282,16 +324,8 @@ internal static class MuiCallHookMessageCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiCallHookMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var rawMethodId) ||
-			!MuiGuestStructCursor.IsComplete(cursor)) return false;
-		methodId = rawMethodId;
-		return true;
-	}
+		=> MuiCallHookMethodMessageCodec.TryReadValue(ref platform, message,
+			out methodId);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiCallHookMessage packet)

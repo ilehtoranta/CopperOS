@@ -163,8 +163,23 @@ internal static class MuiGroupLayoutPolicyStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiGroupLayoutPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiGroupLayoutPolicyField.Magic)
+			value = state.Magic;
+		else if (field == MuiGroupLayoutPolicyField.Horizontal)
+			value = state.Horizontal;
+		else if (field == MuiGroupLayoutPolicyField.HorizontalSpacing)
+			value = state.HorizontalSpacing;
+		else if (field == MuiGroupLayoutPolicyField.VerticalSpacing)
+			value = state.VerticalSpacing;
+		else if (field == MuiGroupLayoutPolicyField.SameWidth)
+			value = state.SameWidth;
+		else if (field == MuiGroupLayoutPolicyField.SameHeight)
+			value = state.SameHeight;
+		else if (field == MuiGroupLayoutPolicyField.PageMode)
+			value = state.PageMode;
+		else return false;
 		return true;
 	}
 
@@ -172,9 +187,25 @@ internal static class MuiGroupLayoutPolicyStateRecordMemoryCodec
 		APTR record, MuiGroupLayoutPolicyField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiGroupLayoutPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiGroupLayoutPolicyField.Magic)
+			state.Magic = value;
+		else if (field == MuiGroupLayoutPolicyField.Horizontal)
+			state.Horizontal = value;
+		else if (field == MuiGroupLayoutPolicyField.HorizontalSpacing)
+			state.HorizontalSpacing = value;
+		else if (field == MuiGroupLayoutPolicyField.VerticalSpacing)
+			state.VerticalSpacing = value;
+		else if (field == MuiGroupLayoutPolicyField.SameWidth)
+			state.SameWidth = value;
+		else if (field == MuiGroupLayoutPolicyField.SameHeight)
+			state.SameHeight = value;
+		else if (field == MuiGroupLayoutPolicyField.PageMode)
+			state.PageMode = value;
+		else return false;
+		return MuiGroupLayoutPolicyStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

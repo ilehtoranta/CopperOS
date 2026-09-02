@@ -15,6 +15,10 @@ namespace CopperOS.MuiMaster;
 internal struct MuiStringFilterStateRecord
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint AcceptOffset = 4;
+	internal const uint RejectOffset = 8;
 	internal const uint Cookie = 0x4D534652u; // 'MSFR'
 
 	internal uint Magic;
@@ -57,14 +61,18 @@ internal static class MuiStringFilterStateFieldCursorCodec
 	private static bool TryResolve(MuiStringFilterStateField field,
 		out uint offset)
 	{
-		offset = field switch
+		if (field == MuiStringFilterStateField.Magic)
+			offset = MuiStringFilterStateRecord.MagicOffset;
+		else if (field == MuiStringFilterStateField.Accept)
+			offset = MuiStringFilterStateRecord.AcceptOffset;
+		else if (field == MuiStringFilterStateField.Reject)
+			offset = MuiStringFilterStateRecord.RejectOffset;
+		else
 		{
-			MuiStringFilterStateField.Magic => 0,
-			MuiStringFilterStateField.Accept => 4,
-			MuiStringFilterStateField.Reject => 8,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -76,7 +84,7 @@ internal static class MuiStringFilterStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 				cursor.Record, MuiStringFilterStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiStringFilterStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -109,16 +117,77 @@ internal static class MuiStringFilterStateFieldCursorCodec
 // pointers; this bounded adapter owns fixed guest-layout translation.
 internal static class MuiStringFilterStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiStringFilterStateField field,
+		out uint offset)
+	{
+		if (field == MuiStringFilterStateField.Magic)
+			offset = MuiStringFilterStateRecord.MagicOffset;
+		else if (field == MuiStringFilterStateField.Accept)
+			offset = MuiStringFilterStateRecord.AcceptOffset;
+		else if (field == MuiStringFilterStateField.Reject)
+			offset = MuiStringFilterStateRecord.RejectOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringFilterStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringFilterStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiStringFilterStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiStringFilterStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiStringFilterStateField.Accept)
+			value = state.Accept.Raw;
+		else if (field == MuiStringFilterStateField.Reject)
+			value = state.Reject.Raw;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringFilterStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiStringFilterStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiStringFilterStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiStringFilterStateField.Accept)
+			state.Accept = APTR.FromPointer(value);
+		else if (field == MuiStringFilterStateField.Reject)
+			state.Reject = APTR.FromPointer(value);
+		else return false;
+		return MuiStringFilterStateRecordCodec.WriteStructural(ref platform, record,
+			state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiStringFilterStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiStringFilterStateRecord.Size -
+			MuiStringFilterStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiStringFilterStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiStringFilterStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -178,7 +247,13 @@ internal static class MuiStringFilterStateRecordCodec
 		MuiStringFilterStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiStringFilterStateAdmission.Validate(value) &&
-		MuiGuestStructCursor.TryCreate(ref platform, address,
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiStringFilterStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiStringFilterStateRecord.Size, out var cursor) &&
 		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 			value.Magic) &&

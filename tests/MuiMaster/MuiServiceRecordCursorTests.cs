@@ -111,6 +111,34 @@ public sealed class MuiServiceRecordCursorTests
 	}
 
 	[Fact]
+	public void StringInteger64FieldPathPreservesNamedQuadRecord()
+	{
+		var platform = CreatePlatform();
+		var record = APTR.FromPointer(0x3280);
+		var initial = new MuiStringInteger64Value
+		{
+			High = 0x10203040u,
+			Low = 0x50607080u,
+		};
+
+		Assert.True(MuiStringInteger64ValueStructCodec.Write(ref platform, record,
+			initial));
+		Assert.True(MuiStringInteger64ValueMemoryCodec.TryWriteUInt32(ref platform,
+			record, MuiStringInteger64Field.High, 0xF1020304u));
+		Assert.True(MuiStringInteger64ValueStructCodec.TryRead(ref platform, record,
+			out var updated));
+		Assert.Equal(0xF1020304u, updated.High);
+		Assert.Equal(initial.Low, updated.Low);
+		Assert.True(MuiStringInteger64ValueMemoryCodec.TryReadUInt32(ref platform,
+			record, MuiStringInteger64Field.Low, out var low));
+		Assert.Equal(initial.Low, low);
+		Assert.False(MuiStringInteger64ValueMemoryCodec.TryWriteUInt32(ref platform,
+			record, unchecked((MuiStringInteger64Field)255), 1));
+		Assert.False(MuiStringInteger64ValueMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(0x40FFC), MuiStringInteger64Field.High, 1));
+	}
+
+	[Fact]
 	public void StringEditWorkMemoryAdapterOwnsMixedFieldRecordBounds()
 	{
 		var platform = CreatePlatform();

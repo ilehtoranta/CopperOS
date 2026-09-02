@@ -911,6 +911,22 @@ public sealed class MuiPopSpecialistTests
 	}
 
 	[Fact]
+	public void PopSpecialistMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var p = NewPlatform();
+		const uint methodId = 0xB3579ACEu;
+		Assert.True(MuiPopSpecialistMethodHeaderCodec.WriteValue(ref p, Packet,
+			methodId));
+		Assert.True(MuiPopSpecialistMethodHeaderCodec.TryReadValue(ref p, Packet,
+			out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiPopSpecialistMethodHeaderCodec.TryReadValue(ref p,
+			APTR.FromPointer(Base + (uint)Size - 1), out _));
+		Assert.False(MuiPopSpecialistMethodHeaderCodec.WriteValue(ref p,
+			APTR.Null, methodId));
+	}
+
+	[Fact]
 	public void PopSpecialistTypedReadersUseNamedMethodHeader()
 	{
 		var p = NewPlatform();

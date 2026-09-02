@@ -24,7 +24,8 @@ internal static class DosShellNativeLaunchCore
 	{
 		_ = error;
 		if (execBase.IsNull || state.IsNull || parentCli.IsNull ||
-			(kind != ShellLaunchKind.NewCli && kind != ShellLaunchKind.NewShell) ||
+			(kind != ShellLaunchKind.NewCli && kind != ShellLaunchKind.NewShell &&
+			 kind != ShellLaunchKind.Cli) ||
 			(window.IsNull ? windowLength != 0 : windowLength == 0) ||
 			(from.IsNull && fromLength != 0) || fromLength > 255 ||
 			(from.IsNotNull && (from.Raw > uint.MaxValue - fromLength - 1 ||

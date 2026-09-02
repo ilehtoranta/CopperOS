@@ -82,17 +82,16 @@ internal static class MuiChoiceEntriesStateRecordMemoryCodec
 	private static bool TryResolve(MuiChoiceEntriesStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiChoiceEntriesStateField.Magic)
+			offset = MuiChoiceEntriesStateRecord.MagicOffset;
+		else if (field == MuiChoiceEntriesStateField.Entries)
+			offset = MuiChoiceEntriesStateRecord.EntriesOffset;
+		else
 		{
-			case MuiChoiceEntriesStateField.Magic:
-				offset = MuiChoiceEntriesStateRecord.MagicOffset;
-				return true;
-			case MuiChoiceEntriesStateField.Entries:
-				offset = MuiChoiceEntriesStateRecord.EntriesOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -112,8 +111,13 @@ internal static class MuiChoiceEntriesStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiChoiceEntriesStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiChoiceEntriesStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiChoiceEntriesStateField.Entries)
+			value = state.Entries.Raw;
+		else return false;
 		return true;
 	}
 
@@ -121,9 +125,15 @@ internal static class MuiChoiceEntriesStateRecordMemoryCodec
 		APTR record, MuiChoiceEntriesStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiChoiceEntriesStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiChoiceEntriesStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiChoiceEntriesStateField.Entries)
+			state.Entries = APTR.FromPointer(value);
+		else return false;
+		return MuiChoiceEntriesStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

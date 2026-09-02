@@ -93,23 +93,20 @@ internal static class MuiApplicationDefaultConfigStateRecordMemoryCodec
 	private static bool TryResolve(MuiApplicationDefaultConfigStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiApplicationDefaultConfigStateField.Magic)
+			offset = MuiApplicationDefaultConfigStateRecord.MagicOffset;
+		else if (field == MuiApplicationDefaultConfigStateField.ConfigId)
+			offset = MuiApplicationDefaultConfigStateRecord.ConfigIdOffset;
+		else if (field == MuiApplicationDefaultConfigStateField.Value)
+			offset = MuiApplicationDefaultConfigStateRecord.ValueOffset;
+		else if (field == MuiApplicationDefaultConfigStateField.Requests)
+			offset = MuiApplicationDefaultConfigStateRecord.RequestsOffset;
+		else
 		{
-			case MuiApplicationDefaultConfigStateField.Magic:
-				offset = MuiApplicationDefaultConfigStateRecord.MagicOffset;
-				return true;
-			case MuiApplicationDefaultConfigStateField.ConfigId:
-				offset = MuiApplicationDefaultConfigStateRecord.ConfigIdOffset;
-				return true;
-			case MuiApplicationDefaultConfigStateField.Value:
-				offset = MuiApplicationDefaultConfigStateRecord.ValueOffset;
-				return true;
-			case MuiApplicationDefaultConfigStateField.Requests:
-				offset = MuiApplicationDefaultConfigStateRecord.RequestsOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -132,9 +129,17 @@ internal static class MuiApplicationDefaultConfigStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiApplicationDefaultConfigStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationDefaultConfigStateField.ConfigId)
+			value = state.ConfigId;
+		else if (field == MuiApplicationDefaultConfigStateField.Value)
+			value = state.Value;
+		else if (field == MuiApplicationDefaultConfigStateField.Requests)
+			value = state.Requests;
+		else return false;
 		return true;
 	}
 
@@ -142,10 +147,19 @@ internal static class MuiApplicationDefaultConfigStateRecordMemoryCodec
 		APTR record, MuiApplicationDefaultConfigStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiApplicationDefaultConfigStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationDefaultConfigStateField.ConfigId)
+			state.ConfigId = value;
+		else if (field == MuiApplicationDefaultConfigStateField.Value)
+			state.Value = value;
+		else if (field == MuiApplicationDefaultConfigStateField.Requests)
+			state.Requests = value;
+		else return false;
+		return MuiApplicationDefaultConfigStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

@@ -1047,6 +1047,24 @@ public sealed class MuiApplicationWindowTests
 	}
 
 	[Fact]
+	public void ApplicationMethodHeaderScalarAdapterPreservesFullUlong()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1520);
+		const uint expected = 0xF1234567u;
+
+		Assert.True(MuiApplicationMethodHeaderCodec.WriteValue(ref platform,
+			address, expected));
+		Assert.True(MuiApplicationMethodHeaderCodec.TryReadValue(ref platform,
+			address, out var actual));
+		Assert.Equal(expected, actual);
+		Assert.False(MuiApplicationMethodHeaderCodec.WriteValue(ref platform,
+			APTR.Null, expected));
+		Assert.False(MuiApplicationMethodHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
+	}
+
+	[Fact]
 	public void WindowCycleChainSlotUsesNamedObjectPointer()
 	{
 		var platform = CreatePlatform(out _);

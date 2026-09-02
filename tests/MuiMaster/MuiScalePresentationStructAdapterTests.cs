@@ -28,6 +28,13 @@ public sealed class MuiScalePresentationStructAdapterTests
 		Assert.True(MuiScalePresentationStateRecordCodec.TryReadRecord(
 			ref platform, address, out var decoded));
 		Assert.Equal(0u, decoded.Horizontal);
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.True(MuiScalePresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiScalePresentationStateField.Magic,
+			out var magic));
+		Assert.Equal(value.Magic, magic);
+		Assert.False(MuiScalePresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiScalePresentationStateField)0xFF, out _));
 		Assert.False(MuiScalePresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.FromPointer(0x30FF9),
 			MuiScalePresentationStateField.Magic, out _));

@@ -142,14 +142,8 @@ internal static class MuiFamilyGetChildMessageStructCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiFamilyGetChildMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out methodId) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
-		return true;
-	}
+		=> MuiFamilyGetChildMethodHeaderCodec.TryReadValue(ref platform,
+			message, out methodId);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiFamilyGetChildMessage packet)
@@ -181,6 +175,41 @@ internal static class MuiFamilyGetChildMessageStructCodec
 				unchecked((uint)number)) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				reference.Raw)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+// Struct-first codec for the method-only Family_GetChild header. The named
+// one-ULONG record remains the ABI contract; the shared storage codec keeps
+// scalar selector admission safe for freestanding native lowering.
+internal static class MuiFamilyGetChildMethodHeaderCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiFamilyGetChildMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiFamilyGetChildMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }

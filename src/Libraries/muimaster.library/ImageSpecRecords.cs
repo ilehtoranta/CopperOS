@@ -27,6 +27,12 @@ public struct MuiImageSpecState
 internal struct MuiImageSpecStateRecord
 {
 	internal const uint Size = 20;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint PresentOffset = 4;
+	internal const uint RawOffset = 8;
+	internal const uint BuiltinPresentOffset = 12;
+	internal const uint BuiltinOffset = 16;
 	internal const uint Cookie = 0x4D495350u; // 'MISP'
 
 	internal uint Magic;
@@ -78,16 +84,22 @@ internal static class MuiImageSpecStateFieldCursorCodec
 	private static bool TryResolve(MuiImageSpecStateField field,
 		out uint offset)
 		{
-			offset = field switch
-		{
-			MuiImageSpecStateField.Magic => 0,
-			MuiImageSpecStateField.Present => 4,
-			MuiImageSpecStateField.Raw => 8,
-			MuiImageSpecStateField.BuiltinPresent => 12,
-			MuiImageSpecStateField.Builtin => 16,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			if (field == MuiImageSpecStateField.Magic)
+				offset = MuiImageSpecStateRecord.MagicOffset;
+			else if (field == MuiImageSpecStateField.Present)
+				offset = MuiImageSpecStateRecord.PresentOffset;
+			else if (field == MuiImageSpecStateField.Raw)
+				offset = MuiImageSpecStateRecord.RawOffset;
+			else if (field == MuiImageSpecStateField.BuiltinPresent)
+				offset = MuiImageSpecStateRecord.BuiltinPresentOffset;
+			else if (field == MuiImageSpecStateField.Builtin)
+				offset = MuiImageSpecStateRecord.BuiltinOffset;
+			else
+			{
+				offset = 0;
+				return false;
+			}
+			return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -99,7 +111,7 @@ internal static class MuiImageSpecStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 			cursor.Record, MuiImageSpecStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiImageSpecStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -134,16 +146,89 @@ internal static class MuiImageSpecStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiImageSpecStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiImageSpecStateField field,
+		out uint offset)
+	{
+		if (field == MuiImageSpecStateField.Magic)
+			offset = MuiImageSpecStateRecord.MagicOffset;
+		else if (field == MuiImageSpecStateField.Present)
+			offset = MuiImageSpecStateRecord.PresentOffset;
+		else if (field == MuiImageSpecStateField.Raw)
+			offset = MuiImageSpecStateRecord.RawOffset;
+		else if (field == MuiImageSpecStateField.BuiltinPresent)
+			offset = MuiImageSpecStateRecord.BuiltinPresentOffset;
+		else if (field == MuiImageSpecStateField.Builtin)
+			offset = MuiImageSpecStateRecord.BuiltinOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiImageSpecStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiImageSpecStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiImageSpecStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiImageSpecStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiImageSpecStateField.Present)
+			value = state.Present;
+		else if (field == MuiImageSpecStateField.Raw)
+			value = state.Raw;
+		else if (field == MuiImageSpecStateField.BuiltinPresent)
+			value = state.BuiltinPresent;
+		else if (field == MuiImageSpecStateField.Builtin)
+			value = state.Builtin;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiImageSpecStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiImageSpecStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiImageSpecStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiImageSpecStateField.Present)
+			state.Present = value;
+		else if (field == MuiImageSpecStateField.Raw)
+			state.Raw = value;
+		else if (field == MuiImageSpecStateField.BuiltinPresent)
+			state.BuiltinPresent = value;
+		else if (field == MuiImageSpecStateField.Builtin)
+			state.Builtin = value;
+		else return false;
+		return MuiImageSpecStateRecordCodec.WriteRecord(ref platform, record,
+			state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiImageSpecStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiImageSpecStateRecord.Size -
+			MuiImageSpecStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiImageSpecStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiImageSpecStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

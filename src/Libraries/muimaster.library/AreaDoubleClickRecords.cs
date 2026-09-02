@@ -96,20 +96,18 @@ internal static class MuiAreaDoubleClickStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaDoubleClickStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaDoubleClickStateField.Magic)
+			offset = MuiAreaDoubleClickStateRecord.MagicOffset;
+		else if (field == MuiAreaDoubleClickStateField.Value)
+			offset = MuiAreaDoubleClickStateRecord.ValueOffset;
+		else if (field == MuiAreaDoubleClickStateField.Generation)
+			offset = MuiAreaDoubleClickStateRecord.GenerationOffset;
+		else
 		{
-			case MuiAreaDoubleClickStateField.Magic:
-				offset = MuiAreaDoubleClickStateRecord.MagicOffset;
-				return true;
-			case MuiAreaDoubleClickStateField.Value:
-				offset = MuiAreaDoubleClickStateRecord.ValueOffset;
-				return true;
-			case MuiAreaDoubleClickStateField.Generation:
-				offset = MuiAreaDoubleClickStateRecord.GenerationOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -130,9 +128,15 @@ internal static class MuiAreaDoubleClickStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaDoubleClickStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaDoubleClickStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaDoubleClickStateField.Value)
+			value = unchecked((uint)state.Value);
+		else if (field == MuiAreaDoubleClickStateField.Generation)
+			value = state.Generation;
+		else return false;
 		return true;
 	}
 
@@ -140,10 +144,17 @@ internal static class MuiAreaDoubleClickStateRecordMemoryCodec
 		APTR record, MuiAreaDoubleClickStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaDoubleClickStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaDoubleClickStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaDoubleClickStateField.Value)
+			state.Value = unchecked((int)value);
+		else if (field == MuiAreaDoubleClickStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiAreaDoubleClickStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

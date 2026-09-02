@@ -201,36 +201,8 @@ internal static class MuiRequesterParameterSlotStructCodec
 	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 		APTR address, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiRequesterParameterSlot.Size, out var cursor)) return false;
-		// Keep complete-record admission in the sequential cursor. Read the ULONG
-		// as bytes because the freestanding compiler has a known generic-interface
-		// ABI lowering defect for 32-bit values with bit 31 set; byte scalars keep
-		// the full C ULONG range without changing the record representation.
-		byte first;
-		byte second;
-		byte third;
-		byte fourth;
-		APTR firstAddress;
-		APTR secondAddress;
-		APTR thirdAddress;
-		APTR fourthAddress;
-		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-			ref platform, ref cursor, 1, out thirdAddress) ||
-			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out fourthAddress)) return false;
-		first = platform.ReadUInt8(firstAddress, 0);
-		second = platform.ReadUInt8(secondAddress, 0);
-		third = platform.ReadUInt8(thirdAddress, 0);
-		fourth = platform.ReadUInt8(fourthAddress, 0);
-		value = ((uint)first << 24) | ((uint)second << 16) |
-			((uint)third << 8) | fourth;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiRequesterParameterSlot slot)
@@ -247,25 +219,7 @@ internal static class MuiRequesterParameterSlotStructCodec
 	internal static bool TryWriteValue<TPlatform>(ref TPlatform platform,
 		APTR address, uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiRequesterParameterSlot.Size, out var cursor)) return false;
-		APTR firstAddress;
-		APTR secondAddress;
-		APTR thirdAddress;
-		APTR fourthAddress;
-		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-			ref platform, ref cursor, 1, out thirdAddress) ||
-			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out fourthAddress)) return false;
-		platform.WriteUInt8(firstAddress, 0, (byte)(value >> 24));
-		platform.WriteUInt8(secondAddress, 0, (byte)(value >> 16));
-		platform.WriteUInt8(thirdAddress, 0, (byte)(value >> 8));
-		platform.WriteUInt8(fourthAddress, 0, (byte)value);
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiRequesterParameterSlot slot)

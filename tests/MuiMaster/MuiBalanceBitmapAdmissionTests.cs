@@ -76,15 +76,26 @@ public sealed class MuiBalanceBitmapAdmissionTests
 		Assert.True(MuiBalancePolicyStateRecordCodec.TryRead(ref platform, address,
 			out _));
 		Assert.True(MuiBalancePolicyStateRecordMemoryCodec.TryGetAddress(
-			ref platform, address, 4, out var lastField));
+			ref platform, address, MuiBalancePolicyStateField.Quiet,
+			out var typedQuietAddress));
+		Assert.Equal(address.Raw + MuiBalancePolicyStateRecord.QuietOffset,
+			typedQuietAddress.Raw);
+		Assert.True(MuiBalancePolicyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiBalancePolicyStateField.Quiet, 0x13579BDF));
+		Assert.True(MuiBalancePolicyStateRecordCodec.TryReadStructural(
+			ref platform, address, out var typedDecoded));
+		Assert.Equal(value.Magic, typedDecoded.Magic);
+		Assert.Equal(0x13579BDFu, typedDecoded.Quiet);
+		Assert.True(MuiBalancePolicyStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, 4u, out var lastField));
 		Assert.Equal(address.Raw + 4, lastField.Raw);
 		Assert.True(MuiBalancePolicyStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 4, out var quiet));
-		Assert.Equal(value.Quiet, quiet);
+			ref platform, address, 4u, out var quiet));
+		Assert.Equal(0x13579BDFu, quiet);
 		Assert.False(MuiBalancePolicyStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiBalancePolicyStateRecord.Size, out _));
 		Assert.False(MuiBalancePolicyStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, 0u, out _));
 		Assert.False(MuiBalancePolicyStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}
@@ -147,8 +158,27 @@ public sealed class MuiBalanceBitmapAdmissionTests
 			sourceAddress, out _));
 		Assert.True(MuiBitmapRemappedStateRecordCodec.TryRead(ref platform,
 			remappedAddress, out _));
+		Assert.True(MuiBitmapSourceStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, sourceAddress, MuiBitmapSourceStateField.Source,
+			0x1A2B3C4Du));
+		Assert.True(MuiBitmapSourceStateRecordCodec.TryReadStructural(ref platform,
+			sourceAddress, out var sourceTyped));
+		Assert.Equal(source.Magic, sourceTyped.Magic);
+		Assert.Equal(0x1A2B3C4Du, sourceTyped.Source.Raw);
+		Assert.True(MuiBitmapRemappedStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, remappedAddress, MuiBitmapRemappedStateField.Remapped,
+			0x55667788u));
+		Assert.True(MuiBitmapRemappedStateRecordCodec.TryReadStructural(
+			ref platform, remappedAddress, out var remappedTyped));
+		Assert.Equal(remapped.Magic, remappedTyped.Magic);
+		Assert.Equal(0x55667788u, remappedTyped.Remapped.Raw);
 		Assert.True(MuiBitmapSourceStateRecordMemoryCodec.TryGetAddress(
-			ref platform, sourceAddress, 4, out var sourceField));
+			ref platform, sourceAddress, MuiBitmapSourceStateField.Source,
+			out var typedSourceField));
+		Assert.Equal(sourceAddress.Raw + MuiBitmapSourceStateRecord.SourceOffset,
+			typedSourceField.Raw);
+		Assert.True(MuiBitmapSourceStateRecordMemoryCodec.TryGetAddress(
+			ref platform, sourceAddress, 4u, out var sourceField));
 		Assert.Equal(sourceAddress.Raw + 4, sourceField.Raw);
 		Assert.True(MuiBitmapRemappedStateRecordMemoryCodec.TryGetAddress(
 			ref platform, remappedAddress, MuiBitmapRemappedStateField.Remapped,
@@ -160,7 +190,7 @@ public sealed class MuiBalanceBitmapAdmissionTests
 		Assert.False(MuiBitmapRemappedStateRecordMemoryCodec.TryGetAddress(
 			ref platform, remappedAddress, (MuiBitmapRemappedStateField)255, out _));
 		Assert.False(MuiBitmapSourceStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, 0u, out _));
 		Assert.False(MuiBitmapRemappedStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.Null, MuiBitmapRemappedStateField.Magic, out _));
 	}

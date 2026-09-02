@@ -64,10 +64,26 @@ public sealed class MuiGaugeLevelmeterAdmissionTests
 		Assert.True(MuiLevelmeterPresentationStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, address, 4, out var horizontal));
 		Assert.Equal(value.Horizontal, horizontal);
+		Assert.True(MuiLevelmeterPresentationStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiLevelmeterPresentationStateField.Horizontal,
+			out var typedHorizontal));
+		Assert.Equal(address.Raw + MuiLevelmeterPresentationStateRecord.HorizontalOffset,
+			typedHorizontal.Raw);
+		Assert.True(MuiLevelmeterPresentationStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiLevelmeterPresentationStateField.Horizontal, 1));
+		Assert.True(MuiLevelmeterPresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiLevelmeterPresentationStateField.Magic,
+			out var typedMagic));
+		Assert.Equal(value.Magic, typedMagic);
+		Assert.True(MuiLevelmeterPresentationStateRecordCodec.TryReadStructural(
+			ref platform, address, out var typedStructural));
+		Assert.Equal(1u, typedStructural.Horizontal);
+		Assert.False(MuiLevelmeterPresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiLevelmeterPresentationStateField)0xFF, out _));
 		Assert.False(MuiLevelmeterPresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiLevelmeterPresentationStateRecord.Size, out _));
 		Assert.False(MuiLevelmeterPresentationStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiLevelmeterPresentationStateRecordCodec.TryReadRecord(
 			ref platform, APTR.Null, out _));
 	}
@@ -141,7 +157,7 @@ public sealed class MuiGaugeLevelmeterAdmissionTests
 		Assert.False(MuiLevelmeterLabelStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiLevelmeterLabelStateRecord.Size, out _));
 		Assert.False(MuiLevelmeterLabelStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiLevelmeterLabelStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

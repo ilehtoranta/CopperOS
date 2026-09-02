@@ -102,26 +102,22 @@ internal static class MuiApplicationConfigWindowStateRecordMemoryCodec
 	private static bool TryResolve(MuiApplicationConfigWindowStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiApplicationConfigWindowStateField.Magic)
+			offset = MuiApplicationConfigWindowStateRecord.MagicOffset;
+		else if (field == MuiApplicationConfigWindowStateField.Flags)
+			offset = MuiApplicationConfigWindowStateRecord.FlagsOffset;
+		else if (field == MuiApplicationConfigWindowStateField.ClassId)
+			offset = MuiApplicationConfigWindowStateRecord.ClassIdOffset;
+		else if (field == MuiApplicationConfigWindowStateField.Requests)
+			offset = MuiApplicationConfigWindowStateRecord.RequestsOffset;
+		else if (field == MuiApplicationConfigWindowStateField.Reserved)
+			offset = MuiApplicationConfigWindowStateRecord.ReservedOffset;
+		else
 		{
-			case MuiApplicationConfigWindowStateField.Magic:
-				offset = MuiApplicationConfigWindowStateRecord.MagicOffset;
-				return true;
-			case MuiApplicationConfigWindowStateField.Flags:
-				offset = MuiApplicationConfigWindowStateRecord.FlagsOffset;
-				return true;
-			case MuiApplicationConfigWindowStateField.ClassId:
-				offset = MuiApplicationConfigWindowStateRecord.ClassIdOffset;
-				return true;
-			case MuiApplicationConfigWindowStateField.Requests:
-				offset = MuiApplicationConfigWindowStateRecord.RequestsOffset;
-				return true;
-			case MuiApplicationConfigWindowStateField.Reserved:
-				offset = MuiApplicationConfigWindowStateRecord.ReservedOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -144,9 +140,19 @@ internal static class MuiApplicationConfigWindowStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationConfigWindowStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationConfigWindowStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationConfigWindowStateField.Flags)
+			value = state.Flags;
+		else if (field == MuiApplicationConfigWindowStateField.ClassId)
+			value = state.ClassId.Raw;
+		else if (field == MuiApplicationConfigWindowStateField.Requests)
+			value = state.Requests;
+		else if (field == MuiApplicationConfigWindowStateField.Reserved)
+			value = state.Reserved;
+		else return false;
 		return true;
 	}
 
@@ -154,10 +160,21 @@ internal static class MuiApplicationConfigWindowStateRecordMemoryCodec
 		APTR record, MuiApplicationConfigWindowStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationConfigWindowStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationConfigWindowStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationConfigWindowStateField.Flags)
+			state.Flags = value;
+		else if (field == MuiApplicationConfigWindowStateField.ClassId)
+			state.ClassId = APTR.FromPointer(value);
+		else if (field == MuiApplicationConfigWindowStateField.Requests)
+			state.Requests = value;
+		else if (field == MuiApplicationConfigWindowStateField.Reserved)
+			state.Reserved = value;
+		else return false;
+		return MuiApplicationConfigWindowStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

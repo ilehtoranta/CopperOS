@@ -1833,6 +1833,22 @@ public sealed class MuiMiscSpecialistTests
 	}
 
 	[Fact]
+	public void MiscSpecialistMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var p = NewPlatform();
+		const uint methodId = 0x9357BDF1u;
+		Assert.True(MuiMiscSpecialistMethodHeaderCodec.WriteValue(ref p, Packet,
+			methodId));
+		Assert.True(MuiMiscSpecialistMethodHeaderCodec.TryReadValue(ref p, Packet,
+			out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiMiscSpecialistMethodHeaderCodec.TryReadValue(ref p,
+			APTR.FromPointer(0x40FFFu), out _));
+		Assert.False(MuiMiscSpecialistMethodHeaderCodec.WriteValue(ref p,
+			APTR.Null, methodId));
+	}
+
+	[Fact]
 	public void MiscSpecialistMessageAdapterOwnsStructBounds()
 	{
 		var p = NewPlatform();

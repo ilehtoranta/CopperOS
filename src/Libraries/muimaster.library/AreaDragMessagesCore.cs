@@ -933,6 +933,15 @@ internal static class MuiAreaDragMessageCodec
 		return true;
 	}
 
+	// The method-only packet is a complete one-ULONG named record. Keep a
+	// scalar-safe pair beside the typed record so freestanding callers avoid
+	// passing a one-field struct through the native ABI.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.WriteValue(ref platform, message, methodId);
+
 	// Selector admission stays scalar for callers that only need MethodID, but
 	// it is read from the named one-ULONG method record in declaration order.
 	[MethodImpl(MethodImplOptions.NoInlining)]
@@ -940,14 +949,8 @@ internal static class MuiAreaDragMessageCodec
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiAreaDragMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var rawMethodId) ||
-			!MuiGuestStructCursor.IsComplete(cursor)) return false;
-		methodId = rawMethodId;
-		return true;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, message,
+			out methodId);
 	}
 
 	internal static bool TryReadBegin<TPlatform>(ref TPlatform platform,

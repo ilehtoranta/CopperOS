@@ -51,18 +51,17 @@ internal static class MuiStoreIterationCounterMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return field == MuiStoreIterationCounterField.Ordinal &&
+			MuiStoreIterationCounterCodec.TryReadValue(ref platform, record,
+				out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiStoreIterationCounterField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		return field == MuiStoreIterationCounterField.Ordinal &&
+			MuiStoreIterationCounterCodec.WriteValue(ref platform, record, value);
 	}
 }
 

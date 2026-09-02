@@ -86,15 +86,20 @@ internal static class MuiGroupPageStateMemoryCodec
 	private static bool TryResolve(MuiGroupPageStateField field,
 		out uint offset)
 	{
-		offset = field switch
+		if (field == MuiGroupPageStateField.Cookie)
+			offset = MuiGroupPageState.CookieOffset;
+		else if (field == MuiGroupPageStateField.Active)
+			offset = MuiGroupPageState.ActiveOffset;
+		else if (field == MuiGroupPageStateField.Changes)
+			offset = MuiGroupPageState.ChangesOffset;
+		else if (field == MuiGroupPageStateField.LastSelector)
+			offset = MuiGroupPageState.LastSelectorOffset;
+		else
 		{
-			MuiGroupPageStateField.Cookie => MuiGroupPageState.CookieOffset,
-			MuiGroupPageStateField.Active => MuiGroupPageState.ActiveOffset,
-			MuiGroupPageStateField.Changes => MuiGroupPageState.ChangesOffset,
-			MuiGroupPageStateField.LastSelector => MuiGroupPageState.LastSelectorOffset,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -114,9 +119,17 @@ internal static class MuiGroupPageStateMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiGroupPageStateCodec.TryReadRecord(ref platform, record,
+			out var state)) return false;
+		if (field == MuiGroupPageStateField.Cookie)
+			value = state.Cookie;
+		else if (field == MuiGroupPageStateField.Active)
+			value = state.Active;
+		else if (field == MuiGroupPageStateField.Changes)
+			value = state.Changes;
+		else if (field == MuiGroupPageStateField.LastSelector)
+			value = state.LastSelector;
+		else return false;
 		return true;
 	}
 
@@ -124,10 +137,18 @@ internal static class MuiGroupPageStateMemoryCodec
 		APTR record, MuiGroupPageStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiGroupPageStateCodec.TryReadRecord(ref platform, record,
+			out var state)) return false;
+		if (field == MuiGroupPageStateField.Cookie)
+			state.Cookie = value;
+		else if (field == MuiGroupPageStateField.Active)
+			state.Active = value;
+		else if (field == MuiGroupPageStateField.Changes)
+			state.Changes = value;
+		else if (field == MuiGroupPageStateField.LastSelector)
+			state.LastSelector = value;
+		else return false;
+		return MuiGroupPageStateCodec.WriteRecord(ref platform, record, state);
 	}
 }
 

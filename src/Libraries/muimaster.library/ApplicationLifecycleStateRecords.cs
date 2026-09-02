@@ -106,32 +106,26 @@ internal static class MuiApplicationLifecycleStateRecordMemoryCodec
 	private static bool TryResolve(MuiApplicationLifecycleStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiApplicationLifecycleStateField.Magic)
+			offset = MuiApplicationLifecycleStateRecord.MagicOffset;
+		else if (field == MuiApplicationLifecycleStateField.Initialized)
+			offset = MuiApplicationLifecycleStateRecord.InitializedOffset;
+		else if (field == MuiApplicationLifecycleStateField.Iconified)
+			offset = MuiApplicationLifecycleStateRecord.IconifiedOffset;
+		else if (field == MuiApplicationLifecycleStateField.Active)
+			offset = MuiApplicationLifecycleStateRecord.ActiveOffset;
+		else if (field == MuiApplicationLifecycleStateField.SingleTask)
+			offset = MuiApplicationLifecycleStateRecord.SingleTaskOffset;
+		else if (field == MuiApplicationLifecycleStateField.DoubleStart)
+			offset = MuiApplicationLifecycleStateRecord.DoubleStartOffset;
+		else if (field == MuiApplicationLifecycleStateField.ForceQuit)
+			offset = MuiApplicationLifecycleStateRecord.ForceQuitOffset;
+		else
 		{
-			case MuiApplicationLifecycleStateField.Magic:
-				offset = MuiApplicationLifecycleStateRecord.MagicOffset;
-				return true;
-			case MuiApplicationLifecycleStateField.Initialized:
-				offset = MuiApplicationLifecycleStateRecord.InitializedOffset;
-				return true;
-			case MuiApplicationLifecycleStateField.Iconified:
-				offset = MuiApplicationLifecycleStateRecord.IconifiedOffset;
-				return true;
-			case MuiApplicationLifecycleStateField.Active:
-				offset = MuiApplicationLifecycleStateRecord.ActiveOffset;
-				return true;
-			case MuiApplicationLifecycleStateField.SingleTask:
-				offset = MuiApplicationLifecycleStateRecord.SingleTaskOffset;
-				return true;
-			case MuiApplicationLifecycleStateField.DoubleStart:
-				offset = MuiApplicationLifecycleStateRecord.DoubleStartOffset;
-				return true;
-			case MuiApplicationLifecycleStateField.ForceQuit:
-				offset = MuiApplicationLifecycleStateRecord.ForceQuitOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -152,9 +146,23 @@ internal static class MuiApplicationLifecycleStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationLifecycleStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationLifecycleStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationLifecycleStateField.Initialized)
+			value = state.Initialized;
+		else if (field == MuiApplicationLifecycleStateField.Iconified)
+			value = state.Iconified;
+		else if (field == MuiApplicationLifecycleStateField.Active)
+			value = state.Active;
+		else if (field == MuiApplicationLifecycleStateField.SingleTask)
+			value = state.SingleTask;
+		else if (field == MuiApplicationLifecycleStateField.DoubleStart)
+			value = state.DoubleStart;
+		else if (field == MuiApplicationLifecycleStateField.ForceQuit)
+			value = state.ForceQuit;
+		else return false;
 		return true;
 	}
 
@@ -162,10 +170,25 @@ internal static class MuiApplicationLifecycleStateRecordMemoryCodec
 		APTR record, MuiApplicationLifecycleStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationLifecycleStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationLifecycleStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationLifecycleStateField.Initialized)
+			state.Initialized = value;
+		else if (field == MuiApplicationLifecycleStateField.Iconified)
+			state.Iconified = value;
+		else if (field == MuiApplicationLifecycleStateField.Active)
+			state.Active = value;
+		else if (field == MuiApplicationLifecycleStateField.SingleTask)
+			state.SingleTask = value;
+		else if (field == MuiApplicationLifecycleStateField.DoubleStart)
+			state.DoubleStart = value;
+		else if (field == MuiApplicationLifecycleStateField.ForceQuit)
+			state.ForceQuit = value;
+		else return false;
+		return MuiApplicationLifecycleStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

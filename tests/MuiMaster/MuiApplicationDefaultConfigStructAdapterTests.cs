@@ -73,4 +73,38 @@ public sealed class MuiApplicationDefaultConfigStructAdapterTests
 		Assert.False(MuiApplicationDefaultConfigStateRecordCodec.TryReadRecord(
 			ref platform, crossingEnd, out _));
 	}
+
+	[Fact]
+	public void ApplicationDefaultConfigFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationDefaultConfigStateRecord
+		{
+			Magic = 0x10203040u,
+			ConfigId = 0x50607080u,
+			Value = 0x90A0B0C0u,
+			Requests = 0xDDEEFF00u,
+		};
+
+		Assert.True(MuiApplicationDefaultConfigStateRecordCodec.WriteRecord(
+			ref platform, address, initial));
+		Assert.True(MuiApplicationDefaultConfigStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationDefaultConfigStateField.Value,
+			0xF1020304u));
+		Assert.True(MuiApplicationDefaultConfigStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiApplicationDefaultConfigStateField.ConfigId,
+			out var configId));
+		Assert.Equal(initial.ConfigId, configId);
+		Assert.True(MuiApplicationDefaultConfigStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(initial.ConfigId, updated.ConfigId);
+		Assert.Equal(0xF1020304u, updated.Value);
+		Assert.Equal(initial.Requests, updated.Requests);
+		Assert.False(MuiApplicationDefaultConfigStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiApplicationDefaultConfigStateField)255), 1));
+	}
 }

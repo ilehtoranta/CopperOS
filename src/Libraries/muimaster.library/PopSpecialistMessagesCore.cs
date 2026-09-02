@@ -155,27 +155,15 @@ internal static class MuiPopSpecialistMessageStructCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiPopSpecialistMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var rawMethodId)) return false;
-		methodId = rawMethodId;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiPopSpecialistMethodHeaderCodec.TryReadValue(ref platform, message,
+			out methodId);
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryWriteMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiPopSpecialistMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				methodId)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiPopSpecialistMethodHeaderCodec.WriteValue(ref platform, message,
+			methodId);
 
 	internal static bool TryReadGet<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiPopSpecialistGetMessage value)
@@ -271,6 +259,41 @@ internal static class MuiPopSpecialistMessageStructCodec
 				value.MethodId) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				value.Result)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+// Struct-first codec for the method-only Popstring/Popobject/Popasl header.
+// The named one-ULONG record remains the ABI contract while shared guest
+// storage keeps scalar selector admission safe for freestanding lowering.
+internal static class MuiPopSpecialistMethodHeaderCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiPopSpecialistMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiPopSpecialistMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }

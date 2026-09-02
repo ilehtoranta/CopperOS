@@ -435,7 +435,9 @@ internal static class MuiDrawingRasterPortStructCodec
 		record = default;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiDrawingRasterPortRecord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiDrawingRasterPortRecord.FieldSize, out var layerAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, layerAddress,
 				out var layer) || !MuiGuestStructCursor.IsComplete(cursor))
 			return false;
 		record.Layer = APTR.FromPointer(layer);
@@ -448,7 +450,9 @@ internal static class MuiDrawingRasterPortStructCodec
 	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiDrawingRasterPortRecord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiDrawingRasterPortRecord.FieldSize, out var layerAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, layerAddress,
 				record.Layer.Raw)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
@@ -637,18 +641,15 @@ internal static class MuiDrawingRecordFieldCursorCodec
 internal static class MuiDrawingRasterPortCodec
 {
 	// Keep the scalar helper available at the native boundary: this record is
-	// one pointer wide, and returning that single-field struct by value can
-	// lose high pointer bits in the freestanding compiler.
+	// one pointer wide, and the named ULONG slot must retain its fixed ABI
+	// width even when callers only need the layer value.
 	internal static bool TryReadLayerValue<TPlatform>(ref TPlatform platform,
 		APTR address, out uint layer)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		layer = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiDrawingRasterPortRecord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out layer)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out layer);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,

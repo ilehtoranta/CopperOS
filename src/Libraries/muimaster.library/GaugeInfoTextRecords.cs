@@ -20,6 +20,9 @@ public struct MuiGaugeInfoTextState
 internal struct MuiGaugeInfoTextStateRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint InfoTextOffset = 4;
 	internal const uint Cookie = 0x4D474954u; // 'MGIT'
 
 	internal uint Magic;
@@ -60,54 +63,23 @@ internal struct MuiGaugeInfoTextStateFieldCursor
 
 internal static class MuiGaugeInfoTextStateFieldCursorCodec
 {
-	private static bool TryResolve(MuiGaugeInfoTextStateField field,
-		out uint offset)
-	{
-		offset = field switch
-		{
-			MuiGaugeInfoTextStateField.Magic => 0,
-			MuiGaugeInfoTextStateField.InfoText => 4,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
-	}
-
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		MuiGaugeInfoTextStateFieldCursor cursor, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		address = APTR.Null;
-		if (!TryResolve(cursor.Field, out var offset) || cursor.Record.IsNull ||
-			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
-			cursor.Record, MuiGaugeInfoTextStateRecord.Size)) return false;
-		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
-	}
+		=> MuiGaugeInfoTextStateRecordMemoryCodec.TryGetAddress(ref platform,
+			cursor.Record, cursor.Field, out address);
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiGaugeInfoTextStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		value = 0;
-		var cursor = default(MuiGaugeInfoTextStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
-	}
+		=> MuiGaugeInfoTextStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			record, field, out value);
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiGaugeInfoTextStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		var cursor = default(MuiGaugeInfoTextStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
-	}
+		=> MuiGaugeInfoTextStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			record, field, value);
 }
 
 // Struct-first guest-memory adapter. Gauge consumers use the named record;
@@ -116,16 +88,76 @@ internal static class MuiGaugeInfoTextStateFieldCursorCodec
 // malformed-state diagnostics.
 internal static class MuiGaugeInfoTextStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiGaugeInfoTextStateField field,
+		out uint offset)
+	{
+		if (field == MuiGaugeInfoTextStateField.Magic)
+			offset = MuiGaugeInfoTextStateRecord.MagicOffset;
+		else if (field == MuiGaugeInfoTextStateField.InfoText)
+			offset = MuiGaugeInfoTextStateRecord.InfoTextOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiGaugeInfoTextStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		if (!TryResolve(field, out var offset) || record.IsNull ||
+			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
+			MuiGaugeInfoTextStateRecord.Size)) return false;
+		address = APTR.FromPointer(record.Raw + offset);
+		return platform.IsMapped(address, MuiGaugeInfoTextStateRecord.FieldSize);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiGaugeInfoTextStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiGaugeInfoTextStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiGaugeInfoTextStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiGaugeInfoTextStateField.InfoText)
+			value = state.InfoText.Raw;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiGaugeInfoTextStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGaugeInfoTextStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiGaugeInfoTextStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiGaugeInfoTextStateField.InfoText)
+			state.InfoText = APTR.FromPointer(value);
+		else return false;
+		return MuiGaugeInfoTextStateRecordCodec.WriteRecord(ref platform, record,
+			state);
+	}
+
+	// Legacy raw-offset adapter retained for bounded diagnostics and older
+	// callers. Typed field access above is the preferred API.
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiGaugeInfoTextStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiGaugeInfoTextStateRecord.Size -
+			MuiGaugeInfoTextStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiGaugeInfoTextStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiGaugeInfoTextStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

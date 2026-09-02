@@ -63,28 +63,21 @@ internal static class MuiStringEditCommandCodec
 {
 	// The command payload is a complete one-ULONG named record. Keep the
 	// address-only helper below for compatibility diagnostics, but exchange the
-	// production value through the bounded sequential cursor.
+	// production value through the shared packed ULONG codec.
 	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 		APTR address, out uint command)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		command = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiStringEditCommandRecord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out command)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out command);
 	}
 
 	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
 		APTR address, uint command)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiStringEditCommandRecord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				command)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, address, command);
 	}
 
 	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,

@@ -17,6 +17,14 @@
     <Compile Include="..\EvalNumericFormatter.cs" Link="EvalNumericFormatter.cs" />
     <Compile Include="..\EvalLFormatFormatter.cs" Link="EvalLFormatFormatter.cs" />
     <Compile Include="..\EvalClassicLFormatFormatter.cs" Link="EvalClassicLFormatFormatter.cs" />
+    <Compile Include="..\QuoteReadItemFormatter.cs" Link="QuoteReadItemFormatter.cs" />
+    <Compile Include="..\QuoteHexFormatter.cs" Link="QuoteHexFormatter.cs" />
+    <Compile Include="..\QuoteUriFormatter.cs" Link="QuoteUriFormatter.cs" />
+    <Compile Include="..\QuoteBase64Formatter.cs" Link="QuoteBase64Formatter.cs" />
+    <Compile Include="..\QuoteForwardPipeline.cs" Link="QuoteForwardPipeline.cs" />
+    <Compile Include="..\QuoteReversePipeline.cs" Link="QuoteReversePipeline.cs" />
+    <Compile Include="..\QuoteRuleParser.cs" Link="QuoteRuleParser.cs" />
+    <Compile Include="..\TypeTextFormatter.cs" Link="TypeTextFormatter.cs" />
     <Compile Include="..\Exe2ArcIo.cs" Link="Exe2ArcIo.cs" />
   </ItemGroup>
 </Project>

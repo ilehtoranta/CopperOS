@@ -25,3 +25,24 @@ public static class NativeEvalEntry
         return NativeCommandStartup.Finish(result, ioError, APTR.Null);
     }
 }
+
+/// <summary>
+/// Private native closure root for the captured Workbench 3.1 Eval subset.
+/// It is not a shipping command or original-binary parity evidence.
+/// </summary>
+public static class NativeWorkbench31EvalEntry
+{
+    [M68kEntryPoint]
+    public static int Main(int argumentLength, CONST_STRPTR argumentText)
+    {
+        var workbench = NativeCommandStartup.ReceiveWorkbenchMessage();
+        if (!NativeCommandStartup.OpenDos(36))
+            return NativeCommandStartup.Finish(DOS.RETURN_FAIL, 0, workbench);
+        if (workbench.IsNotNull)
+            return NativeCommandStartup.Finish(DOS.RETURN_ERROR,
+                (int)DOS.Error.ObjectWrongType, workbench);
+
+        var result = NativeEvalCommand.RunWorkbench31(out var ioError);
+        return NativeCommandStartup.Finish(result, ioError, APTR.Null);
+    }
+}

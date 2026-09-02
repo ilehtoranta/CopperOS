@@ -102,20 +102,18 @@ internal static class MuiAreaDoubleBufferStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaDoubleBufferStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaDoubleBufferStateField.Magic)
+			offset = MuiAreaDoubleBufferStateRecord.MagicOffset;
+		else if (field == MuiAreaDoubleBufferStateField.Enabled)
+			offset = MuiAreaDoubleBufferStateRecord.EnabledOffset;
+		else if (field == MuiAreaDoubleBufferStateField.Generation)
+			offset = MuiAreaDoubleBufferStateRecord.GenerationOffset;
+		else
 		{
-			case MuiAreaDoubleBufferStateField.Magic:
-				offset = MuiAreaDoubleBufferStateRecord.MagicOffset;
-				return true;
-			case MuiAreaDoubleBufferStateField.Enabled:
-				offset = MuiAreaDoubleBufferStateRecord.EnabledOffset;
-				return true;
-			case MuiAreaDoubleBufferStateField.Generation:
-				offset = MuiAreaDoubleBufferStateRecord.GenerationOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -136,9 +134,15 @@ internal static class MuiAreaDoubleBufferStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaDoubleBufferStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaDoubleBufferStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaDoubleBufferStateField.Enabled)
+			value = state.Enabled;
+		else if (field == MuiAreaDoubleBufferStateField.Generation)
+			value = state.Generation;
+		else return false;
 		return true;
 	}
 
@@ -146,10 +150,17 @@ internal static class MuiAreaDoubleBufferStateRecordMemoryCodec
 		APTR record, MuiAreaDoubleBufferStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaDoubleBufferStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaDoubleBufferStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaDoubleBufferStateField.Enabled)
+			state.Enabled = value;
+		else if (field == MuiAreaDoubleBufferStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiAreaDoubleBufferStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

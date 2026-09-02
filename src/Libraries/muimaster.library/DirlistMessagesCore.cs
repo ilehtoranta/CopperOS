@@ -204,15 +204,14 @@ internal static class MuiDirlistMessageStructCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiDirlistMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out methodId) ||
-			!MuiGuestStructCursor.IsComplete(cursor)) return false;
-		return true;
-	}
+		=> MuiDirlistMethodHeaderCodec.TryReadValue(ref platform, message,
+			out methodId);
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryWriteMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiDirlistMethodHeaderCodec.WriteValue(ref platform, message, methodId);
 
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDirlistMethodMessage packet)
@@ -227,13 +226,7 @@ internal static class MuiDirlistMessageStructCodec
 	internal static bool TryWriteMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiDirlistMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				method)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiDirlistMethodHeaderCodec.WriteValue(ref platform, message, method);
 
 	internal static bool TryReadSet<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDirlistSetMessage packet)
@@ -437,6 +430,41 @@ internal static class MuiDirlistGetEntryMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiDirlistMessageStructCodec.TryWriteGetEntry(ref platform, message,
 			packet);
+}
+
+// Struct-first codec for the method-only Dirlist/Volumelist header. The
+// named one-ULONG record remains the ABI contract; shared guest storage keeps
+// selector admission free of direct scalar lowering in freestanding 68k code.
+internal static class MuiDirlistMethodHeaderCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDirlistMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
 }
 
 internal static class MuiDirlistMessageCodec

@@ -12,6 +12,7 @@ namespace CopperOS.Commands.NativeExecution;
 internal sealed record EvalEntryCase(string First, string? Operator,
     string[] Following, string? To, string? Format, bool Hex, string Output)
 {
+    public bool WorkbenchProfile { get; init; }
     public int Result { get; init; } = DOS.RETURN_OK;
     public int IoError { get; init; }
 }
@@ -19,6 +20,7 @@ internal sealed record EvalEntryCase(string First, string? Operator,
 internal sealed partial class ProbeFixture
 {
     public const string EvalEntrySuite = "eval-native-entry-vector-fixture";
+    public const string WorkbenchEvalEntrySuite = "eval-wb31-native-entry-vector-fixture";
 
     private List<object> RunEvalEntryCases()
     {
@@ -58,11 +60,55 @@ internal sealed partial class ProbeFixture
         return reports;
     }
 
+    private List<object> RunWorkbenchEvalEntryCases()
+    {
+        ProbeCase[] cases =
+        [
+            WorkbenchEval("left-to-right", "1+2*3+4", null, [], null, null, "13\n"),
+            WorkbenchEval("operand-vector", "1", "|", ["2", "&", "4"], null, null, "0\n"),
+            WorkbenchEval("x-format", "42", null, [], null, "x=%x", "x=A"),
+            WorkbenchEval("o-format", "9", null, [], null, "o=%o2", "o=11"),
+            WorkbenchEval("to-output", "42", null, [], "RAM:result", null, "42\n"),
+            WorkbenchEval("prefix-caret", "2^3", null, [], null, null, "2\n"),
+            new ProbeCase("readargs-failure", "", DOS.RETURN_ERROR, 118, "")
+            {
+                Eval = new("1", null, [], null, null, false, "")
+                    { WorkbenchProfile = true }, ParserError = 118
+            },
+            new ProbeCase("result-allocation-failure", "", DOS.RETURN_FAIL,
+                (int)DOS.Error.NoFreeStore, "")
+            {
+                Eval = new("1", null, [], null, null, false, "")
+                    { WorkbenchProfile = true }, AllocationFailure = true
+            },
+        ];
+        var reports = new List<object>();
+        foreach (var test in cases) reports.AddRange(Execute([test], false));
+        reports.AddRange(Execute([
+            cases[0] with { Name = "repeat-left-to-right" },
+            cases[5] with { Name = "repeat-prefix-caret" }
+        ], true));
+        reports.AddRange(Execute([
+            cases[2] with { Name = "interleaved-format", StackBytes = 4096 },
+            cases[4] with { Name = "interleaved-to" }
+        ], true));
+        Bus.AssertImageUnchanged();
+        return reports;
+    }
+
     private static ProbeCase Eval(string name, string first, string? op,
         string[] following, string? to, string? format, bool hex, string output) =>
         new(name, "", DOS.RETURN_OK, 0, output)
         {
             Eval = new EvalEntryCase(first, op, following, to, format, hex, output)
+        };
+
+    private static ProbeCase WorkbenchEval(string name, string first, string? op,
+        string[] following, string? to, string? format, string output) =>
+        new(name, "", DOS.RETURN_OK, 0, output)
+        {
+            Eval = new EvalEntryCase(first, op, following, to, format, false, output)
+                { WorkbenchProfile = true }
         };
 
     private void VerifyEvalEntry(Invocation invocation)
@@ -97,13 +143,17 @@ internal sealed partial class ProbeFixture
         Register(baseAddress, DosLvo.ReadArgs, "ReadArgs", (state, invocation) =>
         {
             var definition = invocation.Definition.Eval ?? throw new InvalidOperationException("Missing Eval definition.");
-            Require(Bus.CString(state.D[1]) == "VALUE1/A,OP,VALUE2/M,TO/K,LFORMAT/K,HEX/S" &&
-                state.D[3] == 0, "Eval ReadArgs template/source ABI mismatch.");
+            var expectedTemplate = definition.WorkbenchProfile
+                ? "VALUE1/A,OP,VALUE2/M,TO/K,LFORMAT/K"
+                : "VALUE1/A,OP,VALUE2/M,TO/K,LFORMAT/K,HEX/S";
+            var expectedBytes = definition.WorkbenchProfile ? 20u : 24u;
+            Require(Bus.CString(state.D[1]) == expectedTemplate && state.D[3] == 0,
+                $"Eval ReadArgs template/source ABI mismatch: '{Bus.CString(state.D[1])}'.");
             var results = state.D[2];
             Require((results & 3) == 0 &&
-                Bus.OwnedAllocation(invocation, results, "Exec").Size == 24,
-                "Eval result slots must be a six-LONG owned allocation.");
-            for (var offset = 0u; offset < 24; offset += 4)
+                Bus.OwnedAllocation(invocation, results, "Exec").Size == expectedBytes,
+                "Eval result slots must match the selected profile.");
+            for (var offset = 0u; offset < expectedBytes; offset += 4)
                 Require(Bus.Long(results + offset) == 0, "Eval result slots were not zeroed before ReadArgs.");
             invocation.Reads++;
             if (invocation.Definition.ParserError != 0)
@@ -139,7 +189,12 @@ internal sealed partial class ProbeFixture
             }
             if (definition.To is not null) Bus.Long(results + 12, Put(definition.To));
             if (definition.Format is not null) Bus.Long(results + 16, Put(definition.Format));
-            if (definition.Hex) Bus.Long(results + 20, 1);
+            if (definition.Hex)
+            {
+                Require(!definition.WorkbenchProfile,
+                    "Workbench Eval has no HEX result slot.");
+                Bus.Long(results + 20, 1);
+            }
             return rdArgs;
         });
         Register(baseAddress, DosLvo.FreeArgs, "FreeArgs", (state, invocation) =>

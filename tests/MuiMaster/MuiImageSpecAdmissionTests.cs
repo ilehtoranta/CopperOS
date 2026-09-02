@@ -63,10 +63,25 @@ public sealed class MuiImageSpecAdmissionTests
 		Assert.True(MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
 			address, 8, out var raw));
 		Assert.Equal(value.Raw, raw);
+		Assert.True(MuiImageSpecStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiImageSpecStateField.Builtin, out var typedBuiltin));
+		Assert.Equal(address.Raw + MuiImageSpecStateRecord.BuiltinOffset,
+			typedBuiltin.Raw);
+		Assert.True(MuiImageSpecStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiImageSpecStateField.Raw, 0x2B00));
+		Assert.True(MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiImageSpecStateField.Magic, out var typedMagic));
+		Assert.Equal(value.Magic, typedMagic);
+		Assert.True(MuiImageSpecStateRecordCodec.TryReadStructural(ref platform,
+			address, out var typedStructural));
+		Assert.Equal(0x2B00u, typedStructural.Raw);
+		Assert.Equal(value.Builtin, typedStructural.Builtin);
+		Assert.False(MuiImageSpecStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, (MuiImageSpecStateField)0xFF, out _));
 		Assert.False(MuiImageSpecStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiImageSpecStateRecord.Size, out _));
 		Assert.False(MuiImageSpecStateRecordMemoryCodec.TryGetAddress(ref platform,
-			APTR.Null, 0, out _));
+			APTR.Null, (uint)0, out _));
 		Assert.False(MuiImageSpecStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

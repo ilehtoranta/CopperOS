@@ -129,8 +129,19 @@ internal static class MuiGaugeStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiGaugeStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiGaugeStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiGaugeStateField.Maximum)
+			value = state.Maximum;
+		else if (field == MuiGaugeStateField.Current)
+			value = state.Current;
+		else if (field == MuiGaugeStateField.Divide)
+			value = state.Divide;
+		else if (field == MuiGaugeStateField.Horizontal)
+			value = state.Horizontal;
+		else return false;
 		return true;
 	}
 
@@ -138,9 +149,20 @@ internal static class MuiGaugeStateRecordMemoryCodec
 		APTR record, MuiGaugeStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiGaugeStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiGaugeStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiGaugeStateField.Maximum)
+			state.Maximum = value;
+		else if (field == MuiGaugeStateField.Current)
+			state.Current = value;
+		else if (field == MuiGaugeStateField.Divide)
+			state.Divide = value;
+		else if (field == MuiGaugeStateField.Horizontal)
+			state.Horizontal = value;
+		else return false;
+		return MuiGaugeStateRecordCodec.WriteRecord(ref platform, record, state);
 	}
 }
 

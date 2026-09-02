@@ -113,8 +113,15 @@ internal static class MuiSliderPresentationStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiSliderPresentationStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiSliderPresentationStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiSliderPresentationStateField.Horizontal)
+			value = state.Horizontal;
+		else if (field == MuiSliderPresentationStateField.Quiet)
+			value = state.Quiet;
+		else return false;
 		return true;
 	}
 
@@ -122,9 +129,17 @@ internal static class MuiSliderPresentationStateRecordMemoryCodec
 		APTR record, MuiSliderPresentationStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiSliderPresentationStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiSliderPresentationStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiSliderPresentationStateField.Horizontal)
+			state.Horizontal = value;
+		else if (field == MuiSliderPresentationStateField.Quiet)
+			state.Quiet = value;
+		else return false;
+		return MuiSliderPresentationStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

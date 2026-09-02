@@ -451,7 +451,9 @@ internal static class MuiApplicationWindowCycleChainSlotCodec
 		value = 0;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiApplicationWindowCycleChainSlot.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiApplicationWindowCycleChainSlot.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
 				out value) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
 		return true;
 	}
@@ -473,7 +475,9 @@ internal static class MuiApplicationWindowCycleChainSlotCodec
 	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiApplicationWindowCycleChainSlot.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiApplicationWindowCycleChainSlot.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
 				value)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
@@ -535,8 +539,8 @@ internal static class MuiApplicationWindowCycleChainVectorCodec
 		=> MuiApplicationWindowCycleChainVectorMemoryCodec.TryGetEntry(
 			ref platform, cursor.Base, cursor.Index, out address);
 
-	// Keep the one-pointer record named while confining scalar access to its
-	// native-safe slot adapter.
+	// Keep the one-pointer record named while routing its fixed-width payload
+	// through the shared named ULONG codec at the native-safe slot boundary.
 	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 		MuiApplicationWindowCycleChainCursor cursor, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
@@ -631,11 +635,12 @@ internal static class MuiApplicationWindowSignalStorageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		uint rawSignals;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiApplicationWindowSignalStorage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out rawSignals) || !MuiGuestStructCursor.IsComplete(cursor))
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiApplicationWindowSignalStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out var rawSignals) || !MuiGuestStructCursor.IsComplete(cursor))
 			return false;
 		value.Signals = rawSignals;
 		return true;
@@ -647,7 +652,9 @@ internal static class MuiApplicationWindowSignalStorageCodec
 	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiApplicationWindowSignalStorage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiApplicationWindowSignalStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
 				value.Signals)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}

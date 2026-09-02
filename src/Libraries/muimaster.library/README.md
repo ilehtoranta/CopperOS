@@ -10,6 +10,984 @@ before a field is read or written. This keeps the 68k implementation
 exception-free, freestanding, and free of managed-runtime dependencies while
 preserving the MorphOS ABI.
 
+MG2240–MG2241 extend the same struct-first boundary to String scroll metrics and
+Text contents pointer state. Typed writes preserve dimensions, offsets,
+contents, and cookie siblings while malformed fields fail closed; focused
+MC68000 closures pass the zero-runtime gate without managed runtime services.
+
+MG2238–MG2239 extend the same struct-first boundary to String attached-Listview
+and spell-checking policy state. Typed writes preserve Listview, Enabled, and
+cookie siblings while malformed fields fail closed; focused MC68000 closures
+pass the zero-runtime gate without managed runtime services.
+
+MG2236–MG2237 extend the same struct-first boundary to String edit-hook and
+presentation policy state. Typed writes preserve Hook, length, secret, format,
+Unicode, BOOL, and cookie siblings while malformed fields fail closed; focused
+MC68000 closures pass the zero-runtime gate without managed runtime services.
+
+MG2234–MG2235 extend the same struct-first boundary to String filter and String
+placeholder pointer state. Typed writes preserve Accept/Reject, Contents, and
+cookie siblings while malformed fields fail closed; focused MC68000 closures
+pass the zero-runtime gate without managed runtime services.
+
+MG2222–MG2225 now routes Rectangle bar-title, Rectangle presentation, Scale
+presentation, and Register policy fields through complete named packed records.
+Typed writes preserve pointer, orientation, frame, and cookie siblings without
+managed-runtime dependencies; focused MC68000 closures pass the zero-runtime
+gate. Further MorphOS MUI classes and methods remain open.
+
+MG2232–MG2233 extend the same struct-first boundary to String cursor and
+interaction policy state, preserving signed positions and BOOL siblings through
+complete named records without managed runtime services.
+
+MG2230–MG2231 extend the same struct-first boundary to String acknowledgement
+and String contents pointer state, preserving caller-owned pointers through
+complete named records without managed runtime services.
+
+MG2229 extends the same struct-first boundary to Help node, line, and
+generation state, preserving pointer and signed-line siblings through complete
+named records without managed runtime services.
+
+MG2228 extends the same struct-first boundary to Stringscroll pointer-drag
+state, preserving signed coordinates and capture flags through complete named
+records without managed runtime services.
+
+MG2226–MG2227 extends the same struct-first boundary to Keyadjust scratch text
+and `MUI_MakeObject` preparse bytes, preserving sibling bytes without managed
+runtime services.
+
+MG2218 routes Prop range compatibility fields through the complete named
+`MuiPropRangeStateRecord` codec, preserving entries, visible, first, and cookie
+siblings on individual writes. Package coverage is **2824/2824**; the focused
+MC68000 closure passes (**4356-byte HUNK, 3073 instructions / 31464 cycles**)
+with 20 reachable methods and zero framework members, managed-allocation sites,
+and relocations. MC68020/MC68040 artifacts are **4368/4372** bytes.
+
+MG2219 routes Prop policy compatibility fields through the complete named
+`MuiPropPolicyStateRecord` codec, preserving orientation, delta, slider, border,
+and cookie siblings on individual writes. Package coverage is **2824/2824**; the
+focused MC68000 closure passes (**4468-byte HUNK, 3592 instructions / 36570
+cycles**) with 20 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**4496/4500** bytes.
+
+MG2220 routes Scrollbar layout compatibility fields through the complete named
+`MuiScrollbarLayoutStateRecord` codec, preserving orientation, type, and
+cookie siblings on individual writes. Package coverage is **2824/2824**; the
+focused MC68000 closure passes (**4260-byte HUNK, 2551 instructions / 26180
+cycles**) with 20 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**4264/4268** bytes.
+
+MG2221 routes Slider presentation compatibility fields through the complete
+named `MuiSliderPresentationStateRecord` codec, preserving orientation,
+quiet-display, and cookie siblings on individual writes. Package coverage is
+**2824/2824**; the focused MC68000 closure passes (**4180-byte HUNK, 2626
+instructions / 26920 cycles**) with 19 reachable methods and zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 artifacts
+are **4192/4192** bytes.
+
+MG2218 routes Prop range compatibility fields through the complete named
+`MuiPropRangeStateRecord` codec, preserving entries, visible, first, and cookie
+siblings on individual writes. Package coverage is **2824/2824**; the focused
+MC68000 closure passes (**4356-byte HUNK, 3073 instructions / 31464 cycles**)
+with 20 reachable methods and zero framework members, managed-allocation sites,
+and relocations. MC68020/MC68040 artifacts are **4368/4372** bytes.
+
+MG2219 routes Prop policy compatibility fields through the complete named
+`MuiPropPolicyStateRecord` codec, preserving orientation, delta, slider, border,
+and cookie siblings on individual writes. Package coverage is **2824/2824**; the
+focused MC68000 closure passes (**4468-byte HUNK, 3592 instructions / 36570
+cycles**) with 20 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**4496/4500** bytes.
+
+MG2220 routes Scrollbar layout compatibility fields through the complete named
+`MuiScrollbarLayoutStateRecord` codec, preserving orientation, type, and
+cookie siblings on individual writes. Package coverage is **2824/2824**; the
+focused MC68000 closure passes (**4260-byte HUNK, 2551 instructions / 26180
+cycles**) with 20 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**4264/4268** bytes.
+
+MG2221 routes Slider presentation compatibility fields through the complete
+named `MuiSliderPresentationStateRecord` codec, preserving orientation,
+quiet-display, and cookie siblings on individual writes. Package coverage is
+**2824/2824**; the focused MC68000 closure passes (**4180-byte HUNK, 2626
+instructions / 26920 cycles**) with 19 reachable methods and zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 artifacts
+are **4192/4192** bytes.
+
+MG2215 routes Levelmeter label compatibility through the complete named
+`MuiLevelmeterLabelStateRecord` codec, preserving the caller-owned label APTR
+and record identity on individual writes. Package coverage is **2824/2824**;
+the focused MC68000 closure passes (**4208-byte HUNK, 2122 instructions /
+21852 cycles**) with 20 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**4200/4204** bytes.
+
+MG2216 routes Levelmeter presentation compatibility through the complete named
+`MuiLevelmeterPresentationStateRecord` codec, preserving orientation and cookie
+siblings on individual writes. Package coverage is **2824/2824**; the focused
+MC68000 closure passes (**4252-byte HUNK, 2116 instructions / 21776 cycles**)
+with 20 reachable methods and zero framework members, managed-allocation sites,
+and relocations. MC68020/MC68040 artifacts are **4248/4252** bytes.
+
+MG2217 routes Numeric format compatibility through the complete named
+`MuiNumericFormatStateRecord` codec, preserving the caller-owned format APTR
+and record identity on individual writes. Package coverage is **2824/2824**;
+the focused MC68000 closure passes (**4200-byte HUNK, 2122 instructions /
+21852 cycles**) with 20 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**4192/4196** bytes.
+
+MG2210 routes Image spec compatibility fields through the complete named
+`MuiImageSpecStateRecord` codec, preserving union presence, raw/builtin values,
+and sibling state on individual writes. Package coverage is **2824/2824**; the
+focused MC68000 closure passes (**4476-byte HUNK, 3580 instructions / 36388
+cycles**) with 20 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**4504/4508** bytes.
+
+MG2211 routes Image render compatibility fields through the complete named
+`MuiImageRenderStateRecord` codec, preserving selection, free-axis,
+show-selection, and sibling values on individual writes. Package coverage is
+**2824/2824**; the focused MC68000 closure passes (**4592-byte HUNK, 4084
+instructions / 41420 cycles**) with 20 reachable methods and zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 artifacts
+are **4632/4636** bytes.
+
+MG2212 routes Image OldImage compatibility through the complete named
+`MuiImageOldImageStateRecord` codec, preserving the caller-owned Image APTR and
+record identity on individual writes. Package coverage is **2824/2824**; the
+focused MC68000 closure passes (**4152-byte HUNK, 2053 instructions / 21368
+cycles**) with 20 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**4144/4148** bytes.
+
+MG2213 routes Image FontMatchString compatibility through the complete named
+`MuiImageFontMatchStringStateRecord` codec, preserving the caller-owned string
+APTR and presence sibling on individual writes. Package coverage is **2824/2824**;
+the focused MC68000 closure passes (**4340-byte HUNK, 2574 instructions /
+26516 cycles**) with 20 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**4348/4348** bytes.
+
+MG2214 routes Image FontMatch compatibility fields through the complete named
+`MuiImageFontMatchStateRecord` codec, preserving match, height, width, and
+cookie siblings on individual writes. Package coverage is **2824/2824**; the
+focused MC68000 closure passes (**4388-byte HUNK, 3066 instructions / 31286
+cycles**) with 20 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**4400/4404** bytes.
+
+MG2206 routes Group layout-hook compatibility fields through the complete named
+`MuiGroupLayoutHookStateRecord` codec, preserving the Hook APTR and record
+identity on individual writes. Package coverage is **2824/2824**; the focused
+MC68000 closure passes (**3980-byte HUNK, 2037 instructions / 21186 cycles**)
+with 19 reachable methods and zero framework members, managed-allocation sites,
+and relocations. MC68020/MC68040 artifacts are **3976/3976** bytes.
+
+MG2207 routes Group layout-policy compatibility fields through the complete
+named `MuiGroupLayoutPolicyStateRecord` codec, preserving spacing, axis,
+sizing, page-mode, and sibling values on individual writes. Package coverage is
+**2824/2824**; the focused MC68000 closure passes (**4576-byte HUNK, 4598
+instructions / 46406 cycles**) with 19 reachable methods and zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 artifacts
+are **4636/4636** bytes.
+
+MG2208 routes Group grid compatibility fields through the complete named
+`MuiGroupGridStateRecord` codec, preserving rows, columns, spacing, centering,
+sizing, and sibling values on individual writes. Package coverage is
+**2824/2824**; the focused MC68000 closure passes (**4712-byte HUNK, 5720
+instructions / 57082 cycles**) with 19 reachable methods and zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 artifacts
+are **4808/4808** bytes.
+
+MG2209 routes Group page-state compatibility fields through the complete named
+`MuiGroupPageState` codec, preserving active-page, change, selector, and cookie
+siblings on individual writes. Package coverage is **2824/2824**; the focused
+MC68000 closure passes (**4000-byte HUNK, 3058 instructions / 31090 cycles**)
+with 18 reachable methods and zero framework members, managed-allocation sites,
+and relocations. MC68020/MC68040 artifacts are **4012/4016** bytes.
+
+MG2203 routes Gauge.InfoRate compatibility fields through the complete named
+`MuiGaugeInfoRateStateRecord` codec, preserving the signed MorphOS LONG and
+record identity on individual writes. Package coverage is **2824/2824**; the
+focused MC68000 closure passes (**3956-byte HUNK, 2034 instructions / 21122
+cycles**) with 19 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**3948/3952** bytes.
+
+MG2204 routes Gauge.InfoText compatibility fields through the complete named
+`MuiGaugeInfoTextStateRecord` codec, preserving the caller-owned InfoText APTR
+and record identity on individual writes. Package coverage is **2824/2824**;
+the focused MC68000 closure passes (**3972-byte HUNK, 2037 instructions /
+21186 cycles**) with 19 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**3968/3968** bytes.
+
+MG2205 routes Gauge progress compatibility fields through the complete named
+`MuiGaugeStateRecord` codec, preserving maximum, current, divide, orientation,
+and cookie siblings on individual writes. Package coverage is **2824/2824**;
+the focused MC68000 closure passes (**4284-byte HUNK, 3550 instructions /
+36142 cycles**) with 19 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**4312/4312** bytes.
+
+MG2191 routes the Balance policy compatibility fields through the complete
+named `MuiBalancePolicyStateRecord` codec, preserving the full MorphOS LONG
+value and record identity on individual writes. Package coverage is
+**2824/2824**; the focused MC68000 closure passes (**3948-byte HUNK, 2022
+instructions / 20934 cycles**) with 19 reachable methods and zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 artifacts
+are **3944/3944** bytes.
+
+MG2192 routes Bitmap geometry compatibility fields through the complete named
+`MuiBitmapGeometryStateRecord` codec, preserving Width and Height siblings on
+individual writes. Package coverage is **2824/2824**; the focused MC68000
+closure passes (**4088-byte HUNK, 2540 instructions / 26068 cycles**) with 19
+reachable methods and zero framework members, managed-allocation sites, and
+relocations. MC68020/MC68040 artifacts are **4096/4096** bytes.
+
+MG2193 routes Bitmap policy compatibility fields through the complete named
+`MuiBitmapPolicyStateRecord` codec, preserving pointer, precision,
+transparency, and BOOL siblings on individual writes. Package coverage is
+**2824/2824**; the focused MC68000 closure passes (**4540-byte HUNK, 4599
+instructions / 46434 cycles**) with 19 reachable methods and zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 artifacts
+are **4596/4596** bytes.
+
+MG2194 routes Bitmap source compatibility fields through the complete named
+`MuiBitmapSourceStateRecord` codec, preserving the caller-owned source pointer
+and record identity on individual writes. Package coverage is **2824/2824**;
+the focused MC68000 closure passes (**3956-byte HUNK, 2035 instructions /
+21178 cycles**) with 19 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**3952/3952** bytes.
+
+MG2195 routes Bitmap remapped-source compatibility fields through the complete
+named `MuiBitmapRemappedStateRecord` codec, preserving the renderer-owned APTR
+and record identity on individual writes. Package coverage is **2824/2824**;
+the focused MC68000 closure passes (**3972-byte HUNK, 2037 instructions /
+21186 cycles**) with 19 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**3968/3968** bytes.
+
+MG2196 routes Bodychunk format compatibility fields through the complete named
+`MuiBodychunkFormatStateRecord` codec, preserving compression, depth, masking,
+and record identity on individual writes. Package coverage is **2824/2824**;
+the focused MC68000 closure passes (**4216-byte HUNK, 3051 instructions /
+31128 cycles**) with 19 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**4228/4232** bytes.
+
+MG2197 routes Choice active compatibility fields through the complete named
+`MuiChoiceActiveStateRecord` codec, preserving the active index and record
+identity on individual writes. Package coverage is **2824/2824**; the focused
+MC68000 closure passes (**3924-byte HUNK, 2023 instructions / 20922 cycles**)
+with 19 reachable methods and zero framework members, managed-allocation
+sites, and relocations. MC68020/MC68040 artifacts are **3916/3920** bytes.
+
+MG2198 routes Choice entries compatibility fields through the complete named
+`MuiChoiceEntriesStateRecord` codec, preserving the caller-owned entries
+pointer and record identity on individual writes. Package coverage is
+**2824/2824**; the focused MC68000 closure passes (**3972-byte HUNK, 2037
+instructions / 21186 cycles**) with 19 reachable methods and zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 artifacts
+are **3968/3968** bytes.
+
+MG2199 routes ControlFont compatibility fields through the complete named
+`MuiControlFontStateRecord` codec, preserving optional presence and TextFont
+APTR siblings on individual writes. Package coverage is **2824/2824**; the
+focused MC68000 closure passes (**4076-byte HUNK, 2552 instructions / 26286
+cycles**) with 19 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**4084/4084** bytes.
+
+MG2200 routes the effective ControlFont projection through the complete named
+`MuiControlFontResolutionRecord` codec, preserving inherited, depth, and
+effective-font APTR siblings on individual writes. Package coverage is
+**2824/2824**; the focused MC68000 closure passes (**5268-byte HUNK, 8609
+instructions / 87738 cycles**) with 23 reachable methods and zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 artifacts
+are **5292/5292** bytes.
+
+MG2201 routes Gadget_Gadget compatibility fields through the complete named
+`MuiGadgetGadgetStateRecord` codec, preserving the optional gadget APTR and
+record identity on individual writes. Package coverage is **2824/2824**; the
+focused MC68000 closure passes (**3956-byte HUNK, 2037 instructions / 21186
+cycles**) with 19 reachable methods and zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 artifacts are
+**3952/3952** bytes.
+
+MG2202 routes Gadget interaction compatibility fields through the complete
+named `MuiGadgetInteractionStateRecord` codec, preserving input mode,
+selection, pressed, and selected-visual siblings on individual writes. Package
+coverage is **2824/2824**; the focused MC68000 closure passes (**4348-byte
+HUNK, 3555 instructions / 36126 cycles**) with 19 reachable methods and zero
+framework members, managed-allocation sites, and relocations. MC68020/MC68040
+artifacts are **4376/4376** bytes.
+
+MG2174 routes the Area CustomFont runtime state compatibility fields through
+the complete named `MuiAreaCustomFontRuntimeRecord` codec, preserving Font,
+Spec, Generation, and Active siblings on individual writes. The typed enum
+field path remains struct-first; the explicit raw-offset overload is retained
+only for legacy compatibility. Package coverage is **2807/2807**; the
+focused MC68000 closure passes (**4412-byte HUNK, 3595 instructions / 36732
+cycles**) with 19 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **4440/4440** bytes. The overall MorphOS MUI goal remains open.
+
+MG2173 routes the Area CycleChain state compatibility fields through the
+complete named `MuiAreaCycleChainStateRecord` codec, preserving the signed
+LONG value and generation marker on individual writes while retaining bounded,
+failure-closed mapping. Package coverage is **2806/2806**; the focused MC68000
+closure passes (**4100-byte HUNK, 2551 instructions / 26264 cycles**) with 19
+reachable methods, zero framework members, managed-allocation sites, and
+relocations. MC68020/MC68040 closure artifacts are **4112/4112** bytes.
+
+MG2172 routes the Area CustomFont state compatibility fields through the
+complete named `MuiAreaCustomFontStateRecord` codec, preserving the
+caller-owned specification pointer plus presence and generation on individual
+writes while retaining bounded, failure-closed mapping. Package coverage is
+**2806/2806**; the focused MC68000 closure passes (**4244-byte HUNK, 3069
+instructions / 31422 cycles**) with 19 reachable methods, zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 closure
+artifacts are **4260/4260** bytes.
+
+MG2171 routes the Area ControlChar state compatibility fields through the
+complete named `MuiAreaControlCharStateRecord` codec, preserving the raw
+character and generation siblings on individual writes while retaining
+bounded, failure-closed mapping. Package coverage is **2804/2804**; the
+focused MC68000 closure passes (**4096-byte HUNK, 2540 instructions / 26072
+cycles**) with 19 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **4108/4108** bytes.
+
+MG2170 routes the Area ContextMenu state compatibility fields through the
+complete named `MuiAreaContextMenuStateRecord` codec, preserving opaque
+MenuStrip and Trigger pointers plus Generation on individual writes. Package
+coverage is **2804/2804**; the focused MC68000 closure passes (**4276-byte
+HUNK, 3081 instructions / 31634 cycles**) with 19 reachable methods, zero
+framework members, managed-allocation sites, and relocations. MC68020/MC68040
+closure artifacts are **4292/4292** bytes.
+
+MG2169 routes the Area BuiltinFont state compatibility fields through the
+complete named `MuiAreaBuiltinFontStateRecord` codec, preserving lossless
+selector bits and sibling presence/generation values on individual writes.
+Package coverage is **2804/2804**; the focused MC68000 closure passes
+(**4228-byte HUNK, 3055 instructions / 31174 cycles**) with 19 reachable
+methods, zero framework members, managed-allocation sites, and relocations.
+MC68020/MC68040 closure artifacts are **4244/4244** bytes.
+
+MG2168 routes the Area activation state compatibility fields through the
+complete named `MuiAreaActivationStateRecord` codec, preserving canonical
+Active plus opaque Flags and Generation values on individual writes while
+retaining bounded, failure-closed mapping. Package coverage is **2801/2801**;
+the focused MC68000 closure passes (**4208-byte HUNK, 3055 instructions /
+31170 cycles**) with 19 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **4220/4224** bytes. The overall MorphOS MUI goal remains open.
+
+MG2167 routes the Application_Window relationship state compatibility fields
+through the complete named `MuiApplicationWindowRelationshipStateRecord`
+codec, preserving the caller-owned LastWindow capability and AddedCount on
+individual writes while retaining bounded, failure-closed mapping. Package
+coverage is **2800/2800**; the focused MC68000 closure passes (**4244-byte
+HUNK, 2557 instructions / 26338 cycles**) with 19 reachable methods, zero
+framework members, managed-allocation sites, and relocations. MC68020/MC68040
+closure artifacts are **4252/4252** bytes. The overall MorphOS MUI goal
+remains open.
+
+MG2166 routes the Application UsedClasses state compatibility fields through
+the complete named `MuiApplicationUsedClassesStateRecord` codec, preserving
+the caller-owned vector pointer on individual writes while retaining bounded,
+failure-closed mapping. Package coverage is **2799/2799**; the focused MC68000
+closure passes (**4040-byte HUNK, 2036 instructions / 21182 cycles**) with 19
+reachable methods, zero framework members, managed-allocation sites, and
+relocations. MC68020/MC68040 closure artifacts are **4036/4036** bytes. The
+overall MorphOS MUI goal remains open.
+
+MG2165 routes the Application Save/Load settings-persistence state
+compatibility fields through the complete named
+`MuiApplicationSettingsPersistenceStateRecord` codec, preserving sibling
+Operation, Name, Requests, Saves, and Loads values on individual writes while
+retaining bounded, failure-closed mapping. Package coverage is **2798/2798**;
+the focused MC68000 closure passes (**4624-byte HUNK, 4101 instructions /
+41662 cycles**) with 19 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **4668/4668** bytes. The overall MorphOS MUI goal remains open.
+
+MG2164 routes the Application BuildSettingsPanel state compatibility fields
+through the complete named `MuiApplicationSettingsPanelStateRecord` codec,
+preserving sibling Number, Panel, and Requests values on individual writes
+while retaining bounded, failure-closed mapping. Package coverage is
+**2797/2797**; the focused MC68000 closure passes (**4472-byte HUNK, 2543
+instructions / 26434 cycles**) with 20 reachable methods, zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 closure
+artifacts are **4492/4492** bytes. The overall MorphOS MUI goal remains open.
+
+MG2163 routes the Application policy-state compatibility fields through the
+complete named `MuiApplicationPolicyStateRecord` codec, preserving sibling
+initializer BOOL projections on individual writes while keeping canonical
+admission separate. Package coverage is **2796/2796**; the focused MC68000
+closure passes (**4684-byte HUNK, 3254 instructions / 33184 cycles**) with 21
+reachable methods, zero framework members, managed-allocation sites, and
+relocations. The overall MorphOS MUI goal remains open.
+
+MG2162 routes the Application SetConfigItem-state compatibility fields through
+the complete named `MuiApplicationSetConfigItemStateRecord` codec, preserving
+sibling item, data-pointer, and request values on individual writes. Package
+coverage is **2795/2795**; the focused MC68000 closure passes (**4364-byte
+HUNK, 3256 instructions / 32896 cycles**) with 19 reachable methods, zero
+framework members, managed-allocation sites, and relocations. The overall
+MorphOS MUI goal remains open.
+
+MG2161 routes the Application identity-state compatibility fields through the
+complete named `MuiApplicationIdentityStateRecord` codec, preserving sibling
+caller-owned string pointers on individual writes while keeping C-string
+admission separate. Package coverage is **2794/2794**; the focused MC68000
+closure passes (**6376-byte HUNK, 6621 instructions / 67658 cycles**) with 26
+reachable methods, zero framework members, managed-allocation sites, and
+relocations. The overall MorphOS MUI goal remains open.
+
+MG2160 routes the Application scheduler-state compatibility fields through the
+complete named `MuiApplicationSchedulerStateRecord` codec, preserving queue
+pointers and signal-mask values on individual writes while keeping queue
+admission separate. Package coverage is **2793/2793**; the focused MC68000
+closure passes (**4728-byte HUNK, 5596 instructions / 56580 cycles**) with 19
+reachable methods, zero framework members, managed-allocation sites, and
+relocations. The overall MorphOS MUI goal remains open.
+
+MG2159 routes the Application lifecycle-state compatibility fields through the
+complete named `MuiApplicationLifecycleStateRecord` codec, preserving sibling
+BOOL projections on individual writes while retaining raw structural values
+for admission diagnostics. Package coverage is **2792/2792**; the focused
+MC68000 closure passes (**5192-byte HUNK, 5697 instructions / 57386 cycles**)
+with 21 reachable methods, zero framework members, managed-allocation sites,
+and relocations. The overall MorphOS MUI goal remains open.
+
+MG2158 routes the Application default-config-state compatibility fields through
+the complete named `MuiApplicationDefaultConfigStateRecord` codec, preserving
+sibling IDs, values, and request counters on individual writes. Package
+coverage is **2791/2791**; the focused MC68000 closure passes (**4840-byte
+HUNK, 5365 instructions / 54274 cycles**) with 21 reachable methods, zero
+framework members, managed-allocation sites, and relocations. The overall
+MorphOS MUI goal remains open.
+
+MG2157 routes the Application config-window-state compatibility fields through
+the complete named `MuiApplicationConfigWindowStateRecord` codec, preserving
+sibling flags, class-id, counters, and reserved values on individual writes.
+Package coverage is **2790/2790**; the focused MC68000 closure passes
+(**4488-byte HUNK, 3764 instructions / 37934 cycles**) with 19 reachable
+methods, zero framework members, managed-allocation sites, and relocations. The
+overall MorphOS MUI goal remains open.
+
+MG2156 routes the Application help-state compatibility fields through the
+complete named `MuiApplicationHelpStateRecord` codec, preserving sibling
+windows, strings, line values, and request counters on individual writes.
+Package coverage is **2789/2789**; the focused MC68000 closure passes
+(**4828-byte HUNK, 12847 instructions / 128392 cycles**) with 19 reachable
+methods, zero framework members, managed-allocation sites, and relocations. The
+overall MorphOS MUI goal remains open.
+
+MG2155 routes the Application text-state compatibility fields through the
+complete named `MuiApplicationTextStateRecord` codec, preserving sibling
+HelpFile and IconifyTitle pointers on individual writes. Package coverage is
+**2788/2788**; the focused MC68000 closure passes (**3868-byte HUNK, 2405
+instructions / 25060 cycles**) with 18 reachable methods, zero framework
+members, managed-allocation sites, and relocations. The overall MorphOS MUI
+goal remains open.
+
+MG2154 routes the Application object-state compatibility fields through the
+complete named `MuiApplicationObjectStateRecord` codec, preserving sibling
+DiskObject, DropObject, and Menustrip pointers on individual writes. Package
+coverage is **2787/2787**; the focused MC68000 closure passes (**3804-byte
+HUNK, 2854 instructions / 29366 cycles**) with 17 reachable methods, zero
+framework members, managed-allocation sites, and relocations. The overall
+MorphOS MUI goal remains open.
+
+MG2153 routes the Application message-routing-state compatibility fields
+through the complete named `MuiApplicationMessageRoutingStateRecord` codec,
+preserving sibling message and BOOL values on individual writes. Package
+coverage is **2786/2786**; the focused MC68000 closure passes (**4240-byte
+HUNK, 2620 instructions / 26786 cycles**) with 19 reachable methods, zero
+framework members, managed-allocation sites, and relocations. The overall
+MorphOS MUI goal remains open.
+
+MG2152 routes the Application menu-state compatibility fields through the
+complete named `MuiApplicationMenuStateRecord` codec, preserving sibling
+UserData values on individual writes. Package coverage is **2785/2785**; the
+focused MC68000 closure passes (**3620-byte HUNK, 2311 instructions / 23746
+cycles**) with 17 reachable methods, zero framework members, managed-allocation
+sites, and relocations. The overall MorphOS MUI goal remains open.
+
+MG2151 routes the Application refresh-state compatibility fields through the
+complete named `MuiApplicationRefreshStateRecord` codec, preserving sibling
+counters on individual writes. Package coverage is **2784/2784**; the focused
+MC68000 closure passes (**4524-byte HUNK, 2711 instructions / 27914 cycles**)
+with 21 reachable methods, zero framework members, managed-allocation sites,
+and relocations. The overall MorphOS MUI goal remains open.
+
+MG2150 routes the Application command-state compatibility fields through the
+complete named `MuiApplicationCommandsStateRecord` codec, preserving the
+sibling table capability on individual writes. Package coverage is
+**2783/2783**; the focused MC68000 closure passes (**3996-byte HUNK, 1796
+instructions / 18554 cycles**) with 19 reachable methods, zero framework
+members, managed-allocation sites, and relocations. The overall MorphOS MUI
+goal remains open.
+
+MG2149 routes the shared caller-owned ULONG memory adapter through the complete
+named `MuiGuestUlongStorage` codec, preserving full-width values and
+failure-closed bounds for dependent scalar slots. Package coverage is
+**2782/2782**; the focused MC68000 closure passes (**3400-byte HUNK, 1337
+instructions / 13812 cycles**) with 17 reachable methods, zero framework
+members, managed-allocation sites, and relocations. The overall MorphOS MUI
+goal remains open.
+
+MG2148 routes the Store iteration-counter compatibility field path through the
+complete named `MuiStoreIterationCounter` record and bounded value codec,
+preserving full-width ordinals and failure-closed bounds. Package coverage is
+**2781/2781**; the focused MC68000 closure passes (**3564-byte HUNK, 1264
+instructions / 13082 cycles**) with 18 reachable methods, zero framework
+members, managed-allocation sites, and relocations. The overall MorphOS MUI
+goal remains open.
+
+MG2147 routes the String.mui QUAD (`High`/`Low`) field compatibility path
+through the complete named `MuiStringInteger64Value` struct codec, preserving
+the untouched half on individual writes. Package coverage is **2780/2780**;
+the focused MC68000 closure passes (**4556-byte HUNK, 4082 instructions /
+41602 cycles**) with 22 reachable methods, zero framework members,
+managed-allocation sites, and relocations. The overall MorphOS MUI goal
+remains open.
+
+MG2146 routes the caller-owned UsedClasses vector-entry compatibility path
+through the complete named `MuiApplicationUsedClassesVectorEntry` struct codec,
+preserving full 32-bit pointer values and failure-closed bounds. Package
+coverage is **2779/2779**; the focused MC68000 closure passes (**4336-byte
+HUNK, 1221 instructions / 12782 cycles**) with 21 reachable methods, zero
+framework members, managed-allocation sites, and relocations. The overall
+MorphOS MUI goal remains open.
+
+MG2145 routes the UpdateConfig method selector through a dedicated named
+packed codec backed by shared `MuiGuestUlongStorage`; MG2144 routes the
+Process/Slave generated method-message header through a dedicated named packed
+codec backed by shared `MuiGuestUlongStorage`; MG2143
+routes the List-advanced method-only header through the same boundary; MG2142
+routes the Layout method-only header through the same boundary; MG2141 routes the Headless
+method-only header through the same boundary; MG2140 routes the Notify
+method-only header through the same boundary; MG2139 routes the ExternalWrapper
+method-only header through the same boundary; MG2138 routes the
+ObjectPersistence method-only header through the same boundary; MG2137 covers
+Dataspace-IFF, MG2136 Dirlist/Volumelist, MG2135 Dataspace, and MG2134 Listtree.
+MG2132 and MG2133 cover the Misc and Process specialist headers, while
+MG2129–MG2131 cover Color, Popstring, and Menu. Package coverage is
+**2778/2778**; the focused UpdateConfig MC68000 closure passes (**2684-byte
+HUNK, 1055 instructions / 11116 cycles**) with zero framework members,
+managed-allocation sites, and relocations. The overall MorphOS MUI goal remains
+open.
+
+MG2145 routes the UpdateConfig one-ULONG method selector through the named
+`MuiUpdateConfigMethodMessage` boundary backed by shared
+`MuiGuestUlongStorage`. Package coverage is **2778/2778**; the focused
+MC68000 closure passes (**2684-byte HUNK, 1055 instructions / 11116 cycles**)
+with 13 reachable methods, zero framework members, managed-allocation sites,
+and relocations. The overall MorphOS MUI goal remains open.
+
+MG2144 routes the Process/Slave generated BOOPSI method-message prefix through
+the dedicated `MuiProcessMethodMessageHeader` codec backed by shared
+`MuiGuestUlongStorage`. Package coverage is **2777/2777**; the focused
+MC68000 closure passes (**3252-byte HUNK, 1024 instructions / 10750 cycles**)
+with 16 reachable methods, zero framework members, managed-allocation sites,
+and relocations. The overall MorphOS MUI goal remains open.
+
+MG2142 routes the Layout method-only header through a dedicated named packed
+codec backed by shared `MuiGuestUlongStorage`; MG2141 routes the Headless
+method-only header through the same boundary; MG2140 routes the Notify method-only
+header through the same boundary; MG2139 routes the ExternalWrapper
+method-only header through the same boundary; MG2138 routes the
+ObjectPersistence method-only header through the same boundary; MG2137 routes the
+Dataspace-IFF method-only header through the same boundary; MG2136 routes the
+Dirlist/Volumelist method-only header through the same boundary. MG2135 routes
+the Dataspace method-only header through it as well; MG2134 routes the Listtree
+method-only header through the same boundary. MG2132 and MG2133 route the Misc
+and Process specialist method-only headers through dedicated named packed codecs
+backed by shared `MuiGuestUlongStorage`;
+MG2129–MG2131 cover Color, Popstring, and Menu, MG2126–MG2128 cover Family,
+and MG2125–MG2123 cover GetConfigItem, Notify UserData, and NotifyWrite.
+Package coverage is **2775/2775**; focused MC68000 closures pass (Layout
+**3220-byte HUNK**, Headless **3644-byte HUNK**, Notify **3220-byte HUNK**, ExternalWrapper
+**3248-byte HUNK**, ObjectPersistence
+**3256-byte HUNK**, Dataspace-IFF **3232-byte HUNK**, Dirlist **3220-byte HUNK**, Dataspace **3224-byte HUNK**, Listtree **3220-byte HUNK**, Misc
+**3236-byte HUNK**, Process
+**3248-byte HUNK**, Color
+**3240-byte HUNK**,
+Popstring **3236-byte HUNK**, Menu **3236-byte HUNK**, Family mutation
+**3220-byte HUNK**, Family_GetChild **3244-byte HUNK**, Family_DoChildMethods
+**3264-byte HUNK**, GetConfigItem **3248-byte HUNK**, NotifyUserData **5532-byte
+HUNK**, NotifyWrite **3504-byte HUNK**) with zero framework members,
+managed-allocation sites, and relocations. The overall MorphOS MUI goal remains
+open.
+
+MG2122 routes the Notify SetAsString method-only fallback through the named
+packed `MuiSetAsStringMethodMessage` codec backed by shared
+`MuiGuestUlongStorage`, instead of the generic field adapter. Package coverage
+is **2758/2758**; the focused MC68000 closure passes (**3240-byte HUNK, 1069
+instructions / 11282 cycles**) with 16 reachable methods, zero framework
+members, managed-allocation sites, and relocations. The overall MorphOS MUI
+goal remains open.
+
+MG2121 routes the one-ULONG Group ordering method header through the dedicated
+named packed `MuiGroupOrderingMethodMessage` codec backed by shared
+`MuiGuestUlongStorage`; MG2120 likewise routes the GroupChange method header
+through a named scalar-safe codec. Package coverage is **2758/2758**; focused
+MC68000 closures pass (Group ordering **3236-byte HUNK**, GroupChange
+**3244-byte HUNK**, both **1069 instructions / 11282 cycles**) with 16
+reachable methods, zero framework members, managed-allocation sites, and
+relocations. The overall MorphOS MUI goal remains open.
+
+MG2119 routes the one-field Area exitResize method header through the
+dedicated named packed `MuiAreaExitResizeMessage` codec backed by shared
+`MuiGuestUlongStorage`. Package coverage is **2758/2758**; the focused MC68000
+closure passes (**3236-byte HUNK, 1069 instructions / 11282 cycles**) with 16
+reachable methods, zero framework members, managed-allocation sites, and
+relocations. The overall MorphOS MUI goal remains open.
+
+MG2118 routes the shared CommonControl one-ULONG method header through the
+dedicated named packed `MuiCommonMethodMessage` codec backed by shared
+`MuiGuestUlongStorage`. Package coverage is **2758/2758**; the focused MC68000
+closure passes (**3236-byte HUNK, 1069 instructions / 11282 cycles**) with 16
+reachable methods, zero framework members, managed-allocation sites, and
+relocations. The overall MorphOS MUI goal remains open.
+
+MG2117 routes the one-ULONG CallHook method header through the dedicated named
+packed `MuiCallHookMethodMessage` codec backed by shared
+`MuiGuestUlongStorage`. Package coverage is **2758/2758**; the focused MC68000
+closure passes (**3224-byte HUNK, 1069 instructions / 11282 cycles**) with 16
+reachable methods, zero framework members, managed-allocation sites, and
+relocations. The overall MorphOS MUI goal remains open.
+
+MG2116 routes the one-ULONG BoopsiQuery method header through the shared named
+packed `MuiGuestUlongStorage` codec. Package coverage is **2758/2758**; the
+focused MC68000 closure passes (**2984-byte HUNK, 709 instructions / 7598
+cycles**) with 16 reachable methods, zero framework members,
+managed-allocation sites, and relocations. The overall MorphOS MUI goal
+remains open.
+
+MG2115 routes the Collection/List method-only header through the shared named
+packed `MuiGuestUlongStorage` codec. Package coverage is **2758/2758**; the
+focused MC68000 closure passes (**2992-byte HUNK, 705 instructions / 7518
+cycles**) with 16 reachable methods, zero framework members,
+managed-allocation sites, and relocations. The overall MorphOS MUI goal
+remains open.
+
+MG2114 routes the one-ULONG Area drag method header through the shared named
+packed `MuiGuestUlongStorage` codec. Package coverage is **2758/2758**; the
+focused MC68000 closure passes (**2980-byte HUNK, 709 instructions / 7598
+cycles**) with 16 reachable methods, zero framework members,
+managed-allocation sites, and relocations. The overall MorphOS MUI goal
+remains open.
+
+MG2113 routes the one-ULONG Area activation method header through scalar-safe
+entry points backed by the shared named packed `MuiGuestUlongStorage` codec.
+Package coverage is **2758/2758**; the focused MC68000 closure passes
+(**2984-byte HUNK, 705 instructions / 7518 cycles**) with 16 reachable
+methods, zero framework members, managed-allocation sites, and relocations.
+The overall MorphOS MUI goal remains open.
+
+MG2175 routes the Area DisappearPolicy state compatibility fields through the
+complete named `MuiAreaDisappearPolicyStateRecord` codec, preserving signed
+horizontal and vertical values on individual writes. Package coverage is
+**2810/2810**; the focused MC68000 closure passes (**4156-byte HUNK, 2562
+instructions / 26464 cycles**) with 19 reachable methods, zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 closure
+artifacts are **4164/4164** bytes.
+
+MG2176 routes the Area DoubleBuffer state compatibility fields through the
+complete named `MuiAreaDoubleBufferStateRecord` codec, preserving Enabled and
+Generation siblings on individual writes. Package coverage is **2810/2810**;
+the focused MC68000 closure passes (**4088-byte HUNK, 2538 instructions /
+26038 cycles**) with 19 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **4100/4100** bytes.
+
+MG2177 routes the Area DoubleClick state compatibility fields through the
+complete named `MuiAreaDoubleClickStateRecord` codec, preserving the signed
+signal and generation marker on individual writes. Package coverage is
+**2810/2810**; the focused MC68000 closure passes (**4108-byte HUNK, 2551
+instructions / 26264 cycles**) with 19 reachable methods, zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 closure
+artifacts are **4120/4120** bytes.
+
+MG2178 routes the Area DragPolicy state compatibility fields through the
+complete named `MuiAreaDragPolicyStateRecord` codec, preserving Draggable and
+Dropable siblings on individual writes. Package coverage is **2813/2813**;
+the focused MC68000 closure passes (**4068-byte HUNK, 2538 instructions /
+26030 cycles**) with 19 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **4080/4080** bytes.
+
+MG2179 routes the Area FixedText state compatibility fields through the complete
+named `MuiAreaFixedTextStateRecord` codec, preserving WidthText and HeightText
+APTR siblings on individual writes. Package coverage is **2813/2813**; the
+focused MC68000 closure passes (**4268-byte HUNK, 3076 instructions / 31602
+cycles**) with 19 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **4284/4284** bytes.
+
+MG2180 routes the Area Floating state compatibility fields through the complete
+named `MuiAreaFloatingStateRecord` codec, preserving Enabled and Generation
+siblings on individual writes. Package coverage is **2813/2813**; the focused
+MC68000 closure passes (**4056-byte HUNK, 2538 instructions / 26038 cycles**)
+with 19 reachable methods, zero framework members, managed-allocation sites,
+and relocations. MC68020/MC68040 closure artifacts are **4068/4068** bytes.
+
+MG2181 routes the Area FontSelection state compatibility fields through the
+complete named `MuiAreaFontSelectionStateRecord` codec, preserving Active,
+Source, and Generation siblings on individual writes. Package coverage is
+**2817/2817**; the focused MC68000 closure passes (**4272-byte HUNK, 3071
+instructions / 31436 cycles**) with 19 reachable methods, zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 closure
+artifacts are **4288/4288** bytes.
+
+MG2182 routes the Area Geometry state compatibility fields through the complete
+named `MuiAreaGeometryStateRecord` codec, preserving signed coordinates and
+edge siblings on individual writes. Package coverage is **2817/2817**; the
+focused MC68000 closure passes (**5028-byte HUNK, 4684 instructions / 47908
+cycles**) with 21 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **5080/5084** bytes.
+
+MG2183 routes the Area LayoutPolicy state compatibility fields through the
+complete named `MuiAreaLayoutPolicyStateRecord` codec, preserving weighted
+layout inputs on individual writes. Package coverage is **2817/2817**; the
+focused MC68000 closure passes (**5092-byte HUNK, 7251 instructions / 72332
+cycles**) with 19 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **5240/5240** bytes.
+
+MG2184 routes the Area Presentation state compatibility fields through the
+complete named `MuiAreaPresentationStateRecord` codec, preserving background,
+frame, and BOOL siblings on individual writes. Package coverage is **2820/2820**;
+the focused MC68000 closure passes (**4472-byte HUNK, 4086 instructions /
+41372 cycles**) with 19 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **4520/4520** bytes.
+
+MG2185 routes the Area RenderPolicy state compatibility fields through the
+complete named `MuiAreaRenderPolicyStateRecord` codec, preserving the
+FrameTitle APTR and drawing-policy siblings on individual writes. Package
+coverage is **2820/2820**; the focused MC68000 closure passes (**4784-byte
+HUNK, 5716 instructions / 57282 cycles**) with 19 reachable methods, zero
+framework members, managed-allocation sites, and relocations. MC68020/MC68040
+closure artifacts are **4884/4884** bytes.
+
+MG2186 routes the Area ShortHelp state compatibility fields through the complete
+named `MuiAreaShortHelpStateRecord` codec, preserving the opaque text pointer
+and generation sibling on individual writes. Package coverage is **2820/2820**;
+the focused MC68000 closure passes (**4112-byte HUNK, 2553 instructions /
+26316 cycles**) with 19 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **4120/4120** bytes.
+
+MG2187 routes the Area TextColor state compatibility fields through the complete
+named `MuiAreaTextColorStateRecord` codec, preserving packed color, setup
+Active, and Generation siblings on individual writes. Package coverage is
+**2823/2823**; the focused MC68000 closure passes (**4220-byte HUNK, 3052
+instructions / 31156 cycles**) with 19 reachable methods, zero framework
+members, managed-allocation sites, and relocations. MC68020/MC68040 closure
+artifacts are **4236/4236** bytes.
+
+MG2188 routes the Area Timer state compatibility fields through the complete
+named `MuiAreaTimerStateRecord` codec, preserving the signed event counter and
+generation marker on individual writes. Package coverage is **2823/2823**; the
+focused MC68000 closure passes (**4064-byte HUNK, 2550 instructions / 26252
+cycles**) with 19 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **4072/4072** bytes.
+
+MG2189 routes the Area Timer event-state compatibility fields through the
+complete named `MuiAreaTimerEventStateRecord` codec, preserving tick identity
+and timer flags on individual writes. Package coverage is **2823/2823**; the
+focused MC68000 closure passes (**4436-byte HUNK, 4083 instructions / 41354
+cycles**) with 19 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **4484/4484** bytes.
+
+MG2190 routes the Area Weight state compatibility fields through the complete
+named `MuiAreaWeightStateRecord` codec, preserving the full ULONG weight and
+record identity on individual writes. Package coverage is **2824/2824**; the
+focused MC68000 closure passes (**3912-byte HUNK, 2022 instructions / 20926
+cycles**) with 19 reachable methods, zero framework members,
+managed-allocation sites, and relocations. MC68020/MC68040 closure artifacts
+are **3908/3908** bytes.
+
+MG2112 routes the generic Application method-header record through
+scalar-safe entry points backed by the shared named packed
+`MuiGuestUlongStorage` codec. Package coverage is **2758/2758**; the focused
+MC68000 closure passes (**2972-byte HUNK, 705 instructions / 7518 cycles**)
+with 16 reachable methods, zero framework members, managed-allocation sites,
+and relocations. The overall MorphOS MUI goal remains open.
+
+MG2111 routes the String.mui edit-hook `SGH_KEY` command record through the
+shared named packed `MuiGuestUlongStorage` codec instead of direct cursor
+scalar access, preserving command bounds, high-bit values, and failure-closed
+mapping. Package coverage is **2757/2757**; the focused MC68000 closure passes
+(**3344-byte HUNK, 712 instructions / 7636 cycles**) with 18 reachable
+methods, zero framework members, managed-allocation sites, and relocations.
+The overall MorphOS MUI goal remains open.
+
+MG2110 routes the Misc specialist Keyadjust ForceKeyCode and FSProtectionBits
+flags records through the shared named packed `MuiGuestUlongStorage` codec
+instead of direct cursor scalar loops, preserving full ULONG values, bounds,
+and failure-closed mapping. Package coverage is **2757/2757**; the focused
+MC68000 closure passes (**4792-byte HUNK, 2962 instructions / 30464 cycles**)
+with 22 reachable methods, zero framework members, managed-allocation sites,
+and relocations. The overall MorphOS MUI goal remains open.
+
+MG2109 routes the caller-owned MUIM_GetConfigItem result storage record through
+the shared named packed `MuiGuestUlongStorage` codec. Scalar-safe entry points
+keep the native proof free of the one-field struct call ABI hazard while
+preserving four-byte bounds, high-bit values, and failure-closed mapping.
+Package coverage is **2757/2757**; the focused MC68000 closure passes
+(**2972-byte HUNK, 723 instructions / 7698 cycles**) with 16 reachable
+methods, zero framework members, managed-allocation sites, and relocations.
+The overall MorphOS MUI goal remains open.
+
+MG2108 routes the External BOOPSI caller-owned result-word record through the
+shared named packed `MuiGuestUlongStorage` codec. Scalar-safe entry points
+beside the record avoid the freestanding one-field struct call ABI hazard while
+preserving result bounds and high-bit values. Package coverage is **2757/2757**;
+the focused MC68000 closure passes (**3876-byte HUNK, 1679 instructions /
+17504 cycles**) with 18 reachable methods, zero framework members,
+managed-allocation sites, and relocations. The overall MorphOS MUI goal
+remains open.
+
+MG2107 routes private Scrmodelist mode-ID records through the shared named
+packed `MuiGuestUlongStorage` codec instead of direct cursor scalar access,
+preserving mode-vector bounds, high-bit mode values, and failure-closed mapping.
+Package coverage is **2757/2757**; the focused MC68000 closure passes
+(**3864-byte HUNK, 1940 instructions / 18584 cycles**) with 19 reachable
+methods, zero framework members, managed-allocation sites, and relocations.
+The overall MorphOS MUI goal remains open.
+
+MG2106 routes List TitleArray pointer-table slots through the shared named
+packed `MuiGuestUlongStorage` codec instead of direct cursor scalar access,
+preserving pointer-table bounds, high-bit values, and failure-closed mapping.
+Package coverage is **2757/2757**; the focused MC68000 closure passes
+(**4332-byte HUNK, 3162 instructions / 30652 cycles**) with 22 reachable
+methods, zero framework members, managed-allocation sites, and relocations.
+The overall MorphOS MUI goal remains open.
+
+MG2105 routes the optional Application/Window signal-storage record through the
+shared named packed `MuiGuestUlongStorage` codec instead of direct cursor
+scalar access, preserving signal publication, four-byte bounds, and
+failure-closed mapping. Package coverage is **2757/2757**; the focused
+MC68000 closure passes (**3232-byte HUNK, 1002 instructions / 10630 cycles**)
+with 16 reachable methods, zero framework members, managed-allocation sites,
+and relocations. The overall MorphOS MUI goal remains open.
+
+MG2104 routes the caller-owned Application/Window cycle-chain object slot
+through the shared named packed `MuiGuestUlongStorage` codec instead of direct
+cursor scalar access, preserving vector traversal bounds, object pointer bit
+patterns, and failure-closed mapping. Package coverage is **2757/2757**; the
+focused MC68000 closure passes (**5044-byte HUNK, 2807 instructions / 27398
+cycles**) with 24 reachable methods, zero framework members,
+managed-allocation sites, and relocations. The overall MorphOS MUI goal
+remains open.
+
+MG2103 routes the drawing-service raster-port pointer record through the shared
+named packed `MuiGuestUlongStorage` codec instead of direct cursor scalar
+access, preserving raster-port struct bounds, layer pointer bit patterns, and
+failure-closed mapping. Package coverage is **2757/2757**; the focused
+MC68000 closure passes (**7636-byte HUNK, 6843 instructions / 70336 cycles**)
+with 27 reachable methods, zero framework members, managed-allocation sites,
+and relocations. The overall MorphOS MUI goal remains open.
+
+MG2102 routes the Process specialist dispatch-argument slot through the shared
+named packed `MuiGuestUlongStorage` codec instead of the legacy two-word
+workaround, preserving inline argument vector bounds, high-bit values, and
+failure-atomic mapping. Package coverage is **2757/2757**; the focused
+MC68000 closure passes (**3376-byte HUNK, 1420 instructions / 14770 cycles**)
+with 17 reachable methods, zero framework members, managed-allocation sites,
+and relocations. The overall MorphOS MUI goal remains open.
+
+MG2101 routes the class-service library-prefix ULONG record through the shared
+named packed `MuiGuestUlongStorage` codec instead of the legacy two-word
+workaround, preserving prefix and variable class-id payload admission,
+high-bit values, and failure-atomic mapping. Package coverage is **2757/2757**;
+the focused MC68000 closure passes (**2768-byte HUNK, 665 instructions / 7054
+cycles**) with 14 reachable methods, zero framework members,
+managed-allocation sites, and relocations. The overall MorphOS MUI goal
+remains open.
+
+MG2100 routes the caller-owned MUIM_CallHook parameter slot through the shared
+named packed `MuiGuestUlongStorage` codec instead of the legacy two-word
+workaround, preserving Param1 and variadic-tail bounds, high-bit values, and
+failure-atomic mapping. Package coverage is **2757/2757**; the focused
+MC68000 closure passes (**3812-byte HUNK, 1452 instructions / 14932 cycles**)
+with 18 reachable methods, zero framework members, managed-allocation sites,
+and relocations. The overall MorphOS MUI goal remains open.
+
+MG2097 routes Notify follow-parameter and MultiSet target ULONG records
+through the shared named packed `MuiGuestUlongStorage` codec instead of local
+byte loops, preserving vector bounds, high-bit pointer values, and
+failure-atomic range admission. Package coverage is **2757/2757**; the
+focused MC68000 closure passes (**6228-byte HUNK, 4680 instructions / 44582
+cycles**) with 30 reachable methods, zero framework members,
+managed-allocation sites, and relocations. The overall MorphOS MUI goal
+remains open.
+
+MG2098 routes the five ULONGs in the fixed `MuiControlFontResolutionRecord`
+through the named packed `MuiGuestUlongStorage` codec instead of local byte
+loops, preserving font projection semantics, pointer bit patterns, and the
+20-byte record guard. Package coverage is **2757/2757**; the focused MC68000
+closure passes (**3456-byte HUNK, 5059 instructions / 51558 cycles**) with 16
+reachable methods, zero framework members, managed-allocation sites, and
+relocations. The overall MorphOS MUI goal remains open.
+
+MG2099 routes the Datamap/Objectmap packet family's ULONG fields through the
+shared named packed `MuiGuestUlongStorage` codec, preserving declaration
+order, packet sizes, and high-bit pointer semantics across method, clear, key,
+counter, DatamapSet/Get, and ObjectmapSet records. Package coverage is
+**2757/2757**; the focused MC68000 closure passes (**8172-byte HUNK, 10847
+instructions / 110844 cycles**) with 34 reachable methods, zero framework
+members, managed-allocation sites, and relocations. The overall MorphOS MUI
+goal remains open.
+
+MG2096 routes each ULONG in the fixed `MuiStringInteger64Value` QUAD record
+through the named packed `MuiGuestUlongStorage` codec instead of local byte
+loops, preserving signed QUAD bit-patterns, High/Low ordering, and the 8-byte
+range guard. Package coverage is **2757/2757**; the focused MC68000 closure
+passes (**3776-byte HUNK, 1854 instructions / 19462 cycles**) with 18
+reachable methods, zero framework members, managed-allocation sites, and
+relocations. The overall MorphOS MUI goal remains open.
+
+MG2095 routes the fixed `MuiRequesterParameterSlot` ULONG record through the
+named packed `MuiGuestUlongStorage` codec instead of a local byte loop,
+preserving requester parameter bounds and high-bit values. Package coverage is
+**2757/2757**; the focused MC68000 requester closure passes (**4144-byte
+HUNK, 2104 instructions / 21796 cycles**) with 20 reachable methods, zero
+framework members, managed-allocation sites, and relocations. The overall
+MorphOS MUI goal remains open.
+
+MG2094 routes the fixed `MuiListtreeDisplayColumnRecord` text ULONG through
+the named packed `MuiGuestUlongStorage` codec instead of a local byte loop,
+preserving display-column vector bounds and high-bit pointer values. Package
+coverage is **2757/2757**; the focused MC68000 closure passes (**3820-byte
+HUNK, 1706 instructions / 16856 cycles**) with 20 reachable methods, zero
+framework members, managed-allocation sites, and relocations. The overall
+MorphOS MUI goal remains open.
+
+MG2093 routes the fixed `MuiListColumnMetricValue` ULONG record through the
+named packed `MuiGuestUlongStorage` codec instead of a local byte loop,
+preserving metric vector bounds and high-bit values. Package coverage is
+**2757/2757**; the focused MC68000 closure passes (**4176-byte HUNK, 1939
+instructions / 18576 cycles**) with 22 reachable methods, zero framework
+members, managed-allocation sites, and relocations. The overall MorphOS MUI
+goal remains open.
+
 MG2092 routes the fixed four-byte PushMethod parameter slot and UsedClasses
 vector-entry pointer through the named packed `MuiGuestUlongStorage` codec
 instead of local byte/offset loops, preserving vector bounds and high-bit

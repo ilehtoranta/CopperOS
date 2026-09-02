@@ -70,4 +70,36 @@ public sealed class MuiApplicationRefreshStructAdapterTests
 		Assert.False(MuiApplicationRefreshStateRecordCodec.TryReadRecord(
 			ref platform, crossingEnd, out _));
 	}
+
+	[Fact]
+	public void ApplicationRefreshFieldPathUsesCompleteRecordCodec()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationRefreshStateRecord
+		{
+			Magic = 0x10203040u,
+			Checks = 0x50607080u,
+			RefreshedWindows = 0x90A0B0C0u,
+		};
+
+		Assert.True(MuiApplicationRefreshStateRecordCodec.WriteRecord(ref platform,
+			address, initial));
+		Assert.True(MuiApplicationRefreshStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationRefreshStateField.Checks,
+			0xF1020304u));
+		Assert.True(MuiApplicationRefreshStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address,
+			MuiApplicationRefreshStateField.RefreshedWindows, out var windows));
+		Assert.Equal(initial.RefreshedWindows, windows);
+		Assert.True(MuiApplicationRefreshStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(0xF1020304u, updated.Checks);
+		Assert.Equal(initial.RefreshedWindows, updated.RefreshedWindows);
+		Assert.False(MuiApplicationRefreshStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, unchecked((MuiApplicationRefreshStateField)255),
+			1));
+	}
 }

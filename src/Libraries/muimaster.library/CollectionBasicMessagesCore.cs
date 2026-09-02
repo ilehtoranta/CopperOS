@@ -4,6 +4,7 @@
 */
 
 using Amiga;
+using System.Runtime.CompilerServices;
 
 namespace CopperOS.MuiMaster;
 
@@ -193,24 +194,34 @@ internal static class MuiCollectionBasicStructPacketCodec
 		MuiGuestStructCursor.TryCreate(ref platform, message, size,
 			out cursor);
 
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodValue<TPlatform>(ref TPlatform platform,
+		APTR message, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.TryReadValue(ref platform, message,
+			out methodId);
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryWriteMethodValue<TPlatform>(ref TPlatform platform,
+		APTR message, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.WriteValue(ref platform, message, methodId);
+
 	internal static bool TryReadMethod<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiCollectionMethodMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		return TryCreate(ref platform, message, MuiCollectionMethodMessage.Size,
-			out var cursor) &&
-			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out packet.MethodId) && MuiGuestStructCursor.IsComplete(cursor);
+		if (!TryReadMethodValue(ref platform, message, out var methodId))
+			return false;
+		packet.MethodId = methodId;
+		return true;
 	}
 
 	internal static bool TryWriteMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory =>
-		TryCreate(ref platform, message, MuiCollectionMethodMessage.Size,
-			out var cursor) &&
-		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, method) &&
-		MuiGuestStructCursor.IsComplete(cursor);
+		TryWriteMethodValue(ref platform, message, method);
 
 	internal static bool TryReadGetEntry<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiCollectionGetEntryMessage packet)
@@ -355,11 +366,8 @@ internal static class MuiCollectionBasicMessageCodec
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		methodId = 0;
-		if (!MuiCollectionBasicStructPacketCodec.TryReadMethod(ref platform,
-			message, out var packet)) return false;
-		methodId = packet.MethodId;
-		return true;
+		return MuiCollectionBasicStructPacketCodec.TryReadMethodValue(ref platform,
+			message, out methodId);
 	}
 
 	// Native consumers that only need method validation use this scalar-return

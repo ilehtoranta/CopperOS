@@ -425,6 +425,27 @@ public sealed class MuiStringscrollAdmissionTests
 		Assert.True(MuiStringscrollPointerStateCodec.Write(ref platform,
 			recordAddress, value));
 		Assert.True(MuiStringscrollPointerStateRecordMemoryCodec.TryGetAddress(
+			ref platform, recordAddress, MuiStringscrollPointerStateField.LastPointer,
+			out var typedPointerAddress));
+		Assert.Equal(0x1D38u, typedPointerAddress.Raw);
+		Assert.True(MuiStringscrollPointerStateRecordMemoryCodec.TryReadInt32(
+			ref platform, recordAddress, MuiStringscrollPointerStateField.GrabOffset,
+			out var typedGrabOffset));
+		Assert.Equal(-3, typedGrabOffset);
+		Assert.True(MuiStringscrollPointerStateRecordMemoryCodec.TryWriteInt32(
+			ref platform, recordAddress, MuiStringscrollPointerStateField.LastPointer, 0));
+		Assert.True(MuiStringscrollPointerStateCodec.TryReadStructural(ref platform,
+			recordAddress, out var typedUpdated));
+		Assert.Equal(0, typedUpdated.LastPointer);
+		Assert.Equal(value.StartX, typedUpdated.StartX);
+		Assert.Equal(value.Flags, typedUpdated.Flags);
+		Assert.True(MuiStringscrollPointerStateRecordMemoryCodec.TryWriteInt32(
+			ref platform, recordAddress, MuiStringscrollPointerStateField.LastPointer,
+			value.LastPointer));
+		Assert.False(MuiStringscrollPointerStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, (MuiStringscrollPointerStateField)255,
+			out _));
+		Assert.True(MuiStringscrollPointerStateRecordMemoryCodec.TryGetAddress(
 			ref platform, recordAddress, 24, out var pointerAddress));
 		Assert.Equal(0x1D38u, pointerAddress.Raw);
 		Assert.True(MuiStringscrollPointerStateRecordMemoryCodec.TryReadInt32(
@@ -438,7 +459,7 @@ public sealed class MuiStringscrollAdmissionTests
 		Assert.False(MuiStringscrollPointerStateRecordMemoryCodec.TryGetAddress(
 			ref platform, recordAddress, MuiStringscrollPointerState.Size, out _));
 		Assert.False(MuiStringscrollPointerStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiStringscrollPointerStateCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

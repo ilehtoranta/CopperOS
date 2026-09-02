@@ -102,7 +102,11 @@ public sealed class MuiStringSpellCheckingAdmissionTests
 			0));
 		Assert.True(MuiStringSpellCheckingStateRecordCodec.TryReadStructural(
 			ref platform, recordAddress, out var decoded));
+		Assert.Equal(MuiStringSpellCheckingStateRecord.Cookie, decoded.Magic);
 		Assert.Equal(0u, decoded.Enabled);
+		Assert.False(MuiStringSpellCheckingStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, (MuiStringSpellCheckingStateField)255,
+			out _));
 		Assert.False(MuiStringSpellCheckingStateRecordMemoryCodec.TryGetAddress(
 			ref platform, recordAddress,
 			(MuiStringSpellCheckingStateField)255, out _));

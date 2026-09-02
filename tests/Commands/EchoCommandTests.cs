@@ -1202,6 +1202,11 @@ public sealed class EchoCommandTests
                     StringComparison.OrdinalIgnoreCase))
                 return TryReadEvalArgs(argumentText, argumentLength, resultArray,
                     out rdArgs);
+            if (string.Equals(templateText,
+                    "RULE/A,FILE/K,VAR/K,STR,NOLINE/S,NOQUOTES/S,FIRSTLINE/S,REVERSE=UNQUOTE/S",
+                    StringComparison.OrdinalIgnoreCase))
+                return TryReadQuoteArgs(argumentText, argumentLength, resultArray,
+                    out rdArgs);
             if (templateText.Length == 0)
                 return TryReadEmptyArgs(argumentText, argumentLength,
                     out rdArgs);
@@ -1265,6 +1270,60 @@ public sealed class EchoCommandTests
             rdArgs = new APTR(240);
             Store.ReadArgsCount++;
             return true;
+        }
+
+        private bool TryReadQuoteArgs(APTR argumentText, uint argumentLength,
+            APTR resultArray, out APTR rdArgs)
+        {
+            rdArgs = APTR.Null;
+            Clear(resultArray, 32);
+            var words = Store.ReadText(argumentText, argumentLength).Trim()
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (words.Length < 2) return false;
+            uint slot = 0;
+            WriteUInt32(resultArray, 0, PutQuoteToken(words[0], ref slot).Raw);
+            var sawSource = false;
+            for (var index = 1; index < words.Length; index++)
+            {
+                var word = words[index];
+                if (word.Equals("NOLINE", StringComparison.OrdinalIgnoreCase))
+                    WriteUInt32(resultArray, 16, 1);
+                else if (word.Equals("NOQUOTES", StringComparison.OrdinalIgnoreCase))
+                    WriteUInt32(resultArray, 20, 1);
+                else if (word.Equals("FIRSTLINE", StringComparison.OrdinalIgnoreCase))
+                    WriteUInt32(resultArray, 24, 1);
+                else if (word.Equals("REVERSE", StringComparison.OrdinalIgnoreCase) ||
+                    word.Equals("UNQUOTE", StringComparison.OrdinalIgnoreCase))
+                    WriteUInt32(resultArray, 28, 1);
+                else if (word.StartsWith("VAR=", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (sawSource) return false;
+                    WriteUInt32(resultArray, 8, PutQuoteToken(word[4..], ref slot).Raw); sawSource = true;
+                }
+                else if (word.StartsWith("FILE=", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (sawSource) return false;
+                    WriteUInt32(resultArray, 4, PutQuoteToken(word[5..], ref slot).Raw); sawSource = true;
+                }
+                else
+                {
+                    if (sawSource) return false;
+                    WriteUInt32(resultArray, 12, PutQuoteToken(word, ref slot).Raw); sawSource = true;
+                }
+            }
+            if (!sawSource) return false;
+            rdArgs = new APTR(240);
+            Store.ReadArgsCount++;
+            return true;
+        }
+
+        private APTR PutQuoteToken(string value, ref uint slot)
+        {
+            var text = value.Trim('"');
+            var address = Store.PutAt(7000 + (int)slot * 128, text);
+            WriteUInt8(address, text.Length, 0);
+            slot++;
+            return address;
         }
 
         private bool TryReadRunArgs(

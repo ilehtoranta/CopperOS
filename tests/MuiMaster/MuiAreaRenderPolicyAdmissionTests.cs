@@ -125,6 +125,42 @@ public sealed class MuiAreaRenderPolicyAdmissionTests
 			crossingEnd, out _));
 	}
 
+	[Fact]
+	public void RenderPolicyFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			State);
+		var address = APTR.FromPointer(0x3F00);
+		var value = new MuiAreaRenderPolicyStateRecord
+		{
+			Magic = MuiAreaRenderPolicyStateRecord.Cookie,
+			FillArea = 1,
+			Background = 7,
+			Frame = 2,
+			Font = 0x2200,
+			FrameVisible = 1,
+			FramePhantomHoriz = 0,
+			FrameTitle = APTR.FromPointer(0x4100),
+			FrameDynamic = 1,
+		};
+
+		Assert.True(MuiAreaRenderPolicyStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaRenderPolicyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaRenderPolicyStateField.FrameTitle,
+			0xFEEDBEEFu));
+		Assert.True(MuiAreaRenderPolicyStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaRenderPolicyStateField.Background,
+			out var background));
+		Assert.Equal(value.Background, background);
+		Assert.True(MuiAreaRenderPolicyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(value.Background, decoded.Background);
+		Assert.Equal(0xFEEDBEEFu, decoded.FrameTitle.Raw);
+		Assert.Equal(value.FrameDynamic, decoded.FrameDynamic);
+	}
+
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR areaClass)
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

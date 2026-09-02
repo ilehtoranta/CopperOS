@@ -115,8 +115,13 @@ internal static class MuiStringSpellCheckingStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiStringSpellCheckingStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringSpellCheckingStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiStringSpellCheckingStateField.Enabled)
+			value = state.Enabled;
+		else return false;
 		return true;
 	}
 
@@ -124,9 +129,15 @@ internal static class MuiStringSpellCheckingStateRecordMemoryCodec
 		APTR record, MuiStringSpellCheckingStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiStringSpellCheckingStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringSpellCheckingStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiStringSpellCheckingStateField.Enabled)
+			state.Enabled = value;
+		else return false;
+		return MuiStringSpellCheckingStateRecordCodec.WriteStructural(ref platform,
+			record, state);
 	}
 }
 
@@ -159,9 +170,15 @@ internal static class MuiStringSpellCheckingStateRecordCodec
 	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
 		APTR address,
 		MuiStringSpellCheckingStateRecord value)
-		where TPlatform : struct, IMuiGuestMemory
+	where TPlatform : struct, IMuiGuestMemory
 		=> MuiStringSpellCheckingStateAdmission.Validate(value) &&
-		MuiGuestStructCursor.TryCreate(ref platform, address,
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiStringSpellCheckingStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiStringSpellCheckingStateRecord.Size, out var cursor) &&
 		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 			value.Magic) &&

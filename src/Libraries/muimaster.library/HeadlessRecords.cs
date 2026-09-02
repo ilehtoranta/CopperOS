@@ -126,18 +126,17 @@ internal static class MuiGuestUlongStorageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, storage, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return field == MuiGuestUlongStorageField.Value &&
+			MuiGuestUlongStorageCodec.TryReadValue(ref platform, storage,
+				out value);
 	}
 
 	internal static bool TryWrite<TPlatform>(ref TPlatform platform,
 		APTR storage, MuiGuestUlongStorageField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, storage, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		return field == MuiGuestUlongStorageField.Value &&
+			MuiGuestUlongStorageCodec.WriteValue(ref platform, storage, value);
 	}
 }
 

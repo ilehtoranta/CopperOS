@@ -157,20 +157,18 @@ internal static class MuiAreaTimerStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaTimerStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaTimerStateField.Magic)
+			offset = MuiAreaTimerStateRecord.MagicOffset;
+		else if (field == MuiAreaTimerStateField.Value)
+			offset = MuiAreaTimerStateRecord.ValueOffset;
+		else if (field == MuiAreaTimerStateField.Generation)
+			offset = MuiAreaTimerStateRecord.GenerationOffset;
+		else
 		{
-			case MuiAreaTimerStateField.Magic:
-				offset = MuiAreaTimerStateRecord.MagicOffset;
-				return true;
-			case MuiAreaTimerStateField.Value:
-				offset = MuiAreaTimerStateRecord.ValueOffset;
-				return true;
-			case MuiAreaTimerStateField.Generation:
-				offset = MuiAreaTimerStateRecord.GenerationOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -191,9 +189,15 @@ internal static class MuiAreaTimerStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaTimerStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaTimerStateField.Value)
+			value = unchecked((uint)state.Value);
+		else if (field == MuiAreaTimerStateField.Generation)
+			value = state.Generation;
+		else return false;
 		return true;
 	}
 
@@ -201,10 +205,17 @@ internal static class MuiAreaTimerStateRecordMemoryCodec
 		Amiga.APTR record, MuiAreaTimerStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaTimerStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaTimerStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaTimerStateField.Value)
+			state.Value = unchecked((int)value);
+		else if (field == MuiAreaTimerStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiAreaTimerStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 
@@ -285,29 +296,24 @@ internal static class MuiAreaTimerEventStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaTimerEventStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaTimerEventStateField.Magic)
+			offset = MuiAreaTimerEventStateRecord.MagicOffset;
+		else if (field == MuiAreaTimerEventStateField.Armed)
+			offset = MuiAreaTimerEventStateRecord.ArmedOffset;
+		else if (field == MuiAreaTimerEventStateField.MouseOver)
+			offset = MuiAreaTimerEventStateRecord.MouseOverOffset;
+		else if (field == MuiAreaTimerEventStateField.DelayElapsed)
+			offset = MuiAreaTimerEventStateRecord.DelayElapsedOffset;
+		else if (field == MuiAreaTimerEventStateField.LastTick)
+			offset = MuiAreaTimerEventStateRecord.LastTickOffset;
+		else if (field == MuiAreaTimerEventStateField.Generation)
+			offset = MuiAreaTimerEventStateRecord.GenerationOffset;
+		else
 		{
-			case MuiAreaTimerEventStateField.Magic:
-				offset = MuiAreaTimerEventStateRecord.MagicOffset;
-				return true;
-			case MuiAreaTimerEventStateField.Armed:
-				offset = MuiAreaTimerEventStateRecord.ArmedOffset;
-				return true;
-			case MuiAreaTimerEventStateField.MouseOver:
-				offset = MuiAreaTimerEventStateRecord.MouseOverOffset;
-				return true;
-			case MuiAreaTimerEventStateField.DelayElapsed:
-				offset = MuiAreaTimerEventStateRecord.DelayElapsedOffset;
-				return true;
-			case MuiAreaTimerEventStateField.LastTick:
-				offset = MuiAreaTimerEventStateRecord.LastTickOffset;
-				return true;
-			case MuiAreaTimerEventStateField.Generation:
-				offset = MuiAreaTimerEventStateRecord.GenerationOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -329,9 +335,21 @@ internal static class MuiAreaTimerEventStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaTimerEventStateCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiAreaTimerEventStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaTimerEventStateField.Armed)
+			value = state.Armed;
+		else if (field == MuiAreaTimerEventStateField.MouseOver)
+			value = state.MouseOver;
+		else if (field == MuiAreaTimerEventStateField.DelayElapsed)
+			value = state.DelayElapsed;
+		else if (field == MuiAreaTimerEventStateField.LastTick)
+			value = state.LastTick;
+		else if (field == MuiAreaTimerEventStateField.Generation)
+			value = state.Generation;
+		else return false;
 		return true;
 	}
 
@@ -339,10 +357,22 @@ internal static class MuiAreaTimerEventStateRecordMemoryCodec
 		Amiga.APTR record, MuiAreaTimerEventStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaTimerEventStateCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiAreaTimerEventStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaTimerEventStateField.Armed)
+			state.Armed = value;
+		else if (field == MuiAreaTimerEventStateField.MouseOver)
+			state.MouseOver = value;
+		else if (field == MuiAreaTimerEventStateField.DelayElapsed)
+			state.DelayElapsed = value;
+		else if (field == MuiAreaTimerEventStateField.LastTick)
+			state.LastTick = value;
+		else if (field == MuiAreaTimerEventStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiAreaTimerEventStateCodec.WriteRecord(ref platform, record, state);
 	}
 }
 

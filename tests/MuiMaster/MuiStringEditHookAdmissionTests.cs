@@ -99,6 +99,31 @@ public sealed class MuiStringEditHookAdmissionTests
 		};
 		Assert.True(MuiStringEditHookStateRecordCodec.Write(ref platform,
 			recordAddress, value));
+		Assert.True(MuiStringEditHookStateRecordMemoryCodec.TryGetAddress(
+			ref platform, recordAddress, MuiStringEditHookStateField.EditHook,
+			out var typedHookAddress));
+		Assert.Equal(0x1D44u, typedHookAddress.Raw);
+		Assert.True(MuiStringEditHookStateRecordMemoryCodec.TryGetAddress(
+			ref platform, recordAddress,
+			MuiStringEditHookStateField.LonelyEditHook, out var typedLonelyAddress));
+		Assert.Equal(0x1D48u, typedLonelyAddress.Raw);
+		Assert.True(MuiStringEditHookStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, MuiStringEditHookStateField.EditHook,
+			out var typedHook));
+		Assert.Equal(0x1DC0u, typedHook);
+		Assert.True(MuiStringEditHookStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, recordAddress, MuiStringEditHookStateField.LonelyEditHook, 0));
+		Assert.True(MuiStringEditHookStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, MuiStringEditHookStateField.Magic,
+			out var typedMagic));
+		Assert.Equal(MuiStringEditHookStateRecord.Cookie, typedMagic);
+		Assert.False(MuiStringEditHookStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, (MuiStringEditHookStateField)255, out _));
+		Assert.True(MuiStringEditHookStateRecordCodec.TryReadStructural(ref platform,
+			recordAddress, out var typedUpdated));
+		Assert.Equal(MuiStringEditHookStateRecord.Cookie, typedUpdated.Magic);
+		Assert.Equal(0x1DC0u, typedUpdated.EditHook.Raw);
+		Assert.Equal(0u, typedUpdated.LonelyEditHook);
 		Assert.True(MuiStringEditHookStateRecordMemoryCodec.TryGetAddress(ref platform,
 			recordAddress, 4, out var hookAddress));
 		Assert.Equal(0x1D44u, hookAddress.Raw);
@@ -113,7 +138,7 @@ public sealed class MuiStringEditHookAdmissionTests
 		Assert.False(MuiStringEditHookStateRecordMemoryCodec.TryGetAddress(
 			ref platform, recordAddress, MuiStringEditHookStateRecord.Size, out _));
 		Assert.False(MuiStringEditHookStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiStringEditHookStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

@@ -64,4 +64,32 @@ public sealed class MuiAreaDoubleBufferStructAdapterTests
 		Assert.False(MuiAreaDoubleBufferStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
 	}
+
+	[Fact]
+	public void AreaDoubleBufferFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3A00);
+		var value = new MuiAreaDoubleBufferStateRecord
+		{
+			Magic = MuiAreaDoubleBufferStateRecord.Cookie,
+			Enabled = 1,
+			Generation = 19,
+		};
+
+		Assert.True(MuiAreaDoubleBufferStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaDoubleBufferStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaDoubleBufferStateField.Enabled, 0));
+		Assert.True(MuiAreaDoubleBufferStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaDoubleBufferStateField.Generation,
+			out var generation));
+		Assert.Equal(value.Generation, generation);
+		Assert.True(MuiAreaDoubleBufferStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(0u, decoded.Enabled);
+		Assert.Equal(value.Generation, decoded.Generation);
+		Assert.Equal(value.Magic, decoded.Magic);
+	}
 }

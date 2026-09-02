@@ -105,26 +105,22 @@ public static class MuiAreaCustomFontRuntimeRecordMemoryCodec
 	private static bool TryResolve(MuiAreaCustomFontRuntimeField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaCustomFontRuntimeField.Magic)
+			offset = MuiAreaCustomFontRuntimeRecord.MagicOffset;
+		else if (field == MuiAreaCustomFontRuntimeField.Font)
+			offset = MuiAreaCustomFontRuntimeRecord.FontOffset;
+		else if (field == MuiAreaCustomFontRuntimeField.Spec)
+			offset = MuiAreaCustomFontRuntimeRecord.SpecOffset;
+		else if (field == MuiAreaCustomFontRuntimeField.Generation)
+			offset = MuiAreaCustomFontRuntimeRecord.GenerationOffset;
+		else if (field == MuiAreaCustomFontRuntimeField.Active)
+			offset = MuiAreaCustomFontRuntimeRecord.ActiveOffset;
+		else
 		{
-			case MuiAreaCustomFontRuntimeField.Magic:
-				offset = MuiAreaCustomFontRuntimeRecord.MagicOffset;
-				return true;
-			case MuiAreaCustomFontRuntimeField.Font:
-				offset = MuiAreaCustomFontRuntimeRecord.FontOffset;
-				return true;
-			case MuiAreaCustomFontRuntimeField.Spec:
-				offset = MuiAreaCustomFontRuntimeRecord.SpecOffset;
-				return true;
-			case MuiAreaCustomFontRuntimeField.Generation:
-				offset = MuiAreaCustomFontRuntimeRecord.GenerationOffset;
-				return true;
-			case MuiAreaCustomFontRuntimeField.Active:
-				offset = MuiAreaCustomFontRuntimeRecord.ActiveOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	public static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -159,9 +155,19 @@ public static class MuiAreaCustomFontRuntimeRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaCustomFontRuntimeField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaCustomFontRuntimeField.Font)
+			value = state.Font.Raw;
+		else if (field == MuiAreaCustomFontRuntimeField.Spec)
+			value = state.Spec.Raw;
+		else if (field == MuiAreaCustomFontRuntimeField.Generation)
+			value = state.Generation;
+		else if (field == MuiAreaCustomFontRuntimeField.Active)
+			value = state.Active;
+		else return false;
 		return true;
 	}
 
@@ -180,10 +186,21 @@ public static class MuiAreaCustomFontRuntimeRecordMemoryCodec
 		APTR record, MuiAreaCustomFontRuntimeField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaCustomFontRuntimeRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaCustomFontRuntimeField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaCustomFontRuntimeField.Font)
+			state.Font = APTR.FromPointer(value);
+		else if (field == MuiAreaCustomFontRuntimeField.Spec)
+			state.Spec = APTR.FromPointer(value);
+		else if (field == MuiAreaCustomFontRuntimeField.Generation)
+			state.Generation = value;
+		else if (field == MuiAreaCustomFontRuntimeField.Active)
+			state.Active = value;
+		else return false;
+		return MuiAreaCustomFontRuntimeRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 
 	public static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,

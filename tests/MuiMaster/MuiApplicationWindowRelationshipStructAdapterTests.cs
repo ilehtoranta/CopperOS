@@ -71,4 +71,36 @@ public sealed class MuiApplicationWindowRelationshipStructAdapterTests
 		Assert.False(MuiApplicationWindowRelationshipStateRecordCodec.TryReadRecord(
 			ref platform, crossingEnd, out _));
 	}
+
+	[Fact]
+	public void ApplicationWindowRelationshipFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationWindowRelationshipStateRecord
+		{
+			Magic = 0x10203040u,
+			LastWindow = APTR.FromPointer(0x50607080u),
+			AddedCount = 0x90A0B0C0u,
+		};
+
+		Assert.True(MuiApplicationWindowRelationshipStateRecordCodec.WriteRecord(
+			ref platform, address, initial));
+		Assert.True(MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiApplicationWindowRelationshipStateField.AddedCount, 0xF1020304u));
+		Assert.True(MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address,
+			MuiApplicationWindowRelationshipStateField.LastWindow, out var window));
+		Assert.Equal(initial.LastWindow.Raw, window);
+		Assert.True(MuiApplicationWindowRelationshipStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(initial.LastWindow, updated.LastWindow);
+		Assert.Equal(0xF1020304u, updated.AddedCount);
+		Assert.False(MuiApplicationWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiApplicationWindowRelationshipStateField)255), 1));
+	}
 }

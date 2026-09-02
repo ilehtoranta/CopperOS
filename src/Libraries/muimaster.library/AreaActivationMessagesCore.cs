@@ -34,18 +34,27 @@ internal struct MuiAreaActivationMethodMessage
 
 internal static class MuiAreaActivationMethodMessageCodec
 {
+	// The method-only packet is a complete one-ULONG named record. Scalar-safe
+	// entry points keep the freestanding call boundary independent of the
+	// current one-field struct ABI lowering while retaining the typed record.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out methodId);
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.WriteValue(ref platform, address, methodId);
+
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR address, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiAreaActivationMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var rawMethodId) ||
-			!MuiGuestStructCursor.IsComplete(cursor)) return false;
-		methodId = rawMethodId;
-		return true;
+		return TryReadValue(ref platform, address, out methodId);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -61,13 +70,7 @@ internal static class MuiAreaActivationMethodMessageCodec
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaActivationMethodMessage value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiAreaActivationMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				value.MethodId)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> WriteValue(ref platform, address, value.MethodId);
 }
 
 internal enum MuiAreaActivationPacketKind : byte

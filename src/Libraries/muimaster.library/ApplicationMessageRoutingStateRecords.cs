@@ -133,9 +133,15 @@ internal static class MuiApplicationMessageRoutingStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationMessageRoutingStateRecordCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiApplicationMessageRoutingStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationMessageRoutingStateField.AppMessage)
+			value = state.AppMessage.Raw;
+		else if (field == MuiApplicationMessageRoutingStateField.WindowAppWindow)
+			value = state.WindowAppWindow;
+		else return false;
 		return true;
 	}
 
@@ -143,10 +149,17 @@ internal static class MuiApplicationMessageRoutingStateRecordMemoryCodec
 		APTR record, MuiApplicationMessageRoutingStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationMessageRoutingStateRecordCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiApplicationMessageRoutingStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationMessageRoutingStateField.AppMessage)
+			state.AppMessage = APTR.FromPointer(value);
+		else if (field == MuiApplicationMessageRoutingStateField.WindowAppWindow)
+			state.WindowAppWindow = value;
+		else return false;
+		return MuiApplicationMessageRoutingStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

@@ -39,10 +39,9 @@ internal static class MuiClassServiceLibraryPrefixRecordCodec
 		return platform.IsMapped(payload, 1);
 	}
 
-	// CopperSharp's freestanding generic lowering has a known fault for a
-	// one-ULONG struct crossing a by-value call boundary. Keep the public
-	// named-record API, but expose scalar-safe cursor entry points for the
-	// actual loader boundary and native proof.
+	// Keep the named one-ULONG record API while routing the loader boundary
+	// through the shared bounded ULONG codec. The prefix is still exposed as a
+	// scalar helper so callers never need to handle guest slot addresses.
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadPrefix<TPlatform>(ref TPlatform platform,
 		APTR address, out uint prefix)
@@ -51,13 +50,10 @@ internal static class MuiClassServiceLibraryPrefixRecordCodec
 		prefix = 0;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiClassServiceLibraryPrefixRecord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
-				out var high) ||
-			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
-				out var low) || !MuiGuestStructCursor.IsComplete(cursor))
-			return false;
-		prefix = ((uint)high << 16) | low;
-		return true;
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress)) return false;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+			out prefix) && MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
@@ -67,11 +63,10 @@ internal static class MuiClassServiceLibraryPrefixRecordCodec
 	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiClassServiceLibraryPrefixRecord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
-				(ushort)(prefix >> 16)) ||
-			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
-				(ushort)prefix)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress)) return false;
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+			prefix) && MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,

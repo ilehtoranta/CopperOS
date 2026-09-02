@@ -13,7 +13,7 @@ internal static class Program
     {
         if (args.Length is not (3 or 4))
         {
-            Console.Error.WriteLine("usage: NativeExecution <probe.hunk> <68000|68020|68040> <report.json> [command-startup-vector-fixture|command-argument-boundary-vector-fixture|command-io-vector-fixture|eval-native-entry-vector-fixture|pathpart-native-entry-vector-fixture]");
+            Console.Error.WriteLine("usage: NativeExecution <probe.hunk> <68000|68020|68040> <report.json> [command-startup-vector-fixture|command-argument-boundary-vector-fixture|command-io-vector-fixture|eval-native-entry-vector-fixture|eval-wb31-native-entry-vector-fixture|pathpart-native-entry-vector-fixture|which-wb31-native-entry-vector-fixture|quote-forward-probe-fixture|quote-native-entry-vector-fixture]");
             return 2;
         }
         var suite = args.Length == 4 ? args[3] : ProbeFixture.StartupSuite;
@@ -105,6 +105,9 @@ internal sealed record ProbeCase(string Name, string Arguments, int Result, int 
     public NativeIoCase? NativeIo { get; init; }
     public EvalEntryCase? Eval { get; init; }
     public PathPartEntryCase? PathPart { get; init; }
+    public WhichEntryCase? Which { get; init; }
+    public QuoteForwardProbeCase? QuoteForward { get; init; }
+    public QuoteNativeEntryCase? QuoteEntry { get; init; }
 }
 
 internal sealed class Invocation(ProbeCase definition, int slot)
@@ -135,6 +138,7 @@ internal sealed class Invocation(ProbeCase definition, int slot)
     public bool Forbidden { get; set; }
     public int Instructions { get; set; }
     public NativeIoInvocation? NativeIo { get; set; }
+    public QuoteForwardNativeLayout? QuoteForwardLayout { get; set; }
     public List<string> Events { get; } = [];
     public List<uint> AllocationRequests { get; } = [];
     public MemoryStream Output { get; } = new();
@@ -153,7 +157,10 @@ internal sealed partial class ProbeFixture
     public ProbeFixture(HunkImage image, M68kCpuModel model, string suite)
     {
         Require(suite is StartupSuite or ArgumentBoundarySuite or NativeIoSuite or
-            EvalEntrySuite or PathPartEntrySuite, "Unknown native qualification suite.");
+            EvalEntrySuite or WorkbenchEvalEntrySuite or PathPartEntrySuite or
+            WorkbenchWhichEntrySuite or QuoteForwardProbeSuite or
+            QuoteNativeEntrySuite,
+            "Unknown native qualification suite.");
         Image = image;
         this.model = model;
         this.suite = suite;
@@ -170,7 +177,11 @@ internal sealed partial class ProbeFixture
         if (suite == ArgumentBoundarySuite) return RunArgumentBoundaryCases();
         if (suite == NativeIoSuite) return RunNativeIoCases();
         if (suite == EvalEntrySuite) return RunEvalEntryCases();
+        if (suite == WorkbenchEvalEntrySuite) return RunWorkbenchEvalEntryCases();
         if (suite == PathPartEntrySuite) return RunPathPartEntryCases();
+        if (suite == WorkbenchWhichEntrySuite) return RunWorkbenchWhichEntryCases();
+        if (suite == QuoteForwardProbeSuite) return RunQuoteForwardProbeCases();
+        if (suite == QuoteNativeEntrySuite) return RunQuoteNativeEntryCases();
         // These are supplied DOS results, not a replacement ReadArgs parser.
         // The suite tests native calling conventions, storage, and ownership.
         ProbeCase[] cases =
@@ -246,6 +257,8 @@ internal sealed partial class ProbeFixture
                     Bus.Long(invocation.Process + (uint)DosLayout.Process.Result2, Invocation.InitialIoError);
                     bytes.CopyTo(Bus.Memory.AsSpan((int)invocation.Arguments));
                     Bus.Memory[invocation.Arguments + (uint)bytes.Length] = 0;
+                    if (invocation.Definition.QuoteForward is not null)
+                        PrepareQuoteForwardProbe(invocation);
                 }
                 Bus.Memory.AsSpan((int)(invocation.StackTop - invocation.StackBytes - 16),
                     (int)invocation.StackBytes + 32).Fill(0xb6);
@@ -256,7 +269,8 @@ internal sealed partial class ProbeFixture
                 for (var index = 0; index < 7; index++) cpu.State.A[index] = (uint)(0xae000000 + index * 16);
                 for (var index = 0; index < 8; index++) cpu.State.D[index] = (uint)(0xde000000 + index * 16);
                 cpu.State.D[0] = unchecked((uint)(test.EntryLength ?? bytes.Length));
-                cpu.State.A[0] = test.NullArgumentPointer ? 0 : invocation.Arguments;
+                cpu.State.A[0] = test.NullArgumentPointer ? 0 :
+                    invocation.QuoteForwardLayout?.Control ?? invocation.Arguments;
             }
             while (cores.Any(cpu => cpu.State.ProgramCounter != ReturnAddress))
             {
@@ -288,18 +302,27 @@ internal sealed partial class ProbeFixture
                 Require(Bus.Memory.AsSpan((int)invocation.StackTop, 16).IndexOfAnyExcept((byte)0xb6) < 0, "Stack upper guard changed.");
                 Require(Bus.Memory.AsSpan((int)(invocation.StackTop - invocation.StackBytes - 16), 16)
                     .IndexOfAnyExcept((byte)0xb6) < 0, "Stack lower guard changed.");
-                Require(invocation.Opens == 1 && invocation.Closes == (test.MissingDos ? 0 : 1), "Unbalanced DOS library lifetime.");
-                Require(invocation.Replies == (test.Workbench ? 1 : 0), "Unbalanced WBStartup message lifetime.");
-                Require(invocation.WaitPorts == (test.Workbench ? 1 : 0) &&
-                    invocation.GetMessages == (test.Workbench ? 1 : 0), "Missing or repeated WBStartup queue operations.");
+                if (suite != QuoteForwardProbeSuite)
+                {
+                    Require(invocation.Opens == 1 && invocation.Closes == (test.MissingDos ? 0 : 1), "Unbalanced DOS library lifetime.");
+                    Require(invocation.Replies == (test.Workbench ? 1 : 0), "Unbalanced WBStartup message lifetime.");
+                    Require(invocation.WaitPorts == (test.Workbench ? 1 : 0) &&
+                        invocation.GetMessages == (test.Workbench ? 1 : 0), "Missing or repeated WBStartup queue operations.");
+                }
                 if (suite == NativeIoSuite)
                     VerifyNativeIo(invocation);
                 else if (suite == ArgumentBoundarySuite)
                     VerifyArgumentBoundary(invocation);
-                else if (suite == EvalEntrySuite)
+                else if (suite == EvalEntrySuite || suite == WorkbenchEvalEntrySuite)
                     VerifyEvalEntry(invocation);
                 else if (suite == PathPartEntrySuite)
                     VerifyPathPartEntry(invocation);
+                else if (suite == WorkbenchWhichEntrySuite)
+                    VerifyWorkbenchWhichEntry(invocation);
+                else if (suite == QuoteForwardProbeSuite)
+                    VerifyQuoteForwardProbe(invocation);
+                else if (suite == QuoteNativeEntrySuite)
+                    VerifyQuoteNativeEntry(invocation);
                 else
                 {
                     var reachedParser = !test.Workbench && !test.MissingDos && !test.AllocationFailure &&
@@ -394,10 +417,22 @@ internal sealed partial class ProbeFixture
         Register(ExecBase, ExecLvo.AllocMem, "AllocMem", (state, invocation) =>
         {
             var expectedBytes = invocation.Definition.ArgumentBoundary is { } boundary
-                ? boundary.AllocationBytes : invocation.Definition.Eval is not null
-                    ? invocation.Allocations == 0 ? 24u : 4096u
+                ? boundary.AllocationBytes : invocation.Definition.Eval is { } eval
+                    ? invocation.Allocations == 0
+                        ? eval.WorkbenchProfile ? 20u : 24u
+                        : 4096u
                     : invocation.Definition.PathPart is not null
-                        ? invocation.Allocations == 0 ? 12u : 1024u : 8u;
+                        ? invocation.Allocations == 0 ? 12u : 1024u
+                        : invocation.Definition.QuoteEntry is not null
+                            ? invocation.Allocations switch
+                            {
+                                0 => 32u,
+                                1 => 4096u,
+                                2 => 64u,
+                                _ => 4096u
+                            }
+                        : invocation.Definition.Which is not null
+                            ? invocation.Allocations == 0 ? 16u : 1024u : 8u;
             Require(expectedBytes is not null && state.D[0] == expectedBytes &&
                 state.D[1] == (uint)(Exec.MemoryFlags.Public | Exec.MemoryFlags.Clear),
                 "Unexpected allocation; compiler heap context is not qualified by this suite.");
@@ -435,7 +470,14 @@ internal sealed partial class ProbeFixture
             invocation.Forbidden = true;
             return 0;
         });
-        Register(ExecBase, ExecLvo.Permit, "Permit", (_, _) => throw new InvalidOperationException("Command called Permit after startup reply."));
+        Register(ExecBase, ExecLvo.Permit, "Permit", (_, invocation) =>
+        {
+            if (suite != WorkbenchWhichEntrySuite)
+                throw new InvalidOperationException("Command called Permit after startup reply.");
+            Require(invocation.Forbidden, "Which called Permit without a preceding Forbid.");
+            invocation.Forbidden = false;
+            return 0;
+        });
         Register(ExecBase, ExecLvo.ReplyMsg, "ReplyMsg", (state, invocation) =>
         {
             Require(invocation.Definition.Workbench && invocation.Forbidden && state.A[1] == invocation.Message &&
@@ -453,7 +495,7 @@ internal sealed partial class ProbeFixture
             RegisterIoDos(baseAddress);
             return;
         }
-        if (suite == EvalEntrySuite)
+        if (suite == EvalEntrySuite || suite == WorkbenchEvalEntrySuite)
         {
             RegisterEvalEntryDos(baseAddress);
             return;
@@ -461,6 +503,16 @@ internal sealed partial class ProbeFixture
         if (suite == PathPartEntrySuite)
         {
             RegisterPathPartEntryDos(baseAddress);
+            return;
+        }
+        if (suite == WorkbenchWhichEntrySuite)
+        {
+            RegisterWorkbenchWhichEntryDos(baseAddress);
+            return;
+        }
+        if (suite == QuoteNativeEntrySuite)
+        {
+            RegisterQuoteNativeEntryDos(baseAddress);
             return;
         }
         Register(baseAddress, DosLvo.ReadArgs, "ReadArgs", (state, invocation) =>

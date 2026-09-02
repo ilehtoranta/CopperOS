@@ -18,28 +18,36 @@ internal struct MuiApplicationMethodHeaderMessage
 
 internal static class MuiApplicationMethodHeaderCodec
 {
+	// The header is a complete one-ULONG named record. Keep scalar entry
+	// points beside the record adapter so freestanding callers do not pass a
+	// one-field struct across the native ABI boundary.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out methodId);
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.WriteValue(ref platform, address, methodId);
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiApplicationMethodHeaderMessage value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiApplicationMethodHeaderMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out value.MethodId)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		if (!TryReadValue(ref platform, address, out var methodId)) return false;
+		value.MethodId = methodId;
+		return true;
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiApplicationMethodHeaderMessage value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiApplicationMethodHeaderMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				value.MethodId)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> WriteValue(ref platform, address, value.MethodId);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]

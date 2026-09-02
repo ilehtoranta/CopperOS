@@ -154,8 +154,27 @@ internal static class MuiAreaRenderPolicyStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaRenderPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaRenderPolicyStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaRenderPolicyStateField.FillArea)
+			value = state.FillArea;
+		else if (field == MuiAreaRenderPolicyStateField.Background)
+			value = state.Background;
+		else if (field == MuiAreaRenderPolicyStateField.Frame)
+			value = state.Frame;
+		else if (field == MuiAreaRenderPolicyStateField.Font)
+			value = state.Font;
+		else if (field == MuiAreaRenderPolicyStateField.FrameVisible)
+			value = state.FrameVisible;
+		else if (field == MuiAreaRenderPolicyStateField.FramePhantomHoriz)
+			value = state.FramePhantomHoriz;
+		else if (field == MuiAreaRenderPolicyStateField.FrameTitle)
+			value = state.FrameTitle.Raw;
+		else if (field == MuiAreaRenderPolicyStateField.FrameDynamic)
+			value = state.FrameDynamic;
+		else return false;
 		return true;
 	}
 
@@ -163,9 +182,29 @@ internal static class MuiAreaRenderPolicyStateRecordMemoryCodec
 		APTR record, MuiAreaRenderPolicyStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaRenderPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaRenderPolicyStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaRenderPolicyStateField.FillArea)
+			state.FillArea = value;
+		else if (field == MuiAreaRenderPolicyStateField.Background)
+			state.Background = value;
+		else if (field == MuiAreaRenderPolicyStateField.Frame)
+			state.Frame = value;
+		else if (field == MuiAreaRenderPolicyStateField.Font)
+			state.Font = value;
+		else if (field == MuiAreaRenderPolicyStateField.FrameVisible)
+			state.FrameVisible = value;
+		else if (field == MuiAreaRenderPolicyStateField.FramePhantomHoriz)
+			state.FramePhantomHoriz = value;
+		else if (field == MuiAreaRenderPolicyStateField.FrameTitle)
+			state.FrameTitle = APTR.FromPointer(value);
+		else if (field == MuiAreaRenderPolicyStateField.FrameDynamic)
+			state.FrameDynamic = value;
+		else return false;
+		return MuiAreaRenderPolicyStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

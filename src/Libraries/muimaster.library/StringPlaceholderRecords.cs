@@ -21,6 +21,9 @@ public struct MuiStringPlaceholderState
 internal struct MuiStringPlaceholderStateRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint ContentsOffset = 4;
 	internal const uint Cookie = 0x4D535048u; // 'MSPH'
 
 	internal uint Magic;
@@ -64,13 +67,16 @@ internal static class MuiStringPlaceholderStateFieldCursorCodec
 	private static bool TryResolve(MuiStringPlaceholderStateField field,
 		out uint offset)
 	{
-		offset = field switch
+		if (field == MuiStringPlaceholderStateField.Magic)
+			offset = MuiStringPlaceholderStateRecord.MagicOffset;
+		else if (field == MuiStringPlaceholderStateField.Contents)
+			offset = MuiStringPlaceholderStateRecord.ContentsOffset;
+		else
 		{
-			MuiStringPlaceholderStateField.Magic => 0,
-			MuiStringPlaceholderStateField.Contents => 4,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -82,7 +88,7 @@ internal static class MuiStringPlaceholderStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 				cursor.Record, MuiStringPlaceholderStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiStringPlaceholderStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -117,16 +123,71 @@ internal static class MuiStringPlaceholderStateFieldCursorCodec
 // compatibility and malformed-state diagnostics.
 internal static class MuiStringPlaceholderStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiStringPlaceholderStateField field,
+		out uint offset)
+	{
+		if (field == MuiStringPlaceholderStateField.Magic)
+			offset = MuiStringPlaceholderStateRecord.MagicOffset;
+		else if (field == MuiStringPlaceholderStateField.Contents)
+			offset = MuiStringPlaceholderStateRecord.ContentsOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringPlaceholderStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringPlaceholderStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiStringPlaceholderStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringPlaceholderStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiStringPlaceholderStateField.Contents)
+			value = state.Contents.Raw;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringPlaceholderStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiStringPlaceholderStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringPlaceholderStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiStringPlaceholderStateField.Contents)
+			state.Contents = APTR.FromPointer(value);
+		else return false;
+		return MuiStringPlaceholderStateRecordCodec.WriteStructural(ref platform,
+			record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiStringPlaceholderStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiStringPlaceholderStateRecord.Size -
+			MuiStringPlaceholderStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiStringPlaceholderStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiStringPlaceholderStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -183,7 +244,13 @@ internal static class MuiStringPlaceholderStateRecordCodec
 		MuiStringPlaceholderStateRecord value)
 	where TPlatform : struct, IMuiGuestMemory
 		=> MuiStringPlaceholderStateAdmission.Validate(value) &&
-		MuiGuestStructCursor.TryCreate(ref platform, address,
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiStringPlaceholderStateRecord value)
+	where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiStringPlaceholderStateRecord.Size, out var cursor) &&
 		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 			value.Magic) &&

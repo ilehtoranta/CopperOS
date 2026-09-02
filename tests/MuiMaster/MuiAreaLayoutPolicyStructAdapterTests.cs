@@ -50,4 +50,42 @@ public sealed class MuiAreaLayoutPolicyStructAdapterTests
 		Assert.False(MuiAreaLayoutPolicyStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
 	}
+
+	[Fact]
+	public void AreaLayoutPolicyFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x4000);
+		var value = new MuiAreaLayoutPolicyStateRecord
+		{
+			Magic = MuiAreaLayoutPolicyStateRecord.Cookie,
+			ShowMe = 1,
+			FixWidth = 10,
+			FixHeight = 20,
+			MaxWidth = 100,
+			MaxHeight = 80,
+			InnerLeft = 2,
+			InnerRight = 3,
+			InnerTop = 1,
+			InnerBottom = 1,
+			HorizontalWeight = 7,
+			VerticalWeight = 9,
+		};
+
+		Assert.True(MuiAreaLayoutPolicyStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaLayoutPolicyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaLayoutPolicyField.MaxWidth, 0xFEEDBEEFu));
+		Assert.True(MuiAreaLayoutPolicyStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaLayoutPolicyField.VerticalWeight,
+			out var weight));
+		Assert.Equal(value.VerticalWeight, weight);
+		Assert.True(MuiAreaLayoutPolicyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(0xFEEDBEEFu, decoded.MaxWidth);
+		Assert.Equal(value.ShowMe, decoded.ShowMe);
+		Assert.Equal(value.VerticalWeight, decoded.VerticalWeight);
+		Assert.Equal(value.Magic, decoded.Magic);
+	}
 }

@@ -90,6 +90,23 @@ public sealed class MuiStringContentsAdmissionTests
 		Assert.True(MuiStringContentsStateRecordCodec.Write(ref platform, address,
 			record));
 		Assert.True(MuiStringContentsStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiStringContentsStateField.Contents,
+			out var typedContentsAddress));
+		Assert.Equal(0x1D64u, typedContentsAddress.Raw);
+		Assert.True(MuiStringContentsStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiStringContentsStateField.Contents,
+			out var typedContents));
+		Assert.Equal(source.Raw, typedContents);
+		Assert.True(MuiStringContentsStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiStringContentsStateField.Contents, 0));
+		Assert.True(MuiStringContentsStateRecordCodec.TryReadStructural(ref platform,
+			address, out var typedUpdated));
+		Assert.Equal(APTR.Null, typedUpdated.Contents);
+		Assert.False(MuiStringContentsStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiStringContentsStateField)255, out _));
+		Assert.True(MuiStringContentsStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiStringContentsStateField.Contents, source.Raw));
+		Assert.True(MuiStringContentsStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, 4, out var contentsAddress));
 		Assert.Equal(0x1D64u, contentsAddress.Raw);
 		Assert.True(MuiStringContentsStateRecordMemoryCodec.TryReadUInt32(
@@ -103,7 +120,7 @@ public sealed class MuiStringContentsAdmissionTests
 		Assert.False(MuiStringContentsStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiStringContentsStateRecord.Size, out _));
 		Assert.False(MuiStringContentsStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiStringContentsStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

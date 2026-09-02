@@ -5016,18 +5016,16 @@ public static class MuiListCore
 	internal static class MuiListPointerSlotCodec
 	{
 		// A pointer-table entry is one ULONG on the guest wire. Keep the named
-		// APTR record as the semantic value and serialize it in declaration order
-		// through the bounded cursor.
+		// APTR record as the semantic value and serialize it through the shared
+		// packed ULONG storage codec after the bounded slot is admitted.
 		[MethodImpl(MethodImplOptions.NoInlining)]
 		internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 			APTR address, out uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
 			value = 0;
-			return MuiGuestStructCursor.TryCreate(ref platform, address,
-				MuiListPointerSlotRecord.Size, out var cursor) &&
-				MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-					out value) && MuiGuestStructCursor.IsComplete(cursor);
+			return MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+				out value);
 		}
 
 		internal static bool TryReadRecord<TPlatform>(ref TPlatform platform,
@@ -5045,10 +5043,8 @@ public static class MuiListCore
 			APTR address, uint value)
 			where TPlatform : struct, IMuiGuestMemory
 		{
-			return MuiGuestStructCursor.TryCreate(ref platform, address,
-				MuiListPointerSlotRecord.Size, out var cursor) &&
-				MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-					value) && MuiGuestStructCursor.IsComplete(cursor);
+			return MuiGuestUlongStorageCodec.WriteValue(ref platform, address,
+				value);
 		}
 
 		internal static bool WriteRecord<TPlatform>(ref TPlatform platform,

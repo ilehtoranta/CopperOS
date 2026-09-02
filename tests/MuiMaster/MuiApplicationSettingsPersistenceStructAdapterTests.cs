@@ -80,4 +80,42 @@ public sealed class MuiApplicationSettingsPersistenceStructAdapterTests
 		Assert.False(MuiApplicationSettingsPersistenceStateRecordCodec.TryReadRecord(
 			ref platform, crossingEnd, out _));
 	}
+
+	[Fact]
+	public void SettingsPersistenceFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationSettingsPersistenceStateRecord
+		{
+			Magic = 0x10203040u,
+			Operation = 1,
+			Name = APTR.FromPointer(uint.MaxValue),
+			Requests = 0x50607080u,
+			Saves = 0x90A0B0C0u,
+			Loads = 0xDDEEFF00u,
+		};
+
+		Assert.True(MuiApplicationSettingsPersistenceStateRecordCodec.WriteRecord(
+			ref platform, address, initial));
+		Assert.True(MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			MuiApplicationSettingsPersistenceStateField.Saves, 0xF1020304u));
+		Assert.True(MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address,
+			MuiApplicationSettingsPersistenceStateField.Name, out var name));
+		Assert.Equal(initial.Name.Raw, name);
+		Assert.True(MuiApplicationSettingsPersistenceStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(initial.Operation, updated.Operation);
+		Assert.Equal(initial.Name, updated.Name);
+		Assert.Equal(initial.Requests, updated.Requests);
+		Assert.Equal(0xF1020304u, updated.Saves);
+		Assert.Equal(initial.Loads, updated.Loads);
+		Assert.False(MuiApplicationSettingsPersistenceStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiApplicationSettingsPersistenceStateField)255), 1));
+	}
 }

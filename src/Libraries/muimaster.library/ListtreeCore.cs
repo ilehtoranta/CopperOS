@@ -519,52 +519,14 @@ public static class MuiListtreeCore
 		internal static bool TryReadTextValue<TPlatform>(ref TPlatform platform,
 			APTR address, out uint value)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			value = 0;
-			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-				MuiListtreeDisplayColumnRecord.Size, out var cursor)) return false;
-			APTR firstAddress;
-			APTR secondAddress;
-			APTR thirdAddress;
-			APTR fourthAddress;
-			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-				ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-				ref platform, ref cursor, 1, out thirdAddress) ||
-				!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-					out fourthAddress)) return false;
-			var first = platform.ReadUInt8(firstAddress, 0);
-			var second = platform.ReadUInt8(secondAddress, 0);
-			var third = platform.ReadUInt8(thirdAddress, 0);
-			var fourth = platform.ReadUInt8(fourthAddress, 0);
-			value = ((uint)first << 24) | ((uint)second << 16) |
-				((uint)third << 8) | fourth;
-			return MuiGuestStructCursor.IsComplete(cursor);
-		}
+			=> MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+				out value);
 
 		[MethodImpl(MethodImplOptions.NoInlining)]
 		internal static bool WriteTextValue<TPlatform>(ref TPlatform platform,
 			APTR address, uint value)
 			where TPlatform : struct, IMuiGuestMemory
-		{
-			if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-				MuiListtreeDisplayColumnRecord.Size, out var cursor)) return false;
-			APTR firstAddress;
-			APTR secondAddress;
-			APTR thirdAddress;
-			APTR fourthAddress;
-			if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-				ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-				ref platform, ref cursor, 1, out thirdAddress) ||
-				!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-					out fourthAddress)) return false;
-			platform.WriteUInt8(firstAddress, 0, (byte)(value >> 24));
-			platform.WriteUInt8(secondAddress, 0, (byte)(value >> 16));
-			platform.WriteUInt8(thirdAddress, 0, (byte)(value >> 8));
-			platform.WriteUInt8(fourthAddress, 0, (byte)value);
-			return MuiGuestStructCursor.IsComplete(cursor);
-		}
+			=> MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
 
 		internal static bool TryRead<TPlatform>(ref TPlatform platform,
 			APTR address, out MuiListtreeDisplayColumnRecord value)

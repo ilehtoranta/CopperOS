@@ -172,6 +172,15 @@ internal static class MuiBoopsiQueryPacketFieldCursorCodec
 // required by the 68k wire layout.
 internal static class MuiBoopsiQueryMessageCodec
 {
+	// The method-only envelope is a complete one-ULONG named record. Keep
+	// scalar-safe entry points beside the typed record so freestanding callers
+	// avoid passing a one-field struct through the native ABI.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteMethodIdValue<TPlatform>(ref TPlatform platform,
+		APTR message, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.WriteValue(ref platform, message, methodId);
+
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiBoopsiQueryMethodMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
@@ -191,14 +200,8 @@ internal static class MuiBoopsiQueryMessageCodec
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiBoopsiQueryMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var rawMethodId) ||
-			!MuiGuestStructCursor.IsComplete(cursor)) return false;
-		methodId = rawMethodId;
-		return true;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, message,
+			out methodId);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,

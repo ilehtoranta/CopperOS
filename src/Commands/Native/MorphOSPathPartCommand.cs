@@ -28,45 +28,38 @@ public static class MorphOSPathPartCommand
         }
 
         var buffer = APTR.Null;
-        try
+        var result = DOS.RETURN_OK;
+        if (!arguments.TryGetResult(0, out var directory) ||
+            !arguments.TryGetResult(1, out var file) ||
+            !arguments.TryGetResult(2, out var additions))
         {
-            if (!arguments.TryGetResult(0, out var directory) ||
-                !arguments.TryGetResult(1, out var file) ||
-                !arguments.TryGetResult(2, out var additions))
-            {
-                ioError = (int)DOS.Error.BadTemplate;
-                return DOS.RETURN_ERROR;
-            }
-
+            ioError = (int)DOS.Error.BadTemplate;
+            result = DOS.RETURN_ERROR;
+        }
+        else
+        {
             buffer = Exec.AllocMem(BufferBytes,
                 Exec.MemoryFlags.Public | Exec.MemoryFlags.Clear);
             if (buffer.IsNull)
             {
                 ioError = (int)DOS.Error.NoFreeStore;
-                return DOS.RETURN_FAIL;
+                result = DOS.RETURN_FAIL;
             }
-
-            if (directory != 0 && !WriteDirectory(APTR.FromPointer(directory),
+            else if (directory != 0 && !WriteDirectory(APTR.FromPointer(directory),
                     buffer, out ioError))
-                return DOS.RETURN_ERROR;
-
-            if (file != 0 && !WriteString(CString.FromPointer(DOS.FilePart(
+                result = DOS.RETURN_ERROR;
+            else if (file != 0 && !WriteString(CString.FromPointer(DOS.FilePart(
                     CString.FromPointer(file)).Raw), buffer, out ioError))
-                return DOS.RETURN_ERROR;
-
-            if (additions != 0 && !WriteAddedPath(APTR.FromPointer(additions),
+                result = DOS.RETURN_ERROR;
+            else if (additions != 0 && !WriteAddedPath(APTR.FromPointer(additions),
                     buffer, out ioError))
-                return DOS.RETURN_ERROR;
-
-            return DOS.RETURN_OK;
+                result = DOS.RETURN_ERROR;
         }
-        finally
-        {
-            if (buffer.IsNotNull)
-                Exec.FreeMem(buffer, BufferBytes);
-            arguments.Release();
-            DOS.SetIoErr((DOS.Error)ioError);
-        }
+        if (buffer.IsNotNull)
+            Exec.FreeMem(buffer, BufferBytes);
+        arguments.Release();
+        DOS.SetIoErr((DOS.Error)ioError);
+        return result;
     }
 
     private static bool WriteDirectory(APTR value, APTR buffer, out int ioError)

@@ -97,17 +97,16 @@ internal static class MuiBitmapRemappedStateRecordMemoryCodec
 	private static bool TryResolve(MuiBitmapRemappedStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiBitmapRemappedStateField.Magic)
+			offset = MuiBitmapRemappedStateRecord.MagicOffset;
+		else if (field == MuiBitmapRemappedStateField.Remapped)
+			offset = MuiBitmapRemappedStateRecord.RemappedOffset;
+		else
 		{
-			case MuiBitmapRemappedStateField.Magic:
-				offset = MuiBitmapRemappedStateRecord.MagicOffset;
-				return true;
-			case MuiBitmapRemappedStateField.Remapped:
-				offset = MuiBitmapRemappedStateRecord.RemappedOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -128,8 +127,13 @@ internal static class MuiBitmapRemappedStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiBitmapRemappedStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiBitmapRemappedStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiBitmapRemappedStateField.Remapped)
+			value = state.Remapped.Raw;
+		else return false;
 		return true;
 	}
 
@@ -137,9 +141,15 @@ internal static class MuiBitmapRemappedStateRecordMemoryCodec
 		APTR record, MuiBitmapRemappedStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiBitmapRemappedStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiBitmapRemappedStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiBitmapRemappedStateField.Remapped)
+			state.Remapped = APTR.FromPointer(value);
+		else return false;
+		return MuiBitmapRemappedStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

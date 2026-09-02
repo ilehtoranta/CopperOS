@@ -40,4 +40,37 @@ public sealed class MuiAreaTimerEventStructAdapterTests
 		Assert.False(MuiAreaTimerEventStateCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}
+
+	[Fact]
+	public void AreaTimerEventFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3F40);
+		var value = new MuiAreaTimerEventStateRecord
+		{
+			Magic = MuiAreaTimerEventStateRecord.Cookie,
+			Armed = 1,
+			MouseOver = 1,
+			DelayElapsed = 0,
+			LastTick = 0xFEDCBA98u,
+			Generation = 23,
+		};
+
+		Assert.True(MuiAreaTimerEventStateCodec.WriteRecord(ref platform, address,
+			value));
+		Assert.True(MuiAreaTimerEventStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaTimerEventStateField.LastTick,
+			0x12345678u));
+		Assert.True(MuiAreaTimerEventStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaTimerEventStateField.Generation,
+			out var generation));
+		Assert.Equal(value.Generation, generation);
+		Assert.True(MuiAreaTimerEventStateCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(0x12345678u, decoded.LastTick);
+		Assert.Equal(value.Armed, decoded.Armed);
+		Assert.Equal(value.MouseOver, decoded.MouseOver);
+		Assert.Equal(value.Generation, decoded.Generation);
+	}
 }

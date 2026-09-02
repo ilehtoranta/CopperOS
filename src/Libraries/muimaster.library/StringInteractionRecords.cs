@@ -15,6 +15,11 @@ namespace CopperOS.MuiMaster;
 internal struct MuiStringInteractionStateRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint EditableOffset = 4;
+	internal const uint AdvanceOnCROffset = 8;
+	internal const uint MultilineOffset = 12;
 	internal const uint Cookie = 0x4D534952u; // 'MSIR'
 
 	internal uint Magic;
@@ -56,15 +61,20 @@ internal static class MuiStringInteractionStateFieldCursorCodec
 	private static bool TryResolve(MuiStringInteractionStateField field,
 		out uint offset)
 	{
-		offset = field switch
+		if (field == MuiStringInteractionStateField.Magic)
+			offset = MuiStringInteractionStateRecord.MagicOffset;
+		else if (field == MuiStringInteractionStateField.Editable)
+			offset = MuiStringInteractionStateRecord.EditableOffset;
+		else if (field == MuiStringInteractionStateField.AdvanceOnCR)
+			offset = MuiStringInteractionStateRecord.AdvanceOnCROffset;
+		else if (field == MuiStringInteractionStateField.Multiline)
+			offset = MuiStringInteractionStateRecord.MultilineOffset;
+		else
 		{
-			MuiStringInteractionStateField.Magic => 0,
-			MuiStringInteractionStateField.Editable => 4,
-			MuiStringInteractionStateField.AdvanceOnCR => 8,
-			MuiStringInteractionStateField.Multiline => 12,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -76,7 +86,7 @@ internal static class MuiStringInteractionStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 				cursor.Record, MuiStringInteractionStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiStringInteractionStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -109,16 +119,83 @@ internal static class MuiStringInteractionStateFieldCursorCodec
 // semantic record; this bounded adapter owns fixed guest-layout translation.
 internal static class MuiStringInteractionStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiStringInteractionStateField field,
+		out uint offset)
+	{
+		if (field == MuiStringInteractionStateField.Magic)
+			offset = MuiStringInteractionStateRecord.MagicOffset;
+		else if (field == MuiStringInteractionStateField.Editable)
+			offset = MuiStringInteractionStateRecord.EditableOffset;
+		else if (field == MuiStringInteractionStateField.AdvanceOnCR)
+			offset = MuiStringInteractionStateRecord.AdvanceOnCROffset;
+		else if (field == MuiStringInteractionStateField.Multiline)
+			offset = MuiStringInteractionStateRecord.MultilineOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringInteractionStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringInteractionStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiStringInteractionStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringInteractionStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiStringInteractionStateField.Editable)
+			value = state.Editable;
+		else if (field == MuiStringInteractionStateField.AdvanceOnCR)
+			value = state.AdvanceOnCR;
+		else if (field == MuiStringInteractionStateField.Multiline)
+			value = state.Multiline;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiStringInteractionStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiStringInteractionStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringInteractionStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiStringInteractionStateField.Editable)
+			state.Editable = value;
+		else if (field == MuiStringInteractionStateField.AdvanceOnCR)
+			state.AdvanceOnCR = value;
+		else if (field == MuiStringInteractionStateField.Multiline)
+			state.Multiline = value;
+		else return false;
+		return MuiStringInteractionStateRecordCodec.WriteStructural(ref platform,
+			record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiStringInteractionStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiStringInteractionStateRecord.Size -
+			MuiStringInteractionStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiStringInteractionStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiStringInteractionStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -176,7 +253,13 @@ internal static class MuiStringInteractionStateRecordCodec
 		MuiStringInteractionStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiStringInteractionStateAdmission.Validate(value) &&
-		MuiGuestStructCursor.TryCreate(ref platform, address,
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiStringInteractionStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiStringInteractionStateRecord.Size, out var cursor) &&
 		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 			value.Magic) &&
@@ -191,4 +274,5 @@ internal static class MuiStringInteractionStateRecordCodec
 		MuiStringInteractionStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		WriteRecord(ref platform, address, value);
+
 }

@@ -93,17 +93,16 @@ internal static class MuiGroupLayoutHookStateRecordMemoryCodec
 	private static bool TryResolve(MuiGroupLayoutHookStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiGroupLayoutHookStateField.Magic)
+			offset = MuiGroupLayoutHookStateRecord.MagicOffset;
+		else if (field == MuiGroupLayoutHookStateField.Hook)
+			offset = MuiGroupLayoutHookStateRecord.HookOffset;
+		else
 		{
-			case MuiGroupLayoutHookStateField.Magic:
-				offset = MuiGroupLayoutHookStateRecord.MagicOffset;
-				return true;
-			case MuiGroupLayoutHookStateField.Hook:
-				offset = MuiGroupLayoutHookStateRecord.HookOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -123,8 +122,13 @@ internal static class MuiGroupLayoutHookStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiGroupLayoutHookStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiGroupLayoutHookStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiGroupLayoutHookStateField.Hook)
+			value = state.Hook.Raw;
+		else return false;
 		return true;
 	}
 
@@ -132,9 +136,15 @@ internal static class MuiGroupLayoutHookStateRecordMemoryCodec
 		APTR record, MuiGroupLayoutHookStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiGroupLayoutHookStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiGroupLayoutHookStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiGroupLayoutHookStateField.Hook)
+			state.Hook = APTR.FromPointer(value);
+		else return false;
+		return MuiGroupLayoutHookStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

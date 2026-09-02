@@ -413,6 +413,18 @@ public sealed class MuiCommonControlClassTests
 		Assert.True(MuiCommonControlPacketCore.TryReadMethodIdValue(ref platform,
 			address, out var methodId));
 		Assert.Equal(MuiCommonControlPacketCore.Draw, methodId);
+		Assert.True(MuiCommonMethodMessageHeaderCodec.TryReadValue(ref platform,
+			address, out methodId));
+		Assert.Equal(MuiCommonControlPacketCore.Draw, methodId);
+		Assert.True(MuiCommonMethodMessageHeaderCodec.WriteValue(ref platform,
+			address, 0xF1234567u));
+		Assert.True(MuiCommonMethodMessageHeaderCodec.TryReadValue(ref platform,
+			address, out methodId));
+		Assert.Equal(0xF1234567u, methodId);
+		Assert.False(MuiCommonMethodMessageHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x40FFF), out _));
+		Assert.False(MuiCommonMethodMessageHeaderCodec.WriteValue(ref platform,
+			APTR.Null, 1));
 		Assert.False(MuiCommonControlPacketCore.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}

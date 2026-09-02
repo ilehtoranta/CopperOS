@@ -104,6 +104,25 @@ public sealed class MuiHeadlessCollectionTests
 	}
 
 	[Fact]
+	public void StoreIterationCounterFieldPathUsesNamedRecordCodec()
+	{
+		var platform = CreatePlatform(out _);
+		var record = APTR.FromPointer(0x1280);
+		const uint highBitOrdinal = 0xF1020304u;
+
+		Assert.True(MuiStoreIterationCounterMemoryCodec.TryWriteUInt32(ref platform,
+			record, MuiStoreIterationCounterField.Ordinal, highBitOrdinal));
+		Assert.True(MuiStoreIterationCounterMemoryCodec.TryReadUInt32(ref platform,
+			record, MuiStoreIterationCounterField.Ordinal, out var ordinal));
+		Assert.Equal(highBitOrdinal, ordinal);
+		Assert.False(MuiStoreIterationCounterMemoryCodec.TryWriteUInt32(ref platform,
+			record, unchecked((MuiStoreIterationCounterField)255), 1));
+		Assert.False(MuiStoreIterationCounterMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x30FFF), MuiStoreIterationCounterField.Ordinal,
+			out _));
+	}
+
+	[Fact]
 	public void StoreIterationStateUsesNamedRecordCodec()
 	{
 		var platform = CreatePlatform(out _);

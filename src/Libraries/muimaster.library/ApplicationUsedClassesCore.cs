@@ -68,8 +68,10 @@ internal static class MuiApplicationUsedClassesVectorEntryMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (field != MuiApplicationUsedClassesVectorEntryField.Name ||
+			!MuiApplicationUsedClassesVectorEntryStructCodec.TryRead(ref platform,
+				record, out var entry)) return false;
+		value = entry.Name.Raw;
 		return true;
 	}
 
@@ -77,9 +79,11 @@ internal static class MuiApplicationUsedClassesVectorEntryMemoryCodec
 		APTR record, MuiApplicationUsedClassesVectorEntryField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (field != MuiApplicationUsedClassesVectorEntryField.Name) return false;
+		var entry = default(MuiApplicationUsedClassesVectorEntry);
+		entry.Name = APTR.FromPointer(value);
+		return MuiApplicationUsedClassesVectorEntryStructCodec.Write(ref platform,
+			record, entry);
 	}
 }
 

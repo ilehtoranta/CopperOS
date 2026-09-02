@@ -4,6 +4,7 @@
 */
 
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using Amiga;
 
 namespace CopperOS.MuiMaster;
@@ -649,31 +650,25 @@ internal struct MuiKeyadjustPolicyStateRecord
 
 internal static class MuiKeyadjustPolicyStateCodec
 {
-	// CopperSharp currently has an unstable ABI when a one-ULONG struct is
-	// passed by value. Keep the named record as the public shape, but expose
-	// scalar-safe entry points for freestanding callers that must preserve the
-	// full ULONG range (including bit 31).
+	// Keep scalar-safe entry points beside the named record so freestanding
+	// callers preserve the full ULONG range (including bit 31) without passing a
+	// one-field struct by value across the guest ABI.
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiKeyadjustPolicyStateRecord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out value) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
-		return true;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value);
 	}
 
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiKeyadjustPolicyStateRecord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				value)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -1365,29 +1360,24 @@ internal struct MuiMiscProtectionState
 
 internal static class MuiMiscProtectionStateCodec
 {
-	// Keep scalar entry points for the same one-ULONG by-value ABI limitation;
-	// the named struct APIs below remain the host-facing record shape.
+	// Keep scalar entry points beside the named record for the same one-ULONG
+	// native ABI boundary; the named struct APIs remain the host-facing shape.
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiMiscProtectionState.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out value) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
-		return true;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value);
 	}
 
+	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiMiscProtectionState.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				value)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -1700,8 +1690,9 @@ internal static class MuiMccprefsRegistryCursorCodec
 	}
 }
 
-// Scrmodelist is private but still owns a bounded guest table of mode IDs.
-// Keep append and indexed lookup on a named scalar record boundary.
+	// Scrmodelist is private but still owns a bounded guest table of mode IDs.
+	// Keep append and indexed lookup on a named record boundary, with the fixed
+	// ULONG payload delegated to the shared guest storage codec.
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
 internal struct MuiScrmodelistModeRecord
 {
@@ -1716,11 +1707,8 @@ internal static class MuiScrmodelistModeCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiScrmodelistModeRecord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var modeId) ||
-			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		if (!MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out var modeId)) return false;
 		record.ModeId = modeId;
 		return true;
 	}
@@ -1729,11 +1717,8 @@ internal static class MuiScrmodelistModeCodec
 		MuiScrmodelistModeRecord record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiScrmodelistModeRecord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				record.ModeId)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, address,
+			record.ModeId);
 	}
 }
 

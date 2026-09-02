@@ -73,17 +73,16 @@ internal static class MuiGaugeInfoRateStateRecordMemoryCodec
 	private static bool TryResolve(MuiGaugeInfoRateStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiGaugeInfoRateStateField.Magic)
+			offset = MuiGaugeInfoRateStateRecord.MagicOffset;
+		else if (field == MuiGaugeInfoRateStateField.InfoRate)
+			offset = MuiGaugeInfoRateStateRecord.InfoRateOffset;
+		else
 		{
-			case MuiGaugeInfoRateStateField.Magic:
-				offset = MuiGaugeInfoRateStateRecord.MagicOffset;
-				return true;
-			case MuiGaugeInfoRateStateField.InfoRate:
-				offset = MuiGaugeInfoRateStateRecord.InfoRateOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -103,9 +102,13 @@ internal static class MuiGaugeInfoRateStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiGaugeInfoRateStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiGaugeInfoRateStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiGaugeInfoRateStateField.InfoRate)
+			value = unchecked((uint)state.InfoRate);
+		else return false;
 		return true;
 	}
 
@@ -113,10 +116,15 @@ internal static class MuiGaugeInfoRateStateRecordMemoryCodec
 		APTR record, MuiGaugeInfoRateStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiGaugeInfoRateStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiGaugeInfoRateStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiGaugeInfoRateStateField.InfoRate)
+			state.InfoRate = unchecked((int)value);
+		else return false;
+		return MuiGaugeInfoRateStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

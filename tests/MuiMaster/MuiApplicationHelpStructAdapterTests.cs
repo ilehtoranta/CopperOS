@@ -87,4 +87,46 @@ public sealed class MuiApplicationHelpStructAdapterTests
 		Assert.False(MuiApplicationHelpStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
 	}
+
+	[Fact]
+	public void ApplicationHelpFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationHelpStateRecord
+		{
+			Magic = 0x10203040u,
+			AboutReferenceWindow = APTR.FromPointer(0x50607080u),
+			AboutRequests = 0x90A0B0C0u,
+			HelpWindow = APTR.FromPointer(0x01020304u),
+			HelpName = APTR.FromPointer(0x11223344u),
+			HelpNode = APTR.FromPointer(0x55667788u),
+			HelpLine = 0x99AABBCCu,
+			HelpRequests = 0xDDEEFF00u,
+		};
+
+		Assert.True(MuiApplicationHelpStateRecordCodec.WriteRecord(ref platform,
+			address, initial));
+		Assert.True(MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationHelpStateField.HelpLine,
+			0xF1020304u));
+		Assert.True(MuiApplicationHelpStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiApplicationHelpStateField.AboutRequests,
+			out var aboutRequests));
+		Assert.Equal(initial.AboutRequests, aboutRequests);
+		Assert.True(MuiApplicationHelpStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(initial.AboutReferenceWindow, updated.AboutReferenceWindow);
+		Assert.Equal(initial.AboutRequests, updated.AboutRequests);
+		Assert.Equal(initial.HelpWindow, updated.HelpWindow);
+		Assert.Equal(initial.HelpName, updated.HelpName);
+		Assert.Equal(initial.HelpNode, updated.HelpNode);
+		Assert.Equal(0xF1020304u, updated.HelpLine);
+		Assert.Equal(initial.HelpRequests, updated.HelpRequests);
+		Assert.False(MuiApplicationHelpStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiApplicationHelpStateField)255), 1));
+	}
 }

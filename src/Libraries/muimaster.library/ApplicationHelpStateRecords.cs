@@ -127,35 +127,28 @@ internal static class MuiApplicationHelpStateRecordMemoryCodec
 	private static bool TryResolve(MuiApplicationHelpStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiApplicationHelpStateField.Magic)
+			offset = MuiApplicationHelpStateRecord.MagicOffset;
+		else if (field == MuiApplicationHelpStateField.AboutReferenceWindow)
+			offset = MuiApplicationHelpStateRecord.AboutReferenceWindowOffset;
+		else if (field == MuiApplicationHelpStateField.AboutRequests)
+			offset = MuiApplicationHelpStateRecord.AboutRequestsOffset;
+		else if (field == MuiApplicationHelpStateField.HelpWindow)
+			offset = MuiApplicationHelpStateRecord.HelpWindowOffset;
+		else if (field == MuiApplicationHelpStateField.HelpName)
+			offset = MuiApplicationHelpStateRecord.HelpNameOffset;
+		else if (field == MuiApplicationHelpStateField.HelpNode)
+			offset = MuiApplicationHelpStateRecord.HelpNodeOffset;
+		else if (field == MuiApplicationHelpStateField.HelpLine)
+			offset = MuiApplicationHelpStateRecord.HelpLineOffset;
+		else if (field == MuiApplicationHelpStateField.HelpRequests)
+			offset = MuiApplicationHelpStateRecord.HelpRequestsOffset;
+		else
 		{
-			case MuiApplicationHelpStateField.Magic:
-				offset = MuiApplicationHelpStateRecord.MagicOffset;
-				return true;
-			case MuiApplicationHelpStateField.AboutReferenceWindow:
-				offset = MuiApplicationHelpStateRecord.AboutReferenceWindowOffset;
-				return true;
-			case MuiApplicationHelpStateField.AboutRequests:
-				offset = MuiApplicationHelpStateRecord.AboutRequestsOffset;
-				return true;
-			case MuiApplicationHelpStateField.HelpWindow:
-				offset = MuiApplicationHelpStateRecord.HelpWindowOffset;
-				return true;
-			case MuiApplicationHelpStateField.HelpName:
-				offset = MuiApplicationHelpStateRecord.HelpNameOffset;
-				return true;
-			case MuiApplicationHelpStateField.HelpNode:
-				offset = MuiApplicationHelpStateRecord.HelpNodeOffset;
-				return true;
-			case MuiApplicationHelpStateField.HelpLine:
-				offset = MuiApplicationHelpStateRecord.HelpLineOffset;
-				return true;
-			case MuiApplicationHelpStateField.HelpRequests:
-				offset = MuiApplicationHelpStateRecord.HelpRequestsOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -176,9 +169,25 @@ internal static class MuiApplicationHelpStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationHelpStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationHelpStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationHelpStateField.AboutReferenceWindow)
+			value = state.AboutReferenceWindow.Raw;
+		else if (field == MuiApplicationHelpStateField.AboutRequests)
+			value = state.AboutRequests;
+		else if (field == MuiApplicationHelpStateField.HelpWindow)
+			value = state.HelpWindow.Raw;
+		else if (field == MuiApplicationHelpStateField.HelpName)
+			value = state.HelpName.Raw;
+		else if (field == MuiApplicationHelpStateField.HelpNode)
+			value = state.HelpNode.Raw;
+		else if (field == MuiApplicationHelpStateField.HelpLine)
+			value = state.HelpLine;
+		else if (field == MuiApplicationHelpStateField.HelpRequests)
+			value = state.HelpRequests;
+		else return false;
 		return true;
 	}
 
@@ -186,10 +195,27 @@ internal static class MuiApplicationHelpStateRecordMemoryCodec
 		APTR record, MuiApplicationHelpStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationHelpStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationHelpStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationHelpStateField.AboutReferenceWindow)
+			state.AboutReferenceWindow = APTR.FromPointer(value);
+		else if (field == MuiApplicationHelpStateField.AboutRequests)
+			state.AboutRequests = value;
+		else if (field == MuiApplicationHelpStateField.HelpWindow)
+			state.HelpWindow = APTR.FromPointer(value);
+		else if (field == MuiApplicationHelpStateField.HelpName)
+			state.HelpName = APTR.FromPointer(value);
+		else if (field == MuiApplicationHelpStateField.HelpNode)
+			state.HelpNode = APTR.FromPointer(value);
+		else if (field == MuiApplicationHelpStateField.HelpLine)
+			state.HelpLine = value;
+		else if (field == MuiApplicationHelpStateField.HelpRequests)
+			state.HelpRequests = value;
+		else return false;
+		return MuiApplicationHelpStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

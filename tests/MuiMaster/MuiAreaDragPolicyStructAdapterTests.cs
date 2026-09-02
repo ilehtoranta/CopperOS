@@ -64,4 +64,32 @@ public sealed class MuiAreaDragPolicyStructAdapterTests
 		Assert.False(MuiAreaDragPolicyStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
 	}
+
+	[Fact]
+	public void AreaDragPolicyFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3A00);
+		var value = new MuiAreaDragPolicyStateRecord
+		{
+			Magic = MuiAreaDragPolicyStateRecord.Cookie,
+			Draggable = 1,
+			Dropable = 0,
+		};
+
+		Assert.True(MuiAreaDragPolicyStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaDragPolicyStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaDragPolicyStateField.Draggable, 0));
+		Assert.True(MuiAreaDragPolicyStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaDragPolicyStateField.Dropable,
+			out var dropable));
+		Assert.Equal(value.Dropable, dropable);
+		Assert.True(MuiAreaDragPolicyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(0u, decoded.Draggable);
+		Assert.Equal(value.Dropable, decoded.Dropable);
+		Assert.Equal(value.Magic, decoded.Magic);
+	}
 }

@@ -1131,6 +1131,23 @@ public sealed class MuiAreaLayoutTests
 	}
 
 	[Fact]
+	public void LayoutMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var platform = CreatePlatform(out _);
+		var packet = APTR.FromPointer(0x1200);
+		const uint methodId = 0xC2468ACEu;
+		Assert.True(MuiLayoutMethodHeaderCodec.WriteValue(ref platform, packet,
+			methodId));
+		Assert.True(MuiLayoutMethodHeaderCodec.TryReadValue(ref platform, packet,
+			out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiLayoutMethodHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFF), out _));
+		Assert.False(MuiLayoutMethodHeaderCodec.WriteValue(ref platform,
+			APTR.Null, methodId));
+	}
+
+	[Fact]
 	public void LayoutTypedReadersUseNamedMethodHeader()
 	{
 		var platform = CreatePlatform(out _);

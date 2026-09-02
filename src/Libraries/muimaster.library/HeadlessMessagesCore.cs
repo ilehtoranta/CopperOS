@@ -342,25 +342,14 @@ internal static class MuiHeadlessMessageStructCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR address, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiHeadlessMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out methodId) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
-		return true;
-	}
+		=> MuiHeadlessMethodHeaderCodec.TryReadValue(ref platform, address,
+			out methodId);
 
 	internal static bool TryWriteMethod<TPlatform>(ref TPlatform platform,
 		APTR address, uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiHeadlessMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				methodId)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiHeadlessMethodHeaderCodec.WriteValue(ref platform, address,
+			methodId);
 
 	internal static bool TryReadOmSet<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiHeadlessOmSetMessage value)
@@ -434,6 +423,41 @@ internal static class MuiHeadlessMessageStructCodec
 				value.GadgetInfo.Raw) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				value.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+// Struct-first codec for the method-only headless header. The named
+// one-ULONG record remains the ABI contract; shared guest storage keeps
+// selector admission free of direct scalar lowering in freestanding 68k code.
+internal static class MuiHeadlessMethodHeaderCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiHeadlessMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }

@@ -95,23 +95,20 @@ internal static class MuiApplicationPolicyStateRecordMemoryCodec
 	private static bool TryResolve(MuiApplicationPolicyStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiApplicationPolicyStateField.Magic)
+			offset = MuiApplicationPolicyStateRecord.MagicOffset;
+		else if (field == MuiApplicationPolicyStateField.UseRexx)
+			offset = MuiApplicationPolicyStateRecord.UseRexxOffset;
+		else if (field == MuiApplicationPolicyStateField.UseCommodities)
+			offset = MuiApplicationPolicyStateRecord.UseCommoditiesOffset;
+		else if (field == MuiApplicationPolicyStateField.UseScreenNotify)
+			offset = MuiApplicationPolicyStateRecord.UseScreenNotifyOffset;
+		else
 		{
-			case MuiApplicationPolicyStateField.Magic:
-				offset = MuiApplicationPolicyStateRecord.MagicOffset;
-				return true;
-			case MuiApplicationPolicyStateField.UseRexx:
-				offset = MuiApplicationPolicyStateRecord.UseRexxOffset;
-				return true;
-			case MuiApplicationPolicyStateField.UseCommodities:
-				offset = MuiApplicationPolicyStateRecord.UseCommoditiesOffset;
-				return true;
-			case MuiApplicationPolicyStateField.UseScreenNotify:
-				offset = MuiApplicationPolicyStateRecord.UseScreenNotifyOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -132,9 +129,17 @@ internal static class MuiApplicationPolicyStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationPolicyStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationPolicyStateField.UseRexx)
+			value = state.UseRexx;
+		else if (field == MuiApplicationPolicyStateField.UseCommodities)
+			value = state.UseCommodities;
+		else if (field == MuiApplicationPolicyStateField.UseScreenNotify)
+			value = state.UseScreenNotify;
+		else return false;
 		return true;
 	}
 
@@ -142,10 +147,19 @@ internal static class MuiApplicationPolicyStateRecordMemoryCodec
 		APTR record, MuiApplicationPolicyStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationPolicyStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationPolicyStateField.UseRexx)
+			state.UseRexx = value;
+		else if (field == MuiApplicationPolicyStateField.UseCommodities)
+			state.UseCommodities = value;
+		else if (field == MuiApplicationPolicyStateField.UseScreenNotify)
+			state.UseScreenNotify = value;
+		else return false;
+		return MuiApplicationPolicyStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

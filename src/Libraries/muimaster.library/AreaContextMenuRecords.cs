@@ -103,23 +103,20 @@ internal static class MuiAreaContextMenuStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaContextMenuStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaContextMenuStateField.Magic)
+			offset = MuiAreaContextMenuStateRecord.MagicOffset;
+		else if (field == MuiAreaContextMenuStateField.MenuStrip)
+			offset = MuiAreaContextMenuStateRecord.MenuStripOffset;
+		else if (field == MuiAreaContextMenuStateField.Trigger)
+			offset = MuiAreaContextMenuStateRecord.TriggerOffset;
+		else if (field == MuiAreaContextMenuStateField.Generation)
+			offset = MuiAreaContextMenuStateRecord.GenerationOffset;
+		else
 		{
-			case MuiAreaContextMenuStateField.Magic:
-				offset = MuiAreaContextMenuStateRecord.MagicOffset;
-				return true;
-			case MuiAreaContextMenuStateField.MenuStrip:
-				offset = MuiAreaContextMenuStateRecord.MenuStripOffset;
-				return true;
-			case MuiAreaContextMenuStateField.Trigger:
-				offset = MuiAreaContextMenuStateRecord.TriggerOffset;
-				return true;
-			case MuiAreaContextMenuStateField.Generation:
-				offset = MuiAreaContextMenuStateRecord.GenerationOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -140,9 +137,17 @@ internal static class MuiAreaContextMenuStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaContextMenuStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaContextMenuStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaContextMenuStateField.MenuStrip)
+			value = state.MenuStrip.Raw;
+		else if (field == MuiAreaContextMenuStateField.Trigger)
+			value = state.Trigger.Raw;
+		else if (field == MuiAreaContextMenuStateField.Generation)
+			value = state.Generation;
+		else return false;
 		return true;
 	}
 
@@ -150,10 +155,19 @@ internal static class MuiAreaContextMenuStateRecordMemoryCodec
 		APTR record, MuiAreaContextMenuStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaContextMenuStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaContextMenuStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaContextMenuStateField.MenuStrip)
+			state.MenuStrip = APTR.FromPointer(value);
+		else if (field == MuiAreaContextMenuStateField.Trigger)
+			state.Trigger = APTR.FromPointer(value);
+		else if (field == MuiAreaContextMenuStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiAreaContextMenuStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

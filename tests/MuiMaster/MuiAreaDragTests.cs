@@ -80,6 +80,15 @@ public sealed class MuiAreaDragTests
 		Assert.True(MuiAreaDragMessageCodec.TryReadMethodIdValue(ref platform,
 			packet, out var methodId));
 		Assert.Equal(MuiAreaDragMessageCodec.DragBegin, methodId);
+		Assert.True(MuiAreaDragMessageCodec.WriteMethodIdValue(ref platform,
+			packet, 0xF1234567u));
+		Assert.True(MuiAreaDragMessageCodec.TryReadMethodIdValue(ref platform,
+			packet, out methodId));
+		Assert.Equal(0xF1234567u, methodId);
+		Assert.False(MuiAreaDragMessageCodec.WriteMethodIdValue(ref platform,
+			APTR.Null, 1));
+		Assert.False(MuiAreaDragMessageCodec.TryReadMethodIdValue(ref platform,
+			APTR.FromPointer(0x20FFFu), out _));
 		Assert.False(MuiAreaDragMessageCodec.TryReadMethodId(ref platform,
 			APTR.Null, out _));
 	}

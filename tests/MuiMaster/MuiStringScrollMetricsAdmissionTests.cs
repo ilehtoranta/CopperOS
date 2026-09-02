@@ -75,6 +75,28 @@ public sealed class MuiStringScrollMetricsAdmissionTests
 		Assert.True(MuiStringScrollMetricsStateRecordCodec.Write(ref platform,
 			recordAddress, value));
 		Assert.True(MuiStringScrollMetricsStateRecordMemoryCodec.TryGetAddress(
+			ref platform, recordAddress, MuiStringScrollMetricsStateField.Left,
+			out var typedLeftAddress));
+		Assert.Equal(0x1D94u, typedLeftAddress.Raw);
+		Assert.True(MuiStringScrollMetricsStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, MuiStringScrollMetricsStateField.Height,
+			out var typedHeight));
+		Assert.Equal(240u, typedHeight);
+		Assert.True(MuiStringScrollMetricsStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, recordAddress, MuiStringScrollMetricsStateField.Top, 0));
+		Assert.True(MuiStringScrollMetricsStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, MuiStringScrollMetricsStateField.Magic,
+			out var typedMagic));
+		Assert.Equal(MuiStringScrollMetricsStateRecord.Cookie, typedMagic);
+		Assert.False(MuiStringScrollMetricsStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, (MuiStringScrollMetricsStateField)255,
+			out _));
+		Assert.True(MuiStringScrollMetricsStateRecordCodec.TryReadStructural(
+			ref platform, recordAddress, out var typedUpdated));
+		Assert.Equal(value.Width, typedUpdated.Width);
+		Assert.Equal(value.Left, typedUpdated.Left);
+		Assert.Equal(0u, typedUpdated.Top);
+		Assert.True(MuiStringScrollMetricsStateRecordMemoryCodec.TryGetAddress(
 			ref platform, recordAddress, 20, out var leftAddress));
 		Assert.Equal(0x1D94u, leftAddress.Raw);
 		Assert.True(MuiStringScrollMetricsStateRecordMemoryCodec.TryReadUInt32(
@@ -89,7 +111,7 @@ public sealed class MuiStringScrollMetricsAdmissionTests
 			ref platform, recordAddress, MuiStringScrollMetricsStateRecord.Size,
 			out _));
 		Assert.False(MuiStringScrollMetricsStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiStringScrollMetricsStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

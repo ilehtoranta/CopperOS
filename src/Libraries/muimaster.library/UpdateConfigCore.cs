@@ -290,10 +290,11 @@ internal static class MuiUpdateConfigHeaderStructCodec
 		methodId = 0;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
 			MuiUpdateConfigMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var rawMethodId)) return false;
-		methodId = rawMethodId;
-		return MuiGuestStructCursor.IsComplete(cursor);
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress)) return false;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform,
+			valueAddress, out methodId) &&
+			MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryReadHeader<TPlatform>(ref TPlatform platform,

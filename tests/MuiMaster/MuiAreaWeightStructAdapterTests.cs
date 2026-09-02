@@ -61,4 +61,29 @@ public sealed class MuiAreaWeightStructAdapterTests
 		Assert.False(MuiAreaWeightStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
 	}
+
+	[Fact]
+	public void AreaWeightFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3F00);
+		var value = new MuiAreaWeightStateRecord
+		{
+			Magic = MuiAreaWeightStateRecord.Cookie,
+			Weight = 7,
+		};
+
+		Assert.True(MuiAreaWeightStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaWeightStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaWeightStateField.Weight, 0xFEEDBEEFu));
+		Assert.True(MuiAreaWeightStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiAreaWeightStateField.Magic, out var magic));
+		Assert.Equal(value.Magic, magic);
+		Assert.True(MuiAreaWeightStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(0xFEEDBEEFu, decoded.Weight);
+	}
 }

@@ -70,4 +70,38 @@ public sealed class MuiApplicationSettingsPanelStructAdapterTests
 		Assert.False(MuiApplicationSettingsPanelStateRecordCodec.TryReadRecord(
 			ref platform, crossingEnd, out _));
 	}
+
+	[Fact]
+	public void ApplicationSettingsPanelFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationSettingsPanelStateRecord
+		{
+			Magic = 0x10203040u,
+			Number = 0x50607080u,
+			Panel = APTR.FromPointer(0x90A0B0C0u),
+			Requests = 0xDDEEFF00u,
+		};
+
+		Assert.True(MuiApplicationSettingsPanelStateRecordCodec.WriteRecord(
+			ref platform, address, initial));
+		Assert.True(MuiApplicationSettingsPanelStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationSettingsPanelStateField.Number,
+			0xF1020304u));
+		Assert.True(MuiApplicationSettingsPanelStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiApplicationSettingsPanelStateField.Panel,
+			out var panel));
+		Assert.Equal(initial.Panel.Raw, panel);
+		Assert.True(MuiApplicationSettingsPanelStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(0xF1020304u, updated.Number);
+		Assert.Equal(initial.Panel, updated.Panel);
+		Assert.Equal(initial.Requests, updated.Requests);
+		Assert.False(MuiApplicationSettingsPanelStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiApplicationSettingsPanelStateField)255), 1));
+	}
 }

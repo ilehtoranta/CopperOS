@@ -166,7 +166,9 @@ internal static class MuiProcessMethodMessageHeaderMemoryCodec
 // Complete sequential codec for the fixed generated method-message prefix.
 // The scalar helpers deliberately keep the one-ULONG exchange in a local
 // cursor: this preserves the named record contract while avoiding a native
-// compiler temporary for a one-field struct passed by value.
+// compiler temporary for a one-field struct passed by value. The ULONG
+// itself is still exchanged through the shared packed storage codec so all
+// method headers use one bounded guest-memory representation.
 internal static class MuiProcessMethodMessageHeaderStructCodec
 {
 	[MethodImpl(MethodImplOptions.NoInlining)]
@@ -177,10 +179,11 @@ internal static class MuiProcessMethodMessageHeaderStructCodec
 		methodId = 0;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiProcessMethodMessageHeader.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var rawMethodId)) return false;
-		methodId = rawMethodId;
-		return MuiGuestStructCursor.IsComplete(cursor);
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress)) return false;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform,
+			valueAddress, out methodId) &&
+			MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -201,9 +204,11 @@ internal static class MuiProcessMethodMessageHeaderStructCodec
 	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiProcessMethodMessageHeader.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				methodId)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress)) return false;
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform,
+			valueAddress, methodId) &&
+			MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
@@ -319,10 +324,9 @@ internal static class MuiProcessDispatchArgumentSlotFieldCursorCodec
 
 internal static class MuiProcessDispatchArgumentSlotCodec
 {
-	// CopperSharp's freestanding generic lowering has a known fault for a
-	// one-ULONG struct crossing a by-value call boundary. Keep the named slot
-	// API, but expose scalar-safe cursor entry points for dispatch production
-	// and the native qualification root.
+	// Keep the named one-ULONG slot API while routing guest exchange through the
+	// shared bounded ULONG codec. Dispatch callers still use scalar-safe entry
+	// points and never handle anonymous guest offsets.
 	[MethodImpl(MethodImplOptions.NoInlining)]
 	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
 		APTR address, out uint value)
@@ -331,13 +335,10 @@ internal static class MuiProcessDispatchArgumentSlotCodec
 		value = 0;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiProcessDispatchArgumentSlot.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
-				out var high) ||
-			!MuiGuestStructCursor.TryReadUInt16(ref platform, ref cursor,
-				out var low) || !MuiGuestStructCursor.IsComplete(cursor))
-			return false;
-		value = ((uint)high << 16) | low;
-		return true;
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress)) return false;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+			out value) && MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
@@ -347,11 +348,10 @@ internal static class MuiProcessDispatchArgumentSlotCodec
 	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiProcessDispatchArgumentSlot.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
-				(ushort)(value >> 16)) ||
-			!MuiGuestStructCursor.TryWriteUInt16(ref platform, ref cursor,
-				(ushort)value)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress)) return false;
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+			value) && MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,

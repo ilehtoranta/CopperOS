@@ -78,4 +78,40 @@ public sealed class MuiApplicationConfigWindowStateStructAdapterTests
 		Assert.False(MuiApplicationConfigWindowStateRecordCodec.TryReadRecord(
 			ref platform, crossingEnd, out _));
 	}
+
+	[Fact]
+	public void ApplicationConfigWindowFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationConfigWindowStateRecord
+		{
+			Magic = 0x10203040u,
+			Flags = 0x50607080u,
+			ClassId = APTR.FromPointer(0x90A0B0C0u),
+			Requests = 0x01020304u,
+			Reserved = 0xDDEEFF00u,
+		};
+
+		Assert.True(MuiApplicationConfigWindowStateRecordCodec.WriteRecord(
+			ref platform, address, initial));
+		Assert.True(MuiApplicationConfigWindowStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationConfigWindowStateField.Flags,
+			0xF1020304u));
+		Assert.True(MuiApplicationConfigWindowStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiApplicationConfigWindowStateField.ClassId,
+			out var classId));
+		Assert.Equal(initial.ClassId.Raw, classId);
+		Assert.True(MuiApplicationConfigWindowStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(0xF1020304u, updated.Flags);
+		Assert.Equal(initial.ClassId, updated.ClassId);
+		Assert.Equal(initial.Requests, updated.Requests);
+		Assert.Equal(initial.Reserved, updated.Reserved);
+		Assert.False(MuiApplicationConfigWindowStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiApplicationConfigWindowStateField)255), 1));
+	}
 }

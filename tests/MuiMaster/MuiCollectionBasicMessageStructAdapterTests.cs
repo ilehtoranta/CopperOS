@@ -41,6 +41,15 @@ public sealed class MuiCollectionBasicMessageStructAdapterTests
 		Assert.True(MuiCollectionBasicMessageCodec.TryReadMethod(ref platform,
 			methodAddress, MuiCollectionBasicMessageCodec.Clear, out var method));
 		Assert.Equal(MuiCollectionBasicMessageCodec.Clear, method.MethodId);
+		Assert.True(MuiCollectionBasicStructPacketCodec.TryWriteMethodValue(
+			ref platform, methodAddress, 0xF1234567u));
+		Assert.True(MuiCollectionBasicStructPacketCodec.TryReadMethodValue(
+			ref platform, methodAddress, out var scalarMethodId));
+		Assert.Equal(0xF1234567u, scalarMethodId);
+		Assert.False(MuiCollectionBasicStructPacketCodec.TryWriteMethodValue(
+			ref platform, APTR.Null, 1));
+		Assert.False(MuiCollectionBasicStructPacketCodec.TryReadMethodValue(
+			ref platform, APTR.FromPointer(0x20FFFu), out _));
 
 		Assert.False(MuiCollectionBasicMessageMemoryCodec.TryGetAddress(ref platform,
 			APTR.FromPointer(0x20FF8), MuiCollectionBasicPacketKind.Select,

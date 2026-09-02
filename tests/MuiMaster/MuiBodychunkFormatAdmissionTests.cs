@@ -56,15 +56,29 @@ public sealed class MuiBodychunkFormatAdmissionTests
 		Assert.True(MuiBodychunkFormatStateRecordCodec.TryRead(ref platform, address,
 			out _));
 		Assert.True(MuiBodychunkFormatStateRecordMemoryCodec.TryGetAddress(
-			ref platform, address, 12, out var lastField));
+			ref platform, address, MuiBodychunkFormatStateField.Masking,
+			out var typedMaskingAddress));
+		Assert.Equal(address.Raw + MuiBodychunkFormatStateRecord.MaskingOffset,
+			typedMaskingAddress.Raw);
+		Assert.True(MuiBodychunkFormatStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiBodychunkFormatStateField.Depth,
+			0x12345678u));
+		Assert.True(MuiBodychunkFormatStateRecordCodec.TryReadStructural(
+			ref platform, address, out var typedDecoded));
+		Assert.Equal(value.Magic, typedDecoded.Magic);
+		Assert.Equal(value.Compression, typedDecoded.Compression);
+		Assert.Equal(0x12345678u, typedDecoded.Depth);
+		Assert.Equal(value.Masking, typedDecoded.Masking);
+		Assert.True(MuiBodychunkFormatStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, 12u, out var lastField));
 		Assert.Equal(address.Raw + 12, lastField.Raw);
 		Assert.True(MuiBodychunkFormatStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 4, out var compression));
+			ref platform, address, 4u, out var compression));
 		Assert.Equal(value.Compression, compression);
 		Assert.False(MuiBodychunkFormatStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiBodychunkFormatStateRecord.Size, out _));
 		Assert.False(MuiBodychunkFormatStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, 0u, out _));
 		Assert.False(MuiBodychunkFormatStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

@@ -67,4 +67,38 @@ public sealed class MuiAreaBuiltinFontStructAdapterTests
 		Assert.False(MuiAreaBuiltinFontStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
 	}
+
+	[Fact]
+	public void AreaBuiltinFontFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiAreaBuiltinFontStateRecord
+		{
+			Magic = 0x10203040u,
+			Selector = 0x50607080u,
+			Present = 1,
+			Generation = 0x90A0B0C0u,
+		};
+
+		Assert.True(MuiAreaBuiltinFontStateRecordCodec.WriteRecord(ref platform,
+			address, initial));
+		Assert.True(MuiAreaBuiltinFontStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaBuiltinFontStateField.Selector,
+			0xF1020304u));
+		Assert.True(MuiAreaBuiltinFontStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaBuiltinFontStateField.Generation,
+			out var generation));
+		Assert.Equal(initial.Generation, generation);
+		Assert.True(MuiAreaBuiltinFontStateRecordCodec.TryReadStructural(ref platform,
+			address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(0xF1020304u, updated.Selector);
+		Assert.Equal(initial.Present, updated.Present);
+		Assert.Equal(initial.Generation, updated.Generation);
+		Assert.False(MuiAreaBuiltinFontStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiAreaBuiltinFontStateField)255), 1));
+	}
 }

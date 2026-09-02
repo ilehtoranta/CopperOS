@@ -394,6 +394,41 @@ internal struct MuiDataspaceIffMethodMessage
 	internal uint MethodId;
 }
 
+// Struct-first codec for the method-only Dataspace-IFF header. The named
+// one-ULONG record remains the ABI contract; shared guest storage keeps
+// selector admission free of direct scalar lowering in freestanding 68k code.
+internal static class MuiDataspaceIffMethodHeaderCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDataspaceIffMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiDataspaceIffMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
 internal enum MuiDataspaceIffMethodField : byte
 {
 	MethodId,
@@ -456,16 +491,8 @@ internal static class MuiDataspaceIffMessageCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiDataspaceIffMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var rawMethodId) ||
-			!MuiGuestStructCursor.IsComplete(cursor)) return false;
-		methodId = rawMethodId;
-		return true;
-	}
+		=> MuiDataspaceIffMethodHeaderCodec.TryReadValue(ref platform, message,
+			out methodId);
 
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiDataspaceIffMethodMessage packet)

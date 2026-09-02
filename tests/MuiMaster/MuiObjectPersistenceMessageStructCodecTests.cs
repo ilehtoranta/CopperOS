@@ -53,4 +53,22 @@ public sealed class MuiObjectPersistenceMessageStructCodecTests
 		Assert.False(MuiObjectPersistenceMessageStructCodec.TryReadMethodIdValue(
 			ref platform, APTR.Null, out _));
 	}
+
+	[Fact]
+	public void ObjectPersistenceMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var packet = APTR.FromPointer(0x2400);
+		const uint methodId = 0xC2468ACEu;
+		Assert.True(MuiObjectPersistenceMethodHeaderCodec.WriteValue(ref platform,
+			packet, methodId));
+		Assert.True(MuiObjectPersistenceMethodHeaderCodec.TryReadValue(ref platform,
+			packet, out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiObjectPersistenceMethodHeaderCodec.TryReadValue(ref platform,
+			APTR.FromPointer(0x20FFF), out _));
+		Assert.False(MuiObjectPersistenceMethodHeaderCodec.WriteValue(ref platform,
+			APTR.Null, methodId));
+	}
 }

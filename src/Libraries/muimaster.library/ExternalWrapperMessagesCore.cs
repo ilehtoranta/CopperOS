@@ -199,14 +199,8 @@ internal static class MuiExternalWrapperMessageStructCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiExternalMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out methodId) || !MuiGuestStructCursor.IsComplete(cursor)) return false;
-		return true;
-	}
+		=> MuiExternalWrapperMethodHeaderCodec.TryReadValue(ref platform,
+			message, out methodId);
 
 	internal static bool TryReadUpdate<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiExternalUpdateMessage packet)
@@ -310,13 +304,8 @@ internal static class MuiExternalWrapperMessageStructCodec
 	internal static bool TryWriteMethod<TPlatform>(ref TPlatform platform,
 		APTR message, uint method)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiExternalMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, method))
-			return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
-	}
+		=> MuiExternalWrapperMethodHeaderCodec.WriteValue(ref platform, message,
+			method);
 
 	internal static bool TryReadRenderInfo<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiExternalRenderInfoMessage packet)
@@ -407,6 +396,41 @@ internal static class MuiExternalWrapperMessageStructCodec
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, width) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor, height))
 			return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+}
+
+// Struct-first codec for the method-only external-wrapper header. The named
+// one-ULONG record remains the ABI contract; shared guest storage keeps
+// selector admission free of direct scalar lowering in freestanding 68k code.
+internal static class MuiExternalWrapperMethodHeaderCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiExternalMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }

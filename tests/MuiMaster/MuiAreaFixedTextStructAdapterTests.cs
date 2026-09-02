@@ -68,4 +68,34 @@ public sealed class MuiAreaFixedTextStructAdapterTests
 		Assert.False(MuiAreaFixedTextStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
 	}
+
+	[Fact]
+	public void AreaFixedTextFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3E00);
+		var value = new MuiAreaFixedTextStateRecord
+		{
+			Magic = MuiAreaFixedTextStateRecord.Cookie,
+			WidthText = APTR.FromPointer(0x4100),
+			HeightText = APTR.FromPointer(0x4200),
+			Generation = 19,
+		};
+
+		Assert.True(MuiAreaFixedTextStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaFixedTextStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaFixedTextStateField.WidthText,
+			0xFEEDBEEFu));
+		Assert.True(MuiAreaFixedTextStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaFixedTextStateField.HeightText,
+			out var height));
+		Assert.Equal(value.HeightText.Raw, height);
+		Assert.True(MuiAreaFixedTextStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(0xFEEDBEEFu, decoded.WidthText.Raw);
+		Assert.Equal(value.HeightText, decoded.HeightText);
+		Assert.Equal(value.Generation, decoded.Generation);
+	}
 }

@@ -93,17 +93,16 @@ internal static class MuiApplicationUsedClassesStateRecordMemoryCodec
 	private static bool TryResolve(MuiApplicationUsedClassesStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiApplicationUsedClassesStateField.Magic)
+			offset = MuiApplicationUsedClassesStateRecord.MagicOffset;
+		else if (field == MuiApplicationUsedClassesStateField.Vector)
+			offset = MuiApplicationUsedClassesStateRecord.VectorOffset;
+		else
 		{
-			case MuiApplicationUsedClassesStateField.Magic:
-				offset = MuiApplicationUsedClassesStateRecord.MagicOffset;
-				return true;
-			case MuiApplicationUsedClassesStateField.Vector:
-				offset = MuiApplicationUsedClassesStateRecord.VectorOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -124,9 +123,13 @@ internal static class MuiApplicationUsedClassesStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiApplicationUsedClassesStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiApplicationUsedClassesStateField.Vector)
+			value = state.Vector.Raw;
+		else return false;
 		return true;
 	}
 
@@ -134,10 +137,15 @@ internal static class MuiApplicationUsedClassesStateRecordMemoryCodec
 		APTR record, MuiApplicationUsedClassesStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationUsedClassesStateRecordCodec.TryReadStructural(
+			ref platform, record, out var state)) return false;
+		if (field == MuiApplicationUsedClassesStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiApplicationUsedClassesStateField.Vector)
+			state.Vector = APTR.FromPointer(value);
+		else return false;
+		return MuiApplicationUsedClassesStateRecordCodec.WriteRecord(ref platform,
+			record, state);
 	}
 }
 

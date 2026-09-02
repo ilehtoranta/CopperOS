@@ -175,8 +175,33 @@ internal static class MuiAreaLayoutPolicyStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaLayoutPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaLayoutPolicyField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaLayoutPolicyField.ShowMe)
+			value = state.ShowMe;
+		else if (field == MuiAreaLayoutPolicyField.FixWidth)
+			value = state.FixWidth;
+		else if (field == MuiAreaLayoutPolicyField.FixHeight)
+			value = state.FixHeight;
+		else if (field == MuiAreaLayoutPolicyField.MaxWidth)
+			value = state.MaxWidth;
+		else if (field == MuiAreaLayoutPolicyField.MaxHeight)
+			value = state.MaxHeight;
+		else if (field == MuiAreaLayoutPolicyField.InnerLeft)
+			value = state.InnerLeft;
+		else if (field == MuiAreaLayoutPolicyField.InnerRight)
+			value = state.InnerRight;
+		else if (field == MuiAreaLayoutPolicyField.InnerTop)
+			value = state.InnerTop;
+		else if (field == MuiAreaLayoutPolicyField.InnerBottom)
+			value = state.InnerBottom;
+		else if (field == MuiAreaLayoutPolicyField.HorizontalWeight)
+			value = state.HorizontalWeight;
+		else if (field == MuiAreaLayoutPolicyField.VerticalWeight)
+			value = state.VerticalWeight;
+		else return false;
 		return true;
 	}
 
@@ -184,9 +209,35 @@ internal static class MuiAreaLayoutPolicyStateRecordMemoryCodec
 		APTR record, MuiAreaLayoutPolicyField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaLayoutPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaLayoutPolicyField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaLayoutPolicyField.ShowMe)
+			state.ShowMe = value;
+		else if (field == MuiAreaLayoutPolicyField.FixWidth)
+			state.FixWidth = value;
+		else if (field == MuiAreaLayoutPolicyField.FixHeight)
+			state.FixHeight = value;
+		else if (field == MuiAreaLayoutPolicyField.MaxWidth)
+			state.MaxWidth = value;
+		else if (field == MuiAreaLayoutPolicyField.MaxHeight)
+			state.MaxHeight = value;
+		else if (field == MuiAreaLayoutPolicyField.InnerLeft)
+			state.InnerLeft = value;
+		else if (field == MuiAreaLayoutPolicyField.InnerRight)
+			state.InnerRight = value;
+		else if (field == MuiAreaLayoutPolicyField.InnerTop)
+			state.InnerTop = value;
+		else if (field == MuiAreaLayoutPolicyField.InnerBottom)
+			state.InnerBottom = value;
+		else if (field == MuiAreaLayoutPolicyField.HorizontalWeight)
+			state.HorizontalWeight = value;
+		else if (field == MuiAreaLayoutPolicyField.VerticalWeight)
+			state.VerticalWeight = value;
+		else return false;
+		return MuiAreaLayoutPolicyStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

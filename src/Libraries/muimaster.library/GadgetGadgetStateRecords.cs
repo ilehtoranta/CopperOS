@@ -97,17 +97,16 @@ internal static class MuiGadgetGadgetStateRecordMemoryCodec
 	private static bool TryResolve(MuiGadgetGadgetStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiGadgetGadgetStateField.Magic)
+			offset = MuiGadgetGadgetStateRecord.MagicOffset;
+		else if (field == MuiGadgetGadgetStateField.Gadget)
+			offset = MuiGadgetGadgetStateRecord.GadgetOffset;
+		else
 		{
-			case MuiGadgetGadgetStateField.Magic:
-				offset = MuiGadgetGadgetStateRecord.MagicOffset;
-				return true;
-			case MuiGadgetGadgetStateField.Gadget:
-				offset = MuiGadgetGadgetStateRecord.GadgetOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -127,8 +126,13 @@ internal static class MuiGadgetGadgetStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiGadgetGadgetStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiGadgetGadgetStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiGadgetGadgetStateField.Gadget)
+			value = state.Gadget.Raw;
+		else return false;
 		return true;
 	}
 
@@ -136,9 +140,15 @@ internal static class MuiGadgetGadgetStateRecordMemoryCodec
 		APTR record, MuiGadgetGadgetStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiGadgetGadgetStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiGadgetGadgetStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiGadgetGadgetStateField.Gadget)
+			state.Gadget = APTR.FromPointer(value);
+		else return false;
+		return MuiGadgetGadgetStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

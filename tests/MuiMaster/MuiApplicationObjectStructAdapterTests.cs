@@ -67,4 +67,38 @@ public sealed class MuiApplicationObjectStructAdapterTests
 		Assert.False(MuiApplicationObjectStateRecordCodec.TryReadRecord(
 			ref platform, crossingEnd, out _));
 	}
+
+	[Fact]
+	public void ApplicationObjectFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3640);
+		var initial = new MuiApplicationObjectStateRecord
+		{
+			Magic = 0x10203040u,
+			DiskObject = APTR.FromPointer(0x50607080u),
+			DropObject = APTR.FromPointer(0x90A0B0C0u),
+			Menustrip = APTR.FromPointer(0x01020304u),
+		};
+
+		Assert.True(MuiApplicationObjectStateRecordCodec.WriteRecord(ref platform,
+			address, initial));
+		Assert.True(MuiApplicationObjectStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiApplicationObjectStateField.DropObject,
+			0xF1020304u));
+		Assert.True(MuiApplicationObjectStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiApplicationObjectStateField.DiskObject,
+			out var disk));
+		Assert.Equal(initial.DiskObject.Raw, disk);
+		Assert.True(MuiApplicationObjectStateRecordCodec.TryReadStructural(
+			ref platform, address, out var updated));
+		Assert.Equal(initial.Magic, updated.Magic);
+		Assert.Equal(initial.DiskObject, updated.DiskObject);
+		Assert.Equal(APTR.FromPointer(0xF1020304u), updated.DropObject);
+		Assert.Equal(initial.Menustrip, updated.Menustrip);
+		Assert.False(MuiApplicationObjectStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address,
+			unchecked((MuiApplicationObjectStateField)255), 1));
+	}
 }

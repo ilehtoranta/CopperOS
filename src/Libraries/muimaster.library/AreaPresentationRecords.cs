@@ -93,29 +93,24 @@ internal static class MuiAreaPresentationStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaPresentationStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaPresentationStateField.Magic)
+			offset = MuiAreaPresentationStateRecord.MagicOffset;
+		else if (field == MuiAreaPresentationStateField.Disabled)
+			offset = MuiAreaPresentationStateRecord.DisabledOffset;
+		else if (field == MuiAreaPresentationStateField.ShowMe)
+			offset = MuiAreaPresentationStateRecord.ShowMeOffset;
+		else if (field == MuiAreaPresentationStateField.Background)
+			offset = MuiAreaPresentationStateRecord.BackgroundOffset;
+		else if (field == MuiAreaPresentationStateField.Frame)
+			offset = MuiAreaPresentationStateRecord.FrameOffset;
+		else if (field == MuiAreaPresentationStateField.CustomBackfill)
+			offset = MuiAreaPresentationStateRecord.CustomBackfillOffset;
+		else
 		{
-			case MuiAreaPresentationStateField.Magic:
-				offset = MuiAreaPresentationStateRecord.MagicOffset;
-				return true;
-			case MuiAreaPresentationStateField.Disabled:
-				offset = MuiAreaPresentationStateRecord.DisabledOffset;
-				return true;
-			case MuiAreaPresentationStateField.ShowMe:
-				offset = MuiAreaPresentationStateRecord.ShowMeOffset;
-				return true;
-			case MuiAreaPresentationStateField.Background:
-				offset = MuiAreaPresentationStateRecord.BackgroundOffset;
-				return true;
-			case MuiAreaPresentationStateField.Frame:
-				offset = MuiAreaPresentationStateRecord.FrameOffset;
-				return true;
-			case MuiAreaPresentationStateField.CustomBackfill:
-				offset = MuiAreaPresentationStateRecord.CustomBackfillOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -135,8 +130,21 @@ internal static class MuiAreaPresentationStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaPresentationStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaPresentationStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaPresentationStateField.Disabled)
+			value = state.Disabled;
+		else if (field == MuiAreaPresentationStateField.ShowMe)
+			value = state.ShowMe;
+		else if (field == MuiAreaPresentationStateField.Background)
+			value = state.Background;
+		else if (field == MuiAreaPresentationStateField.Frame)
+			value = state.Frame;
+		else if (field == MuiAreaPresentationStateField.CustomBackfill)
+			value = state.CustomBackfill;
+		else return false;
 		return true;
 	}
 
@@ -144,9 +152,23 @@ internal static class MuiAreaPresentationStateRecordMemoryCodec
 		APTR record, MuiAreaPresentationStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaPresentationStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaPresentationStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaPresentationStateField.Disabled)
+			state.Disabled = value;
+		else if (field == MuiAreaPresentationStateField.ShowMe)
+			state.ShowMe = value;
+		else if (field == MuiAreaPresentationStateField.Background)
+			state.Background = value;
+		else if (field == MuiAreaPresentationStateField.Frame)
+			state.Frame = value;
+		else if (field == MuiAreaPresentationStateField.CustomBackfill)
+			state.CustomBackfill = value;
+		else return false;
+		return MuiAreaPresentationStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

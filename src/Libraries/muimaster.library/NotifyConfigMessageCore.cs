@@ -139,6 +139,35 @@ internal static class MuiGetConfigItemMessageCodec
 {
 	internal const uint Method = 0x80423EDB;
 
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadMethodHeaderValue<TPlatform>(
+		ref TPlatform platform, APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGetConfigItemMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteMethodHeaderValue<TPlatform>(
+		ref TPlatform platform, APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiGetConfigItemMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
 	internal static bool TryReadMethodId<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiGetConfigItemMethodMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
@@ -157,16 +186,7 @@ internal static class MuiGetConfigItemMessageCodec
 	internal static bool TryReadMethodIdValue<TPlatform>(ref TPlatform platform,
 		APTR message, out uint methodId)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		methodId = 0;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiGetConfigItemMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var rawMethodId) ||
-			!MuiGuestStructCursor.IsComplete(cursor)) return false;
-		methodId = rawMethodId;
-		return true;
-	}
+		=> TryReadMethodHeaderValue(ref platform, message, out methodId);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR message, out MuiGetConfigItemMessage packet)

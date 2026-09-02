@@ -104,6 +104,27 @@ public sealed class MuiStringPresentationAdmissionTests
 		Assert.True(MuiStringPresentationStateRecordCodec.Write(ref platform,
 			recordAddress, value));
 		Assert.True(MuiStringPresentationStateRecordMemoryCodec.TryGetAddress(
+			ref platform, recordAddress, MuiStringPresentationStateField.Format,
+			out var typedFormatAddress));
+		Assert.Equal(0x1D4Cu, typedFormatAddress.Raw);
+		Assert.True(MuiStringPresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, MuiStringPresentationStateField.MaxLen,
+			out var typedMaxLen));
+		Assert.Equal(32u, typedMaxLen);
+		Assert.True(MuiStringPresentationStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, recordAddress, MuiStringPresentationStateField.Unicode, 0));
+		Assert.True(MuiStringPresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, MuiStringPresentationStateField.Magic,
+			out var typedMagic));
+		Assert.Equal(MuiStringPresentationStateRecord.Cookie, typedMagic);
+		Assert.False(MuiStringPresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, (MuiStringPresentationStateField)255, out _));
+		Assert.True(MuiStringPresentationStateRecordCodec.TryReadStructural(
+			ref platform, recordAddress, out var typedUpdated));
+		Assert.Equal(MuiStringPresentationStateRecord.Cookie, typedUpdated.Magic);
+		Assert.Equal(32u, typedUpdated.MaxLen);
+		Assert.Equal(0u, typedUpdated.Unicode);
+		Assert.True(MuiStringPresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, recordAddress, 12, out var formatAddress));
 		Assert.Equal(0x1D4Cu, formatAddress.Raw);
 		Assert.True(MuiStringPresentationStateRecordMemoryCodec.TryReadUInt32(
@@ -118,7 +139,7 @@ public sealed class MuiStringPresentationAdmissionTests
 			ref platform, recordAddress, MuiStringPresentationStateRecord.Size,
 			out _));
 		Assert.False(MuiStringPresentationStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiStringPresentationStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

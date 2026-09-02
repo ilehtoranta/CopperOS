@@ -358,25 +358,10 @@ internal static class MuiMultiSetTargetEntryCodec
 		value = 0;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiMultiSetTargetEntry.Size, out var cursor)) return false;
-		// Preserve the named one-field APTR record while reading bytes so a
-		// high-bit target capability cannot be mis-lowered as a native address.
-		APTR firstAddress;
-		APTR secondAddress;
-		APTR thirdAddress;
-		APTR fourthAddress;
-		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-			ref platform, ref cursor, 1, out thirdAddress) ||
-			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out fourthAddress)) return false;
-		var first = platform.ReadUInt8(firstAddress, 0);
-		var second = platform.ReadUInt8(secondAddress, 0);
-		var third = platform.ReadUInt8(thirdAddress, 0);
-		var fourth = platform.ReadUInt8(fourthAddress, 0);
-		value = ((uint)first << 24) | ((uint)second << 16) |
-			((uint)third << 8) | fourth;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiGuestUlongStorage.Size, out var valueAddress)) return false;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform,
+			valueAddress, out value) && MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
@@ -386,21 +371,10 @@ internal static class MuiMultiSetTargetEntryCodec
 	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiMultiSetTargetEntry.Size, out var cursor)) return false;
-		APTR firstAddress;
-		APTR secondAddress;
-		APTR thirdAddress;
-		APTR fourthAddress;
-		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-			ref platform, ref cursor, 1, out thirdAddress) ||
-			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out fourthAddress)) return false;
-		platform.WriteUInt8(firstAddress, 0, (byte)(value >> 24));
-		platform.WriteUInt8(secondAddress, 0, (byte)(value >> 16));
-		platform.WriteUInt8(thirdAddress, 0, (byte)(value >> 8));
-		platform.WriteUInt8(fourthAddress, 0, (byte)value);
-		return MuiGuestStructCursor.IsComplete(cursor);
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiGuestUlongStorage.Size, out var valueAddress)) return false;
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+			value) && MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryReadInto<TPlatform>(ref TPlatform platform,
@@ -598,26 +572,10 @@ internal static class MuiNotifyFollowParameterSlotCodec
 		value = 0;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiNotifyFollowParameterSlot.Size, out var cursor)) return false;
-		// Keep the one-ULONG record named while reading bytes individually. This
-		// avoids the freestanding generic-interface lowering seam for 32-bit
-		// out-values whose high bits can otherwise be mistaken for an address.
-		APTR firstAddress;
-		APTR secondAddress;
-		APTR thirdAddress;
-		APTR fourthAddress;
-		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-			ref platform, ref cursor, 1, out thirdAddress) ||
-			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out fourthAddress)) return false;
-		var first = platform.ReadUInt8(firstAddress, 0);
-		var second = platform.ReadUInt8(secondAddress, 0);
-		var third = platform.ReadUInt8(thirdAddress, 0);
-		var fourth = platform.ReadUInt8(fourthAddress, 0);
-		value = ((uint)first << 24) | ((uint)second << 16) |
-			((uint)third << 8) | fourth;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiGuestUlongStorage.Size, out var valueAddress)) return false;
+		return MuiGuestUlongStorageCodec.TryReadValue(ref platform,
+			valueAddress, out value) && MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	[MethodImpl(MethodImplOptions.NoInlining)]
@@ -627,21 +585,10 @@ internal static class MuiNotifyFollowParameterSlotCodec
 	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiNotifyFollowParameterSlot.Size, out var cursor)) return false;
-		APTR firstAddress;
-		APTR secondAddress;
-		APTR thirdAddress;
-		APTR fourthAddress;
-		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-			out firstAddress) || !MuiGuestStructCursor.TryTake(ref platform,
-			ref cursor, 1, out secondAddress) || !MuiGuestStructCursor.TryTake(
-			ref platform, ref cursor, 1, out thirdAddress) ||
-			!MuiGuestStructCursor.TryTake(ref platform, ref cursor, 1,
-				out fourthAddress)) return false;
-		platform.WriteUInt8(firstAddress, 0, (byte)(value >> 24));
-		platform.WriteUInt8(secondAddress, 0, (byte)(value >> 16));
-		platform.WriteUInt8(thirdAddress, 0, (byte)(value >> 8));
-		platform.WriteUInt8(fourthAddress, 0, (byte)value);
-		return MuiGuestStructCursor.IsComplete(cursor);
+		if (!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+			MuiGuestUlongStorage.Size, out var valueAddress)) return false;
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+			value) && MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
@@ -671,27 +618,35 @@ internal struct MuiNotifyConfigStorage
 
 internal static class MuiNotifyConfigStorageCodec
 {
+	// Keep scalar-safe entry points beside the named storage record so native
+	// callers do not pass a one-field struct by value across the guest ABI.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value);
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiNotifyConfigStorage value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiNotifyConfigStorage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out value.Value)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		if (!TryReadValue(ref platform, address, out value.Value)) return false;
+		return true;
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		APTR address, MuiNotifyConfigStorage value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiNotifyConfigStorage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				value.Value)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		return WriteValue(ref platform, address, value.Value);
 	}
 }
 
@@ -723,21 +678,48 @@ internal static class MuiNotifyMethodMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiNotifyMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out value.MethodId)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		return MuiNotifyMethodHeaderCodec.TryReadValue(ref platform, address,
+			out value.MethodId);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiNotifyMethodMessage value)
 		where TPlatform : struct, IMuiGuestMemory
+		=> MuiNotifyMethodHeaderCodec.WriteValue(ref platform, address,
+			value.MethodId);
+}
+
+// Struct-first codec for the method-only Notify header. The named one-ULONG
+// record remains the ABI contract; shared guest storage keeps selector
+// admission free of direct scalar lowering in freestanding 68k code.
+internal static class MuiNotifyMethodHeaderCodec
+{
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		methodId = 0;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiNotifyMethodMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.TryReadValue(ref platform, valueAddress,
+				out methodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint methodId)
+		where TPlatform : struct, IMuiGuestMemory
 	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiNotifyMethodMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				value.MethodId)) return false;
+			!MuiGuestStructCursor.TryTake(ref platform, ref cursor,
+				MuiGuestUlongStorage.Size, out var valueAddress) ||
+			!MuiGuestUlongStorageCodec.WriteValue(ref platform, valueAddress,
+				methodId)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }

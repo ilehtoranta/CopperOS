@@ -96,20 +96,18 @@ internal static class MuiAreaShortHelpStateRecordMemoryCodec
 	private static bool TryResolve(MuiAreaShortHelpStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiAreaShortHelpStateField.Magic)
+			offset = MuiAreaShortHelpStateRecord.MagicOffset;
+		else if (field == MuiAreaShortHelpStateField.Text)
+			offset = MuiAreaShortHelpStateRecord.TextOffset;
+		else if (field == MuiAreaShortHelpStateField.Generation)
+			offset = MuiAreaShortHelpStateRecord.GenerationOffset;
+		else
 		{
-			case MuiAreaShortHelpStateField.Magic:
-				offset = MuiAreaShortHelpStateRecord.MagicOffset;
-				return true;
-			case MuiAreaShortHelpStateField.Text:
-				offset = MuiAreaShortHelpStateRecord.TextOffset;
-				return true;
-			case MuiAreaShortHelpStateField.Generation:
-				offset = MuiAreaShortHelpStateRecord.GenerationOffset;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -130,9 +128,15 @@ internal static class MuiAreaShortHelpStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaShortHelpStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaShortHelpStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaShortHelpStateField.Text)
+			value = state.Text.Raw;
+		else if (field == MuiAreaShortHelpStateField.Generation)
+			value = state.Generation;
+		else return false;
 		return true;
 	}
 
@@ -140,10 +144,17 @@ internal static class MuiAreaShortHelpStateRecordMemoryCodec
 		APTR record, MuiAreaShortHelpStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaShortHelpStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiAreaShortHelpStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaShortHelpStateField.Text)
+			state.Text = APTR.FromPointer(value);
+		else if (field == MuiAreaShortHelpStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiAreaShortHelpStateRecordCodec.WriteRecord(ref platform, record,
+			state);
 	}
 }
 

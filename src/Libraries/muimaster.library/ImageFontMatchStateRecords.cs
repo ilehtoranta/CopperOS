@@ -25,6 +25,11 @@ public struct MuiImageFontMatchState
 internal struct MuiImageFontMatchStateRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint MatchOffset = 4;
+	internal const uint HeightOffset = 8;
+	internal const uint WidthOffset = 12;
 	internal const uint Cookie = 0x4D494653u; // 'MIFS'
 
 	internal uint Magic;
@@ -65,15 +70,20 @@ internal static class MuiImageFontMatchStateFieldCursorCodec
 	private static bool TryResolve(MuiImageFontMatchStateField field,
 		out uint offset)
 	{
-		offset = field switch
+		if (field == MuiImageFontMatchStateField.Magic)
+			offset = MuiImageFontMatchStateRecord.MagicOffset;
+		else if (field == MuiImageFontMatchStateField.Match)
+			offset = MuiImageFontMatchStateRecord.MatchOffset;
+		else if (field == MuiImageFontMatchStateField.Height)
+			offset = MuiImageFontMatchStateRecord.HeightOffset;
+		else if (field == MuiImageFontMatchStateField.Width)
+			offset = MuiImageFontMatchStateRecord.WidthOffset;
+		else
 		{
-			MuiImageFontMatchStateField.Magic => 0,
-			MuiImageFontMatchStateField.Match => 4,
-			MuiImageFontMatchStateField.Height => 8,
-			MuiImageFontMatchStateField.Width => 12,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -85,7 +95,7 @@ internal static class MuiImageFontMatchStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 			cursor.Record, MuiImageFontMatchStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiImageFontMatchStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -120,16 +130,83 @@ internal static class MuiImageFontMatchStateFieldCursorCodec
 // and malformed-state diagnostics.
 internal static class MuiImageFontMatchStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiImageFontMatchStateField field,
+		out uint offset)
+	{
+		if (field == MuiImageFontMatchStateField.Magic)
+			offset = MuiImageFontMatchStateRecord.MagicOffset;
+		else if (field == MuiImageFontMatchStateField.Match)
+			offset = MuiImageFontMatchStateRecord.MatchOffset;
+		else if (field == MuiImageFontMatchStateField.Height)
+			offset = MuiImageFontMatchStateRecord.HeightOffset;
+		else if (field == MuiImageFontMatchStateField.Width)
+			offset = MuiImageFontMatchStateRecord.WidthOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiImageFontMatchStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiImageFontMatchStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiImageFontMatchStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiImageFontMatchStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiImageFontMatchStateField.Match)
+			value = state.Match;
+		else if (field == MuiImageFontMatchStateField.Height)
+			value = state.Height;
+		else if (field == MuiImageFontMatchStateField.Width)
+			value = state.Width;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiImageFontMatchStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiImageFontMatchStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiImageFontMatchStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiImageFontMatchStateField.Match)
+			state.Match = value;
+		else if (field == MuiImageFontMatchStateField.Height)
+			state.Height = value;
+		else if (field == MuiImageFontMatchStateField.Width)
+			state.Width = value;
+		else return false;
+		return MuiImageFontMatchStateRecordCodec.WriteRecord(ref platform, record,
+			state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiImageFontMatchStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiImageFontMatchStateRecord.Size -
+			MuiImageFontMatchStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiImageFontMatchStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiImageFontMatchStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,

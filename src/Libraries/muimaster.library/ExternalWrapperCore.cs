@@ -2126,28 +2126,37 @@ internal static class MuiExternalBoopsiTagItemStructCodec
 
 internal static class MuiExternalBoopsiResultWordStructCodec
 {
+	// Keep scalar-safe entry points beside the named record so the native
+	// boundary never has to pass this one-field struct by value.
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool TryReadValue<TPlatform>(ref TPlatform platform,
+		APTR address, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out value);
+
+	[MethodImpl(MethodImplOptions.NoInlining)]
+	internal static bool WriteValue<TPlatform>(ref TPlatform platform,
+		APTR address, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestUlongStorageCodec.WriteValue(ref platform, address, value);
+
 	internal static bool TryRead<TPlatform>(ref TPlatform platform,
 		APTR address, out MuiExternalBoopsiResultWord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiExternalBoopsiResultWord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var result)) return false;
+		if (!TryReadValue(ref platform, address,
+			out var result)) return false;
 		value.Value = result;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		return true;
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform,
 		APTR address, MuiExternalBoopsiResultWord value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
-			MuiExternalBoopsiResultWord.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				value.Value)) return false;
-		return MuiGuestStructCursor.IsComplete(cursor);
+		return WriteValue(ref platform, address, value.Value);
 	}
 }
 

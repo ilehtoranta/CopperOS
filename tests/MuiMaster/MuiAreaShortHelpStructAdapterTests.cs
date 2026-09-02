@@ -62,4 +62,32 @@ public sealed class MuiAreaShortHelpStructAdapterTests
 		Assert.False(MuiAreaShortHelpStateRecordCodec.TryReadRecord(ref platform,
 			crossingEnd, out _));
 	}
+
+	[Fact]
+	public void AreaShortHelpFieldPathPreservesNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x30000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3F40);
+		var value = new MuiAreaShortHelpStateRecord
+		{
+			Magic = MuiAreaShortHelpStateRecord.Cookie,
+			Text = APTR.FromPointer(0x4100),
+			Generation = 19,
+		};
+
+		Assert.True(MuiAreaShortHelpStateRecordCodec.WriteRecord(ref platform,
+			address, value));
+		Assert.True(MuiAreaShortHelpStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiAreaShortHelpStateField.Text, 0xFEEDBEEFu));
+		Assert.True(MuiAreaShortHelpStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiAreaShortHelpStateField.Generation,
+			out var generation));
+		Assert.Equal(value.Generation, generation);
+		Assert.True(MuiAreaShortHelpStateRecordCodec.TryReadStructural(ref platform,
+			address, out var decoded));
+		Assert.Equal(value.Magic, decoded.Magic);
+		Assert.Equal(0xFEEDBEEFu, decoded.Text.Raw);
+		Assert.Equal(value.Generation, decoded.Generation);
+	}
 }

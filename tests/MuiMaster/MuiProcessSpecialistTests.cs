@@ -576,6 +576,43 @@ public sealed class MuiProcessSpecialistTests
 	}
 
 	[Fact]
+	public void ProcessMethodMessageHeaderUsesSharedUlongStorageBoundary()
+	{
+		var p = NewPlatform();
+		var address = APTR.FromPointer(0x2FFFC);
+		const uint methodId = 0xC2468ACEu;
+
+		Assert.True(MuiProcessMethodMessageHeaderStructCodec.TryWriteMethodIdValue(
+			ref p, address, methodId));
+		Assert.True(MuiProcessMethodMessageHeaderStructCodec.TryReadMethodIdValue(
+			ref p, address, out var decoded));
+		Assert.Equal(methodId, decoded);
+		Assert.True(MuiProcessMethodMessageHeaderCodec.TryRead(ref p, address,
+			out var header));
+		Assert.Equal(methodId, header.MethodId);
+
+		Assert.True(MuiProcessMethodMessageHeaderStructCodec.TryWriteMethodIdValue(
+			ref p, address, 0xF1020304u));
+		Assert.True(MuiProcessMethodMessageHeaderCodec.TryRead(ref p, address,
+			out header));
+		Assert.Equal(0xF1020304u, header.MethodId);
+
+		var nearEnd = APTR.FromPointer(0x40FFC);
+		Assert.True(MuiProcessMethodMessageHeaderStructCodec.TryWriteMethodIdValue(
+			ref p, nearEnd, methodId));
+		Assert.True(MuiProcessMethodMessageHeaderStructCodec.TryReadMethodIdValue(
+			ref p, nearEnd, out decoded));
+		Assert.Equal(methodId, decoded);
+		var truncated = APTR.FromPointer(0x40FFD);
+		Assert.False(MuiProcessMethodMessageHeaderStructCodec.TryReadMethodIdValue(
+			ref p, truncated, out _));
+		Assert.False(MuiProcessMethodMessageHeaderStructCodec.TryWriteMethodIdValue(
+			ref p, truncated, methodId));
+		Assert.False(MuiProcessMethodMessageHeaderStructCodec.TryReadMethodIdValue(
+			ref p, APTR.Null, out _));
+	}
+
+	[Fact]
 	public void ProcessDispatchArgumentSlotCodecUsesNamedValue()
 	{
 		var p = NewPlatform();
@@ -1028,6 +1065,22 @@ public sealed class MuiProcessSpecialistTests
 		Assert.Equal(MuiProcessAttributes.Process_Launch, methodId);
 		Assert.False(MuiProcessSpecialistMessageCodec.TryReadMethodId(ref p,
 			APTR.Null, out _));
+	}
+
+	[Fact]
+	public void ProcessSpecialistMethodHeaderUsesSharedUlongStorageBoundary()
+	{
+		var p = NewPlatform();
+		const uint methodId = 0x8246ACEFu;
+		Assert.True(MuiProcessSpecialistMethodHeaderCodec.WriteValue(ref p,
+			Message, methodId));
+		Assert.True(MuiProcessSpecialistMethodHeaderCodec.TryReadValue(ref p,
+			Message, out var readMethodId));
+		Assert.Equal(methodId, readMethodId);
+		Assert.False(MuiProcessSpecialistMethodHeaderCodec.TryReadValue(ref p,
+			APTR.FromPointer(0x40FFFu), out _));
+		Assert.False(MuiProcessSpecialistMethodHeaderCodec.WriteValue(ref p,
+			APTR.Null, methodId));
 	}
 
 	[Fact]
