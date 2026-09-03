@@ -110,10 +110,52 @@ internal static class MuiDirlistMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, packet, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		switch (packet)
+		{
+			case MuiDirlistPacketKind.Method:
+				return field == MuiDirlistField.MethodId &&
+					MuiDirlistMethodHeaderCodec.TryReadValue(ref platform, message,
+						out value);
+			case MuiDirlistPacketKind.Set:
+				if (!MuiDirlistMessageStructCodec.TryReadSet(ref platform,
+					message, out var set)) return false;
+				if (field == MuiDirlistField.MethodId) value = set.MethodId;
+				else if (field == MuiDirlistField.Attribute) value = set.Attribute;
+				else if (field == MuiDirlistField.Value) value = set.Value;
+				else return false;
+				return true;
+			case MuiDirlistPacketKind.Rename:
+				if (!MuiDirlistMessageStructCodec.TryReadRename(ref platform,
+					message, out var rename)) return false;
+				if (field == MuiDirlistField.MethodId) value = rename.MethodId;
+				else if (field == MuiDirlistField.Entry) value = rename.Entry;
+				else if (field == MuiDirlistField.Name) value = rename.Name;
+				else return false;
+				return true;
+			case MuiDirlistPacketKind.Protection:
+				if (!MuiDirlistMessageStructCodec.TryReadProtection(ref platform,
+					message, out var protection)) return false;
+				if (field == MuiDirlistField.MethodId)
+					value = protection.MethodId;
+				else if (field == MuiDirlistField.Entry)
+					value = protection.Entry;
+				else if (field == MuiDirlistField.Protection)
+					value = protection.Protection;
+				else return false;
+				return true;
+			case MuiDirlistPacketKind.GetEntry:
+				if (!MuiDirlistMessageStructCodec.TryReadGetEntry(ref platform,
+					message, out var getEntry)) return false;
+				if (field == MuiDirlistField.MethodId)
+					value = getEntry.MethodId;
+				else if (field == MuiDirlistField.Position)
+					value = getEntry.Position;
+				else if (field == MuiDirlistField.Storage)
+					value = getEntry.Storage;
+				else return false;
+				return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -121,10 +163,56 @@ internal static class MuiDirlistMessageMemoryCodec
 		uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, packet, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		switch (packet)
+		{
+			case MuiDirlistPacketKind.Method:
+				return field == MuiDirlistField.MethodId &&
+					MuiDirlistMethodHeaderCodec.WriteValue(ref platform,
+						message, value);
+			case MuiDirlistPacketKind.Set:
+				if (!MuiDirlistMessageStructCodec.TryReadSet(ref platform,
+					message, out var set)) return false;
+				if (field == MuiDirlistField.MethodId) set.MethodId = value;
+				else if (field == MuiDirlistField.Attribute) set.Attribute = value;
+				else if (field == MuiDirlistField.Value) set.Value = value;
+				else return false;
+				return MuiDirlistMessageStructCodec.TryWriteSet(ref platform,
+					message, set);
+			case MuiDirlistPacketKind.Rename:
+				if (!MuiDirlistMessageStructCodec.TryReadRename(ref platform,
+					message, out var rename)) return false;
+				if (field == MuiDirlistField.MethodId) rename.MethodId = value;
+				else if (field == MuiDirlistField.Entry) rename.Entry = value;
+				else if (field == MuiDirlistField.Name) rename.Name = value;
+				else return false;
+				return MuiDirlistMessageStructCodec.TryWriteRename(ref platform,
+					message, rename);
+			case MuiDirlistPacketKind.Protection:
+				if (!MuiDirlistMessageStructCodec.TryReadProtection(ref platform,
+					message, out var protection)) return false;
+				if (field == MuiDirlistField.MethodId)
+					protection.MethodId = value;
+				else if (field == MuiDirlistField.Entry)
+					protection.Entry = value;
+				else if (field == MuiDirlistField.Protection)
+					protection.Protection = value;
+				else return false;
+				return MuiDirlistMessageStructCodec.TryWriteProtection(ref platform,
+					message, protection);
+			case MuiDirlistPacketKind.GetEntry:
+				if (!MuiDirlistMessageStructCodec.TryReadGetEntry(ref platform,
+					message, out var getEntry)) return false;
+				if (field == MuiDirlistField.MethodId)
+					getEntry.MethodId = value;
+				else if (field == MuiDirlistField.Position)
+					getEntry.Position = value;
+				else if (field == MuiDirlistField.Storage)
+					getEntry.Storage = value;
+				else return false;
+				return MuiDirlistMessageStructCodec.TryWriteGetEntry(ref platform,
+					message, getEntry);
+		}
+		return false;
 	}
 }
 

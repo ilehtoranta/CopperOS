@@ -27,6 +27,16 @@ public struct MuiTextPresentationState
 internal struct MuiTextPresentationStateRecord
 {
 	internal const uint Size = 36;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint SetMinOffset = 4;
+	internal const uint SetMaxOffset = 8;
+	internal const uint SetVMaxOffset = 12;
+	internal const uint ControlCharOffset = 16;
+	internal const uint MarkingOffset = 20;
+	internal const uint ShortenOffset = 24;
+	internal const uint HiCharOffset = 28;
+	internal const uint HiCharPresentOffset = 32;
 	internal const uint Cookie = 0x4D545850u; // 'MTXP'
 
 	internal uint Magic;
@@ -65,20 +75,30 @@ internal static class MuiTextPresentationStateFieldCursorCodec
 	private static bool TryResolve(MuiTextPresentationStateField field,
 		out uint offset)
 	{
-		offset = field switch
+		if (field == MuiTextPresentationStateField.Magic)
+			offset = MuiTextPresentationStateRecord.MagicOffset;
+		else if (field == MuiTextPresentationStateField.SetMin)
+			offset = MuiTextPresentationStateRecord.SetMinOffset;
+		else if (field == MuiTextPresentationStateField.SetMax)
+			offset = MuiTextPresentationStateRecord.SetMaxOffset;
+		else if (field == MuiTextPresentationStateField.SetVMax)
+			offset = MuiTextPresentationStateRecord.SetVMaxOffset;
+		else if (field == MuiTextPresentationStateField.ControlChar)
+			offset = MuiTextPresentationStateRecord.ControlCharOffset;
+		else if (field == MuiTextPresentationStateField.Marking)
+			offset = MuiTextPresentationStateRecord.MarkingOffset;
+		else if (field == MuiTextPresentationStateField.Shorten)
+			offset = MuiTextPresentationStateRecord.ShortenOffset;
+		else if (field == MuiTextPresentationStateField.HiChar)
+			offset = MuiTextPresentationStateRecord.HiCharOffset;
+		else if (field == MuiTextPresentationStateField.HiCharPresent)
+			offset = MuiTextPresentationStateRecord.HiCharPresentOffset;
+		else
 		{
-			MuiTextPresentationStateField.Magic => 0,
-			MuiTextPresentationStateField.SetMin => 4,
-			MuiTextPresentationStateField.SetMax => 8,
-			MuiTextPresentationStateField.SetVMax => 12,
-			MuiTextPresentationStateField.ControlChar => 16,
-			MuiTextPresentationStateField.Marking => 20,
-			MuiTextPresentationStateField.Shorten => 24,
-			MuiTextPresentationStateField.HiChar => 28,
-			MuiTextPresentationStateField.HiCharPresent => 32,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -90,7 +110,7 @@ internal static class MuiTextPresentationStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 			cursor.Record, MuiTextPresentationStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiTextPresentationStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -123,16 +143,113 @@ internal static class MuiTextPresentationStateFieldCursorCodec
 // the semantic record; this bounded adapter owns fixed guest-layout translation.
 internal static class MuiTextPresentationStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiTextPresentationStateField field,
+		out uint offset)
+	{
+		if (field == MuiTextPresentationStateField.Magic)
+			offset = MuiTextPresentationStateRecord.MagicOffset;
+		else if (field == MuiTextPresentationStateField.SetMin)
+			offset = MuiTextPresentationStateRecord.SetMinOffset;
+		else if (field == MuiTextPresentationStateField.SetMax)
+			offset = MuiTextPresentationStateRecord.SetMaxOffset;
+		else if (field == MuiTextPresentationStateField.SetVMax)
+			offset = MuiTextPresentationStateRecord.SetVMaxOffset;
+		else if (field == MuiTextPresentationStateField.ControlChar)
+			offset = MuiTextPresentationStateRecord.ControlCharOffset;
+		else if (field == MuiTextPresentationStateField.Marking)
+			offset = MuiTextPresentationStateRecord.MarkingOffset;
+		else if (field == MuiTextPresentationStateField.Shorten)
+			offset = MuiTextPresentationStateRecord.ShortenOffset;
+		else if (field == MuiTextPresentationStateField.HiChar)
+			offset = MuiTextPresentationStateRecord.HiCharOffset;
+		else if (field == MuiTextPresentationStateField.HiCharPresent)
+			offset = MuiTextPresentationStateRecord.HiCharPresentOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiTextPresentationStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiTextPresentationStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiTextPresentationStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiTextPresentationStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiTextPresentationStateField.SetMin)
+			value = state.SetMin;
+		else if (field == MuiTextPresentationStateField.SetMax)
+			value = state.SetMax;
+		else if (field == MuiTextPresentationStateField.SetVMax)
+			value = state.SetVMax;
+		else if (field == MuiTextPresentationStateField.ControlChar)
+			value = state.ControlChar;
+		else if (field == MuiTextPresentationStateField.Marking)
+			value = state.Marking;
+		else if (field == MuiTextPresentationStateField.Shorten)
+			value = state.Shorten;
+		else if (field == MuiTextPresentationStateField.HiChar)
+			value = state.HiChar;
+		else if (field == MuiTextPresentationStateField.HiCharPresent)
+			value = state.HiCharPresent;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiTextPresentationStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiTextPresentationStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiTextPresentationStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiTextPresentationStateField.SetMin)
+			state.SetMin = value;
+		else if (field == MuiTextPresentationStateField.SetMax)
+			state.SetMax = value;
+		else if (field == MuiTextPresentationStateField.SetVMax)
+			state.SetVMax = value;
+		else if (field == MuiTextPresentationStateField.ControlChar)
+			state.ControlChar = value;
+		else if (field == MuiTextPresentationStateField.Marking)
+			state.Marking = value;
+		else if (field == MuiTextPresentationStateField.Shorten)
+			state.Shorten = value;
+		else if (field == MuiTextPresentationStateField.HiChar)
+			state.HiChar = value;
+		else if (field == MuiTextPresentationStateField.HiCharPresent)
+			state.HiCharPresent = value;
+		else return false;
+		return MuiTextPresentationStateRecordCodec.WriteStructural(ref platform,
+			record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiTextPresentationStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiTextPresentationStateRecord.Size -
+			MuiTextPresentationStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiTextPresentationStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiTextPresentationStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -200,7 +317,13 @@ internal static class MuiTextPresentationStateRecordCodec
 		MuiTextPresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiTextPresentationStateAdmission.Validate(value) &&
-		MuiGuestStructCursor.TryCreate(ref platform, address,
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiTextPresentationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiTextPresentationStateRecord.Size, out var cursor) &&
 		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 			value.Magic) &&

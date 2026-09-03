@@ -71,25 +71,16 @@ internal static class MuiApplicationWindowListStateFieldCursorCodec
 		APTR record, MuiApplicationWindowListStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiApplicationWindowListStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiApplicationWindowListStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, record, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiApplicationWindowListStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationWindowListStateFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		return MuiApplicationWindowListStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, record, field, value);
 	}
 }
 
@@ -149,18 +140,59 @@ internal static class MuiApplicationWindowListStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (!MuiApplicationWindowListStateCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		switch (field)
+		{
+			case MuiApplicationWindowListStateField.Cookie:
+				value = state.Cookie; return true;
+			case MuiApplicationWindowListStateField.Application:
+				value = state.Application.Raw; return true;
+			case MuiApplicationWindowListStateField.List:
+				value = state.List.Raw; return true;
+			case MuiApplicationWindowListStateField.Entries:
+				value = state.Entries.Raw; return true;
+			case MuiApplicationWindowListStateField.Count:
+				value = state.Count; return true;
+			case MuiApplicationWindowListStateField.Capacity:
+				value = state.Capacity; return true;
+			case MuiApplicationWindowListStateField.Mutation:
+				value = state.Mutation; return true;
+			case MuiApplicationWindowListStateField.Generation:
+				value = state.Generation; return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiApplicationWindowListStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationWindowListStateCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		switch (field)
+		{
+			case MuiApplicationWindowListStateField.Cookie:
+				state.Cookie = value; break;
+			case MuiApplicationWindowListStateField.Application:
+				state.Application = APTR.FromPointer(value); break;
+			case MuiApplicationWindowListStateField.List:
+				state.List = APTR.FromPointer(value); break;
+			case MuiApplicationWindowListStateField.Entries:
+				state.Entries = APTR.FromPointer(value); break;
+			case MuiApplicationWindowListStateField.Count:
+				state.Count = value; break;
+			case MuiApplicationWindowListStateField.Capacity:
+				state.Capacity = value; break;
+			case MuiApplicationWindowListStateField.Mutation:
+				state.Mutation = value; break;
+			case MuiApplicationWindowListStateField.Generation:
+				state.Generation = value; break;
+			default:
+				return false;
+		}
+		return MuiApplicationWindowListStateCodec.WriteStructural(ref platform,
+			record, state);
 	}
 }
 
@@ -228,6 +260,16 @@ internal static class MuiApplicationWindowListStateCodec
 		value.Generation = generation;
 		return true;
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiApplicationWindowListState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationWindowListState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, value);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -284,25 +326,16 @@ internal static class MuiApplicationWindowListEntryFieldCursorCodec
 		APTR record, MuiApplicationWindowListEntryField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiApplicationWindowListEntryFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiApplicationWindowListEntryRecordMemoryCodec.TryReadUInt32(
+			ref platform, record, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiApplicationWindowListEntryField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationWindowListEntryFieldCursor);
-		cursor.Record = record;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		return MuiApplicationWindowListEntryRecordMemoryCodec.TryWriteUInt32(
+			ref platform, record, field, value);
 	}
 }
 
@@ -350,18 +383,43 @@ internal static class MuiApplicationWindowListEntryRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (!MuiApplicationWindowListEntryCodec.TryReadStructural(ref platform,
+			record, out var entry)) return false;
+		switch (field)
+		{
+			case MuiApplicationWindowListEntryField.Next:
+				value = entry.Next.Raw; return true;
+			case MuiApplicationWindowListEntryField.Previous:
+				value = entry.Previous.Raw; return true;
+			case MuiApplicationWindowListEntryField.Object:
+				value = entry.Object.Raw; return true;
+			case MuiApplicationWindowListEntryField.Reserved:
+				value = entry.Reserved.Raw; return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiApplicationWindowListEntryField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationWindowListEntryCodec.TryReadStructural(ref platform,
+			record, out var entry)) return false;
+		switch (field)
+		{
+			case MuiApplicationWindowListEntryField.Next:
+				entry.Next = APTR.FromPointer(value); break;
+			case MuiApplicationWindowListEntryField.Previous:
+				entry.Previous = APTR.FromPointer(value); break;
+			case MuiApplicationWindowListEntryField.Object:
+				entry.Object = APTR.FromPointer(value); break;
+			case MuiApplicationWindowListEntryField.Reserved:
+				entry.Reserved = APTR.FromPointer(value); break;
+			default:
+				return false;
+		}
+		return MuiApplicationWindowListEntryCodec.WriteStructural(ref platform,
+			record, entry);
 	}
 }
 
@@ -496,6 +554,16 @@ internal static class MuiApplicationWindowListEntryCodec
 		value.Reserved = APTR.FromPointer(reserved);
 		return value.Reserved.Raw == MuiApplicationWindowListEntry.ProjectionMagic;
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiApplicationWindowListEntry value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationWindowListEntry value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, value);
 }
 
 public static class MuiApplicationWindowListCore

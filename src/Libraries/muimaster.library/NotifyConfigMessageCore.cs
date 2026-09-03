@@ -93,9 +93,16 @@ internal static class MuiGetConfigItemMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (field == MuiGetConfigItemPacketField.MethodId)
+			return MuiGetConfigItemMessageCodec.TryReadMethodIdValue(ref platform,
+				message, out value);
+		if (!MuiGetConfigItemMessageCodec.TryReadStructural(ref platform, message,
+			out var packet)) return false;
+		if (field == MuiGetConfigItemPacketField.ConfigId)
+			value = packet.ConfigId;
+		else if (field == MuiGetConfigItemPacketField.Storage)
+			value = packet.Storage.Raw;
+		else return false;
 		return true;
 	}
 
@@ -103,10 +110,18 @@ internal static class MuiGetConfigItemMessageMemoryCodec
 		APTR message, MuiGetConfigItemPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (field == MuiGetConfigItemPacketField.MethodId)
+			return MuiGetConfigItemMessageCodec.WriteMethodHeaderValue(ref platform,
+				message, value);
+		if (!MuiGetConfigItemMessageCodec.TryReadStructural(ref platform, message,
+			out var packet)) return false;
+		if (field == MuiGetConfigItemPacketField.ConfigId)
+			packet.ConfigId = value;
+		else if (field == MuiGetConfigItemPacketField.Storage)
+			packet.Storage = APTR.FromPointer(value);
+		else return false;
+		return MuiGetConfigItemMessageCodec.WriteStructural(ref platform, message,
+			packet);
 	}
 }
 
@@ -193,11 +208,19 @@ internal static class MuiGetConfigItemMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		uint methodId;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiGetConfigItemMessage.Size) ||
-			!TryReadMethodIdValue(ref platform, message, out methodId) ||
-			methodId != Method) return false;
+		if (!TryReadStructural(ref platform, message, out packet) ||
+			packet.MethodId != Method) return false;
+		return true;
+	}
+
+	// Complete named-record exchange used by typed field adapters. It does not
+	// validate the selector, so a caller-owned packet can be modified before
+	// semantic MUIM_GetConfigItem admission is applied.
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiGetConfigItemMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
 			MuiGetConfigItemMessage.Size, out var cursor) ||
 			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
@@ -206,9 +229,8 @@ internal static class MuiGetConfigItemMessageCodec
 				out var configId) ||
 			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var rawStorage) ||
-			!MuiGuestStructCursor.IsComplete(cursor) ||
-			rawMethodId != Method) return false;
-		packet.MethodId = methodId;
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		packet.MethodId = rawMethodId;
 		packet.ConfigId = configId;
 		packet.Storage = APTR.FromPointer(rawStorage);
 		return true;
@@ -218,10 +240,18 @@ internal static class MuiGetConfigItemMessageCodec
 		APTR message, MuiGetConfigItemMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		packet.MethodId = Method;
+		return WriteStructural(ref platform, message, packet);
+	}
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR message, MuiGetConfigItemMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
 			MuiGetConfigItemMessage.Size, out var cursor) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				Method) ||
+				packet.MethodId) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				packet.ConfigId) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,

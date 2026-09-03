@@ -66,17 +66,23 @@ public sealed class MuiWindowFocusAdmissionTests
 		Assert.True(MuiWindowFocusStateRecordCodec.Write(ref platform, address,
 			value));
 		Assert.True(MuiWindowFocusStateRecordMemoryCodec.TryGetAddress(ref platform,
-			address, 8, out var defaultObject) && defaultObject.Raw == 0x1548u);
+			address, MuiWindowFocusStateField.DefaultObject,
+			out var defaultObject) && defaultObject.Raw == 0x1548u);
 		Assert.True(MuiWindowFocusStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out var active) && active == 0);
+			address, MuiWindowFocusStateField.ActiveObject,
+			out var active) && active == 0);
 		Assert.True(MuiWindowFocusStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 0, MuiWindowFocusStateRecord.Cookie));
+			address, MuiWindowFocusStateField.Magic,
+			MuiWindowFocusStateRecord.Cookie));
 		Assert.True(MuiWindowFocusStateRecordCodec.TryReadStructural(ref platform,
-			address, out var decoded) && decoded.DefaultObject.IsNull);
+			address, out var decoded) && decoded.Magic == value.Magic &&
+			decoded.ActiveObject == value.ActiveObject && decoded.DefaultObject.IsNull);
+		Assert.False(MuiWindowFocusStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, (MuiWindowFocusStateField)255, out _));
 		Assert.False(MuiWindowFocusStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiWindowFocusStateRecord.Size, out _));
 		Assert.False(MuiWindowFocusStateRecordMemoryCodec.TryGetAddress(ref platform,
-			APTR.Null, 0, out _));
+			APTR.Null, (uint)0, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreateWindow(out APTR window)

@@ -77,8 +77,15 @@ internal static class MuiApplicationPersistenceFrameMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, frame, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationPersistenceFrameStateCodec.TryReadStructural(
+			ref platform, frame, out var state)) return false;
+		if (field == MuiApplicationPersistenceFrameField.Object) value =
+			state.Object.Raw;
+		else if (field == MuiApplicationPersistenceFrameField.NextChild) value =
+			state.NextChild;
+		else if (field == MuiApplicationPersistenceFrameField.VisitMarker) value =
+			state.VisitMarker;
+		else return false;
 		return true;
 	}
 
@@ -86,9 +93,17 @@ internal static class MuiApplicationPersistenceFrameMemoryCodec
 		APTR frame, MuiApplicationPersistenceFrameField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, frame, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationPersistenceFrameStateCodec.TryReadStructural(
+			ref platform, frame, out var state)) return false;
+		if (field == MuiApplicationPersistenceFrameField.Object) state.Object =
+			APTR.FromPointer(value);
+		else if (field == MuiApplicationPersistenceFrameField.NextChild) state.NextChild =
+			value;
+		else if (field == MuiApplicationPersistenceFrameField.VisitMarker) state.VisitMarker =
+			value;
+		else return false;
+		return MuiApplicationPersistenceFrameStateCodec.WriteStructural(ref platform,
+			frame, state);
 	}
 }
 
@@ -274,6 +289,16 @@ internal static class MuiApplicationPersistenceFrameStateStructCodec
 				value.VisitMarker)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiApplicationPersistenceFrameState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationPersistenceFrameState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, value);
 }
 
 internal static class MuiApplicationPersistenceFrameStateCodec
@@ -288,6 +313,18 @@ internal static class MuiApplicationPersistenceFrameStateCodec
 		MuiApplicationPersistenceFrameState value)
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiApplicationPersistenceFrameStateStructCodec.Write(ref platform,
+			address, value);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiApplicationPersistenceFrameState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationPersistenceFrameStateStructCodec.TryRead(ref platform,
+			address, out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationPersistenceFrameState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationPersistenceFrameStateStructCodec.Write(ref platform,
 			address, value);
 }
 

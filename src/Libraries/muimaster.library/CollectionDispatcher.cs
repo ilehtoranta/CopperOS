@@ -15,6 +15,10 @@ internal struct MuiCollectionMethodMessage
 	public const uint FieldSize = 4;
 	public const uint MethodIdOffset = 0;
 	public uint MethodId;
+	// The reserved carrier word is not part of the 4-byte MorphOS packet. It
+	// keeps CopperSharp's native ref-struct ABI in pointer mode for this
+	// single-field carrier while the codec still exchanges only MethodId.
+	internal uint NativeAbiReserved;
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]

@@ -26,9 +26,15 @@ public sealed class MuiStringIntegerStructAdapterTests
 		Assert.True(MuiStringIntegerStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, MuiStringIntegerStateField.Value,
 			unchecked((uint)456)));
+		Assert.True(MuiStringIntegerStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiStringIntegerStateField.Magic,
+			out var magic) && magic == MuiStringIntegerStateRecord.Cookie);
 		Assert.True(MuiStringIntegerStateRecordCodec.TryReadStructural(
 			ref platform, address, out var decoded));
 		Assert.Equal(456, decoded.Value);
+		Assert.Equal(MuiStringIntegerStateRecord.Cookie, decoded.Magic);
+		Assert.False(MuiStringIntegerStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiStringIntegerStateField)255, out _));
 		Assert.False(MuiStringIntegerStateRecordMemoryCodec.TryGetAddress(
 			ref platform, APTR.FromPointer(0x30FF9),
 			MuiStringIntegerStateField.Magic, out _));

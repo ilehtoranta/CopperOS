@@ -13,7 +13,7 @@ internal static class Program
     {
         if (args.Length is not (3 or 4))
         {
-            Console.Error.WriteLine("usage: NativeExecution <probe.hunk> <68000|68020|68040> <report.json> [command-startup-vector-fixture|command-argument-boundary-vector-fixture|command-io-vector-fixture|eval-native-entry-vector-fixture|eval-wb31-native-entry-vector-fixture|pathpart-native-entry-vector-fixture|which-wb31-native-entry-vector-fixture|quote-forward-probe-fixture|quote-native-entry-vector-fixture]");
+            Console.Error.WriteLine("usage: NativeExecution <probe.hunk> <68000|68020|68040> <report.json> [command-startup-vector-fixture|command-argument-boundary-vector-fixture|command-io-vector-fixture|eval-native-entry-vector-fixture|eval-wb31-native-entry-vector-fixture|pathpart-native-entry-vector-fixture|which-wb31-native-entry-vector-fixture|quote-forward-probe-fixture|quote-native-entry-vector-fixture|type-text-probe-fixture|type-text-io-probe-fixture]");
             return 2;
         }
         var suite = args.Length == 4 ? args[3] : ProbeFixture.StartupSuite;
@@ -108,6 +108,8 @@ internal sealed record ProbeCase(string Name, string Arguments, int Result, int 
     public WhichEntryCase? Which { get; init; }
     public QuoteForwardProbeCase? QuoteForward { get; init; }
     public QuoteNativeEntryCase? QuoteEntry { get; init; }
+    public TypeTextProbeCase? TypeText { get; init; }
+    public TypeTextIoProbeCase? TypeTextIo { get; init; }
 }
 
 internal sealed class Invocation(ProbeCase definition, int slot)
@@ -139,6 +141,8 @@ internal sealed class Invocation(ProbeCase definition, int slot)
     public int Instructions { get; set; }
     public NativeIoInvocation? NativeIo { get; set; }
     public QuoteForwardNativeLayout? QuoteForwardLayout { get; set; }
+    public TypeTextNativeLayout? TypeTextLayout { get; set; }
+    public TypeTextIoNativeLayout? TypeTextIoLayout { get; set; }
     public List<string> Events { get; } = [];
     public List<uint> AllocationRequests { get; } = [];
     public MemoryStream Output { get; } = new();
@@ -159,7 +163,7 @@ internal sealed partial class ProbeFixture
         Require(suite is StartupSuite or ArgumentBoundarySuite or NativeIoSuite or
             EvalEntrySuite or WorkbenchEvalEntrySuite or PathPartEntrySuite or
             WorkbenchWhichEntrySuite or QuoteForwardProbeSuite or
-            QuoteNativeEntrySuite,
+            QuoteNativeEntrySuite or TypeTextProbeSuite or TypeTextIoProbeSuite,
             "Unknown native qualification suite.");
         Image = image;
         this.model = model;
@@ -168,6 +172,7 @@ internal sealed partial class ProbeFixture
         Bus.LoadAndProtect(LoadAddress, image.Code);
         RegisterExec();
         if (suite == NativeIoSuite) RegisterIoExec();
+        if (suite == TypeTextIoProbeSuite) RegisterTypeTextIoExec();
         RegisterDos(0x8000);
         RegisterDos(0x9000);
     }
@@ -182,6 +187,8 @@ internal sealed partial class ProbeFixture
         if (suite == WorkbenchWhichEntrySuite) return RunWorkbenchWhichEntryCases();
         if (suite == QuoteForwardProbeSuite) return RunQuoteForwardProbeCases();
         if (suite == QuoteNativeEntrySuite) return RunQuoteNativeEntryCases();
+        if (suite == TypeTextProbeSuite) return RunTypeTextProbeCases();
+        if (suite == TypeTextIoProbeSuite) return RunTypeTextIoProbeCases();
         // These are supplied DOS results, not a replacement ReadArgs parser.
         // The suite tests native calling conventions, storage, and ownership.
         ProbeCase[] cases =
@@ -259,6 +266,10 @@ internal sealed partial class ProbeFixture
                     Bus.Memory[invocation.Arguments + (uint)bytes.Length] = 0;
                     if (invocation.Definition.QuoteForward is not null)
                         PrepareQuoteForwardProbe(invocation);
+                    if (invocation.Definition.TypeText is not null)
+                        PrepareTypeTextProbe(invocation);
+                    if (invocation.Definition.TypeTextIo is not null)
+                        PrepareTypeTextIoProbe(invocation);
                 }
                 Bus.Memory.AsSpan((int)(invocation.StackTop - invocation.StackBytes - 16),
                     (int)invocation.StackBytes + 32).Fill(0xb6);
@@ -270,7 +281,9 @@ internal sealed partial class ProbeFixture
                 for (var index = 0; index < 8; index++) cpu.State.D[index] = (uint)(0xde000000 + index * 16);
                 cpu.State.D[0] = unchecked((uint)(test.EntryLength ?? bytes.Length));
                 cpu.State.A[0] = test.NullArgumentPointer ? 0 :
-                    invocation.QuoteForwardLayout?.Control ?? invocation.Arguments;
+                    invocation.QuoteForwardLayout?.Control ??
+                    invocation.TypeTextLayout?.Control ??
+                    invocation.TypeTextIoLayout?.Control ?? invocation.Arguments;
             }
             while (cores.Any(cpu => cpu.State.ProgramCounter != ReturnAddress))
             {
@@ -302,7 +315,8 @@ internal sealed partial class ProbeFixture
                 Require(Bus.Memory.AsSpan((int)invocation.StackTop, 16).IndexOfAnyExcept((byte)0xb6) < 0, "Stack upper guard changed.");
                 Require(Bus.Memory.AsSpan((int)(invocation.StackTop - invocation.StackBytes - 16), 16)
                     .IndexOfAnyExcept((byte)0xb6) < 0, "Stack lower guard changed.");
-                if (suite != QuoteForwardProbeSuite)
+                if (suite != QuoteForwardProbeSuite && suite != TypeTextProbeSuite &&
+                    suite != TypeTextIoProbeSuite)
                 {
                     Require(invocation.Opens == 1 && invocation.Closes == (test.MissingDos ? 0 : 1), "Unbalanced DOS library lifetime.");
                     Require(invocation.Replies == (test.Workbench ? 1 : 0), "Unbalanced WBStartup message lifetime.");
@@ -323,6 +337,10 @@ internal sealed partial class ProbeFixture
                     VerifyQuoteForwardProbe(invocation);
                 else if (suite == QuoteNativeEntrySuite)
                     VerifyQuoteNativeEntry(invocation);
+                else if (suite == TypeTextProbeSuite)
+                    VerifyTypeTextProbe(invocation);
+                else if (suite == TypeTextIoProbeSuite)
+                    VerifyTypeTextIoProbe(invocation);
                 else
                 {
                     var reachedParser = !test.Workbench && !test.MissingDos && !test.AllocationFailure &&
@@ -410,7 +428,8 @@ internal sealed partial class ProbeFixture
         {
             Require(state.A[1] == invocation.DosBase && !invocation.Definition.MissingDos &&
                 invocation.Opens == 1 && invocation.Closes == 0, "Closed unowned or already closed library.");
-            Bus.AssertReleased(invocation);
+            if (suite != TypeTextIoProbeSuite)
+                Bus.AssertReleased(invocation);
             invocation.Closes++;
             return 0xc10ced;
         });
@@ -513,6 +532,11 @@ internal sealed partial class ProbeFixture
         if (suite == QuoteNativeEntrySuite)
         {
             RegisterQuoteNativeEntryDos(baseAddress);
+            return;
+        }
+        if (suite == TypeTextIoProbeSuite)
+        {
+            RegisterTypeTextIoDos(baseAddress);
             return;
         }
         Register(baseAddress, DosLvo.ReadArgs, "ReadArgs", (state, invocation) =>

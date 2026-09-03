@@ -2548,6 +2548,13 @@ public sealed class MuiHeadlessDispatcherTests
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
 			State);
 		var packet = APTR.FromPointer(0x1400);
+		Assert.True(MuiCallHookMessageStructCodec.Write(ref platform, packet,
+			new MuiCallHookMessage
+			{
+				MethodId = MuiCallHookMessageCodec.Method,
+				Hook = APTR.FromPointer(0x1200),
+				Param1 = 0x11223344u,
+			}));
 		Assert.True(MuiCallHookMessageMemoryCodec.TryGetAddress(ref platform,
 			packet, MuiCallHookPacketField.MethodId, out var methodAddress));
 		Assert.Equal(packet.Raw + MuiCallHookMessage.MethodIdOffset,
@@ -2566,6 +2573,54 @@ public sealed class MuiHeadlessDispatcherTests
 			packet, (MuiCallHookPacketField)255, out _));
 		Assert.False(MuiCallHookMessageMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiCallHookPacketField.Hook, out _));
+	}
+
+	[Fact]
+	public void CallHookFieldAccessUsesCompleteNamedPacketRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var packet = APTR.FromPointer(0x1800);
+		var original = new MuiCallHookMessage
+		{
+			MethodId = 0x8042B96Bu,
+			Hook = APTR.FromPointer(0x1560),
+			Param1 = 0x10203040u,
+		};
+		Assert.True(MuiCallHookMessageStructCodec.Write(ref platform, packet,
+			original));
+
+		Assert.True(MuiCallHookMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiCallHookPacketField.Hook, 0x5060u));
+		Assert.True(MuiCallHookMessageMemoryCodec.TryReadUInt32(ref platform,
+			packet, MuiCallHookPacketField.Param1, out var param1));
+		Assert.Equal(original.Param1, param1);
+		Assert.True(MuiCallHookMessageStructCodec.TryRead(ref platform, packet,
+			out var afterHook));
+		Assert.Equal(original.MethodId, afterHook.MethodId);
+		Assert.Equal(0x5060u, afterHook.Hook.Raw);
+
+		Assert.True(MuiCallHookMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiCallHookPacketField.Param1, 0xCAFEBABEu));
+		Assert.True(MuiCallHookMessageStructCodec.TryRead(ref platform, packet,
+			out var afterParam));
+		Assert.Equal(afterHook.Hook.Raw, afterParam.Hook.Raw);
+		Assert.Equal(0xCAFEBABEu, afterParam.Param1);
+
+		Assert.True(MuiCallHookMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiCallHookPacketField.MethodId, 0xF1234567u));
+		Assert.True(MuiCallHookMessageStructCodec.TryRead(ref platform, packet,
+			out var afterMethod));
+		Assert.Equal(0xF1234567u, afterMethod.MethodId);
+		Assert.Equal(afterParam.Hook.Raw, afterMethod.Hook.Raw);
+		Assert.Equal(afterParam.Param1, afterMethod.Param1);
+
+		Assert.False(MuiCallHookMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x20FF5), MuiCallHookPacketField.Hook, out _));
+		Assert.False(MuiCallHookMessageMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(0x20FF5), MuiCallHookPacketField.Param1, 1));
+		Assert.False(MuiCallHookMessageMemoryCodec.TryReadUInt32(ref platform,
+			packet, (MuiCallHookPacketField)255, out _));
 	}
 
 	[Fact]

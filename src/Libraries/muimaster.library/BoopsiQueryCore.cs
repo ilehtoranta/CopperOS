@@ -127,9 +127,30 @@ internal static class MuiBoopsiQueryMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (field == MuiBoopsiQueryPacketField.MethodId)
+			return MuiBoopsiQueryMessageCodec.TryReadMethodIdValue(ref platform,
+				message, out value);
+		if (!MuiBoopsiQueryMessageCodec.TryReadStructural(ref platform, message,
+			out var record)) return false;
+		if (field == MuiBoopsiQueryPacketField.Screen)
+			value = record.Screen.Raw;
+		else if (field == MuiBoopsiQueryPacketField.Flags)
+			value = record.Flags;
+		else if (field == MuiBoopsiQueryPacketField.MinWidth)
+			value = unchecked((uint)record.MinWidth);
+		else if (field == MuiBoopsiQueryPacketField.MinHeight)
+			value = unchecked((uint)record.MinHeight);
+		else if (field == MuiBoopsiQueryPacketField.MaxWidth)
+			value = unchecked((uint)record.MaxWidth);
+		else if (field == MuiBoopsiQueryPacketField.MaxHeight)
+			value = unchecked((uint)record.MaxHeight);
+		else if (field == MuiBoopsiQueryPacketField.DefaultWidth)
+			value = unchecked((uint)record.DefaultWidth);
+		else if (field == MuiBoopsiQueryPacketField.DefaultHeight)
+			value = unchecked((uint)record.DefaultHeight);
+		else if (field == MuiBoopsiQueryPacketField.RenderInfo)
+			value = record.RenderInfo.Raw;
+		else return false;
 		return true;
 	}
 
@@ -137,10 +158,32 @@ internal static class MuiBoopsiQueryMessageMemoryCodec
 		APTR message, MuiBoopsiQueryPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (field == MuiBoopsiQueryPacketField.MethodId)
+			return MuiBoopsiQueryMessageCodec.WriteMethodIdValue(ref platform,
+				message, value);
+		if (!MuiBoopsiQueryMessageCodec.TryReadStructural(ref platform, message,
+			out var record)) return false;
+		if (field == MuiBoopsiQueryPacketField.Screen)
+			record.Screen = APTR.FromPointer(value);
+		else if (field == MuiBoopsiQueryPacketField.Flags)
+			record.Flags = value;
+		else if (field == MuiBoopsiQueryPacketField.MinWidth)
+			record.MinWidth = unchecked((int)value);
+		else if (field == MuiBoopsiQueryPacketField.MinHeight)
+			record.MinHeight = unchecked((int)value);
+		else if (field == MuiBoopsiQueryPacketField.MaxWidth)
+			record.MaxWidth = unchecked((int)value);
+		else if (field == MuiBoopsiQueryPacketField.MaxHeight)
+			record.MaxHeight = unchecked((int)value);
+		else if (field == MuiBoopsiQueryPacketField.DefaultWidth)
+			record.DefaultWidth = unchecked((int)value);
+		else if (field == MuiBoopsiQueryPacketField.DefaultHeight)
+			record.DefaultHeight = unchecked((int)value);
+		else if (field == MuiBoopsiQueryPacketField.RenderInfo)
+			record.RenderInfo = APTR.FromPointer(value);
+		else return false;
+		return MuiBoopsiQueryMessageCodec.WriteStructural(ref platform, message,
+			record);
 	}
 }
 
@@ -209,12 +252,19 @@ internal static class MuiBoopsiQueryMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		record = default;
-		uint methodId;
-		if (message.IsNull || !platform.IsMapped(message,
-			MuiBoopsiQueryMessage.Size) ||
-			!TryReadMethodIdValue(ref platform, message, out methodId) ||
-			methodId != MuiBoopsiQueryMessage.Method)
-			return false;
+		if (!TryReadStructural(ref platform, message, out record) ||
+			record.MethodId != MuiBoopsiQueryMessage.Method) return false;
+		return true;
+	}
+
+	// Complete named-record exchange used by field adapters.  It deliberately
+	// does not validate the method selector, allowing a typed field mutation to
+	// preserve a caller-owned packet before semantic dispatch admission.
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiBoopsiQueryMessage record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		record = default;
 		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
 			MuiBoopsiQueryMessage.Size, out var cursor) ||
 			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
@@ -237,9 +287,8 @@ internal static class MuiBoopsiQueryMessageCodec
 				out var rawDefaultHeight) ||
 			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
 				out var rawRenderInfo) ||
-			!MuiGuestStructCursor.IsComplete(cursor) ||
-			rawMethodId != MuiBoopsiQueryMessage.Method) return false;
-		record.MethodId = methodId;
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		record.MethodId = rawMethodId;
 		record.Screen = APTR.FromPointer(rawScreen);
 		record.Flags = flags;
 		record.MinWidth = unchecked((int)rawMinWidth);
@@ -256,10 +305,18 @@ internal static class MuiBoopsiQueryMessageCodec
 		APTR message, MuiBoopsiQueryMessage record)
 		where TPlatform : struct, IMuiGuestMemory
 	{
+		record.MethodId = MuiBoopsiQueryMessage.Method;
+		return WriteStructural(ref platform, message, record);
+	}
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR message, MuiBoopsiQueryMessage record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
 			MuiBoopsiQueryMessage.Size, out var cursor) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				MuiBoopsiQueryMessage.Method) ||
+				record.MethodId) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				record.Screen.Raw) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,

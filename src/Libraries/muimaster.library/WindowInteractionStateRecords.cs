@@ -15,6 +15,13 @@ namespace CopperOS.MuiMaster;
 internal struct MuiWindowInteractionStateRecord
 {
 	internal const uint Size = 24;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint SnapshotFlagsOffset = 4;
+	internal const uint SnapshotRequestsOffset = 8;
+	internal const uint CycleChainHeadOffset = 12;
+	internal const uint CycleChainCountOffset = 16;
+	internal const uint CycleChainRequestsOffset = 20;
 	internal const uint Cookie = 0x57495354u; // 'WIST'
 
 	internal uint Magic;
@@ -93,19 +100,24 @@ internal static class MuiWindowInteractionStateFieldCursorCodec
 	private static bool TryResolve(MuiWindowInteractionStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiWindowInteractionStateField.Magic)
+			offset = MuiWindowInteractionStateRecord.MagicOffset;
+		else if (field == MuiWindowInteractionStateField.SnapshotFlags)
+			offset = MuiWindowInteractionStateRecord.SnapshotFlagsOffset;
+		else if (field == MuiWindowInteractionStateField.SnapshotRequests)
+			offset = MuiWindowInteractionStateRecord.SnapshotRequestsOffset;
+		else if (field == MuiWindowInteractionStateField.CycleChainHead)
+			offset = MuiWindowInteractionStateRecord.CycleChainHeadOffset;
+		else if (field == MuiWindowInteractionStateField.CycleChainCount)
+			offset = MuiWindowInteractionStateRecord.CycleChainCountOffset;
+		else if (field == MuiWindowInteractionStateField.CycleChainRequests)
+			offset = MuiWindowInteractionStateRecord.CycleChainRequestsOffset;
+		else
 		{
-			case MuiWindowInteractionStateField.Magic:
-			case MuiWindowInteractionStateField.SnapshotFlags:
-			case MuiWindowInteractionStateField.SnapshotRequests:
-			case MuiWindowInteractionStateField.CycleChainHead:
-			case MuiWindowInteractionStateField.CycleChainCount:
-			case MuiWindowInteractionStateField.CycleChainRequests:
-				offset = (uint)field * 4;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -118,7 +130,7 @@ internal static class MuiWindowInteractionStateFieldCursorCodec
 			!platform.IsMapped(cursor.Record,
 				MuiWindowInteractionStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiWindowInteractionStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -152,16 +164,95 @@ internal static class MuiWindowInteractionStateFieldCursorCodec
 // the sole fixed-layout translation for the guest record.
 internal static class MuiWindowInteractionStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiWindowInteractionStateField field,
+		out uint offset)
+	{
+		if (field == MuiWindowInteractionStateField.Magic)
+			offset = MuiWindowInteractionStateRecord.MagicOffset;
+		else if (field == MuiWindowInteractionStateField.SnapshotFlags)
+			offset = MuiWindowInteractionStateRecord.SnapshotFlagsOffset;
+		else if (field == MuiWindowInteractionStateField.SnapshotRequests)
+			offset = MuiWindowInteractionStateRecord.SnapshotRequestsOffset;
+		else if (field == MuiWindowInteractionStateField.CycleChainHead)
+			offset = MuiWindowInteractionStateRecord.CycleChainHeadOffset;
+		else if (field == MuiWindowInteractionStateField.CycleChainCount)
+			offset = MuiWindowInteractionStateRecord.CycleChainCountOffset;
+		else if (field == MuiWindowInteractionStateField.CycleChainRequests)
+			offset = MuiWindowInteractionStateRecord.CycleChainRequestsOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowInteractionStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowInteractionStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiWindowInteractionStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiWindowInteractionStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiWindowInteractionStateField.SnapshotFlags)
+			value = state.SnapshotFlags;
+		else if (field == MuiWindowInteractionStateField.SnapshotRequests)
+			value = state.SnapshotRequests;
+		else if (field == MuiWindowInteractionStateField.CycleChainHead)
+			value = state.CycleChainHead.Raw;
+		else if (field == MuiWindowInteractionStateField.CycleChainCount)
+			value = state.CycleChainCount;
+		else if (field == MuiWindowInteractionStateField.CycleChainRequests)
+			value = state.CycleChainRequests;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowInteractionStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiWindowInteractionStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiWindowInteractionStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiWindowInteractionStateField.SnapshotFlags)
+			state.SnapshotFlags = value;
+		else if (field == MuiWindowInteractionStateField.SnapshotRequests)
+			state.SnapshotRequests = value;
+		else if (field == MuiWindowInteractionStateField.CycleChainHead)
+			state.CycleChainHead = APTR.FromPointer(value);
+		else if (field == MuiWindowInteractionStateField.CycleChainCount)
+			state.CycleChainCount = value;
+		else if (field == MuiWindowInteractionStateField.CycleChainRequests)
+			state.CycleChainRequests = value;
+		else return false;
+		return MuiWindowInteractionStateRecordCodec.WriteStructural(ref platform,
+			record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiWindowInteractionStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiWindowInteractionStateRecord.Size -
+			MuiWindowInteractionStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiWindowInteractionStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiWindowInteractionStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -191,6 +282,11 @@ internal static class MuiWindowInteractionStateRecordCodec
 	// declaration order; numeric positions remain confined to the compatibility
 	// adapter.
 	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiWindowInteractionStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
 		APTR address, MuiWindowInteractionStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiGuestStructCursor.TryCreate(ref platform, address,

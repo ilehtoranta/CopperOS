@@ -71,18 +71,25 @@ public sealed class MuiWindowPresentationAdmissionTests
 		Assert.True(MuiWindowPresentationStateRecordCodec.WriteRecord(ref platform,
 			address, value));
 		Assert.True(MuiWindowPresentationStateRecordMemoryCodec.TryGetAddress(
-			ref platform, address, 16, out var publicScreen) && publicScreen.Raw ==
+			ref platform, address, MuiWindowPresentationStateField.PublicScreen,
+			out var publicScreen) && publicScreen.Raw ==
 			0x1690u);
 		Assert.True(MuiWindowPresentationStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 8, out var screen) && screen == 0);
+			ref platform, address, MuiWindowPresentationStateField.Screen,
+			out var screen) && screen == 0);
 		Assert.True(MuiWindowPresentationStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 0, MuiWindowPresentationStateRecord.Cookie));
+			ref platform, address, MuiWindowPresentationStateField.Magic,
+			MuiWindowPresentationStateRecord.Cookie));
 		Assert.True(MuiWindowPresentationStateRecordCodec.TryReadStructural(ref platform,
-			address, out var decoded) && decoded.Title.IsNull);
+			address, out var decoded) && decoded.Magic == value.Magic &&
+			decoded.Title == value.Title && decoded.Screen == value.Screen &&
+			decoded.ScreenTitle == value.ScreenTitle && decoded.PublicScreen.IsNull);
+		Assert.False(MuiWindowPresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiWindowPresentationStateField)255, out _));
 		Assert.False(MuiWindowPresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiWindowPresentationStateRecord.Size, out _));
 		Assert.False(MuiWindowPresentationStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreateWindow(out APTR window)

@@ -62,15 +62,32 @@ internal static class MuiAreaActivationMethodMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = default;
-		if (!TryReadMethodId(ref platform, address, out var methodId)) return false;
-		value.MethodId = methodId;
-		return true;
+		return TryReadStructural(ref platform, address, out value);
 	}
 
 	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
 		MuiAreaActivationMethodMessage value)
 		where TPlatform : struct, IMuiGuestMemory
-		=> WriteValue(ref platform, address, value.MethodId);
+		=> WriteStructural(ref platform, address, value);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaActivationMethodMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = default;
+		if (!MuiGuestUlongStorageCodec.TryReadValue(ref platform, address,
+			out var methodId)) return false;
+		value.MethodId = methodId;
+		return true;
+	}
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaActivationMethodMessage value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		return MuiGuestUlongStorageCodec.WriteValue(ref platform, address,
+			value.MethodId);
+	}
 }
 
 internal enum MuiAreaActivationPacketKind : byte
@@ -110,14 +127,8 @@ internal static class MuiAreaActivationFieldCursorCodec
 		MuiAreaActivationField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiAreaActivationFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		return MuiAreaActivationRecordMemoryCodec.TryReadUInt32(ref platform,
+			message, packet, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -125,13 +136,8 @@ internal static class MuiAreaActivationFieldCursorCodec
 		MuiAreaActivationField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaActivationFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		return MuiAreaActivationRecordMemoryCodec.TryWriteUInt32(ref platform,
+			message, packet, field, value);
 	}
 }
 
@@ -194,10 +200,28 @@ internal static class MuiAreaActivationRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (packet == MuiAreaActivationPacketKind.Method)
+		{
+			// Keep the one-ULONG method header on its scalar-safe seam. The
+			// public shape is still the named method record, but current
+			// freestanding lowering cannot reliably pass a one-field struct.
+			return field == MuiAreaActivationField.MethodId &&
+				MuiAreaActivationMethodMessageCodec.TryReadValue(ref platform,
+					message, out value);
+		}
+		if (packet == MuiAreaActivationPacketKind.Activation)
+		{
+			if (!MuiAreaActivationMessageCodec.TryReadStructural(ref platform,
+				message, out var activation)) return false;
+			if (field == MuiAreaActivationField.MethodId)
+				value = activation.MethodId;
+			else if (field == MuiAreaActivationField.Flags)
+				value = activation.Flags;
+			else
+				return false;
+			return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -205,10 +229,26 @@ internal static class MuiAreaActivationRecordMemoryCodec
 		MuiAreaActivationField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (packet == MuiAreaActivationPacketKind.Method)
+		{
+			return field == MuiAreaActivationField.MethodId &&
+				MuiAreaActivationMethodMessageCodec.WriteValue(ref platform,
+					message, value);
+		}
+		if (packet == MuiAreaActivationPacketKind.Activation)
+		{
+			if (!MuiAreaActivationMessageCodec.TryReadStructural(ref platform,
+				message, out var activation)) return false;
+			if (field == MuiAreaActivationField.MethodId)
+				activation.MethodId = value;
+			else if (field == MuiAreaActivationField.Flags)
+				activation.Flags = value;
+			else
+				return false;
+			return MuiAreaActivationMessageCodec.WriteStructural(ref platform,
+				message, activation);
+		}
+		return false;
 	}
 }
 
@@ -249,13 +289,7 @@ internal static class MuiAreaActivationMessageCodec
 		out MuiAreaActivationMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiAreaActivationMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out packet.MethodId) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out packet.Flags) ||
-			!MuiGuestStructCursor.IsComplete(cursor) ||
+		if (!TryReadStructural(ref platform, message, out packet) ||
 			!IsMethod(packet.MethodId))
 		{
 			packet = default;
@@ -268,7 +302,28 @@ internal static class MuiAreaActivationMessageCodec
 		MuiAreaActivationMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!IsMethod(packet.MethodId)) return false;
+		return IsMethod(packet.MethodId) &&
+			WriteStructural(ref platform, message, packet);
+	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiAreaActivationMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+			MuiAreaActivationMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.Flags)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR message, MuiAreaActivationMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
 		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
 			MuiAreaActivationMessage.Size, out var cursor) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,

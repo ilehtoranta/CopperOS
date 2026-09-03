@@ -265,6 +265,106 @@ public sealed class MuiDirlistVolumelistTests
 	}
 
 	[Fact]
+	public void DirlistFieldAccessUsesCompleteNamedPacketRecords()
+	{
+		var platform = CreatePlatform(out _, out _, out _);
+		var methodAddress = APTR.FromPointer(0x2B00);
+		Assert.True(MuiDirlistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			methodAddress, MuiDirlistPacketKind.Method, MuiDirlistField.MethodId,
+			MuiDirlistMessageCodec.ReRead));
+		Assert.True(MuiDirlistMessageMemoryCodec.TryReadUInt32(ref platform,
+			methodAddress, MuiDirlistPacketKind.Method, MuiDirlistField.MethodId,
+			out var method));
+		Assert.Equal(MuiDirlistMessageCodec.ReRead, method);
+
+		var setAddress = APTR.FromPointer(0x2B20);
+		var set = new MuiDirlistSetMessage
+		{
+			MethodId = MuiDirlistMessageCodec.Set,
+			Attribute = 7,
+			Value = 9,
+		};
+		Assert.True(MuiDirlistSetMessageCodec.TryWrite(ref platform, setAddress,
+			set));
+		Assert.True(MuiDirlistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			setAddress, MuiDirlistPacketKind.Set, MuiDirlistField.Value,
+			0xCAFEBABEu));
+		Assert.True(MuiDirlistSetMessageCodec.TryRead(ref platform, setAddress,
+			out var updatedSet));
+		Assert.Equal(set.MethodId, updatedSet.MethodId);
+		Assert.Equal(set.Attribute, updatedSet.Attribute);
+		Assert.Equal(0xCAFEBABEu, updatedSet.Value);
+
+		var renameAddress = APTR.FromPointer(0x2B40);
+		var rename = new MuiDirlistRenameMessage
+		{
+			MethodId = MuiDirlistMessageCodec.Rename,
+			Entry = 3,
+			Name = 0x00012A00,
+		};
+		Assert.True(MuiDirlistRenameMessageCodec.TryWrite(ref platform,
+			renameAddress, rename));
+		Assert.True(MuiDirlistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			renameAddress, MuiDirlistPacketKind.Rename, MuiDirlistField.Entry,
+			11));
+		Assert.True(MuiDirlistRenameMessageCodec.TryRead(ref platform,
+			renameAddress, out var updatedRename));
+		Assert.Equal(rename.MethodId, updatedRename.MethodId);
+		Assert.Equal(11u, updatedRename.Entry);
+		Assert.Equal(rename.Name, updatedRename.Name);
+
+		var protectionAddress = APTR.FromPointer(0x2B60);
+		var protection = new MuiDirlistProtectionMessage
+		{
+			MethodId = MuiDirlistMessageCodec.SetProtection,
+			Entry = 4,
+			Protection = 0x12345678,
+		};
+		Assert.True(MuiDirlistProtectionMessageCodec.TryWrite(ref platform,
+			protectionAddress, protection));
+		Assert.True(MuiDirlistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			protectionAddress, MuiDirlistPacketKind.Protection,
+			MuiDirlistField.Protection, 0xFEDCBA98u));
+		Assert.True(MuiDirlistProtectionMessageCodec.TryRead(ref platform,
+			protectionAddress, out var updatedProtection));
+		Assert.Equal(protection.MethodId, updatedProtection.MethodId);
+		Assert.Equal(protection.Entry, updatedProtection.Entry);
+		Assert.Equal(0xFEDCBA98u, updatedProtection.Protection);
+
+		var getEntryAddress = APTR.FromPointer(0x2B80);
+		var getEntry = new MuiDirlistGetEntryMessage
+		{
+			MethodId = MuiDirlistMessageCodec.ListGetEntry,
+			Position = unchecked((uint)-2),
+			Storage = 0x00013A00,
+		};
+		Assert.True(MuiDirlistGetEntryMessageCodec.TryWrite(ref platform,
+			getEntryAddress, getEntry));
+		Assert.True(MuiDirlistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			getEntryAddress, MuiDirlistPacketKind.GetEntry,
+			MuiDirlistField.Storage, 0x00013B00));
+		Assert.True(MuiDirlistGetEntryMessageCodec.TryRead(ref platform,
+			getEntryAddress, out var updatedGetEntry));
+		Assert.Equal(getEntry.MethodId, updatedGetEntry.MethodId);
+		Assert.Equal(getEntry.Position, updatedGetEntry.Position);
+		Assert.Equal(0x00013B00u, updatedGetEntry.Storage);
+
+		Assert.False(MuiDirlistMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x80FF8), MuiDirlistPacketKind.Set,
+			MuiDirlistField.Value, out _));
+		Assert.False(MuiDirlistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(0x80FF8), MuiDirlistPacketKind.GetEntry,
+			MuiDirlistField.Storage, 1));
+		Assert.False(MuiDirlistMessageMemoryCodec.TryReadUInt32(ref platform,
+			setAddress, MuiDirlistPacketKind.Protection,
+			MuiDirlistField.Attribute, out _));
+		Assert.False(MuiDirlistMessageMemoryCodec.TryWriteUInt32(ref platform,
+			setAddress, MuiDirlistPacketKind.Set, (MuiDirlistField)255, 1));
+		Assert.False(MuiDirlistMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.Null, MuiDirlistPacketKind.Set, MuiDirlistField.Value, out _));
+	}
+
+	[Fact]
 	public void DirlistFixedWireCodecsUseNamedFields()
 	{
 		var platform = CreatePlatform(out _, out _, out _);

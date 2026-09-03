@@ -145,9 +145,16 @@ internal static class MuiCallHookMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (field == MuiCallHookPacketField.MethodId)
+		{
+			return MuiCallHookMethodMessageCodec.TryReadValue(ref platform,
+				message, out value);
+		}
+		if (!MuiCallHookMessageStructCodec.TryRead(ref platform, message,
+			out var packet)) return false;
+		if (field == MuiCallHookPacketField.Hook) value = packet.Hook.Raw;
+		else if (field == MuiCallHookPacketField.Param1) value = packet.Param1;
+		else return false;
 		return true;
 	}
 
@@ -155,10 +162,18 @@ internal static class MuiCallHookMessageMemoryCodec
 		APTR message, MuiCallHookPacketField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (field == MuiCallHookPacketField.MethodId)
+		{
+			return MuiCallHookMethodMessageCodec.WriteValue(ref platform,
+				message, value);
+		}
+		if (!MuiCallHookMessageStructCodec.TryRead(ref platform, message,
+			out var packet)) return false;
+		if (field == MuiCallHookPacketField.Hook)
+			packet.Hook = APTR.FromPointer(value);
+		else if (field == MuiCallHookPacketField.Param1) packet.Param1 = value;
+		else return false;
+		return MuiCallHookMessageStructCodec.Write(ref platform, message, packet);
 	}
 }
 
@@ -332,23 +347,8 @@ internal static class MuiCallHookMessageCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		packet = default;
-		uint methodId;
-		if (!TryReadMethodIdValue(ref platform, message, out methodId) ||
-			methodId != Method || !platform.IsMapped(message,
-			MuiCallHookMessage.Size)) return false;
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
-			MuiCallHookMessage.Size, out var cursor) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var rawMethodId) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var rawHook) ||
-			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
-				out var param1) ||
-			!MuiGuestStructCursor.IsComplete(cursor)) return false;
-		if (rawMethodId != Method) return false;
-		packet.MethodId = methodId;
-		packet.Hook = APTR.FromPointer(rawHook);
-		packet.Param1 = param1;
+		if (!MuiCallHookMessageStructCodec.TryRead(ref platform, message,
+			out packet) || packet.MethodId != Method) return false;
 		return true;
 	}
 
@@ -356,14 +356,51 @@ internal static class MuiCallHookMessageCodec
 		APTR message, MuiCallHookMessage packet)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!MuiGuestStructCursor.TryCreate(ref platform, message,
+		// The dispatch-facing writer preserves the fixed MUIM_CallHook selector;
+		// callers that need an arbitrary structural record use the named codec
+		// directly (as the field adapter does).
+		packet.MethodId = Method;
+		return MuiCallHookMessageStructCodec.Write(ref platform, message,
+			packet);
+	}
+}
+
+// Complete named codec for the fixed CallHook envelope.  Unlike the
+// dispatch-facing codec above, this structural form does not validate the
+// method selector, so field mutation can preserve a caller-owned record while
+// the semantic dispatch path still enforces MUIM_CallHook.
+internal static class MuiCallHookMessageStructCodec
+{
+	internal static bool TryRead<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiCallHookMessage record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		record = default;
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
+			MuiCallHookMessage.Size, out var cursor) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.MethodId) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out var rawHook) ||
+			!MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out record.Param1) ||
+			!MuiGuestStructCursor.IsComplete(cursor)) return false;
+		record.Hook = APTR.FromPointer(rawHook);
+		return true;
+	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform,
+		APTR address, MuiCallHookMessage record)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiCallHookMessage.Size, out var cursor) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				Method) ||
+				record.MethodId) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				packet.Hook.Raw) ||
+				record.Hook.Raw) ||
 			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
-				packet.Param1)) return false;
+				record.Param1)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 }

@@ -91,11 +91,33 @@ public sealed class MuiTextPresentationAdmissionTests
 		Assert.True(MuiTextPresentationStateRecordCodec.Write(ref platform,
 			recordAddress, value));
 		Assert.True(MuiTextPresentationStateRecordMemoryCodec.TryGetAddress(
+			ref platform, recordAddress, MuiTextPresentationStateField.Shorten,
+			out var typedShortenAddress));
+		Assert.Equal(0x1D38u, typedShortenAddress.Raw);
+		Assert.True(MuiTextPresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, MuiTextPresentationStateField.ControlChar,
+			out var typedControlChar));
+		Assert.Equal(13u, typedControlChar);
+		Assert.True(MuiTextPresentationStateRecordMemoryCodec.TryGetAddress(
 			ref platform, recordAddress, 24, out var shortenAddress));
 		Assert.Equal(0x1D38u, shortenAddress.Raw);
 		Assert.True(MuiTextPresentationStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, recordAddress, 16, out var controlChar));
 		Assert.Equal(13u, controlChar);
+		Assert.True(MuiTextPresentationStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, recordAddress, MuiTextPresentationStateField.Shorten, 0));
+		Assert.True(MuiTextPresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, MuiTextPresentationStateField.Magic,
+			out var typedMagic));
+		Assert.Equal(MuiTextPresentationStateRecord.Cookie, typedMagic);
+		Assert.False(MuiTextPresentationStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, recordAddress, (MuiTextPresentationStateField)255, out _));
+		Assert.True(MuiTextPresentationStateRecordCodec.TryReadStructural(
+			ref platform, recordAddress, out var typedUpdated));
+		Assert.Equal(MuiTextPresentationStateRecord.Cookie, typedUpdated.Magic);
+		Assert.Equal(value.SetMin, typedUpdated.SetMin);
+		Assert.Equal(value.Marking, typedUpdated.Marking);
+		Assert.Equal(0u, typedUpdated.Shorten);
 		Assert.True(MuiTextPresentationStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, recordAddress, 24, 0));
 		Assert.True(MuiTextPresentationStateRecordCodec.TryReadStructural(
@@ -105,7 +127,7 @@ public sealed class MuiTextPresentationAdmissionTests
 			ref platform, recordAddress, MuiTextPresentationStateRecord.Size,
 			out _));
 		Assert.False(MuiTextPresentationStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiTextPresentationStateRecordCodec.TryReadStructural(
 			ref platform, APTR.Null, out _));
 	}

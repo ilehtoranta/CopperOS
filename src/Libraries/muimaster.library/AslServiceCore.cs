@@ -117,20 +117,63 @@ internal static class MuiAslRecordMemoryCodec
 		out uint value) where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, kind, field, out var address,
-			out var fieldSize) || fieldSize != 4) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		switch (kind)
+		{
+			case MuiAslRecordKind.State:
+				if (!MuiAslServiceStateStructCodec.TryRead(ref platform, record,
+					out var state)) return false;
+				if (field == MuiAslRecordField.Magic) value = state.Magic;
+				else if (field == MuiAslRecordField.Head) value = state.Head.Raw;
+				else if (field == MuiAslRecordField.Generation)
+					value = state.Generation;
+				else return false;
+				return true;
+			case MuiAslRecordKind.Lease:
+				if (!MuiAslRequestLeaseStructCodec.TryRead(ref platform, record,
+					out var lease)) return false;
+				if (field == MuiAslRecordField.Next) value = lease.Next.Raw;
+				else if (field == MuiAslRecordField.Requester)
+					value = lease.Requester.Raw;
+				else if (field == MuiAslRecordField.Type) value = lease.Type;
+				else if (field == MuiAslRecordField.Tags) value = lease.Tags.Raw;
+				else return false;
+				return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiAslRecordKind kind, MuiAslRecordField field,
 		uint value) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, kind, field, out var address,
-			out var fieldSize) || fieldSize != 4) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		switch (kind)
+		{
+			case MuiAslRecordKind.State:
+				if (!MuiAslServiceStateStructCodec.TryRead(ref platform, record,
+					out var state)) return false;
+				if (field == MuiAslRecordField.Magic) state.Magic = value;
+				else if (field == MuiAslRecordField.Head)
+					state.Head = APTR.FromPointer(value);
+				else if (field == MuiAslRecordField.Generation)
+					state.Generation = value;
+				else return false;
+				return MuiAslServiceStateStructCodec.Write(ref platform, record,
+					state);
+			case MuiAslRecordKind.Lease:
+				if (!MuiAslRequestLeaseStructCodec.TryRead(ref platform, record,
+					out var lease)) return false;
+				if (field == MuiAslRecordField.Next)
+					lease.Next = APTR.FromPointer(value);
+				else if (field == MuiAslRecordField.Requester)
+					lease.Requester = APTR.FromPointer(value);
+				else if (field == MuiAslRecordField.Type) lease.Type = value;
+				else if (field == MuiAslRecordField.Tags)
+					lease.Tags = APTR.FromPointer(value);
+				else return false;
+				return MuiAslRequestLeaseStructCodec.Write(ref platform, record,
+					lease);
+		}
+		return false;
 	}
 }
 

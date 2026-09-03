@@ -185,6 +185,55 @@ public sealed class MuiAreaDragTests
 	}
 
 	[Fact]
+	public void AreaDragStateFieldAccessUsesCompleteNamedRecord()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1780);
+		var expected = new MuiAreaDragState
+		{
+			Magic = MuiAreaDragStateCodec.Cookie,
+			Source = 0x3400,
+			Target = 0x3500,
+			LastX = -4,
+			LastY = -12,
+			Qualifier = 3,
+			EventFlags = 5,
+			Flags = MuiAreaDragState.ActiveFlag | MuiAreaDragState.CapturedFlag,
+		};
+		MuiAreaDragStateCodec.Write(ref platform, address, expected);
+		Assert.True(MuiAreaDragStateMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiAreaDragStateField.LastX, out var lastX));
+		Assert.Equal(-4, unchecked((int)lastX));
+		Assert.True(MuiAreaDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaDragStateField.LastY, unchecked((uint)-20)));
+		Assert.True(MuiAreaDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaDragStateField.Target, 0x3600));
+		Assert.True(MuiAreaDragStateCodec.TryReadStructural(ref platform, address,
+			out var updated));
+		Assert.Equal(expected.Magic, updated.Magic);
+		Assert.Equal(expected.Source, updated.Source);
+		Assert.Equal(0x3600u, updated.Target);
+		Assert.Equal(expected.LastX, updated.LastX);
+		Assert.Equal(-20, updated.LastY);
+		Assert.Equal(expected.Qualifier, updated.Qualifier);
+		Assert.Equal(expected.EventFlags, updated.EventFlags);
+		Assert.Equal(expected.Flags, updated.Flags);
+
+		Assert.True(MuiAreaDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaDragStateField.Magic, 0xDEADBEEFu));
+		Assert.True(MuiAreaDragStateMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiAreaDragStateField.Magic, out var magic));
+		Assert.Equal(0xDEADBEEFu, magic);
+		Assert.False(MuiAreaDragStateCodec.TryRead(ref platform, address, out _));
+		Assert.False(MuiAreaDragStateMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x20FF0u), MuiAreaDragStateField.Flags, out _));
+		Assert.False(MuiAreaDragStateMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.Null, MuiAreaDragStateField.Flags, 1));
+		Assert.False(MuiAreaDragStateMemoryCodec.TryReadUInt32(ref platform,
+			address, (MuiAreaDragStateField)255, out _));
+	}
+
+	[Fact]
 	public void AreaDragTypedReadersUseNamedMethodHeader()
 	{
 		var platform = CreatePlatform(out _);

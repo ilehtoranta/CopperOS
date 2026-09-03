@@ -141,10 +141,43 @@ internal static class MuiCollectionBasicMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (packet == MuiCollectionBasicPacketKind.Method)
+		{
+			if (!MuiCollectionBasicStructPacketCodec.TryReadMethodRecord(
+				ref platform, message, out var method)) return false;
+			if (field != MuiCollectionBasicField.MethodId) return false;
+			value = method.MethodId;
+			return true;
+		}
+		if (packet == MuiCollectionBasicPacketKind.GetEntry)
+		{
+			if (!MuiCollectionBasicStructPacketCodec.TryReadGetEntry(ref platform,
+				message, out var getEntry)) return false;
+			if (field == MuiCollectionBasicField.MethodId)
+				value = getEntry.MethodId;
+			else if (field == MuiCollectionBasicField.Position)
+				value = getEntry.Position;
+			else if (field == MuiCollectionBasicField.Storage)
+				value = getEntry.Storage;
+			else return false;
+			return true;
+		}
+		if (packet == MuiCollectionBasicPacketKind.Select)
+		{
+			if (!MuiCollectionBasicStructPacketCodec.TryReadSelect(ref platform,
+				message, out var select)) return false;
+			if (field == MuiCollectionBasicField.MethodId)
+				value = select.MethodId;
+			else if (field == MuiCollectionBasicField.Position)
+				value = select.Position;
+			else if (field == MuiCollectionBasicField.Select)
+				value = select.Select;
+			else if (field == MuiCollectionBasicField.Storage)
+				value = select.Storage;
+			else return false;
+			return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -152,10 +185,46 @@ internal static class MuiCollectionBasicMessageMemoryCodec
 		MuiCollectionBasicField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (packet == MuiCollectionBasicPacketKind.Method)
+		{
+			if (!MuiCollectionBasicStructPacketCodec.TryReadMethodRecord(
+				ref platform, message, out var method) ||
+				field != MuiCollectionBasicField.MethodId) return false;
+			method.MethodId = value;
+			return MuiCollectionBasicStructPacketCodec.TryWriteMethodRecord(
+				ref platform, message, ref method);
+		}
+		if (packet == MuiCollectionBasicPacketKind.GetEntry)
+		{
+			if (!MuiCollectionBasicStructPacketCodec.TryReadGetEntry(ref platform,
+				message, out var getEntry)) return false;
+			if (field == MuiCollectionBasicField.MethodId)
+				getEntry.MethodId = value;
+			else if (field == MuiCollectionBasicField.Position)
+				getEntry.Position = value;
+			else if (field == MuiCollectionBasicField.Storage)
+				getEntry.Storage = value;
+			else return false;
+			return MuiCollectionBasicStructPacketCodec.TryWriteGetEntry(ref platform,
+				message, getEntry);
+		}
+		if (packet == MuiCollectionBasicPacketKind.Select)
+		{
+			if (!MuiCollectionBasicStructPacketCodec.TryReadSelect(ref platform,
+				message, out var select)) return false;
+			if (field == MuiCollectionBasicField.MethodId)
+				select.MethodId = value;
+			else if (field == MuiCollectionBasicField.Position)
+				select.Position = value;
+			else if (field == MuiCollectionBasicField.Select)
+				select.Select = value;
+			else if (field == MuiCollectionBasicField.Storage)
+				select.Storage = value;
+			else return false;
+			return MuiCollectionBasicStructPacketCodec.TryWriteSelect(ref platform,
+				message, select);
+		}
+		return false;
 	}
 }
 
@@ -216,6 +285,28 @@ internal static class MuiCollectionBasicStructPacketCodec
 			return false;
 		packet.MethodId = methodId;
 		return true;
+	}
+
+	internal static bool TryReadMethodRecord<TPlatform>(ref TPlatform platform,
+		APTR message, out MuiCollectionMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		packet = default;
+		return TryCreate(ref platform, message, MuiCollectionMethodMessage.Size,
+			out var cursor) &&
+			MuiGuestStructCursor.TryReadUInt32(ref platform, ref cursor,
+				out packet.MethodId) && MuiGuestStructCursor.IsComplete(cursor);
+	}
+
+	internal static bool TryWriteMethodRecord<TPlatform>(ref TPlatform platform,
+		APTR message, ref MuiCollectionMethodMessage packet)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!TryCreate(ref platform, message, MuiCollectionMethodMessage.Size,
+			out var cursor) ||
+			!MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
+				packet.MethodId)) return false;
+		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
 	internal static bool TryWriteMethod<TPlatform>(ref TPlatform platform,

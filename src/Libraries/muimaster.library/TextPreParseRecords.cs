@@ -20,6 +20,9 @@ public struct MuiTextPreParseState
 internal struct MuiTextPreParseStateRecord
 {
 	internal const uint Size = 8;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint PreParseOffset = 4;
 	internal const uint Cookie = 0x4D545050u; // 'MTPP'
 
 	internal uint Magic;
@@ -63,13 +66,16 @@ internal static class MuiTextPreParseStateFieldCursorCodec
 	private static bool TryResolve(MuiTextPreParseStateField field,
 		out uint offset)
 	{
-		offset = field switch
+		if (field == MuiTextPreParseStateField.Magic)
+			offset = MuiTextPreParseStateRecord.MagicOffset;
+		else if (field == MuiTextPreParseStateField.PreParse)
+			offset = MuiTextPreParseStateRecord.PreParseOffset;
+		else
 		{
-			MuiTextPreParseStateField.Magic => 0,
-			MuiTextPreParseStateField.PreParse => 4,
-			_ => uint.MaxValue,
-		};
-		return offset != uint.MaxValue;
+			offset = 0;
+			return false;
+		}
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -81,7 +87,7 @@ internal static class MuiTextPreParseStateFieldCursorCodec
 			cursor.Record.Raw > uint.MaxValue - offset || !platform.IsMapped(
 			cursor.Record, MuiTextPreParseStateRecord.Size)) return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiTextPreParseStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -116,16 +122,71 @@ internal static class MuiTextPreParseStateFieldCursorCodec
 // diagnostics.
 internal static class MuiTextPreParseStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiTextPreParseStateField field,
+		out uint offset)
+	{
+		if (field == MuiTextPreParseStateField.Magic)
+			offset = MuiTextPreParseStateRecord.MagicOffset;
+		else if (field == MuiTextPreParseStateField.PreParse)
+			offset = MuiTextPreParseStateRecord.PreParseOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiTextPreParseStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiTextPreParseStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiTextPreParseStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiTextPreParseStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiTextPreParseStateField.PreParse)
+			value = state.PreParse.Raw;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiTextPreParseStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiTextPreParseStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiTextPreParseStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiTextPreParseStateField.PreParse)
+			state.PreParse = APTR.FromPointer(value);
+		else return false;
+		return MuiTextPreParseStateRecordCodec.WriteStructural(ref platform,
+			record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiTextPreParseStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiTextPreParseStateRecord.Size -
+			MuiTextPreParseStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiTextPreParseStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiTextPreParseStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -172,16 +233,26 @@ internal static class MuiTextPreParseStateRecordCodec
 		=> TryReadStructural(ref platform, address, out value) &&
 		MuiTextPreParseStateAdmission.Validate(value);
 
-	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
 		MuiTextPreParseStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory
-	{
-		if (!MuiTextPreParseStateAdmission.Validate(value)) return false;
-		return MuiGuestStructCursor.TryCreate(ref platform, address,
+		=> MuiTextPreParseStateAdmission.Validate(value) &&
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiTextPreParseStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiTextPreParseStateRecord.Size, out var cursor) &&
 			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				value.Magic) &&
 			MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 				value.PreParse.Raw) && MuiGuestStructCursor.IsComplete(cursor);
-	}
+
+	internal static bool Write<TPlatform>(ref TPlatform platform, APTR address,
+		MuiTextPreParseStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteRecord(ref platform, address, value);
 }

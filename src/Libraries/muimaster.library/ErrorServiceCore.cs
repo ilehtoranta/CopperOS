@@ -79,9 +79,17 @@ internal static class MuiErrorServiceStateMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiErrorServiceStateStructCodec.TryRead(ref platform, record,
+			out var state)) return false;
+		if (field == MuiErrorServiceStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiErrorServiceStateField.Version)
+			value = state.Version;
+		else if (field == MuiErrorServiceStateField.Error)
+			value = state.Error;
+		else if (field == MuiErrorServiceStateField.Sequence)
+			value = state.Sequence;
+		else return false;
 		return true;
 	}
 
@@ -89,10 +97,18 @@ internal static class MuiErrorServiceStateMemoryCodec
 		APTR record, MuiErrorServiceStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiErrorServiceStateStructCodec.TryRead(ref platform, record,
+			out var state)) return false;
+		if (field == MuiErrorServiceStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiErrorServiceStateField.Version)
+			state.Version = value;
+		else if (field == MuiErrorServiceStateField.Error)
+			state.Error = value;
+		else if (field == MuiErrorServiceStateField.Sequence)
+			state.Sequence = value;
+		else return false;
+		return MuiErrorServiceStateStructCodec.Write(ref platform, record, state);
 	}
 }
 

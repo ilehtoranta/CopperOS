@@ -86,11 +86,28 @@ public sealed class MuiTextCopyAdmissionTests
 		};
 		Assert.True(MuiTextCopyStateRecordCodec.Write(ref platform, address, record));
 		Assert.True(MuiTextCopyStateRecordMemoryCodec.TryGetAddress(ref platform,
+			address, MuiTextCopyStateField.Copy, out var typedCopyAddress));
+		Assert.Equal(0x1D24u, typedCopyAddress.Raw);
+		Assert.True(MuiTextCopyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiTextCopyStateField.Copy, out var typedCopy));
+		Assert.Equal(1u, typedCopy);
+		Assert.True(MuiTextCopyStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, 4, out var copyAddress));
 		Assert.Equal(0x1D24u, copyAddress.Raw);
 		Assert.True(MuiTextCopyStateRecordMemoryCodec.TryReadUInt32(ref platform,
 			address, 4, out var copy));
 		Assert.Equal(1u, copy);
+		Assert.True(MuiTextCopyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiTextCopyStateField.Copy, 0));
+		Assert.True(MuiTextCopyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiTextCopyStateField.Magic, out var typedMagic));
+		Assert.Equal(MuiTextCopyStateRecord.Cookie, typedMagic);
+		Assert.False(MuiTextCopyStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, (MuiTextCopyStateField)255, out _));
+		Assert.True(MuiTextCopyStateRecordCodec.TryReadStructural(ref platform,
+			address, out var typedUpdated));
+		Assert.Equal(MuiTextCopyStateRecord.Cookie, typedUpdated.Magic);
+		Assert.Equal(0u, typedUpdated.Copy);
 		Assert.True(MuiTextCopyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			address, 4, 0));
 		Assert.True(MuiTextCopyStateRecordCodec.TryReadStructural(ref platform,
@@ -99,7 +116,7 @@ public sealed class MuiTextCopyAdmissionTests
 		Assert.False(MuiTextCopyStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiTextCopyStateRecord.Size, out _));
 		Assert.False(MuiTextCopyStateRecordMemoryCodec.TryGetAddress(ref platform,
-			APTR.Null, 0, out _));
+			APTR.Null, (uint)0, out _));
 		Assert.False(MuiTextCopyStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

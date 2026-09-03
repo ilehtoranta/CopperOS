@@ -323,6 +323,59 @@ public sealed class MuiAreaActivationTests
 			MuiAreaActivationField.Flags, out _));
 	}
 
+	[Fact]
+	public void AreaActivationFieldAccessUsesCompleteNamedRecords()
+	{
+		var platform = CreatePlatform(out _);
+		var activationAddress = APTR.FromPointer(0x1600);
+		var activation = new MuiAreaActivationMessage
+		{
+			MethodId = MuiAreaActivationMessageCodec.GoActive,
+			Flags = 0x11223344u,
+		};
+		Assert.True(MuiAreaActivationMessageCodec.WriteStructural(ref platform,
+			activationAddress, activation));
+		Assert.True(MuiAreaActivationRecordMemoryCodec.TryReadUInt32(ref platform,
+			activationAddress, MuiAreaActivationPacketKind.Activation,
+			MuiAreaActivationField.Flags, out var flags));
+		Assert.Equal(activation.Flags, flags);
+		Assert.True(MuiAreaActivationRecordMemoryCodec.TryWriteUInt32(ref platform,
+			activationAddress, MuiAreaActivationPacketKind.Activation,
+			MuiAreaActivationField.Flags, 0x55667788u));
+		Assert.True(MuiAreaActivationFieldCursorCodec.TryWriteUInt32(ref platform,
+			activationAddress, MuiAreaActivationPacketKind.Activation,
+			MuiAreaActivationField.MethodId, MuiAreaActivationMessageCodec.GoInactive));
+		Assert.True(MuiAreaActivationMessageCodec.TryReadStructural(ref platform,
+			activationAddress, out var updatedActivation));
+		Assert.Equal(MuiAreaActivationMessageCodec.GoInactive,
+			updatedActivation.MethodId);
+		Assert.Equal(0x55667788u, updatedActivation.Flags);
+
+		var methodAddress = APTR.FromPointer(0x1620);
+		var method = new MuiAreaActivationMethodMessage
+		{
+			MethodId = MuiAreaActivationMessageCodec.GoActive,
+		};
+		Assert.True(MuiAreaActivationMethodMessageCodec.WriteStructural(ref platform,
+			methodAddress, method));
+		Assert.True(MuiAreaActivationRecordMemoryCodec.TryWriteUInt32(ref platform,
+			methodAddress, MuiAreaActivationPacketKind.Method,
+			MuiAreaActivationField.MethodId, MuiAreaActivationMessageCodec.GoInactive));
+		Assert.True(MuiAreaActivationMethodMessageCodec.TryReadStructural(ref platform,
+			methodAddress, out var updatedMethod));
+		Assert.Equal(MuiAreaActivationMessageCodec.GoInactive, updatedMethod.MethodId);
+
+		Assert.False(MuiAreaActivationRecordMemoryCodec.TryReadUInt32(ref platform,
+			activationAddress, MuiAreaActivationPacketKind.Method,
+			MuiAreaActivationField.Flags, out _));
+		Assert.False(MuiAreaActivationRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(0x20FFCu), MuiAreaActivationPacketKind.Activation,
+			MuiAreaActivationField.Flags, 1));
+		Assert.False(MuiAreaActivationFieldCursorCodec.TryReadUInt32(ref platform,
+			APTR.Null, MuiAreaActivationPacketKind.Activation,
+			MuiAreaActivationField.Flags, out _));
+	}
+
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR areaClass)
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

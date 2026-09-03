@@ -81,20 +81,36 @@ public sealed class MuiTextShortenedAdmissionTests
 		Assert.True(MuiTextShortenedStateRecordCodec.Write(ref platform, address,
 			record));
 		Assert.True(MuiTextShortenedStateRecordMemoryCodec.TryGetAddress(
+			ref platform, address, MuiTextShortenedStateField.Shortened,
+			out var typedShortenedAddress));
+		Assert.Equal(0x1B24u, typedShortenedAddress.Raw);
+		Assert.True(MuiTextShortenedStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiTextShortenedStateField.Shortened,
+			out var typedShortened));
+		Assert.Equal(1u, typedShortened);
+		Assert.True(MuiTextShortenedStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, 4, out var shortenedAddress));
 		Assert.Equal(0x1B24u, shortenedAddress.Raw);
 		Assert.True(MuiTextShortenedStateRecordMemoryCodec.TryReadUInt32(
 			ref platform, address, 4, out var shortened));
 		Assert.Equal(1u, shortened);
 		Assert.True(MuiTextShortenedStateRecordMemoryCodec.TryWriteUInt32(
+			ref platform, address, MuiTextShortenedStateField.Shortened, 0));
+		Assert.True(MuiTextShortenedStateRecordMemoryCodec.TryWriteUInt32(
 			ref platform, address, 4, 0));
+		Assert.True(MuiTextShortenedStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiTextShortenedStateField.Magic,
+			out var typedMagic));
+		Assert.Equal(MuiTextShortenedStateRecord.Cookie, typedMagic);
+		Assert.False(MuiTextShortenedStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiTextShortenedStateField)255, out _));
 		Assert.True(MuiTextShortenedStateRecordCodec.TryReadStructural(ref platform,
 			address, out var updated));
 		Assert.Equal(0u, updated.Shortened);
 		Assert.False(MuiTextShortenedStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiTextShortenedStateRecord.Size, out _));
 		Assert.False(MuiTextShortenedStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiTextShortenedStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

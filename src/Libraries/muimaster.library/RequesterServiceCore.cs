@@ -74,9 +74,13 @@ internal static class MuiRequesterServiceStateMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiRequesterServiceStateStructCodec.TryRead(ref platform, record,
+			out var state)) return false;
+		if (field == MuiRequesterServiceStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiRequesterServiceStateField.Generation)
+			value = state.Generation;
+		else return false;
 		return true;
 	}
 
@@ -84,10 +88,15 @@ internal static class MuiRequesterServiceStateMemoryCodec
 		APTR record, MuiRequesterServiceStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiRequesterServiceStateStructCodec.TryRead(ref platform, record,
+			out var state)) return false;
+		if (field == MuiRequesterServiceStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiRequesterServiceStateField.Generation)
+			state.Generation = value;
+		else return false;
+		return MuiRequesterServiceStateStructCodec.Write(ref platform, record,
+			state);
 	}
 }
 

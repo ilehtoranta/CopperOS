@@ -15,6 +15,10 @@ namespace CopperOS.MuiMaster;
 internal struct MuiWindowFocusStateRecord
 {
 	internal const uint Size = 12;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint ActiveObjectOffset = 4;
+	internal const uint DefaultObjectOffset = 8;
 	internal const uint Cookie = 0x57464F53u; // 'WFOS'
 
 	internal uint Magic;
@@ -71,16 +75,18 @@ internal static class MuiWindowFocusStateFieldCursorCodec
 	private static bool TryResolve(MuiWindowFocusStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiWindowFocusStateField.Magic)
+			offset = MuiWindowFocusStateRecord.MagicOffset;
+		else if (field == MuiWindowFocusStateField.ActiveObject)
+			offset = MuiWindowFocusStateRecord.ActiveObjectOffset;
+		else if (field == MuiWindowFocusStateField.DefaultObject)
+			offset = MuiWindowFocusStateRecord.DefaultObjectOffset;
+		else
 		{
-			case MuiWindowFocusStateField.Magic:
-			case MuiWindowFocusStateField.ActiveObject:
-			case MuiWindowFocusStateField.DefaultObject:
-				offset = (uint)field * 4;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -93,7 +99,7 @@ internal static class MuiWindowFocusStateFieldCursorCodec
 			!platform.IsMapped(cursor.Record, MuiWindowFocusStateRecord.Size))
 			return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiWindowFocusStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -127,16 +133,77 @@ internal static class MuiWindowFocusStateFieldCursorCodec
 // bounded adapter handles their four-byte guest representation.
 internal static class MuiWindowFocusStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiWindowFocusStateField field,
+		out uint offset)
+	{
+		if (field == MuiWindowFocusStateField.Magic)
+			offset = MuiWindowFocusStateRecord.MagicOffset;
+		else if (field == MuiWindowFocusStateField.ActiveObject)
+			offset = MuiWindowFocusStateRecord.ActiveObjectOffset;
+		else if (field == MuiWindowFocusStateField.DefaultObject)
+			offset = MuiWindowFocusStateRecord.DefaultObjectOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowFocusStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowFocusStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiWindowFocusStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiWindowFocusStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiWindowFocusStateField.ActiveObject)
+			value = state.ActiveObject.Raw;
+		else if (field == MuiWindowFocusStateField.DefaultObject)
+			value = state.DefaultObject.Raw;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowFocusStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiWindowFocusStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiWindowFocusStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiWindowFocusStateField.ActiveObject)
+			state.ActiveObject = APTR.FromPointer(value);
+		else if (field == MuiWindowFocusStateField.DefaultObject)
+			state.DefaultObject = APTR.FromPointer(value);
+		else return false;
+		return MuiWindowFocusStateRecordCodec.WriteStructural(ref platform,
+			record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiWindowFocusStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiWindowFocusStateRecord.Size -
+			MuiWindowFocusStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiWindowFocusStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiWindowFocusStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -165,6 +232,11 @@ internal static class MuiWindowFocusStateRecordCodec
 	// the two opaque object capabilities are exchanged in declaration order;
 	// numeric positions remain confined to the compatibility adapter.
 	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiWindowFocusStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
 		APTR address, MuiWindowFocusStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiGuestStructCursor.TryCreate(ref platform, address,

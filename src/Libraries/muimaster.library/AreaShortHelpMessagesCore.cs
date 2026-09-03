@@ -198,13 +198,43 @@ internal static class MuiAreaShortHelpMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaShortHelpMessageFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		switch (packet)
+		{
+			case MuiAreaShortHelpPacketKind.Check:
+				if (!MuiAreaCheckShortHelpMessageCodec.TryRead(ref platform,
+					message, out var check)) return false;
+				if (field == MuiAreaShortHelpMessageField.MethodId)
+					value = check.MethodId;
+				else if (field == MuiAreaShortHelpMessageField.Help)
+					value = check.Help.Raw;
+				else if (field == MuiAreaShortHelpMessageField.MouseX)
+					value = unchecked((uint)check.MouseX);
+				else if (field == MuiAreaShortHelpMessageField.MouseY)
+					value = unchecked((uint)check.MouseY);
+				else return false;
+				return true;
+			case MuiAreaShortHelpPacketKind.Create:
+				if (!MuiAreaCreateShortHelpMessageCodec.TryRead(ref platform,
+					message, out var create)) return false;
+				if (field == MuiAreaShortHelpMessageField.MethodId)
+					value = create.MethodId;
+				else if (field == MuiAreaShortHelpMessageField.MouseX)
+					value = unchecked((uint)create.MouseX);
+				else if (field == MuiAreaShortHelpMessageField.MouseY)
+					value = unchecked((uint)create.MouseY);
+				else return false;
+				return true;
+			case MuiAreaShortHelpPacketKind.Delete:
+				if (!MuiAreaDeleteShortHelpMessageCodec.TryRead(ref platform,
+					message, out var delete)) return false;
+				if (field == MuiAreaShortHelpMessageField.MethodId)
+					value = delete.MethodId;
+				else if (field == MuiAreaShortHelpMessageField.Help)
+					value = delete.Help.Raw;
+				else return false;
+				return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -212,13 +242,46 @@ internal static class MuiAreaShortHelpMessageMemoryCodec
 		MuiAreaShortHelpMessageField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaShortHelpMessageFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		switch (packet)
+		{
+			case MuiAreaShortHelpPacketKind.Check:
+				if (!MuiAreaCheckShortHelpMessageCodec.TryRead(ref platform,
+					message, out var check)) return false;
+				if (field == MuiAreaShortHelpMessageField.MethodId)
+					check.MethodId = value;
+				else if (field == MuiAreaShortHelpMessageField.Help)
+					check.Help = APTR.FromPointer(value);
+				else if (field == MuiAreaShortHelpMessageField.MouseX)
+					check.MouseX = unchecked((int)value);
+				else if (field == MuiAreaShortHelpMessageField.MouseY)
+					check.MouseY = unchecked((int)value);
+				else return false;
+				return MuiAreaCheckShortHelpMessageCodec.Write(ref platform,
+					message, check);
+			case MuiAreaShortHelpPacketKind.Create:
+				if (!MuiAreaCreateShortHelpMessageCodec.TryRead(ref platform,
+					message, out var create)) return false;
+				if (field == MuiAreaShortHelpMessageField.MethodId)
+					create.MethodId = value;
+				else if (field == MuiAreaShortHelpMessageField.MouseX)
+					create.MouseX = unchecked((int)value);
+				else if (field == MuiAreaShortHelpMessageField.MouseY)
+					create.MouseY = unchecked((int)value);
+				else return false;
+				return MuiAreaCreateShortHelpMessageCodec.Write(ref platform,
+					message, create);
+			case MuiAreaShortHelpPacketKind.Delete:
+				if (!MuiAreaDeleteShortHelpMessageCodec.TryRead(ref platform,
+					message, out var delete)) return false;
+				if (field == MuiAreaShortHelpMessageField.MethodId)
+					delete.MethodId = value;
+				else if (field == MuiAreaShortHelpMessageField.Help)
+					delete.Help = APTR.FromPointer(value);
+				else return false;
+				return MuiAreaDeleteShortHelpMessageCodec.Write(ref platform,
+					message, delete);
+		}
+		return false;
 	}
 
 }

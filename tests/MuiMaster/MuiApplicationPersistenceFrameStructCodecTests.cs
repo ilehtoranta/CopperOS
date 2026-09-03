@@ -33,6 +33,33 @@ public sealed class MuiApplicationPersistenceFrameStructCodecTests
 	}
 
 	[Fact]
+	public void PersistenceFrameFieldAccessUsesCompleteNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x2600);
+		var expected = default(MuiApplicationPersistenceFrameState);
+		expected.Object = APTR.FromPointer(0x3000);
+		expected.NextChild = 17;
+		expected.VisitMarker = 29;
+		Assert.True(MuiApplicationPersistenceFrameStateCodec.WriteStructural(
+			ref platform, address, expected));
+		Assert.True(MuiApplicationPersistenceFrameMemoryCodec.TryWrite(ref platform,
+			address, MuiApplicationPersistenceFrameField.NextChild, 23));
+		Assert.True(MuiApplicationPersistenceFrameMemoryCodec.TryRead(ref platform,
+			address, MuiApplicationPersistenceFrameField.Object, out var objectValue));
+		Assert.Equal(expected.Object.Raw, objectValue);
+		Assert.True(MuiApplicationPersistenceFrameStateCodec.TryReadStructural(
+			ref platform, address, out var actual));
+		Assert.Equal(23u, actual.NextChild);
+		Assert.Equal(expected.VisitMarker, actual.VisitMarker);
+		Assert.False(MuiApplicationPersistenceFrameMemoryCodec.TryRead(ref platform,
+			address, (MuiApplicationPersistenceFrameField)255, out _));
+		Assert.False(MuiApplicationPersistenceFrameMemoryCodec.TryWrite(ref platform,
+			APTR.FromPointer(0x30FF5), MuiApplicationPersistenceFrameField.Object, 1));
+	}
+
+	[Fact]
 	public void PersistenceFrameCodecRejectsIncompleteGuestRecord()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

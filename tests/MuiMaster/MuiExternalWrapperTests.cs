@@ -270,6 +270,62 @@ public sealed class MuiExternalWrapperTests
 	}
 
 	[Fact]
+	public void BoopsiQueryFieldAccessUsesCompleteNamedPacketRecord()
+	{
+		var p = NewPlatform();
+		var original = new MuiBoopsiQueryMessage
+		{
+			MethodId = MuiBoopsiQueryMessage.Method,
+			Screen = APTR.FromPointer(0x2A00),
+			Flags = 0xA5u,
+			MinWidth = -8,
+			MinHeight = 9,
+			MaxWidth = 640,
+			MaxHeight = 480,
+			DefaultWidth = 320,
+			DefaultHeight = 200,
+			RenderInfo = APTR.FromPointer(0x2B00),
+		};
+		Assert.True(MuiBoopsiQueryMessageCodec.WriteStructural(ref p, Packet,
+			original));
+
+		Assert.True(MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiBoopsiQueryPacketField.Screen, 0x2C00));
+		Assert.True(MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiBoopsiQueryPacketField.MinWidth,
+			unchecked((uint)-24)));
+		Assert.True(MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiBoopsiQueryPacketField.RenderInfo, 0x2D00));
+		Assert.True(MuiBoopsiQueryMessageCodec.TryReadStructural(ref p, Packet,
+			out var afterFields));
+		Assert.Equal(original.MethodId, afterFields.MethodId);
+		Assert.Equal(0x2C00u, afterFields.Screen.Raw);
+		Assert.Equal(original.Flags, afterFields.Flags);
+		Assert.Equal(-24, afterFields.MinWidth);
+		Assert.Equal(original.MinHeight, afterFields.MinHeight);
+		Assert.Equal(original.MaxWidth, afterFields.MaxWidth);
+		Assert.Equal(original.MaxHeight, afterFields.MaxHeight);
+		Assert.Equal(original.DefaultWidth, afterFields.DefaultWidth);
+		Assert.Equal(original.DefaultHeight, afterFields.DefaultHeight);
+		Assert.Equal(0x2D00u, afterFields.RenderInfo.Raw);
+
+		Assert.True(MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref p,
+			Packet, MuiBoopsiQueryPacketField.MethodId, 0xF1234567u));
+		Assert.True(MuiBoopsiQueryMessageCodec.TryReadStructural(ref p, Packet,
+			out var afterMethod));
+		Assert.Equal(0xF1234567u, afterMethod.MethodId);
+		Assert.Equal(afterFields.Screen.Raw, afterMethod.Screen.Raw);
+		Assert.Equal(afterFields.RenderInfo.Raw, afterMethod.RenderInfo.Raw);
+
+		Assert.False(MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref p,
+			APTR.FromPointer(0x40FD9), MuiBoopsiQueryPacketField.Flags, out _));
+		Assert.False(MuiBoopsiQueryMessageMemoryCodec.TryWriteUInt32(ref p,
+			APTR.FromPointer(0x40FD9), MuiBoopsiQueryPacketField.MaxHeight, 1));
+		Assert.False(MuiBoopsiQueryMessageMemoryCodec.TryReadUInt32(ref p,
+			Packet, (MuiBoopsiQueryPacketField)255, out _));
+	}
+
+	[Fact]
 	public void ExternalWrapperHeaderCodecUsesNamedFields()
 	{
 		var p = NewPlatform();

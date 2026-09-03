@@ -15,6 +15,29 @@ namespace CopperOS.MuiMaster;
 internal struct MuiWindowOpenPolicyStateRecord
 {
 	internal const uint Size = 88;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint AlternateHeightOffset = 4;
+	internal const uint AlternateWidthOffset = 8;
+	internal const uint AlternateLeftEdgeOffset = 12;
+	internal const uint AlternateTopEdgeOffset = 16;
+	internal const uint HeightOffset = 20;
+	internal const uint WidthOffset = 24;
+	internal const uint LeftEdgeOffset = 28;
+	internal const uint TopEdgeOffset = 32;
+	internal const uint CloseGadgetOffset = 36;
+	internal const uint DepthGadgetOffset = 40;
+	internal const uint DragBarOffset = 44;
+	internal const uint SizeGadgetOffset = 48;
+	internal const uint SizeRightOffset = 52;
+	internal const uint AppWindowOffset = 56;
+	internal const uint BackdropOffset = 60;
+	internal const uint BorderlessOffset = 64;
+	internal const uint PanelWindowOffset = 68;
+	internal const uint TabletMessagesOffset = 72;
+	internal const uint UseBottomBorderScrollerOffset = 76;
+	internal const uint UseLeftBorderScrollerOffset = 80;
+	internal const uint UseRightBorderScrollerOffset = 84;
 	internal const uint Cookie = 0x574F5053u; // 'WOPS'
 
 	internal uint Magic;
@@ -101,35 +124,56 @@ internal static class MuiWindowOpenPolicyStateFieldCursorCodec
 	private static bool TryResolve(MuiWindowOpenPolicyStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiWindowOpenPolicyStateField.Magic)
+			offset = MuiWindowOpenPolicyStateRecord.MagicOffset;
+		else if (field == MuiWindowOpenPolicyStateField.AlternateHeight)
+			offset = MuiWindowOpenPolicyStateRecord.AlternateHeightOffset;
+		else if (field == MuiWindowOpenPolicyStateField.AlternateWidth)
+			offset = MuiWindowOpenPolicyStateRecord.AlternateWidthOffset;
+		else if (field == MuiWindowOpenPolicyStateField.AlternateLeftEdge)
+			offset = MuiWindowOpenPolicyStateRecord.AlternateLeftEdgeOffset;
+		else if (field == MuiWindowOpenPolicyStateField.AlternateTopEdge)
+			offset = MuiWindowOpenPolicyStateRecord.AlternateTopEdgeOffset;
+		else if (field == MuiWindowOpenPolicyStateField.Height)
+			offset = MuiWindowOpenPolicyStateRecord.HeightOffset;
+		else if (field == MuiWindowOpenPolicyStateField.Width)
+			offset = MuiWindowOpenPolicyStateRecord.WidthOffset;
+		else if (field == MuiWindowOpenPolicyStateField.LeftEdge)
+			offset = MuiWindowOpenPolicyStateRecord.LeftEdgeOffset;
+		else if (field == MuiWindowOpenPolicyStateField.TopEdge)
+			offset = MuiWindowOpenPolicyStateRecord.TopEdgeOffset;
+		else if (field == MuiWindowOpenPolicyStateField.CloseGadget)
+			offset = MuiWindowOpenPolicyStateRecord.CloseGadgetOffset;
+		else if (field == MuiWindowOpenPolicyStateField.DepthGadget)
+			offset = MuiWindowOpenPolicyStateRecord.DepthGadgetOffset;
+		else if (field == MuiWindowOpenPolicyStateField.DragBar)
+			offset = MuiWindowOpenPolicyStateRecord.DragBarOffset;
+		else if (field == MuiWindowOpenPolicyStateField.SizeGadget)
+			offset = MuiWindowOpenPolicyStateRecord.SizeGadgetOffset;
+		else if (field == MuiWindowOpenPolicyStateField.SizeRight)
+			offset = MuiWindowOpenPolicyStateRecord.SizeRightOffset;
+		else if (field == MuiWindowOpenPolicyStateField.AppWindow)
+			offset = MuiWindowOpenPolicyStateRecord.AppWindowOffset;
+		else if (field == MuiWindowOpenPolicyStateField.Backdrop)
+			offset = MuiWindowOpenPolicyStateRecord.BackdropOffset;
+		else if (field == MuiWindowOpenPolicyStateField.Borderless)
+			offset = MuiWindowOpenPolicyStateRecord.BorderlessOffset;
+		else if (field == MuiWindowOpenPolicyStateField.PanelWindow)
+			offset = MuiWindowOpenPolicyStateRecord.PanelWindowOffset;
+		else if (field == MuiWindowOpenPolicyStateField.TabletMessages)
+			offset = MuiWindowOpenPolicyStateRecord.TabletMessagesOffset;
+		else if (field == MuiWindowOpenPolicyStateField.UseBottomBorderScroller)
+			offset = MuiWindowOpenPolicyStateRecord.UseBottomBorderScrollerOffset;
+		else if (field == MuiWindowOpenPolicyStateField.UseLeftBorderScroller)
+			offset = MuiWindowOpenPolicyStateRecord.UseLeftBorderScrollerOffset;
+		else if (field == MuiWindowOpenPolicyStateField.UseRightBorderScroller)
+			offset = MuiWindowOpenPolicyStateRecord.UseRightBorderScrollerOffset;
+		else
 		{
-			case MuiWindowOpenPolicyStateField.Magic:
-			case MuiWindowOpenPolicyStateField.AlternateHeight:
-			case MuiWindowOpenPolicyStateField.AlternateWidth:
-			case MuiWindowOpenPolicyStateField.AlternateLeftEdge:
-			case MuiWindowOpenPolicyStateField.AlternateTopEdge:
-			case MuiWindowOpenPolicyStateField.Height:
-			case MuiWindowOpenPolicyStateField.Width:
-			case MuiWindowOpenPolicyStateField.LeftEdge:
-			case MuiWindowOpenPolicyStateField.TopEdge:
-			case MuiWindowOpenPolicyStateField.CloseGadget:
-			case MuiWindowOpenPolicyStateField.DepthGadget:
-			case MuiWindowOpenPolicyStateField.DragBar:
-			case MuiWindowOpenPolicyStateField.SizeGadget:
-			case MuiWindowOpenPolicyStateField.SizeRight:
-			case MuiWindowOpenPolicyStateField.AppWindow:
-			case MuiWindowOpenPolicyStateField.Backdrop:
-			case MuiWindowOpenPolicyStateField.Borderless:
-			case MuiWindowOpenPolicyStateField.PanelWindow:
-			case MuiWindowOpenPolicyStateField.TabletMessages:
-			case MuiWindowOpenPolicyStateField.UseBottomBorderScroller:
-			case MuiWindowOpenPolicyStateField.UseLeftBorderScroller:
-			case MuiWindowOpenPolicyStateField.UseRightBorderScroller:
-				offset = (uint)field * 4;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -142,7 +186,7 @@ internal static class MuiWindowOpenPolicyStateFieldCursorCodec
 			!platform.IsMapped(cursor.Record, MuiWindowOpenPolicyStateRecord.Size))
 			return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiWindowOpenPolicyStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -176,16 +220,191 @@ internal static class MuiWindowOpenPolicyStateFieldCursorCodec
 // the semantic struct; this bounded boundary owns fixed guest translation.
 internal static class MuiWindowOpenPolicyStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiWindowOpenPolicyStateField field,
+		out uint offset)
+	{
+		if (field == MuiWindowOpenPolicyStateField.Magic)
+			offset = MuiWindowOpenPolicyStateRecord.MagicOffset;
+		else if (field == MuiWindowOpenPolicyStateField.AlternateHeight)
+			offset = MuiWindowOpenPolicyStateRecord.AlternateHeightOffset;
+		else if (field == MuiWindowOpenPolicyStateField.AlternateWidth)
+			offset = MuiWindowOpenPolicyStateRecord.AlternateWidthOffset;
+		else if (field == MuiWindowOpenPolicyStateField.AlternateLeftEdge)
+			offset = MuiWindowOpenPolicyStateRecord.AlternateLeftEdgeOffset;
+		else if (field == MuiWindowOpenPolicyStateField.AlternateTopEdge)
+			offset = MuiWindowOpenPolicyStateRecord.AlternateTopEdgeOffset;
+		else if (field == MuiWindowOpenPolicyStateField.Height)
+			offset = MuiWindowOpenPolicyStateRecord.HeightOffset;
+		else if (field == MuiWindowOpenPolicyStateField.Width)
+			offset = MuiWindowOpenPolicyStateRecord.WidthOffset;
+		else if (field == MuiWindowOpenPolicyStateField.LeftEdge)
+			offset = MuiWindowOpenPolicyStateRecord.LeftEdgeOffset;
+		else if (field == MuiWindowOpenPolicyStateField.TopEdge)
+			offset = MuiWindowOpenPolicyStateRecord.TopEdgeOffset;
+		else if (field == MuiWindowOpenPolicyStateField.CloseGadget)
+			offset = MuiWindowOpenPolicyStateRecord.CloseGadgetOffset;
+		else if (field == MuiWindowOpenPolicyStateField.DepthGadget)
+			offset = MuiWindowOpenPolicyStateRecord.DepthGadgetOffset;
+		else if (field == MuiWindowOpenPolicyStateField.DragBar)
+			offset = MuiWindowOpenPolicyStateRecord.DragBarOffset;
+		else if (field == MuiWindowOpenPolicyStateField.SizeGadget)
+			offset = MuiWindowOpenPolicyStateRecord.SizeGadgetOffset;
+		else if (field == MuiWindowOpenPolicyStateField.SizeRight)
+			offset = MuiWindowOpenPolicyStateRecord.SizeRightOffset;
+		else if (field == MuiWindowOpenPolicyStateField.AppWindow)
+			offset = MuiWindowOpenPolicyStateRecord.AppWindowOffset;
+		else if (field == MuiWindowOpenPolicyStateField.Backdrop)
+			offset = MuiWindowOpenPolicyStateRecord.BackdropOffset;
+		else if (field == MuiWindowOpenPolicyStateField.Borderless)
+			offset = MuiWindowOpenPolicyStateRecord.BorderlessOffset;
+		else if (field == MuiWindowOpenPolicyStateField.PanelWindow)
+			offset = MuiWindowOpenPolicyStateRecord.PanelWindowOffset;
+		else if (field == MuiWindowOpenPolicyStateField.TabletMessages)
+			offset = MuiWindowOpenPolicyStateRecord.TabletMessagesOffset;
+		else if (field == MuiWindowOpenPolicyStateField.UseBottomBorderScroller)
+			offset = MuiWindowOpenPolicyStateRecord.UseBottomBorderScrollerOffset;
+		else if (field == MuiWindowOpenPolicyStateField.UseLeftBorderScroller)
+			offset = MuiWindowOpenPolicyStateRecord.UseLeftBorderScrollerOffset;
+		else if (field == MuiWindowOpenPolicyStateField.UseRightBorderScroller)
+			offset = MuiWindowOpenPolicyStateRecord.UseRightBorderScrollerOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowOpenPolicyStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowOpenPolicyStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiWindowOpenPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiWindowOpenPolicyStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiWindowOpenPolicyStateField.AlternateHeight)
+			value = unchecked((uint)state.AlternateHeight);
+		else if (field == MuiWindowOpenPolicyStateField.AlternateWidth)
+			value = unchecked((uint)state.AlternateWidth);
+		else if (field == MuiWindowOpenPolicyStateField.AlternateLeftEdge)
+			value = unchecked((uint)state.AlternateLeftEdge);
+		else if (field == MuiWindowOpenPolicyStateField.AlternateTopEdge)
+			value = unchecked((uint)state.AlternateTopEdge);
+		else if (field == MuiWindowOpenPolicyStateField.Height)
+			value = unchecked((uint)state.Height);
+		else if (field == MuiWindowOpenPolicyStateField.Width)
+			value = unchecked((uint)state.Width);
+		else if (field == MuiWindowOpenPolicyStateField.LeftEdge)
+			value = unchecked((uint)state.LeftEdge);
+		else if (field == MuiWindowOpenPolicyStateField.TopEdge)
+			value = unchecked((uint)state.TopEdge);
+		else if (field == MuiWindowOpenPolicyStateField.CloseGadget)
+			value = state.CloseGadget;
+		else if (field == MuiWindowOpenPolicyStateField.DepthGadget)
+			value = state.DepthGadget;
+		else if (field == MuiWindowOpenPolicyStateField.DragBar)
+			value = state.DragBar;
+		else if (field == MuiWindowOpenPolicyStateField.SizeGadget)
+			value = state.SizeGadget;
+		else if (field == MuiWindowOpenPolicyStateField.SizeRight)
+			value = state.SizeRight;
+		else if (field == MuiWindowOpenPolicyStateField.AppWindow)
+			value = state.AppWindow;
+		else if (field == MuiWindowOpenPolicyStateField.Backdrop)
+			value = state.Backdrop;
+		else if (field == MuiWindowOpenPolicyStateField.Borderless)
+			value = state.Borderless;
+		else if (field == MuiWindowOpenPolicyStateField.PanelWindow)
+			value = state.PanelWindow;
+		else if (field == MuiWindowOpenPolicyStateField.TabletMessages)
+			value = state.TabletMessages;
+		else if (field == MuiWindowOpenPolicyStateField.UseBottomBorderScroller)
+			value = state.UseBottomBorderScroller;
+		else if (field == MuiWindowOpenPolicyStateField.UseLeftBorderScroller)
+			value = state.UseLeftBorderScroller;
+		else if (field == MuiWindowOpenPolicyStateField.UseRightBorderScroller)
+			value = state.UseRightBorderScroller;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowOpenPolicyStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiWindowOpenPolicyStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiWindowOpenPolicyStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiWindowOpenPolicyStateField.AlternateHeight)
+			state.AlternateHeight = unchecked((int)value);
+		else if (field == MuiWindowOpenPolicyStateField.AlternateWidth)
+			state.AlternateWidth = unchecked((int)value);
+		else if (field == MuiWindowOpenPolicyStateField.AlternateLeftEdge)
+			state.AlternateLeftEdge = unchecked((int)value);
+		else if (field == MuiWindowOpenPolicyStateField.AlternateTopEdge)
+			state.AlternateTopEdge = unchecked((int)value);
+		else if (field == MuiWindowOpenPolicyStateField.Height)
+			state.Height = unchecked((int)value);
+		else if (field == MuiWindowOpenPolicyStateField.Width)
+			state.Width = unchecked((int)value);
+		else if (field == MuiWindowOpenPolicyStateField.LeftEdge)
+			state.LeftEdge = unchecked((int)value);
+		else if (field == MuiWindowOpenPolicyStateField.TopEdge)
+			state.TopEdge = unchecked((int)value);
+		else if (field == MuiWindowOpenPolicyStateField.CloseGadget)
+			state.CloseGadget = value;
+		else if (field == MuiWindowOpenPolicyStateField.DepthGadget)
+			state.DepthGadget = value;
+		else if (field == MuiWindowOpenPolicyStateField.DragBar)
+			state.DragBar = value;
+		else if (field == MuiWindowOpenPolicyStateField.SizeGadget)
+			state.SizeGadget = value;
+		else if (field == MuiWindowOpenPolicyStateField.SizeRight)
+			state.SizeRight = value;
+		else if (field == MuiWindowOpenPolicyStateField.AppWindow)
+			state.AppWindow = value;
+		else if (field == MuiWindowOpenPolicyStateField.Backdrop)
+			state.Backdrop = value;
+		else if (field == MuiWindowOpenPolicyStateField.Borderless)
+			state.Borderless = value;
+		else if (field == MuiWindowOpenPolicyStateField.PanelWindow)
+			state.PanelWindow = value;
+		else if (field == MuiWindowOpenPolicyStateField.TabletMessages)
+			state.TabletMessages = value;
+		else if (field == MuiWindowOpenPolicyStateField.UseBottomBorderScroller)
+			state.UseBottomBorderScroller = value;
+		else if (field == MuiWindowOpenPolicyStateField.UseLeftBorderScroller)
+			state.UseLeftBorderScroller = value;
+		else if (field == MuiWindowOpenPolicyStateField.UseRightBorderScroller)
+			state.UseRightBorderScroller = value;
+		else return false;
+		return MuiWindowOpenPolicyStateRecordCodec.WriteStructural(ref platform,
+			record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiWindowOpenPolicyStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiWindowOpenPolicyStateRecord.Size -
+			MuiWindowOpenPolicyStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiWindowOpenPolicyStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiWindowOpenPolicyStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -214,6 +433,11 @@ internal static class MuiWindowOpenPolicyStateRecordCodec
 	// Signed geometry and canonical BOOL fields are exchanged in declaration
 	// order; numeric positions remain confined to the compatibility adapter.
 	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiWindowOpenPolicyStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
 		APTR address, MuiWindowOpenPolicyStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiGuestStructCursor.TryCreate(ref platform, address,
@@ -359,7 +583,7 @@ internal static class MuiWindowOpenPolicyStateRecordCodec
 		MuiWindowOpenPolicyStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiWindowOpenPolicyStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, (uint)field * 4, out value);
+			address, field, out value);
 
 	private static bool TryReadSigned<TPlatform>(ref TPlatform platform,
 		APTR address, MuiWindowOpenPolicyStateField field, out int value)
@@ -385,7 +609,7 @@ internal static class MuiWindowOpenPolicyStateRecordCodec
 		MuiWindowOpenPolicyStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiWindowOpenPolicyStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, (uint)field * 4, value);
+			address, field, value);
 
 	private static bool WriteSigned<TPlatform>(ref TPlatform platform,
 		APTR address, MuiWindowOpenPolicyStateField field, int value)

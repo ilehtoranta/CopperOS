@@ -76,17 +76,25 @@ public sealed class MuiWindowInteractionAdmissionTests
 		Assert.True(MuiWindowInteractionStateRecordCodec.Write(ref platform,
 			address, value));
 		Assert.True(MuiWindowInteractionStateRecordMemoryCodec.TryGetAddress(
-			ref platform, address, 20, out var requests) && requests.Raw == 0x1654u);
+			ref platform, address, MuiWindowInteractionStateField.CycleChainRequests,
+			out var requests) && requests.Raw == 0x1654u);
 		Assert.True(MuiWindowInteractionStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 4, out var flags) && flags == 1);
+			ref platform, address, MuiWindowInteractionStateField.SnapshotFlags,
+			out var flags) && flags == 1);
 		Assert.True(MuiWindowInteractionStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 4, 0));
+			ref platform, address, MuiWindowInteractionStateField.SnapshotFlags, 0));
 		Assert.True(MuiWindowInteractionStateRecordCodec.TryReadStructural(ref platform,
-			address, out var decoded) && decoded.SnapshotFlags == 0);
+			address, out var decoded) && decoded.Magic == value.Magic &&
+			decoded.SnapshotFlags == 0 && decoded.SnapshotRequests == value.SnapshotRequests &&
+			decoded.CycleChainHead == value.CycleChainHead &&
+			decoded.CycleChainCount == value.CycleChainCount &&
+			decoded.CycleChainRequests == value.CycleChainRequests);
+		Assert.False(MuiWindowInteractionStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiWindowInteractionStateField)255, out _));
 		Assert.False(MuiWindowInteractionStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiWindowInteractionStateRecord.Size, out _));
 		Assert.False(MuiWindowInteractionStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreateWindow(out APTR window,

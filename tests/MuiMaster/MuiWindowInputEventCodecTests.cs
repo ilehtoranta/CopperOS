@@ -22,6 +22,13 @@ public sealed class MuiWindowInputEventCodecTests
 			TimeStamp = new TimeVal { Seconds = 2, Microseconds = 3 },
 		};
 		Assert.True(MuiWindowInputEventCodec.Write(ref platform, address, value));
+		Assert.True(MuiWindowInputEventRecordCodec.TryReadStructural(ref platform,
+			address, out var structural) && structural.NextEvent == value.NextEvent &&
+			structural.Class == (byte)value.Class && structural.SubClass ==
+			(byte)value.SubClass && structural.Code == value.Code &&
+			structural.Qualifier == (ushort)value.Qualifier && structural.Position ==
+			value.Position && structural.Seconds == value.TimeStamp.Seconds &&
+			structural.Microseconds == value.TimeStamp.Microseconds);
 		Assert.True(MuiWindowInputEventMemoryCodec.TryGetAddress(ref platform,
 			address, MuiWindowInputEventField.Code, out var code) && code.Raw ==
 			0x17A6u);
@@ -32,6 +39,13 @@ public sealed class MuiWindowInputEventCodecTests
 			address, MuiWindowInputEventField.Position, 24));
 		Assert.True(MuiWindowInputEventCodec.TryRead(ref platform, address,
 			out var decoded) && decoded.Position == 24 && decoded.Code == 0x44);
+		Assert.True(MuiWindowInputEventMemoryCodec.TryReadUInt8(ref platform,
+			address, MuiWindowInputEventField.Class, out var eventClass) &&
+			eventClass == (byte)InputEventClass.RawKey);
+		Assert.False(MuiWindowInputEventMemoryCodec.TryReadUInt16(ref platform,
+			address, MuiWindowInputEventField.Class, out _));
+		Assert.False(MuiWindowInputEventMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiWindowInputEventField.Code, 0x10000));
 		Assert.False(MuiWindowInputEventMemoryCodec.TryGetAddress(ref platform,
 			APTR.FromPointer(uint.MaxValue - 8),
 			MuiWindowInputEventField.Microseconds, out _));

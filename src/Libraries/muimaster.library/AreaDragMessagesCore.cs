@@ -488,13 +488,126 @@ internal static class MuiAreaDragMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaDragFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (packet == MuiAreaDragPacketKind.Method)
+			return field == MuiAreaDragField.MethodId &&
+				MuiGuestUlongStorageCodec.TryReadValue(ref platform, message,
+					out value);
+		if (packet == MuiAreaDragPacketKind.Begin)
+		{
+			if (!MuiAreaDragBeginMessageCodec.TryRead(ref platform, message,
+				out var begin)) return false;
+			if (field == MuiAreaDragField.MethodId) value = begin.MethodId;
+			else if (field == MuiAreaDragField.Object) value = begin.Object;
+			else return false;
+			return true;
+		}
+		if (packet == MuiAreaDragPacketKind.DoDrag)
+		{
+			if (!MuiAreaDoDragMessageCodec.TryRead(ref platform, message,
+				out var doDrag)) return false;
+			if (field == MuiAreaDragField.MethodId) value = doDrag.MethodId;
+			else if (field == MuiAreaDragField.TouchX)
+				value = unchecked((uint)doDrag.TouchX);
+			else if (field == MuiAreaDragField.TouchY)
+				value = unchecked((uint)doDrag.TouchY);
+			else if (field == MuiAreaDragField.Flags) value = doDrag.Flags;
+			else return false;
+			return true;
+		}
+		if (packet == MuiAreaDragPacketKind.CreateImage)
+		{
+			if (!MuiAreaCreateDragImageMessageCodec.TryRead(ref platform, message,
+				out var create)) return false;
+			if (field == MuiAreaDragField.MethodId) value = create.MethodId;
+			else if (field == MuiAreaDragField.TouchX)
+				value = unchecked((uint)create.TouchX);
+			else if (field == MuiAreaDragField.TouchY)
+				value = unchecked((uint)create.TouchY);
+			else if (field == MuiAreaDragField.Flags) value = create.Flags;
+			else return false;
+			return true;
+		}
+		if (packet == MuiAreaDragPacketKind.Drop)
+		{
+			if (!MuiAreaDragDropMessageCodec.TryRead(ref platform, message,
+				out var drop)) return false;
+			if (field == MuiAreaDragField.MethodId) value = drop.MethodId;
+			else if (field == MuiAreaDragField.Object) value = drop.Object;
+			else if (field == MuiAreaDragField.X)
+				value = unchecked((uint)drop.X);
+			else if (field == MuiAreaDragField.Y)
+				value = unchecked((uint)drop.Y);
+			else if (field == MuiAreaDragField.Qualifier) value = drop.Qualifier;
+			else return false;
+			return true;
+		}
+		if (packet == MuiAreaDragPacketKind.Event)
+		{
+			if (!MuiAreaDragEventMessageCodec.TryRead(ref platform, message,
+				out var dragEvent)) return false;
+			if (field == MuiAreaDragField.MethodId) value = dragEvent.MethodId;
+			else if (field == MuiAreaDragField.Window) value = dragEvent.Window;
+			else if (field == MuiAreaDragField.Object) value = dragEvent.Object;
+			else if (field == MuiAreaDragField.DragImage)
+				value = dragEvent.DragImage;
+			else if (field == MuiAreaDragField.IntuiMessage)
+				value = dragEvent.IntuiMessage;
+			else if (field == MuiAreaDragField.MuiKey)
+				value = unchecked((uint)dragEvent.MuiKey);
+			else if (field == MuiAreaDragField.MousePointerType)
+				value = dragEvent.MousePointerType;
+			else if (field == MuiAreaDragField.Flags) value = dragEvent.Flags;
+			else return false;
+			return true;
+		}
+		if (packet == MuiAreaDragPacketKind.Finish)
+		{
+			if (!MuiAreaDragFinishMessageCodec.TryRead(ref platform, message,
+				out var finish)) return false;
+			if (field == MuiAreaDragField.MethodId) value = finish.MethodId;
+			else if (field == MuiAreaDragField.Object) value = finish.Object;
+			else if (field == MuiAreaDragField.DropFollows)
+				value = unchecked((uint)finish.DropFollows);
+			else return false;
+			return true;
+		}
+		if (packet == MuiAreaDragPacketKind.Query)
+		{
+			if (!MuiAreaDragQueryMessageCodec.TryRead(ref platform, message,
+				out var query)) return false;
+			if (field == MuiAreaDragField.MethodId) value = query.MethodId;
+			else if (field == MuiAreaDragField.Object) value = query.Object;
+			else return false;
+			return true;
+		}
+		if (packet == MuiAreaDragPacketKind.Report)
+		{
+			if (!MuiAreaDragReportMessageCodec.TryRead(ref platform, message,
+				out var report)) return false;
+			if (field == MuiAreaDragField.MethodId) value = report.MethodId;
+			else if (field == MuiAreaDragField.Object) value = report.Object;
+			else if (field == MuiAreaDragField.X)
+				value = unchecked((uint)report.X);
+			else if (field == MuiAreaDragField.Y)
+				value = unchecked((uint)report.Y);
+			else if (field == MuiAreaDragField.Update)
+				value = unchecked((uint)report.Update);
+			else if (field == MuiAreaDragField.Qualifier)
+				value = report.Qualifier;
+			else return false;
+			return true;
+		}
+		if (packet == MuiAreaDragPacketKind.DeleteImage)
+		{
+			if (!MuiAreaDeleteDragImageMessageCodec.TryRead(ref platform, message,
+				out var delete)) return false;
+			if (field == MuiAreaDragField.MethodId) value = delete.MethodId;
+			else if (field == MuiAreaDragField.DragImage)
+				value = delete.DragImage;
+			else return false;
+			return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -502,13 +615,124 @@ internal static class MuiAreaDragMessageMemoryCodec
 		uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaDragFieldCursor);
-		cursor.Message = message;
-		cursor.Packet = packet;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (packet == MuiAreaDragPacketKind.Method)
+			return field == MuiAreaDragField.MethodId &&
+				MuiGuestUlongStorageCodec.WriteValue(ref platform, message, value);
+		if (packet == MuiAreaDragPacketKind.Begin)
+		{
+			if (!MuiAreaDragBeginMessageCodec.TryRead(ref platform, message,
+				out var begin)) return false;
+			if (field == MuiAreaDragField.MethodId) begin.MethodId = value;
+			else if (field == MuiAreaDragField.Object) begin.Object = value;
+			else return false;
+			return MuiAreaDragBeginMessageCodec.Write(ref platform, message, begin);
+		}
+		if (packet == MuiAreaDragPacketKind.DoDrag)
+		{
+			if (!MuiAreaDoDragMessageCodec.TryRead(ref platform, message,
+				out var doDrag)) return false;
+			if (field == MuiAreaDragField.MethodId) doDrag.MethodId = value;
+			else if (field == MuiAreaDragField.TouchX)
+				doDrag.TouchX = unchecked((int)value);
+			else if (field == MuiAreaDragField.TouchY)
+				doDrag.TouchY = unchecked((int)value);
+			else if (field == MuiAreaDragField.Flags) doDrag.Flags = value;
+			else return false;
+			return MuiAreaDoDragMessageCodec.Write(ref platform, message, doDrag);
+		}
+		if (packet == MuiAreaDragPacketKind.CreateImage)
+		{
+			if (!MuiAreaCreateDragImageMessageCodec.TryRead(ref platform, message,
+				out var create)) return false;
+			if (field == MuiAreaDragField.MethodId) create.MethodId = value;
+			else if (field == MuiAreaDragField.TouchX)
+				create.TouchX = unchecked((int)value);
+			else if (field == MuiAreaDragField.TouchY)
+				create.TouchY = unchecked((int)value);
+			else if (field == MuiAreaDragField.Flags) create.Flags = value;
+			else return false;
+			return MuiAreaCreateDragImageMessageCodec.Write(ref platform, message,
+				create);
+		}
+		if (packet == MuiAreaDragPacketKind.Drop)
+		{
+			if (!MuiAreaDragDropMessageCodec.TryRead(ref platform, message,
+				out var drop)) return false;
+			if (field == MuiAreaDragField.MethodId) drop.MethodId = value;
+			else if (field == MuiAreaDragField.Object) drop.Object = value;
+			else if (field == MuiAreaDragField.X) drop.X = unchecked((int)value);
+			else if (field == MuiAreaDragField.Y) drop.Y = unchecked((int)value);
+			else if (field == MuiAreaDragField.Qualifier) drop.Qualifier = value;
+			else return false;
+			return MuiAreaDragDropMessageCodec.Write(ref platform, message, drop);
+		}
+		if (packet == MuiAreaDragPacketKind.Event)
+		{
+			if (!MuiAreaDragEventMessageCodec.TryRead(ref platform, message,
+				out var dragEvent)) return false;
+			if (field == MuiAreaDragField.MethodId) dragEvent.MethodId = value;
+			else if (field == MuiAreaDragField.Window) dragEvent.Window = value;
+			else if (field == MuiAreaDragField.Object) dragEvent.Object = value;
+			else if (field == MuiAreaDragField.DragImage)
+				dragEvent.DragImage = value;
+			else if (field == MuiAreaDragField.IntuiMessage)
+				dragEvent.IntuiMessage = value;
+			else if (field == MuiAreaDragField.MuiKey)
+				dragEvent.MuiKey = unchecked((int)value);
+			else if (field == MuiAreaDragField.MousePointerType)
+				dragEvent.MousePointerType = value;
+			else if (field == MuiAreaDragField.Flags) dragEvent.Flags = value;
+			else return false;
+			return MuiAreaDragEventMessageCodec.Write(ref platform, message,
+				dragEvent);
+		}
+		if (packet == MuiAreaDragPacketKind.Finish)
+		{
+			if (!MuiAreaDragFinishMessageCodec.TryRead(ref platform, message,
+				out var finish)) return false;
+			if (field == MuiAreaDragField.MethodId) finish.MethodId = value;
+			else if (field == MuiAreaDragField.Object) finish.Object = value;
+			else if (field == MuiAreaDragField.DropFollows)
+				finish.DropFollows = unchecked((int)value);
+			else return false;
+			return MuiAreaDragFinishMessageCodec.Write(ref platform, message, finish);
+		}
+		if (packet == MuiAreaDragPacketKind.Query)
+		{
+			if (!MuiAreaDragQueryMessageCodec.TryRead(ref platform, message,
+				out var query)) return false;
+			if (field == MuiAreaDragField.MethodId) query.MethodId = value;
+			else if (field == MuiAreaDragField.Object) query.Object = value;
+			else return false;
+			return MuiAreaDragQueryMessageCodec.Write(ref platform, message, query);
+		}
+		if (packet == MuiAreaDragPacketKind.Report)
+		{
+			if (!MuiAreaDragReportMessageCodec.TryRead(ref platform, message,
+				out var report)) return false;
+			if (field == MuiAreaDragField.MethodId) report.MethodId = value;
+			else if (field == MuiAreaDragField.Object) report.Object = value;
+			else if (field == MuiAreaDragField.X) report.X = unchecked((int)value);
+			else if (field == MuiAreaDragField.Y) report.Y = unchecked((int)value);
+			else if (field == MuiAreaDragField.Update)
+				report.Update = unchecked((int)value);
+			else if (field == MuiAreaDragField.Qualifier)
+				report.Qualifier = value;
+			else return false;
+			return MuiAreaDragReportMessageCodec.Write(ref platform, message, report);
+		}
+		if (packet == MuiAreaDragPacketKind.DeleteImage)
+		{
+			if (!MuiAreaDeleteDragImageMessageCodec.TryRead(ref platform, message,
+				out var delete)) return false;
+			if (field == MuiAreaDragField.MethodId) delete.MethodId = value;
+			else if (field == MuiAreaDragField.DragImage)
+				delete.DragImage = value;
+			else return false;
+			return MuiAreaDeleteDragImageMessageCodec.Write(ref platform, message,
+				delete);
+		}
+		return false;
 	}
 }
 

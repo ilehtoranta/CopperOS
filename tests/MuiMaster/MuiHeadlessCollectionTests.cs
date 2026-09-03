@@ -149,6 +149,61 @@ public sealed class MuiHeadlessCollectionTests
 	}
 
 	[Fact]
+	public void StorePolicyFieldAccessUsesCompleteNamedRecords()
+	{
+		var platform = CreatePlatform(out _);
+		var poolAddress = APTR.FromPointer(0x1380);
+		var pool = default(MuiStorePoolStateRecord);
+		pool.Pool = APTR.FromPointer(0x1500);
+		pool.Policy = 1;
+		pool.OwnsPool = 1;
+		pool.Magic = MuiStorePoolStateRecord.MagicValue;
+		Assert.True(MuiStorePoolStateCodec.WriteStructural(ref platform,
+			poolAddress, pool));
+		Assert.True(MuiStorePoolStateCodec.TryWriteUInt32(ref platform,
+			poolAddress, MuiStorePoolStateField.Policy, 2));
+		Assert.True(MuiStorePoolStateCodec.TryReadUInt32(ref platform,
+			poolAddress, MuiStorePoolStateField.Pool, out var poolHandle));
+		Assert.Equal(pool.Pool.Raw, poolHandle);
+		Assert.True(MuiStorePoolStateCodec.TryReadStructural(ref platform,
+			poolAddress, out var poolAfter));
+		Assert.Equal(2u, poolAfter.Policy);
+		Assert.Equal(pool.OwnsPool, poolAfter.OwnsPool);
+		Assert.Equal(pool.Magic, poolAfter.Magic);
+		Assert.False(MuiStorePoolStateCodec.TryReadUInt32(ref platform,
+			poolAddress, (MuiStorePoolStateField)255, out _));
+		Assert.False(MuiStorePoolStateCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(0x40000), MuiStorePoolStateField.Policy, 3));
+
+		var iterationAddress = APTR.FromPointer(0x13C0);
+		var iteration = default(MuiStoreIterationStateRecord);
+		iteration.Next = APTR.FromPointer(0x1600);
+		iteration.Counter = APTR.FromPointer(0x1640);
+		iteration.Current = APTR.FromPointer(0x1680);
+		iteration.NextRecord = APTR.FromPointer(0x16C0);
+		iteration.Kind = (uint)MuiStorePolicyKind.Dataspace;
+		iteration.Magic = MuiStoreIterationStateRecord.MagicValue;
+		Assert.True(MuiStoreIterationStateCodec.WriteStructural(ref platform,
+			iterationAddress, iteration));
+		Assert.True(MuiStoreIterationStateCodec.TryWriteUInt32(ref platform,
+			iterationAddress, MuiStoreIterationStateField.Current, 0x1700));
+		Assert.True(MuiStoreIterationStateCodec.TryReadUInt32(ref platform,
+			iterationAddress, MuiStoreIterationStateField.NextRecord,
+			out var nextRecord));
+		Assert.Equal(iteration.NextRecord.Raw, nextRecord);
+		Assert.True(MuiStoreIterationStateCodec.TryReadStructural(ref platform,
+			iterationAddress, out var iterationAfter));
+		Assert.Equal(APTR.FromPointer(0x1700), iterationAfter.Current);
+		Assert.Equal(iteration.Next, iterationAfter.Next);
+		Assert.Equal(iteration.Kind, iterationAfter.Kind);
+		Assert.Equal(iteration.Magic, iterationAfter.Magic);
+		Assert.False(MuiStoreIterationStateCodec.TryReadUInt32(ref platform,
+			iterationAddress, (MuiStoreIterationStateField)255, out _));
+		Assert.False(MuiStoreIterationStateCodec.TryReadStructural(ref platform,
+			APTR.FromPointer(0x40000), out _));
+	}
+
+	[Fact]
 	public void FamilyMutationVectorCodecUsesNamedObjectField()
 	{
 		var platform = CreatePlatform(out _);

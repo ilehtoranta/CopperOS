@@ -90,8 +90,17 @@ internal static class MuiSpecialistHookMessageRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiSpecialistHookMessageCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiSpecialistHookMessageField.MethodId)
+			value = state.MethodId;
+		else if (field == MuiSpecialistHookMessageField.Param1)
+			value = state.Param1;
+		else if (field == MuiSpecialistHookMessageField.Param2)
+			value = state.Param2;
+		else if (field == MuiSpecialistHookMessageField.Reserved)
+			value = state.Reserved;
+		else return false;
 		return true;
 	}
 
@@ -99,9 +108,19 @@ internal static class MuiSpecialistHookMessageRecordMemoryCodec
 		APTR record, MuiSpecialistHookMessageField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiSpecialistHookMessageCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiSpecialistHookMessageField.MethodId)
+			state.MethodId = value;
+		else if (field == MuiSpecialistHookMessageField.Param1)
+			state.Param1 = value;
+		else if (field == MuiSpecialistHookMessageField.Param2)
+			state.Param2 = value;
+		else if (field == MuiSpecialistHookMessageField.Reserved)
+			state.Reserved = value;
+		else return false;
+		return MuiSpecialistHookMessageCodec.WriteStructural(ref platform, record,
+			state);
 	}
 }
 
@@ -151,6 +170,11 @@ internal static class MuiSpecialistHookMessageCodec
 	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
 		APTR address, MuiSpecialistHookMessage value)
 		where TPlatform : struct, IMuiGuestMemory =>
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiSpecialistHookMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
 		MuiGuestStructCursor.TryCreate(ref platform, address,
 			MuiSpecialistHookMessage.Size, out var cursor) &&
 		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
@@ -161,6 +185,11 @@ internal static class MuiSpecialistHookMessageCodec
 			value.Param2) &&
 		MuiGuestStructCursor.TryWriteUInt32(ref platform, ref cursor,
 			value.Reserved) && MuiGuestStructCursor.IsComplete(cursor);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiSpecialistHookMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
 
 	internal static bool TryRead<TPlatform>(ref TPlatform platform, APTR address,
 		out MuiSpecialistHookMessage value)

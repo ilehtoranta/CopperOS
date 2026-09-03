@@ -254,22 +254,146 @@ internal static class MuiClassRecordMemoryCodec
 		out uint value) where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, address, record, field,
-			out var fieldAddress))
-			return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
-		return true;
+		if (record == MuiClassRecordKind.State)
+		{
+			if (!MuiClassServiceStateStructCodec.TryRead(ref platform, address,
+				out var state)) return false;
+			if (field == MuiClassRecordField.Magic)
+				value = state.Magic;
+			else if (field == MuiClassRecordField.Head)
+				value = state.Head.Raw;
+			else if (field == MuiClassRecordField.Headless)
+				value = state.Headless.Raw;
+			else if (field == MuiClassRecordField.Generation)
+				value = state.Generation;
+			else return false;
+			return true;
+		}
+		if (record == MuiClassRecordKind.Lease)
+		{
+			if (!MuiClassServiceLeaseStructCodec.TryRead(ref platform, address,
+				out var lease)) return false;
+			if (field == MuiClassRecordField.Next)
+				value = lease.Next.Raw;
+			else if (field == MuiClassRecordField.Flags)
+				value = lease.Flags;
+			else if (field == MuiClassRecordField.ClassId)
+				value = lease.ClassId.Raw;
+			else if (field == MuiClassRecordField.Boopsi)
+				value = lease.Boopsi.Raw;
+			else if (field == MuiClassRecordField.LibraryBase)
+				value = lease.LibraryBase.Raw;
+			else if (field == MuiClassRecordField.RefCount)
+				value = lease.RefCount;
+			else if (field == MuiClassRecordField.HeadlessClass)
+				value = lease.HeadlessClass.Raw;
+			else if (field == MuiClassRecordField.CustomClass)
+				value = lease.CustomClass.Raw;
+			else if (field == MuiClassRecordField.SuperService)
+				value = lease.SuperService.Raw;
+			else if (field == MuiClassRecordField.ObjectCount)
+				value = lease.ObjectCount;
+			else if (field == MuiClassRecordField.ChildCount)
+				value = lease.ChildCount;
+			else return false;
+			return true;
+		}
+		if (record == MuiClassRecordKind.CustomClass)
+		{
+			if (!MuiCustomClassStructCodec.TryRead(ref platform, address,
+				out var custom)) return false;
+			if (field == MuiClassRecordField.UserData)
+				value = custom.UserData.Raw;
+			else if (field == MuiClassRecordField.UtilityBase)
+				value = custom.UtilityBase.Raw;
+			else if (field == MuiClassRecordField.DosBase)
+				value = custom.DosBase.Raw;
+			else if (field == MuiClassRecordField.GfxBase)
+				value = custom.GfxBase.Raw;
+			else if (field == MuiClassRecordField.IntuitionBase)
+				value = custom.IntuitionBase.Raw;
+			else if (field == MuiClassRecordField.Super)
+				value = custom.Super.Raw;
+			else if (field == MuiClassRecordField.Class)
+				value = custom.Class.Raw;
+			else return false;
+			return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiClassRecordKind record, MuiClassRecordField field,
 		uint value) where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, address, record, field,
-			out var fieldAddress))
-			return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
-		return true;
+		if (record == MuiClassRecordKind.State)
+		{
+			if (!MuiClassServiceStateStructCodec.TryRead(ref platform, address,
+				out var state)) return false;
+			if (field == MuiClassRecordField.Magic)
+				state.Magic = value;
+			else if (field == MuiClassRecordField.Head)
+				state.Head = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.Headless)
+				state.Headless = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.Generation)
+				state.Generation = value;
+			else return false;
+			return MuiClassServiceStateStructCodec.Write(ref platform, address,
+				state);
+		}
+		if (record == MuiClassRecordKind.Lease)
+		{
+			if (!MuiClassServiceLeaseStructCodec.TryRead(ref platform, address,
+				out var lease)) return false;
+			if (field == MuiClassRecordField.Next)
+				lease.Next = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.Flags)
+				lease.Flags = value;
+			else if (field == MuiClassRecordField.ClassId)
+				lease.ClassId = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.Boopsi)
+				lease.Boopsi = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.LibraryBase)
+				lease.LibraryBase = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.RefCount)
+				lease.RefCount = value;
+			else if (field == MuiClassRecordField.HeadlessClass)
+				lease.HeadlessClass = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.CustomClass)
+				lease.CustomClass = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.SuperService)
+				lease.SuperService = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.ObjectCount)
+				lease.ObjectCount = value;
+			else if (field == MuiClassRecordField.ChildCount)
+				lease.ChildCount = value;
+			else return false;
+			return MuiClassServiceLeaseStructCodec.Write(ref platform, address,
+				lease);
+		}
+		if (record == MuiClassRecordKind.CustomClass)
+		{
+			if (!MuiCustomClassStructCodec.TryRead(ref platform, address,
+				out var custom)) return false;
+			if (field == MuiClassRecordField.UserData)
+				custom.UserData = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.UtilityBase)
+				custom.UtilityBase = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.DosBase)
+				custom.DosBase = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.GfxBase)
+				custom.GfxBase = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.IntuitionBase)
+				custom.IntuitionBase = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.Super)
+				custom.Super = APTR.FromPointer(value);
+			else if (field == MuiClassRecordField.Class)
+				custom.Class = APTR.FromPointer(value);
+			else return false;
+			return MuiCustomClassStructCodec.Write(ref platform, address, custom);
+		}
+		return false;
 	}
 }
 

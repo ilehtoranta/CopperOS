@@ -114,9 +114,25 @@ internal static class MuiAreaDragStateMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiAreaDragStateCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiAreaDragStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiAreaDragStateField.Source)
+			value = state.Source;
+		else if (field == MuiAreaDragStateField.Target)
+			value = state.Target;
+		else if (field == MuiAreaDragStateField.LastX)
+			value = unchecked((uint)state.LastX);
+		else if (field == MuiAreaDragStateField.LastY)
+			value = unchecked((uint)state.LastY);
+		else if (field == MuiAreaDragStateField.Qualifier)
+			value = state.Qualifier;
+		else if (field == MuiAreaDragStateField.EventFlags)
+			value = state.EventFlags;
+		else if (field == MuiAreaDragStateField.Flags)
+			value = state.Flags;
+		else return false;
 		return true;
 	}
 
@@ -124,10 +140,26 @@ internal static class MuiAreaDragStateMemoryCodec
 		APTR record, MuiAreaDragStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiAreaDragStateCodec.TryReadStructural(ref platform, record,
+			out var state)) return false;
+		if (field == MuiAreaDragStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiAreaDragStateField.Source)
+			state.Source = value;
+		else if (field == MuiAreaDragStateField.Target)
+			state.Target = value;
+		else if (field == MuiAreaDragStateField.LastX)
+			state.LastX = unchecked((int)value);
+		else if (field == MuiAreaDragStateField.LastY)
+			state.LastY = unchecked((int)value);
+		else if (field == MuiAreaDragStateField.Qualifier)
+			state.Qualifier = value;
+		else if (field == MuiAreaDragStateField.EventFlags)
+			state.EventFlags = value;
+		else if (field == MuiAreaDragStateField.Flags)
+			state.Flags = value;
+		else return false;
+		return MuiAreaDragStateCodec.TryWriteStruct(ref platform, record, state);
 	}
 }
 
@@ -184,7 +216,7 @@ internal static class MuiAreaDragStateCodec
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
-	internal static bool TryReadStruct<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
 		APTR storage, out MuiAreaDragState value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -210,8 +242,14 @@ internal static class MuiAreaDragStateCodec
 			!MuiGuestStructCursor.IsComplete(cursor)) return false;
 		value.LastX = unchecked((int)rawLastX);
 		value.LastY = unchecked((int)rawLastY);
-		return value.Magic == Cookie;
+		return true;
 	}
+
+	internal static bool TryReadStruct<TPlatform>(ref TPlatform platform,
+		APTR storage, out MuiAreaDragState value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadStructural(ref platform, storage, out value) &&
+		value.Magic == Cookie;
 
 	internal static void Write<TPlatform>(ref TPlatform platform, APTR storage,
 		MuiAreaDragState value) where TPlatform : struct, IMuiGuestMemory

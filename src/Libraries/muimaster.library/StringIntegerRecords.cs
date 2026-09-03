@@ -123,8 +123,21 @@ internal static class MuiStringIntegerStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		// The cookie is also the recovery sentinel used by malformed-state
+		// diagnostics. It must remain readable even when the record is not yet
+		// structurally admissible; all semantic fields use the structural path.
+		if (field == MuiStringIntegerStateField.Magic)
+		{
+			if (!TryGetAddress(ref platform, record, field, out var magicAddress))
+				return false;
+			value = platform.ReadUInt32(magicAddress, 0);
+			return true;
+		}
+		if (!MuiStringIntegerStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringIntegerStateField.Value)
+			value = unchecked((uint)state.Value);
+		else return false;
 		return true;
 	}
 
@@ -132,9 +145,22 @@ internal static class MuiStringIntegerStateRecordMemoryCodec
 		APTR record, MuiStringIntegerStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		// Preserve the bounded cookie-repair operation used by malformed-state
+		// diagnostics; semantic value writes remain structural below.
+		if (field == MuiStringIntegerStateField.Magic)
+		{
+			if (!TryGetAddress(ref platform, record, field, out var magicAddress))
+				return false;
+			platform.WriteUInt32(magicAddress, 0, value);
+			return true;
+		}
+		if (!MuiStringIntegerStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiStringIntegerStateField.Value)
+			state.Value = unchecked((int)value);
+		else return false;
+		return MuiStringIntegerStateRecordCodec.WriteStructural(ref platform,
+			record, state);
 	}
 }
 
@@ -167,6 +193,12 @@ internal static class MuiStringIntegerStateRecordCodec
 		MuiStringIntegerStateAdmission.Validate(value);
 
 	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address,
+		MuiStringIntegerStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory
+		=> WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
 		APTR address,
 		MuiStringIntegerStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory

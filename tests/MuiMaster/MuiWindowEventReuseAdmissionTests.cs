@@ -82,7 +82,15 @@ public sealed class MuiWindowEventReuseAdmissionTests
 			ref platform, address, MuiWindowEventReuseStateField.MuiKey,
 			unchecked((uint)-8)));
 		Assert.True(MuiWindowEventReuseStateRecordCodec.TryReadStructural(ref platform,
-			address, out var decoded) && decoded.MuiKey == -8);
+			address, out var decoded) && decoded.Magic == value.Magic &&
+			decoded.ContextActive == value.ContextActive && decoded.Pending == value.Pending &&
+			decoded.EventMessage == value.EventMessage && decoded.InputEvent == value.InputEvent &&
+			decoded.EventClass == value.EventClass && decoded.MuiKey == -8);
+		Assert.True(MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiWindowEventReuseStateField.Magic,
+			out var magic) && magic == value.Magic);
+		Assert.False(MuiWindowEventReuseStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiWindowEventReuseStateField)255, out _));
 		Assert.False(MuiWindowEventReuseStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, (MuiWindowEventReuseStateField)255, out _));
 		Assert.False(MuiWindowEventReuseStateRecordMemoryCodec.TryGetAddress(

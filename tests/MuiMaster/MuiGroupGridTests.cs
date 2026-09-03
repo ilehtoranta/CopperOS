@@ -70,6 +70,49 @@ public sealed class MuiGroupGridTests
 	}
 
 	[Fact]
+	public void GroupGridSpecFieldAccessUsesCompleteNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var address = APTR.FromPointer(0x3500);
+		var original = new MuiGroupGridSpec
+		{
+			Columns = 2,
+			Rows = 4,
+			HorizontalSpacing = 5,
+			VerticalSpacing = 6,
+			SameWidth = 1,
+			SameHeight = 0,
+			HorizontalCenter = 2,
+			VerticalCenter = 3,
+		};
+		Assert.True(MuiGroupGridSpecCodec.Write(ref platform, address, original));
+		Assert.True(MuiGroupGridSpecMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGroupGridSpecField.Columns, 8));
+		Assert.True(MuiGroupGridSpecMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGroupGridSpecField.HorizontalSpacing, 12));
+		Assert.True(MuiGroupGridSpecMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiGroupGridSpecField.VerticalCenter, 9));
+		Assert.True(MuiGroupGridSpecCodec.TryRead(ref platform, address,
+			out var after));
+		Assert.Equal(8u, after.Columns);
+		Assert.Equal(original.Rows, after.Rows);
+		Assert.Equal(12u, after.HorizontalSpacing);
+		Assert.Equal(original.VerticalSpacing, after.VerticalSpacing);
+		Assert.Equal(original.SameWidth, after.SameWidth);
+		Assert.Equal(original.SameHeight, after.SameHeight);
+		Assert.Equal(original.HorizontalCenter, after.HorizontalCenter);
+		Assert.Equal(9u, after.VerticalCenter);
+
+		Assert.False(MuiGroupGridSpecMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x40FE1), MuiGroupGridSpecField.Rows, out _));
+		Assert.False(MuiGroupGridSpecMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(0x40FE1), MuiGroupGridSpecField.Columns, 1));
+		Assert.False(MuiGroupGridSpecMemoryCodec.TryReadUInt32(ref platform,
+			address, (MuiGroupGridSpecField)255, out _));
+	}
+
+	[Fact]
 	public void GroupGridSpecSequentialRecordRoundTripsAndRejectsTruncation()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x4000,

@@ -51,6 +51,39 @@ public sealed class MuiServiceRecordCursorTests
 	}
 
 	[Fact]
+	public void ErrorServiceFieldAccessUsesCompleteNamedStateRecord()
+	{
+		var platform = CreatePlatform();
+		var record = APTR.FromPointer(0x3400);
+		var original = new MuiErrorServiceStateRecord
+		{
+			Magic = MuiErrorServiceLayout.Magic,
+			Version = MuiErrorServiceLayout.Version,
+			Error = 7,
+			Sequence = 11,
+		};
+		Assert.True(MuiErrorServiceStateStructCodec.Write(ref platform, record,
+			original));
+		Assert.True(MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform,
+			record, MuiErrorServiceStateField.Error, 0xFFFFFFFEu));
+		Assert.True(MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform,
+			record, MuiErrorServiceStateField.Sequence, 23));
+		Assert.True(MuiErrorServiceStateStructCodec.TryRead(ref platform, record,
+			out var afterFields));
+		Assert.Equal(original.Magic, afterFields.Magic);
+		Assert.Equal(original.Version, afterFields.Version);
+		Assert.Equal(0xFFFFFFFEu, afterFields.Error);
+		Assert.Equal(23u, afterFields.Sequence);
+
+		Assert.False(MuiErrorServiceStateMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x40FF1), MuiErrorServiceStateField.Error, out _));
+		Assert.False(MuiErrorServiceStateMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(0x40FF1), MuiErrorServiceStateField.Sequence, 1));
+		Assert.False(MuiErrorServiceStateMemoryCodec.TryReadUInt32(ref platform,
+			record, (MuiErrorServiceStateField)255, out _));
+	}
+
+	[Fact]
 	public void GroupPageFieldsUseNamedRecordBoundary()
 	{
 		var platform = CreatePlatform();
@@ -236,6 +269,36 @@ public sealed class MuiServiceRecordCursorTests
 		Assert.False(MuiRequesterServiceStateFieldCursorCodec.TryReadUInt32(
 			ref platform, APTR.FromPointer(0xFFFFFFF0u),
 			MuiRequesterServiceStateField.Magic, out _));
+	}
+
+	[Fact]
+	public void RequesterServiceFieldAccessUsesCompleteNamedStateRecord()
+	{
+		var platform = CreatePlatform();
+		var record = APTR.FromPointer(0x3500);
+		var original = new MuiRequesterServiceStateRecord
+		{
+			Magic = MuiRequesterServiceLayout.Magic,
+			Generation = 7,
+		};
+		Assert.True(MuiRequesterServiceStateStructCodec.Write(ref platform,
+			record, original));
+		Assert.True(MuiRequesterServiceStateMemoryCodec.TryWriteUInt32(ref platform,
+			record, MuiRequesterServiceStateField.Generation, 11));
+		Assert.True(MuiRequesterServiceStateMemoryCodec.TryReadUInt32(ref platform,
+			record, MuiRequesterServiceStateField.Magic, out var magic));
+		Assert.Equal(original.Magic, magic);
+		Assert.True(MuiRequesterServiceStateStructCodec.TryRead(ref platform,
+			record, out var after));
+		Assert.Equal(original.Magic, after.Magic);
+		Assert.Equal(11u, after.Generation);
+
+		Assert.False(MuiRequesterServiceStateMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x40FFC), MuiRequesterServiceStateField.Magic, out _));
+		Assert.False(MuiRequesterServiceStateMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(0x40FFC), MuiRequesterServiceStateField.Generation, 1));
+		Assert.False(MuiRequesterServiceStateMemoryCodec.TryReadUInt32(ref platform,
+			record, (MuiRequesterServiceStateField)255, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreatePlatform() =>

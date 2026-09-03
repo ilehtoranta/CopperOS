@@ -44,6 +44,55 @@ public sealed class MuiAreaResizeTests
 	}
 
 	[Fact]
+	public void ResizeFieldAccessUsesCompleteNamedRecords()
+	{
+		var platform = CreatePlatform(out _);
+		var initAddress = APTR.FromPointer(0x1600);
+		var init = new MuiAreaInitResizeMessage
+		{
+			MethodId = MuiAreaResizeMessageCodec.InitResize,
+			Flags = 0x11223344u,
+		};
+		Assert.True(MuiAreaInitResizeMessageCodec.WriteStructural(ref platform,
+			initAddress, init));
+		Assert.True(MuiAreaResizeMessageMemoryCodec.TryReadUInt32(ref platform,
+			initAddress, MuiAreaResizeMessageField.Flags, out var flags));
+		Assert.Equal(init.Flags, flags);
+		Assert.True(MuiAreaResizeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			initAddress, MuiAreaResizeMessageField.Flags, 0x55667788u));
+		Assert.True(MuiAreaResizeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			initAddress, MuiAreaResizeMessageField.MethodId,
+			MuiAreaResizeMessageCodec.ExitResize));
+		Assert.True(MuiAreaInitResizeMessageCodec.TryReadStructural(ref platform,
+			initAddress, out var updatedInit));
+		Assert.Equal(MuiAreaResizeMessageCodec.ExitResize, updatedInit.MethodId);
+		Assert.Equal(0x55667788u, updatedInit.Flags);
+
+		var exitAddress = APTR.FromPointer(0x1620);
+		var exit = new MuiAreaExitResizeMessage
+		{
+			MethodId = MuiAreaResizeMessageCodec.ExitResize,
+		};
+		Assert.True(MuiAreaExitResizeMessageCodec.WriteStructural(ref platform,
+			exitAddress, exit));
+		Assert.True(MuiAreaResizeMessageMemoryCodec.TryReadUInt32(ref platform,
+			exitAddress, MuiAreaResizeMessageField.MethodId, out var methodId));
+		Assert.Equal(exit.MethodId, methodId);
+		Assert.True(MuiAreaResizeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			exitAddress, MuiAreaResizeMessageField.MethodId, 0xF1234567u));
+		Assert.True(MuiAreaExitResizeMessageCodec.TryReadStructural(ref platform,
+			exitAddress, out var updatedExit));
+		Assert.Equal(0xF1234567u, updatedExit.MethodId);
+
+		Assert.False(MuiAreaResizeMessageMemoryCodec.TryReadUInt32(ref platform,
+			initAddress, (MuiAreaResizeMessageField)255, out _));
+		Assert.False(MuiAreaResizeMessageMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(0x20FFCu), MuiAreaResizeMessageField.Flags, 1));
+		Assert.False(MuiAreaResizeMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.Null, MuiAreaResizeMessageField.MethodId, out _));
+	}
+
+	[Fact]
 	public void ResizeStateRecordUsesNamedFields()
 	{
 		var platform = CreatePlatform(out _);
@@ -86,6 +135,49 @@ public sealed class MuiAreaResizeTests
 			out _));
 		Assert.False(MuiAreaResizeStateRecordCodec.TryRead(ref platform,
 			APTR.FromPointer(0x20FFFu), out _));
+	}
+
+	[Fact]
+	public void ResizeStateFieldAccessUsesCompleteNamedRecord()
+	{
+		var platform = CreatePlatform(out _);
+		var address = APTR.FromPointer(0x1560);
+		var expected = new MuiAreaResizeStateRecord
+		{
+			Magic = MuiAreaResizeStateRecord.Cookie,
+			Active = 0xFFFFFFFFu,
+			Flags = 0x11223344u,
+			Generation = 7,
+		};
+		Assert.True(MuiAreaResizeStateRecordCodec.WriteRecord(ref platform, address,
+			expected));
+		Assert.True(MuiAreaResizeStateMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiAreaResizeStateField.Active, out var active));
+		Assert.Equal(expected.Active, active);
+		Assert.True(MuiAreaResizeStateMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaResizeStateField.Flags, 0x55667788u));
+		Assert.True(MuiAreaResizeStateMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaResizeStateField.Generation, 9));
+		Assert.True(MuiAreaResizeStateRecordCodec.TryReadStructural(ref platform,
+			address, out var updated));
+		Assert.Equal(expected.Magic, updated.Magic);
+		Assert.Equal(expected.Active, updated.Active);
+		Assert.Equal(0x55667788u, updated.Flags);
+		Assert.Equal(9u, updated.Generation);
+
+		Assert.True(MuiAreaResizeStateMemoryCodec.TryWriteUInt32(ref platform,
+			address, MuiAreaResizeStateField.Magic, 0xDEADBEEFu));
+		Assert.True(MuiAreaResizeStateMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiAreaResizeStateField.Magic, out var magic));
+		Assert.Equal(0xDEADBEEFu, magic);
+		Assert.False(MuiAreaResizeStateRecordCodec.TryRead(ref platform, address,
+			out _));
+		Assert.False(MuiAreaResizeStateMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x20FFCu), MuiAreaResizeStateField.Flags, out _));
+		Assert.False(MuiAreaResizeStateMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.Null, MuiAreaResizeStateField.Generation, 1));
+		Assert.False(MuiAreaResizeStateMemoryCodec.TryReadUInt32(ref platform,
+			address, (MuiAreaResizeStateField)255, out _));
 	}
 
 	[Fact]

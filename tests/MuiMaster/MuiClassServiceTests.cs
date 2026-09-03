@@ -160,6 +160,98 @@ public sealed class MuiClassServiceTests
 	}
 
 	[Fact]
+	public void ClassRecordFieldAccessUsesCompleteNamedRecords()
+	{
+		var platform = NewPlatform();
+		var stateAddress = APTR.FromPointer(0x1B00);
+		var leaseAddress = APTR.FromPointer(0x1B20);
+		var customAddress = APTR.FromPointer(0x1B60);
+		var state = new MuiClassServiceStateRecord
+		{
+			Magic = MuiClassServiceLayout.Magic,
+			Head = leaseAddress,
+			Headless = HeadlessState,
+			Generation = 3,
+		};
+		var lease = new MuiClassServiceLeaseRecord
+		{
+			Next = stateAddress,
+			Flags = 0x80000011u,
+			ClassId = FooId,
+			Boopsi = APTR.FromPointer(0x5000),
+			LibraryBase = LibraryBase,
+			RefCount = 2,
+			HeadlessClass = HeadlessState,
+			CustomClass = customAddress,
+			SuperService = stateAddress,
+			ObjectCount = 4,
+			ChildCount = 5,
+		};
+		var custom = new MuiCustomClassRecord
+		{
+			UserData = APTR.FromPointer(0x6000),
+			UtilityBase = APTR.FromPointer(0x6010),
+			DosBase = APTR.FromPointer(0x6020),
+			GfxBase = APTR.FromPointer(0x6030),
+			IntuitionBase = APTR.FromPointer(0x6040),
+			Super = APTR.FromPointer(0x6050),
+			Class = APTR.FromPointer(0x6060),
+		};
+
+		Assert.True(MuiClassServiceStateStructCodec.Write(ref platform,
+			stateAddress, state));
+		Assert.True(MuiClassServiceLeaseStructCodec.Write(ref platform,
+			leaseAddress, lease));
+		Assert.True(MuiCustomClassStructCodec.Write(ref platform,
+			customAddress, custom));
+		Assert.True(MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform,
+			stateAddress, MuiClassRecordKind.State, MuiClassRecordField.Generation,
+			9));
+		Assert.True(MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform,
+			leaseAddress, MuiClassRecordKind.Lease, MuiClassRecordField.ChildCount,
+			8));
+		Assert.True(MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform,
+			customAddress, MuiClassRecordKind.CustomClass, MuiClassRecordField.Class,
+			0xDEADBEEFu));
+		Assert.True(MuiClassServiceStateStructCodec.TryRead(ref platform,
+			stateAddress, out var updatedState));
+		Assert.Equal(state.Head, updatedState.Head);
+		Assert.Equal(state.Headless, updatedState.Headless);
+		Assert.Equal(9u, updatedState.Generation);
+		Assert.True(MuiClassServiceLeaseStructCodec.TryRead(ref platform,
+			leaseAddress, out var updatedLease));
+		Assert.Equal(lease.Flags, updatedLease.Flags);
+		Assert.Equal(lease.CustomClass, updatedLease.CustomClass);
+		Assert.Equal(8u, updatedLease.ChildCount);
+		Assert.True(MuiCustomClassStructCodec.TryRead(ref platform,
+			customAddress, out var updatedCustom));
+		Assert.Equal(custom.Super, updatedCustom.Super);
+		Assert.Equal(0xDEADBEEFu, updatedCustom.Class.Raw);
+
+		Assert.True(MuiClassRecordMemoryCodec.TryReadUInt32(ref platform,
+			stateAddress, MuiClassRecordKind.State, MuiClassRecordField.Headless,
+			out var headless));
+		Assert.Equal(state.Headless.Raw, headless);
+		Assert.True(MuiClassRecordMemoryCodec.TryReadUInt32(ref platform,
+			leaseAddress, MuiClassRecordKind.Lease, MuiClassRecordField.Boopsi,
+			out var boopsi));
+		Assert.Equal(lease.Boopsi.Raw, boopsi);
+		Assert.True(MuiClassRecordMemoryCodec.TryReadUInt32(ref platform,
+			customAddress, MuiClassRecordKind.CustomClass,
+			MuiClassRecordField.UtilityBase, out var utility));
+		Assert.Equal(custom.UtilityBase.Raw, utility);
+
+		Assert.False(MuiClassRecordMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x20FF0), MuiClassRecordKind.Lease,
+			MuiClassRecordField.Flags, out _));
+		Assert.False(MuiClassRecordMemoryCodec.TryWriteUInt32(ref platform,
+			stateAddress, (MuiClassRecordKind)255, MuiClassRecordField.Magic, 1));
+		Assert.False(MuiClassRecordMemoryCodec.TryReadUInt32(ref platform,
+			customAddress, MuiClassRecordKind.CustomClass,
+			(MuiClassRecordField)255, out _));
+	}
+
+	[Fact]
 	public void ClassServiceSequentialStructCodecsRoundTripCompleteRecords()
 	{
 		var platform = NewPlatform();

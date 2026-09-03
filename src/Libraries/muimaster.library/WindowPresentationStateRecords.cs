@@ -16,6 +16,12 @@ namespace CopperOS.MuiMaster;
 internal struct MuiWindowPresentationStateRecord
 {
 	internal const uint Size = 20;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint TitleOffset = 4;
+	internal const uint ScreenOffset = 8;
+	internal const uint ScreenTitleOffset = 12;
+	internal const uint PublicScreenOffset = 16;
 	internal const uint Cookie = 0x57505253u; // 'WPRS'
 
 	internal uint Magic;
@@ -76,18 +82,22 @@ internal static class MuiWindowPresentationStateFieldCursorCodec
 	private static bool TryResolve(MuiWindowPresentationStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiWindowPresentationStateField.Magic)
+			offset = MuiWindowPresentationStateRecord.MagicOffset;
+		else if (field == MuiWindowPresentationStateField.Title)
+			offset = MuiWindowPresentationStateRecord.TitleOffset;
+		else if (field == MuiWindowPresentationStateField.Screen)
+			offset = MuiWindowPresentationStateRecord.ScreenOffset;
+		else if (field == MuiWindowPresentationStateField.ScreenTitle)
+			offset = MuiWindowPresentationStateRecord.ScreenTitleOffset;
+		else if (field == MuiWindowPresentationStateField.PublicScreen)
+			offset = MuiWindowPresentationStateRecord.PublicScreenOffset;
+		else
 		{
-			case MuiWindowPresentationStateField.Magic:
-			case MuiWindowPresentationStateField.Title:
-			case MuiWindowPresentationStateField.Screen:
-			case MuiWindowPresentationStateField.ScreenTitle:
-			case MuiWindowPresentationStateField.PublicScreen:
-				offset = (uint)field * 4;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -100,7 +110,7 @@ internal static class MuiWindowPresentationStateFieldCursorCodec
 			!platform.IsMapped(cursor.Record, MuiWindowPresentationStateRecord.Size))
 			return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiWindowPresentationStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -134,16 +144,89 @@ internal static class MuiWindowPresentationStateFieldCursorCodec
 // adapter owns only their fixed four-byte guest representation.
 internal static class MuiWindowPresentationStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiWindowPresentationStateField field,
+		out uint offset)
+	{
+		if (field == MuiWindowPresentationStateField.Magic)
+			offset = MuiWindowPresentationStateRecord.MagicOffset;
+		else if (field == MuiWindowPresentationStateField.Title)
+			offset = MuiWindowPresentationStateRecord.TitleOffset;
+		else if (field == MuiWindowPresentationStateField.Screen)
+			offset = MuiWindowPresentationStateRecord.ScreenOffset;
+		else if (field == MuiWindowPresentationStateField.ScreenTitle)
+			offset = MuiWindowPresentationStateRecord.ScreenTitleOffset;
+		else if (field == MuiWindowPresentationStateField.PublicScreen)
+			offset = MuiWindowPresentationStateRecord.PublicScreenOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowPresentationStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowPresentationStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiWindowPresentationStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiWindowPresentationStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiWindowPresentationStateField.Title)
+			value = state.Title.Raw;
+		else if (field == MuiWindowPresentationStateField.Screen)
+			value = state.Screen.Raw;
+		else if (field == MuiWindowPresentationStateField.ScreenTitle)
+			value = state.ScreenTitle.Raw;
+		else if (field == MuiWindowPresentationStateField.PublicScreen)
+			value = state.PublicScreen.Raw;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowPresentationStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiWindowPresentationStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiWindowPresentationStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiWindowPresentationStateField.Title)
+			state.Title = APTR.FromPointer(value);
+		else if (field == MuiWindowPresentationStateField.Screen)
+			state.Screen = APTR.FromPointer(value);
+		else if (field == MuiWindowPresentationStateField.ScreenTitle)
+			state.ScreenTitle = APTR.FromPointer(value);
+		else if (field == MuiWindowPresentationStateField.PublicScreen)
+			state.PublicScreen = APTR.FromPointer(value);
+		else return false;
+		return MuiWindowPresentationStateRecordCodec.WriteStructural(ref platform,
+			record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiWindowPresentationStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiWindowPresentationStateRecord.Size -
+			MuiWindowPresentationStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiWindowPresentationStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiWindowPresentationStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -172,6 +255,11 @@ internal static class MuiWindowPresentationStateRecordCodec
 	// caller-owned APTR fields are exchanged in declaration order; numeric
 	// positions remain confined to the bounded compatibility adapter.
 	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiWindowPresentationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
 		APTR address, MuiWindowPresentationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiGuestStructCursor.TryCreate(ref platform, address,

@@ -164,8 +164,23 @@ internal static class MuiWindowEventReuseStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiWindowEventReuseStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiWindowEventReuseStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiWindowEventReuseStateField.ContextActive)
+			value = state.ContextActive;
+		else if (field == MuiWindowEventReuseStateField.Pending)
+			value = state.Pending;
+		else if (field == MuiWindowEventReuseStateField.EventMessage)
+			value = state.EventMessage.Raw;
+		else if (field == MuiWindowEventReuseStateField.InputEvent)
+			value = state.InputEvent.Raw;
+		else if (field == MuiWindowEventReuseStateField.EventClass)
+			value = state.EventClass;
+		else if (field == MuiWindowEventReuseStateField.MuiKey)
+			value = unchecked((uint)state.MuiKey);
+		else return false;
 		return true;
 	}
 
@@ -173,9 +188,25 @@ internal static class MuiWindowEventReuseStateRecordMemoryCodec
 		APTR record, MuiWindowEventReuseStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiWindowEventReuseStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiWindowEventReuseStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiWindowEventReuseStateField.ContextActive)
+			state.ContextActive = value;
+		else if (field == MuiWindowEventReuseStateField.Pending)
+			state.Pending = value;
+		else if (field == MuiWindowEventReuseStateField.EventMessage)
+			state.EventMessage = APTR.FromPointer(value);
+		else if (field == MuiWindowEventReuseStateField.InputEvent)
+			state.InputEvent = APTR.FromPointer(value);
+		else if (field == MuiWindowEventReuseStateField.EventClass)
+			state.EventClass = value;
+		else if (field == MuiWindowEventReuseStateField.MuiKey)
+			state.MuiKey = unchecked((int)value);
+		else return false;
+		return MuiWindowEventReuseStateRecordCodec.WriteStructural(ref platform,
+			record, state);
 	}
 }
 
@@ -210,6 +241,11 @@ internal static class MuiWindowEventReuseStateRecordCodec
 	}
 
 	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiWindowEventReuseStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
 		APTR address, MuiWindowEventReuseStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiGuestStructCursor.TryCreate(ref platform, address,

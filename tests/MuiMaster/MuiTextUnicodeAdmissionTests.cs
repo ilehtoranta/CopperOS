@@ -81,20 +81,29 @@ public sealed class MuiTextUnicodeAdmissionTests
 		Assert.True(MuiTextUnicodeStateRecordCodec.Write(ref platform, address,
 			record));
 		Assert.True(MuiTextUnicodeStateRecordMemoryCodec.TryGetAddress(
-			ref platform, address, 4, out var unicodeAddress));
+			ref platform, address, MuiTextUnicodeStateField.Unicode,
+			out var unicodeAddress));
 		Assert.Equal(0x1B04u, unicodeAddress.Raw);
 		Assert.True(MuiTextUnicodeStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 4, out var unicode));
+			ref platform, address, MuiTextUnicodeStateField.Unicode,
+			out var unicode));
 		Assert.Equal(1u, unicode);
 		Assert.True(MuiTextUnicodeStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 4, 0));
+			ref platform, address, MuiTextUnicodeStateField.Unicode, 0));
 		Assert.True(MuiTextUnicodeStateRecordCodec.TryReadStructural(ref platform,
 			address, out var updated));
+		Assert.Equal(MuiTextUnicodeStateRecord.Cookie, updated.Magic);
 		Assert.Equal(0u, updated.Unicode);
+		Assert.True(MuiTextUnicodeStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, MuiTextUnicodeStateField.Magic,
+			out var magic));
+		Assert.Equal(MuiTextUnicodeStateRecord.Cookie, magic);
+		Assert.False(MuiTextUnicodeStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiTextUnicodeStateField)255, out _));
 		Assert.False(MuiTextUnicodeStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiTextUnicodeStateRecord.Size, out _));
 		Assert.False(MuiTextUnicodeStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 		Assert.False(MuiTextUnicodeStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

@@ -87,11 +87,29 @@ public sealed class MuiTextPreParseAdmissionTests
 		Assert.True(MuiTextPreParseStateRecordCodec.Write(ref platform,
 			recordAddress, value));
 		Assert.True(MuiTextPreParseStateRecordMemoryCodec.TryGetAddress(ref platform,
+			recordAddress, MuiTextPreParseStateField.PreParse,
+			out var typedPreParseAddress));
+		Assert.Equal(0x1D64u, typedPreParseAddress.Raw);
+		Assert.True(MuiTextPreParseStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			recordAddress, MuiTextPreParseStateField.PreParse, out var typedPreParse));
+		Assert.Equal(0x1DC0u, typedPreParse);
+		Assert.True(MuiTextPreParseStateRecordMemoryCodec.TryGetAddress(ref platform,
 			recordAddress, 4, out var preParseAddress));
 		Assert.Equal(0x1D64u, preParseAddress.Raw);
 		Assert.True(MuiTextPreParseStateRecordMemoryCodec.TryReadUInt32(ref platform,
 			recordAddress, 4, out var preParse));
 		Assert.Equal(0x1DC0u, preParse);
+		Assert.True(MuiTextPreParseStateRecordMemoryCodec.TryWriteUInt32(ref platform,
+			recordAddress, MuiTextPreParseStateField.PreParse, 0));
+		Assert.True(MuiTextPreParseStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			recordAddress, MuiTextPreParseStateField.Magic, out var typedMagic));
+		Assert.Equal(MuiTextPreParseStateRecord.Cookie, typedMagic);
+		Assert.False(MuiTextPreParseStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			recordAddress, (MuiTextPreParseStateField)255, out _));
+		Assert.True(MuiTextPreParseStateRecordCodec.TryReadStructural(ref platform,
+			recordAddress, out var typedUpdated));
+		Assert.Equal(MuiTextPreParseStateRecord.Cookie, typedUpdated.Magic);
+		Assert.True(typedUpdated.PreParse.IsNull);
 		Assert.True(MuiTextPreParseStateRecordMemoryCodec.TryWriteUInt32(ref platform,
 			recordAddress, 4, 0));
 		Assert.True(MuiTextPreParseStateRecordCodec.TryReadStructural(ref platform,
@@ -100,7 +118,7 @@ public sealed class MuiTextPreParseAdmissionTests
 		Assert.False(MuiTextPreParseStateRecordMemoryCodec.TryGetAddress(ref platform,
 			recordAddress, MuiTextPreParseStateRecord.Size, out _));
 		Assert.False(MuiTextPreParseStateRecordMemoryCodec.TryGetAddress(ref platform,
-			APTR.Null, 0, out _));
+			APTR.Null, (uint)0, out _));
 		Assert.False(MuiTextPreParseStateRecordCodec.TryReadStructural(ref platform,
 			APTR.Null, out _));
 	}

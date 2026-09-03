@@ -121,6 +121,125 @@ public sealed class MuiApplicationInputBufferedTests
 	}
 
 	[Fact]
+	public void ApplicationQueuePacketFieldAccessUsesCompleteNamedRecords()
+	{
+		var platform = CreatePlatform(out _);
+		var pushAddress = APTR.FromPointer(0x1280);
+		var push = new MuiApplicationPushMethodMessage
+		{
+			MethodId = 1,
+			Destination = 2,
+			Count = 3,
+		};
+		Assert.True(MuiApplicationPushMethodMessageCodec.WriteStructural(ref platform,
+			pushAddress, push));
+		Assert.True(MuiApplicationQueuePacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, pushAddress, MuiApplicationQueuePacketKind.PushMethod,
+			MuiApplicationQueuePacketField.Count, 4));
+		Assert.True(MuiApplicationQueuePacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, pushAddress, MuiApplicationQueuePacketKind.PushMethod,
+			MuiApplicationQueuePacketField.MethodId, out var methodId));
+		Assert.Equal(push.MethodId, methodId);
+		Assert.True(MuiApplicationPushMethodMessageCodec.TryReadStructural(ref platform,
+			pushAddress, out var pushAfter));
+		Assert.Equal(4u, pushAfter.Count);
+		Assert.Equal(push.Destination, pushAfter.Destination);
+
+		var unpushAddress = APTR.FromPointer(0x12C0);
+		var unpush = new MuiApplicationUnpushMethodMessage
+		{
+			MethodId = 5,
+			TargetObject = 6,
+			MethodIdSelector = 7,
+			Method = 8,
+		};
+		Assert.True(MuiApplicationUnpushMethodMessageCodec.WriteStructural(ref platform,
+			unpushAddress, unpush));
+		Assert.True(MuiApplicationQueuePacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, unpushAddress, MuiApplicationQueuePacketKind.UnpushMethod,
+			MuiApplicationQueuePacketField.Method, 9));
+		Assert.True(MuiApplicationUnpushMethodMessageCodec.TryReadStructural(ref platform,
+			unpushAddress, out var unpushAfter));
+		Assert.Equal(unpush.TargetObject, unpushAfter.TargetObject);
+		Assert.Equal(9u, unpushAfter.Method);
+		Assert.False(MuiApplicationQueuePacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, pushAddress, MuiApplicationQueuePacketKind.PushMethod,
+			MuiApplicationQueuePacketField.Method, out _));
+		Assert.False(MuiApplicationQueuePacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(0x20FFC),
+			MuiApplicationQueuePacketKind.UnpushMethod,
+			MuiApplicationQueuePacketField.Method, 1));
+	}
+
+	[Fact]
+	public void ApplicationInputPacketFieldAccessUsesCompleteNamedRecords()
+	{
+		var platform = CreatePlatform(out _);
+		var returnAddress = APTR.FromPointer(0x1400);
+		var returnId = new MuiApplicationReturnIdMessage
+		{
+			MethodId = 1,
+			ReturnId = 2,
+		};
+		Assert.True(MuiApplicationReturnIdMessageCodec.WriteStructural(ref platform,
+			returnAddress, returnId));
+		Assert.True(MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, returnAddress, MuiApplicationInputPacketKind.ReturnId,
+			MuiApplicationInputPacketField.ReturnId, 3));
+		Assert.True(MuiApplicationInputPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, returnAddress, MuiApplicationInputPacketKind.ReturnId,
+			MuiApplicationInputPacketField.MethodId, out var returnMethod));
+		Assert.Equal(returnId.MethodId, returnMethod);
+		Assert.True(MuiApplicationReturnIdMessageCodec.TryReadStructural(ref platform,
+			returnAddress, out var returnAfter));
+		Assert.Equal(3u, returnAfter.ReturnId);
+
+		var inputAddress = APTR.FromPointer(0x1440);
+		var input = new MuiApplicationInputMessage { MethodId = 4, SignalStorage = 5 };
+		Assert.True(MuiApplicationInputMessageCodec.WriteStructural(ref platform,
+			inputAddress, input));
+		Assert.True(MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, inputAddress, MuiApplicationInputPacketKind.Input,
+			MuiApplicationInputPacketField.SignalStorage, 6));
+		Assert.True(MuiApplicationInputMessageCodec.TryReadStructural(ref platform,
+			inputAddress, out var inputAfter));
+		Assert.Equal(input.MethodId, inputAfter.MethodId);
+		Assert.Equal(6u, inputAfter.SignalStorage);
+
+		var bufferedAddress = APTR.FromPointer(0x1480);
+		Assert.True(MuiApplicationInputBufferedMessageCodec.WriteStructural(ref platform,
+			bufferedAddress, new MuiApplicationInputBufferedMessage { MethodId = 7 }));
+		Assert.True(MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, bufferedAddress, MuiApplicationInputPacketKind.InputBuffered,
+			MuiApplicationInputPacketField.MethodId, 8));
+		Assert.True(MuiApplicationInputBufferedMessageCodec.TryReadStructural(ref platform,
+			bufferedAddress, out var bufferedAfter));
+		Assert.Equal(8u, bufferedAfter.MethodId);
+
+		var handlerAddress = APTR.FromPointer(0x14C0);
+		var handler = new MuiApplicationInputHandlerMessage
+		{
+			MethodId = 9,
+			Handler = 10,
+		};
+		Assert.True(MuiApplicationInputHandlerMessageCodec.WriteStructural(ref platform,
+			handlerAddress, handler));
+		Assert.True(MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, handlerAddress, MuiApplicationInputPacketKind.InputHandler,
+			MuiApplicationInputPacketField.Handler, 11));
+		Assert.True(MuiApplicationInputHandlerMessageCodec.TryReadStructural(ref platform,
+			handlerAddress, out var handlerAfter));
+		Assert.Equal(handler.MethodId, handlerAfter.MethodId);
+		Assert.Equal(11u, handlerAfter.Handler);
+		Assert.False(MuiApplicationInputPacketRecordMemoryCodec.TryReadUInt32(
+			ref platform, returnAddress, MuiApplicationInputPacketKind.ReturnId,
+			MuiApplicationInputPacketField.Handler, out _));
+		Assert.False(MuiApplicationInputPacketRecordMemoryCodec.TryWriteUInt32(
+			ref platform, APTR.FromPointer(0x20FFC), MuiApplicationInputPacketKind.Input,
+			MuiApplicationInputPacketField.MethodId, 1));
+	}
+
+	[Fact]
 	public void ApplicationPushMethodParametersUseNamedTailBoundary()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,

@@ -82,8 +82,17 @@ internal static class MuiApplicationSettingsHeaderMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, header, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationSettingsHeaderCodec.TryReadStructural(ref platform,
+			header, out var state)) return false;
+		if (field == MuiApplicationSettingsHeaderField.MagicValue) value =
+			state.MagicValue;
+		else if (field == MuiApplicationSettingsHeaderField.VersionValue) value =
+			state.VersionValue;
+		else if (field == MuiApplicationSettingsHeaderField.RecordCount) value =
+			state.RecordCount;
+		else if (field == MuiApplicationSettingsHeaderField.PayloadBytes) value =
+			state.PayloadBytes;
+		else return false;
 		return true;
 	}
 
@@ -91,9 +100,15 @@ internal static class MuiApplicationSettingsHeaderMemoryCodec
 		APTR header, MuiApplicationSettingsHeaderField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, header, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationSettingsHeaderCodec.TryReadStructural(ref platform,
+			header, out var state)) return false;
+		if (field == MuiApplicationSettingsHeaderField.MagicValue) state.MagicValue = value;
+		else if (field == MuiApplicationSettingsHeaderField.VersionValue) state.VersionValue = value;
+		else if (field == MuiApplicationSettingsHeaderField.RecordCount) state.RecordCount = value;
+		else if (field == MuiApplicationSettingsHeaderField.PayloadBytes) state.PayloadBytes = value;
+		else return false;
+		return MuiApplicationSettingsHeaderCodec.WriteStructural(ref platform,
+			header, state);
 	}
 }
 
@@ -175,8 +190,11 @@ internal static class MuiApplicationSettingsRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
+		if (!MuiApplicationSettingsRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationSettingsRecordField.Key) value = state.Key;
+		else if (field == MuiApplicationSettingsRecordField.Length) value = state.Length;
+		else return false;
 		return true;
 	}
 
@@ -184,9 +202,13 @@ internal static class MuiApplicationSettingsRecordMemoryCodec
 		APTR record, MuiApplicationSettingsRecordField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationSettingsRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiApplicationSettingsRecordField.Key) state.Key = value;
+		else if (field == MuiApplicationSettingsRecordField.Length) state.Length = value;
+		else return false;
+		return MuiApplicationSettingsRecordCodec.WriteStructural(ref platform,
+			record, state);
 	}
 }
 
@@ -268,6 +290,18 @@ internal static class MuiApplicationSettingsHeaderCodec
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiApplicationSettingsHeaderStructCodec.Write(ref platform, address,
 			value);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiApplicationSettingsHeader value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationSettingsHeaderStructCodec.TryRead(ref platform, address,
+			out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationSettingsHeader value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationSettingsHeaderStructCodec.Write(ref platform, address,
+			value);
 }
 
 internal static class MuiApplicationSettingsRecordStructCodec
@@ -313,6 +347,18 @@ internal static class MuiApplicationSettingsRecordCodec
 		MuiApplicationSettingsRecord value)
 		where TPlatform : struct, IMuiGuestMemory
 		=> MuiApplicationSettingsRecordStructCodec.Write(ref platform, address,
+			value);
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiApplicationSettingsRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationSettingsRecordStructCodec.TryRead(ref platform, address,
+			out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationSettingsRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		MuiApplicationSettingsRecordStructCodec.Write(ref platform, address,
 			value);
 }
 

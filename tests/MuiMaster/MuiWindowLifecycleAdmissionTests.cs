@@ -68,17 +68,23 @@ public sealed class MuiWindowLifecycleAdmissionTests
 		Assert.True(MuiWindowLifecycleStateRecordCodec.WriteRecord(ref platform, address,
 			value));
 		Assert.True(MuiWindowLifecycleStateRecordMemoryCodec.TryGetAddress(ref platform,
-			address, 16, out var iconified) && iconified.Raw == 0x1590u);
+			address, MuiWindowLifecycleStateField.IconifiedOpen,
+			out var iconified) && iconified.Raw == 0x1590u);
 		Assert.True(MuiWindowLifecycleStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 12, out var eventMask) && eventMask == 0x40u);
+			ref platform, address, MuiWindowLifecycleStateField.EventMask,
+			out var eventMask) && eventMask == 0x40u);
 		Assert.True(MuiWindowLifecycleStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 16, 0));
+			ref platform, address, MuiWindowLifecycleStateField.IconifiedOpen, 0));
 		Assert.True(MuiWindowLifecycleStateRecordCodec.TryReadStructural(ref platform,
-			address, out var decoded) && decoded.IconifiedOpen == 0);
+			address, out var decoded) && decoded.Magic == value.Magic &&
+			decoded.NativeWindow == value.NativeWindow && decoded.Open == value.Open &&
+			decoded.EventMask == value.EventMask && decoded.IconifiedOpen == 0);
+		Assert.False(MuiWindowLifecycleStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiWindowLifecycleStateField)255, out _));
 		Assert.False(MuiWindowLifecycleStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiWindowLifecycleStateRecord.Size, out _));
 		Assert.False(MuiWindowLifecycleStateRecordMemoryCodec.TryGetAddress(ref platform,
-			APTR.Null, 0, out _));
+			APTR.Null, (uint)0, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreateWindow(out APTR window)

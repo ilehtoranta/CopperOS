@@ -138,13 +138,31 @@ internal static class MuiAreaCustomFontMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		var cursor = default(MuiAreaCustomFontMessageFieldCursor);
-		cursor.Message = message;
-		cursor.Kind = kind;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (kind == MuiAreaCustomFontMessageKind.Open)
+		{
+			if (!MuiAreaOpenCustomFontMessageCodec.TryReadStructural(ref platform,
+				message, out var open)) return false;
+			if (field == MuiAreaCustomFontMessageField.MethodId)
+				value = open.MethodId;
+			else if (field == MuiAreaCustomFontMessageField.Pointer)
+				value = open.Spec.Raw;
+			else
+				return false;
+			return true;
+		}
+		if (kind == MuiAreaCustomFontMessageKind.Close)
+		{
+			if (!MuiAreaCloseCustomFontMessageCodec.TryReadStructural(ref platform,
+				message, out var close)) return false;
+			if (field == MuiAreaCustomFontMessageField.MethodId)
+				value = close.MethodId;
+			else if (field == MuiAreaCustomFontMessageField.Pointer)
+				value = close.Font.Raw;
+			else
+				return false;
+			return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -152,13 +170,33 @@ internal static class MuiAreaCustomFontMessageMemoryCodec
 		MuiAreaCustomFontMessageField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiAreaCustomFontMessageFieldCursor);
-		cursor.Message = message;
-		cursor.Kind = kind;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (kind == MuiAreaCustomFontMessageKind.Open)
+		{
+			if (!MuiAreaOpenCustomFontMessageCodec.TryReadStructural(ref platform,
+				message, out var open)) return false;
+			if (field == MuiAreaCustomFontMessageField.MethodId)
+				open.MethodId = value;
+			else if (field == MuiAreaCustomFontMessageField.Pointer)
+				open.Spec = APTR.FromPointer(value);
+			else
+				return false;
+			return MuiAreaOpenCustomFontMessageCodec.WriteStructural(ref platform,
+				message, open);
+		}
+		if (kind == MuiAreaCustomFontMessageKind.Close)
+		{
+			if (!MuiAreaCloseCustomFontMessageCodec.TryReadStructural(ref platform,
+				message, out var close)) return false;
+			if (field == MuiAreaCustomFontMessageField.MethodId)
+				close.MethodId = value;
+			else if (field == MuiAreaCustomFontMessageField.Pointer)
+				close.Font = APTR.FromPointer(value);
+			else
+				return false;
+			return MuiAreaCloseCustomFontMessageCodec.WriteStructural(ref platform,
+				message, close);
+		}
+		return false;
 	}
 }
 
@@ -192,6 +230,16 @@ internal static class MuiAreaOpenCustomFontMessageCodec
 				value.Spec.Raw)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaOpenCustomFontMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaOpenCustomFontMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, value);
 }
 
 internal static class MuiAreaCloseCustomFontMessageCodec
@@ -224,6 +272,16 @@ internal static class MuiAreaCloseCustomFontMessageCodec
 				value.Font.Raw)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaCloseCustomFontMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaCloseCustomFontMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, value);
 }
 
 // Compatibility adapter retained for callers that still construct the typed

@@ -72,9 +72,11 @@ internal static class MuiAslTagItemMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
+		if (!MuiAslTagItemCodec.TryRead(ref platform, record, out var item))
 			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (field == MuiAslTagItemField.Tag) value = item.Tag;
+		else if (field == MuiAslTagItemField.Data) value = item.Data;
+		else return false;
 		return true;
 	}
 
@@ -82,10 +84,12 @@ internal static class MuiAslTagItemMessageMemoryCodec
 		APTR record, MuiAslTagItemField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
+		if (!MuiAslTagItemCodec.TryRead(ref platform, record, out var item))
 			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (field == MuiAslTagItemField.Tag) item.Tag = value;
+		else if (field == MuiAslTagItemField.Data) item.Data = value;
+		else return false;
+		return MuiAslTagItemCodec.Write(ref platform, record, item);
 	}
 }
 

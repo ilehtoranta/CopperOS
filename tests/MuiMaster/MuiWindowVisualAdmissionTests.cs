@@ -70,17 +70,24 @@ public sealed class MuiWindowVisualAdmissionTests
 		Assert.True(MuiWindowVisualStateRecordCodec.WriteRecord(ref platform, address,
 			value));
 		Assert.True(MuiWindowVisualStateRecordMemoryCodec.TryGetAddress(ref platform,
-			address, 12, out var opacity) && opacity.Raw == 0x170Cu);
+			address, MuiWindowVisualStateField.Opacity,
+			out var opacity) && opacity.Raw == 0x170Cu);
 		Assert.True(MuiWindowVisualStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 20, out var action) && action == 7);
+			address, MuiWindowVisualStateField.MenuAction,
+			out var action) && action == 7);
 		Assert.True(MuiWindowVisualStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 12, 64));
+			address, MuiWindowVisualStateField.Opacity, 64));
 		Assert.True(MuiWindowVisualStateRecordCodec.TryReadStructural(ref platform,
-			address, out var decoded) && decoded.Opacity == 64);
+			address, out var decoded) && decoded.Magic == value.Magic &&
+			decoded.NoMenus == value.NoMenus && decoded.HasAlpha == value.HasAlpha &&
+			decoded.Opacity == 64 && decoded.FancyDrawing == value.FancyDrawing &&
+			decoded.MenuAction == value.MenuAction);
+		Assert.False(MuiWindowVisualStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, (MuiWindowVisualStateField)255, out _));
 		Assert.False(MuiWindowVisualStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiWindowVisualStateRecord.Size, out _));
 		Assert.False(MuiWindowVisualStateRecordMemoryCodec.TryGetAddress(ref platform,
-			APTR.Null, 0, out _));
+			APTR.Null, (uint)0, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreateWindow(out APTR window)

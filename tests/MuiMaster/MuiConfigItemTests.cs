@@ -124,6 +124,45 @@ public sealed class MuiConfigItemTests
 			APTR.Null, MuiGetConfigItemPacketField.ConfigId, out _));
 	}
 
+	[Fact]
+	public void GetConfigItemFieldAccessUsesCompleteNamedPacketRecord()
+	{
+		var platform = CreatePlatform(out _);
+		var packet = APTR.FromPointer(0x1800);
+		var original = new MuiGetConfigItemMessage
+		{
+			MethodId = MuiGetConfigItemMessageCodec.Method,
+			ConfigId = PublicScreen,
+			Storage = APTR.FromPointer(0x1910),
+		};
+		Assert.True(MuiGetConfigItemMessageCodec.WriteStructural(ref platform,
+			packet, original));
+		Assert.True(MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiGetConfigItemPacketField.ConfigId, 0x2A));
+		Assert.True(MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiGetConfigItemPacketField.Storage, 0x1A10));
+		Assert.True(MuiGetConfigItemMessageCodec.TryReadStructural(ref platform,
+			packet, out var afterFields));
+		Assert.Equal(original.MethodId, afterFields.MethodId);
+		Assert.Equal(0x2Au, afterFields.ConfigId);
+		Assert.Equal(0x1A10u, afterFields.Storage.Raw);
+
+		Assert.True(MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
+			packet, MuiGetConfigItemPacketField.MethodId, 0xF1234567u));
+		Assert.True(MuiGetConfigItemMessageCodec.TryReadStructural(ref platform,
+			packet, out var afterMethod));
+		Assert.Equal(0xF1234567u, afterMethod.MethodId);
+		Assert.Equal(afterFields.ConfigId, afterMethod.ConfigId);
+		Assert.Equal(afterFields.Storage.Raw, afterMethod.Storage.Raw);
+
+		Assert.False(MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x5FF5), MuiGetConfigItemPacketField.ConfigId, out _));
+		Assert.False(MuiGetConfigItemMessageMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(0x5FF5), MuiGetConfigItemPacketField.Storage, 1));
+		Assert.False(MuiGetConfigItemMessageMemoryCodec.TryReadUInt32(ref platform,
+			packet, (MuiGetConfigItemPacketField)255, out _));
+	}
+
 	private static MuiHeadlessTestPlatform CreatePlatform(out APTR obj)
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x5000, 0x2000,

@@ -15,6 +15,11 @@ namespace CopperOS.MuiMaster;
 internal struct MuiWindowEventStateRecord
 {
 	internal const uint Size = 16;
+	internal const uint FieldSize = 4;
+	internal const uint MagicOffset = 0;
+	internal const uint CloseRequestOffset = 4;
+	internal const uint InputEventOffset = 8;
+	internal const uint MouseObjectOffset = 12;
 	internal const uint Cookie = 0x57455654u; // 'WEVT'
 
 	internal uint Magic;
@@ -71,17 +76,20 @@ internal static class MuiWindowEventStateFieldCursorCodec
 	private static bool TryResolve(MuiWindowEventStateField field,
 		out uint offset)
 	{
-		switch (field)
+		if (field == MuiWindowEventStateField.Magic)
+			offset = MuiWindowEventStateRecord.MagicOffset;
+		else if (field == MuiWindowEventStateField.CloseRequest)
+			offset = MuiWindowEventStateRecord.CloseRequestOffset;
+		else if (field == MuiWindowEventStateField.InputEvent)
+			offset = MuiWindowEventStateRecord.InputEventOffset;
+		else if (field == MuiWindowEventStateField.MouseObject)
+			offset = MuiWindowEventStateRecord.MouseObjectOffset;
+		else
 		{
-			case MuiWindowEventStateField.Magic:
-			case MuiWindowEventStateField.CloseRequest:
-			case MuiWindowEventStateField.InputEvent:
-			case MuiWindowEventStateField.MouseObject:
-				offset = (uint)field * 4;
-				return true;
+			offset = 0;
+			return false;
 		}
-		offset = 0;
-		return false;
+		return true;
 	}
 
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
@@ -94,7 +102,7 @@ internal static class MuiWindowEventStateFieldCursorCodec
 			!platform.IsMapped(cursor.Record, MuiWindowEventStateRecord.Size))
 			return false;
 		address = APTR.FromPointer(cursor.Record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiWindowEventStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -128,16 +136,83 @@ internal static class MuiWindowEventStateFieldCursorCodec
 // adapter owns only their fixed four-byte guest representation.
 internal static class MuiWindowEventStateRecordMemoryCodec
 {
+	private static bool TryResolve(MuiWindowEventStateField field,
+		out uint offset)
+	{
+		if (field == MuiWindowEventStateField.Magic)
+			offset = MuiWindowEventStateRecord.MagicOffset;
+		else if (field == MuiWindowEventStateField.CloseRequest)
+			offset = MuiWindowEventStateRecord.CloseRequestOffset;
+		else if (field == MuiWindowEventStateField.InputEvent)
+			offset = MuiWindowEventStateRecord.InputEventOffset;
+		else if (field == MuiWindowEventStateField.MouseObject)
+			offset = MuiWindowEventStateRecord.MouseObjectOffset;
+		else
+		{
+			offset = 0;
+			return false;
+		}
+		return true;
+	}
+
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowEventStateField field, out APTR address)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		address = APTR.Null;
+		return TryResolve(field, out var offset) &&
+			TryGetAddress(ref platform, record, offset, out address);
+	}
+
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowEventStateField field, out uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		value = 0;
+		if (!MuiWindowEventStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiWindowEventStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiWindowEventStateField.CloseRequest)
+			value = state.CloseRequest;
+		else if (field == MuiWindowEventStateField.InputEvent)
+			value = state.InputEvent.Raw;
+		else if (field == MuiWindowEventStateField.MouseObject)
+			value = state.MouseObject.Raw;
+		else return false;
+		return true;
+	}
+
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+		APTR record, MuiWindowEventStateField field, uint value)
+		where TPlatform : struct, IMuiGuestMemory
+	{
+		if (!MuiWindowEventStateRecordCodec.TryReadStructural(ref platform,
+			record, out var state)) return false;
+		if (field == MuiWindowEventStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiWindowEventStateField.CloseRequest)
+			state.CloseRequest = value;
+		else if (field == MuiWindowEventStateField.InputEvent)
+			state.InputEvent = APTR.FromPointer(value);
+		else if (field == MuiWindowEventStateField.MouseObject)
+			state.MouseObject = APTR.FromPointer(value);
+		else return false;
+		return MuiWindowEventStateRecordCodec.WriteStructural(ref platform,
+			record, state);
+	}
+
 	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR record, uint offset, out APTR address)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		address = APTR.Null;
-		if (record.IsNull || offset > MuiWindowEventStateRecord.Size - 4 ||
+		if (record.IsNull || offset > MuiWindowEventStateRecord.Size -
+			MuiWindowEventStateRecord.FieldSize ||
 			record.Raw > uint.MaxValue - offset || !platform.IsMapped(record,
 			MuiWindowEventStateRecord.Size)) return false;
 		address = APTR.FromPointer(record.Raw + offset);
-		return platform.IsMapped(address, 4);
+		return platform.IsMapped(address, MuiWindowEventStateRecord.FieldSize);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
@@ -166,6 +241,11 @@ internal static class MuiWindowEventStateRecordCodec
 	// close BOOL, and two opaque capabilities are exchanged in declaration
 	// order; numeric positions remain confined to the compatibility adapter.
 	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiWindowEventStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
 		APTR address, MuiWindowEventStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiGuestStructCursor.TryCreate(ref platform, address,

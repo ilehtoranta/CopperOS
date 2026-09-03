@@ -130,9 +130,18 @@ internal static class MuiSleepStateRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
+		if (!MuiSleepStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state))
 			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (field == MuiSleepStateField.Magic)
+			value = state.Magic;
+		else if (field == MuiSleepStateField.Depth)
+			value = state.Depth;
+		else if (field == MuiSleepStateField.SavedDisabled)
+			value = state.SavedDisabled;
+		else if (field == MuiSleepStateField.Request)
+			value = state.Request;
+		else return false;
 		return true;
 	}
 
@@ -140,10 +149,19 @@ internal static class MuiSleepStateRecordMemoryCodec
 		APTR record, MuiSleepStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
+		if (!MuiSleepStateRecordCodec.TryReadStructural(ref platform, record,
+			out var state))
 			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (field == MuiSleepStateField.Magic)
+			state.Magic = value;
+		else if (field == MuiSleepStateField.Depth)
+			state.Depth = value;
+		else if (field == MuiSleepStateField.SavedDisabled)
+			state.SavedDisabled = value;
+		else if (field == MuiSleepStateField.Request)
+			state.Request = value;
+		else return false;
+		return MuiSleepStateRecordCodec.WriteRecord(ref platform, record, state);
 	}
 }
 

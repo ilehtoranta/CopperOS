@@ -101,6 +101,86 @@ public sealed class MuiAreaContextMenuTests
 	}
 
 	[Fact]
+	public void ContextMenuFieldAccessUsesCompleteNamedRecords()
+	{
+		var platform = CreatePlatform(out _);
+		var addAddress = APTR.FromPointer(0x2500);
+		var add = new MuiAreaContextMenuAddMessage
+		{
+			MethodId = MuiAreaContextMenuMessageCodec.Add,
+			MenuStrip = APTR.FromPointer(0x1800),
+			MouseX = -8,
+			MouseY = 21,
+			MouseXPointer = APTR.FromPointer(0x1900),
+			MouseYPointer = APTR.FromPointer(0x1A00),
+		};
+		Assert.True(MuiAreaContextMenuAddMessageCodec.WriteStructural(ref platform,
+			addAddress, add));
+		Assert.True(MuiAreaContextMenuMessageMemoryCodec.TryReadUInt32(ref platform,
+			addAddress, MuiAreaContextMenuPacketKind.Add,
+			MuiAreaContextMenuMessageField.MouseX, out var mouseX));
+		Assert.Equal(unchecked((uint)add.MouseX), mouseX);
+		Assert.True(MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+			addAddress, MuiAreaContextMenuPacketKind.Add,
+			MuiAreaContextMenuMessageField.MouseY, unchecked((uint)-17)));
+		Assert.True(MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+			addAddress, MuiAreaContextMenuPacketKind.Add,
+			MuiAreaContextMenuMessageField.MouseYPointer, 0x1B00u));
+		Assert.True(MuiAreaContextMenuAddMessageCodec.TryReadStructural(ref platform,
+			addAddress, out var updatedAdd));
+		Assert.Equal(add.MethodId, updatedAdd.MethodId);
+		Assert.Equal(add.MenuStrip, updatedAdd.MenuStrip);
+		Assert.Equal(add.MouseX, updatedAdd.MouseX);
+		Assert.Equal(-17, updatedAdd.MouseY);
+		Assert.Equal(add.MouseXPointer, updatedAdd.MouseXPointer);
+		Assert.Equal(APTR.FromPointer(0x1B00), updatedAdd.MouseYPointer);
+
+		var buildAddress = APTR.FromPointer(0x2540);
+		var build = new MuiAreaContextMenuBuildMessage
+		{
+			MethodId = MuiAreaContextMenuMessageCodec.Build,
+			MouseX = 13,
+			MouseY = -4,
+		};
+		Assert.True(MuiAreaContextMenuBuildMessageCodec.WriteStructural(ref platform,
+			buildAddress, build));
+		Assert.True(MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+			buildAddress, MuiAreaContextMenuPacketKind.Build,
+			MuiAreaContextMenuMessageField.MouseX, unchecked((uint)-19)));
+		Assert.True(MuiAreaContextMenuBuildMessageCodec.TryReadStructural(ref platform,
+			buildAddress, out var updatedBuild));
+		Assert.Equal(build.MethodId, updatedBuild.MethodId);
+		Assert.Equal(-19, updatedBuild.MouseX);
+		Assert.Equal(build.MouseY, updatedBuild.MouseY);
+
+		var choiceAddress = APTR.FromPointer(0x2580);
+		var choice = new MuiAreaContextMenuChoiceMessage
+		{
+			MethodId = MuiAreaContextMenuMessageCodec.Choice,
+			Item = APTR.FromPointer(0x1C00),
+		};
+		Assert.True(MuiAreaContextMenuChoiceMessageCodec.WriteStructural(ref platform,
+			choiceAddress, choice));
+		Assert.True(MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+			choiceAddress, MuiAreaContextMenuPacketKind.Choice,
+			MuiAreaContextMenuMessageField.Item, 0x1D00u));
+		Assert.True(MuiAreaContextMenuChoiceMessageCodec.TryReadStructural(ref platform,
+			choiceAddress, out var updatedChoice));
+		Assert.Equal(choice.MethodId, updatedChoice.MethodId);
+		Assert.Equal(APTR.FromPointer(0x1D00), updatedChoice.Item);
+
+		Assert.False(MuiAreaContextMenuMessageMemoryCodec.TryReadUInt32(ref platform,
+			addAddress, MuiAreaContextMenuPacketKind.Add,
+			MuiAreaContextMenuMessageField.Item, out _));
+		Assert.False(MuiAreaContextMenuMessageMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(0x20FF0), MuiAreaContextMenuPacketKind.Add,
+			MuiAreaContextMenuMessageField.MouseY, 1));
+		Assert.False(MuiAreaContextMenuMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.Null, MuiAreaContextMenuPacketKind.Choice,
+			MuiAreaContextMenuMessageField.Item, out _));
+	}
+
+	[Fact]
 	public void ContextMenuRecordUsesDedicatedStructCodec()
 	{
 		var platform = CreatePlatform(out _);

@@ -155,10 +155,53 @@ internal static class MuiAreaContextMenuMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (packet == MuiAreaContextMenuPacketKind.Add)
+		{
+			if (!MuiAreaContextMenuAddMessageCodec.TryReadStructural(ref platform,
+				message, out var add)) return false;
+			if (field == MuiAreaContextMenuMessageField.MethodId)
+				value = add.MethodId;
+			else if (field == MuiAreaContextMenuMessageField.MenuStrip)
+				value = add.MenuStrip.Raw;
+			else if (field == MuiAreaContextMenuMessageField.MouseX)
+				value = unchecked((uint)add.MouseX);
+			else if (field == MuiAreaContextMenuMessageField.MouseY)
+				value = unchecked((uint)add.MouseY);
+			else if (field == MuiAreaContextMenuMessageField.MouseXPointer)
+				value = add.MouseXPointer.Raw;
+			else if (field == MuiAreaContextMenuMessageField.MouseYPointer)
+				value = add.MouseYPointer.Raw;
+			else
+				return false;
+			return true;
+		}
+		if (packet == MuiAreaContextMenuPacketKind.Build)
+		{
+			if (!MuiAreaContextMenuBuildMessageCodec.TryReadStructural(ref platform,
+				message, out var build)) return false;
+			if (field == MuiAreaContextMenuMessageField.MethodId)
+				value = build.MethodId;
+			else if (field == MuiAreaContextMenuMessageField.MouseX)
+				value = unchecked((uint)build.MouseX);
+			else if (field == MuiAreaContextMenuMessageField.MouseY)
+				value = unchecked((uint)build.MouseY);
+			else
+				return false;
+			return true;
+		}
+		if (packet == MuiAreaContextMenuPacketKind.Choice)
+		{
+			if (!MuiAreaContextMenuChoiceMessageCodec.TryReadStructural(ref platform,
+				message, out var choice)) return false;
+			if (field == MuiAreaContextMenuMessageField.MethodId)
+				value = choice.MethodId;
+			else if (field == MuiAreaContextMenuMessageField.Item)
+				value = choice.Item.Raw;
+			else
+				return false;
+			return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -166,10 +209,56 @@ internal static class MuiAreaContextMenuMessageMemoryCodec
 		MuiAreaContextMenuMessageField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (packet == MuiAreaContextMenuPacketKind.Add)
+		{
+			if (!MuiAreaContextMenuAddMessageCodec.TryReadStructural(ref platform,
+				message, out var add)) return false;
+			if (field == MuiAreaContextMenuMessageField.MethodId)
+				add.MethodId = value;
+			else if (field == MuiAreaContextMenuMessageField.MenuStrip)
+				add.MenuStrip = APTR.FromPointer(value);
+			else if (field == MuiAreaContextMenuMessageField.MouseX)
+				add.MouseX = unchecked((int)value);
+			else if (field == MuiAreaContextMenuMessageField.MouseY)
+				add.MouseY = unchecked((int)value);
+			else if (field == MuiAreaContextMenuMessageField.MouseXPointer)
+				add.MouseXPointer = APTR.FromPointer(value);
+			else if (field == MuiAreaContextMenuMessageField.MouseYPointer)
+				add.MouseYPointer = APTR.FromPointer(value);
+			else
+				return false;
+			return MuiAreaContextMenuAddMessageCodec.WriteStructural(ref platform,
+				message, add);
+		}
+		if (packet == MuiAreaContextMenuPacketKind.Build)
+		{
+			if (!MuiAreaContextMenuBuildMessageCodec.TryReadStructural(ref platform,
+				message, out var build)) return false;
+			if (field == MuiAreaContextMenuMessageField.MethodId)
+				build.MethodId = value;
+			else if (field == MuiAreaContextMenuMessageField.MouseX)
+				build.MouseX = unchecked((int)value);
+			else if (field == MuiAreaContextMenuMessageField.MouseY)
+				build.MouseY = unchecked((int)value);
+			else
+				return false;
+			return MuiAreaContextMenuBuildMessageCodec.WriteStructural(ref platform,
+				message, build);
+		}
+		if (packet == MuiAreaContextMenuPacketKind.Choice)
+		{
+			if (!MuiAreaContextMenuChoiceMessageCodec.TryReadStructural(ref platform,
+				message, out var choice)) return false;
+			if (field == MuiAreaContextMenuMessageField.MethodId)
+				choice.MethodId = value;
+			else if (field == MuiAreaContextMenuMessageField.Item)
+				choice.Item = APTR.FromPointer(value);
+			else
+				return false;
+			return MuiAreaContextMenuChoiceMessageCodec.WriteStructural(ref platform,
+				message, choice);
+		}
+		return false;
 	}
 }
 
@@ -223,6 +312,16 @@ internal static class MuiAreaContextMenuAddMessageCodec
 				value.MouseYPointer.Raw)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaContextMenuAddMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaContextMenuAddMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, value);
 }
 
 internal static class MuiAreaContextMenuBuildMessageCodec
@@ -260,6 +359,16 @@ internal static class MuiAreaContextMenuBuildMessageCodec
 				unchecked((uint)value.MouseY))) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaContextMenuBuildMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaContextMenuBuildMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, value);
 }
 
 internal static class MuiAreaContextMenuChoiceMessageCodec
@@ -292,6 +401,16 @@ internal static class MuiAreaContextMenuChoiceMessageCodec
 				value.Item.Raw)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaContextMenuChoiceMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaContextMenuChoiceMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, value);
 }
 
 internal static class MuiAreaContextMenuMessageCodec

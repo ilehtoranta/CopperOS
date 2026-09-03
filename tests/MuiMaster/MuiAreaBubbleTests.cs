@@ -70,6 +70,66 @@ public sealed class MuiAreaBubbleTests
 	}
 
 	[Fact]
+	public void BubbleFieldAccessUsesCompleteNamedRecords()
+	{
+		var platform = CreatePlatform(out _);
+		var createAddress = APTR.FromPointer(0x2500);
+		var create = new MuiAreaCreateBubbleMessage
+		{
+			MethodId = MuiAreaBubbleMessageCodec.CreateBubble,
+			X = -11,
+			Y = 23,
+			Text = APTR.FromPointer(0x1800),
+			Flags = 7,
+		};
+		Assert.True(MuiAreaCreateBubbleMessageCodec.WriteStructural(ref platform,
+			createAddress, create));
+		Assert.True(MuiAreaBubbleMessageMemoryCodec.TryReadUInt32(ref platform,
+			createAddress, MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.X, out var x));
+		Assert.Equal(unchecked((uint)create.X), x);
+		Assert.True(MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+			createAddress, MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.Y, unchecked((uint)-17)));
+		Assert.True(MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+			createAddress, MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.Text, 0x1900u));
+		Assert.True(MuiAreaCreateBubbleMessageCodec.TryReadStructural(ref platform,
+			createAddress, out var updatedCreate));
+		Assert.Equal(create.MethodId, updatedCreate.MethodId);
+		Assert.Equal(create.X, updatedCreate.X);
+		Assert.Equal(-17, updatedCreate.Y);
+		Assert.Equal(APTR.FromPointer(0x1900), updatedCreate.Text);
+		Assert.Equal(create.Flags, updatedCreate.Flags);
+
+		var deleteAddress = APTR.FromPointer(0x2540);
+		var delete = new MuiAreaDeleteBubbleMessage
+		{
+			MethodId = MuiAreaBubbleMessageCodec.DeleteBubble,
+			Bubble = APTR.FromPointer(0x1A00),
+		};
+		Assert.True(MuiAreaDeleteBubbleMessageCodec.WriteStructural(ref platform,
+			deleteAddress, delete));
+		Assert.True(MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+			deleteAddress, MuiAreaBubblePacketKind.Delete,
+			MuiAreaBubbleMessageField.Bubble, 0x1B00u));
+		Assert.True(MuiAreaDeleteBubbleMessageCodec.TryReadStructural(ref platform,
+			deleteAddress, out var updatedDelete));
+		Assert.Equal(delete.MethodId, updatedDelete.MethodId);
+		Assert.Equal(APTR.FromPointer(0x1B00), updatedDelete.Bubble);
+
+		Assert.False(MuiAreaBubbleMessageMemoryCodec.TryReadUInt32(ref platform,
+			createAddress, MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.Bubble, out _));
+		Assert.False(MuiAreaBubbleMessageMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(0x20FF0), MuiAreaBubblePacketKind.Create,
+			MuiAreaBubbleMessageField.Flags, 1));
+		Assert.False(MuiAreaBubbleMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.Null, MuiAreaBubblePacketKind.Delete,
+			MuiAreaBubbleMessageField.Bubble, out _));
+	}
+
+	[Fact]
 	public void DispatcherCreatesAndDeletesProviderOwnedBubble()
 	{
 		var platform = CreatePlatform(out var areaClass);

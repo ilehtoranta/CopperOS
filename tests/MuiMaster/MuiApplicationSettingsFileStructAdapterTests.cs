@@ -101,4 +101,46 @@ public sealed class MuiApplicationSettingsFileStructAdapterTests
 		Assert.False(MuiApplicationSettingsHeaderStructCodec.Write(ref platform,
 			APTR.Null, header));
 	}
+
+	[Fact]
+	public void ApplicationSettingsFieldAccessUsesCompleteNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x40000, 0x4000,
+			APTR.FromPointer(0x1000));
+		var headerAddress = APTR.FromPointer(0x2400);
+		var header = new MuiApplicationSettingsHeader
+		{
+			MagicValue = MuiApplicationSettingsFileCore.Magic,
+			VersionValue = MuiApplicationSettingsFileCore.Version,
+			RecordCount = 3,
+			PayloadBytes = 64,
+		};
+		Assert.True(MuiApplicationSettingsHeaderCodec.WriteStructural(ref platform,
+			headerAddress, header));
+		Assert.True(MuiApplicationSettingsHeaderMemoryCodec.TryWrite(ref platform,
+			headerAddress, MuiApplicationSettingsHeaderField.RecordCount, 4));
+		Assert.True(MuiApplicationSettingsHeaderMemoryCodec.TryRead(ref platform,
+			headerAddress, MuiApplicationSettingsHeaderField.MagicValue,
+			out var magic));
+		Assert.Equal(header.MagicValue, magic);
+		Assert.True(MuiApplicationSettingsHeaderCodec.TryReadStructural(ref platform,
+			headerAddress, out var headerAfter));
+		Assert.Equal(4u, headerAfter.RecordCount);
+		Assert.Equal(header.PayloadBytes, headerAfter.PayloadBytes);
+
+		var recordAddress = APTR.FromPointer(0x2440);
+		var record = new MuiApplicationSettingsRecord { Key = 9, Length = 12 };
+		Assert.True(MuiApplicationSettingsRecordCodec.WriteStructural(ref platform,
+			recordAddress, record));
+		Assert.True(MuiApplicationSettingsRecordMemoryCodec.TryWrite(ref platform,
+			recordAddress, MuiApplicationSettingsRecordField.Length, 16));
+		Assert.True(MuiApplicationSettingsRecordCodec.TryReadStructural(ref platform,
+			recordAddress, out var recordAfter));
+		Assert.Equal(record.Key, recordAfter.Key);
+		Assert.Equal(16u, recordAfter.Length);
+		Assert.False(MuiApplicationSettingsHeaderMemoryCodec.TryRead(ref platform,
+			headerAddress, (MuiApplicationSettingsHeaderField)255, out _));
+		Assert.False(MuiApplicationSettingsRecordMemoryCodec.TryWrite(ref platform,
+			APTR.FromPointer(0x40FF9), MuiApplicationSettingsRecordField.Key, 1));
+	}
 }

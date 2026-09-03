@@ -254,25 +254,16 @@ internal static class MuiApplicationWindowNodeFieldCursorCodec
 		APTR address, MuiApplicationWindowNodeField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiApplicationWindowNodeFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
-		return true;
+		return MuiApplicationWindowNodeRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiApplicationWindowNodeField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiApplicationWindowNodeFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
-		return true;
+		return MuiApplicationWindowNodeRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, field, value);
 	}
 }
 
@@ -323,18 +314,47 @@ internal static class MuiApplicationWindowNodeRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (!MuiApplicationWindowNodeCodec.TryReadStructural(ref platform, record,
+			out var node)) return false;
+		switch (field)
+		{
+			case MuiApplicationWindowNodeField.Next:
+				value = node.Next.Raw; return true;
+			case MuiApplicationWindowNodeField.Value:
+				value = node.Value.Raw; return true;
+			case MuiApplicationWindowNodeField.Sequence:
+				value = node.Sequence; return true;
+			case MuiApplicationWindowNodeField.Auxiliary:
+				value = node.Auxiliary; return true;
+			case MuiApplicationWindowNodeField.Packet:
+				value = node.Packet; return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiApplicationWindowNodeField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationWindowNodeCodec.TryReadStructural(ref platform, record,
+			out var node)) return false;
+		switch (field)
+		{
+			case MuiApplicationWindowNodeField.Next:
+				node.Next = APTR.FromPointer(value); break;
+			case MuiApplicationWindowNodeField.Value:
+				node.Value = APTR.FromPointer(value); break;
+			case MuiApplicationWindowNodeField.Sequence:
+				node.Sequence = value; break;
+			case MuiApplicationWindowNodeField.Auxiliary:
+				node.Auxiliary = value; break;
+			case MuiApplicationWindowNodeField.Packet:
+				node.Packet = value; break;
+			default:
+				return false;
+		}
+		return MuiApplicationWindowNodeCodec.WriteStructural(ref platform, record,
+			node);
 	}
 }
 
@@ -429,6 +449,16 @@ internal static class MuiApplicationWindowNodeCodec
 				record.Packet)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiApplicationWindowNodeRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out record);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationWindowNodeRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, record);
 }
 
 // MUIM_Window_SetCycleChain receives a NULL-terminated APTR vector. Keep each
@@ -722,81 +752,48 @@ internal static class MuiEventHandlerNodeFieldCursorCodec
 		APTR address, MuiEventHandlerNodeField field, out byte value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiEventHandlerNodeFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress, out var size) ||
-			size != MuiEventHandlerNodeRecord.ByteFieldSize) return false;
-		value = platform.ReadUInt8(fieldAddress, 0);
-		return true;
+		return MuiEventHandlerNodeRecordMemoryCodec.TryReadUInt8(ref platform,
+			address, field, out value);
 	}
 
 	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
 		APTR address, MuiEventHandlerNodeField field, out ushort value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiEventHandlerNodeFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress, out var size) ||
-			size != MuiEventHandlerNodeRecord.WordFieldSize) return false;
-		value = platform.ReadUInt16(fieldAddress, 0);
-		return true;
+		return MuiEventHandlerNodeRecordMemoryCodec.TryReadUInt16(ref platform,
+			address, field, out value);
 	}
 
 	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiEventHandlerNodeField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiEventHandlerNodeFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress, out var size) ||
-			size != MuiEventHandlerNodeRecord.LongFieldSize) return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
-		return true;
+		return MuiEventHandlerNodeRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, field, out value);
 	}
 
 	internal static bool TryWriteUInt8<TPlatform>(ref TPlatform platform,
 		APTR address, MuiEventHandlerNodeField field, byte value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiEventHandlerNodeFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress, out var size) ||
-			size != MuiEventHandlerNodeRecord.ByteFieldSize) return false;
-		platform.WriteUInt8(fieldAddress, 0, value);
-		return true;
+		return MuiEventHandlerNodeRecordMemoryCodec.TryWriteUInt8(ref platform,
+			address, field, value);
 	}
 
 	internal static bool TryWriteUInt16<TPlatform>(ref TPlatform platform,
 		APTR address, MuiEventHandlerNodeField field, ushort value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiEventHandlerNodeFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress, out var size) ||
-			size != MuiEventHandlerNodeRecord.WordFieldSize) return false;
-		platform.WriteUInt16(fieldAddress, 0, value);
-		return true;
+		return MuiEventHandlerNodeRecordMemoryCodec.TryWriteUInt16(ref platform,
+			address, field, value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiEventHandlerNodeField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiEventHandlerNodeFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress, out var size) ||
-			size != MuiEventHandlerNodeRecord.LongFieldSize) return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
-		return true;
+		return MuiEventHandlerNodeRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, field, value);
 	}
 }
 
@@ -867,10 +864,16 @@ internal static class MuiEventHandlerNodeRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address,
-			out var size) || size != MuiEventHandlerNodeRecord.ByteFieldSize) return false;
-		value = platform.ReadUInt8(address, 0);
-		return true;
+		if (!MuiEventHandlerNodeCodec.TryReadStructural(ref platform, record,
+			out var node)) return false;
+		switch (field)
+		{
+			case MuiEventHandlerNodeField.Reserved:
+				value = node.Reserved; return true;
+			case MuiEventHandlerNodeField.Priority:
+				value = unchecked((byte)node.Priority); return true;
+		}
+		return false;
 	}
 
 	internal static bool TryReadUInt16<TPlatform>(ref TPlatform platform,
@@ -878,9 +881,9 @@ internal static class MuiEventHandlerNodeRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address,
-			out var size) || size != MuiEventHandlerNodeRecord.WordFieldSize) return false;
-		value = platform.ReadUInt16(address, 0);
+		if (!MuiEventHandlerNodeCodec.TryReadStructural(ref platform, record,
+			out var node) || field != MuiEventHandlerNodeField.Flags) return false;
+		value = node.Flags;
 		return true;
 	}
 
@@ -889,40 +892,74 @@ internal static class MuiEventHandlerNodeRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address,
-			out var size) || size != MuiEventHandlerNodeRecord.LongFieldSize) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (!MuiEventHandlerNodeCodec.TryReadStructural(ref platform, record,
+			out var node)) return false;
+		switch (field)
+		{
+			case MuiEventHandlerNodeField.NodeSuccessor:
+				value = node.NodeSuccessor.Raw; return true;
+			case MuiEventHandlerNodeField.NodePredecessor:
+				value = node.NodePredecessor.Raw; return true;
+			case MuiEventHandlerNodeField.Object:
+				value = node.Object.Raw; return true;
+			case MuiEventHandlerNodeField.Class:
+				value = node.Class.Raw; return true;
+			case MuiEventHandlerNodeField.Events:
+				value = node.Events; return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt8<TPlatform>(ref TPlatform platform,
 		APTR record, MuiEventHandlerNodeField field, byte value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address,
-			out var size) || size != MuiEventHandlerNodeRecord.ByteFieldSize) return false;
-		platform.WriteUInt8(address, 0, value);
-		return true;
+		if (!MuiEventHandlerNodeCodec.TryReadStructural(ref platform, record,
+			out var node)) return false;
+		switch (field)
+		{
+			case MuiEventHandlerNodeField.Reserved:
+				node.Reserved = value; break;
+			case MuiEventHandlerNodeField.Priority:
+				node.Priority = unchecked((sbyte)value); break;
+			default:
+				return false;
+		}
+		return MuiEventHandlerNodeCodec.WriteStructural(ref platform, record, node);
 	}
 
 	internal static bool TryWriteUInt16<TPlatform>(ref TPlatform platform,
 		APTR record, MuiEventHandlerNodeField field, ushort value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address,
-			out var size) || size != MuiEventHandlerNodeRecord.WordFieldSize) return false;
-		platform.WriteUInt16(address, 0, value);
-		return true;
+		if (!MuiEventHandlerNodeCodec.TryReadStructural(ref platform, record,
+			out var node) || field != MuiEventHandlerNodeField.Flags) return false;
+		node.Flags = value;
+		return MuiEventHandlerNodeCodec.WriteStructural(ref platform, record, node);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiEventHandlerNodeField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address,
-			out var size) || size != MuiEventHandlerNodeRecord.LongFieldSize) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiEventHandlerNodeCodec.TryReadStructural(ref platform, record,
+			out var node)) return false;
+		switch (field)
+		{
+			case MuiEventHandlerNodeField.NodeSuccessor:
+				node.NodeSuccessor = APTR.FromPointer(value); break;
+			case MuiEventHandlerNodeField.NodePredecessor:
+				node.NodePredecessor = APTR.FromPointer(value); break;
+			case MuiEventHandlerNodeField.Object:
+				node.Object = APTR.FromPointer(value); break;
+			case MuiEventHandlerNodeField.Class:
+				node.Class = APTR.FromPointer(value); break;
+			case MuiEventHandlerNodeField.Events:
+				node.Events = value; break;
+			default:
+				return false;
+		}
+		return MuiEventHandlerNodeCodec.WriteStructural(ref platform, record, node);
 	}
 }
 
@@ -990,6 +1027,16 @@ internal static class MuiEventHandlerNodeCodec
 				record.Events)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiEventHandlerNodeRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out record);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiEventHandlerNodeRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, record);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]
@@ -1042,25 +1089,16 @@ internal static class MuiInputHandlerFieldCursorCodec
 		APTR address, MuiInputHandlerField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		value = 0;
-		var cursor = default(MuiInputHandlerFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
-		return true;
+		return MuiInputHandlerRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, field, out value);
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiInputHandlerField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		var cursor = default(MuiInputHandlerFieldCursor);
-		cursor.Address = address;
-		cursor.Field = field;
-		if (!TryGetAddress(ref platform, cursor, out var fieldAddress)) return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
-		return true;
+		return MuiInputHandlerRecordMemoryCodec.TryWriteUInt32(ref platform,
+			address, field, value);
 	}
 }
 
@@ -1113,18 +1151,50 @@ internal static class MuiInputHandlerRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (!MuiInputHandlerCodec.TryReadStructural(ref platform, record,
+			out var handler)) return false;
+		switch (field)
+		{
+			case MuiInputHandlerField.NodeSuccessor:
+				value = handler.NodeSuccessor.Raw; return true;
+			case MuiInputHandlerField.NodePredecessor:
+				value = handler.NodePredecessor.Raw; return true;
+			case MuiInputHandlerField.Object:
+				value = handler.Object.Raw; return true;
+			case MuiInputHandlerField.Events:
+				value = handler.Events; return true;
+			case MuiInputHandlerField.Reserved:
+				value = handler.Reserved; return true;
+			case MuiInputHandlerField.Packet:
+				value = handler.Packet; return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiInputHandlerField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiInputHandlerCodec.TryReadStructural(ref platform, record,
+			out var handler)) return false;
+		switch (field)
+		{
+			case MuiInputHandlerField.NodeSuccessor:
+				handler.NodeSuccessor = APTR.FromPointer(value); break;
+			case MuiInputHandlerField.NodePredecessor:
+				handler.NodePredecessor = APTR.FromPointer(value); break;
+			case MuiInputHandlerField.Object:
+				handler.Object = APTR.FromPointer(value); break;
+			case MuiInputHandlerField.Events:
+				handler.Events = value; break;
+			case MuiInputHandlerField.Reserved:
+				handler.Reserved = value; break;
+			case MuiInputHandlerField.Packet:
+				handler.Packet = value; break;
+			default:
+				return false;
+		}
+		return MuiInputHandlerCodec.WriteStructural(ref platform, record, handler);
 	}
 }
 
@@ -1179,6 +1249,16 @@ internal static class MuiInputHandlerCodec
 				record.Packet)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiInputHandlerRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out record);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiInputHandlerRecord record)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, record);
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 2)]

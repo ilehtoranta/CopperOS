@@ -59,7 +59,7 @@ internal enum MuiStorePoolStateField : byte
 
 internal static class MuiStorePoolStateCodec
 {
-	private static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR address, MuiStorePoolStateField field, out APTR fieldAddress)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -79,25 +79,31 @@ internal static class MuiStorePoolStateCodec
 		return platform.IsMapped(fieldAddress, 4);
 	}
 
-	private static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiStorePoolStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
-			return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
+		if (!TryReadStructural(ref platform, address, out var state)) return false;
+		if (field == MuiStorePoolStateField.Pool) value = state.Pool.Raw;
+		else if (field == MuiStorePoolStateField.Policy) value = state.Policy;
+		else if (field == MuiStorePoolStateField.OwnsPool) value = state.OwnsPool;
+		else if (field == MuiStorePoolStateField.Magic) value = state.Magic;
+		else return false;
 		return true;
 	}
 
-	private static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiStorePoolStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
-			return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
-		return true;
+		if (!TryReadStructural(ref platform, address, out var state)) return false;
+		if (field == MuiStorePoolStateField.Pool) state.Pool = APTR.FromPointer(value);
+		else if (field == MuiStorePoolStateField.Policy) state.Policy = value;
+		else if (field == MuiStorePoolStateField.OwnsPool) state.OwnsPool = value;
+		else if (field == MuiStorePoolStateField.Magic) state.Magic = value;
+		else return false;
+		return WriteStructural(ref platform, address, state);
 	}
 
 	// Declaration-order pool state: Pool APTR, policy/ownership flags, magic.
@@ -122,7 +128,17 @@ internal static class MuiStorePoolStateCodec
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStorePoolStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
+
 	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStorePoolStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
 		APTR address, MuiStorePoolStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiGuestStructCursor.TryCreate(ref platform, address,
@@ -181,7 +197,7 @@ internal enum MuiStoreIterationStateField : byte
 
 internal static class MuiStoreIterationStateCodec
 {
-	private static bool TryGetAddress<TPlatform>(ref TPlatform platform,
+	internal static bool TryGetAddress<TPlatform>(ref TPlatform platform,
 		APTR address, MuiStoreIterationStateField field, out APTR fieldAddress)
 		where TPlatform : struct, IMuiGuestMemory
 	{
@@ -203,25 +219,35 @@ internal static class MuiStoreIterationStateCodec
 		return platform.IsMapped(fieldAddress, 4);
 	}
 
-	private static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
+	internal static bool TryReadUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiStoreIterationStateField field, out uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
-			return false;
-		value = platform.ReadUInt32(fieldAddress, 0);
+		if (!TryReadStructural(ref platform, address, out var state)) return false;
+		if (field == MuiStoreIterationStateField.Next) value = state.Next.Raw;
+		else if (field == MuiStoreIterationStateField.Counter) value = state.Counter.Raw;
+		else if (field == MuiStoreIterationStateField.Current) value = state.Current.Raw;
+		else if (field == MuiStoreIterationStateField.NextRecord) value = state.NextRecord.Raw;
+		else if (field == MuiStoreIterationStateField.Kind) value = state.Kind;
+		else if (field == MuiStoreIterationStateField.Magic) value = state.Magic;
+		else return false;
 		return true;
 	}
 
-	private static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
+	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR address, MuiStoreIterationStateField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, address, field, out var fieldAddress))
-			return false;
-		platform.WriteUInt32(fieldAddress, 0, value);
-		return true;
+		if (!TryReadStructural(ref platform, address, out var state)) return false;
+		if (field == MuiStoreIterationStateField.Next) state.Next = APTR.FromPointer(value);
+		else if (field == MuiStoreIterationStateField.Counter) state.Counter = APTR.FromPointer(value);
+		else if (field == MuiStoreIterationStateField.Current) state.Current = APTR.FromPointer(value);
+		else if (field == MuiStoreIterationStateField.NextRecord) state.NextRecord = APTR.FromPointer(value);
+		else if (field == MuiStoreIterationStateField.Kind) state.Kind = value;
+		else if (field == MuiStoreIterationStateField.Magic) state.Magic = value;
+		else return false;
+		return WriteStructural(ref platform, address, state);
 	}
 
 	// Declaration-order iterator record: four APTR links followed by Kind and
@@ -252,7 +278,17 @@ internal static class MuiStoreIterationStateCodec
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
 
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiStoreIterationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryReadRecord(ref platform, address, out value);
+
 	internal static bool WriteRecord<TPlatform>(ref TPlatform platform,
+		APTR address, MuiStoreIterationStateRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		WriteStructural(ref platform, address, value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
 		APTR address, MuiStoreIterationStateRecord value)
 		where TPlatform : struct, IMuiGuestMemory =>
 		MuiGuestStructCursor.TryCreate(ref platform, address,

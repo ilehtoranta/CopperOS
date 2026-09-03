@@ -119,10 +119,37 @@ internal static class MuiAreaBubbleMessageMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (packet == MuiAreaBubblePacketKind.Create)
+		{
+			if (!MuiAreaCreateBubbleMessageCodec.TryReadStructural(ref platform,
+				message, out var create)) return false;
+			if (field == MuiAreaBubbleMessageField.MethodId)
+				value = create.MethodId;
+			else if (field == MuiAreaBubbleMessageField.X)
+				value = unchecked((uint)create.X);
+			else if (field == MuiAreaBubbleMessageField.Y)
+				value = unchecked((uint)create.Y);
+			else if (field == MuiAreaBubbleMessageField.Text)
+				value = create.Text.Raw;
+			else if (field == MuiAreaBubbleMessageField.Flags)
+				value = create.Flags;
+			else
+				return false;
+			return true;
+		}
+		if (packet == MuiAreaBubblePacketKind.Delete)
+		{
+			if (!MuiAreaDeleteBubbleMessageCodec.TryReadStructural(ref platform,
+				message, out var delete)) return false;
+			if (field == MuiAreaBubbleMessageField.MethodId)
+				value = delete.MethodId;
+			else if (field == MuiAreaBubbleMessageField.Bubble)
+				value = delete.Bubble.Raw;
+			else
+				return false;
+			return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
@@ -130,10 +157,39 @@ internal static class MuiAreaBubbleMessageMemoryCodec
 		MuiAreaBubbleMessageField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, message, packet, field,
-			out var address)) return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (packet == MuiAreaBubblePacketKind.Create)
+		{
+			if (!MuiAreaCreateBubbleMessageCodec.TryReadStructural(ref platform,
+				message, out var create)) return false;
+			if (field == MuiAreaBubbleMessageField.MethodId)
+				create.MethodId = value;
+			else if (field == MuiAreaBubbleMessageField.X)
+				create.X = unchecked((int)value);
+			else if (field == MuiAreaBubbleMessageField.Y)
+				create.Y = unchecked((int)value);
+			else if (field == MuiAreaBubbleMessageField.Text)
+				create.Text = APTR.FromPointer(value);
+			else if (field == MuiAreaBubbleMessageField.Flags)
+				create.Flags = value;
+			else
+				return false;
+			return MuiAreaCreateBubbleMessageCodec.WriteStructural(ref platform,
+				message, create);
+		}
+		if (packet == MuiAreaBubblePacketKind.Delete)
+		{
+			if (!MuiAreaDeleteBubbleMessageCodec.TryReadStructural(ref platform,
+				message, out var delete)) return false;
+			if (field == MuiAreaBubbleMessageField.MethodId)
+				delete.MethodId = value;
+			else if (field == MuiAreaBubbleMessageField.Bubble)
+				delete.Bubble = APTR.FromPointer(value);
+			else
+				return false;
+			return MuiAreaDeleteBubbleMessageCodec.WriteStructural(ref platform,
+				message, delete);
+		}
+		return false;
 	}
 }
 
@@ -181,6 +237,16 @@ internal static class MuiAreaCreateBubbleMessageCodec
 				value.Flags)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaCreateBubbleMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaCreateBubbleMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, value);
 }
 
 internal static class MuiAreaDeleteBubbleMessageCodec
@@ -213,6 +279,16 @@ internal static class MuiAreaDeleteBubbleMessageCodec
 				value.Bubble.Raw)) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiAreaDeleteBubbleMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiAreaDeleteBubbleMessage value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, value);
 }
 
 internal static class MuiAreaBubbleMessageCodec

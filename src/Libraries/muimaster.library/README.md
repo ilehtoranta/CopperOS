@@ -10,6 +10,352 @@ before a field is read or written. This keeps the 68k implementation
 exception-free, freestanding, and free of managed-runtime dependencies while
 preserving the MorphOS ABI.
 
+MG2244–MG2245 extend the same struct-first boundary to Text presentation and
+shortened state. Typed writes preserve policy siblings, status, and cookies
+while malformed fields fail closed; focused MC68000 closures pass the
+zero-runtime gate without managed runtime services.
+
+MG2246 extends the same struct-first boundary to Text Unicode state. Typed
+writes preserve the record cookie while malformed fields fail closed; the
+focused MC68000 closure passes the zero-runtime gate without managed runtime
+services.
+
+MG2247–MG2248 extend the same struct-first boundary to Window control and event
+state. Typed writes preserve identifiers, BOOLs, opaque capabilities, and
+cookies while malformed fields fail closed; the focused closures pass the
+zero-runtime gate without managed runtime services.
+
+MG2249–MG2250 extend the same struct-first boundary to Window focus and
+lifecycle state. Typed writes preserve object/native-window capabilities,
+lifecycle fields, and cookies while malformed fields fail closed; the focused
+closures pass the zero-runtime gate without managed runtime services.
+
+MG2251–MG2252 extend the same struct-first boundary to Window interaction and
+presentation state. Typed writes preserve cycle-chain/caller-owned capability
+fields, request counters, and cookies while malformed fields fail closed; the
+focused closures pass the zero-runtime gate without managed runtime services.
+
+MG2253–MG2254 extend the same struct-first boundary to Window relationship and
+visual state. Typed writes preserve object capabilities, drawing policies, and
+cookies while malformed fields fail closed; the focused closures pass the
+zero-runtime gate without managed runtime services.
+
+MG2255 extends the same struct-first boundary to the 88-byte Window OpenWindow
+policy record. Typed writes preserve signed geometry, policy BOOLs, and cookies
+while malformed fields fail closed; its focused closure passes the zero-runtime
+gate without managed runtime services.
+
+MG2256 extends the same struct-first boundary to Window EventReuse state. Typed
+read/modify/write operations preserve pending dispatch fields, capabilities,
+signed keys, and cookies while malformed fields fail closed; its focused
+closure passes the zero-runtime gate without managed runtime services.
+
+MG2257 extends the same struct-first boundary to the mixed-size Window
+InputEvent record. Typed byte/word/LONG projections now use structural
+read/modify/write operations, preserving neighbouring fields and signed
+position values while malformed field/type combinations fail closed; its
+focused closure passes the zero-runtime gate without managed runtime services.
+
+MG2258 extends the same struct-first boundary to String integer state. Semantic
+signed-value reads and writes use the named record and preserve its cookie;
+bounded cookie repair remains available for malformed-state diagnostics. Its
+focused closure passes the zero-runtime gate without managed runtime services.
+
+MG2259 extends the same struct-first boundary to the mixed MenuItem trigger
+record. Typed pointer, signed-word, flag, byte, and selection fields use
+structural read/modify/write operations and preserve unrelated menu fields;
+its focused closure passes the zero-runtime gate without managed runtime
+services.
+
+MG2260 extends the same struct-first boundary to the composed IntuiText node in
+MenuItem trigger storage. Typed pen, draw-mode, signed-edge, and pointer fields
+use structural read/modify/write operations and preserve the text-node chain;
+its focused closure passes the zero-runtime gate without managed runtime
+services.
+
+MG2261 extends the same struct-first boundary to the shared Pop/Filepanel
+specialist hook message. Typed parameter updates use structural named-record
+access and preserve sibling parameters and reserved data; its focused closure
+passes the zero-runtime gate without managed runtime services.
+
+MG2262 extends the same struct-first boundary to Store pool ownership and
+iterator state. Typed updates preserve pool handles, ownership flags, iterator
+links, and cookies while malformed fields fail closed; its focused closure
+passes the zero-runtime gate without managed runtime services.
+
+MG2263 extends the same struct-first boundary to the nested Exec message node
+and mixed-width AppMessage payload. Typed updates preserve links, signed
+fields, argument metadata, and reserved siblings while malformed field/type
+combinations fail closed; its focused closure passes the zero-runtime gate
+without managed runtime services.
+
+MG2264 extends the same struct-first boundary to Workbench argument vector
+elements. Typed BPTR/STRPTR updates preserve sibling slots while malformed
+fields fail closed; its focused closure passes the zero-runtime gate without
+managed runtime services.
+
+MG2265 extends the same struct-first boundary to Application Save/Load
+traversal frames. Typed updates preserve object identity and traversal
+counters while malformed fields fail closed; its focused closure passes the
+zero-runtime gate without managed runtime services.
+
+MG2266 extends the same struct-first boundary to the internal settings header
+and key/length records. Typed updates preserve sibling metadata while
+malformed fields fail closed; its focused closure passes the zero-runtime gate
+without managed runtime services.
+
+MG2267 extends the same struct-first boundary to Application PushMethod and
+UnpushMethod queue packets. Typed updates preserve sibling parameters while
+malformed packet/field combinations fail closed; its focused closure passes
+the zero-runtime gate without managed runtime services.
+
+MG2268 extends the same struct-first boundary to Application ReturnId, Input,
+InputBuffered, and InputHandler packets. Typed updates preserve sibling
+values while malformed packet/field combinations fail closed; its focused
+closure passes the zero-runtime gate without managed runtime services. The
+single-ULONG InputBuffered member retains its named packet struct and routes
+through the shared bounded ULONG record adapter.
+
+MG2269 extends the same struct-first boundary to the 36-byte MorphOS
+`MUI_Command` record. Typed pointer, signed-parameter, and reserved-field
+updates preserve sibling values while malformed records fail closed; its
+focused closure passes the zero-runtime gate without managed runtime services.
+
+MG2270 extends the same struct-first boundary to Application WindowList state
+and entry records, including compatibility cursor wrappers. Typed APTR and
+scalar updates preserve sibling values while invalid fields, truncated
+records, and null records fail closed; its focused closure passes the
+zero-runtime gate without managed runtime services.
+
+MG2271 extends the same struct-first boundary to the ApplicationWindow
+queue-node record and its compatibility cursor adapter. Typed APTR and scalar
+updates preserve sibling values while invalid, truncated, and null records fail
+closed; its focused closure passes the zero-runtime gate without managed runtime
+services.
+
+MG2272 extends the same struct-first boundary to the mixed-width event-handler
+node and its compatibility cursor adapter. Typed APTR, byte, word, and LONG
+updates preserve sibling values while invalid, truncated, and null records fail
+closed; its focused closure passes the zero-runtime gate without managed runtime
+services.
+
+MG2273 extends the same struct-first boundary to the six-LONG input-handler
+node and its compatibility cursor adapter. Typed APTR and scalar updates
+preserve sibling values while invalid, truncated, and null records fail closed;
+its focused closure passes the zero-runtime gate without managed runtime
+services.
+
+MG2274 extends the same struct-first boundary to the ShowHelp and AboutMUI
+presentation packet records. Typed scalar updates preserve sibling values while
+invalid, truncated, and null records fail closed; its focused closure passes the
+zero-runtime gate without managed runtime services.
+
+MG2275 extends the same struct-first boundary to the SetConfigItem,
+OpenConfigWindow, BuildSettingsPanel, and SettingsIo application settings
+packet records. Typed scalar updates preserve method headers and sibling values
+while invalid, truncated, and null records fail closed; its focused closure
+passes the zero-runtime gate without managed runtime services.
+
+MG2276 extends the same struct-first boundary to the GoActive/GoInactive
+activation packet and method-header records. Typed scalar updates preserve
+packet siblings while invalid, truncated, and null records fail closed; the
+one-ULONG header retains its documented scalar-safe seam for freestanding
+lowering, and the focused closure passes the zero-runtime gate without managed
+runtime services.
+
+MG2277 extends the same struct-first boundary to the CreateBubble and
+DeleteBubble packet records. Typed signed-coordinate and APTR updates preserve
+method headers and sibling values while invalid, truncated, and null records
+fail closed; the focused closure passes the zero-runtime gate without managed
+runtime services.
+
+MG2278 extends the same struct-first boundary to the Add, Build, and Choice
+context-menu packet records. Typed signed-coordinate and APTR updates preserve
+method headers and sibling values while invalid, truncated, and null records
+fail closed; the focused closure passes the zero-runtime gate without managed
+runtime services.
+
+MG2279 extends the same struct-first boundary to the OpenCustomFont and
+CloseCustomFont packet records. Typed APTR updates preserve method headers
+while invalid, truncated, and null records fail closed; the focused closure
+passes the zero-runtime gate without managed runtime services.
+
+MG2280 extends the same struct-first boundary to the InitResize and ExitResize
+packet records. Typed flags and method-header updates preserve packet siblings
+while invalid, truncated, and null records fail closed; the one-ULONG header
+retains its documented scalar-safe seam for freestanding lowering, and the
+focused closure passes the zero-runtime gate without managed runtime services.
+
+MG2281 extends the same struct-first boundary to all Area drag packet records.
+Typed signed coordinates, pointers, flags, qualifiers, and method fields
+preserve packet siblings while invalid, truncated, and null records fail
+closed; the one-ULONG method packet retains its documented scalar-safe seam.
+The focused closure passes the zero-runtime gate without managed runtime
+services.
+
+MG2282 extends the same struct-first boundary to Area resize lifecycle state.
+Typed magic, active, flags, and generation updates preserve sibling values; the
+structural seam retains raw diagnostic values while the validated lifecycle
+codec keeps its cookie and active-state policy. The focused closure passes the
+zero-runtime gate without managed runtime services.
+
+MG2283 extends the same struct-first boundary to Area drag lifecycle state.
+Typed magic, source/target, signed coordinates, qualifier, event flags, and
+lifecycle flags preserve sibling values while malformed records fail closed;
+the structural seam retains raw diagnostic values and the validated codec keeps
+its cookie policy. The focused closure passes the zero-runtime gate without
+managed runtime services.
+
+MG2284 extends the same struct-first boundary to Area ShortHelp packet fields.
+Typed method, pointer, and signed-coordinate updates preserve packet siblings
+while unsupported fields, truncated records, and null messages fail closed.
+The focused closure passes the zero-runtime gate without managed runtime
+services.
+
+MG2285 extends the same struct-first boundary to the Dirlist/Volumelist
+Method, Set, Rename, Protection, and GetEntry packet fields. Typed updates
+preserve packet siblings while unsupported fields, truncated records, and null
+messages fail closed. The focused closure passes the zero-runtime gate without
+managed runtime services.
+
+MG2286 extends the same struct-first boundary to ASL state and requester-lease
+fields. Typed magic, head, generation, next, requester, type, and tags updates
+preserve siblings while unsupported fields, truncated records, and null records
+fail closed. The focused closure passes the zero-runtime gate without managed
+runtime services.
+
+MG2287 extends the same struct-first boundary to ASL TagItem Tag/Data fields.
+Typed updates preserve the sibling field while odd, unsupported, truncated,
+and null records fail closed. The focused closure passes the zero-runtime gate
+without managed runtime services.
+
+MG2288 extends the same struct-first boundary to CallHook Hook and Param1
+fields. The complete named `MuiCallHookMessage` record is used for field
+read/modify/write operations; MethodId remains a deliberate four-byte header
+boundary for admission. Unsupported fields, truncated records, and null
+messages fail closed. Package host coverage is **2855/2855**. The focused
+MC68000 closure passes at **4540 bytes, 4181 instructions / 42598 cycles** with
+20 reachable methods, zero framework members, zero managed-allocation sites,
+and zero relocations; MC68020/MC68040 artifacts are **4544/4544** bytes.
+
+MG2289 extends the same struct-first boundary to BoopsiQuery Screen, flags,
+signed dimensions, and RenderInfo fields. The complete named
+`MuiBoopsiQueryMessage` record is used for typed read/modify/write operations;
+MethodId remains a deliberate four-byte header boundary for admission.
+Unsupported fields, truncated records, and null messages fail closed. Package
+host coverage is **2856/2856**. The focused MC68000 closure passes at
+**5248 bytes, 12310 instructions / 123794 cycles** with 20 reachable methods,
+zero framework members, zero managed-allocation sites, and zero relocations;
+MC68020/MC68040 artifacts are **5412/5412** bytes.
+
+MG2290 extends the same struct-first boundary to GetConfigItem ConfigId and
+Storage fields. The complete named `MuiGetConfigItemMessage` record is used
+for typed read/modify/write operations; MethodId remains a deliberate
+four-byte header boundary for admission. Unsupported fields, truncated
+records, and null messages fail closed. Package host coverage is **2857/2857**.
+The focused MC68000 closure passes at **4788 bytes, 4201 instructions /
+42860 cycles** with 21 reachable methods, zero framework members, zero
+managed-allocation sites, and zero relocations; MC68020/MC68040 artifacts are
+**4792/4792** bytes.
+
+MG2291 extends the same struct-first boundary to error-state Magic, Version,
+Error, and Sequence fields. The complete named `MuiErrorServiceStateRecord`
+is used for typed read/modify/write operations; unsupported fields and
+truncated or null records fail closed. Package host coverage is **2858/2858**.
+The focused MC68000 closure passes at **3604 bytes, 4022 instructions /
+40694 cycles** with 16 reachable methods, zero framework members,
+zero managed-allocation sites, and zero relocations; MC68020/MC68040 artifacts
+are **3612/3616** bytes.
+
+MG2292 extends the same struct-first boundary to requester-service Magic and
+Generation fields. The complete named `MuiRequesterServiceStateRecord` is
+used for typed read/modify/write operations; unsupported fields and truncated
+or null records fail closed. Package host coverage is **2859/2859**. The
+focused MC68000 closure passes at **3420 bytes, 2339 instructions / 23878
+cycles** with 16 reachable methods, zero framework members, zero
+managed-allocation sites, and zero relocations; MC68020/MC68040 artifacts are
+**3412/3416** bytes.
+
+MG2293 extends the same struct-first boundary to GroupGrid specification
+Columns, Rows, spacing, same-size, and centering fields. The complete named
+`MuiGroupGridSpec` record is used for typed read/modify/write operations;
+unsupported fields and truncated or null records fail closed. Package host
+coverage is **2860/2860**. The focused MC68000 closure passes at **4372 bytes,
+8938 instructions / 90244 cycles** with 18 reachable methods, zero framework
+members, zero managed-allocation sites, and zero relocations; MC68020/MC68040
+artifacts are **4448/4452** bytes.
+
+MG2294 extends the same struct-first boundary to SleepState Magic, Depth,
+SavedDisabled, and Request fields. The complete named `MuiSleepStateRecord`
+is used for structural read/modify/write operations; malformed state remains
+available to diagnostics while semantic admission stays fail-closed. Package
+host coverage is **2861/2861**. The focused MC68000 closure passes at **4172
+bytes, 6621 instructions / 66936 cycles** with 19 reachable methods, zero
+framework members, zero managed-allocation sites, and zero relocations;
+MC68020/MC68040 artifacts are **4192/4196** bytes.
+
+MG2295 extends the same struct-first boundary to class-service State, Lease,
+and MUI_CustomClass fields. The complete named records are used for structural
+read/modify/write operations across all three record kinds; unsupported,
+truncated, and null records fail closed. Package host coverage is **2862/2862**.
+The focused MC68000 closure passes at **7072 bytes, 14770 instructions /
+148630 cycles** with 20 reachable methods, zero framework members, zero
+managed-allocation sites, and zero relocations; MC68020/MC68040 artifacts are
+**7420/7424** bytes.
+
+MG2296 extends the same struct-first boundary to SetCycleChain MethodId and
+FirstObject fields. The complete named two-ULONG message is used for structural
+read/modify/write operations; method admission remains a separate consumer
+concern, and unsupported, truncated, and null packets fail closed. Package host
+coverage is **2863/2863**. The focused MC68000 closure passes at **3940 bytes,
+3349 instructions / 34224 cycles** with 18 reachable methods, zero framework
+members, zero managed-allocation sites, and zero relocations; MC68020/MC68040
+artifacts are **3940/3940** bytes.
+
+MG2297 extends the same struct-first boundary to Window Add/RemoveEventHandler
+MethodId and Handler fields. The complete named two-ULONG message is used for
+structural read/modify/write operations for both packet kinds; selector
+admission remains a separate consumer concern, and unsupported, truncated, and
+null packets fail closed. Package host coverage is **2864/2864**. The focused
+MC68000 closure passes at **4048 bytes, 3361 instructions / 34164 cycles** with
+18 reachable methods, zero framework members, zero managed-allocation sites,
+and zero relocations; MC68020/MC68040 artifacts are **4048/4048** bytes.
+
+MG2298 extends the same struct-first boundary to Application and Window menu
+query/set MethodId, MenuId, and State fields for all four packet kinds. The
+complete named records are used for structural read/modify/write operations;
+method admission remains a separate consumer concern, and unsupported,
+truncated, and null packets fail closed. Package host coverage is **2865/2865**.
+The focused MC68000 closure passes at **6708 bytes, 7821 instructions /
+78886 cycles** with 24 reachable methods, zero framework members, zero
+managed-allocation sites, and zero relocations; MC68020/MC68040 artifacts are
+**6728/6732** bytes.
+
+MG2299 extends the same struct-first boundary to ConfigId, CheckRefresh, Loop,
+WindowMethod, and Snapshot method packet fields. Complete named records are
+used for structural read/modify/write operations. The single-word method
+carriers retain the exact 4-byte MorphOS wire size and carry a named non-wire
+reserved word solely for the freestanding ref-struct ABI. Package host coverage
+is **2866/2866**. The focused MC68000 closure passes at **7108 bytes, 6990
+instructions / 70726 cycles** with 26 reachable methods, zero framework
+members, zero managed-allocation sites, and zero relocations; MC68020/MC68040
+artifacts are **7180/7184** bytes.
+
+MG2300 extends the same struct-first boundary to Collection basic Method,
+GetEntry, and Select packet fields. Complete named records are used for
+structural read/modify/write operations, preserving sibling fields. The
+single-word method carrier retains the exact 4-byte MorphOS wire size and
+carries a named non-wire reserved word solely for the freestanding ref-struct
+ABI. Package host coverage is **2866/2866**. The focused MC68000 closure passes
+at **6124 bytes, 5758 instructions / 58482 cycles** with 24 reachable methods,
+zero framework members, zero managed-allocation sites, and zero relocations;
+MC68020/MC68040 artifacts are **6200/6200** bytes.
+
+MG2242–MG2243 extend the same struct-first boundary to Text Copy and Text
+PreParse state. Typed writes preserve BOOL, preparse pointers, and cookie
+siblings while malformed fields fail closed; focused MC68000 closures pass the
+zero-runtime gate without managed runtime services.
+
 MG2240–MG2241 extend the same struct-first boundary to String scroll metrics and
 Text contents pointer state. Typed writes preserve dimensions, offsets,
 contents, and cookie siblings while malformed fields fail closed; focused

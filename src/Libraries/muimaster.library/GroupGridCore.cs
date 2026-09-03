@@ -115,9 +115,25 @@ internal static class MuiGroupGridSpecMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
+		if (!MuiGroupGridSpecCodec.TryRead(ref platform, record, out var spec))
 			return false;
-		value = platform.ReadUInt32(address, 0);
+		if (field == MuiGroupGridSpecField.Columns)
+			value = spec.Columns;
+		else if (field == MuiGroupGridSpecField.Rows)
+			value = spec.Rows;
+		else if (field == MuiGroupGridSpecField.HorizontalSpacing)
+			value = spec.HorizontalSpacing;
+		else if (field == MuiGroupGridSpecField.VerticalSpacing)
+			value = spec.VerticalSpacing;
+		else if (field == MuiGroupGridSpecField.SameWidth)
+			value = spec.SameWidth;
+		else if (field == MuiGroupGridSpecField.SameHeight)
+			value = spec.SameHeight;
+		else if (field == MuiGroupGridSpecField.HorizontalCenter)
+			value = spec.HorizontalCenter;
+		else if (field == MuiGroupGridSpecField.VerticalCenter)
+			value = spec.VerticalCenter;
+		else return false;
 		return true;
 	}
 
@@ -125,10 +141,26 @@ internal static class MuiGroupGridSpecMemoryCodec
 		APTR record, MuiGroupGridSpecField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
+		if (!MuiGroupGridSpecCodec.TryRead(ref platform, record, out var spec))
 			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (field == MuiGroupGridSpecField.Columns)
+			spec.Columns = value;
+		else if (field == MuiGroupGridSpecField.Rows)
+			spec.Rows = value;
+		else if (field == MuiGroupGridSpecField.HorizontalSpacing)
+			spec.HorizontalSpacing = value;
+		else if (field == MuiGroupGridSpecField.VerticalSpacing)
+			spec.VerticalSpacing = value;
+		else if (field == MuiGroupGridSpecField.SameWidth)
+			spec.SameWidth = value;
+		else if (field == MuiGroupGridSpecField.SameHeight)
+			spec.SameHeight = value;
+		else if (field == MuiGroupGridSpecField.HorizontalCenter)
+			spec.HorizontalCenter = value;
+		else if (field == MuiGroupGridSpecField.VerticalCenter)
+			spec.VerticalCenter = value;
+		else return false;
+		return MuiGroupGridSpecCodec.Write(ref platform, record, spec);
 	}
 }
 

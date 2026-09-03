@@ -123,6 +123,72 @@ public sealed class MuiAslServiceTests
 	}
 
 	[Fact]
+	public void AslFieldAccessUsesCompleteNamedStateAndLeaseRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var stateAddress = APTR.FromPointer(0x1E00);
+		var state = new MuiAslServiceStateRecord
+		{
+			Magic = MuiAslServiceLayout.Magic,
+			Head = APTR.FromPointer(0x1F00),
+			Generation = 3,
+		};
+		Assert.True(MuiAslServiceStateStructCodec.Write(ref platform,
+			stateAddress, state));
+		Assert.True(MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform,
+			stateAddress, MuiAslRecordKind.State, MuiAslRecordField.Head,
+			0x2000));
+		Assert.True(MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform,
+			stateAddress, MuiAslRecordKind.State, MuiAslRecordField.Generation,
+			9));
+		Assert.True(MuiAslServiceStateStructCodec.TryRead(ref platform,
+			stateAddress, out var updatedState));
+		Assert.Equal(state.Magic, updatedState.Magic);
+		Assert.Equal(APTR.FromPointer(0x2000), updatedState.Head);
+		Assert.Equal(9u, updatedState.Generation);
+
+		var leaseAddress = APTR.FromPointer(0x1E20);
+		var lease = new MuiAslRequestLeaseRecord
+		{
+			Next = APTR.FromPointer(0x2100),
+			Requester = APTR.FromPointer(0x2200),
+			Type = 6,
+			Tags = APTR.FromPointer(0x2300),
+		};
+		Assert.True(MuiAslRequestLeaseStructCodec.Write(ref platform,
+			leaseAddress, lease));
+		Assert.True(MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform,
+			leaseAddress, MuiAslRecordKind.Lease, MuiAslRecordField.Type, 11));
+		Assert.True(MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform,
+			leaseAddress, MuiAslRecordKind.Lease, MuiAslRecordField.Tags,
+			0x2400));
+		Assert.True(MuiAslRequestLeaseStructCodec.TryRead(ref platform,
+			leaseAddress, out var updatedLease));
+		Assert.Equal(lease.Next, updatedLease.Next);
+		Assert.Equal(lease.Requester, updatedLease.Requester);
+		Assert.Equal(11u, updatedLease.Type);
+		Assert.Equal(APTR.FromPointer(0x2400), updatedLease.Tags);
+
+		Assert.True(MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform,
+			stateAddress, MuiAslRecordKind.State, MuiAslRecordField.Magic, 0));
+		Assert.True(MuiAslRecordMemoryCodec.TryReadUInt32(ref platform,
+			stateAddress, MuiAslRecordKind.State, MuiAslRecordField.Magic,
+			out var rawMagic));
+		Assert.Equal(0u, rawMagic);
+		Assert.False(MuiAslRecordMemoryCodec.TryReadUInt32(ref platform,
+			leaseAddress, MuiAslRecordKind.State, MuiAslRecordField.Type,
+			out _));
+		Assert.False(MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.FromPointer(0x20FF4), MuiAslRecordKind.Lease,
+			MuiAslRecordField.Tags, 1));
+		Assert.False(MuiAslRecordMemoryCodec.TryReadUInt32(ref platform,
+			APTR.Null, MuiAslRecordKind.State, MuiAslRecordField.Head, out _));
+		Assert.False(MuiAslRecordMemoryCodec.TryWriteUInt32(ref platform,
+			stateAddress, (MuiAslRecordKind)255, MuiAslRecordField.Magic, 1));
+	}
+
+	[Fact]
 	public void TagControlItemsFollowMoreSkipAndIgnoreSemantics()
 	{
 		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
@@ -295,6 +361,47 @@ public sealed class MuiAslServiceTests
 			record, (MuiAslTagItemField)255, out _));
 		Assert.False(MuiAslTagItemMessageMemoryCodec.TryGetAddress(ref platform,
 			APTR.Null, MuiAslTagItemField.Data, out _));
+	}
+
+	[Fact]
+	public void AslTagItemFieldAccessUsesCompleteNamedRecord()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			State);
+		var recordAddress = APTR.FromPointer(0x1A00);
+		var record = new MuiAslTagItemRecord
+		{
+			Tag = 0x80030001u,
+			Data = 0x12345678u,
+		};
+		Assert.True(MuiAslTagItemCodec.Write(ref platform, recordAddress, record));
+		Assert.True(MuiAslTagItemMessageMemoryCodec.TryWrite(ref platform,
+			recordAddress, MuiAslTagItemField.Tag, 0x80030002u));
+		Assert.True(MuiAslTagItemMessageMemoryCodec.TryWrite(ref platform,
+			recordAddress, MuiAslTagItemField.Data, 0xCAFEBABEu));
+		Assert.True(MuiAslTagItemMessageMemoryCodec.TryRead(ref platform,
+			recordAddress, MuiAslTagItemField.Tag, out var tag));
+		Assert.True(MuiAslTagItemMessageMemoryCodec.TryRead(ref platform,
+			recordAddress, MuiAslTagItemField.Data, out var data));
+		Assert.Equal(0x80030002u, tag);
+		Assert.Equal(0xCAFEBABEu, data);
+		Assert.True(MuiAslTagItemCodec.TryRead(ref platform, recordAddress,
+			out var updated));
+		Assert.Equal(0x80030002u, updated.Tag);
+		Assert.Equal(0xCAFEBABEu, updated.Data);
+
+		Assert.False(MuiAslTagItemMessageMemoryCodec.TryRead(ref platform,
+			APTR.FromPointer(0x20FFC), MuiAslTagItemField.Data, out _));
+		Assert.False(MuiAslTagItemMessageMemoryCodec.TryWrite(ref platform,
+			APTR.FromPointer(0x20FFC), MuiAslTagItemField.Tag, 1));
+		Assert.False(MuiAslTagItemMessageMemoryCodec.TryRead(ref platform,
+			recordAddress, (MuiAslTagItemField)255, out _));
+		Assert.False(MuiAslTagItemMessageMemoryCodec.TryWrite(ref platform,
+			recordAddress, (MuiAslTagItemField)255, 1));
+		Assert.False(MuiAslTagItemMessageMemoryCodec.TryRead(ref platform,
+			APTR.FromPointer(0x1A01), MuiAslTagItemField.Tag, out _));
+		Assert.False(MuiAslTagItemMessageMemoryCodec.TryWrite(ref platform,
+			APTR.Null, MuiAslTagItemField.Data, 1));
 	}
 
 	[Fact]

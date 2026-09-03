@@ -69,17 +69,24 @@ public sealed class MuiWindowRelationshipAdmissionTests
 		Assert.True(MuiWindowRelationshipStateRecordCodec.Write(ref platform,
 			address, value));
 		Assert.True(MuiWindowRelationshipStateRecordMemoryCodec.TryGetAddress(
-			ref platform, address, 12, out var refWindow) && refWindow.Raw == 0x16CCu);
+			ref platform, address, MuiWindowRelationshipStateField.RefWindow,
+			out var refWindow) && refWindow.Raw == 0x16CCu);
 		Assert.True(MuiWindowRelationshipStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 4, out var root) && root == 0);
+			ref platform, address, MuiWindowRelationshipStateField.RootObject,
+			out var root) && root == 0);
 		Assert.True(MuiWindowRelationshipStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 0, MuiWindowRelationshipStateRecord.Cookie));
+			ref platform, address, MuiWindowRelationshipStateField.Magic,
+			MuiWindowRelationshipStateRecord.Cookie));
 		Assert.True(MuiWindowRelationshipStateRecordCodec.TryReadStructural(ref platform,
-			address, out var decoded) && decoded.Menustrip.IsNull);
+			address, out var decoded) && decoded.Magic == value.Magic &&
+			decoded.RootObject == value.RootObject && decoded.RefWindow == value.RefWindow &&
+			decoded.Menustrip.IsNull);
+		Assert.False(MuiWindowRelationshipStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiWindowRelationshipStateField)255, out _));
 		Assert.False(MuiWindowRelationshipStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiWindowRelationshipStateRecord.Size, out _));
 		Assert.False(MuiWindowRelationshipStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreateWindow(out APTR window)

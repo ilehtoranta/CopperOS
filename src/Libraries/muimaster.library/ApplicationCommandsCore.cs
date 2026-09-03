@@ -134,20 +134,63 @@ internal static class MuiApplicationCommandRecordMemoryCodec
 		where TPlatform : struct, IMuiGuestMemory
 	{
 		value = 0;
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		value = platform.ReadUInt32(address, 0);
-		return true;
+		if (!MuiApplicationCommandRecordCodec.TryReadStructural(ref platform,
+			record, out var command)) return false;
+		switch (field)
+		{
+			case MuiApplicationCommandField.Name:
+				value = command.Name.Raw; return true;
+			case MuiApplicationCommandField.Template:
+				value = command.Template.Raw; return true;
+			case MuiApplicationCommandField.Parameters:
+				value = unchecked((uint)command.Parameters); return true;
+			case MuiApplicationCommandField.Hook:
+				value = command.Hook.Raw; return true;
+			case MuiApplicationCommandField.Reserved0:
+				value = unchecked((uint)command.Reserved0); return true;
+			case MuiApplicationCommandField.Reserved1:
+				value = unchecked((uint)command.Reserved1); return true;
+			case MuiApplicationCommandField.Reserved2:
+				value = unchecked((uint)command.Reserved2); return true;
+			case MuiApplicationCommandField.Reserved3:
+				value = unchecked((uint)command.Reserved3); return true;
+			case MuiApplicationCommandField.Reserved4:
+				value = unchecked((uint)command.Reserved4); return true;
+		}
+		return false;
 	}
 
 	internal static bool TryWriteUInt32<TPlatform>(ref TPlatform platform,
 		APTR record, MuiApplicationCommandField field, uint value)
 		where TPlatform : struct, IMuiGuestMemory
 	{
-		if (!TryGetAddress(ref platform, record, field, out var address))
-			return false;
-		platform.WriteUInt32(address, 0, value);
-		return true;
+		if (!MuiApplicationCommandRecordCodec.TryReadStructural(ref platform,
+			record, out var command)) return false;
+		switch (field)
+		{
+			case MuiApplicationCommandField.Name:
+				command.Name = APTR.FromPointer(value); break;
+			case MuiApplicationCommandField.Template:
+				command.Template = APTR.FromPointer(value); break;
+			case MuiApplicationCommandField.Parameters:
+				command.Parameters = unchecked((int)value); break;
+			case MuiApplicationCommandField.Hook:
+				command.Hook = APTR.FromPointer(value); break;
+			case MuiApplicationCommandField.Reserved0:
+				command.Reserved0 = unchecked((int)value); break;
+			case MuiApplicationCommandField.Reserved1:
+				command.Reserved1 = unchecked((int)value); break;
+			case MuiApplicationCommandField.Reserved2:
+				command.Reserved2 = unchecked((int)value); break;
+			case MuiApplicationCommandField.Reserved3:
+				command.Reserved3 = unchecked((int)value); break;
+			case MuiApplicationCommandField.Reserved4:
+				command.Reserved4 = unchecked((int)value); break;
+			default:
+				return false;
+		}
+		return MuiApplicationCommandRecordCodec.WriteStructural(ref platform,
+			record, command);
 	}
 }
 
@@ -217,6 +260,16 @@ internal static class MuiApplicationCommandRecordCodec
 				unchecked((uint)value.Reserved4))) return false;
 		return MuiGuestStructCursor.IsComplete(cursor);
 	}
+
+	internal static bool TryReadStructural<TPlatform>(ref TPlatform platform,
+		APTR address, out MuiApplicationCommandRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		TryRead(ref platform, address, out value);
+
+	internal static bool WriteStructural<TPlatform>(ref TPlatform platform,
+		APTR address, MuiApplicationCommandRecord value)
+		where TPlatform : struct, IMuiGuestMemory =>
+		Write(ref platform, address, value);
 }
 
 public static class MuiApplicationCommandsCore

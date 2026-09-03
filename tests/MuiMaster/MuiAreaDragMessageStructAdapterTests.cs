@@ -205,4 +205,196 @@ public sealed class MuiAreaDragMessageStructAdapterTests
 		Assert.True(MuiAreaDragMessageCodec.WriteReport(ref platform,
 			APTR.FromPointer(0x3520), report));
 	}
+
+	[Fact]
+	public void DragFieldAccessUsesCompleteNamedRecords()
+	{
+		var platform = new MuiHeadlessTestPlatform(0x1000, 0x20000, 0x4000,
+			APTR.FromPointer(0x1000));
+
+		var methodAddress = APTR.FromPointer(0x3180);
+		Assert.True(MuiAreaDragMessageCodec.WriteMethodIdValue(ref platform,
+			methodAddress, 0xF1020304u));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryReadUInt32(ref platform,
+			methodAddress, MuiAreaDragPacketKind.Method,
+			MuiAreaDragField.MethodId, out var methodId));
+		Assert.Equal(0xF1020304u, methodId);
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			methodAddress, MuiAreaDragPacketKind.Method,
+			MuiAreaDragField.MethodId, MuiAreaDragMessageCodec.DragBegin));
+		Assert.True(MuiAreaDragMessageCodec.TryReadMethodIdValue(ref platform,
+			methodAddress, out methodId));
+		Assert.Equal(MuiAreaDragMessageCodec.DragBegin, methodId);
+
+		var beginAddress = APTR.FromPointer(0x31A0);
+		var begin = new MuiAreaDragBeginMessage
+		{
+			MethodId = MuiAreaDragMessageCodec.DragBegin,
+			Object = 0x4010,
+		};
+		Assert.True(MuiAreaDragBeginMessageCodec.Write(ref platform, beginAddress,
+			begin));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			beginAddress, MuiAreaDragPacketKind.Begin, MuiAreaDragField.Object,
+			0x4020));
+		Assert.True(MuiAreaDragBeginMessageCodec.TryRead(ref platform,
+			beginAddress, out var beginRead));
+		Assert.Equal(begin.MethodId, beginRead.MethodId);
+		Assert.Equal(0x4020u, beginRead.Object);
+
+		var doDragAddress = APTR.FromPointer(0x31C0);
+		var doDrag = new MuiAreaDoDragMessage
+		{
+			MethodId = MuiAreaDragMessageCodec.DoDrag,
+			TouchX = -5,
+			TouchY = 7,
+			Flags = 2,
+		};
+		Assert.True(MuiAreaDoDragMessageCodec.Write(ref platform, doDragAddress,
+			doDrag));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			doDragAddress, MuiAreaDragPacketKind.DoDrag, MuiAreaDragField.TouchX,
+			unchecked((uint)-9)));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			doDragAddress, MuiAreaDragPacketKind.DoDrag, MuiAreaDragField.Flags,
+			0xAA));
+		Assert.True(MuiAreaDoDragMessageCodec.TryRead(ref platform, doDragAddress,
+			out var doDragRead));
+		Assert.Equal(-9, doDragRead.TouchX);
+		Assert.Equal(doDrag.TouchY, doDragRead.TouchY);
+		Assert.Equal(0xAAu, doDragRead.Flags);
+
+		var createAddress = APTR.FromPointer(0x31E0);
+		var create = new MuiAreaCreateDragImageMessage
+		{
+			MethodId = MuiAreaDragMessageCodec.CreateDragImage,
+			TouchX = 11,
+			TouchY = -13,
+			Flags = 4,
+		};
+		Assert.True(MuiAreaCreateDragImageMessageCodec.Write(ref platform,
+			createAddress, create));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			createAddress, MuiAreaDragPacketKind.CreateImage,
+			MuiAreaDragField.TouchY, unchecked((uint)17)));
+		Assert.True(MuiAreaCreateDragImageMessageCodec.TryRead(ref platform,
+			createAddress, out var createRead));
+		Assert.Equal(create.TouchX, createRead.TouchX);
+		Assert.Equal(17, createRead.TouchY);
+		Assert.Equal(create.Flags, createRead.Flags);
+
+		var dropAddress = APTR.FromPointer(0x3200);
+		var drop = new MuiAreaDragDropMessage
+		{
+			MethodId = MuiAreaDragMessageCodec.DragDrop,
+			Object = 0x4030,
+			X = -12,
+			Y = 24,
+			Qualifier = 5,
+		};
+		Assert.True(MuiAreaDragDropMessageCodec.Write(ref platform, dropAddress,
+			drop));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			dropAddress, MuiAreaDragPacketKind.Drop, MuiAreaDragField.Y, 31));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryReadUInt32(ref platform,
+			dropAddress, MuiAreaDragPacketKind.Drop, MuiAreaDragField.X,
+			out var dropX));
+		Assert.Equal(-12, unchecked((int)dropX));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryReadUInt32(ref platform,
+			dropAddress, MuiAreaDragPacketKind.Drop, MuiAreaDragField.Y,
+			out var dropY));
+		Assert.Equal(31, unchecked((int)dropY));
+
+		var eventAddress = APTR.FromPointer(0x3220);
+		var dragEvent = new MuiAreaDragEventMessage
+		{
+			MethodId = MuiAreaDragMessageCodec.DragEvent,
+			Window = 0x4040,
+			Object = 0x4050,
+			DragImage = 0x4060,
+			IntuiMessage = 0x4070,
+			MuiKey = -1,
+			MousePointerType = 2,
+			Flags = 4,
+		};
+		Assert.True(MuiAreaDragEventMessageCodec.Write(ref platform, eventAddress,
+			dragEvent));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			eventAddress, MuiAreaDragPacketKind.Event, MuiAreaDragField.MuiKey,
+			unchecked((uint)-2)));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryReadUInt32(ref platform,
+			eventAddress, MuiAreaDragPacketKind.Event,
+			MuiAreaDragField.DragImage, out var dragImage));
+		Assert.Equal(0x4060u, dragImage);
+		Assert.True(MuiAreaDragEventMessageCodec.TryRead(ref platform, eventAddress,
+			out var eventRead));
+		Assert.Equal(dragEvent.Window, eventRead.Window);
+		Assert.Equal(-2, eventRead.MuiKey);
+		Assert.Equal(dragEvent.Flags, eventRead.Flags);
+
+		var finishAddress = APTR.FromPointer(0x3250);
+		var finish = new MuiAreaDragFinishMessage
+		{
+			MethodId = MuiAreaDragMessageCodec.DragFinish,
+			Object = 0x4080,
+			DropFollows = -1,
+		};
+		Assert.True(MuiAreaDragFinishMessageCodec.Write(ref platform,
+			finishAddress, finish));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			finishAddress, MuiAreaDragPacketKind.Finish,
+			MuiAreaDragField.DropFollows, 1));
+		Assert.True(MuiAreaDragFinishMessageCodec.TryRead(ref platform,
+			finishAddress, out var finishRead));
+		Assert.Equal(finish.Object, finishRead.Object);
+		Assert.Equal(1, finishRead.DropFollows);
+
+		var queryAddress = APTR.FromPointer(0x3270);
+		Assert.True(MuiAreaDragMessageCodec.WriteQuery(ref platform, queryAddress,
+			0x4090));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryReadUInt32(ref platform,
+			queryAddress, MuiAreaDragPacketKind.Query, MuiAreaDragField.Object,
+			out var queryObject));
+		Assert.Equal(0x4090u, queryObject);
+
+		var reportAddress = APTR.FromPointer(0x3290);
+		var report = new MuiAreaDragReportMessage
+		{
+			MethodId = MuiAreaDragMessageCodec.DragReport,
+			Object = 0x40A0,
+			X = 2,
+			Y = -4,
+			Update = -3,
+			Qualifier = 6,
+		};
+		Assert.True(MuiAreaDragReportMessageCodec.Write(ref platform,
+			reportAddress, report));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			reportAddress, MuiAreaDragPacketKind.Report,
+			MuiAreaDragField.Update, unchecked((uint)9)));
+		Assert.True(MuiAreaDragReportMessageCodec.TryRead(ref platform,
+			reportAddress, out var reportRead));
+		Assert.Equal(report.X, reportRead.X);
+		Assert.Equal(9, reportRead.Update);
+		Assert.Equal(report.Qualifier, reportRead.Qualifier);
+
+		var deleteAddress = APTR.FromPointer(0x32B0);
+		Assert.True(MuiAreaDragMessageCodec.WriteDeleteDragImage(ref platform,
+			deleteAddress, 0x40B0));
+		Assert.True(MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			deleteAddress, MuiAreaDragPacketKind.DeleteImage,
+			MuiAreaDragField.DragImage, 0x40C0));
+		Assert.True(MuiAreaDeleteDragImageMessageCodec.TryRead(ref platform,
+			deleteAddress, out var deleteRead));
+		Assert.Equal(0x40C0u, deleteRead.DragImage);
+
+		Assert.False(MuiAreaDragMessageMemoryCodec.TryReadUInt32(ref platform,
+			APTR.FromPointer(0x20FF0), MuiAreaDragPacketKind.Event,
+			MuiAreaDragField.Flags, out _));
+		Assert.False(MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			APTR.Null, MuiAreaDragPacketKind.Report, MuiAreaDragField.Update, 1));
+		Assert.False(MuiAreaDragMessageMemoryCodec.TryWriteUInt32(ref platform,
+			beginAddress, MuiAreaDragPacketKind.Begin,
+			MuiAreaDragField.Window, 1));
+	}
 }

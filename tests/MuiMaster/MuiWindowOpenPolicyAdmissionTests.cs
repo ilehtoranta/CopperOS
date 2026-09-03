@@ -71,19 +71,27 @@ public sealed class MuiWindowOpenPolicyAdmissionTests
 		Assert.True(MuiWindowOpenPolicyStateRecordCodec.WriteRecord(ref platform,
 			address, value));
 		Assert.True(MuiWindowOpenPolicyStateRecordMemoryCodec.TryGetAddress(
-			ref platform, address, 84, out var rightScroller) && rightScroller.Raw ==
+			ref platform, address, MuiWindowOpenPolicyStateField.UseRightBorderScroller,
+			out var rightScroller) && rightScroller.Raw ==
 			0x1794u);
 		Assert.True(MuiWindowOpenPolicyStateRecordMemoryCodec.TryReadUInt32(
-			ref platform, address, 4, out var alternateHeight) &&
+			ref platform, address, MuiWindowOpenPolicyStateField.AlternateHeight,
+			out var alternateHeight) &&
 			alternateHeight == unchecked((uint)-2));
 		Assert.True(MuiWindowOpenPolicyStateRecordMemoryCodec.TryWriteUInt32(
-			ref platform, address, 20, unchecked((uint)-240)));
+			ref platform, address, MuiWindowOpenPolicyStateField.Height,
+			unchecked((uint)-240)));
 		Assert.True(MuiWindowOpenPolicyStateRecordCodec.TryReadStructural(ref platform,
-			address, out var decoded) && decoded.Height == -240);
+			address, out var decoded) && decoded.Magic == value.Magic &&
+			decoded.AlternateHeight == value.AlternateHeight &&
+			decoded.CloseGadget == value.CloseGadget && decoded.Borderless == value.Borderless &&
+			decoded.Height == -240);
+		Assert.False(MuiWindowOpenPolicyStateRecordMemoryCodec.TryReadUInt32(
+			ref platform, address, (MuiWindowOpenPolicyStateField)255, out _));
 		Assert.False(MuiWindowOpenPolicyStateRecordMemoryCodec.TryGetAddress(
 			ref platform, address, MuiWindowOpenPolicyStateRecord.Size, out _));
 		Assert.False(MuiWindowOpenPolicyStateRecordMemoryCodec.TryGetAddress(
-			ref platform, APTR.Null, 0, out _));
+			ref platform, APTR.Null, (uint)0, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreateWindow(out APTR window)

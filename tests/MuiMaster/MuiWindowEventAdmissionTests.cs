@@ -70,17 +70,26 @@ public sealed class MuiWindowEventAdmissionTests
 		Assert.True(MuiWindowEventStateRecordCodec.WriteRecord(ref platform, address,
 			value));
 		Assert.True(MuiWindowEventStateRecordMemoryCodec.TryGetAddress(ref platform,
-			address, 12, out var mouseObject) && mouseObject.Raw == 0x15CCu);
+			address, MuiWindowEventStateField.MouseObject,
+			out var mouseObject) && mouseObject.Raw == 0x15CCu);
 		Assert.True(MuiWindowEventStateRecordMemoryCodec.TryReadUInt32(ref platform,
-			address, 4, out var closeRequest) && closeRequest == 1);
+			address, MuiWindowEventStateField.CloseRequest,
+			out var closeRequest) && closeRequest == 1);
 		Assert.True(MuiWindowEventStateRecordMemoryCodec.TryWriteUInt32(ref platform,
-			address, 4, 0));
+			address, MuiWindowEventStateField.CloseRequest, 0));
 		Assert.True(MuiWindowEventStateRecordCodec.TryReadStructural(ref platform,
-			address, out var decoded) && decoded.CloseRequest == 0);
+			address, out var decoded) && decoded.Magic == value.Magic &&
+			decoded.InputEvent == value.InputEvent && decoded.MouseObject == value.MouseObject &&
+			decoded.CloseRequest == 0);
+		Assert.True(MuiWindowEventStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, MuiWindowEventStateField.Magic, out var magic) &&
+			magic == value.Magic);
+		Assert.False(MuiWindowEventStateRecordMemoryCodec.TryReadUInt32(ref platform,
+			address, (MuiWindowEventStateField)255, out _));
 		Assert.False(MuiWindowEventStateRecordMemoryCodec.TryGetAddress(ref platform,
 			address, MuiWindowEventStateRecord.Size, out _));
 		Assert.False(MuiWindowEventStateRecordMemoryCodec.TryGetAddress(ref platform,
-			APTR.Null, 0, out _));
+			APTR.Null, (uint)0, out _));
 	}
 
 	private static MuiHeadlessTestPlatform CreateWindow(out APTR window)
