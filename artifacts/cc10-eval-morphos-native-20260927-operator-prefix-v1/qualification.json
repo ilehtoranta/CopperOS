@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "suite": "CC10-Eval-native-entry-supplied-vector",
+  "status": "passed",
+  "failure": null,
+  "configuration": "Release",
+  "runtime": "resident",
+  "entry": "CopperOS.Commands.NativeRoot.NativeEvalEntry::Main",
+  "expectedCasesPerCpu": 19,
+  "executionScope": "Copper68k supplied post-ReadArgs vectors, including the source-derived lowercase two-letter operator prefixes; no real DOS parser, OS, filesystem, or original-command comparison.",
+  "artifacts": [
+    {
+      "cpu": "68000",
+      "artifact": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\cc10-eval-morphos-native-20260927-operator-prefix-v1\\eval-native-entry-resident-68000.hunk",
+        "bytes": 25156,
+        "sha256": "4b2db101feb89a0a4ef916bab6acfb928c1a1c7ae502f2689f44b7aacdf0c483"
+      },
+      "compatibility": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\cc10-eval-morphos-native-20260927-operator-prefix-v1\\eval-native-entry-resident-68000.hunk.compatibility.json",
+        "bytes": 4267,
+        "sha256": "446598b053cfe3d95f408a7f83ba1e13ddc2fb14e2c67e13f555cd253c169117"
+      },
+      "execution": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\cc10-eval-morphos-native-20260927-operator-prefix-v1\\eval-native-entry-resident-68000.hunk.execution.json",
+        "bytes": 16702,
+        "sha256": "79a69840700f97e37cb819ab78d4c1d16096a1b56198b6bf13fa895ec52ebc5e"
+      },
+      "reachableMethods": 92,
+      "runtimeFeatures": [
+        "nullable-values"
+      ],
+      "passedCases": 19,
+      "sharedImageWrites": 0
+    },
+    {
+      "cpu": "68020",
+      "artifact": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\cc10-eval-morphos-native-20260927-operator-prefix-v1\\eval-native-entry-resident-68020.hunk",
+        "bytes": 25580,
+        "sha256": "1b0fbf19a39b309dba23195b4f6ae4d9cffb672d633e02b752959cb797782d11"
+      },
+      "compatibility": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\cc10-eval-morphos-native-20260927-operator-prefix-v1\\eval-native-entry-resident-68020.hunk.compatibility.json",
+        "bytes": 4267,
+        "sha256": "60eef321a8b038a5f847e99fca0b824b7eb21426e091890894def182b3a48cab"
+      },
+      "execution": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\cc10-eval-morphos-native-20260927-operator-prefix-v1\\eval-native-entry-resident-68020.hunk.execution.json",
+        "bytes": 16701,
+        "sha256": "fee6198f2b8b6186682229048e511b72f65c7486272b77cf1a3d384e861cecc6"
+      },
+      "reachableMethods": 92,
+      "runtimeFeatures": [
+        "nullable-values"
+      ],
+      "passedCases": 19,
+      "sharedImageWrites": 0
+    },
+    {
+      "cpu": "68040",
+      "artifact": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\cc10-eval-morphos-native-20260927-operator-prefix-v1\\eval-native-entry-resident-68040.hunk",
+        "bytes": 24924,
+        "sha256": "d42faf0a9a6314ab8b473920830f26a9d172278e5e87cfccc35101bf2afe2a62"
+      },
+      "compatibility": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\cc10-eval-morphos-native-20260927-operator-prefix-v1\\eval-native-entry-resident-68040.hunk.compatibility.json",
+        "bytes": 4267,
+        "sha256": "1ce81a70392fb49536b42532999cec7ced3c59b261494247ca285390a670a074"
+      },
+      "execution": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\cc10-eval-morphos-native-20260927-operator-prefix-v1\\eval-native-entry-resident-68040.hunk.execution.json",
+        "bytes": 16698,
+        "sha256": "e00ca4194864118ea3e2a6d197f55ee20aa5b24728b5c78ab6a3d5618f4be59b"
+      },
+      "reachableMethods": 92,
+      "runtimeFeatures": [
+        "nullable-values"
+      ],
+      "passedCases": 19,
+      "sharedImageWrites": 0
+    }
+  ]
+}

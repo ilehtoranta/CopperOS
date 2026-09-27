@@ -531,26 +531,30 @@ public static class EvalExpressionEvaluator
             cursor.Position++;
         }
         var length = cursor.Position - start;
-        if (EqualsWord(ref memory, source, start, length, (byte)'m', (byte)'o', (byte)'d') ||
+        // Eval 50.7 calls strncmp(token, "mod", tokenLength) and the
+        // equivalent checks for the other long operator names. That accepts
+        // lowercase two-letter prefixes as well as the full word; single
+        // letter aliases are handled separately and case-insensitively.
+        if (EqualsWordPrefix(ref memory, source, start, length, (byte)'m', (byte)'o', (byte)'d') ||
             EqualsAlias(ref memory, source, start, length, (byte)'m')) op = Operator.Modulo;
-        else if (EqualsWord(ref memory, source, start, length, (byte)'x', (byte)'o', (byte)'r') ||
+        else if (EqualsWordPrefix(ref memory, source, start, length, (byte)'x', (byte)'o', (byte)'r') ||
             EqualsAlias(ref memory, source, start, length, (byte)'x')) op = Operator.Xor;
-        else if (EqualsWord(ref memory, source, start, length, (byte)'e', (byte)'q', (byte)'v') ||
+        else if (EqualsWordPrefix(ref memory, source, start, length, (byte)'e', (byte)'q', (byte)'v') ||
             EqualsAlias(ref memory, source, start, length, (byte)'e')) op = Operator.Equivalence;
-        else if (EqualsWord(ref memory, source, start, length, (byte)'l', (byte)'s', (byte)'h') ||
+        else if (EqualsWordPrefix(ref memory, source, start, length, (byte)'l', (byte)'s', (byte)'h') ||
             EqualsAlias(ref memory, source, start, length, (byte)'l')) op = Operator.LeftShift;
-        else if (EqualsWord(ref memory, source, start, length, (byte)'r', (byte)'s', (byte)'h') ||
+        else if (EqualsWordPrefix(ref memory, source, start, length, (byte)'r', (byte)'s', (byte)'h') ||
             EqualsAlias(ref memory, source, start, length, (byte)'r')) op = Operator.RightShift;
         else { cursor.Position = start; return false; }
         return true;
     }
 
-    private static bool EqualsWord<TMemory>(ref TMemory memory, APTR source,
+    private static bool EqualsWordPrefix<TMemory>(ref TMemory memory, APTR source,
         uint start, uint length, byte first, byte second, byte third)
-        where TMemory : struct, IAmigaGuestMemory => length == 3 &&
+        where TMemory : struct, IAmigaGuestMemory => length is 2 or 3 &&
         memory.ReadUInt8(source, (int)start) == first &&
         memory.ReadUInt8(source, (int)(start + 1)) == second &&
-        memory.ReadUInt8(source, (int)(start + 2)) == third;
+        (length == 2 || memory.ReadUInt8(source, (int)(start + 2)) == third);
 
     private static bool EqualsAlias<TMemory>(ref TMemory memory, APTR source,
         uint start, uint length, byte expected) where TMemory : struct, IAmigaGuestMemory

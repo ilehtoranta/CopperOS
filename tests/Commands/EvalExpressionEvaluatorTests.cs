@@ -31,6 +31,11 @@ public sealed class EvalExpressionEvaluatorTests
     [InlineData("'A + 1", 66L)]
     [InlineData("0xffffffffffffffff", -1L)]
     [InlineData("9 M 4", 1L)]
+    [InlineData("9 mo 4", 1L)]
+    [InlineData("7 xo 3", 4L)]
+    [InlineData("5 eq 3", -7L)]
+    [InlineData("1 ls 4", 16L)]
+    [InlineData("32 rs 3", 4L)]
     public void Evaluates_the_bounded_source_observed_integer_subset(string text,
         long expected)
     {
@@ -47,6 +52,11 @@ public sealed class EvalExpressionEvaluatorTests
     [InlineData("", EvalExpressionStatus.Malformed)]
     [InlineData("1 +", EvalExpressionStatus.Malformed)]
     [InlineData("1 MOD 2", EvalExpressionStatus.Malformed)]
+    [InlineData("9 MO 4", EvalExpressionStatus.Malformed)]
+    [InlineData("7 XO 3", EvalExpressionStatus.Malformed)]
+    [InlineData("5 EQ 3", EvalExpressionStatus.Malformed)]
+    [InlineData("1 LS 4", EvalExpressionStatus.Malformed)]
+    [InlineData("32 RS 3", EvalExpressionStatus.Malformed)]
     [InlineData("1 / 0", EvalExpressionStatus.DivideByZero)]
     [InlineData("1 lsh 64", EvalExpressionStatus.InvalidShift)]
     [InlineData("9223372036854775807 + 1", EvalExpressionStatus.Overflow)]

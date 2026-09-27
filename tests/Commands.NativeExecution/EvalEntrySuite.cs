@@ -28,6 +28,11 @@ internal sealed partial class ProbeFixture
         [
             Eval("decimal-expression", "1+2*3", null, [], null, null, false, "7\n"),
             Eval("operand-vector", "1", "+", ["2", "*", "3"], null, null, false, "7\n"),
+            Eval("modulo-word-prefix", "9", "mo", ["4"], null, null, false, "1\n"),
+            Eval("xor-word-prefix", "7", "xo", ["3"], null, null, false, "4\n"),
+            Eval("equivalence-word-prefix", "5", "eq", ["3"], null, null, false, "-7\n"),
+            Eval("left-shift-word-prefix", "1", "ls", ["4"], null, null, false, "16\n"),
+            Eval("right-shift-word-prefix", "32", "rs", ["3"], null, null, false, "4\n"),
             Eval("hex", "42", null, [], null, null, true, "0x2a\n"),
             Eval("lformat", "42", null, [], null, "x=%x", true, "x=2a"),
             Eval("to-output", "42", null, [], "RAM:result", null, false, "42\n"),
