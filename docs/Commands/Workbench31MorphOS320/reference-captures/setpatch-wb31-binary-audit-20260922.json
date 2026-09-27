@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "command": "SetPatch",
+  "recorded": "2026-09-22",
+  "references": [
+    {
+      "source_id": "wb31-install-m10-40.42",
+      "volume": "Install3.1",
+      "path": "C/SetPatch",
+      "header_block": 660,
+      "bytes": 13484,
+      "sha256": "745b2f90fabcdeccba099b3302593eff89f393d65bd84a9c6bad1b46063ab5cc"
+    },
+    {
+      "source_id": "wb31-workbench-m10-40.42",
+      "volume": "Workbench3.1",
+      "path": "C/SetPatch",
+      "header_block": 399,
+      "bytes": 13484,
+      "sha256": "745b2f90fabcdeccba099b3302593eff89f393d65bd84a9c6bad1b46063ab5cc"
+    }
+  ],
+  "file_format": "amiga-hunk",
+  "version": {
+    "name": "setpatch",
+    "version": 40,
+    "revision": 16,
+    "date_text": "14.2.94",
+    "byte_offset": 2205,
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template": {
+    "text": "QUIET/S,NOCACHE/S,REVERSE/S,NOAGA/S",
+    "byte_offset": 1918,
+    "confidence": "syntax-only-candidate-not-runtime-or-source-verified"
+  },
+  "protection": {
+    "raw": 0,
+    "pure": false,
+    "script": false,
+    "evidence": "adf-file-header-byte-320-big-endian"
+  },
+  "bounded_import_and_patch_surface": {
+    "libraries_and_devices": [
+      "exec.library",
+      "dos.library",
+      "graphics.library",
+      "intuition.library",
+      "layers.library",
+      "console.device",
+      "scsi.device",
+      "trackdisk.device",
+      "timer.device",
+      "nonvolatile.library",
+      "cd.device",
+      "68040.library"
+    ],
+    "named_patch_families": [
+      "A3000/68040 RAMSEY/DMAC settings",
+      "68040 support code",
+      "BestModeIDA",
+      "Graphics BltBitMap",
+      "Graphics BltMaskBitMapRastPort",
+      "CIA handlers and console CMD_CLEAR",
+      "Conner CP2024",
+      "Graphics ChangeVPBitMap/ScrollVPort",
+      "ExAll replacement",
+      "DOS Flush",
+      "graphics hash table",
+      "blitter interrupts",
+      "Intuition IAddress",
+      "Line-A exception vector",
+      "monitor database",
+      "NMI hardware",
+      "DOS Open",
+      "screen quiet title bar",
+      "SCSI Open",
+      "shared semaphores",
+      "Graphics Set/LoadRGB4",
+      "old A1010 drives",
+      "nonvolatile.library GetNVList",
+      "NuDrive firmware/CD interrupt",
+      "graphics WriteChunkyPixel",
+      "memory pools"
+    ]
+  },
+  "diagnostic_candidates": [
+    "Unidentified patch!",
+    "SetPatch (V%ld.%ld) has already been installed. Patch list:",
+    "None.",
+    "This disk requires Kickstart version 2.0 or greater.",
+    "Enabled data cache"
+  ],
+  "bounded_observations": [
+    "The same 13,484-byte body and SHA-256 occur on the Install3.1 and Workbench3.1 media selections.",
+    "The command has four candidate switches and a large machine-specific patch registry rather than a normal filesystem-only command.",
+    "The reference includes explicit A3000, 68040, SCSI, trackdisk, CIA, NMI, cache, graphics, Intuition and third-party Nu* patch families.",
+    "The binary is marked non-PURE by the observed AmigaDOS protection word."
+  ],
+  "evidence_limits": [
+    "No original guest run establishes parser/help behavior, patch selection predicates, ordering, already-installed detection, return levels, IoErr or diagnostics.",
+    "No machine profile proves which patch families are safe or applicable on CopperStart-supported hardware.",
+    "No replacement may write unknown ROM addresses, install guessed patches, or report success when a required facility is absent.",
+    "Resident/lifecycle, installed metadata, package placement, licensing and differential gates remain open."
+  ]
+}

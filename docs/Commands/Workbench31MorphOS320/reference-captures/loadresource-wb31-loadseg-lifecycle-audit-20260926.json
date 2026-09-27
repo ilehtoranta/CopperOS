@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "capture_id": "loadresource-wb31-loadseg-lifecycle-audit-20260926",
+  "kind": "offline-hunk-code-audit",
+  "profile": "wb31",
+  "command": "LoadResource",
+  "source_id": "wb31-workbench-m10-40.42",
+  "path": "C/LoadResource",
+  "source_bytes": 3972,
+  "source_sha256": "51c8d6da726d5d1429e84f36e323218eb94750ab60b650efe768fc2907d16f38",
+  "analysis_method": "Validated the C/LoadResource payload from the selected Workbench ADF with the repository's checksum-checking ADF reader, verified its SHA-256, then disassembled the HUNK offline. No original Workbench guest execution was performed.",
+  "public_abi": {
+    "exec_set_function_lvo": -420,
+    "dos_loadseg_lvo": -150,
+    "set_function_inputs": "A1 library base, A0 signed vector offset, D0 replacement function",
+    "set_function_return": "D0 previous function pointer",
+    "authority": "CopperSharp SDK Exec.SetFunction and ExecLvo/DosLvo declarations; offsets agree with the hash-bound HUNK call sites"
+  },
+  "coordinator_entry": {
+    "main_hunk": 0,
+    "create_new_proc_call_offset": "0x0128",
+    "entry_tag_offset": "0x011c",
+    "entry_tag": "NP_Entry",
+    "entry_code_offset": "0x0202",
+    "entry_authority": "NDK 3.1 dostags.h in the local Amiga Developer CD identifies NP_Entry as TAG_USER + 1003; the HUNK pairs this tag with the PC-relative entry address",
+    "client_port_lookup": "Exec Forbid/FindPort protects lookup of the shared LoadResource port. If absent, DOS CreateNewProc receives NP_Entry pointing to HUNK0 offset 0x0202; the client sends its actual resource request to the selected/created server port.",
+    "worker_entry": "The process entry waits on its Process message port, checks/creates the named shared service port under Forbid, forwards a duplicate-start request to an already published port, or publishes its own port and queues that same first resource request before entering the worker dispatcher.",
+    "port_and_message_calls": [
+      {
+        "code_offset": "0x021e",
+        "operation": "Exec WaitPort",
+        "exec_lvo": -384
+      },
+      {
+        "code_offset": "0x0224",
+        "operation": "Exec GetMsg",
+        "exec_lvo": -372
+      },
+      {
+        "code_offset": "0x0234",
+        "operation": "Exec FindPort",
+        "exec_lvo": -390
+      },
+      {
+        "code_offset": "0x0240",
+        "operation": "Exec PutMsg to existing worker",
+        "exec_lvo": -366
+      },
+      {
+        "code_offset": "0x0286",
+        "operation": "Exec AddPort",
+        "exec_lvo": -354
+      },
+      {
+        "code_offset": "0x0290",
+        "operation": "Exec PutMsg to own service port",
+        "exec_lvo": -366
+      },
+      {
+        "code_offset": "0x0294",
+        "operation": "Exec Permit",
+        "exec_lvo": -138
+      }
+    ],
+    "evidence_limit": "Static control-flow evidence only; the initial request is replied at HUNK2 0x0628 after processing, not by the startup path. Message scheduling, concurrent startup and server lifetime were not executed on original Workbench."
+  },
+  "loadseg_and_registry_lifecycle": [
+    {
+      "hunk": 2,
+      "code_offset": "0x0166-0x0194",
+      "observations": [
+        "The routine initializes the shared list at data offset 0x0238 and the Exec semaphore at data offset 0x0244.",
+        "At 0x018a it calls Exec SetFunction with A1=dos.library, A0=-150 (DOS LoadSeg), and D0 loaded from the PC-relative address formed at 0x0180; the 68000 effective address resolves to HUNK2 code offset 0x0000.",
+        "Exec SetFunction's returned previous vector is stored at data offset 0x0272."
+      ]
+    },
+    {
+      "hunk": 2,
+      "code_offset": "0x0000-0x009c",
+      "observations": [
+        "This replacement function is installed at HUNK2 offset 0x0000. Its DOS LoadSeg input filename arrives in D1; it increments the active-operation count at data offset 0x0276, obtains a temporary DOS ACCESS_READ lock for the input name, and then obtains the registry semaphore at 0x0244.",
+        "It obtains a temporary DOS ACCESS_READ lock for the input name and compares it with each registry record's lock at record offset 0x0008 using DOS SameLock.",
+        "On a match, it takes the preloaded SegList from record offset 0x000c, removes the record under the semaphore, unlocks the record's DOS lock and frees the 16-byte record. It returns that SegList to the LoadSeg caller, consuming the cache entry once.",
+        "On no match, it releases the semaphore and temporary lock, then calls the saved original LoadSeg vector at data offset 0x0272 with the original D1 filename.",
+        "Both paths decrement the active-operation count and return the selected SegList/result in D0."
+      ]
+    },
+    {
+      "hunk": 2,
+      "code_offset": "0x009e-0x0164",
+      "observations": [
+        "The add helper uses Exec AllocVec for a 16-byte record, obtains a DOS ACCESS_READ lock for the path, stores the lock at record offset 0x0008 and SegList at 0x000c, then links it into the shared list under the semaphore.",
+        "The remove helper searches by SegList value, unlinks a match under the semaphore, releases the DOS lock, frees the record with Exec FreeVec, and calls DOS UnLoadSeg for that SegList. If the hook already consumed the record, this helper finds no match and does not unload the SegList."
+      ]
+    },
+    {
+      "hunk": 2,
+      "code_offset": "0x0196-0x01ea",
+      "observations": [
+        "At 0x01a0 the teardown helper calls Exec AttemptSemaphore (-576). Failed acquisition branches directly to 0x01e6. Successful acquisition permits vector mutation only if the cache list at DATA+0x0238 is empty and the operation count at DATA+0x0276 is zero; otherwise it releases the semaphore at 0x01e2.",
+        "At 0x01c6 it calls Exec SetFunction for DOS LoadSeg with the saved pointer at DATA+0x0272, compares the returned previous function pointer with the PC-relative address formed at 0x01ca, and, when those values differ, calls SetFunction again at 0x01da with the returned pointer.",
+        "The effective address formed at 0x01ca is HUNK2 offset 0x0000, the same replacement target installed at 0x0180.",
+        "Every decoded path reaches the unconditional MOVEQ #1,D0 at 0x01e6 before returning. This helper therefore does not return a failure value for a busy/nonempty cache or a newer vector. The later worker-startup audit records how the worker consumes this result. This is a static observation; safety of original guest teardown has not been established."
+      ]
+    }
+  ],
+  "resolved_pointer_identity": {
+    "install_instruction": "HUNK2 offset 0x0180: LEA -0x0182(PC),A0",
+    "teardown_comparison_instruction": "HUNK2 offset 0x01ca: LEA -0x01cc(PC),A0",
+    "effective_target_for_both": "HUNK2 code offset 0x0000",
+    "evidence": "68000 PC-relative displacement is based at the extension word; Capstone 5.0.7 disassembly of the hash-bound code renders both operands as $0(pc). The replacement installed by SetFunction is therefore the same entry pointer checked during teardown."
+  },
+  "evidence_limits": [
+    "All observations are static HUNK call and data-flow facts; the Workbench process, message-port behavior, hook effects, and lock lifetime were not executed.",
+    "The hook's guest-visible LoadSeg behavior and the meaning of every registry state value remain open.",
+    "The command's protection metadata has P clear. This audit does not qualify any replacement as PURE or resident."
+  ],
+  "corrections_20260926": [
+    {
+      "field": "coordinator_entry",
+      "previous_error": "The JSON contained two coordinator_entry keys; common parsers silently discarded the earlier exact offsets.",
+      "correction": "Merged both records into one unique key and clarified that startup queues the first resource request rather than replying immediately."
+    },
+    {
+      "field": "loadseg_and_registry_lifecycle.teardown",
+      "previous_error": "The earlier description did not distinguish conditional vector restoration from unconditional success returned by the teardown helper, and did not identify AttemptSemaphore.",
+      "evidence": "HUNK2 0x01a0 is JSR -0x240(A6), 0x01a6 branches to 0x01e6 on acquisition failure, and 0x01e6 is 70 01 (MOVEQ #1,D0)."
+    },
+    {
+      "field": "loadseg_and_registry_lifecycle.hook ordering",
+      "previous_error": "The entry description implied semaphore acquisition before the temporary filename lock.",
+      "evidence": "DOS Lock is called at HUNK2 0x0016; Exec ObtainSemaphore at 0x0026."
+    }
+  ]
+}

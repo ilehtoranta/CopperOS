@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "captureDate": "2026-09-27",
+  "subject": "MorphOS TaskList PID_CLI attribute and FindTaskByPID identity boundary",
+  "authoritativeDocumentation": {
+    "url": "https://morphos-team.net/sdk/exec.html",
+    "sections": [
+      "NewGetTaskAttrsA",
+      "FindTaskByPID"
+    ],
+    "facts": [
+      "TASKINFOTYPE_PID_CLI (0x24) reports a CLI number for a Process with a CLI and the unique task ID otherwise.",
+      "TASKINFOTYPE_PID (0x33) reports the unique ID assigned to each task.",
+      "FindTaskByPID accepts a unique process ID or CLI number; zero selects the current task. Reading a foreign task requires Forbid/Permit protection.",
+      "A CLI-number lookup may identify a replacement Process after the old CLI terminates and another takes its CLI number."
+    ]
+  },
+  "officialSdkLayoutEvidence": {
+    "package": "MorphOS SDK May 2026, local package sdk-20260529.lha",
+    "packageSourceUrl": "https://www.morphos-team.net/downloads",
+    "packagePath": "D:/TestData/MorphOS/sdk-20260529.lha",
+    "packageSha256": "310dfb888b995e32206c5c3aba409847334a5fee049d13aad27b4af0d518ec77",
+    "archiveMember": "morphossdk/sdk.pack:Development/gg/os-include/exec/tasks.h",
+    "headerSha256": "73fa10f90970a3a9eaef00c47780b2218f398c0e2bdc607c374113b3bd162f5a",
+    "headerBytes": 16440,
+    "execBaseArchiveMember": "morphossdk/sdk.pack:Development/gg/os-include/exec/execbase.h",
+    "execBaseHeaderSha256": "57df1222d69b826a64c4d32a8d3f5442f824012bd99bc09d2c97535f8bc47fdb",
+    "execBaseHeaderBytes": 7531,
+    "layout": {
+      "Task.tc_ETask": 34,
+      "TaskFlag.TF_ETASK": 8,
+      "ETask.UniqueID": 24,
+      "uniqueIdBytes": 4,
+      "ExecBase.ex_TaskID": 576,
+      "ETask.Size": 86,
+      "uniqueIdOffsetDerivation": "ETask.Message is 20 bytes and ETask.Parent is one 4-byte pointer before UniqueID."
+    },
+    "interpretation": "For MorphOS-shaped tasks with a mapped ETask extension, the provider reads the same unique ID described by TASKINFOTYPE_PID and TASKINFOTYPE_PID_CLI. NewCreateTaskA allocates this extension in its existing owned task block. DOS-owned Process allocation also creates it when the Exec library version is 50 or newer; version 40 retains the original Workbench Process and stack layout. Both paths assign a nonzero ID from ExecBase.ex_TaskID under Forbid/Permit. This does not prove that other standard Exec paths create extensions or that assigned values match a MorphOS guest."
+  },
+  "sourceEvidence": {
+    "path": "artifacts/morphos320-c-source-extracted/c/tasklist/tasklist.c",
+    "sha256": "66fd02c45ac1e91e770bb9b4cefb6966427f94a0b951a4fc21b695b5294ed94b",
+    "line": 562,
+    "operation": "NewGetTaskAttrs(task, &pid, sizeof(pid), TASKINFOTYPE_PID_CLI, TAG_DONE)"
+  },
+  "candidateImplementation": {
+    "selectorPath": "../CopperSharp68k/Sdk.Amiga/Exec/Enums.cs",
+    "providerPath": "../CopperStart/src/CopperStart.Exec/ExecMorphOsTaskCore.cs",
+    "selectorValue": "0x24",
+    "cliProcessBehavior": "For an NT_PROCESS task with a non-null Process.pr_CLI, return Process.pr_TaskNum.",
+    "nonCliBehavior": "Read ETask.UniqueID only when TF_ETASK marks tc_ETask valid and the extension is mapped; otherwise retain the portable task-address identity fallback.",
+    "findTaskByPidBehavior": "Search live current, ready, and waiting tasks by MorphOS ETask.UniqueID when present, otherwise the portable task-address fallback, or the current CLI number. A CLI number can resolve to a replacement Process after the old task is removed and the number is reused.",
+    "newCreateTaskBehavior": "Allocate an 86-byte ETask after the task body in the existing owned allocation, initialize its Message and Children list, assign a nonzero value from ExecBase.ex_TaskID while task switches are forbidden, and let the existing reap path release it with the task.",
+    "dosOwnedProcessBehavior": "When the Exec library version is 50 or newer, append an 86-byte ETask after Process and before the stack, publish tc_ETask, initialize its parent and child list, and assign a nonzero ex_TaskID under Forbid/Permit. Exec version 40 keeps the classic Process and stack layout."
+  },
+  "verification": {
+    "nativeTaskPidParity": {
+      "command": "dotnet test tests/CopperStart.Exec.Tests/CopperStart.Exec.Tests.csproj --filter \"FullyQualifiedName~MorphOsExtendedProfileMatchesMc68000\" --no-restore --verbosity minimal",
+      "passed": 1,
+      "failed": 0,
+      "checks": [
+        "MC68000 and managed traces agree when reading a valid ETask unique ID",
+        "MC68000 and managed traces agree on the task-address fallback when TF_ETASK is clear"
+      ]
+    },
+    "etaskValidityAndProvider": {
+      "command": "dotnet test tests/CopperStart.Exec.Tests/CopperStart.Exec.Tests.csproj --filter \"FullyQualifiedName~ExecMorphOsExtendedCoreTests|FullyQualifiedName~DosProcessPublicationTests\" --no-restore --verbosity minimal",
+      "passed": 20,
+      "failed": 0,
+      "checks": [
+        "NewCreateTask and MorphOS DOS-owned Process set TF_ETASK while preserving other Task flags",
+        "MorphOS PID lookup ignores tc_ETask when TF_ETASK is clear",
+        "Workbench version-40 Process layout leaves TF_ETASK clear"
+      ]
+    },
+    "focusedProviderSuite": {
+      "command": "dotnet test CopperStart/tests/CopperStart.Exec.Tests/CopperStart.Exec.Tests.csproj --filter FullyQualifiedName~ExecMorphOsExtendedCoreTests|FullyQualifiedName~CompiledMorphOsFindTaskByPidPointerEntryResolvesNativeAndCliIdentities --no-restore",
+      "passed": 14,
+      "failed": 0
+    },
+    "dosProcessIdentitySuite": {
+      "command": "dotnet test CopperStart/tests/CopperStart.Exec.Tests/CopperStart.Exec.Tests.csproj --filter FullyQualifiedName~DosChildProcessLaunchCoreTests|FullyQualifiedName~DosPreparedChildPublicationTests|FullyQualifiedName~DosProcessLifecycleCoreTests|FullyQualifiedName~DosProcessPublicationTests --no-restore",
+      "passed": 42,
+      "failed": 0,
+      "checks": [
+        "MorphOS version-50 Process ETask placement and ID assignment",
+        "FindTaskByPID resolves the DOS-owned Process by its native ETask ID",
+        "Workbench version-40 Process and stack layout remains unchanged"
+      ]
+    },
+    "residentQualification": {
+      "receipt": "artifacts/tasklist-morphos-native-pid-cli-20260927-v4/qualification.json",
+      "cpus": [
+        "68000",
+        "68020",
+        "68040"
+      ],
+      "suppliedVectorsPerCpu": 54,
+      "reachableMethodsPerCpu": 69,
+      "managedAllocationSites": 0,
+      "runtimeFeatures": 0,
+      "runtimeHelpers": 0,
+      "externalTargets": 0,
+      "exceptionRegions": 0,
+      "fatalMachineFaultSites": 0,
+      "sharedImageWrites": 0,
+      "leakedResources": 0,
+      "hunkSha256": {
+        "68000": "2f451c70b874f117811788307988008017518ae3d0c94ed3e3ec9d58fe3d1b32",
+        "68020": "c09bc3a7d90d6cd0e8f8047c96ae3e44225a5754e1288b7c3ec60738b8d0276f",
+        "68040": "b134a2202f23ede40a4a7d342259e7f72d8a6a55d4c887df36e46d35813d7fba"
+      }
+    }
+  },
+  "openEvidence": [
+    "Compare CLI and non-CLI PID output against an original MorphOS 3.20 guest.",
+    "Compare ID sequencing and reuse for NewCreateTaskA and DOS-owned Process allocations with an original MorphOS 3.20 guest.",
+    "Initialize ETask for other standard Exec task creation paths before relying on native unique PIDs for every task.",
+    "Test concurrent task removal and CLI-number reuse while TaskList is snapshotting or while another command resolves a PID.",
+    "Complete MorphOS source/package correspondence, rights, PURE/resident, lifecycle, and package admission."
+  ]
+}

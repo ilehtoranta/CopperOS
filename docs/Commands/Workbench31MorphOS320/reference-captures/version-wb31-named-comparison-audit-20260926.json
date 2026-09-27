@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "capture_id": "version-wb31-named-comparison-audit-20260926",
+  "kind": "offline-hunk-code-audit-with-separate-original-guest-observations",
+  "profile": "wb31",
+  "command": "Version",
+  "source_id": "wb31-workbench-m10-40.42",
+  "source_adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+  "path": "C/Version",
+  "source_bytes": 4764,
+  "source_sha256": "dc2f55cd48b37bd1efecdbf07d38757463129dd9076ea6bf1b5d967f2189f224",
+  "source_header_block": 439,
+  "analysis_method": "Rehashed the original disk 2 ADF outside the repository, read C/Version into memory through tools/Commands/Inventory/inventory.py, verified its hash, parsed the single CODE HUNK, and disassembled the entry, comparison, parser and named lookup helpers using Capstone 5.0.7 in 68000 big-endian mode. No original binary was written by this audit. Instruction offsets are CODE-relative, not load addresses.",
+  "hunk": {
+    "index": 0,
+    "kind": "CODE",
+    "file_offset": 32,
+    "bytes": 4728,
+    "sha256": "bb0ccab2faa02968a595a91ac99b5720825a79efa46e833656337e70b5da96d1"
+  },
+  "entry": {
+    "readargs": "0x0060 DOS.ReadArgs, LVO -798; template at 0x0326: NAME,VERSION/N,REVISION/N,FILE/S,FULL/S,UNIT/N,INTERNAL/S,RES/S",
+    "libraries": "Exec.OpenLibrary at 0x001e opens dos.library with requested version 0, then 0x0028 checks lib_Version >=37. Exec.OpenLibrary at 0x0038 opens utility.library version 37. Ordinary exit closes Utility at 0x02b0 before DOS at 0x02fc.",
+    "search_flags": "0x006e initializes D5=-1; FILE at ReadArgs slot 3 changes it to 0x20 at 0x0076. Main passes flags using tag 0x80110002 through 0x0118 -> 0x107c -> 0x0bfc. This audit does not establish all other option semantics."
+  },
+  "comparison": {
+    "actual_fields": "Main copies result +0x10 into D5 (major) at 0x0148 and +0x14 into D4 (revision) at 0x014c.",
+    "initial_result": "0x0232 sets D7=0.",
+    "major": "0x0234 reads the VERSION/N result pointer. If present, 0x023c reads its signed LONG; 0x023e CMP.L requested,D5 and 0x0240 BGE use signed comparison. Actual major below requested sets D7=5 at 0x0242. Actual major above requested skips revision at 0x0248.",
+    "equal_major_revision": "For equal majors, 0x024a reads the REVISION/N pointer. If present, 0x0252 CMP.L (A0),D4 and 0x0254 BGE accept actual revision >= requested; otherwise 0x0256 sets D7=5.",
+    "revision_only": "When VERSION is absent, 0x025a-0x0268 independently applies the same signed minimum revision comparison, setting D7=5 only when actual revision is lower.",
+    "return": "0x0300 moves D7 to D0. Comparison mismatch is RETURN_WARN=5; success is RETURN_OK=0."
+  },
+  "output_and_cleanup_order": {
+    "normal": "0x015c calls the VPrintf wrapper at 0x045a with format '%s' at 0x03a2 and the already constructed result string. Wrapper calls DOS.VPrintf LVO -954 at 0x0476. Parser constructs the normal 'name major.revision' string using format '%s %ld.%ld' at 0x042c, via RawDoFmt wrapper call 0x087e.",
+    "full": "FULL-dependent date and extra output calls precede the common newline; this audit does not freeze all date/extra formatting or malformed-string semantics.",
+    "newline": "0x01e2 calls DOS.PutStr LVO -948 with '\n' at 0x03b0.",
+    "before_comparison": "0x01ec frees parsed result data through helper 0x0bcc, then named requests proceed to comparison at 0x0232. Both ordinary and FULL output therefore precede comparison and remain visible on warning.",
+    "final_cleanup": "0x0290 DOS.FreeArgs runs after comparison; Utility and DOS close afterwards. No SetIoErr is called by this ordinary comparison path, and D6 remains zero so no PrintFault is emitted for a requirement mismatch. Caller post-System IoErr is not proof of the command's secondary error."
+  },
+  "named_lookup": {
+    "resident_first": "0x0d08 calls custom helper 0x10a4. It walks ExecBase.ResModules at +0x012c, following high-bit continuation pointers, and compares the complete query with rt_Name at +0x0e using Utility.Stricmp LVO -162 at 0x10ce; the return value is tested as LONG. This is not an Exec.FindResident call, and no FilePart is applied to this first query.",
+    "resident_fields": "0x098a reads rt_Name into result +0x0c; 0x0992 reads the unsigned rt_Version byte at +0x0b into result +0x10. 0x099a passes rt_IdString at +0x12 to parser 0x054c with D0=1,D1=0: major is retained from the Resident and revision may be parsed from its ID string.",
+    "intermediate_sources": "If Resident lookup misses, command segments are checked under Exec.Forbid at 0x0d32 and Permit at 0x0dac. Helper 0x0482 calls DOS.FindSegment first with system=0 at 0x049c, then system=1 at 0x04ac. A separate trailing-colon DOS-list path precedes loaded-library lookup. Full provider semantics are outside this bounded audit.",
+    "loaded_library": "Exec.Forbid LVO -132 at 0x0e4c; LibList address ExecBase+0x017a at 0x0e50; DOS.FilePart LVO -870 at 0x0e60; custom case-insensitive list search at 0x0e6c -> 0x10de. Utility.Stricmp occurs at 0x10f6 and its LONG result is tested at 0x10fa.",
+    "loaded_library_fields": "Hit reads ln_Name +0x0a at 0x0e7c, unsigned lib_Version WORD +0x14 at 0x0e84, unsigned lib_Revision WORD +0x16 at 0x0e8e, and lib_IdString +0x18 at 0x0e96. Parser at 0x0ea2 receives D0=D1=1 and preserves the numeric fields. Search flags clear at 0x0eaa; Exec.Permit LVO -138 at 0x0eb0. The named loaded-library hit does not open or close that library.",
+    "remaining_order": "The code continues with DeviceList, direct named file, LIBS: basename and DEVS: basename providers when preceding sources miss. Their complete behavior remains outside this audit; a loaded-library shortcut is not equivalent to default named lookup.",
+    "dos_library_resolution_gap": "The original guest's dos.library request may resolve in the first Resident-table search. Output alone does not establish which provider returned the result."
+  },
+  "separate_guest_evidence": {
+    "qualification": "artifacts/workbench31-guest-command-captures-20260926-v1/qualification.json",
+    "qualification_sha256": "fbe6aa405f1a864bb161ad4a23cc932b1ad18689f4ef2d9efbd0e37e6466691c",
+    "observations": [
+      { "command": "C:Version dos.library", "return": 0, "output": "dos.library 40.3\n" },
+      { "command": "C:Version dos.library VERSION 39", "return": 0, "output": "dos.library 40.3\n" },
+      { "command": "C:Version dos.library VERSION 999", "return": 5, "output": "dos.library 40.3\n" }
+    ],
+    "scope": "Original normal-CLI execution through the public probe supports named-command output and major comparison. It does not establish replacement parity, original RES option handling, revision-only/negative argument guest behavior, or child Result2 propagation. The aggregate also includes a bad-number capture, which is not a success-path comparison observation."
+  },
+  "implementation_scope": {
+    "qualification": "artifacts/version-wb31-native-20260926-comparison-v1/qualification.json",
+    "correction": "Existing supported system and RES candidate paths now print before applying signed minimum requirements. Existing VPrintf argument packing is corrected so system output uses a leading %s and RES FULL places its second string in the second LONG slot. Supplied-vector formatting now reads those actual argument slots.",
+    "limits": "Default named non-RES lookup remains explicitly unimplemented. Complete classic system output, lookup hierarchy, FILE/UNIT/INTERNAL, exact resident parsing, parser return behavior, original-vs-replacement guest parity, PURE/resident lifetime and packaging remain open. The candidate still normalizes IoErr; this audit does not resolve that semantic difference."
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "command": "IPrefs",
+  "recorded": "2026-09-22",
+  "profiles": {
+    "wb31": {
+      "source_id": "wb31-workbench-m10-40.42",
+      "volume": "Workbench3.1",
+      "path": "C/IPrefs",
+      "header_block": 271,
+      "bytes": 13848,
+      "sha256": "14341be81f06506852204a33e7bfe7eb6fa2067d7f1e55810007bd94b021f0ef",
+      "file_format": "amiga-hunk",
+      "version": {
+        "name": "iprefs",
+        "version": 40,
+        "revision": 7,
+        "date_text": "2.6.93",
+        "evidence": "unexecuted-binary-ver-tag"
+      },
+      "protection": {
+        "raw": 0,
+        "pure": false,
+        "evidence": "adf-file-header-byte-320-big-endian"
+      },
+      "imports_and_strings": [
+        "dos.library",
+        "intuition.library",
+        "graphics.library",
+        "utility.library",
+        "layers.library",
+        "locale.library",
+        "diskfont.library",
+        "keymap.library",
+        "iffparse.library",
+        "datatypes.library",
+        "workbench.library",
+        "ENV:Sys/locale.prefs",
+        "ENV:Sys/icontrol.prefs"
+      ],
+      "bounded_observations": [
+        "The binary has no recovered ReadArgs template; it is a startup preference service rather than a normal option command.",
+        "Embedded diagnostics cover iffparse, locale, diskfont, file, keymap, datatypes, font, sound and picture failures.",
+        "The Workbench member is non-PURE by its observed protection word."
+      ]
+    },
+    "morphos320": {
+      "source_id": "morphos320-live-iso",
+      "volume": "MorphOS 3.20",
+      "path": "MorphOS/C/IPrefs",
+      "iso_extent": 175924,
+      "bytes": 43798,
+      "sha256": "2c4f6bf00b8f917fe30675fa7c758850583dc712f64b8bf1fed40c646b38cccf",
+      "file_format": "morphos-packed-native",
+      "version": null,
+      "source": {
+        "root": "artifacts/morphos320-c-source-extracted/c/iprefs",
+        "main": {
+          "path": "artifacts/morphos320-c-source-extracted/c/iprefs/main.c",
+          "bytes": 53295,
+          "sha256": "050fe1998b8695fbcc32bbb523ae5c78b918588dba970b384135842f43b32135"
+        },
+        "evidence": "released-source-behavior-only"
+      },
+      "startup_contract": {
+        "entry": "main(void)",
+        "duplicate_guard": "FindTask(IPREFS_SEM_NAME) returns failure without starting a second service",
+        "required_libraries": [
+          {"name": "dos.library", "version": 37},
+          {"name": "intuition.library", "version": 39},
+          {"name": "graphics.library", "version": 39},
+          {"name": "utility.library", "version": 39},
+          {"name": "iffparse.library", "version": 39},
+          {"name": "keymap.library", "version": 39},
+          {"name": "layers.library", "version": 39},
+          {"name": "diskfont.library", "version": 39},
+          {"name": "workbench.library", "version": 39},
+          {"name": "icon.library", "version": 39},
+          {"name": "cybergraphics.library", "version": 50},
+          {"name": "query.library", "version": 51},
+          {"name": "mount.library", "version": 51}
+        ],
+        "process": "CreateNewProcTags(IPREFS_SEM_NAME, priority 0, PPC code, no console/current/home directory, no copied variables)",
+        "completion": "A private message port receives one completion message after preference loading; only then does main validate installation and return RETURN_OK.",
+        "environment": "Expand ENV:, create missing ENV:sys and ENVARC:sys directories, and use the resolved environment root for the preference table."
+      },
+      "preference_table": [
+        "mouse.conf/mouse.prefs",
+        "keyboard.conf/keyboard.prefs",
+        "input.prefs",
+        "font.conf/font.prefs",
+        "screens.txt/publicscreens.prefs",
+        "locale.prefs",
+        "palette.prefs",
+        "wbpattern.prefs",
+        "icontrol.conf/newicontrol.prefs",
+        "serial.prefs",
+        "printer.prefs/printergfx.prefs",
+        "pointer.prefs",
+        "overscan.prefs",
+        "sound.prefs",
+        "workbench.prefs",
+        "reaction.prefs",
+        "poseidon.prefs",
+        "blanker.conf/blanker.prefs",
+        "interface.prefs",
+        "user.prefs",
+        "log.prefs",
+        "displayengine.conf",
+        "laptop.conf/laptopquick.conf",
+        "diskcache.conf"
+      ],
+      "runtime_services": [
+        "IFF preference dispatch through the ID-based handler table",
+        "input/keymap and codepage setup",
+        "font, screen, palette, pointer and Workbench pattern loading",
+        "printer, serial, sound, network, Poseidon, powerbook, compositing and disk-cache preference handlers",
+        "notification setup and delayed Workbench screen reopen",
+        "installation/version validation with requester, reboot or shift-qualified shell fallback"
+      ]
+    }
+  },
+  "evidence_limits": [
+    "No profile has an original guest startup receipt, exact preference ordering/output, requester comparison or result/IoErr trace.",
+    "The MorphOS source is behavior evidence only and is not copied into CopperOS; its packed member has no recovered version tag.",
+    "The Workbench member's exact service sequence and preference file set are not inferred from the MorphOS source.",
+    "IPrefs owns a continuing process and global preference state, so resident/PURE, termination, concurrent startup and package gates remain open.",
+    "No implementation may fake preference success while required providers or a supported desktop service are absent."
+  ]
+}

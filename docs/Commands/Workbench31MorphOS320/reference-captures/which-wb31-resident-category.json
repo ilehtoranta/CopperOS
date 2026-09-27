@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "capture_id": "which-wb31-resident-category-20260831",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Which",
+    "command_sha256": "35f7f3fee29dd2d56f482537af1c5f5a88b552080e6c26be14f455a3241b7157",
+    "version": "which 37.1 (12.1.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/which-wb31-resident-category-startup-probe",
+    "source_sha256": "dc534134faff9c012af0923aafd1473e084877b7925bd46f25ef350778a87366",
+    "disposable_adf_before_run_sha256": "91d86e074f804ef55faaa8c456bae6266174ea6c2f93dbaf0c227a4c56ba2ab0",
+    "disposable_adf_after_run_sha256": "23a48c9baf18e6b90e098f79560c5e1006964b92446a37a49cf5806faa0e9fd2",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "c2ac784e026886fa4bf9d12d172370acc2c8a4ffc3194615f9a61a82a8b44a3b",
+    "capture_bytes": 22,
+    "capture_text": "BEGIN\nRES Execute\nEND\n"
+  },
+  "observations": [
+    "After Path C: and Resident >NIL: C:Execute PURE, C:Which Execute RES emits RES Execute followed by LF.",
+    "Resident >NIL: Execute REMOVE completes before the fixture writes END."
+  ],
+  "limits": [
+    "The startup sequence and output target are authored probe content on a disposable ADF copy.",
+    "This does not establish default resident ordering, NORES, ALL, disabled/system resident handling, return level, IoErr, diagnostics, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Which bytes are copied into this repository."
+  ]
+}

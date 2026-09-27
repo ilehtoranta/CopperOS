@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "command": "SetFont",
+  "source_id": "wb31-workbench-m10-40.42",
+  "volume": "Workbench3.1",
+  "path": "C/SetFont",
+  "bytes": 1092,
+  "sha256": "c3e1e763b12fd4f710a414443facea49479aa723a94828828dbaee214fe4ad8c",
+  "file_format": "amiga-hunk",
+  "audit_kind": "bounded-static-disassembly",
+  "observations": [
+    {
+      "code_offset": "0x000e-0x0010",
+      "operation": "initialize command result D6 to RETURN_FAIL (20) and IoErr D7 to ERROR_INVALID_RESIDENT_LIBRARY (122)"
+    },
+    {
+      "code_offset": "0x0098-0x009a, 0x028c-0x0290",
+      "operation": "when ReadArgs fails, fetch IoErr into D7 and leave D6 at RETURN_FAIL"
+    },
+    {
+      "code_offset": "0x00a8-0x00ac, 0x027a",
+      "operation": "store the low 16 bits of SIZE/N in TextAttr.ta_YSize, then reject when that word is <= 4 (CMP.W/BLS); set IoErr 115 and leave D6 at RETURN_FAIL"
+    },
+    {
+      "code_offset": "0x0172-0x0198",
+      "operation": "use IoErr 205 for OpenDiskFont failure and for a missing console task; a proportional font without PROP instead closes the font and sets IoErr 212"
+    },
+    {
+      "code_offset": "0x01cc-0x01d0 -> 0x0274-0x0278",
+      "operation": "a NULL console Window takes the success path and clears both result and IoErr"
+    },
+    {
+      "code_offset": "0x0204-0x0270, 0x0274-0x0278",
+      "operation": "PutStr/Flush results are not tested; after output the command sets result and IoErr to zero"
+    },
+    {
+      "code_offset": "0x02d0-0x02d8",
+      "operation": "return D6 as the command result after publishing D7 through SetIoErr"
+    }
+  ],
+  "conclusion": "ReadArgs and SIZE failures return RETURN_FAIL with the applicable IoErr; the no-window console path and completed output path return success. Output failures do not change the final success result.",
+  "evidence_limits": [
+    "This audit records static control flow; exact guest IoErr side effects of failing DOS output calls need Workbench execution.",
+    "This audit does not establish original guest diagnostics, PURE/resident lifecycle, licensing, package admission or shipping equivalence."
+  ]
+}

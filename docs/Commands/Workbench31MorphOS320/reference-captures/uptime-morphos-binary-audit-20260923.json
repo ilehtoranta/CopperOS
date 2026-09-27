@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "profile": "morphos320",
+  "source_id": "morphos320-live-iso",
+  "command": "Uptime",
+  "path": "MorphOS/C/Uptime",
+  "iso_extent": 178788,
+  "bytes": 2733,
+  "sha256": "1b1c87202fca5c789a1c34c700d72d879367bb9fb76bd2f23c168d60bdc60c7e",
+  "version": {
+    "name": "uptime",
+    "version": 50,
+    "revision": 5,
+    "date_text": "9.2.2014",
+    "byte_offset": 2687,
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template": {
+    "status": "no-template",
+    "evidence": "MorphOS Library command reference; no ReadArgs grammar claimed"
+  },
+  "string_scan": {
+    "ascii_run_count": 28,
+    "meaningful_syntax_or_diagnostic_candidates": [],
+    "version_tag_observed": true,
+    "evidence": "packed-member printable scan; random short runs are not treated as strings"
+  },
+  "installer_event": {
+    "script": "hdinstall.fixc",
+    "line": 83,
+    "operation": "file-protection-add",
+    "flag": "P",
+    "confidence": "literal-script-observed-not-installed-metadata"
+  },
+  "scope": "binary identity and documented invocation boundary only; no raw binary is stored in the repository",
+  "open_gates": [
+    "original guest output and exact formatting",
+    "timer/system-time API and failure behavior",
+    "guest lifecycle and resident/PURE execution",
+    "installed AmigaDOS protection metadata",
+    "package/licensing and differential comparison"
+  ]
+}

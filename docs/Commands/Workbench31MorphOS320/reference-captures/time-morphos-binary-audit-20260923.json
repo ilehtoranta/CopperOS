@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "profile": "morphos320",
+  "source_id": "morphos320-live-iso",
+  "command": "Time",
+  "path": "MorphOS/C/Time",
+  "iso_extent": 178504,
+  "bytes": 4999,
+  "sha256": "03e00e1a8b35a2b31f785d17c1189228a3960bf345abef4493c3ac2abbe347a5",
+  "version": {
+    "name": "Time",
+    "version": 1,
+    "revision": 0,
+    "date_text": "24.05.26",
+    "byte_offset": 4951,
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template": {
+    "status": "unknown",
+    "candidates": [],
+    "evidence": "packed MorphOS member; no ReadArgs grammar is inferred from the printable scan"
+  },
+  "documented_behavior": {
+    "summary": "Measures the time it takes to execute a command",
+    "evidence": "MorphOS Library Shell Commands index; exact output and command-tail boundary remain unobserved"
+  },
+  "string_scan": {
+    "ascii_run_count": 71,
+    "meaningful_syntax_or_diagnostic_candidates": [],
+    "version_tag_observed": true,
+    "evidence": "packed-member printable scan; short random runs are not treated as strings"
+  },
+  "installer_event": {
+    "script": "hdinstall.fixc",
+    "line": 79,
+    "operation": "file-protection-add",
+    "flag": "P",
+    "confidence": "literal-script-observed-not-installed-metadata"
+  },
+  "scope": "binary identity and documented purpose only; no raw binary is stored in the repository",
+  "open_gates": [
+    "exact command-tail grammar and help output",
+    "guest timer source, units, rounding and nested-command result precedence",
+    "output and diagnostic bytes, IoErr and Ctrl-C behavior",
+    "resident/PURE lifecycle and repeat/concurrent calls",
+    "installed AmigaDOS protection metadata",
+    "package/licensing and differential comparison"
+  ]
+}

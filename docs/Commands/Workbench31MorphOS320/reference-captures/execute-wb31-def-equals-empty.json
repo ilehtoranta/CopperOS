@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "capture_id": "execute-wb31-def-equals-empty-20260901",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Execute",
+    "command_sha256": "27c2f578b63857ab5fbe03cdf621d553408cc670b9f07d9988ce224d22b57ecd",
+    "version": "execute 37.11 (14.5.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/execute-wb31-def-equals-empty-startup-probe",
+    "source_sha256": "7f163cad54fee08710a3eaabdfa8cae37d27f3ab6f39dcba3801326e7e12767c",
+    "disposable_adf_after_run_sha256": "401da70ac911fbbe51421a6024b95f0aeb59cfc3bd31fe8afb294393bde45e2a",
+    "capture_file": "S/Shell-Startup",
+    "capture_raw_sha256": "a2b683dc428d5590f5896c71530ec5d24be857aa326cb46433ad761a6a74b84f",
+    "capture_raw_bytes": 116,
+    "capture_text_before_nul_sha256": "4346ee7aee86489ad92d93d7ecff522ed76b7dbbe15f15b3e868fcf828b477aa",
+    "capture_text_before_nul_bytes": 38,
+    "capture_text_before_nul": "BEGIN\nAFTER\nSTATUS RC=0 RESULT2=0\nEND\n"
+  },
+  "observation": {
+    "script_directives": [".KEY filename", ".DEF filename="],
+    "invocation": "C:Execute RAM:execute-probe",
+    "result": "The original command returned RC 0 and Result2 0. It suppressed the line containing <filename>, while running the following non-substituting line."
+  },
+  "limits": [
+    "Copying the short guest capture over the running S/Shell-Startup leaves a NUL-padded 116-byte file. The authenticated observation is its prefix before the first NUL; both raw and prefix hashes are recorded.",
+    "This establishes one empty equals-form default with one reference only.",
+    "It does not establish whitespace-form empties, other empty substitutions, invalid or duplicate defaults, diagnostics, IoErr, streams, temporary-file internals, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Execute bytes are copied into this repository."
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "capture_id": "eval-wb31-classic-numeric-20260901",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Eval",
+    "command_sha256": "e320ba5d36b788e83719a09c7481d2c91d511396787b0b534e29c496240af962",
+    "version": "eval 37.3 (26.3.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/eval-wb31-classic-numeric-probe",
+    "source_sha256": "da5474f76c7dd0f3af511d41b1e55388dc78e8820bc966f2e64df442708300b0",
+    "disposable_adf_before_run_sha256": "32f953016770205b45250eace6db01cec8b7d8bd51880cbcb58ea612f78add67",
+    "disposable_adf_after_run_sha256": "034a7e3d6be2d46c1e2432dd45d93c9b812422ce69c3ca98ea32d9fa1ee574eb",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "1384ba2b9a0213ca97af57367279ca3e7886acb52f89f5cd94e427ce19a8622b",
+    "capture_bytes": 38,
+    "capture_text": "BEGIN\n30\n7\n1\n16\n16\n8\nn=9\no=1\np=11\nEND\n"
+  },
+  "observation": {
+    "invocations": [
+      "C:Eval 20-5*2",
+      "C:Eval 1+(2*3)",
+      "C:Eval -2+3",
+      "C:Eval 0x10",
+      "C:Eval #x10",
+      "C:Eval 010",
+      "C:Eval 9 LFORMAT=\"n=%n\"",
+      "C:Eval 9 LFORMAT=\"o=%o\"",
+      "C:Eval 9 LFORMAT=\"p=%o2\""
+    ],
+    "result": "The original command output 30, 7, 1, 16, 16, 8, n=9, o=1, and p=11 in invocation order."
+  },
+  "limits": [
+    "The startup sequence and capture target are authored probe content on a disposable ADF copy.",
+    "This establishes selected arithmetic, literal and N/n/O/o LFORMAT cases only; it does not establish the complete grammar, value width/overflow behavior, formatting width ranges/padding, errors, return level, IoErr, TO behavior, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Eval bytes are copied into this repository."
+  ]
+}

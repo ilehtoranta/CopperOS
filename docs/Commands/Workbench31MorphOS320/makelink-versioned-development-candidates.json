@@ -1,0 +1,481 @@
+{
+  "schema_version": 1,
+  "status": "development-only",
+  "scope": "Current-SDK versioned Workbench MakeLink development images with local two-build reproducibility and native-vector execution. Only 68000 retains earlier original-DOS/Version execution, supported by direct byte/hash equality with the current HUNK. Historical SDK source snapshots are not current build evidence. No shipping, installed-image or PURE admission.",
+  "shipping": false,
+  "pure_admission": false,
+  "qualified_shipping_commands": 0,
+  "qualified_shipping_profiles": 0,
+  "required_shipping_path": "C:MakeLink selected by profile only after all gates pass",
+  "version_id": "$VER: MakeLink 0.1 (8.9.2026) CopperOS wb31",
+  "build_qualification": {
+    "path": "artifacts/workbench-makelink-filehandle-abi-20260908/qualification.json",
+    "sha256": "fcebfca783daef8febb3c93fac71f47fff48510693d9d700b44b356941b00305"
+  },
+  "preservation_audit": {
+    "path": "artifacts/command-release-build-adapters-filehandle-abi-20260908/preservation-and-byte-identity.json",
+    "sha256": "19b2c69c0d72efaee00def59261584bbbda40b52b9ef42ea8dcc2684e949cf5a"
+  },
+  "reproducibility_scope": "Two fresh managed/native build directories on the same host; no cross-host hermetic reproducibility claim.",
+  "runtime_scope": "The current build reran 20 supplied-vector invocations per CPU. Earlier original-DOS/Version execution applies only to the byte-identical versioned 68000 HUNK; it is not a new OS run or evidence for 68020/68040. Different unversioned hashes retain separate evidence.",
+  "tool_review": {
+    "date": "2026-09-08",
+    "scope": "Independent bounded source review of supported HUNK structure/preservation and build evidence scopes; no concrete supported-path correctness defect found.",
+    "tools": [
+      {
+        "path": "tools/Commands/append_hunk_version.py",
+        "sha256": "a67ccfec2db7d6c0edfb9030e3392ba6e0eb65bf1083a8b0d9391731a1806102"
+      },
+      {
+        "path": "tools/Commands/build_workbench_makelink_versioned.py",
+        "sha256": "3d63eea12aedfc3617501dabd47206e055c3bde5d66cf04ef760ba6300540b3f"
+      }
+    ],
+    "limits": [
+      "A structural metadata append alone cannot establish runtime control-flow safety for arbitrary input.",
+      "Observed source/build-input snapshots are not a complete hermetic MSBuild or runtime closure.",
+      "The native suite requests 16384-byte stacks; the declared 4096-byte stack remains unqualified.",
+      "Old-HUNK real-DOS/stack/concurrency evidence must not be admitted for versioned hashes without new evidence."
+    ]
+  },
+  "candidates": [
+    {
+      "command": "makelink",
+      "profile": "wb31",
+      "cpu": "68000",
+      "status": "development-only",
+      "shipping": false,
+      "pure_admission": false,
+      "installed_path": null,
+      "amiga_protection": null,
+      "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\makelink-68000.hunk",
+      "sha256": "12d1f36504f5a0f7099bc419e4fffc5f43f138d7b4e8745a2ca907bcb73b5f45",
+      "bytes": 3232,
+      "raw": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\makelink-68000.raw.hunk",
+        "sha256": "fd42d840165936c2dc4ff5980319b47d1e1dd2ccb6e466c48c03548c7ae1050c"
+      },
+      "version_id": "$VER: MakeLink 0.1 (8.9.2026) CopperOS wb31",
+      "output_format": "hunk",
+      "entry": "CopperOS.Commands.AddBuffersNativeRoot.Workbench31MakeLinkEntry::Main",
+      "fpu": "disabled",
+      "runtime_profile": "resident",
+      "declared_stack_bytes": 4096,
+      "minimum_stack_qualified": false,
+      "source": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\src\\Commands\\Native\\Workbench31MakeLinkCommand.cs",
+        "sha256": "a5d297bdeb75bca6c4aadc8fee386aba337cb5ab2bca680fe078509459e6a628"
+      },
+      "compiler": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\build\\bin\\CopperSharp.Compiler.Cli\\release\\CopperSharp.Compiler.Cli.dll",
+        "sha256": "10a7cbaef4bad16002a161afaf00d63c7da0f54b18b4a3506bebb6bded05a669"
+      },
+      "sdk": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\build\\bin\\CopperOS.Commands.AddBuffersNativeRoot\\release\\CopperSharp.Sdk.Amiga.dll",
+        "sha256": "89f504c897eb79f605f110a9b4857cb12a3e84e693884512caabaf080d0017d2"
+      },
+      "native_static": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\makelink-68000.compatibility.json",
+        "sha256": "d80810fa8e4aa9cb70d4d2733a2ddc00e6480cde71b28225ac64c582c7b8eae0"
+      },
+      "version_append": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\makelink-68000.version.json",
+        "sha256": "0c8670b9eb2db60420fa595bae4c5f43ae0ccc5f4a2a20d385dd7f7b67bc8606"
+      },
+      "input_manifest": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\native-build-inputs.json",
+        "sha256": "84e71ff19d240ada0ad73adb3eebdfde269828e68bd4f6d681cb7e060df5ba7d"
+      },
+      "native_execution": {
+        "report": {
+          "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\makelink-68000.runtime.json",
+          "sha256": "6367b5f937749d4f66db208aaf650072931e63d24ae87d02b36787fc21449269"
+        },
+        "invocations": 20,
+        "suite": "workbench-makelink-native-entry-vector-fixture",
+        "observed_configured_stack_bytes": [
+          16384
+        ],
+        "maximum_observed_stack_bytes_written": 164,
+        "scope": "Existing supplied-vector suite, including interleaving; not real DOS, declared-stack qualification or full parity."
+      },
+      "source_snapshot": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\source-snapshot.json",
+        "sha256": "db542a7e79a6dbf98e7c3e1f7c181b7293247c71863e13021e73e17c79bd6bbc"
+      },
+      "dependencies": [
+        {
+          "id": "exec.library",
+          "minimum_version": 36,
+          "abi": {
+            "path": "C:\\D-drive\\Koodit\\GIT\\CopperSharp68k\\Sdk.Amiga\\Exec\\Exec.cs",
+            "sha256": "e75c083a9ad0187e20cd0ea20a14c8207c531f9bcf3202491af29ade83377bf7"
+          }
+        },
+        {
+          "id": "dos.library",
+          "minimum_version": 36,
+          "abi": {
+            "path": "C:\\D-drive\\Koodit\\GIT\\CopperSharp68k\\Sdk.Amiga\\DOS\\DOS.cs",
+            "sha256": "48cc27e51afff73c13f023c70708c2ed90f8ba6a7b9cd773275f9dc6bcd6b243"
+          }
+        }
+      ],
+      "dependency_policy": "Exec36 is the declared 2.0+ platform floor, obtained at absolute4 without an OpenLibrary version check; DOS36 is explicitly required by the entry. Kickstart3.1 is the compatibility target. No version below these floors is claimed. ABI layout/LVO sources are in source-snapshot.json.",
+      "id": "CC12.MakeLink.wb31.68000.versioned-20260908",
+      "previous_unversioned_binary": {
+        "path": "artifacts/workbench-makelink-startup-owned-qualified/makelink-68000.hunk",
+        "sha256": "fd42d840165936c2dc4ff5980319b47d1e1dd2ccb6e466c48c03548c7ae1050c",
+        "bytes": 3184,
+        "evidence_transfer": "none; source/CODE preservation is recorded separately and does not qualify this larger image for old-HUNK runtime, stack, help/EOF, concurrency, original-DOS or PURE observations"
+      },
+      "remaining_gates": [
+        "remaining original-DOS options/startup/handler paths for this versioned HUNK; five output/error cases and actual Version query now covered",
+        "complete profile options/startup/handler/error correspondence",
+        "actual CopperStart command launch",
+        "required pure/resident lifecycle and original classification",
+        "declared minimum stack qualification",
+        "full dependency/version release admission and staged image/protection readback"
+      ],
+      "metadata_build_evidence": {
+        "path": "artifacts/workbench-makelink-filehandle-abi-20260908/qualification.json",
+        "sha256": "fcebfca783daef8febb3c93fac71f47fff48510693d9d700b44b356941b00305"
+      },
+      "preservation_evidence": {
+        "path": "artifacts/command-release-build-adapters-filehandle-abi-20260908/preservation-and-byte-identity.json",
+        "sha256": "19b2c69c0d72efaee00def59261584bbbda40b52b9ef42ea8dcc2684e949cf5a"
+      },
+      "previous_versioned_binary": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-versioned-20260908\\pass-a\\makelink-68000.hunk",
+        "sha256": "12d1f36504f5a0f7099bc419e4fffc5f43f138d7b4e8745a2ca907bcb73b5f45",
+        "bytes": 3232,
+        "byte_identity_evidence": {
+          "path": "artifacts/command-release-build-adapters-filehandle-abi-20260908/preservation-and-byte-identity.json",
+          "sha256": "19b2c69c0d72efaee00def59261584bbbda40b52b9ef42ea8dcc2684e949cf5a"
+        },
+        "scope": "Historical SDK build; command bytes are identical to both fresh build passes. Only already captured execution of this exact hash is retained, without claiming a new OS execution or current historical source snapshot."
+      },
+      "original_dos_version_evidence": {
+        "report": "artifacts/workbench-makelink-versioned-20260908/version-boot-complete/verified.json",
+        "report_sha256": "88e1928b49755de17e5a364f22619bdcf9134f8ab999469a881678f82191ba0c",
+        "scope": "Earlier execution of the identical versioned 68000 HUNK: five original-DOS MakeLink runs, exact redirected diagnostics/final errors, balanced direct allocations/locks/FIBs and independent post-removal alias contents; original C:Version discovers tag through file/load inspection and complete 27-byte RAM output is independently read. Unchanged observer, ROM/media and 32x250000 bound. Not full startup/profile, cross-CPU real-OS, stack minimum or shipping/resident admission.",
+        "controls": "artifacts/workbench-makelink-versioned-20260908/version-boot-complete/controls.json",
+        "controls_sha256": "56d818673650dbcc29999bd43ba055c8af478d1a4b0e87ce23ac932f190e3261",
+        "negative_control_count": 14,
+        "makelink_invocations": 5,
+        "version_invocations": 1,
+        "version_output_hex": "4d616b654c696e6b20302e310a436f707065724f5320776233310a",
+        "version_primary": 0,
+        "version_final_ioerr": 0,
+        "shipping_qualified": false,
+        "pure_admitted": false,
+        "minimum_stack_qualified": false,
+        "artifact_sha256": "12d1f36504f5a0f7099bc419e4fffc5f43f138d7b4e8745a2ca907bcb73b5f45",
+        "current_build_byte_identity_evidence": {
+          "path": "artifacts/command-release-build-adapters-filehandle-abi-20260908/preservation-and-byte-identity.json",
+          "sha256": "19b2c69c0d72efaee00def59261584bbbda40b52b9ef42ea8dcc2684e949cf5a"
+        },
+        "current_sdk_execution_rerun": false
+      }
+    },
+    {
+      "command": "makelink",
+      "profile": "wb31",
+      "cpu": "68020",
+      "status": "development-only",
+      "shipping": false,
+      "pure_admission": false,
+      "installed_path": null,
+      "amiga_protection": null,
+      "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\makelink-68020.hunk",
+      "sha256": "f2ee57c9d4f79b971d98718ec1585b8cd9780b085699abd04f7aa808789c1fd8",
+      "bytes": 3272,
+      "raw": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\makelink-68020.raw.hunk",
+        "sha256": "485ea699b1ee3242dc48d105c8b32c08efc3f8cd9718eeccb057a54a9caee3a4"
+      },
+      "version_id": "$VER: MakeLink 0.1 (8.9.2026) CopperOS wb31",
+      "output_format": "hunk",
+      "entry": "CopperOS.Commands.AddBuffersNativeRoot.Workbench31MakeLinkEntry::Main",
+      "fpu": "disabled",
+      "runtime_profile": "resident",
+      "declared_stack_bytes": 4096,
+      "minimum_stack_qualified": false,
+      "source": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\src\\Commands\\Native\\Workbench31MakeLinkCommand.cs",
+        "sha256": "a5d297bdeb75bca6c4aadc8fee386aba337cb5ab2bca680fe078509459e6a628"
+      },
+      "compiler": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\build\\bin\\CopperSharp.Compiler.Cli\\release\\CopperSharp.Compiler.Cli.dll",
+        "sha256": "10a7cbaef4bad16002a161afaf00d63c7da0f54b18b4a3506bebb6bded05a669"
+      },
+      "sdk": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\build\\bin\\CopperOS.Commands.AddBuffersNativeRoot\\release\\CopperSharp.Sdk.Amiga.dll",
+        "sha256": "89f504c897eb79f605f110a9b4857cb12a3e84e693884512caabaf080d0017d2"
+      },
+      "native_static": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\makelink-68020.compatibility.json",
+        "sha256": "fca64ba097d2254256be7921c426c850bc44504b633b25c83274aa3dec856951"
+      },
+      "version_append": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\makelink-68020.version.json",
+        "sha256": "298372c07ddc198cb757f63f8bc6c219ffc9b3fdaa1075c4a62b3af37c767876"
+      },
+      "input_manifest": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\native-build-inputs.json",
+        "sha256": "84e71ff19d240ada0ad73adb3eebdfde269828e68bd4f6d681cb7e060df5ba7d"
+      },
+      "native_execution": {
+        "report": {
+          "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\makelink-68020.runtime.json",
+          "sha256": "c48d2a5587cb8f35415cdc8a8f2e3af1bed7eec79a59728a0d2f5cad6aa828f4"
+        },
+        "invocations": 20,
+        "suite": "workbench-makelink-native-entry-vector-fixture",
+        "observed_configured_stack_bytes": [
+          16384
+        ],
+        "maximum_observed_stack_bytes_written": 164,
+        "scope": "Existing supplied-vector suite, including interleaving; not real DOS, declared-stack qualification or full parity."
+      },
+      "source_snapshot": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\source-snapshot.json",
+        "sha256": "db542a7e79a6dbf98e7c3e1f7c181b7293247c71863e13021e73e17c79bd6bbc"
+      },
+      "dependencies": [
+        {
+          "id": "exec.library",
+          "minimum_version": 36,
+          "abi": {
+            "path": "C:\\D-drive\\Koodit\\GIT\\CopperSharp68k\\Sdk.Amiga\\Exec\\Exec.cs",
+            "sha256": "e75c083a9ad0187e20cd0ea20a14c8207c531f9bcf3202491af29ade83377bf7"
+          }
+        },
+        {
+          "id": "dos.library",
+          "minimum_version": 36,
+          "abi": {
+            "path": "C:\\D-drive\\Koodit\\GIT\\CopperSharp68k\\Sdk.Amiga\\DOS\\DOS.cs",
+            "sha256": "48cc27e51afff73c13f023c70708c2ed90f8ba6a7b9cd773275f9dc6bcd6b243"
+          }
+        }
+      ],
+      "dependency_policy": "Exec36 is the declared 2.0+ platform floor, obtained at absolute4 without an OpenLibrary version check; DOS36 is explicitly required by the entry. Kickstart3.1 is the compatibility target. No version below these floors is claimed. ABI layout/LVO sources are in source-snapshot.json.",
+      "id": "CC12.MakeLink.wb31.68020.versioned-20260908",
+      "previous_unversioned_binary": {
+        "path": "artifacts/workbench-makelink-startup-owned-qualified/makelink-68020.hunk",
+        "sha256": "485ea699b1ee3242dc48d105c8b32c08efc3f8cd9718eeccb057a54a9caee3a4",
+        "bytes": 3224,
+        "evidence_transfer": "none; source/CODE preservation is recorded separately and does not qualify this larger image for old-HUNK runtime, stack, help/EOF, concurrency, original-DOS or PURE observations"
+      },
+      "remaining_gates": [
+        "exact versioned HUNK original-DOS and Version query behavior",
+        "complete profile options/startup/handler/error correspondence",
+        "actual CopperStart command launch",
+        "required pure/resident lifecycle and original classification",
+        "declared minimum stack qualification",
+        "full dependency/version release admission and staged image/protection readback"
+      ],
+      "metadata_build_evidence": {
+        "path": "artifacts/workbench-makelink-filehandle-abi-20260908/qualification.json",
+        "sha256": "fcebfca783daef8febb3c93fac71f47fff48510693d9d700b44b356941b00305"
+      },
+      "preservation_evidence": {
+        "path": "artifacts/command-release-build-adapters-filehandle-abi-20260908/preservation-and-byte-identity.json",
+        "sha256": "19b2c69c0d72efaee00def59261584bbbda40b52b9ef42ea8dcc2684e949cf5a"
+      },
+      "previous_versioned_binary": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-versioned-20260908\\pass-a\\makelink-68020.hunk",
+        "sha256": "f2ee57c9d4f79b971d98718ec1585b8cd9780b085699abd04f7aa808789c1fd8",
+        "bytes": 3272,
+        "byte_identity_evidence": {
+          "path": "artifacts/command-release-build-adapters-filehandle-abi-20260908/preservation-and-byte-identity.json",
+          "sha256": "19b2c69c0d72efaee00def59261584bbbda40b52b9ef42ea8dcc2684e949cf5a"
+        },
+        "scope": "Historical SDK build; command bytes are identical to both fresh build passes. Only already captured execution of this exact hash is retained, without claiming a new OS execution or current historical source snapshot."
+      }
+    },
+    {
+      "command": "makelink",
+      "profile": "wb31",
+      "cpu": "68040",
+      "status": "development-only",
+      "shipping": false,
+      "pure_admission": false,
+      "installed_path": null,
+      "amiga_protection": null,
+      "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\makelink-68040.hunk",
+      "sha256": "34fdd4711ebd79aae834cc064c2cf142e7ec4581a96f9402c06a6df8c2eb566a",
+      "bytes": 3228,
+      "raw": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\makelink-68040.raw.hunk",
+        "sha256": "e0d9689ecf803ffee27b7dcc0739e0e4631993cc2e406c3f8337892dd214735f"
+      },
+      "version_id": "$VER: MakeLink 0.1 (8.9.2026) CopperOS wb31",
+      "output_format": "hunk",
+      "entry": "CopperOS.Commands.AddBuffersNativeRoot.Workbench31MakeLinkEntry::Main",
+      "fpu": "disabled",
+      "runtime_profile": "resident",
+      "declared_stack_bytes": 4096,
+      "minimum_stack_qualified": false,
+      "source": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\src\\Commands\\Native\\Workbench31MakeLinkCommand.cs",
+        "sha256": "a5d297bdeb75bca6c4aadc8fee386aba337cb5ab2bca680fe078509459e6a628"
+      },
+      "compiler": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\build\\bin\\CopperSharp.Compiler.Cli\\release\\CopperSharp.Compiler.Cli.dll",
+        "sha256": "10a7cbaef4bad16002a161afaf00d63c7da0f54b18b4a3506bebb6bded05a669"
+      },
+      "sdk": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\build\\bin\\CopperOS.Commands.AddBuffersNativeRoot\\release\\CopperSharp.Sdk.Amiga.dll",
+        "sha256": "89f504c897eb79f605f110a9b4857cb12a3e84e693884512caabaf080d0017d2"
+      },
+      "native_static": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\makelink-68040.compatibility.json",
+        "sha256": "09b44e1647133e5eaf461006e6d0c7688c42cc3b8c38d82433fb971a970ede01"
+      },
+      "version_append": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\makelink-68040.version.json",
+        "sha256": "94ebb606be98d1816fb0084cf75ae3bd4f4190b696897845391433ef253bc96a"
+      },
+      "input_manifest": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\pass-a\\native-build-inputs.json",
+        "sha256": "84e71ff19d240ada0ad73adb3eebdfde269828e68bd4f6d681cb7e060df5ba7d"
+      },
+      "native_execution": {
+        "report": {
+          "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\makelink-68040.runtime.json",
+          "sha256": "0dc9c300e77d06d6dacdb6569ca0d28b1ad1168e0c650b2705b16eef413283c7"
+        },
+        "invocations": 20,
+        "suite": "workbench-makelink-native-entry-vector-fixture",
+        "observed_configured_stack_bytes": [
+          16384
+        ],
+        "maximum_observed_stack_bytes_written": 164,
+        "scope": "Existing supplied-vector suite, including interleaving; not real DOS, declared-stack qualification or full parity."
+      },
+      "source_snapshot": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-filehandle-abi-20260908\\source-snapshot.json",
+        "sha256": "db542a7e79a6dbf98e7c3e1f7c181b7293247c71863e13021e73e17c79bd6bbc"
+      },
+      "dependencies": [
+        {
+          "id": "exec.library",
+          "minimum_version": 36,
+          "abi": {
+            "path": "C:\\D-drive\\Koodit\\GIT\\CopperSharp68k\\Sdk.Amiga\\Exec\\Exec.cs",
+            "sha256": "e75c083a9ad0187e20cd0ea20a14c8207c531f9bcf3202491af29ade83377bf7"
+          }
+        },
+        {
+          "id": "dos.library",
+          "minimum_version": 36,
+          "abi": {
+            "path": "C:\\D-drive\\Koodit\\GIT\\CopperSharp68k\\Sdk.Amiga\\DOS\\DOS.cs",
+            "sha256": "48cc27e51afff73c13f023c70708c2ed90f8ba6a7b9cd773275f9dc6bcd6b243"
+          }
+        }
+      ],
+      "dependency_policy": "Exec36 is the declared 2.0+ platform floor, obtained at absolute4 without an OpenLibrary version check; DOS36 is explicitly required by the entry. Kickstart3.1 is the compatibility target. No version below these floors is claimed. ABI layout/LVO sources are in source-snapshot.json.",
+      "id": "CC12.MakeLink.wb31.68040.versioned-20260908",
+      "previous_unversioned_binary": {
+        "path": "artifacts/workbench-makelink-startup-owned-qualified/makelink-68040.hunk",
+        "sha256": "e0d9689ecf803ffee27b7dcc0739e0e4631993cc2e406c3f8337892dd214735f",
+        "bytes": 3180,
+        "evidence_transfer": "none; source/CODE preservation is recorded separately and does not qualify this larger image for old-HUNK runtime, stack, help/EOF, concurrency, original-DOS or PURE observations"
+      },
+      "remaining_gates": [
+        "exact versioned HUNK original-DOS and Version query behavior",
+        "complete profile options/startup/handler/error correspondence",
+        "actual CopperStart command launch",
+        "required pure/resident lifecycle and original classification",
+        "declared minimum stack qualification",
+        "full dependency/version release admission and staged image/protection readback"
+      ],
+      "metadata_build_evidence": {
+        "path": "artifacts/workbench-makelink-filehandle-abi-20260908/qualification.json",
+        "sha256": "fcebfca783daef8febb3c93fac71f47fff48510693d9d700b44b356941b00305"
+      },
+      "preservation_evidence": {
+        "path": "artifacts/command-release-build-adapters-filehandle-abi-20260908/preservation-and-byte-identity.json",
+        "sha256": "19b2c69c0d72efaee00def59261584bbbda40b52b9ef42ea8dcc2684e949cf5a"
+      },
+      "previous_versioned_binary": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-versioned-20260908\\pass-a\\makelink-68040.hunk",
+        "sha256": "34fdd4711ebd79aae834cc064c2cf142e7ec4581a96f9402c06a6df8c2eb566a",
+        "bytes": 3228,
+        "byte_identity_evidence": {
+          "path": "artifacts/command-release-build-adapters-filehandle-abi-20260908/preservation-and-byte-identity.json",
+          "sha256": "19b2c69c0d72efaee00def59261584bbbda40b52b9ef42ea8dcc2684e949cf5a"
+        },
+        "scope": "Historical SDK build; command bytes are identical to both fresh build passes. Only already captured execution of this exact hash is retained, without claiming a new OS execution or current historical source snapshot."
+      }
+    }
+  ],
+  "release_build_gates_evidence": {
+    "report": "artifacts/command-release-build-adapters-filehandle-abi-20260908/verified.json",
+    "report_sha256": "c4536d29b424d00cf98945096cc39ff9f427dfe7aa36faf938e8846dcc1d0f0c",
+    "scope": "Current-SDK three-CPU build-adapter acceptance and retained release rejection; no runtime/purity or shipping promotion.",
+    "accepted_gates": [
+      "native-static",
+      "reproducible-build"
+    ],
+    "tested_cpus": [
+      "68000",
+      "68020",
+      "68040"
+    ],
+    "remaining_required_gates_per_cpu": 11,
+    "tests_passed": 34,
+    "eligible_for_staging": false,
+    "shipping": false,
+    "pure_admission": false,
+    "tests_skipped": 0
+  },
+  "historical_build_evidence": [
+    {
+      "status": "historical-not-current-sdk",
+      "build_qualification": {
+        "path": "artifacts/workbench-makelink-versioned-20260908/qualification.json",
+        "sha256": "111e349e2921c077decdcf21543f3c1e9dbc90673c0c6ca750103ae62f1fc08b"
+      },
+      "preservation_audit": {
+        "path": "artifacts/workbench-makelink-versioned-20260908/preservation-audit.json",
+        "sha256": "0efabee4fe0434497279b0b9e276eff40a849bdb113e74c94a3f8017e88eb053"
+      },
+      "release_build_gates_evidence": {
+        "report": "artifacts/command-release-build-adapters-20260908/verified.json",
+        "report_sha256": "5085d5457f5c3f275715a7467c4d084a5aa2ed2e9fec9b7a647ca9dd329dd4bf",
+        "scope": "Three-CPU build-adapter acceptance and retained release rejection; no runtime/purity or shipping promotion.",
+        "accepted_gates": [
+          "native-static",
+          "reproducible-build"
+        ],
+        "tested_cpus": [
+          "68000",
+          "68020",
+          "68040"
+        ],
+        "remaining_required_gates_per_cpu": 11,
+        "tests_passed": 34,
+        "eligible_for_staging": false,
+        "shipping": false,
+        "pure_admission": false
+      },
+      "source_snapshot": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-versioned-20260908\\source-snapshot.json",
+        "sha256": "b90e07623a9849a2b6a8ab0a43280ab4530d1f13afc4988b84dd03a1dbafda9a"
+      },
+      "sdk": {
+        "path": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-makelink-versioned-20260908\\pass-a\\build\\bin\\CopperOS.Commands.AddBuffersNativeRoot\\release\\CopperSharp.Sdk.Amiga.dll",
+        "sha256": "6d9c23b2a47fbf67a36bfc3dffe86e493ba32396eb40a1f219e4bf2fe8a0bdcf"
+      },
+      "development_records_snapshot": {
+        "path": "artifacts/command-release-build-adapters-filehandle-abi-20260908/historical-versioned-development-candidates.json",
+        "sha256": "172001836ab708476b4efca22892180461872dcedc6b6043db0df667295f6b10"
+      },
+      "scope": "Retained unchanged history. FileHandle ABI source changes supersede this build snapshot and SDK identity; these older build reports must not pass current-source qualification. Earlier original-DOS runtime evidence is retained only through the separate identical-HUNK proof."
+    }
+  ]
+}

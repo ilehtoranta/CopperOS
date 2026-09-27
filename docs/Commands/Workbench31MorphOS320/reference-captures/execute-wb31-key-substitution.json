@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "capture_id": "execute-wb31-key-substitution-20260831",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Execute",
+    "command_sha256": "27c2f578b63857ab5fbe03cdf621d553408cc670b9f07d9988ce224d22b57ecd",
+    "version": "execute 37.11 (14.5.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/execute-wb31-startup-probe",
+    "source_sha256": "0f8b9aee1924a91b602f245fa4a22f3ba3527e1efdb1b342c535dd6ac36cdd07",
+    "disposable_adf_before_run_sha256": "093b29813642e308f697ce5d43ade09495dfb6854f2280a53b4ad1880fb77b50",
+    "disposable_adf_after_run_sha256": "55130b3c68eb33093539038041e50cc3c7d2a8d4016afde0d6f8d7a7d708a608",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "b00678ee84fdfe80dcf43e3178692e51fade045afeb662d306a06a4acde8bcbd",
+    "capture_bytes": 13,
+    "capture_text": "fallback\nEND\n"
+  },
+  "observation": {
+    "script_template": ".KEY filename",
+    "invocation": "C:Execute RAM:execute-probe fallback",
+    "result": "The original command substituted the positional argument into <filename> and returned to the caller, which appended END.",
+    "no_t_control": {
+      "source": "tests/Commands/fixtures/execute-wb31-no-t-startup-probe",
+      "source_sha256": "327718c656fa67d0ccc0c2bb3da5944bee99bc2d65fdff5e40ab810550951f1c",
+      "disposable_adf_before_run_sha256": "6cb2b520142c803bf93b847428d9f6aa53a085f8ab10e007d23d77d84695a4c3",
+      "disposable_adf_after_run_sha256": "a2b0a6c19c8c2b88ca79f49d01e71f1bdf7f507fd5298073e22742ad5ae0c3fd",
+      "capture_sha256": "b00678ee84fdfe80dcf43e3178692e51fade045afeb662d306a06a4acde8bcbd",
+      "capture_text": "fallback\nEND\n",
+      "result": "This positional substitution case completed without assigning T:."
+    }
+  },
+  "limits": [
+    "The startup sequence, inner script and output target are authored probe content on a disposable ADF copy.",
+    "This captures one positional .KEY substitution case only. The no-T control does not establish whether the original uses a temporary file internally or its behavior on a real T: creation failure.",
+    "It does not establish directive ordering, diagnostics, return level, IoErr, streams, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Execute bytes are copied into this repository."
+  ]
+}

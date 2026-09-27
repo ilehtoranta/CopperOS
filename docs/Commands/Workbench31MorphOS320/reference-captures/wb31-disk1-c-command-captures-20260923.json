@@ -1,0 +1,159 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "source_id": "wb31-install-m10-40.42",
+  "volume": "Install3.1",
+  "disk": "Disk 1 of 6 (Install)",
+  "source_zip_sha256": "e320dbbcb2b8e34da7d3e37a2953c623c26755191a74c2512169b2e6f81f2e78",
+  "adf_sha256": "8f54e735925d733719a321a0ddabd8fd6d1c1c3d3c0a516ed6b77dee89ac9e1e",
+  "scope": "C command members captured from the externally supplied disk 1 ADF; metadata/hash evidence only, not runtime or PURE admission",
+  "commands": [
+    {
+      "name": "AddBuffers",
+      "path": "C:/AddBuffers",
+      "bytes": 444,
+      "sha256": "49be9c1cf1fb87c60fe8d6cc30c73aed6615654763833f3247fc17aecdc6b1ca",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "Assign",
+      "path": "C:/Assign",
+      "bytes": 3220,
+      "sha256": "2f58ca68d02a750a44b46e4b255e53cb244db7a9ce56ce40210594e46bd47a4e",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "BindDrivers",
+      "path": "C:/BindDrivers",
+      "bytes": 1420,
+      "sha256": "8bc40c2cb0bb3bcd927d2f8696713284f5c554c06d6f65842bf7e062e0f60503",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "Check2090",
+      "path": "C:/Check2090",
+      "bytes": 220,
+      "sha256": "dd1c09556296ece881678cf5d37b9635655eee433f6887443c1bbec5d83a2462",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "Copy",
+      "path": "C:/Copy",
+      "bytes": 5580,
+      "sha256": "930f081b7dbdcae9d2fef7fd516dd8a92102f1f740071bd224f4637051c41529",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "Delete",
+      "path": "C:/Delete",
+      "bytes": 1972,
+      "sha256": "78b2714a750a5e2d7635238049990303f49c758808eef857b69cf8df28338d5a",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "Execute",
+      "path": "C:/Execute",
+      "bytes": 4432,
+      "sha256": "27c2f578b63857ab5fbe03cdf621d553408cc670b9f07d9988ce224d22b57ecd",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "ExtractKickstart",
+      "path": "C:/ExtractKickstart",
+      "bytes": 1216,
+      "sha256": "832fc20fe032a4028b0e1ebc5b4e93641cb0ed02598f6a238fa54426a14ca736",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "FindResident",
+      "path": "C:/FindResident",
+      "bytes": 220,
+      "sha256": "de05148f716d4271287ba1c67b225606d14ff370ce0f756811d6188912dff437",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "GuessBootDev",
+      "path": "C:/GuessBootDev",
+      "bytes": 680,
+      "sha256": "b0f61f0852e877b4e7b219ca2ea5a1d55bd9c5b9c5e13b643d5ca3b10d9dcf88",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "IconPos",
+      "path": "C:/IconPos",
+      "bytes": 1720,
+      "sha256": "b8591835500a15d3c20bec94d4ae52f5cc7ef25189d9b65372ac0756d7675800",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "List",
+      "path": "C:/List",
+      "bytes": 5108,
+      "sha256": "69fb8b8075bc505977884e50233b7cc84237ebfc83405c27b1d818c9356dede1",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "LoadWB",
+      "path": "C:/LoadWB",
+      "bytes": 1136,
+      "sha256": "01eebbf8e22d0a7aac94ec1803e0ef0a3f00b6408ccf49cee29a713680c0276d",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "MakeDir",
+      "path": "C:/MakeDir",
+      "bytes": 464,
+      "sha256": "23911db49742055d8bddcfe5f8de82cbb2232f8a7ef850d51bfd27f9b54c819b",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "Prod_Prep",
+      "path": "C:/Prod_Prep",
+      "bytes": 37008,
+      "sha256": "b2b1278e80433fe87885ccfc1bb062d48b3d06168fb73d8bade6b638ef7e33b3",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "Reboot",
+      "path": "C:/Reboot",
+      "bytes": 84,
+      "sha256": "661f3cd4fb752de3224ef66990818827c6ca1c5329b4a7d397fdce5b3ab2af41",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "SetPatch",
+      "path": "C:/SetPatch",
+      "bytes": 13484,
+      "sha256": "745b2f90fabcdeccba099b3302593eff89f393d65bd84a9c6bad1b46063ab5cc",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "UpdateWBFiles",
+      "path": "C:/UpdateWBFiles",
+      "bytes": 6764,
+      "sha256": "3aeb41230cae46822a764a1d1e0187b3f34b3c7870c4cba6ab3443d3c48c2de3",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "Version",
+      "path": "C:/Version",
+      "bytes": 4764,
+      "sha256": "dc2f55cd48b37bd1efecdbf07d38757463129dd9076ea6bf1b5d967f2189f224",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    },
+    {
+      "name": "Wait",
+      "path": "C:/Wait",
+      "bytes": 852,
+      "sha256": "722ec810c589b1a5caa081a46b8e5a956c89096a36ca37844cb3da9a32708127",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository"
+    }
+  ],
+  "open_gates": [
+    "disks 3-6 and machine variants",
+    "installed placement and protection flags",
+    "exact parser/help/diagnostic and guest behavior",
+    "PURE/resident lifecycle",
+    "package/licensing and differential comparison"
+  ]
+}

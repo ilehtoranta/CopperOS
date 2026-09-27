@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "command": "SetFont",
+  "source_id": "wb31-workbench-m10-40.42",
+  "volume": "Workbench3.1",
+  "path": "C/SetFont",
+  "bytes": 1092,
+  "sha256": "c3e1e763b12fd4f710a414443facea49479aa723a94828828dbaee214fe4ad8c",
+  "file_format": "amiga-hunk",
+  "audit_kind": "bounded-static-disassembly",
+  "observations": [
+    {
+      "code_offset": "0x00e6-0x00ec",
+      "operation": "initialize TextAttr.ta_Flags at its stack-built structure byte to 0x43, combining ROM, DISK and DESIGNED selection bits"
+    },
+    {
+      "code_offset": "0x00ec-0x00f8",
+      "operation": "when ReadArgs result slot 3 (PROP) is nonzero, replace ta_Flags with 0x63, adding FPF_PROPORTIONAL (0x20)"
+    },
+    {
+      "code_offset": "0x00f8-0x0108",
+      "operation": "when ReadArgs result slot 2 (SCALE) is nonzero, clear FPF_DESIGNED (0x40) from ta_Flags"
+    }
+  ],
+  "layout_evidence": {
+    "field": "TextAttr.ta_Flags",
+    "offset": 7,
+    "source": "CopperSharp SDK Graphics.TextAttr field order, matching the HUNK's structure construction"
+  },
+  "resulting_flags": [
+    { "scale": false, "prop": false, "value": "0x43" },
+    { "scale": true, "prop": false, "value": "0x03" },
+    { "scale": false, "prop": true, "value": "0x63" },
+    { "scale": true, "prop": true, "value": "0x23" }
+  ],
+  "conclusion": "SCALE clears FPF_DESIGNED and PROP adds FPF_PROPORTIONAL; the two switches are independent and may be combined.",
+  "evidence_limits": [
+    "This records the original HUNK's TextAttr construction; actual diskfont selection and console behavior still require original Workbench guest comparison.",
+    "This audit does not establish PURE/resident lifecycle, installed placement, licensing, package admission or shipping equivalence."
+  ]
+}

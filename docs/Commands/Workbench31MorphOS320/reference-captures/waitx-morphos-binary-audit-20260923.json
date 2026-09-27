@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "profile": "morphos320",
+  "source_id": "morphos320-live-iso",
+  "command": "WaitX",
+  "path": "MorphOS/C/WaitX",
+  "iso_extent": 178824,
+  "bytes": 4230,
+  "sha256": "88f59afb972fb0bc410eb720b3b25e5baa50e401cb9ab1cc7ac331568e075e03",
+  "version": {
+    "name": "WaitX",
+    "version": 51,
+    "revision": 1,
+    "date_text": "26.03.2018",
+    "byte_offset": 4181,
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template": {
+    "status": "unknown",
+    "candidates": [],
+    "evidence": "packed MorphOS member; no ReadArgs grammar is inferred from the printable scan"
+  },
+  "documented_behavior": {
+    "summary": "Waits for an amount of time and then executes the given command line",
+    "evidence": "MorphOS Library Shell Commands index; exact delay grammar, launch boundary and result precedence remain unobserved"
+  },
+  "string_scan": {
+    "ascii_run_count": 36,
+    "meaningful_syntax_or_diagnostic_candidates": [],
+    "version_tag_observed": true,
+    "evidence": "packed-member printable scan; short random runs are not treated as strings"
+  },
+  "installer_event": {
+    "script": "hdinstall.fixc",
+    "line": 87,
+    "operation": "file-protection-add",
+    "flag": "P",
+    "confidence": "literal-script-observed-not-installed-metadata"
+  },
+  "scope": "binary identity and documented purpose only; no raw binary is stored in the repository",
+  "open_gates": [
+    "exact command-tail grammar and help output",
+    "guest delay units/rounding and scheduler-visible wait behavior",
+    "nested command launch, streams, result level, IoErr and Ctrl-C precedence",
+    "timer/process allocation failure and cleanup",
+    "resident/PURE lifecycle and repeat/concurrent calls",
+    "installed AmigaDOS protection metadata",
+    "package/licensing and differential comparison"
+  ]
+}

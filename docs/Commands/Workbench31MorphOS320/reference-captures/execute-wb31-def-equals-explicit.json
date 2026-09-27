@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "capture_id": "execute-wb31-def-equals-explicit-20260901",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Execute",
+    "command_sha256": "27c2f578b63857ab5fbe03cdf621d553408cc670b9f07d9988ce224d22b57ecd",
+    "version": "execute 37.11 (14.5.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/execute-wb31-def-equals-explicit-startup-probe",
+    "source_sha256": "a7bf9ecfa8aaf85521b6213e9e774e2caeef2bbb77d175cc618eb9422952c262",
+    "disposable_adf_after_run_sha256": "3152be4b1867b329f268fb0c2d1fcd9970b47dd3c0778c54a0a790c090d60166",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "11f3a74c09f892303d35c45f3dad05e5c8313c1f4bfd729735300b5b9df522ce",
+    "capture_bytes": 28,
+    "capture_text": "BEGIN\nfallback\nexplicit\nEND\n"
+  },
+  "observation": {
+    "script_directives": [".KEY filename", ".DEF filename=fallback"],
+    "invocations": ["C:Execute RAM:execute-probe", "C:Execute RAM:execute-probe explicit"],
+    "result": "The original command applied the equals-form default to the omitted formal, then used the explicit positional value instead of that default. Both calls returned to the caller, which appended END."
+  },
+  "limits": [
+    "The startup sequence, inner script and output target are authored probe content on a disposable ADF copy.",
+    "This establishes one equals-form default and one explicit positional override only.",
+    "It does not establish empty/default failures, duplicate behavior, diagnostics, return level, IoErr, streams, temporary-file internals, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Execute bytes are copied into this repository."
+  ]
+}

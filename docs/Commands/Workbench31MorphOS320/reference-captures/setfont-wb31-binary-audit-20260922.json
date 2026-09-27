@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "command": "SetFont",
+  "source_id": "wb31-workbench-m10-40.42",
+  "volume": "Workbench3.1",
+  "path": "C/SetFont",
+  "bytes": 1092,
+  "sha256": "c3e1e763b12fd4f710a414443facea49479aa723a94828828dbaee214fe4ad8c",
+  "file_format": "amiga-hunk",
+  "version": {
+    "name": "setfont",
+    "version": 39,
+    "revision": 1,
+    "date_text": "2.6.92",
+    "byte_offset": 885,
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template": {
+    "text": "NAME/A,SIZE/N/A,SCALE/S,PROP/S,ITALIC/S,BOLD/S,UNDERLINE/S",
+    "byte_offset": 826,
+    "confidence": "syntax-only-candidate-not-runtime-or-source-verified"
+  },
+  "imports_observed": [
+    "dos.library",
+    "graphics.library",
+    "diskfont.library",
+    "utility.library"
+  ],
+  "bounded_code_observations": [
+    "Opens all four libraries at version 37 before parsing.",
+    "Parses seven ReadArgs result slots, stores SIZE/N as the low 16 bits of TextAttr.ta_YSize, and rejects that word when it is at or below four with IoErr 115; high input bits do not affect the comparison.",
+    "Builds a TextAttr with style bits for ITALIC, BOLD and UNDERLINE, and adjusts proportional/designed flags.",
+    "Ensures the requested name has a case-insensitive .font suffix before OpenDiskFont.",
+    "If PROP is absent, rejects a returned proportional TextFont by closing it and setting IoErr 212; with PROP, this check is skipped. Offset evidence is expanded in setfont-proportional-font-audit-20260925.json.",
+    "Initializes result to RETURN_FAIL and IoErr to 122; ReadArgs failure retains RETURN_FAIL with its IoErr, SIZE <= 4 uses IoErr 115, missing console task retains IoErr 205, and a missing Window returns success. Detailed control-flow evidence is in setfont-result-policy-audit-20260925.json.",
+    "Obtains the current process console task and sends DOS DoPkt ACTION_DISK_INFO (25) with a BPTR to InfoData; reads the console Window pointer from InfoData.id_VolumeNode, calls graphics SetFont on Window.RastPort, closes the prior font, and stores the replacement at Window.Font. Offset evidence is expanded in setfont-console-window-audit-20260925.json.",
+    "Writes console escape sequences for italic, bold and underline through the current DOS output and flushes it."
+  ],
+  "evidence_limits": [
+    "The bounded packet/window HUNK observations and public layout evidence do not establish behavior of the selected Workbench console handler, exact guest output, or result/IoErr precedence.",
+    "The media protection word has P clear; runtime PURE/resident behavior remains unobserved.",
+    "This audit does not authorize copying the original binary or claiming shipping equivalence."
+  ]
+}

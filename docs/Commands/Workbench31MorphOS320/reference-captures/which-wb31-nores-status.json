@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "capture_id": "which-wb31-nores-status-20260831",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Which",
+    "command_sha256": "35f7f3fee29dd2d56f482537af1c5f5a88b552080e6c26be14f455a3241b7157",
+    "version": "which 37.1 (12.1.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/which-wb31-nores-status-startup-probe",
+    "source_sha256": "ed7271fe7be41ad6897f3cde70bc78151908ba2aa3715eca502edab1a1239e84",
+    "disposable_adf_before_run_sha256": "84545cdf696acf825a29c0d5906489782db8b772f1a26e5591c43db6b40a5b45",
+    "disposable_adf_after_run_sha256": "46ff6923ece6aa35c060e3b46b369bb1ad3d1795ebfc0f1eb8a7d6e0c01d07bb",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "89a261fe02736d28bd1be57b4be9ba0f474d39cb0a5d4625da316e451574d2b1",
+    "capture_bytes": 54,
+    "capture_text": "BEGIN\nWorkbench3.1:C/Execute\nNORES RC=0 RESULT2=0\nEND\n"
+  },
+  "observations": [
+    "After Path C: and Resident >NIL: C:Execute PURE, C:Which Execute NORES emits Workbench3.1:C/Execute and leaves RC=0, Result2=0.",
+    "The fixture reaches END after the resident is removed."
+  ],
+  "limits": [
+    "The startup sequence and output target are authored probe content on a disposable ADF copy.",
+    "This does not establish ALL, missing-name, diagnostics, cancellation, disabled internals, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Which bytes are copied into this repository."
+  ]
+}

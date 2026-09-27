@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "capture": "unexecuted-morphos-packed-member-inspection",
+  "sourceId": "morphos320-live-iso",
+  "path": "MorphOS/C/SetKeyboard",
+  "isoExtent": 178200,
+  "sectorSize": 2048,
+  "bytes": 2856,
+  "sha256": "f12a418b372b7e2d724a2ba56235e58bcd9135466c26fea8031e12f1af3c8fa4",
+  "format": "morphos-packed-native",
+  "magicHex": "7f4d4f53",
+  "versionTag": {
+    "text": "$VER: SetKeyboard 50.4 (9.9.07) ",
+    "byteOffset": 2807
+  },
+  "templateCandidates": [],
+  "diagnosticStringCandidates": [],
+  "inspectionBoundary": "The packed payload was read and hashed without execution. No plaintext ReadArgs template or reliable diagnostic string was recovered; absence is not a syntax or behavior claim.",
+  "correspondenceSource": {
+    "path": "c/iprefs/inputprefs.c",
+    "bytes": 14236,
+    "sha256": "f4f83475e0747243962978d37aa17de78beb441b5d2ecb2b72321df4daa17703",
+    "observedFunctions": [
+      "FindKeyMap",
+      "SetKeyMap"
+    ],
+    "status": "related-source-correspondence-not-packed-binary-equivalence"
+  }
+}

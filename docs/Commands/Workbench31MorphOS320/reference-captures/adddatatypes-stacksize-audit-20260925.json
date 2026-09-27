@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "recorded": "2026-09-25",
+  "command": "AddDataTypes",
+  "morphos_iso_source": {
+    "url": "https://morphos-team.net/morphos-3.20.iso",
+    "read_method": "HTTP byte-range reads of the ISO directory and the single AddDataTypes file extent",
+    "full_image_hash_verified": false,
+    "official_page_md5": "70b84b8c0bb1cf9b10b7062fe8809c85"
+  },
+  "profiles": {
+    "morphos320": {
+      "binary": {
+        "path": "MorphOS/C/AddDataTypes",
+        "iso_extent": 175124,
+        "bytes": 7751,
+        "sha256": "afe23d74f3c3b18cd45f892189a6a26bf1bc8d42a426ec7db816e0c9995d11dd",
+        "version": "AddDataTypes 50.6 (27.11.04)",
+        "evidence_limit": "The packed MorphOS executable wraps an ELF payload whose code section is encrypted; no loader-stack constant was recovered from static disassembly."
+      },
+      "released_source": {
+        "path": "artifacts/morphos320-c-source-extracted/c/adddatatypes/adddatatypes.c",
+        "sha256": "c1dba7617b92c738cf2d68c37a35fd8a261ef7c3a87eb51b7acebde7fc303cea",
+        "embedded_dtcd_default": "AROS_STACKSIZE",
+        "external_function_default": 4096,
+        "evidence": "The source initializes DefaultStack from AROS_STACKSIZE for embedded DTCD loading and separately initializes it to 4096 in the file-function-name path."
+      },
+      "target_header": {
+        "repository": "https://github.com/aros-development-team/AROS",
+        "commit": "d09193345ec4f63bc152730bd576a0469f50282d",
+        "path": "arch/ppc-morphos/include/aros/cpu.h",
+        "git_blob_sha1": "ca7cdb6bdf4b78b0a783400d64da47c7cde0d059",
+        "sha256": "3a10b250874aaf1685a28f67e4995bc13e65325ef3e55ad8487e158f9f79bdda",
+        "line": 157,
+        "aros_stacksize_bytes": 32768,
+        "evidence_limit": "This is the pinned official ppc-morphos target header value available in the current AROS tree. Its correspondence to the exact November 2004 header used to build AddDataTypes 50.6 is not yet established."
+      },
+      "candidate": {
+        "embedded_dtcd_stack_bytes": 32768,
+        "verification": "Supplied-vector resident fixtures now assert this value for MorphOS CLI and Workbench startup paths."
+      }
+    },
+    "wb31": {
+      "binary": {
+        "path": "artifacts/wb31-disk2-C-AddDataTypes.bin",
+        "sha256": "391da11b39bfc7c492c1b58aa9e442f1c1712bd507380903a88a4534d27c264d",
+        "embedded_internal_loadseg_code_offset": "0x0d62",
+        "embedded_stack_initialization_code_offset": "0x0cb8",
+        "embedded_stack_bytes": 4096,
+        "other_internal_loadseg_code_offset": "0x09e0",
+        "other_stack_initialization_code_offset": "0x0930",
+        "other_stack_bytes": 4096,
+        "evidence": "Static 68000 disassembly shows MOVE.L #$1000 into the stack-size cell before each InternalLoadSeg call; the DTCD path passes that cell at code offset 0x0d62."
+      },
+      "candidate": {
+        "embedded_dtcd_stack_bytes": 4096,
+        "verification": "Supplied-vector resident fixtures assert this value for the Workbench 3.1 CLI profile."
+      }
+    }
+  },
+  "remaining_gates": [
+    "Bind the exact historical ppc-morphos/AROS header or an authentic guest execution to the 2004 MorphOS command binary.",
+    "Exercise the real MorphOS DOS InternalLoadSeg callback and segment-unload behavior in a guest."
+  ]
+}

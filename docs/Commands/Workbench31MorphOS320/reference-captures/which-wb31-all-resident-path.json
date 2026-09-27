@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "capture_id": "which-wb31-all-resident-path-20260831",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Which",
+    "command_sha256": "35f7f3fee29dd2d56f482537af1c5f5a88b552080e6c26be14f455a3241b7157",
+    "version": "which 37.1 (12.1.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/which-wb31-all-startup-probe",
+    "source_sha256": "66afd6a53bfb11296863c2a83ab00500ab3dbfce4836891bfef4afe6b5e823ce",
+    "disposable_adf_before_run_sha256": "6e9d8b430ee8ad75827d7c28e8151f53cfb069205f14b7c0f5410ffc1b40617f",
+    "disposable_adf_after_run_sha256": "62973ea2288bf4067fa84cd89f3f0e0d31292f18957ad3c434ed1905f332d298",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "2047347ee6db21ec6c425a167d5cd783a543dcd4136b257f7f0555b46c936912",
+    "capture_bytes": 64,
+    "capture_text": "BEGIN\nRES Execute\nWorkbench3.1:C/Execute\nWorkbench3.1:C/Execute\n"
+  },
+  "observations": [
+    "After Resident >NIL: C:Execute PURE, C:Which Execute ALL emits RES Execute first, then Workbench3.1:C/Execute twice, each followed by LF.",
+    "Equivalent path discoveries are not deduplicated in this controlled resident/path configuration.",
+    "The fixture does not reach its post-Which marker. This records ordered output only, not the exact result, IoErr, or diagnostic behavior."
+  ],
+  "limits": [
+    "The startup sequence and output target are authored probe content on a disposable ADF copy.",
+    "This does not establish all route identities, current-directory precedence, disabled/system residents, option conflicts, parsing, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Which bytes are copied into this repository."
+  ]
+}

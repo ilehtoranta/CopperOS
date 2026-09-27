@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "profile": "morphos320",
+  "source_id": "morphos320-live-iso",
+  "command": "Date",
+  "path": "MorphOS/C/Date",
+  "iso_extent": 175288,
+  "bytes": 3748,
+  "sha256": "5419ee6b3f3cd9a18168c1eafe6d373f5b832d1fb9d0c9ec856f51a6c0597dac",
+  "version": {
+    "name": "Date",
+    "version": 50,
+    "revision": 7,
+    "date_text": "10.8.2025",
+    "byte_offset": 3713,
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template": {
+    "text": "DAY,DATE,TIME,TO=VER/K,LFORMAT/K",
+    "evidence": "released-source-and-packed-member-identity"
+  },
+  "source": {
+    "path": "artifacts/morphos320-c-source-extracted/c/date/date.c",
+    "bytes": 9453,
+    "sha256": "c63217b0383ad0861bdd167838dc03c22dab74555d96819fdc0f229b148d86ee",
+    "evidence": "released-source-behavior-only"
+  },
+  "startup_contract": {
+    "dos_library_minimum": 37,
+    "readargs_template": "DAY,DATE,TIME,TO=VER/K,LFORMAT/K",
+    "parser_failure": "PrintFault(IoErr(), \"Date\") and RETURN_FAIL",
+    "setter": "timer.device VBlank unit with TR_SETSYSTIME and IOF_QUICK",
+    "normal_output": "DateStamp/DateToStr followed by borrowed Output() write",
+    "to_output": "MODE_NEWFILE target and close after formatting",
+    "locale_output": "locale.library v38, OpenLocale, FormatDate hook, newline"
+  },
+  "open_gates": [
+    "exact packed output and diagnostic bytes",
+    "timer/provider failure and result precedence",
+    "original guest differential and installed metadata",
+    "resident/PURE lifecycle and repeat/concurrent calls",
+    "package/licensing and differential comparison"
+  ],
+  "scope": "hash-bound MorphOS 3.20 packed identity plus released-source contract; raw binary is not stored in the repository"
+}

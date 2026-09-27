@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "capture_id": "loadresource-wb31-client-catalog-lifecycle-audit-20260926",
+  "kind": "offline-hunk-code-audit",
+  "profile": "wb31",
+  "command": "LoadResource",
+  "source_id": "wb31-workbench-m10-40.42",
+  "path": "C/LoadResource",
+  "source_bytes": 3972,
+  "source_sha256": "51c8d6da726d5d1429e84f36e323218eb94750ab60b650efe768fc2907d16f38",
+  "analysis_method": "Rehashed artifacts/loadresource-wb31-reference.bin, independently parsed HUNK_HEADER/CODE/DATA/RELOC32/END boundaries, and disassembled the complete HUNK0 client and HUNK2 catalog helpers using Capstone 5.0.7 in 68000 big-endian mode. Rechecked the listing and resource-action call sites against artifacts/loadresource-wb31-worker-actions-disassembly.txt and raw bytes. Inspected direct references to DATA+0x027c in both code hunks. No original guest execution was performed.",
+  "hunks": [
+    { "index": 0, "kind": "CODE", "bytes": 704 },
+    { "index": 1, "kind": "DATA", "bytes": 680 },
+    { "index": 2, "kind": "CODE", "bytes": 2380 }
+  ],
+  "client_entry": {
+    "stack": "HUNK0 0x0000 reserves 64 local bytes; 0x0004 saves D2-D3/D6-D7/A2-A6. HUNK0 0x0072-0x007c clears exactly 54 bytes at A7+0x2e, including the three ReadArgs result slots at A7+0x58.",
+    "initial_return": { "offset": "HUNK0 0x0022", "register": "D6", "value": 20 },
+    "initial_ioerr": { "offset": "HUNK0 0x0020", "register": "D7", "value": 122, "ndk_name": "ERROR_INVALID_RESIDENT_LIBRARY" },
+    "opens": [
+      { "offset": "HUNK0 0x002a", "library": "locale.library", "version": 38, "base_data_offset": "0x0288" },
+      { "offset": "HUNK0 0x0038", "library": "dos.library", "version": 39, "base_data_offset": "0x0284" },
+      { "offset": "HUNK0 0x0046", "library": "utility.library", "version": 39, "base_data_offset": "0x028c" },
+      { "offset": "HUNK0 0x0054", "library": "graphics.library", "version": 39, "base_data_offset": "0x0290" }
+    ],
+    "open_order": "All four Exec OpenLibrary calls execute before the first failure test. HUNK0 0x005c/0x0064/0x006c then require DOS, Utility and Graphics respectively. Each failed test goes directly to cleanup at 0x01c6. Locale is optional. There is no startup PrintFault on these branches.",
+    "readargs": {
+      "call": "HUNK0 0x0092, DOS LVO -798",
+      "template": "NAME/M,LOCK/S,UNLOCK/S",
+      "arguments": "D1=DATA+0x003e; D2=A7+0x0058 (three already-cleared LONG slots); D3=0",
+      "saved_result": "HUNK0 0x0096 stores returned RDArgs pointer at A7+0x0028; 0x009a tests that result.",
+      "failure": "Zero result branches to 0x01b8: DOS IoErr is read at 0x01b8, copied to D7 at 0x01bc and D1 at 0x01be, D2 is zeroed at 0x01c0, and DOS PrintFault is called at 0x01c2. D6 remains 20. This path does not call FreeArgs, Forbid or Permit. The captured error is later passed to SetIoErr at 0x01d0."
+    },
+    "cli": {
+      "call": "HUNK0 0x009e, DOS LVO -492",
+      "subsequent_instructions": "0x00a2 MOVEA.L D0,A0; 0x00a4 MOVE.L 0x3c(A0),D1; 0x00a8 ASL.L #2,D1; 0x00aa MOVEA.L D1,A3; 0x00ac MOVE.L (A3),DATA+0x0298",
+      "null_handling": "There is no null test or failure branch for Cli or cli_Module before these dereferences. If Cli returns zero, the next data read is from absolute address 0x3c; no orderly missing-CLI diagnostic or return can be derived from these instructions. This describes static flow, not a confirmed guest crash or a requirement to reproduce invalid memory access."
+    }
+  },
+  "client_transaction_and_cleanup": {
+    "forbid": "HUNK0 0x00b4 calls Exec Forbid before FindPort at 0x00be and possible CreateNewProc at 0x0128.",
+    "create_failure": "If FindPort returned zero and CreateNewProc returns zero, 0x0132 branches to 0x013c, A2 is still zero, and 0x013e branches to 0x0190. DOS IoErr is called at 0x0194, its result is saved in D7 at 0x0198 and passed in D1 at 0x019a; D2=0 at 0x019c; PrintFault is called at 0x019e. D6 remains 20. Error capture precedes printing.",
+    "create_success": "Only a nonzero CreateNewProc return reaches 0x0134, which clears the saved command segment's next-link LONG. 0x0138 selects the new Process+0x5c as the initial request destination.",
+    "success_reply": "PutMsg/WaitPort/GetMsg are at HUNK0 0x0176/0x017c/0x0182. Result at request+22 becomes D6 at 0x0186, and IoErr at request+26 becomes D7 at 0x018a.",
+    "post_transaction": "Both the completed transaction and CreateNewProc failure reach Exec Permit at 0x01a6, followed by FreeArgs at 0x01b2 with the saved RDArgs pointer. The captured D6/D7 values survive those calls under the public register ABI.",
+    "cleanup_guard": "HUNK0 0x01c6 reads DOSBase and 0x01ca skips directly to return at 0x01f6 if it is zero. This single branch guards SetIoErr and all four CloseLibrary calls. Thus the decoded missing-DOS branch skips closing even other successful startup opens; this unusual branch is recorded without claiming guest resource effects.",
+    "set_ioerr": "HUNK0 0x01ce copies D7 to D1 and 0x01d0 calls DOS SetIoErr (-462). This occurs after FreeArgs on transaction paths but before library closes. No second SetIoErr or direct pr_Result2 store occurs after the closes.",
+    "closes": [
+      { "offset": "HUNK0 0x01da", "library": "dos.library", "argument": "A1=current DOSBase copied from A6 at 0x01d4" },
+      { "offset": "HUNK0 0x01e2", "library": "utility.library", "argument": "A1=DATA+0x028c" },
+      { "offset": "HUNK0 0x01ea", "library": "locale.library", "argument": "A1=DATA+0x0288" },
+      { "offset": "HUNK0 0x01f2", "library": "graphics.library", "argument": "A1=DATA+0x0290" }
+    ],
+    "close_null_checks": "There are no individual nonzero tests around the Utility/Locale/Graphics CloseLibrary arguments. The instructions alone do not establish the guest effects of a null argument or error-state changes inside library cleanup.",
+    "return": "HUNK0 0x01f6 moves D6 to D0; 0x01f8 restores saved registers; 0x01fc releases the 64-byte local frame; 0x0200 returns."
+  },
+  "message_catalog_helpers": {
+    "slot": "DATA+0x027c is four initial zero bytes. It is separate from LocaleBase at DATA+0x0288 and from opened-resource catalog handles.",
+    "open": {
+      "range": "HUNK2 0x0238-0x0260",
+      "flow": "0x023c tests the catalog slot and 0x0240 skips opening when nonzero. If zero, 0x0242/0x0246 tests LocaleBase. With Locale available, OpenCatalogA at 0x0254 receives A0=0, A1=DATA+0x01fc (sys/c.catalog), A2=0. 0x0258 stores D0 in the catalog slot, including a zero failure result.",
+      "store_bytes": "HUNK2 0x0258: 29 40 02 7c"
+    },
+    "close": {
+      "range": "HUNK2 0x0262-0x0276",
+      "flow": "0x0264 loads the slot to D0; 0x0268 skips if zero. Otherwise A0 receives that pointer, A6 receives LocaleBase, and 0x0270 calls CloseCatalog(-36). The helper then restores A6 and returns. It does not clear or decrement the stored pointer.",
+      "complete_bytes": "2f0e 202c027c 670a 2040 2c6c0288 4eaeffdc 2c5f 4e75"
+    },
+    "get": {
+      "range": "HUNK2 0x0278-0x02c0",
+      "flow": "Finds the requested id/default string in the 8-byte entry table at DATA+0x0184. If LocaleBase is zero it returns the default. Otherwise GetCatalogStr(-72) at 0x02b4 receives A0=the catalog slot, D0=id, A1=default, even when the catalog slot is zero. It does not open or close a catalog itself."
+    },
+    "print": {
+      "range": "HUNK2 0x02c2-0x02ea",
+      "call_order": [
+        "0x02ca calls Open helper 0x0238",
+        "0x02d0 calls Get helper 0x0278",
+        "0x02de calls DOS VPrintf(-954), using the caller's stacked format arguments",
+        "0x02e2 calls Close helper 0x0262",
+        "0x02e6 restores saved D2/D7/A6 and 0x02ea returns"
+      ],
+      "print_without_arguments": "HUNK2 0x02ec-0x02f6 pushes a pointer to the empty string at DATA+0x0078, then the id, and calls the Print helper."
+    },
+    "all_decoded_direct_slot_references": [
+      "HUNK2 0x023c: TST.L DATA+0x027c",
+      "HUNK2 0x0258: MOVE.L D0,DATA+0x027c (OpenCatalogA result)",
+      "HUNK2 0x0264: MOVE.L DATA+0x027c,D0 (Close)",
+      "HUNK2 0x02ac: MOVEA.L DATA+0x027c,A0 (GetCatalogStr)"
+    ],
+    "listing_nesting": {
+      "outer_open": "HUNK2 0x0572 calls Open before testing whether the resource list is empty.",
+      "empty": "0x0588 calls Print-with-empty-argument for C357; that executes nested Open/Get/VPrintf/Close. Control then reaches outer Close at 0x05e6.",
+      "nonempty_header": "0x0594 and 0x05a0 directly call Get for C354(TYPE) and C356(NAME plus LF). 0x05ae invokes Print(C355, TYPE, NAME), including its nested Open/Get/VPrintf/Close.",
+      "nonempty_rows": "For every row, 0x05c8 directly calls Get(C350+record type); 0x05d8 invokes Print(C355, type string, stored name), including nested Open/Get/VPrintf/Close. Outer Close follows at 0x05e6.",
+      "static_consequence": "When the first Open succeeds, the unchanged nonzero slot suppresses subsequent OpenCatalogA calls. Empty listing submits that pointer to CloseCatalog twice. An N-row nonempty listing submits it N+2 times (header, each row, outer Close). Later GetCatalogStr calls can receive the pointer already submitted to CloseCatalog. This is an actual static behavior in the selected bytes, not a mistaken pairing of separate catalog variables. Catalog object retention, pointer validity, reference counting and guest effects remain unproven."
+    }
+  },
+  "diagnostic_ioerr_order": [
+    { "path": "Ordinary LoadSeg failure outside errors 121/205/212", "order": "HUNK2 0x06be reads IoErr and 0x06c2 saves it in D7 before C359 printing at 0x074a. The Print helper's catalog operations and VPrintf therefore occur after error capture." },
+    { "path": "Resource catalog open failure", "order": "C35B Print at HUNK2 0x072e completes Open/Get/VPrintf/Close before DOS IoErr at 0x0738 is saved in D7 at 0x073c." },
+    { "path": "Resource library open failure", "order": "C359 Print at HUNK2 0x07b0 completes Open/Get/VPrintf/Close before DOS IoErr at 0x07ba is saved in D7 at 0x07be." },
+    { "path": "OpenDiskFont failure", "order": "C359 Print at HUNK2 0x0896 uses the derived font filename and completes Open/Get/VPrintf/Close before DOS IoErr at 0x08a0 is saved in D7 at 0x08a4. Diskfont library close at 0x08ae follows capture." },
+    { "path": "diskfont.library unavailable", "order": "C35A Print-with-empty-argument at HUNK2 0x08ba completes Open/Get/VPrintf/Close before DOS IoErr at 0x08c2 is saved in D7 at 0x08c6." },
+    { "path": "Unrecognized loaded resource", "order": "Cache removal helper at HUNK2 0x08e0 precedes C35B Print at 0x08ec; D7 is explicitly set to 212 at 0x08f2-0x08f4 regardless of diagnostic-side IoErr." }
+  ],
+  "implementation_implications": [
+    "Client ReadArgs failure returns 20 in this source; do not silently substitute the generic argument wrapper's warning result.",
+    "For CreateNewProc failure and ReadArgs failure, capture IoErr before PrintFault. Preserve transaction Result/IoErr across Permit and FreeArgs. The original final SetIoErr precedes library closes.",
+    "The original contains no safe missing-CLI branch. Any explicit replacement handling needs to be labeled as an integration policy outside proven original failure behavior.",
+    "Replacement message helpers must use explicitly owned catalog state and preserve the observed lazy Open/Get/VPrintf/Close order, including outer listing nesting. A native fixture can prove this call order and unchanged state slot; it cannot prove the guest validity of the pointer after CloseCatalog.",
+    "Postdiagnostic action IoErr can include CloseCatalog effects because CloseCatalog runs inside the diagnostic helper. A fixture that mutates only VPrintf's IoErr cannot establish this full ordering.",
+    "Do not turn the un-cleared pointer observation into a claim that the guest necessarily frees the catalog or crashes. Preserve the static fact and require original guest evidence for its lifecycle implications."
+  ],
+  "evidence_limits": [
+    "No source command, OS library, scheduler, CLI launch, allocation failure or catalog lifecycle was executed in an original Workbench guest.",
+    "Public library register preservation is assumed when describing values surviving calls; library internals, expunge behavior, null CloseLibrary behavior and changes to process IoErr remain outside this static audit.",
+    "The audit does not qualify command completion, PURE status, cross-invocation code lifetime or shipping readiness."
+  ]
+}

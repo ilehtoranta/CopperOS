@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "capture_id": "which-wb31-basic-lookup-20260831",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Which",
+    "command_sha256": "35f7f3fee29dd2d56f482537af1c5f5a88b552080e6c26be14f455a3241b7157",
+    "version": "which 37.1 (12.1.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/which-wb31-startup-probe",
+    "source_sha256": "f1aa94d415eb50c3db5f96b51a39b69c0b39360262a8dedf6c8d1944a133e8de",
+    "disposable_adf_before_run_sha256": "7616c44d4fdaf2524e686facb8a7d875889b711703f752838f890e6f68c0cc55",
+    "disposable_adf_after_run_sha256": "48936e6302a3980ac101f2f8d2dded6fd679ccf5fedfc36500d0141f9ca05df4",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "2855ab7d3833d1da9f497bb8c7688cce36d65965e165c3a85b05e4b3a6267215",
+    "capture_bytes": 52,
+    "capture_text": "BEGIN\nWorkbench3.1:C/Execute\nWorkbench3.1:C/Execute\n"
+  },
+  "observations": [
+    "C:Which Execute emits Workbench3.1:C/Execute followed by LF.",
+    "C:Which C:Execute emits the same line followed by LF.",
+    "The following missing-name invocation did not reach the fixture's END marker under FailAt 20. This establishes an error-level outcome for this controlled startup boundary, but does not establish an exact return level, IoErr, or diagnostic stream."
+  ],
+  "limits": [
+    "The startup sequence and output target are authored probe content on a disposable ADF copy.",
+    "This does not establish internal, resident, alias, current-directory, path, ALL, NORES, RES, parsing, diagnostics, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Which bytes are copied into this repository."
+  ]
+}

@@ -1,0 +1,768 @@
+{
+  "schema_version": 1,
+  "goal": "Goals/WORKBENCH31_MORPHOS_C_COMMANDS_GOAL.md",
+  "status": "foundation-in-progress-no-shipping-admission",
+  "profiles": [
+    "wb31",
+    "morphos320"
+  ],
+  "cpu_targets": [
+    "68000",
+    "68020",
+    "68040"
+  ],
+  "required_command_identities": 200,
+  "required_command_profiles": 246,
+  "qualified_shipping_artifacts": [],
+  "qualification_only_artifacts": [
+    {
+      "id": "CC03.private-startup-probe.68000",
+      "cpu": "68000",
+      "entry": "CopperOS.Commands.NativeRoot.NativeCommandProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/68000/command-startup-vector-fixture/command-probe.hunk",
+      "sha256": "b10d8198e157031ad4ead4ddc1cbb5a64da3f2f12da82bbc3fcec2b7e04bc7b0",
+      "bytes": 2176,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "command-startup-vector-fixture",
+      "native_invocations": 31,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 120.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "no-runtime-helpers",
+        "reportedCount": 0,
+        "reportedHelpers": []
+      },
+      "evidence": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/qualification.json",
+      "evidence_sha256": "76a5de237142bae1fbb543aa8330ad879b160ba33d0501c5c5c50682a8810002",
+      "input_manifest": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/input-manifest.json",
+      "input_manifest_sha256": "fd412646b6d651425f7e40d1af39320ec60202f42643e6d5eb0eddf59ab99ded"
+    },
+    {
+      "id": "CC04.private-argument-boundary-probe.68000",
+      "cpu": "68000",
+      "entry": "CopperOS.Commands.NativeRoot.NativeArgumentBoundaryProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/68000/command-argument-boundary-vector-fixture/argument-boundary-probe.hunk",
+      "sha256": "f44b9fdb258ca47a0768619c49eebf244da49dddff1d70caeff76d84a4d89424",
+      "bytes": 3096,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "command-argument-boundary-vector-fixture",
+      "native_invocations": 25,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 156.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "no-runtime-helpers",
+        "reportedCount": 0,
+        "reportedHelpers": []
+      },
+      "evidence": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/qualification.json",
+      "evidence_sha256": "76a5de237142bae1fbb543aa8330ad879b160ba33d0501c5c5c50682a8810002",
+      "input_manifest": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/input-manifest.json",
+      "input_manifest_sha256": "fd412646b6d651425f7e40d1af39320ec60202f42643e6d5eb0eddf59ab99ded"
+    },
+    {
+      "id": "CC04.private-io-probe.68000",
+      "cpu": "68000",
+      "entry": "CopperOS.Commands.NativeRoot.NativeIoProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/68000/command-io-vector-fixture/io-probe.hunk",
+      "sha256": "60c575a44f89d0b19abe4b214364422b011d362fc4b199871d8f753fac6adc88",
+      "bytes": 1620,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "command-io-vector-fixture",
+      "native_invocations": 32,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 84.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "exact-foundation-io-native-return-tail",
+        "reportedCount": 1,
+        "reportedHelpers": [
+          "__c68k_shared_epilogue_97FEB6A1E88C94DE"
+        ],
+        "helper": "__c68k_shared_epilogue_97FEB6A1E88C94DE",
+        "codeOffset": 888,
+        "byteCount": 10,
+        "bytesHex": "2002508f4cdf4c1c4e75",
+        "sha256": "97feb6a1e88c94de5f5ad339a80015a1e2a39ed4412338df37c5007e7f8e4867",
+        "hunkCodeBoundary": 898,
+        "callers": [
+          {
+            "symbol": "CopperOS.Commands.Native.NativeCommandIo::ReadOnce",
+            "offset": 700,
+            "size": 62,
+            "prologueHex": "48e73832518f",
+            "terminalBranchOffset": 760,
+            "branchTarget": 888
+          },
+          {
+            "symbol": "CopperOS.Commands.Native.NativeCommandIo::WriteOnce",
+            "offset": 762,
+            "size": 62,
+            "prologueHex": "48e73832518f",
+            "terminalBranchOffset": 822,
+            "branchTarget": 888
+          }
+        ],
+        "externalRuntimeDependencyApproved": false
+      },
+      "evidence": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/qualification.json",
+      "evidence_sha256": "76a5de237142bae1fbb543aa8330ad879b160ba33d0501c5c5c50682a8810002",
+      "input_manifest": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/input-manifest.json",
+      "input_manifest_sha256": "fd412646b6d651425f7e40d1af39320ec60202f42643e6d5eb0eddf59ab99ded"
+    },
+    {
+      "id": "CC03.private-startup-probe.68020",
+      "cpu": "68020",
+      "entry": "CopperOS.Commands.NativeRoot.NativeCommandProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/68020/command-startup-vector-fixture/command-probe.hunk",
+      "sha256": "b2ff2e497a76a52068c99f833b2795e6da60dd3878275145d08c3a24665d65ad",
+      "bytes": 2176,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "command-startup-vector-fixture",
+      "native_invocations": 31,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 120.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "no-runtime-helpers",
+        "reportedCount": 0,
+        "reportedHelpers": []
+      },
+      "evidence": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/qualification.json",
+      "evidence_sha256": "76a5de237142bae1fbb543aa8330ad879b160ba33d0501c5c5c50682a8810002",
+      "input_manifest": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/input-manifest.json",
+      "input_manifest_sha256": "fd412646b6d651425f7e40d1af39320ec60202f42643e6d5eb0eddf59ab99ded"
+    },
+    {
+      "id": "CC04.private-argument-boundary-probe.68020",
+      "cpu": "68020",
+      "entry": "CopperOS.Commands.NativeRoot.NativeArgumentBoundaryProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/68020/command-argument-boundary-vector-fixture/argument-boundary-probe.hunk",
+      "sha256": "d8773b0c14ba50dfc43823e2f043527d3356fb0a155290a6cab959d1ba329a4e",
+      "bytes": 3116,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "command-argument-boundary-vector-fixture",
+      "native_invocations": 25,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 156.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "no-runtime-helpers",
+        "reportedCount": 0,
+        "reportedHelpers": []
+      },
+      "evidence": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/qualification.json",
+      "evidence_sha256": "76a5de237142bae1fbb543aa8330ad879b160ba33d0501c5c5c50682a8810002",
+      "input_manifest": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/input-manifest.json",
+      "input_manifest_sha256": "fd412646b6d651425f7e40d1af39320ec60202f42643e6d5eb0eddf59ab99ded"
+    },
+    {
+      "id": "CC04.private-io-probe.68020",
+      "cpu": "68020",
+      "entry": "CopperOS.Commands.NativeRoot.NativeIoProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/68020/command-io-vector-fixture/io-probe.hunk",
+      "sha256": "27c82885925ccbbc58bd2c77a5ed9bc0f389d39589227beadef1ebb72fca0b26",
+      "bytes": 1592,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "command-io-vector-fixture",
+      "native_invocations": 32,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 84.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "exact-foundation-io-native-return-tail",
+        "reportedCount": 1,
+        "reportedHelpers": [
+          "__c68k_shared_epilogue_97FEB6A1E88C94DE"
+        ],
+        "helper": "__c68k_shared_epilogue_97FEB6A1E88C94DE",
+        "codeOffset": 860,
+        "byteCount": 10,
+        "bytesHex": "2002508f4cdf4c1c4e75",
+        "sha256": "97feb6a1e88c94de5f5ad339a80015a1e2a39ed4412338df37c5007e7f8e4867",
+        "hunkCodeBoundary": 870,
+        "callers": [
+          {
+            "symbol": "CopperOS.Commands.Native.NativeCommandIo::ReadOnce",
+            "offset": 684,
+            "size": 58,
+            "prologueHex": "48e73832518f",
+            "terminalBranchOffset": 740,
+            "branchTarget": 860
+          },
+          {
+            "symbol": "CopperOS.Commands.Native.NativeCommandIo::WriteOnce",
+            "offset": 742,
+            "size": 58,
+            "prologueHex": "48e73832518f",
+            "terminalBranchOffset": 798,
+            "branchTarget": 860
+          }
+        ],
+        "externalRuntimeDependencyApproved": false
+      },
+      "evidence": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/qualification.json",
+      "evidence_sha256": "76a5de237142bae1fbb543aa8330ad879b160ba33d0501c5c5c50682a8810002",
+      "input_manifest": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/input-manifest.json",
+      "input_manifest_sha256": "fd412646b6d651425f7e40d1af39320ec60202f42643e6d5eb0eddf59ab99ded"
+    },
+    {
+      "id": "CC03.private-startup-probe.68040",
+      "cpu": "68040",
+      "entry": "CopperOS.Commands.NativeRoot.NativeCommandProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/68040/command-startup-vector-fixture/command-probe.hunk",
+      "sha256": "b2ff2e497a76a52068c99f833b2795e6da60dd3878275145d08c3a24665d65ad",
+      "bytes": 2176,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "command-startup-vector-fixture",
+      "native_invocations": 31,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 120.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "no-runtime-helpers",
+        "reportedCount": 0,
+        "reportedHelpers": []
+      },
+      "evidence": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/qualification.json",
+      "evidence_sha256": "76a5de237142bae1fbb543aa8330ad879b160ba33d0501c5c5c50682a8810002",
+      "input_manifest": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/input-manifest.json",
+      "input_manifest_sha256": "fd412646b6d651425f7e40d1af39320ec60202f42643e6d5eb0eddf59ab99ded"
+    },
+    {
+      "id": "CC04.private-argument-boundary-probe.68040",
+      "cpu": "68040",
+      "entry": "CopperOS.Commands.NativeRoot.NativeArgumentBoundaryProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/68040/command-argument-boundary-vector-fixture/argument-boundary-probe.hunk",
+      "sha256": "bdcb5ce77c5544e6cc69152b61c2ea100f577bf1652a4b08ca1d677fc179e8da",
+      "bytes": 3132,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "command-argument-boundary-vector-fixture",
+      "native_invocations": 25,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 156.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "no-runtime-helpers",
+        "reportedCount": 0,
+        "reportedHelpers": []
+      },
+      "evidence": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/qualification.json",
+      "evidence_sha256": "76a5de237142bae1fbb543aa8330ad879b160ba33d0501c5c5c50682a8810002",
+      "input_manifest": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/input-manifest.json",
+      "input_manifest_sha256": "fd412646b6d651425f7e40d1af39320ec60202f42643e6d5eb0eddf59ab99ded"
+    },
+    {
+      "id": "CC04.private-io-probe.68040",
+      "cpu": "68040",
+      "entry": "CopperOS.Commands.NativeRoot.NativeIoProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/68040/command-io-vector-fixture/io-probe.hunk",
+      "sha256": "adf0256395dbf22ddc4372e2f3af9c6b7914da8f86305385cbd5879364d371bc",
+      "bytes": 1604,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "command-io-vector-fixture",
+      "native_invocations": 32,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 84.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "exact-foundation-io-native-return-tail",
+        "reportedCount": 1,
+        "reportedHelpers": [
+          "__c68k_shared_epilogue_97FEB6A1E88C94DE"
+        ],
+        "helper": "__c68k_shared_epilogue_97FEB6A1E88C94DE",
+        "codeOffset": 872,
+        "byteCount": 10,
+        "bytesHex": "2002508f4cdf4c1c4e75",
+        "sha256": "97feb6a1e88c94de5f5ad339a80015a1e2a39ed4412338df37c5007e7f8e4867",
+        "hunkCodeBoundary": 882,
+        "callers": [
+          {
+            "symbol": "CopperOS.Commands.Native.NativeCommandIo::ReadOnce",
+            "offset": 692,
+            "size": 60,
+            "prologueHex": "48e73832518f",
+            "terminalBranchOffset": 750,
+            "branchTarget": 872
+          },
+          {
+            "symbol": "CopperOS.Commands.Native.NativeCommandIo::WriteOnce",
+            "offset": 752,
+            "size": 60,
+            "prologueHex": "48e73832518f",
+            "terminalBranchOffset": 810,
+            "branchTarget": 872
+          }
+        ],
+        "externalRuntimeDependencyApproved": false
+      },
+      "evidence": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/qualification.json",
+      "evidence_sha256": "76a5de237142bae1fbb543aa8330ad879b160ba33d0501c5c5c50682a8810002",
+      "input_manifest": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/input-manifest.json",
+      "input_manifest_sha256": "fd412646b6d651425f7e40d1af39320ec60202f42643e6d5eb0eddf59ab99ded"
+    },
+    {
+      "id": "CC10.private-eval-numeric-probe.68000",
+      "cpu": "68000",
+      "entry": "CopperOS.Commands.EvalNativeRoot.EvalNumericProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.EvalNativeRoot/bin/Release/net10.0/qualification/18c0fa3254384c3287734b3537a17510/68000/eval-numeric-component/eval-numeric-probe.hunk",
+      "sha256": "37120e9c91a089896b87abd197caea27830f1f057c2999b5c39f5d375d29a988",
+      "bytes": 2180,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "eval-numeric-component",
+      "native_invocations": 180,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 192.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "no-runtime-helpers",
+        "reportedCount": 0,
+        "reportedHelpers": []
+      },
+      "evidence": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.EvalNativeRoot/bin/Release/net10.0/qualification/18c0fa3254384c3287734b3537a17510/qualification.json",
+      "evidence_sha256": "cf73581bbaf7386c710d7f2a3046320d914c1844221f1699df9c19909ff2c0a3",
+      "input_manifest": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.EvalNativeRoot/bin/Release/net10.0/qualification/18c0fa3254384c3287734b3537a17510/input-manifest.json",
+      "input_manifest_sha256": "2fc06d1470b560270728c3d794ced6eb31ef8a8e0c1e5a56ab699ea2d9735802"
+    },
+    {
+      "id": "CC10.private-eval-numeric-probe.68020",
+      "cpu": "68020",
+      "entry": "CopperOS.Commands.EvalNativeRoot.EvalNumericProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.EvalNativeRoot/bin/Release/net10.0/qualification/18c0fa3254384c3287734b3537a17510/68020/eval-numeric-component/eval-numeric-probe.hunk",
+      "sha256": "1a29402f34e3aa19ab00ee730f5ab6d18c9330bc95ad7ac6e0c7edd83f3659b2",
+      "bytes": 2072,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "eval-numeric-component",
+      "native_invocations": 180,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 180.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "no-runtime-helpers",
+        "reportedCount": 0,
+        "reportedHelpers": []
+      },
+      "evidence": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.EvalNativeRoot/bin/Release/net10.0/qualification/18c0fa3254384c3287734b3537a17510/qualification.json",
+      "evidence_sha256": "cf73581bbaf7386c710d7f2a3046320d914c1844221f1699df9c19909ff2c0a3",
+      "input_manifest": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.EvalNativeRoot/bin/Release/net10.0/qualification/18c0fa3254384c3287734b3537a17510/input-manifest.json",
+      "input_manifest_sha256": "2fc06d1470b560270728c3d794ced6eb31ef8a8e0c1e5a56ab699ea2d9735802"
+    },
+    {
+      "id": "CC10.private-eval-numeric-probe.68040",
+      "cpu": "68040",
+      "entry": "CopperOS.Commands.EvalNativeRoot.EvalNumericProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.EvalNativeRoot/bin/Release/net10.0/qualification/18c0fa3254384c3287734b3537a17510/68040/eval-numeric-component/eval-numeric-probe.hunk",
+      "sha256": "f5634680bd675ca8dd2627081a64c26828498fe94e74adeef3c950e4b74f00ad",
+      "bytes": 2060,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "eval-numeric-component",
+      "native_invocations": 180,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 180.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "no-runtime-helpers",
+        "reportedCount": 0,
+        "reportedHelpers": []
+      },
+      "evidence": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.EvalNativeRoot/bin/Release/net10.0/qualification/18c0fa3254384c3287734b3537a17510/qualification.json",
+      "evidence_sha256": "cf73581bbaf7386c710d7f2a3046320d914c1844221f1699df9c19909ff2c0a3",
+      "input_manifest": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.EvalNativeRoot/bin/Release/net10.0/qualification/18c0fa3254384c3287734b3537a17510/input-manifest.json",
+      "input_manifest_sha256": "2fc06d1470b560270728c3d794ced6eb31ef8a8e0c1e5a56ab699ea2d9735802"
+    },
+    {
+      "id": "CC12.private-makedir-classic-probe.68000",
+      "cpu": "68000",
+      "entry": "CopperOS.Commands.NativeRoot.Workbench31MakeDirProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification-makedir/1fe8f38d9e6a497eb675ed3a94459bc5/68000/makedir-classic-reference-vector-fixture/makedir-probe.hunk",
+      "sha256": "e4f4b52268d76241848254059b22c1ffd116fbfe38d07d3c8152484702754eaa",
+      "bytes": 1876,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "makedir-classic-reference-vector-fixture",
+      "native_invocations": 39,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 140.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "no-runtime-helpers",
+        "reportedCount": 0,
+        "reportedHelpers": []
+      },
+      "evidence": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification-makedir/1fe8f38d9e6a497eb675ed3a94459bc5/qualification.json",
+      "evidence_sha256": "896d121aa130115c090368961c4c4d044092ca24d8beda0598a2661e35f3c16b",
+      "input_manifest": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification-makedir/1fe8f38d9e6a497eb675ed3a94459bc5/input-manifest.json",
+      "input_manifest_sha256": "c3c7f7cdec443818cdd16e23f22a46e266e39b09bc67d438eae23f56f83d6610",
+      "original_native_invocations": 38,
+      "original_command_vector_comparisons": 38,
+      "original_configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "original_observed_stack_bytes": 80.0,
+      "private_reference": {
+        "role": "private-original-workbench31-makedir",
+        "path": "D:\\TestData\\CopperOSCommands\\Workbench31\\MakeDir-37.2.hunk",
+        "bytes": 464,
+        "sha256": "23911db49742055d8bddcfe5f8de82cbb2232f8a7ef850d51bfd27f9b54c819b",
+        "snapshotCopied": false
+      },
+      "comparison_scope": "Supplied DOS arguments, filesystem outcomes and output vectors; original DOS parser/formatter/filesystem and normal command launch are not executed."
+    },
+    {
+      "id": "CC12.private-makedir-classic-probe.68020",
+      "cpu": "68020",
+      "entry": "CopperOS.Commands.NativeRoot.Workbench31MakeDirProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification-makedir/1fe8f38d9e6a497eb675ed3a94459bc5/68020/makedir-classic-reference-vector-fixture/makedir-probe.hunk",
+      "sha256": "7f659778241981e20544aad498bae07a7d9ff5bcf6d68027919dd8d63e602b3c",
+      "bytes": 1904,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "makedir-classic-reference-vector-fixture",
+      "native_invocations": 39,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 140.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "no-runtime-helpers",
+        "reportedCount": 0,
+        "reportedHelpers": []
+      },
+      "evidence": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification-makedir/1fe8f38d9e6a497eb675ed3a94459bc5/qualification.json",
+      "evidence_sha256": "896d121aa130115c090368961c4c4d044092ca24d8beda0598a2661e35f3c16b",
+      "input_manifest": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification-makedir/1fe8f38d9e6a497eb675ed3a94459bc5/input-manifest.json",
+      "input_manifest_sha256": "c3c7f7cdec443818cdd16e23f22a46e266e39b09bc67d438eae23f56f83d6610",
+      "original_native_invocations": 38,
+      "original_command_vector_comparisons": 38,
+      "original_configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "original_observed_stack_bytes": 80.0,
+      "private_reference": {
+        "role": "private-original-workbench31-makedir",
+        "path": "D:\\TestData\\CopperOSCommands\\Workbench31\\MakeDir-37.2.hunk",
+        "bytes": 464,
+        "sha256": "23911db49742055d8bddcfe5f8de82cbb2232f8a7ef850d51bfd27f9b54c819b",
+        "snapshotCopied": false
+      },
+      "comparison_scope": "Supplied DOS arguments, filesystem outcomes and output vectors; original DOS parser/formatter/filesystem and normal command launch are not executed."
+    },
+    {
+      "id": "CC12.private-makedir-classic-probe.68040",
+      "cpu": "68040",
+      "entry": "CopperOS.Commands.NativeRoot.Workbench31MakeDirProbe::Main",
+      "shipping": false,
+      "profile": "private-qualification-only",
+      "path": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification-makedir/1fe8f38d9e6a497eb675ed3a94459bc5/68040/makedir-classic-reference-vector-fixture/makedir-probe.hunk",
+      "sha256": "6aff57aa0ee472840c72d2f41f23f5342e115f69466958429c2776dd10d77a1a",
+      "bytes": 1880,
+      "runtime": "resident",
+      "fpu": "disabled",
+      "fixture": "makedir-classic-reference-vector-fixture",
+      "native_invocations": 39,
+      "configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "observed_stack_bytes": 140.0,
+      "minimum_shipping_stack_qualified": false,
+      "reproducible_bytes": true,
+      "pure_admission": false,
+      "installed_path": null,
+      "original_os_differential": "not-run",
+      "fatal_machine_fault_site_count": 0,
+      "native_helper_admission": {
+        "policy": "no-runtime-helpers",
+        "reportedCount": 0,
+        "reportedHelpers": []
+      },
+      "evidence": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification-makedir/1fe8f38d9e6a497eb675ed3a94459bc5/qualification.json",
+      "evidence_sha256": "896d121aa130115c090368961c4c4d044092ca24d8beda0598a2661e35f3c16b",
+      "input_manifest": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification-makedir/1fe8f38d9e6a497eb675ed3a94459bc5/input-manifest.json",
+      "input_manifest_sha256": "c3c7f7cdec443818cdd16e23f22a46e266e39b09bc67d438eae23f56f83d6610",
+      "original_native_invocations": 38,
+      "original_command_vector_comparisons": 38,
+      "original_configured_stack_bytes": [
+        4096,
+        16384
+      ],
+      "original_observed_stack_bytes": 80.0,
+      "private_reference": {
+        "role": "private-original-workbench31-makedir",
+        "path": "D:\\TestData\\CopperOSCommands\\Workbench31\\MakeDir-37.2.hunk",
+        "bytes": 464,
+        "sha256": "23911db49742055d8bddcfe5f8de82cbb2232f8a7ef850d51bfd27f9b54c819b",
+        "snapshotCopied": false
+      },
+      "comparison_scope": "Supplied DOS arguments, filesystem outcomes and output vectors; original DOS parser/formatter/filesystem and normal command launch are not executed."
+    }
+  ],
+  "staged_paths": [],
+  "rules": {
+    "probe_is_never_installed": true,
+    "unqualified_required_pure_artifacts_are_rejected": true,
+    "original_script_metadata_is_not_replacement_purity_proof": true,
+    "missing_or_stale_hash_bound_evidence_is_rejected": true,
+    "native_commands_must_not_require_this_host_manifest_at_runtime": true,
+    "enforcement_status": "Packaging requirements; production image-builder admission is not implemented or qualified yet."
+  },
+  "qualification_workflow": {
+    "script": "tools/Commands/qualify_native.ps1",
+    "scope": "Private startup/argument/I/O vector, numeric component and classic MakeDir original/generated supplied-vector fixtures with source/binary/runtime binding. Original DOS parser/formatter/filesystem, full commands, normal launch, boot, resident registry and image metadata remain separate gates.",
+    "private_roots": [
+      "CopperOS.Commands.NativeRoot.NativeCommandProbe::Main",
+      "CopperOS.Commands.NativeRoot.NativeArgumentBoundaryProbe::Main",
+      "CopperOS.Commands.NativeRoot.NativeIoProbe::Main",
+      "CopperOS.Commands.EvalNativeRoot.EvalNumericProbe::Main",
+      "CopperOS.Commands.NativeRoot.Workbench31MakeDirProbe::Main"
+    ],
+    "successful_run_pointers": {
+      "Foundation": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/latest.json",
+      "EvalNumeric": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.EvalNativeRoot/bin/Release/net10.0/qualification/latest.json",
+      "Workbench31MakeDir": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification-makedir/latest.json"
+    },
+    "evidence_is_a_source_bound_checkpoint": true,
+    "later_source_or_input_changes_require_requalification": true
+  },
+  "open_packaging_gates": [
+    "All required command semantics and per-profile differential evidence",
+    "Per-command native startup and shared-image qualification; private probes do not admit command artifacts.",
+    "Actual Kickstart and CopperStart launch and process teardown",
+    "DOS resident add/use/remove/replace and active-use ownership",
+    "Original installed metadata and normal versus installation-media selection",
+    "Image-builder integration and readback of actual Amiga protection fields"
+  ],
+  "qualification_evidence_runs": [
+    {
+      "component": "Foundation",
+      "run_id": "40cf9509a3a1480a9c796649ebe50568",
+      "evidence": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/qualification.json",
+      "evidence_sha256": "76a5de237142bae1fbb543aa8330ad879b160ba33d0501c5c5c50682a8810002",
+      "input_manifest": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification/40cf9509a3a1480a9c796649ebe50568/input-manifest.json",
+      "input_manifest_sha256": "fd412646b6d651425f7e40d1af39320ec60202f42643e6d5eb0eddf59ab99ded",
+      "source_files": 442,
+      "binary_files": 20,
+      "restore_files": 27,
+      "host_files": 196,
+      "private_reference_files": 0,
+      "passed_stages": 61,
+      "passed_input_checks": 63,
+      "reproducible_artifacts": 9,
+      "generated_native_invocations": 264,
+      "original_native_invocations": 0,
+      "original_command_vector_comparisons": 0
+    },
+    {
+      "component": "EvalNumeric",
+      "run_id": "18c0fa3254384c3287734b3537a17510",
+      "evidence": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.EvalNativeRoot/bin/Release/net10.0/qualification/18c0fa3254384c3287734b3537a17510/qualification.json",
+      "evidence_sha256": "cf73581bbaf7386c710d7f2a3046320d914c1844221f1699df9c19909ff2c0a3",
+      "input_manifest": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.EvalNativeRoot/bin/Release/net10.0/qualification/18c0fa3254384c3287734b3537a17510/input-manifest.json",
+      "input_manifest_sha256": "2fc06d1470b560270728c3d794ced6eb31ef8a8e0c1e5a56ab699ea2d9735802",
+      "source_files": 528,
+      "binary_files": 20,
+      "restore_files": 33,
+      "host_files": 196,
+      "private_reference_files": 0,
+      "passed_stages": 25,
+      "passed_input_checks": 27,
+      "reproducible_artifacts": 3,
+      "generated_native_invocations": 540,
+      "original_native_invocations": 0,
+      "original_command_vector_comparisons": 0
+    },
+    {
+      "component": "Workbench31MakeDir",
+      "run_id": "1fe8f38d9e6a497eb675ed3a94459bc5",
+      "evidence": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification-makedir/1fe8f38d9e6a497eb675ed3a94459bc5/qualification.json",
+      "evidence_sha256": "896d121aa130115c090368961c4c4d044092ca24d8beda0598a2661e35f3c16b",
+      "input_manifest": "D:/TestData/CopperOSCommands/Q/ad1d7d83/CopperOS/tests/Commands.NativeRoot/bin/Release/net10.0/qualification-makedir/1fe8f38d9e6a497eb675ed3a94459bc5/input-manifest.json",
+      "input_manifest_sha256": "c3c7f7cdec443818cdd16e23f22a46e266e39b09bc67d438eae23f56f83d6610",
+      "source_files": 443,
+      "binary_files": 20,
+      "restore_files": 27,
+      "host_files": 196,
+      "private_reference_files": 1,
+      "passed_stages": 25,
+      "passed_input_checks": 27,
+      "reproducible_artifacts": 3,
+      "generated_native_invocations": 117,
+      "original_native_invocations": 114,
+      "original_command_vector_comparisons": 114
+    }
+  ],
+  "previous_checkpoint_manifest": {
+    "path": "D:/TestData/CopperOSCommands/Q/ad1d7d83/previous-build-manifest.json",
+    "sha256": "fd13eb4398cb00b137a35ce5ed017a490bccf042aa93f45af96c48fb2e3541b3",
+    "reason": "Preserved before refreshing the same fifteen fixture artifacts against the frozen narrow-field/RunCommand-bridge source checkpoint. Prior original-DOS MakeDir comparisons retain their separate older artifact binding."
+  },
+  "current_checkpoint_audit": {
+    "path": "D:/TestData/CopperOSCommands/Q/ad1d7d83/accepted-requalification-audit.json",
+    "sha256": "69433b37337cabdfd2babac4d0af3a8849dc52db6fc7697e45123d2bd334a13a",
+    "source_files_per_private_capture": 570,
+    "copied_sources_and_evidence_verified": true,
+    "original_long_path_eval_failed_receipt": {
+      "path": "D:/TestData/CopperOSCommands/BuildSnapshots/commands-requalification-20260830T153022Z-8881cb48/CopperOS/tests/Commands.EvalNativeRoot/bin/Release/net10.0/qualification/d3df1c3aca5a4de7b8ca5d3f48500b56/qualification.json",
+      "bytes": 43600,
+      "sha256": "62e03dfb0b65b9004357490b7757d0bf41c2f6ed588dd3a99730ffab7d690eb0"
+    },
+    "qualifier_guard_changes": 0,
+    "shipping_admission": false,
+    "pure_admission": false
+  }
+}

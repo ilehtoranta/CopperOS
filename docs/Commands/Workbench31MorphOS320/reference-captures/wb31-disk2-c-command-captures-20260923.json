@@ -1,0 +1,369 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "source_id": "wb31-workbench-m10-40.42",
+  "volume": "Workbench3.1",
+  "disk": "Disk 2 of 6 (Workbench)",
+  "source_zip_sha256": "d93611887acf91f68f5608a5b7812f03eb16f743f40451b67c93067b04c967ed",
+  "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+  "scope": "C command members captured from the externally supplied disk 2 ADF; metadata/hash evidence only, not runtime or PURE admission",
+  "commands": [
+    {
+      "name": "AddBuffers",
+      "path": "C:/AddBuffers",
+      "bytes": 444,
+      "sha256": "49be9c1cf1fb87c60fe8d6cc30c73aed6615654763833f3247fc17aecdc6b1ca",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "AddDataTypes",
+      "path": "C:/AddDataTypes",
+      "bytes": 5880,
+      "sha256": "391da11b39bfc7c492c1b58aa9e442f1c1712bd507380903a88a4534d27c264d",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Assign",
+      "path": "C:/Assign",
+      "bytes": 3220,
+      "sha256": "2f58ca68d02a750a44b46e4b255e53cb244db7a9ce56ce40210594e46bd47a4e",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Avail",
+      "path": "C:/Avail",
+      "bytes": 736,
+      "sha256": "8989be3d11118c5a028bdd9179dac4f2e7ebf3ef692a4632b1c9b37fff5c1ccd",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "BindDrivers",
+      "path": "C:/BindDrivers",
+      "bytes": 1420,
+      "sha256": "8bc40c2cb0bb3bcd927d2f8696713284f5c554c06d6f65842bf7e062e0f60503",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Break",
+      "path": "C:/Break",
+      "bytes": 432,
+      "sha256": "623ed6f6d43d30a5abce4f5b6ac75b89b33a79579c9628c9e4a55a0cfc392c41",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "ChangeTaskPri",
+      "path": "C:/ChangeTaskPri",
+      "bytes": 460,
+      "sha256": "8e7d47b887f2daee51f1588ed1c20d26aa2363c5672c94da5d4ae97e3469c170",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "ConClip",
+      "path": "C:/ConClip",
+      "bytes": 2432,
+      "sha256": "770ccf4ab4c7ede61b327d86c45322fe966e107ae7ef806e04341786a2dd75cc",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Copy",
+      "path": "C:/Copy",
+      "bytes": 5580,
+      "sha256": "930f081b7dbdcae9d2fef7fd516dd8a92102f1f740071bd224f4637051c41529",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "CPU",
+      "path": "C:/CPU",
+      "bytes": 3652,
+      "sha256": "a0b36df7dc312fa3ca7a1bca3b27b61d1795b01602ae9bc2567c2278597da041",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Date",
+      "path": "C:/Date",
+      "bytes": 1092,
+      "sha256": "9568fa98cd28304d185f07e4dd396340dcd36cb18451ca095323712ac0e29ac7",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Delete",
+      "path": "C:/Delete",
+      "bytes": 1972,
+      "sha256": "78b2714a750a5e2d7635238049990303f49c758808eef857b69cf8df28338d5a",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Dir",
+      "path": "C:/Dir",
+      "bytes": 3440,
+      "sha256": "fe64a2da9688601a7d921e544639fd57559de359ea8ba1eb2f5b6b0f70135e7b",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "DiskChange",
+      "path": "C:/DiskChange",
+      "bytes": 312,
+      "sha256": "58e99df3cbdcc4afdbd2aea602e1ac8a058780b2fde5604e9ca3465cef85dc26",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Ed",
+      "path": "C:/Ed",
+      "bytes": 25044,
+      "sha256": "8dadce83bee1ea73f5c9deebb254a6556da943c88793ac308fcc680a6cf9ed87",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Edit",
+      "path": "C:/Edit",
+      "bytes": 14792,
+      "sha256": "a3054846f6223d41396ae74c38998ef702b9c405ca6bc2a7cfca563a3ec5aada",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Eval",
+      "path": "C:/Eval",
+      "bytes": 2084,
+      "sha256": "e320ba5d36b788e83719a09c7481d2c91d511396787b0b534e29c496240af962",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Execute",
+      "path": "C:/Execute",
+      "bytes": 4432,
+      "sha256": "27c2f578b63857ab5fbe03cdf621d553408cc670b9f07d9988ce224d22b57ecd",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Filenote",
+      "path": "C:/Filenote",
+      "bytes": 896,
+      "sha256": "c5e4576eddb734c57260f6c3516f082ae955e3a89b3a495c3a27cfacb5b209f9",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "IconX",
+      "path": "C:/IconX",
+      "bytes": 1452,
+      "sha256": "042b8e0bb79f7d91d542f239d40fffe9421781f42c31e1087ebfeb9f173d12c8",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Info",
+      "path": "C:/Info",
+      "bytes": 1980,
+      "sha256": "873e4f7030f8c5a6dfed3e048c7888f6d9de394af795fa6a6c2322f2f1f605bf",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Install",
+      "path": "C:/Install",
+      "bytes": 1712,
+      "sha256": "fe3bf5c48c09e989d41ade5053900e9c3910fa9b39a556977cc051373d1d7661",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "IPrefs",
+      "path": "C:/IPrefs",
+      "bytes": 13848,
+      "sha256": "14341be81f06506852204a33e7bfe7eb6fa2067d7f1e55810007bd94b021f0ef",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Join",
+      "path": "C:/Join",
+      "bytes": 1200,
+      "sha256": "50d8543c20eaa193b324d0b845772dfaaa2fbab1bf17cd4f698d8b98fb35d266",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "List",
+      "path": "C:/List",
+      "bytes": 5108,
+      "sha256": "69fb8b8075bc505977884e50233b7cc84237ebfc83405c27b1d818c9356dede1",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "LoadResource",
+      "path": "C:/LoadResource",
+      "bytes": 3972,
+      "sha256": "51c8d6da726d5d1429e84f36e323218eb94750ab60b650efe768fc2907d16f38",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "LoadWB",
+      "path": "C:/LoadWB",
+      "bytes": 1136,
+      "sha256": "01eebbf8e22d0a7aac94ec1803e0ef0a3f00b6408ccf49cee29a713680c0276d",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Lock",
+      "path": "C:/Lock",
+      "bytes": 536,
+      "sha256": "b1dc5345b0ef71f728fa197ff71df7fc62332d824d08dfa9c1aaa26a36d76d50",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "MagTape",
+      "path": "C:/MagTape",
+      "bytes": 1768,
+      "sha256": "1a52f4c2e0b10ea2dc7a4c92e45a945f7ee350cce80ef0ecdb70a722a8a25c64",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "MakeDir",
+      "path": "C:/MakeDir",
+      "bytes": 464,
+      "sha256": "23911db49742055d8bddcfe5f8de82cbb2232f8a7ef850d51bfd27f9b54c819b",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "MakeLink",
+      "path": "C:/MakeLink",
+      "bytes": 700,
+      "sha256": "c24b0af713e6f3a252d964c4545da29535bf6652394879a7dc4c57fdce7c02de",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Mount",
+      "path": "C:/Mount",
+      "bytes": 6880,
+      "sha256": "f47fa83e2efe3af8313b93f01ca79ede9999c62d0b5d7bfb97110e60b44de948",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Protect",
+      "path": "C:/Protect",
+      "bytes": 1300,
+      "sha256": "e2368a9f0fa9b0a9b0fb1d253957f28d1d4cd05819eb539bfdcec1876a4f7e11",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Relabel",
+      "path": "C:/Relabel",
+      "bytes": 584,
+      "sha256": "163ea95df394d2c800a161befae0bea664cb6b8a07dffc2b2b1af3141588a3ff",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "RemRAD",
+      "path": "C:/RemRAD",
+      "bytes": 1128,
+      "sha256": "eab4b310e10bf13193ed0ed4f3d8bd9baddc614245d229154fab688d7063834e",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Rename",
+      "path": "C:/Rename",
+      "bytes": 1140,
+      "sha256": "ebff9d5f1401ca67fe9542bde304c603d21366f81852716c236c5c7ca1e49579",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "RequestChoice",
+      "path": "C:/RequestChoice",
+      "bytes": 1120,
+      "sha256": "161c03df81cc2ce46f12cba19167cf301f55e3f10a57b7f7b535937ccbc82381",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "RequestFile",
+      "path": "C:/RequestFile",
+      "bytes": 1520,
+      "sha256": "2ba44b2795cfb683d6ad17cd10e3f714e84aa9ba1e039e18f3a806941628e354",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Search",
+      "path": "C:/Search",
+      "bytes": 2476,
+      "sha256": "b3e70309e954ea4a27d2e83a900bd749e59f3759e4bb1f8cb1e6943646f7bf43",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "SetClock",
+      "path": "C:/SetClock",
+      "bytes": 668,
+      "sha256": "740baa5e0eebd14c2357434e5205a8d720a1533bb6e1439e35be8e1e4af1153c",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "SetDate",
+      "path": "C:/SetDate",
+      "bytes": 688,
+      "sha256": "affce0fce8eefb7700e7848d04b666781bd14a1c6f9597e73828be203415dbce",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "SetFont",
+      "path": "C:/SetFont",
+      "bytes": 1092,
+      "sha256": "c3e1e763b12fd4f710a414443facea49479aa723a94828828dbaee214fe4ad8c",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "SetKeyboard",
+      "path": "C:/SetKeyboard",
+      "bytes": 1412,
+      "sha256": "ffb46c3b077872ea9b85620b6601e18ef08903c902b5a65110d7f96fa0b7d074",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "SetPatch",
+      "path": "C:/SetPatch",
+      "bytes": 13484,
+      "sha256": "745b2f90fabcdeccba099b3302593eff89f393d65bd84a9c6bad1b46063ab5cc",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Sort",
+      "path": "C:/Sort",
+      "bytes": 1980,
+      "sha256": "df1e158e897ab6c04951296b00261f72622647d1b7ce08d49311ad085eb04500",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Status",
+      "path": "C:/Status",
+      "bytes": 828,
+      "sha256": "fd7b386f103bafba80add97523991389880f9b6987f4534280abb61b8193580c",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Type",
+      "path": "C:/Type",
+      "bytes": 1496,
+      "sha256": "b3d27f65aea039d11b995ebb9e09458f5d68b271018762bf16c4984cfb9221de",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Version",
+      "path": "C:/Version",
+      "bytes": 4764,
+      "sha256": "dc2f55cd48b37bd1efecdbf07d38757463129dd9076ea6bf1b5d967f2189f224",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Wait",
+      "path": "C:/Wait",
+      "bytes": 852,
+      "sha256": "722ec810c589b1a5caa081a46b8e5a956c89096a36ca37844cb3da9a32708127",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    },
+    {
+      "name": "Which",
+      "path": "C:/Which",
+      "bytes": 1068,
+      "sha256": "35f7f3fee29dd2d56f482537af1c5f5a88b552080e6c26be14f455a3241b7157",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 2 outside repository"
+    }
+  ],
+  "open_gates": [
+    "disks 3-6 and machine variants",
+    "installed placement and protection flags",
+    "exact parser/help/diagnostic and guest behavior",
+    "PURE/resident lifecycle",
+    "package/licensing and differential comparison"
+  ]
+}

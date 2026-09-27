@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "capture_id": "eval-wb31-basic-20260901",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Eval",
+    "command_sha256": "e320ba5d36b788e83719a09c7481d2c91d511396787b0b534e29c496240af962",
+    "version": "eval 37.3 (26.3.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/eval-wb31-startup-probe",
+    "source_sha256": "76d923337db3f12763098a3fa84de2d9c04d10cb2a77f34058607261e9659c9d",
+    "disposable_adf_before_run_sha256": "6b79c4f8394ade60d85c54946d8da6b6cb8d32c1513231ee9e1116a3189146aa",
+    "disposable_adf_after_run_sha256": "ab501677f8a3c368952c1d5e756f1b8304f3a0be70950ae3a027c3d124923fc6",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "c6933ea66f2f2f1adb772767ac21dc67054e6dc7a26ad8f1557268c44c64fa11",
+    "capture_bytes": 17,
+    "capture_text": "BEGIN\n9\n3\nx=AEND\n"
+  },
+  "observation": {
+    "invocations": [
+      "C:Eval 1+2*3",
+      "C:Eval 1 + 2",
+      "C:Eval 42 LFORMAT=\"x=%x\""
+    ],
+    "result": "The original command returned to the caller after all three invocations. The first output was 9, the spaced addition output was 3, and the observed LFORMAT output was x=A with no trailing line feed. The caller's END marker therefore immediately followed that text."
+  },
+  "limits": [
+    "The startup sequence and capture target are authored probe content on a disposable ADF copy.",
+    "This establishes these three successful command lines only; it does not establish the complete grammar, numeric width/base rules, other LFORMAT conversions, argument errors, return level, IoErr, TO behavior, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Eval bytes are copied into this repository."
+  ]
+}

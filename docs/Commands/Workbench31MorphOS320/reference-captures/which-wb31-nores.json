@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "capture_id": "which-wb31-nores-20260831",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Which",
+    "command_sha256": "35f7f3fee29dd2d56f482537af1c5f5a88b552080e6c26be14f455a3241b7157",
+    "version": "which 37.1 (12.1.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/which-wb31-nores-startup-probe",
+    "source_sha256": "019bce1ce66bb2714364b8cb112e33d025a39675abe9c93f64e83a9c0d676b84",
+    "disposable_adf_before_run_sha256": "0ea21c8ec9856bd849bb0432cc720a2c801b80868fdb00634e6c039d2dce40ab",
+    "disposable_adf_after_run_sha256": "d4f55503ea7f2430807ad995e89e9889f19315916ac67f8246ee0f31bc809a46",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "3c800710d51fc82d24f1ae6076436a47d3698d04195f7204ec2061b8623309e1",
+    "capture_bytes": 29,
+    "capture_text": "BEGIN\nWorkbench3.1:C/Execute\n"
+  },
+  "observations": [
+    "After Resident >NIL: C:Execute PURE, C:Which Execute NORES emits Workbench3.1:C/Execute followed by LF.",
+    "The fixture does not reach its cleanup marker. This records lookup output only, not status or resident cleanup behavior."
+  ],
+  "limits": [
+    "The startup sequence and output target are authored probe content on a disposable ADF copy.",
+    "This does not establish current-directory/path precedence, result level, IoErr, diagnostics, ALL, parsing, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Which bytes are copied into this repository."
+  ]
+}

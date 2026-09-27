@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "component": "MorphOS 3.20 datatypes.library target binary identity",
+  "profile": "morphos320",
+  "recorded": "2026-09-25",
+  "source_iso": {
+    "path": "D:/TestData/MorphOSReferences/morphos-3.20.iso",
+    "sha256": "3761e191124cfd204a490915f8d285d55969e95b66c5c3cd1cf854bc71dab911",
+    "volume": "MorphOSBoot"
+  },
+  "member": {
+    "path": "MorphOS/Libs/datatypes.library",
+    "iso_extent": 203116,
+    "bytes": 20091,
+    "sha256": "647e21f96b422d6e702237ac0e706176a68efff7a2ebcb42aaa6d247b59d3f61",
+    "file_format": "MorphOS packed native (7fMOS)",
+    "embedded_version": "DataTypes 51.4 (22.10.2015)"
+  },
+  "analysis_status": "binary identity and version tag only; private datatype-list ABI not yet confirmed by disassembly or guest observation",
+  "evidence_limits": [
+    "This binds the actual target library member on the captured 3.20 ISO, unlike the source archive whose published path is versioned 3.19.",
+    "The packed payload has not been decoded or executed in an authentic MorphOS 3.20 guest by this audit.",
+    "It does not prove DataTypesList or CompoundDatatype field offsets, list ownership, callback stack sizing, unload safety, concurrency behavior, PURE/resident status or shipping eligibility."
+  ]
+}

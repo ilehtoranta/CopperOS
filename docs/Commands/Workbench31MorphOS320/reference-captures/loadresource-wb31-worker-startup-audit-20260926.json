@@ -1,0 +1,342 @@
+{
+  "schema_version": 1,
+  "capture_id": "loadresource-wb31-worker-startup-audit-20260926",
+  "kind": "offline-hunk-code-audit",
+  "profile": "wb31",
+  "command": "LoadResource",
+  "source_id": "wb31-workbench-m10-40.42",
+  "path": "C/LoadResource",
+  "source_bytes": 3972,
+  "source_sha256": "51c8d6da726d5d1429e84f36e323218eb94750ab60b650efe768fc2907d16f38",
+  "analysis_method": "Rehashed the local selected Workbench C/LoadResource payload, parsed HUNK boundaries and relocation targets, and disassembled reachable entry points using Capstone 5.0.7 in 68000 big-endian mode. Embedded alignment/data words were not treated as entry points. Rechecked public CreateNewProc tag names and CLI structure in the local NDK 3.1 ISO. No original guest execution was performed.",
+  "hunks": [
+    {
+      "index": 0,
+      "kind": "CODE",
+      "bytes": 704
+    },
+    {
+      "index": 1,
+      "kind": "DATA",
+      "bytes": 680
+    },
+    {
+      "index": 2,
+      "kind": "CODE",
+      "bytes": 2380
+    }
+  ],
+  "primary_abi_sources": [
+    {
+      "member": "NDK_3.1/Includes&Libs/include_h/dos/dostags.h",
+      "container": "D:/TestData/AmigaDeveloperCD.iso",
+      "block_2048": 21063,
+      "bytes": 5155,
+      "sha256": "db4f2d4512f802daa2531d7b007cc97ca179fd1ea123fde9cf1584701e986239",
+      "facts": "NP_Dummy=TAG_USER+1000; the exact tags below; NP_Entry excludes NP_Seglist; NP_FreeSeglist applies to NP_Seglist."
+    },
+    {
+      "member": "NDK_3.1/Includes&Libs/include_h/dos/dosextens.h",
+      "container": "D:/TestData/AmigaDeveloperCD.iso",
+      "block_2048": 21052,
+      "bytes": 16933,
+      "facts": "CommandLineInterface.cli_Module is the sixteenth LONG/BPTR field (offset 60) and contains the current command SegList; Process contains pr_MsgPort and pr_CurrentDir."
+    }
+  ],
+  "service_identity": {
+    "name_data_offset": "0x020c",
+    "name_bytes_hex": "ab 20 4c 6f 61 64 52 65 73 6f 75 72 63 65 20 bb 00",
+    "latin1_name": "« LoadResource »",
+    "accessor": "HUNK2 0x037c: LEA DATA+0x020c,A0; MOVE.L A0,D0; RTS",
+    "accessor_trampoline": "HUNK0 0x02ac JMP relocated HUNK2+0x037c"
+  },
+  "create_new_proc": {
+    "hunk": 0,
+    "call_offset": "0x0128",
+    "dos_lvo": -498,
+    "argument": "D1=A7 points to the following tag/value sequence; the list occupies 84 bytes including TAG_DONE.",
+    "tags": [
+      {
+        "tag": "NP_Entry",
+        "tag_value": "0x800003eb",
+        "value": "HUNK0+0x0202",
+        "tag_instruction": "0x011c",
+        "value_instruction": "0x0118"
+      },
+      {
+        "tag": "NP_Input",
+        "tag_value": "0x800003ec",
+        "value": 0,
+        "tag_instruction": "0x0112"
+      },
+      {
+        "tag": "NP_Output",
+        "tag_value": "0x800003ed",
+        "value": 0,
+        "tag_instruction": "0x010a"
+      },
+      {
+        "tag": "NP_CurrentDir",
+        "tag_value": "0x800003f2",
+        "value": 0,
+        "tag_instruction": "0x0102"
+      },
+      {
+        "tag": "NP_StackSize",
+        "tag_value": "0x800003f3",
+        "value": 3000,
+        "tag_instruction": "0x00fa"
+      },
+      {
+        "tag": "NP_Name",
+        "tag_value": "0x800003f4",
+        "value": "DATA+0x020c",
+        "tag_instruction": "0x00f0"
+      },
+      {
+        "tag": "NP_Priority",
+        "tag_value": "0x800003f5",
+        "value": 0,
+        "tag_instruction": "0x00e8"
+      },
+      {
+        "tag": "NP_WindowPtr",
+        "tag_value": "0x800003f7",
+        "value": 0,
+        "tag_instruction": "0x00e0"
+      },
+      {
+        "tag": "NP_HomeDir",
+        "tag_value": "0x800003f8",
+        "value": 0,
+        "tag_instruction": "0x00d8"
+      },
+      {
+        "tag": "NP_CopyVars",
+        "tag_value": "0x800003f9",
+        "value": 0,
+        "tag_instruction": "0x00d0"
+      },
+      {
+        "tag": "TAG_DONE",
+        "tag_value": "0x00000000",
+        "tag_instruction": "0x00cc"
+      }
+    ],
+    "not_present": [
+      "NP_Seglist",
+      "NP_FreeSeglist",
+      "NP_Cli",
+      "NP_Arguments"
+    ],
+    "result": "On nonzero Process result, HUNK0 0x0134 clears the first command segment link and 0x0138 selects returned Process+0x5c as the first-request destination. On failure it leaves the segment link intact and enters the client failure path at 0x0190."
+  },
+  "client_coordination": [
+    {
+      "offsets": "HUNK0 0x009e-0x00ac",
+      "observation": "Calls DOS Cli, reads cli_Module at CLI+0x3c, converts BPTR to address, and saves the first segment header LONG (the next-segment BPTR) into DATA+0x0298."
+    },
+    {
+      "offsets": "HUNK0 0x00b4-0x00c6",
+      "observation": "Exec Forbid, resolve service name, Exec FindPort; use existing service when nonzero, otherwise create a process with the tags above."
+    },
+    {
+      "offsets": "HUNK0 0x0140-0x018a",
+      "observation": "Builds the actual 54-byte resource request on the caller stack, sends it with PutMsg at 0x0176, WaitPort at 0x017c, GetMsg at 0x0182, then reads Result/IoErr. This is the same request described by the separate request-protocol audit."
+    },
+    {
+      "offsets": "HUNK0 0x01a2-0x01b2",
+      "observation": "Calls Permit only after the synchronous transaction/failure path, then FreeArgs. The WaitPort call can yield execution while the client is waiting; static instruction order alone does not prove race-free startup."
+    }
+  ],
+  "worker_startup": {
+    "entry": "HUNK0 0x0202",
+    "receive_initial_request": "Loads current Exec ThisTask, adds 0x5c for its Process message port, then WaitPort at 0x021e and GetMsg at 0x0224. Saves that message in A5, calls Forbid at 0x022a, then FindPort at 0x0234.",
+    "duplicate_worker": "If FindPort returns a service, PutMsg at 0x0240 forwards the same initial request to it. At 0x0244-0x024c the duplicate reads DATA+0x0298 and calls DOS UnLoadSeg; it then returns through HUNK0 0x02a0. There is no immediate reply to the client and no explicit Permit in this branch.",
+    "primary_worker_port": {
+      "location": "34-byte MsgPort in HUNK0 worker stack frame at A7+0x0e",
+      "fields": [
+        {
+          "offset": 8,
+          "value": 4,
+          "meaning": "NT_MSGPORT",
+          "instruction": "0x0266"
+        },
+        {
+          "offset": 9,
+          "value": -1,
+          "meaning": "Node priority",
+          "instruction": "0x0274"
+        },
+        {
+          "offset": 10,
+          "value": "DATA+0x020c",
+          "meaning": "Node name pointer",
+          "instruction": "0x0270"
+        },
+        {
+          "offset": 14,
+          "value": 0,
+          "meaning": "PA_SIGNAL",
+          "instruction": "0x0262"
+        },
+        {
+          "offset": 15,
+          "value": "Exec AllocSignal(-1) result",
+          "meaning": "Signal bit",
+          "instruction": "0x025e"
+        },
+        {
+          "offset": 16,
+          "value": "current Exec ThisTask",
+          "meaning": "Signal task",
+          "instruction": "0x0252"
+        },
+        {
+          "offset": 20,
+          "value": "empty list initialized via HUNK2+0x093c",
+          "meaning": "Message queue",
+          "instruction": "0x027a-0x027e"
+        }
+      ],
+      "signal_allocation": "Exec AllocSignal(-1) at HUNK0 0x025a; no result-failure branch is present before its low byte is stored.",
+      "publication": "Exec AddPort at HUNK0 0x0286 publishes the stack-owned service port."
+    },
+    "first_request_dispatch": "PutMsg at HUNK0 0x0290 queues the original request onto the new service port. Permit at 0x0294 follows. HUNK0 0x029c calls a trampoline that jumps to HUNK2+0x03ec with A0=service port. Startup does not reply; the dispatcher processes this message and ReplyMsg occurs at HUNK2 0x0628."
+  },
+  "worker_dispatch": [
+    {
+      "offsets": "HUNK2 0x03ec-0x03fa",
+      "observation": "Reserves 544 stack bytes, saves the service-port pointer, initializes the opened-resource list at DATA+0x029c, then initializes/installs the separate one-shot LoadSeg hook/cache via 0x0166."
+    },
+    {
+      "offsets": "HUNK2 0x0400-0x0418, 0x0614-0x0628",
+      "observation": "WaitPort/GetMsg receive a request. Any nonzero request word at +20 takes the direct failure path: Result=20, IoErr=212, then ReplyMsg without selecting caller streams/directory."
+    },
+    {
+      "offsets": "HUNK2 0x041c-0x0444",
+      "observation": "For request flag zero, clears Result/IoErr, selects request CurrentDirectory via DOS CurrentDir and request Input/Output via SelectInput/SelectOutput, retaining all three previous values."
+    },
+    {
+      "offsets": "HUNK2 0x0448-0x0570",
+      "observation": "A nonnull NAME vector is traversed until its null terminator or nonzero request Result. Each name uses DOS MatchFirst/MatchNext/MatchEnd. UNLOCK at request+50 takes precedence over the LOCK flag at +46."
+    },
+    {
+      "offsets": "HUNK2 0x0452-0x0488",
+      "observation": "Before each MatchFirst, clears a 538-byte AnchorPath/buffer area, sets ap_BreakBits=0x1000, ap_Flags=1 and ap_Strlen=256. The expanded-name buffer passed onward is stack+0x011e (AnchorPath+280)."
+    },
+    {
+      "offsets": "HUNK2 0x052c-0x0564",
+      "observation": "Error 232 from matching ends enumeration without setting failure. Other nonzero results set request Result=20 and IoErr to that result; MatchEnd runs and further names are skipped once Result is nonzero."
+    },
+    {
+      "offsets": "HUNK2 0x0572-0x05e6",
+      "observation": "Null NAME selects registry listing even when switches are present. Empty list prints catalog C357; otherwise prints TYPE/NAME header and each registry name with label C350+record type."
+    },
+    {
+      "offsets": "HUNK2 0x05ea-0x0628",
+      "observation": "For normal requests, nonzero selected IoErr is printed through DOS PrintFault. Restores previous CurrentDir/Input/Output before ReplyMsg at 0x0628."
+    }
+  ],
+  "opened_resource_registry": {
+    "list_data_offset": "0x029c",
+    "empty_tailpredecessor_data_offset": "0x02a4",
+    "insertion_entry": "HUNK2 0x0384",
+    "allocation": "Exec AllocVec(strlen(name)+19,0) at 0x03a6",
+    "record_fields": [
+      {
+        "offset": 0,
+        "bytes": 8,
+        "field": "list links"
+      },
+      {
+        "offset": 8,
+        "bytes": 1,
+        "field": "resource type: 0 library, 1 device label, 2 font, 3 catalog"
+      },
+      {
+        "offset": 9,
+        "bytes": 1,
+        "field": "unused priority byte; no initialization observed"
+      },
+      {
+        "offset": 10,
+        "bytes": 4,
+        "field": "name APTR pointing to record+18"
+      },
+      {
+        "offset": 14,
+        "bytes": 4,
+        "field": "opened resource pointer"
+      },
+      {
+        "offset": 18,
+        "bytes": "strlen(name)+1",
+        "field": "copied NUL-terminated name"
+      }
+    ],
+    "lookup": "HUNK2 0x03e0 dispatches to list walk at 0x02f8. Utility Stricmp (-162) at 0x0316 compares requested and recorded names. This is a case-insensitive string lookup, distinct from DOS SameLock in the SegList cache.",
+    "insertion_call_sites": [
+      {
+        "offset": "0x0798",
+        "type": 0,
+        "resource": "library opened with Exec OpenLibrary(name,0)"
+      },
+      {
+        "offset": "0x087a",
+        "type": 2,
+        "resource": "font opened with diskfont.library OpenDiskFont"
+      },
+      {
+        "offset": "0x0712",
+        "type": 3,
+        "resource": "catalog opened with locale.library OpenCatalogA"
+      }
+    ],
+    "device_path": "HUNK2 classification helper returns 2 for NT_DEVICE (byte 3 at Resident+12). At 0x076c-0x076e this branches directly to return after the SegList was cached at 0x0758. No opened-resource registry insertion or OpenDevice occurs in this path. The device preload remains in the one-shot LoadSeg cache; LOCK does not create a type-1 registry entry in the decoded flow.",
+    "unlock": "HUNK2 0x0498 looks up the expanded name. Type 0 closes library, type 2 closes font, type 3 closes catalog. All found nodes then go through 0x0678: Exec Remove at 0x0684 and FreeVec at 0x068a. Type 1 has no close call in the switch. Missing names print C35C and continue without setting request Result/IoErr at that branch.",
+    "duplicate_lock": "The load helper first checks registry at 0x06a4; an existing record prints C358 at 0x090e and returns zero through 0x0914.",
+    "failed_record_allocation": "The library/font/catalog paths close the just-opened handle if insertion returns false. Those branches do not assign an allocation error to D7; this is an exact static branch observation and requires original runtime qualification.",
+    "serialization": "Only the worker dispatch path accesses this opened-resource list. The separately semaphore-protected 16-byte cache at DATA+0x0238 must not be conflated with it."
+  },
+  "segment_lifetime_and_exit": [
+    {
+      "offsets": "HUNK0 0x00a4-0x00ac, 0x0134",
+      "observation": "Saves the next-segment BPTR from the first command segment header in DATA+0x0298. Successful process creation clears that header link. With standard SegList layout this detaches HUNK1 DATA and HUNK2 CODE from the caller-owned HUNK0 chain; the retained tail is used by the worker."
+    },
+    {
+      "offsets": "HUNK0 0x0202-0x02a8",
+      "observation": "The process entry and startup port are in HUNK0/worker stack, but normal service work enters HUNK2 and terminates through DOS Exit rather than returning through the startup entry."
+    },
+    {
+      "offsets": "HUNK2 0x062c-0x0652",
+      "observation": "After ReplyMsg, a nonempty opened-resource registry returns to WaitPort. When empty, Forbid at 0x063c precedes a service-message-queue emptiness check, then calls teardown helper 0x0196 at 0x064c and tests its low word at 0x0650."
+    },
+    {
+      "offsets": "HUNK2 0x0196-0x01ea",
+      "observation": "The teardown helper uses AttemptSemaphore. Vector restoration is conditional on semaphore acquisition, empty cache and zero active count; a newer LoadSeg vector is restored if displaced by the attempted removal. Every decoded path nevertheless reaches 0x01e6 bytes 70 01 (MOVEQ #1,D0). This helper provides no failure return to the worker in these bytes."
+    },
+    {
+      "offsets": "HUNK2 0x0654-0x0668",
+      "observation": "The nonzero-return branch removes the published port (RemPort at 0x0656), calls UnLoadSeg(DATA+0x0298) at 0x0662, then calls DOS Exit(0) at 0x0668. There is no intervening Permit in this exit path."
+    },
+    {
+      "offsets": "HUNK2 0x066c-0x0674",
+      "observation": "When the queue check prevents shutdown, calls Permit and loops back to WaitPort."
+    }
+  ],
+  "implementation_implications": [
+    "Worker startup and the first normal request are one synchronous transaction; avoid inventing a separate startup acknowledgment or freeing ReadArgs data before ReplyMsg.",
+    "Maintain distinct opened-resource registry and one-shot SegList cache state and ownership.",
+    "The original uses a detached multi-HUNK tail. A replacement using a different native HUNK layout needs an explicit code-image lifetime design before its worker/hook can ship; successful static compilation does not establish that lifetime.",
+    "The original static teardown has an unconditional success return despite conditional vector restoration. Do not cite this helper as proof that idle/foreign-hook gates protect segment unloading. Establish original runtime behavior and replacement lifecycle requirements before qualifying this boundary."
+  ],
+  "evidence_limits": [
+    "All command behavior above is inferred from hash-bound static instruction/data flow. No original Workbench process creation, scheduling, resource action or hook lifetime was executed.",
+    "DOS default handling for omitted tags, exact loader/CLI segment cleanup, and the safety/effect of self-unloading while under Forbid remain original-guest qualification obligations.",
+    "The unconditional teardown return is recorded exactly, without claiming that its guest effect is an established original bug or that reproducing unsafe behavior is required.",
+    "Library lease lifetime, locale fallback/error precedence, every font/catalog branch, allocation/signal failures and concurrency remain incompletely qualified.",
+    "The source media has PURE clear. A persistent worker is not evidence that the command is PURE or a Shell resident command.",
+    "This audit does not qualify a replacement for shipping or redistribute the original executable."
+  ]
+}

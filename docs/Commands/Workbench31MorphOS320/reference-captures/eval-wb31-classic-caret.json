@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "capture_id": "eval-wb31-classic-caret-20260901",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Eval",
+    "command_sha256": "e320ba5d36b788e83719a09c7481d2c91d511396787b0b534e29c496240af962",
+    "version": "eval 37.3 (26.3.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/eval-wb31-classic-caret-probe",
+    "source_sha256": "05cb0a4b7bb9a3d872d826ef15da715a19816347f7521135c6b4c7d29aeac32e",
+    "disposable_adf_before_run_sha256": "9d90bfda5beaca662a45159b8fa1bbd09ee3e48c32f00064487fb6e3acf1d9f4",
+    "disposable_adf_after_run_sha256": "0a3d53bbb666da7e80ceda49f831c50635e508b55706d3b583c4071964a3d986",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "6b6bb0820914a6df96bd7807c34c315fec67c82d447b6a3db1c03e7ddd3f31ad",
+    "capture_bytes": 26,
+    "capture_text": "BEGIN\n2\n2\n2\n5\n0\n2\n2\n5\nEND\n"
+  },
+  "observation": {
+    "invocations": [
+      "C:Eval 2^3",
+      "C:Eval 2 ^ 3",
+      "C:Eval 2^3+4",
+      "C:Eval 2 + 3 ^ 4",
+      "C:Eval 2 ** 3",
+      "C:Eval 2 pow 3",
+      "C:Eval 2 junk",
+      "C:Eval 2+3junk"
+    ],
+    "result": "The original command output 2, 2, 2, 5, 0, 2, 2, and 5 in invocation order. The first four, plus trailing word forms, show accepted evaluated prefixes; the double-star outcome is recorded without a grammar interpretation."
+  },
+  "limits": [
+    "The startup sequence and capture target are authored probe content on a disposable ADF copy.",
+    "This proves selected output bytes only. It does not establish all malformed-input statuses, diagnostics, return level, IoErr, general tokenizer recovery, caret/double-star semantics, TO behavior, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Eval bytes are copied into this repository."
+  ]
+}

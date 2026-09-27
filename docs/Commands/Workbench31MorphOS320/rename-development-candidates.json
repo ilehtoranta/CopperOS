@@ -1,0 +1,653 @@
+{
+  "schema_version": 1,
+  "status": "development-only",
+  "scope": "Workbench and MorphOS Rename development bodies with three-CPU native evidence and bounded original-Kickstart-DOS execution on 68000. No original MorphOS runtime equivalence, accepted packaging or PURE admission claimed.",
+  "candidates": [
+    {
+      "id": "CC12.Rename.wb31.68000",
+      "binary": "artifacts/workbench-rename-native/rename-68000.hunk",
+      "sha256": "ffc200c9350e86e50c1173c73872c1b6bed8739398579ab71b4f97444eef0d28",
+      "bytes": 4556,
+      "status": "development-only",
+      "shipping": false,
+      "pure_admitted": false,
+      "runtime_evidence": [
+        {
+          "scope": "candidate-rename-direct-directory-verified",
+          "receipt": "artifacts/copy-boot-fixture/rename-native-media.json",
+          "receipt_sha256": "d3aa9281685ec09e4639fcec302846bd503a1539269244707736027ca6cb884a",
+          "report": "artifacts/copy-boot-fixture/verified-rename-native.json",
+          "report_sha256": "d357f897fca75851e6c9f11a626036a2170c09c362b3f141d7c8bfaf502fae6a"
+        },
+        {
+          "scope": "candidate-rename-error-recovery-verified",
+          "receipt": "artifacts/copy-boot-fixture/rename-native-errors-media.json",
+          "receipt_sha256": "d150780b387999b4aab6d5a51370b863d6dcf3816d9b6530b65c1b383d2d1b1a",
+          "report": "artifacts/copy-boot-fixture/verified-rename-native-errors.json",
+          "report_sha256": "2a99289f04a1e8b3b22ba0fb9a85a9089cb3a2201a7f177ba6db3b0e191f051c"
+        },
+        {
+          "scope": "candidate-rename-nondirectory-verified",
+          "receipt": "artifacts/copy-boot-fixture/rename-native-nondirectory-media.json",
+          "receipt_sha256": "2e165ad07d5b0b8f6637d5dbc12de0a956a92391420878ac24154b9c18d379cf",
+          "report": "artifacts/copy-boot-fixture/verified-rename-native-nondirectory.json",
+          "report_sha256": "a91e5801fc27b4f2e4b9e1c3c1073eff130ee1d4738c28c343f7e0f8f221d5f8"
+        },
+        {
+          "scope": "candidate-rename-partial-failure-readback-verified",
+          "receipt": "artifacts/copy-boot-fixture/rename-native-partial-media.json",
+          "receipt_sha256": "08b7c37fb543a8c4f428115967f360a1a9da60eed75052e9441692021da5c5c5",
+          "report": "artifacts/copy-boot-fixture/verified-rename-native-partial.json",
+          "report_sha256": "88c4aa38e2d195505c74549c240f2178b63eb03b4e0d7a3974970e4e5a0185f4"
+        },
+        {
+          "scope": "candidate-rename-original-dos-concurrent-verified",
+          "receipt": "artifacts/copy-boot-fixture/rename-native-concurrent-media.json",
+          "receipt_sha256": "0eeedd6df57e1e55717c96f86f7ae734567a2ea585835acf28724db750de77c0",
+          "report": "artifacts/copy-boot-fixture/verified-rename-native-concurrent.json",
+          "report_sha256": "5e9c8f20b93da4aee0e93302a8b769187b3a67eeea660f9cbb7aeb247aeccdaf"
+        },
+        {
+          "scope": "candidate-rename-wildcard-as-original-dos-verified",
+          "receipt": "artifacts/copy-boot-fixture/rename-native-wildcard-media.json",
+          "receipt_sha256": "fb06d45db29c95f7c03a467edb5e8e6308a7807e6c77c4ff46cd6265b03ccbfd",
+          "report": "artifacts/copy-boot-fixture/verified-rename-native-wildcard.json",
+          "report_sha256": "86d342bec6abaffb1bfd2a0dfa7b011fa2ece4c806564a2461a2fab20625a688"
+        }
+      ],
+      "startup_vector_evidence": {
+        "report": "artifacts/workbench-rename-native/rename-68000.startup.json",
+        "sha256": "4eb6ecb1c2f3876734185a817f5770bea1e92fbb748e68266eeca7408bae5e39",
+        "invocations": 10,
+        "scope": "Candidate startup and early break with supplied vectors, not full body or original startup parity."
+      },
+      "allocation_vector_evidence": {
+        "report": "artifacts/workbench-rename-native/rename-68000.allocation.json",
+        "sha256": "c8e77dae50025eeda7efc6570107ffb8d6497e9728b54affc133de95d42e677c",
+        "invocations": 16,
+        "scope": "Includes startup cases and four AllocVec failure points with interleaved failure callers; supplied vectors only."
+      },
+      "parser_vector_evidence": {
+        "report": "artifacts/workbench-rename-native/rename-68000.parser.json",
+        "sha256": "950d087a20e5226a95fec0a825c47be1e9e58af82e582b2fc0e92e8ec5a9fee8",
+        "invocations": 20,
+        "scope": "Cumulative startup/allocation suite plus parser error116 and synthetic zero-IoErr failure, sequential and interleaved."
+      },
+      "matcher_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-matcher-qualified\\rename-68000.runtime.json",
+        "report_sha256": "ac24a68ba7503f35382e6c7eed1d87f3853a72867fb71cde9881a6a324015ec5",
+        "invocations": 24,
+        "scope": "Cumulative suite including failed initial MatchFirst with D0=103 and IoErr214/0, sequential and interleaved."
+      },
+      "prefix_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-prefix-qualified\\rename-68000.runtime.json",
+        "report_sha256": "04b954a5863315a07b126f547072860d9723d45ec5a6833519a95e9a33779510",
+        "invocations": 27,
+        "scope": "Cumulative suite including error205 prefix with failed VPrintf and poisoned IoErr, sequential and interleaved."
+      },
+      "direct_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-direct-qualified\\rename-68000.runtime.json",
+        "report_sha256": "68ba82c1b94758feb69087a4dc9ab2a7207d00e72ee6a35b2a472f9a4de54001",
+        "invocations": 33,
+        "scope": "Cumulative suite plus direct success, ParsePattern failure120/zero, 256-byte unterminated result, and interleaved success/rejection."
+      },
+      "capacity_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-capacity-qualified\\rename-68000.runtime.json",
+        "report_sha256": "a8941835860b7d3807cd7a3f97e5aea4e9b3b0a613bac47c2dc4aacbf284c431",
+        "invocations": 36,
+        "scope": "Cumulative suite plus valid255-byte parsed source with final NUL and interleaving against unterminated256-byte rejection."
+      },
+      "directory_name_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-name-qualified\\rename-68000.runtime.json",
+        "report_sha256": "8c919d548c55b41a8a11baf3f80eb46f624df829fe3001525362eaa24aa5d821",
+        "invocations": 42,
+        "scope": "Cumulative suite plus NameFromLock failure120/zero, empty and unterminated outputs, with owned directory locks/FIBs and interleaving."
+      },
+      "composition_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-compose-qualified\\rename-68000.runtime.json",
+        "report_sha256": "f9176bf90a1a98d219886d897af12134478cdd140cde2a1b19811aaf05528d4f",
+        "invocations": 47,
+        "scope": "Cumulative suite plus colon-prefix directory composition255/256-byte boundary and two interleaved successful directory callers; MatchNext overwrites anchor buffers."
+      },
+      "slash_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-slash-qualified\\rename-68000.runtime.json",
+        "report_sha256": "c6c85e85b6bf4f0a6b818fc1b1ba12c9b4f5327a301786e9da94e6a44e3f3c05",
+        "invocations": 52,
+        "scope": "Cumulative suite plus slash-appended255-byte destination,256-byte overflow and no-room-for-slash rejection; interleaved valid/overflow callers."
+      },
+      "progress_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-progress-qualified\\rename-68000.runtime.json",
+        "report_sha256": "78721988c6fffac3696d896d84b978a65300b31d99fa504e8e0fecae2b920614",
+        "invocations": 55,
+        "scope": "Cumulative suite plus nonquiet directory progress whose VPrintf returns failure/IoErr999, interleaved with QUIET success."
+      },
+      "partial_failure_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-partial-qualified\\rename-68000.runtime.json",
+        "report_sha256": "ed9d9e5e28e368883672e721d699356ec9dffc11a89a963226077a54c8afaa78",
+        "invocations": 58,
+        "scope": "Cumulative suite plus second directory Rename failure203 after supplied first success, with prefix output poisoning and interleaved successful caller."
+      },
+      "fib_failure_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-fib-qualified\\rename-68000.runtime.json",
+        "report_sha256": "d9eea9aeda5071ce105a2a5b29feacec1fd3406e56a257f6174cea1cce7e9975",
+        "invocations": 62,
+        "scope": "Cumulative suite plus failed directory FIB allocation103/zero and interleaved failure/success."
+      },
+      "matchnext_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-next-qualified\\rename-68000.runtime.json",
+        "report_sha256": "9349e037cd21c5a644fdaf50c47b5f2ed3ca9a3b831ecdfc10476c3912acac6c",
+        "invocations": 66,
+        "scope": "Cumulative suite plus MatchNext304/103 with matching IoErr; current item still renamed and later pattern visited, including interleaving."
+      },
+      "later_match_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-later-qualified\\rename-68000.runtime.json",
+        "report_sha256": "fe653256bea85aa0a2e288d18bcead0b56e9c8c2085a4726d69e8f44566d8b55",
+        "invocations": 69,
+        "scope": "Cumulative suite plus later MatchFirst205 after one supplied rename success; no initial failure prefix; interleaved success caller."
+      },
+      "single_source_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-single-qualified\\rename-68000.runtime.json",
+        "report_sha256": "bfe9b22dac2055dab71f7e700f29b03592de2c6af254135d303dd0c1bcf21398",
+        "invocations": 74,
+        "scope": "Cumulative suite plus single-source SameLock1/-1 and failed temporary source Lock, with interleaved distinct-lock callers."
+      },
+      "same_lock_zero_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-same-qualified\\rename-68000.runtime.json",
+        "report_sha256": "b250f51bf158ed1816fcf0a08861f7b775e557a13bb6ca2a63f1a829d70d80c9",
+        "invocations": 77,
+        "scope": "Cumulative suite plus SameLock0 direct fallback with distinct BPTRs, interleaved with SameLock1 directory traversal."
+      },
+      "stack_budget_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-stack-qualified\\rename-68000.runtime.json",
+        "report_sha256": "ee3528cb803149308971494713beb047246f81cf14d7f5938c4e2ee155c34130",
+        "configured_bytes": 4096,
+        "maximum_written_bytes": 204,
+        "scope": "Covered candidate code with supplied vectors only; real DOS stack consumption and minimum stack remain unqualified."
+      },
+      "anchor_boundary_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-anchor-qualified\\rename-68000.runtime.json",
+        "report_sha256": "d84418cc9829be1feef47724195231e8e59cd286a0aa8cf8bcb6212b1ad2d9b6",
+        "invocations": 81,
+        "scope": "Cumulative suite plus108-byte unterminated FIB filename and256-byte unterminated anchor path; sequential/interleaved rejection."
+      },
+      "multi_match_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-multimatch-qualified\\rename-68000.runtime.json",
+        "report_sha256": "f0e3727630482fae5099fb0c2976fd329af5fab0e7d2db504f1429bb0de4437c",
+        "invocations": 84,
+        "scope": "Cumulative suite plus one-source two-match traversal; MatchNext0 replaces file with next before first rename, then232; interleaved one-match caller."
+      },
+      "false_zero_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-falsezero-qualified\\rename-68000.runtime.json",
+        "report_sha256": "1963c0ec71e654146d6e7038d34203b8651a9e26daf8f89ab4b6f556b0b5d17f",
+        "invocations": 87,
+        "scope": "Cumulative suite plus direct Rename(FALSE)/IoErr0, exact raw-name prefix, no common fault, return0; interleaved success."
+      },
+      "secondary_error_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-ioerr-qualified\\rename-68000.runtime.json",
+        "report_sha256": "009625e4a6583aa8a389f49958809e51236f024609d0d8b2b5c9a5dbfbc2fa64",
+        "invocations": 91,
+        "scope": "Cumulative suite plus parser fault116 whose PrintFault returns0/IoErr999 and successful fault followed by FreeVec IoErr774..777; primary20 retained."
+      },
+      "wildcard_reference_comparison": {
+        "report": "artifacts/copy-boot-fixture/compared-rename-wildcard.json",
+        "sha256": "df51e74da4be4f862d3fea57e65f8fbcea867fac2a9936db012957219cf1f201",
+        "scope": "Same startup, original DOS/handler: parser success, two wildcard effects, AS effect, primary returns, silent calls and exact destination readback. Not complete call-trace, final IoErr or full-profile parity."
+      },
+      "directory_false_zero_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-directoryzero-qualified\\rename-68000.runtime.json",
+        "report_sha256": "b97496221649f2bd86b55605ecbfbdc0f41cd263a291d14728e1da38cb5e4fb7",
+        "invocations": 94,
+        "scope": "Cumulative suite plus second directory Rename(FALSE)/IoErr0 after supplied success; prefix/no fault/return0 and interleaving."
+      },
+      "success_cleanup_error_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-successio-qualified\\rename-68000.runtime.json",
+        "report_sha256": "fcb012308d682441308537a02fbf110af872020937a1472e3d5509646fbd114c",
+        "invocations": 97,
+        "scope": "Cumulative suite plus successful direct Rename followed by FreeVec IoErr774..777; return0/final777, no fault; interleaved parser failure cleanup."
+      },
+      "multi_match_failure_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-multifailure-qualified\\rename-68000.runtime.json",
+        "report_sha256": "e8e7a8e4e5ce83177b7e817a57d77920caff74d93c6c518623d9eff4f5b9540e",
+        "invocations": 100,
+        "scope": "Cumulative suite plus second distinct match Rename203 failure within one source pattern, with saved next-path diagnostic and interleaved success."
+      },
+      "examine_failure_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-examine-qualified\\rename-68000.runtime.json",
+        "report_sha256": "b990290dfe2389c6aa8abd73a7090d96cbef2991c425edfcbe11a21d56328ab3",
+        "invocations": 103,
+        "scope": "Cumulative suite plus single-source destination Examine(FALSE)/IoErr222 direct fallback, with successful Rename and owned FIB/lock release."
+      }
+    },
+    {
+      "id": "CC12.Rename.wb31.68020",
+      "binary": "artifacts/workbench-rename-native/rename-68020.hunk",
+      "sha256": "8af4273368f9327ff39784b7d44c583d841a1affbe9d13b880bbad36562c1c08",
+      "bytes": 4604,
+      "status": "development-only",
+      "shipping": false,
+      "pure_admitted": false,
+      "runtime_evidence": [],
+      "startup_vector_evidence": {
+        "report": "artifacts/workbench-rename-native/rename-68020.startup.json",
+        "sha256": "2677c619c57bf715bc9ab5366dd4f5d0fd1a6c10603311c7e76555aee3134565",
+        "invocations": 10,
+        "scope": "Candidate startup and early break with supplied vectors, not full body or original startup parity."
+      },
+      "allocation_vector_evidence": {
+        "report": "artifacts/workbench-rename-native/rename-68020.allocation.json",
+        "sha256": "d0fbec1f41b431fbce8addbbd26a05556ee6149e6b2015a593089b29535fd353",
+        "invocations": 16,
+        "scope": "Includes startup cases and four AllocVec failure points with interleaved failure callers; supplied vectors only."
+      },
+      "parser_vector_evidence": {
+        "report": "artifacts/workbench-rename-native/rename-68020.parser.json",
+        "sha256": "e787d357e9adc8ca5b35da826a49601ec6dba85f4e8275c0bf09d4919db0346a",
+        "invocations": 20,
+        "scope": "Cumulative startup/allocation suite plus parser error116 and synthetic zero-IoErr failure, sequential and interleaved."
+      },
+      "matcher_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-matcher-qualified\\rename-68020.runtime.json",
+        "report_sha256": "3c6cd333a8a24d8b9d88f9a63513f272d5fa115193020e20a78022b399a6a9bf",
+        "invocations": 24,
+        "scope": "Cumulative suite including failed initial MatchFirst with D0=103 and IoErr214/0, sequential and interleaved."
+      },
+      "prefix_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-prefix-qualified\\rename-68020.runtime.json",
+        "report_sha256": "ce914efa4e8ad29168bc6fa69fcc5dffe81cce8deddbd7cffbe561941da7a6f5",
+        "invocations": 27,
+        "scope": "Cumulative suite including error205 prefix with failed VPrintf and poisoned IoErr, sequential and interleaved."
+      },
+      "direct_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-direct-qualified\\rename-68020.runtime.json",
+        "report_sha256": "2f199e160152723e4cec90cc81d0c5e7bdd4e8c3390aa00f9d088c7527fb9c7c",
+        "invocations": 33,
+        "scope": "Cumulative suite plus direct success, ParsePattern failure120/zero, 256-byte unterminated result, and interleaved success/rejection."
+      },
+      "capacity_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-capacity-qualified\\rename-68020.runtime.json",
+        "report_sha256": "f075da6add1ae6f9284ccb061c51a1b3c193279ba7137779f237c1e464095eb4",
+        "invocations": 36,
+        "scope": "Cumulative suite plus valid255-byte parsed source with final NUL and interleaving against unterminated256-byte rejection."
+      },
+      "directory_name_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-name-qualified\\rename-68020.runtime.json",
+        "report_sha256": "67eb3c1dbe10cfd4b8ad48c77060560a3f06fa3eab1c14525b35af4506e1abe6",
+        "invocations": 42,
+        "scope": "Cumulative suite plus NameFromLock failure120/zero, empty and unterminated outputs, with owned directory locks/FIBs and interleaving."
+      },
+      "composition_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-compose-qualified\\rename-68020.runtime.json",
+        "report_sha256": "931cc37a2ba4cb41a67e94295fda351a8985f8e5c002d85d16403e86b4d7d61b",
+        "invocations": 47,
+        "scope": "Cumulative suite plus colon-prefix directory composition255/256-byte boundary and two interleaved successful directory callers; MatchNext overwrites anchor buffers."
+      },
+      "slash_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-slash-qualified\\rename-68020.runtime.json",
+        "report_sha256": "8837e4792871b5334710f002859b062c6de81b0882140709a09350f9d3c2a210",
+        "invocations": 52,
+        "scope": "Cumulative suite plus slash-appended255-byte destination,256-byte overflow and no-room-for-slash rejection; interleaved valid/overflow callers."
+      },
+      "progress_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-progress-qualified\\rename-68020.runtime.json",
+        "report_sha256": "45396c2cca3b07b55818b1d77c193ef0ed0a53364b6fc67c9d0a899b58e1bcd0",
+        "invocations": 55,
+        "scope": "Cumulative suite plus nonquiet directory progress whose VPrintf returns failure/IoErr999, interleaved with QUIET success."
+      },
+      "partial_failure_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-partial-qualified\\rename-68020.runtime.json",
+        "report_sha256": "724744dc517b950d9ee5429fb1e1dd2bf7393d762c7e3ba8176554fb92bca481",
+        "invocations": 58,
+        "scope": "Cumulative suite plus second directory Rename failure203 after supplied first success, with prefix output poisoning and interleaved successful caller."
+      },
+      "fib_failure_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-fib-qualified\\rename-68020.runtime.json",
+        "report_sha256": "7febd8f4cbfd9d8af54cfa9b042bf829390fda643b1053070cad617124891f1c",
+        "invocations": 62,
+        "scope": "Cumulative suite plus failed directory FIB allocation103/zero and interleaved failure/success."
+      },
+      "matchnext_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-next-qualified\\rename-68020.runtime.json",
+        "report_sha256": "a2b43e692e70104b041ce9b7b5e7264c967e52a938b3e5d3e79cb8b66ddb026b",
+        "invocations": 66,
+        "scope": "Cumulative suite plus MatchNext304/103 with matching IoErr; current item still renamed and later pattern visited, including interleaving."
+      },
+      "later_match_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-later-qualified\\rename-68020.runtime.json",
+        "report_sha256": "88bf2ec41b80495b6c51fec3da27f04f59222c0d06c4c79d3163c54292eceda8",
+        "invocations": 69,
+        "scope": "Cumulative suite plus later MatchFirst205 after one supplied rename success; no initial failure prefix; interleaved success caller."
+      },
+      "single_source_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-single-qualified\\rename-68020.runtime.json",
+        "report_sha256": "a74274d7a5f17f51c8237561a04054085083777a43fcd32290779d4ce11bd926",
+        "invocations": 74,
+        "scope": "Cumulative suite plus single-source SameLock1/-1 and failed temporary source Lock, with interleaved distinct-lock callers."
+      },
+      "same_lock_zero_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-same-qualified\\rename-68020.runtime.json",
+        "report_sha256": "96c7510e26ab01414169da18e71f581a57fc4554472e6dfc9191d2c134d46231",
+        "invocations": 77,
+        "scope": "Cumulative suite plus SameLock0 direct fallback with distinct BPTRs, interleaved with SameLock1 directory traversal."
+      },
+      "stack_budget_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-stack-qualified\\rename-68020.runtime.json",
+        "report_sha256": "9effeba5432dadeb69190c6cb3ee99a2f985fbad309b58465d6c7212090497e4",
+        "configured_bytes": 4096,
+        "maximum_written_bytes": 204,
+        "scope": "Covered candidate code with supplied vectors only; real DOS stack consumption and minimum stack remain unqualified."
+      },
+      "anchor_boundary_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-anchor-qualified\\rename-68020.runtime.json",
+        "report_sha256": "31566b94c999ee2a2a6266d410b922123c7f3601f8fb39de2a3a3198564a4523",
+        "invocations": 81,
+        "scope": "Cumulative suite plus108-byte unterminated FIB filename and256-byte unterminated anchor path; sequential/interleaved rejection."
+      },
+      "multi_match_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-multimatch-qualified\\rename-68020.runtime.json",
+        "report_sha256": "0cc23e47bcce048903d5feddcd9405ada67c17f52c9fd9ad77f30903b2abb445",
+        "invocations": 84,
+        "scope": "Cumulative suite plus one-source two-match traversal; MatchNext0 replaces file with next before first rename, then232; interleaved one-match caller."
+      },
+      "false_zero_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-falsezero-qualified\\rename-68020.runtime.json",
+        "report_sha256": "146f6853783b2ef39fbce1a15829217471ca4429df90cac8217764139975bdd7",
+        "invocations": 87,
+        "scope": "Cumulative suite plus direct Rename(FALSE)/IoErr0, exact raw-name prefix, no common fault, return0; interleaved success."
+      },
+      "secondary_error_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-ioerr-qualified\\rename-68020.runtime.json",
+        "report_sha256": "88d4867ef0db5731ad5636ce84972ecea1eccca1f8d3f5609c6d22f5b991237b",
+        "invocations": 91,
+        "scope": "Cumulative suite plus parser fault116 whose PrintFault returns0/IoErr999 and successful fault followed by FreeVec IoErr774..777; primary20 retained."
+      },
+      "directory_false_zero_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-directoryzero-qualified\\rename-68020.runtime.json",
+        "report_sha256": "051a27d556ab99e38723104508a69275ae543c58654de8995df57e00bd6a9fc5",
+        "invocations": 94,
+        "scope": "Cumulative suite plus second directory Rename(FALSE)/IoErr0 after supplied success; prefix/no fault/return0 and interleaving."
+      },
+      "success_cleanup_error_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-successio-qualified\\rename-68020.runtime.json",
+        "report_sha256": "1c75cf91e244660695c788573696649731c6d4b7c07d91d4b2f4eec7a4b6d97b",
+        "invocations": 97,
+        "scope": "Cumulative suite plus successful direct Rename followed by FreeVec IoErr774..777; return0/final777, no fault; interleaved parser failure cleanup."
+      },
+      "multi_match_failure_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-multifailure-qualified\\rename-68020.runtime.json",
+        "report_sha256": "cbf30b7123575bf3d249888f3197665dd1aff2be539dab7559a37faae3b497f1",
+        "invocations": 100,
+        "scope": "Cumulative suite plus second distinct match Rename203 failure within one source pattern, with saved next-path diagnostic and interleaved success."
+      },
+      "examine_failure_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-examine-qualified\\rename-68020.runtime.json",
+        "report_sha256": "36ea8d06ec5f64b74be8b94b348501f09493fa34ebe5b25e39519b19ffe45e1c",
+        "invocations": 103,
+        "scope": "Cumulative suite plus single-source destination Examine(FALSE)/IoErr222 direct fallback, with successful Rename and owned FIB/lock release."
+      }
+    },
+    {
+      "id": "CC12.Rename.wb31.68040",
+      "binary": "artifacts/workbench-rename-native/rename-68040.hunk",
+      "sha256": "83457f951a1fda7661813412e3748880c68cfd55458dd093e2d4b5e12a6b85c0",
+      "bytes": 4544,
+      "status": "development-only",
+      "shipping": false,
+      "pure_admitted": false,
+      "runtime_evidence": [],
+      "startup_vector_evidence": {
+        "report": "artifacts/workbench-rename-native/rename-68040.startup.json",
+        "sha256": "dd89e68a9bda0c2d522d8934b13b086e53ed89cdeb8bca11fc39414faf37525e",
+        "invocations": 10,
+        "scope": "Candidate startup and early break with supplied vectors, not full body or original startup parity."
+      },
+      "allocation_vector_evidence": {
+        "report": "artifacts/workbench-rename-native/rename-68040.allocation.json",
+        "sha256": "e5f4a74d7d908913cd0fd58baec88569f9e0cca37f151302bf14ef22353d65cf",
+        "invocations": 16,
+        "scope": "Includes startup cases and four AllocVec failure points with interleaved failure callers; supplied vectors only."
+      },
+      "parser_vector_evidence": {
+        "report": "artifacts/workbench-rename-native/rename-68040.parser.json",
+        "sha256": "89fe73e057554bd7526cc2b95b749c7e4f40170fefed0f0c76572d2db5be45ec",
+        "invocations": 20,
+        "scope": "Cumulative startup/allocation suite plus parser error116 and synthetic zero-IoErr failure, sequential and interleaved."
+      },
+      "matcher_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-matcher-qualified\\rename-68040.runtime.json",
+        "report_sha256": "a1f6330e73bb16172aa977ddf3e47f08594ea3014de30ed3310fcd115f35ac81",
+        "invocations": 24,
+        "scope": "Cumulative suite including failed initial MatchFirst with D0=103 and IoErr214/0, sequential and interleaved."
+      },
+      "prefix_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-prefix-qualified\\rename-68040.runtime.json",
+        "report_sha256": "8fe8b954db5d05a94d233ab8c58c5691718808a898db62fa5f3ffa76bd160540",
+        "invocations": 27,
+        "scope": "Cumulative suite including error205 prefix with failed VPrintf and poisoned IoErr, sequential and interleaved."
+      },
+      "direct_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-direct-qualified\\rename-68040.runtime.json",
+        "report_sha256": "838fe046a620a087df5f0a3515f9641bf13bdaf2f66eb2af06a1590b416735de",
+        "invocations": 33,
+        "scope": "Cumulative suite plus direct success, ParsePattern failure120/zero, 256-byte unterminated result, and interleaved success/rejection."
+      },
+      "capacity_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-capacity-qualified\\rename-68040.runtime.json",
+        "report_sha256": "ea1d73d9e319c0bfb1959648d492c85a4e1c03ce97c6e7df1f20e56e9d60031d",
+        "invocations": 36,
+        "scope": "Cumulative suite plus valid255-byte parsed source with final NUL and interleaving against unterminated256-byte rejection."
+      },
+      "directory_name_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-name-qualified\\rename-68040.runtime.json",
+        "report_sha256": "5cea424e9b6dd2eb878ab5fb0caa762fb725a54378e376f3908316ed1947c6a1",
+        "invocations": 42,
+        "scope": "Cumulative suite plus NameFromLock failure120/zero, empty and unterminated outputs, with owned directory locks/FIBs and interleaving."
+      },
+      "composition_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-compose-qualified\\rename-68040.runtime.json",
+        "report_sha256": "80c9c704e21cd7373c5650f43ea2229af29c33e1df04ead4f4e5a55fe5c6f78f",
+        "invocations": 47,
+        "scope": "Cumulative suite plus colon-prefix directory composition255/256-byte boundary and two interleaved successful directory callers; MatchNext overwrites anchor buffers."
+      },
+      "slash_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-slash-qualified\\rename-68040.runtime.json",
+        "report_sha256": "e8bec773550d0e4f22bb34b6ca45f0b51805e9e719fc502fdfa0e963bd3a3ed5",
+        "invocations": 52,
+        "scope": "Cumulative suite plus slash-appended255-byte destination,256-byte overflow and no-room-for-slash rejection; interleaved valid/overflow callers."
+      },
+      "progress_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-progress-qualified\\rename-68040.runtime.json",
+        "report_sha256": "cc53f7e52aa3747dffe29f3fccc55fe3f2566dcdbb3f37f74361ceef8d5a1837",
+        "invocations": 55,
+        "scope": "Cumulative suite plus nonquiet directory progress whose VPrintf returns failure/IoErr999, interleaved with QUIET success."
+      },
+      "partial_failure_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-partial-qualified\\rename-68040.runtime.json",
+        "report_sha256": "dc641c2a25decaadedab558810dc5e5cdb7ff46498f401b9c79ceb2574511dbe",
+        "invocations": 58,
+        "scope": "Cumulative suite plus second directory Rename failure203 after supplied first success, with prefix output poisoning and interleaved successful caller."
+      },
+      "fib_failure_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-fib-qualified\\rename-68040.runtime.json",
+        "report_sha256": "b39c1f0bae973e65dea880f9314256688e2e254a80b061d866c7fd332f986cd9",
+        "invocations": 62,
+        "scope": "Cumulative suite plus failed directory FIB allocation103/zero and interleaved failure/success."
+      },
+      "matchnext_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-next-qualified\\rename-68040.runtime.json",
+        "report_sha256": "af772795bb62b8c0afd696d0830a5c17f89a9aeff930fe585cd50ded7bb93f88",
+        "invocations": 66,
+        "scope": "Cumulative suite plus MatchNext304/103 with matching IoErr; current item still renamed and later pattern visited, including interleaving."
+      },
+      "later_match_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-later-qualified\\rename-68040.runtime.json",
+        "report_sha256": "9103eb01abb4fbdac7bdaa062addff79e0740df763b251f76fec9583f686a03a",
+        "invocations": 69,
+        "scope": "Cumulative suite plus later MatchFirst205 after one supplied rename success; no initial failure prefix; interleaved success caller."
+      },
+      "single_source_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-single-qualified\\rename-68040.runtime.json",
+        "report_sha256": "1b64a19fceebfcefcda25965766a8ed088751e71d7ca7a7ba300cd8f7655e0fb",
+        "invocations": 74,
+        "scope": "Cumulative suite plus single-source SameLock1/-1 and failed temporary source Lock, with interleaved distinct-lock callers."
+      },
+      "same_lock_zero_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-same-qualified\\rename-68040.runtime.json",
+        "report_sha256": "714016802a2a05b41c55d87a22c4f25fcb728e7074671d73cc11352f0fa13328",
+        "invocations": 77,
+        "scope": "Cumulative suite plus SameLock0 direct fallback with distinct BPTRs, interleaved with SameLock1 directory traversal."
+      },
+      "stack_budget_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-stack-qualified\\rename-68040.runtime.json",
+        "report_sha256": "582abdfde93e455a86fdb8e5002623a8f6f983eea96c7256b2f58e275dccc7ab",
+        "configured_bytes": 4096,
+        "maximum_written_bytes": 204,
+        "scope": "Covered candidate code with supplied vectors only; real DOS stack consumption and minimum stack remain unqualified."
+      },
+      "anchor_boundary_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-anchor-qualified\\rename-68040.runtime.json",
+        "report_sha256": "c173f393ac7d42146a3c29953a725376ed121d9768c504ae2c679e419d5a8a6d",
+        "invocations": 81,
+        "scope": "Cumulative suite plus108-byte unterminated FIB filename and256-byte unterminated anchor path; sequential/interleaved rejection."
+      },
+      "multi_match_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-multimatch-qualified\\rename-68040.runtime.json",
+        "report_sha256": "c66c084031e332ce792cef4454b3e28aeff235ec1f7f9c18e5b540f409c4f2ae",
+        "invocations": 84,
+        "scope": "Cumulative suite plus one-source two-match traversal; MatchNext0 replaces file with next before first rename, then232; interleaved one-match caller."
+      },
+      "false_zero_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-falsezero-qualified\\rename-68040.runtime.json",
+        "report_sha256": "8ecad3ef145ea1908a28939bbd86c91385576b361b0fe069d3797f95e6a8cc84",
+        "invocations": 87,
+        "scope": "Cumulative suite plus direct Rename(FALSE)/IoErr0, exact raw-name prefix, no common fault, return0; interleaved success."
+      },
+      "secondary_error_vector_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-ioerr-qualified\\rename-68040.runtime.json",
+        "report_sha256": "39e4de0a487f69cace5545c97f169f44a9954164a8a32d5dfa37a4553db3ad17",
+        "invocations": 91,
+        "scope": "Cumulative suite plus parser fault116 whose PrintFault returns0/IoErr999 and successful fault followed by FreeVec IoErr774..777; primary20 retained."
+      },
+      "directory_false_zero_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-directoryzero-qualified\\rename-68040.runtime.json",
+        "report_sha256": "7730fbe124acc6f9aa6ef227690b76b843fce34c17b4fdccd46d04e773cc7d71",
+        "invocations": 94,
+        "scope": "Cumulative suite plus second directory Rename(FALSE)/IoErr0 after supplied success; prefix/no fault/return0 and interleaving."
+      },
+      "success_cleanup_error_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-successio-qualified\\rename-68040.runtime.json",
+        "report_sha256": "469450c98e058a5684649c06bdc112a39d5d7d70870e8aa1bf350660a2b214f3",
+        "invocations": 97,
+        "scope": "Cumulative suite plus successful direct Rename followed by FreeVec IoErr774..777; return0/final777, no fault; interleaved parser failure cleanup."
+      },
+      "multi_match_failure_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-multifailure-qualified\\rename-68040.runtime.json",
+        "report_sha256": "57204b6b82a039b6b50a57d4441ef449379015ea3208777813094c70c60b2364",
+        "invocations": 100,
+        "scope": "Cumulative suite plus second distinct match Rename203 failure within one source pattern, with saved next-path diagnostic and interleaved success."
+      },
+      "examine_failure_evidence": {
+        "report": "C:\\D-drive\\Koodit\\GIT\\CopperOS\\artifacts\\workbench-rename-examine-qualified\\rename-68040.runtime.json",
+        "report_sha256": "4e37433423fbab5b77c8ee5697c1e6f2c4b099faaa6c0fae6699b4beaeaf17f1",
+        "invocations": 103,
+        "scope": "Cumulative suite plus single-source destination Examine(FALSE)/IoErr222 direct fallback, with successful Rename and owned FIB/lock release."
+      }
+    },
+    {
+      "id": "CC12.Rename.morphos320.68000",
+      "profile": "morphos320",
+      "cpu": "68000",
+      "binary": "artifacts/morphos-rename-body-qualified/rename-68000.hunk",
+      "sha256": "17dcab63c589be597108984f3d2729372edacdae0860e97ad8a5d3a9e0d08663",
+      "bytes": 4240,
+      "status": "development-only",
+      "shipping": false,
+      "pure_admitted": false,
+      "installation_path": null,
+      "entry": "CopperOS.Commands.AddBuffersNativeRoot.NativeMorphOSRenameEntry::Main",
+      "native_suite": "morphos-rename-native-entry-vector-fixture",
+      "native_invocations": 112,
+      "native_report": "artifacts/morphos-rename-body-qualified/rename-68000.runtime.json",
+      "native_report_sha256": "be14e2e2f6b4072a44ff770c889af2702b6e8347e494c20461ff22f58ec1f4f9",
+      "qualification_report": "artifacts/morphos-rename-body-qualified/qualification.json",
+      "qualification_report_sha256": "a5e611bdc49915a19951a7468acb12291b795fec4a44ef09ff8be071ec4a3338",
+      "remaining_gates": [
+        "original MorphOS runtime correspondence and complete options/output/IoErr differential",
+        "actual CopperStart launch and handler qualification",
+        "real OS stack, installed P metadata and full resident lifecycle",
+        "profile packaging and complete command admission"
+      ],
+      "runtime_evidence": [
+        {
+          "scope": "Original Kickstart DOS/RAM handler: ordinary direct rename, wildcard two-match move, AS alias, tracked ownership, unchanged resident image and exact post-removal readback. No original MorphOS executable comparison.",
+          "report": "artifacts/copy-boot-fixture/verified-morphos-rename-native.json",
+          "report_sha256": "0e0730c4d153b48a9ad37f569c549b9134673d9c1fb9a0cc6591ddab91773737",
+          "receipt": "artifacts/copy-boot-fixture/morphos-rename-native-media.json",
+          "receipt_sha256": "023c35eeca29c6d65cfd73d0dbea23e46a2105b19737d0b678dbec713f4205f2",
+          "negative_controls": "artifacts/copy-boot-fixture/morphos-rename-native-controls.json",
+          "negative_controls_sha256": "34ef63cbddc7aa71dc84a5b5d4366dcd0afa0000e5a68fe21a0d7a3c9a1b4f63"
+        }
+      ]
+    },
+    {
+      "id": "CC12.Rename.morphos320.68020",
+      "profile": "morphos320",
+      "cpu": "68020",
+      "binary": "artifacts/morphos-rename-body-qualified/rename-68020.hunk",
+      "sha256": "2be2b3ac364349eea5e28e1996a518e97471f05670bb80e6c9a287f32e08939c",
+      "bytes": 4320,
+      "status": "development-only",
+      "shipping": false,
+      "pure_admitted": false,
+      "installation_path": null,
+      "entry": "CopperOS.Commands.AddBuffersNativeRoot.NativeMorphOSRenameEntry::Main",
+      "native_suite": "morphos-rename-native-entry-vector-fixture",
+      "native_invocations": 112,
+      "native_report": "artifacts/morphos-rename-body-qualified/rename-68020.runtime.json",
+      "native_report_sha256": "39573249a0f5d703680141fbe5a7a274e6c2d2b9ca107860f056ace66db80c4d",
+      "qualification_report": "artifacts/morphos-rename-body-qualified/qualification.json",
+      "qualification_report_sha256": "a5e611bdc49915a19951a7468acb12291b795fec4a44ef09ff8be071ec4a3338",
+      "remaining_gates": [
+        "original MorphOS runtime correspondence and complete options/output/IoErr differential",
+        "actual CopperStart launch and handler qualification",
+        "real OS stack, installed P metadata and full resident lifecycle",
+        "profile packaging and complete command admission"
+      ]
+    },
+    {
+      "id": "CC12.Rename.morphos320.68040",
+      "profile": "morphos320",
+      "cpu": "68040",
+      "binary": "artifacts/morphos-rename-body-qualified/rename-68040.hunk",
+      "sha256": "3669efcc7f872979e381c8dbdeaa59f4e20b575b3e582827d23c5af0516f05d4",
+      "bytes": 4228,
+      "status": "development-only",
+      "shipping": false,
+      "pure_admitted": false,
+      "installation_path": null,
+      "entry": "CopperOS.Commands.AddBuffersNativeRoot.NativeMorphOSRenameEntry::Main",
+      "native_suite": "morphos-rename-native-entry-vector-fixture",
+      "native_invocations": 112,
+      "native_report": "artifacts/morphos-rename-body-qualified/rename-68040.runtime.json",
+      "native_report_sha256": "d2082ca2d75cb84deeaf82b9b81b3a3880b8f4fc9b95bb09398b607e530e56a6",
+      "qualification_report": "artifacts/morphos-rename-body-qualified/qualification.json",
+      "qualification_report_sha256": "a5e611bdc49915a19951a7468acb12291b795fec4a44ef09ff8be071ec4a3338",
+      "remaining_gates": [
+        "original MorphOS runtime correspondence and complete options/output/IoErr differential",
+        "actual CopperStart launch and handler qualification",
+        "real OS stack, installed P metadata and full resident lifecycle",
+        "profile packaging and complete command admission"
+      ]
+    }
+  ],
+  "qualification_driver": {
+    "script": "tools/Commands/qualify_workbench_rename_native.ps1",
+    "report": "artifacts/workbench-rename-entry-qualified/qualification.json",
+    "report_sha256": "18c84130a73ab60dbb2c54882a6f7e644ff80a0f1e8359fdd608dd1e8cc78b8d",
+    "scope": "Candidate startup, early break, allocation and parser failures with supplied vectors, including interleaving. Full body, original DOS/parity, minimum stack, purity and packaging remain separate gates."
+  },
+  "matcher_qualification": {
+    "report": "artifacts/workbench-rename-matcher-qualified/qualification.json",
+    "sha256": "d5a85ce0d22c7e21a809afd5f1a8716e222f5f41c8c3b0ef6327cf83ecd51495",
+    "shipping": false
+  }
+}

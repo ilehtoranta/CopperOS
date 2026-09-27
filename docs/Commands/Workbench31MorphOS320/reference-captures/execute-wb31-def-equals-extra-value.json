@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "capture_id": "execute-wb31-def-equals-extra-value-20260901",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Execute",
+    "command_sha256": "27c2f578b63857ab5fbe03cdf621d553408cc670b9f07d9988ce224d22b57ecd",
+    "version": "execute 37.11 (14.5.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/execute-wb31-def-equals-extra-value-startup-probe",
+    "source_sha256": "7e1998c8cdac185d49c6d9211edcc0e34485c683f7555624bfa838a01dba8469",
+    "disposable_adf_after_run_sha256": "7179517fdf01219695a755ff9badfddeaf5dda37440b5986722efabb32aaf7f8",
+    "capture_file": "S/Shell-Startup",
+    "capture_raw_sha256": "dd3fccfd870d8372429e54075db9e6789d75a50babc61cb54fcd5a8e8c9b63c7",
+    "capture_raw_bytes": 44,
+    "capture_text_before_nul_sha256": "dd3fccfd870d8372429e54075db9e6789d75a50babc61cb54fcd5a8e8c9b63c7",
+    "capture_text_before_nul_bytes": 44,
+    "capture_text_before_nul": "BEGIN\nVALUE:first\nSTATUS RC=0 RESULT2=0\nEND\n"
+  },
+  "observation": {
+    "script_directives": [".KEY filename", ".DEF filename=first second"],
+    "invocation": "C:Execute RAM:execute-probe",
+    "result": "The original command returned RC 0 and Result2 0. It used the value before the first whitespace after the equals form when expanding <filename>."
+  },
+  "limits": [
+    "The output ADF is a disposable derivative, not reference evidence.",
+    "This establishes one equals-form surplus-token case with one reference only.",
+    "It does not establish other malformed directives, diagnostics, IoErr, streams, temporary-file internals, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Execute bytes are copied into this repository."
+  ]
+}

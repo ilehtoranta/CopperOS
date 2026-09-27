@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "captureDate": "2026-09-24",
+  "subject": "MorphOS Version RTF_EXTENDED resident revision ABI",
+  "officialSdk": {
+    "url": "https://morphos-team.net/sdk/includes/exec/resident.html",
+    "header": "exec/resident.h",
+    "headerProfile": "MorphOS Exec V50",
+    "packing": 2,
+    "observations": [
+      "Resident.rt_Revision is a UWORD immediately after rt_Init.",
+      "The SDK marks rt_Revision valid only when RTF_EXTENDED is set.",
+      "RTF_EXTENDED is bit 6 (0x40) of rt_Flags."
+    ]
+  },
+  "offsetDerivation": {
+    "classicResidentBytes": 26,
+    "revisionOffset": 26,
+    "basis": "The existing CopperSharp Amiga Resident.Size constant is 26. Under the MorphOS header's pack(2), rt_Revision follows the classic fields through rt_Init at byte offset 26."
+  },
+  "sourceEvidence": {
+    "path": "artifacts/morphos320-c-source-extracted/c/version/version.c",
+    "sha256": "818f64fae8abf914633b4bc807d6b105eb0ccf30e1e48ac1527745d486c22490",
+    "function": "makeresidentver",
+    "lines": "1079-1100",
+    "behavior": "When createresidentver fails, the source falls back to rt_Version and revision -1; for MorphOS only, it replaces that revision with rt_Revision when RTF_EXTENDED is set, then creates the default version strings."
+  },
+  "candidateEvidence": {
+    "path": "src/Commands/Native/NativeMorphOSVersionCommand.cs",
+    "behavior": "The RES fallback reads rt_Revision at offset 26 only when rt_Flags bit 6 is set. Supplied vectors force version-text allocation failure to reach both the extended-revision fallback and parsed-IdString paths.",
+    "qualification": "artifacts/version-morphos-native-20260924-resident-v1/qualification.json"
+  },
+  "limits": [
+    "This records the documented structure ABI and source branch; it does not prove that every installed MorphOS resident is extended.",
+    "The candidate HUNK fixture does not replace original MorphOS guest execution, resident lifecycle, or package admission evidence."
+  ]
+}

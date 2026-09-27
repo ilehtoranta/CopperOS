@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "profile": "morphos320",
+  "source_id": "morphos320-live-iso",
+  "command": "Avail",
+  "path": "MorphOS/C/Avail",
+  "iso_extent": 175208,
+  "bytes": 3999,
+  "sha256": "8c7c34f6b714e0a6cde7b66d153e65fdff6e9681558335bfee830e2fe2a5f9f7",
+  "version": {
+    "name": "Avail",
+    "version": 50,
+    "revision": 6,
+    "date_text": "9.9.07",
+    "byte_offset": 3966,
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template": {
+    "text": "CHIP/S,FAST/S,TOTAL/S,FLUSH/S,H=HUMAN/S",
+    "evidence": "released-source-and-packed-member-identity"
+  },
+  "source": {
+    "path": "artifacts/morphos320-c-source-extracted/c/avail/avail.c",
+    "bytes": 9191,
+    "sha256": "90fd07e3edff26f5cc80fec358c7f28ec06ab422d68a75c903d1c25d3ca857c",
+    "evidence": "released-source-behavior-only"
+  },
+  "startup_contract": {
+    "dos_library_minimum": 37,
+    "readargs_template": "CHIP/S,FAST/S,TOTAL/S,FLUSH/S,H=HUMAN/S",
+    "parser_failure": "RETURN_FAIL with PrintFault(IoErr(), \"Avail\")",
+    "multiple_selectors": "warning text and no PrintFault",
+    "flush": "public AllocVec probe; FreeVec only when allocation succeeds",
+    "summary": "Forbid around nine AvailMem calls, then Permit; MorphOS fake-chip adjustment uses ExecBase MaxLocMem",
+    "diagnostic_policy": "PrintFault on non-OK errors unless multiple-selector warning"
+  },
+  "open_gates": [
+    "exact packed output and diagnostic bytes",
+    "MorphOS fake-chip MaxLocMem behavior on a real guest",
+    "original guest differential and memory-provider behavior",
+    "resident/PURE lifecycle and repeat/concurrent calls",
+    "installed AmigaDOS protection metadata",
+    "package/licensing and differential comparison"
+  ],
+  "scope": "hash-bound MorphOS 3.20 packed identity plus released-source contract; raw binary is not stored in the repository"
+}

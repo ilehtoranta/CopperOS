@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "capture_id": "eval-wb31-classic-operators-20260901",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Eval",
+    "command_sha256": "e320ba5d36b788e83719a09c7481d2c91d511396787b0b534e29c496240af962",
+    "version": "eval 37.3 (26.3.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/eval-wb31-classic-operators-probe",
+    "source_sha256": "dd4539f291eed71c62d55733f2cd29d9ad20560e1cba16eb78c109a21131a6d8",
+    "disposable_adf_before_run_sha256": "6362c09cacd2cf402555632c0e8f999e4b4432f848d2ad11c883c9668fe77af1",
+    "disposable_adf_after_run_sha256": "6bfb7161190ef9f9b0f2e522bdf94c66cd75fa178ce465f52b0c4e73c6657a44",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "ca58649a0861c6287dcae439a37930efd1f96f6b0fbb92f0ab459a713e60fe7f",
+    "capture_bytes": 33,
+    "capture_text": "BEGIN\n4\n2\n2\n0\n5\n-6\n16\n4\n-2\n2\nEND\n"
+  },
+  "observation": {
+    "invocations": [
+      "C:Eval 20/5",
+      "C:Eval 20%6",
+      "C:Eval 20 mod 6",
+      "C:Eval 1|2&4",
+      "C:Eval 6 xor 3",
+      "C:Eval 6 eqv 3",
+      "C:Eval 1 lsh 4",
+      "C:Eval 16 rsh 2",
+      "C:Eval ~1",
+      "C:Eval 2^3"
+    ],
+    "result": "The original command output 4, 2, 2, 0, 5, -6, 16, 4, -2, and 2 in invocation order. The final caret expression completed and output 2; this observation does not establish why the trailing caret expression produced that value."
+  },
+  "limits": [
+    "The startup sequence and capture target are authored probe content on a disposable ADF copy.",
+    "This establishes selected operator examples only. It does not establish the complete precedence table, operands/ranges, overflow, division edge cases, caret grammar, diagnostics, return level, IoErr, TO behavior, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Eval bytes are copied into this repository."
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "capture_id": "search-wb31-binary-audit-20260923",
+  "kind": "read-only-static-binary-audit",
+  "profile": "wb31",
+  "command": "Search",
+  "source_id": "wb31-workbench-m10-40.42",
+  "volume": "Workbench3.1",
+  "disk": "Disk 2 of 6 (Workbench)",
+  "path": "C/Search",
+  "bytes": 2476,
+  "sha256": "b3e70309e954ea4a27d2e83a900bd749e59f3759e4bb1f8cb1e6943646f7bf43",
+  "file_format": "amiga-hunk",
+  "reference_capture": "wb31-disk2-c-command-captures-20260923.json",
+  "observations": {
+    "templates": [
+      {
+        "text": "FROM/M,SEARCH/A,ALL/S,NONUM/S,QUIET/S,QUICK/S,FILE/S,PATTERN/S",
+        "byte_offset": 490,
+        "confidence": "primary-readargs-template-candidate"
+      },
+      {
+        "text": "SEARCH/A,PATTERN/S,NONUM/S",
+        "byte_offset": 462,
+        "confidence": "embedded-secondary-template-candidate-unclassified"
+      }
+    ],
+    "version": {
+      "text": "$VER: search 40.1 (12.4.93)",
+      "byte_offset": 553,
+      "evidence": "unexecuted-binary-version-string"
+    },
+    "diagnostic_strings": [
+      {
+        "text": "** SEARCH string too long",
+        "byte_offset": 584
+      },
+      {
+        "text": " (dir)",
+        "byte_offset": 630
+      },
+      {
+        "text": "** File abandoned",
+        "byte_offset": 656
+      }
+    ]
+  },
+  "limits": [
+    "Embedded strings identify syntax and diagnostic candidates only; they do not establish which strings are used at runtime.",
+    "The Workbench template has eight slots and does not include MorphOS CASE or LINES options.",
+    "No Workbench Search source member or original guest execution was used for this audit.",
+    "Output bytes, parser behavior, return level, IoErr, traversal, file limits, break behavior, and installed PURE/resident state remain open."
+  ]
+}

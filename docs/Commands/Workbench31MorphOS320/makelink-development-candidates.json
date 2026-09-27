@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "status": "development-only",
+  "scope": "Current hash-bound MakeLink candidates; not accepted packaging artifacts and not covered by the historical build-manifest checkpoint audit.",
+  "required_shipping_path": "C:MakeLink selected by profile after all gates pass",
+  "candidates": [
+    {
+      "id": "CC12.MakeLink.wb31.68000",
+      "profile": "wb31",
+      "cpu": "68000",
+      "entry": "CopperOS.Commands.AddBuffersNativeRoot.Workbench31MakeLinkEntry::Main",
+      "binary": "artifacts/workbench-makelink-startup-owned-qualified/makelink-68000.hunk",
+      "sha256": "fd42d840165936c2dc4ff5980319b47d1e1dd2ccb6e466c48c03548c7ae1050c",
+      "bytes": 3184,
+      "native_suite": "workbench-makelink-native-entry-vector-fixture",
+      "native_invocations": 20,
+      "native_report": "artifacts/workbench-makelink-startup-owned-qualified/makelink-68000.runtime.json",
+      "native_report_sha256": "b6e32ab215b0562529500d471489b3411dd9b8fec0f944d12572ed72b8e4f864",
+      "shipping": false,
+      "pure_admission": false,
+      "installation_path": null,
+      "remaining_gates": [
+        "complete profile contract and option/error matrix",
+        "original pure classification and installed flags",
+        "original runtime concurrency and full differential coverage",
+        "minimum stack and package image validation"
+      ],
+      "original_dos_evidence": {
+        "scope": "five-call unforced/forced directory, loop, missing parent, default hard link; bounded resident cleanup and alias readback only",
+        "verified_report": "artifacts/copy-boot-fixture/verified-workbench-makelink-startup-fixed.json",
+        "verified_report_sha256": "f58165231105ea2d8d7572c96332aee30b3d2d3c7e58e134b2337e1f8897d941",
+        "media_receipt": "artifacts/copy-boot-fixture/workbench-makelink-startup-fixed-media.json",
+        "media_receipt_sha256": "d487ce6f382105a52056e229bfe9aaa257ed72e7ee436f6e6b45fd7f4f947fb9"
+      },
+      "original_dos_concurrency_evidence": {
+        "scope": "one foreground success overlapped with deep directory-loop rejection; not full purity qualification",
+        "verified_report": "artifacts/copy-boot-fixture/verified-workbench-makelink-concurrent-readback.json",
+        "verified_report_sha256": "47278c3c337d63a4de478d6539cf60223b3794f390d58c8b2ce7ffba44c7b776"
+      },
+      "current_binary_error_differential": {
+        "scope": "Five identical original-DOS startup invocations: success, parser failure, missing target, duplicate link, recovery; primary returns, fault inputs and format strings, link decisions, candidate ownership, unchanged shared image and exact alias readbacks. Not rendered diagnostic bytes, final IoErr, full startup/profile/purity or shipping qualification.",
+        "report": "artifacts/copy-boot-fixture/verified-workbench-makelink-errors-current-20260907.json",
+        "report_sha256": "3e66e290232c5fe1b42831e78cde2c5b87882b8e117180d9eb079c1bff8043cb",
+        "negative_controls": "artifacts/copy-boot-fixture/workbench-makelink-errors-current-20260907-controls.json",
+        "negative_controls_sha256": "c3597739b215cf67c6738e61c865975b2853001609acafb99778127c581c0ddd"
+      },
+      "final_secondary_evidence": {
+        "report": "artifacts/copy-boot-fixture/verified-workbench-makelink-secondary-20260908.json",
+        "report_sha256": "9585bf6542454a5fd6e924c88a3d5d66addfbbbc3fdba2a67b0889e934c6acb7",
+        "scope": "Five current-HUNK versus original Workbench MakeLink calls through the same original DOS. Final owning-process pr_Result2 at public RunCommand return is compared after cleanup. Other options, handlers, startup, cleanup-error injections, rendered output and full-profile/purity/shipping remain separate.",
+        "controls": "artifacts/copy-boot-fixture/workbench-makelink-secondary-controls-20260908.json",
+        "controls_sha256": "d207481def11e90069ea352eeb220330dd53803ab70fd37c38befc0106851b73"
+      },
+      "rendered_output_evidence": {
+        "report": "artifacts/copy-boot-fixture/verified-workbench-makelink-output-20260908.json",
+        "report_sha256": "84ac78e85021b6161b9a6f72e64aeec9c59b341d19d754137b81de420e5050ce",
+        "scope": "Five original-Kickstart-DOS invocations with separate redirected RAM files, independently sized and read after resident removal; exact diagnostic bytes including two empty success outputs, completed RunCommand primary returns and Process.Result2, target/link decisions, balanced candidate resources and alias content. Current 68000 HUNK only; no full profile, startup or pure/resident admission.",
+        "controls": "artifacts/copy-boot-fixture/workbench-makelink-output-20260908-controls.json",
+        "controls_sha256": "21ff0a0c1c0c7f84a03e14442b155914029f7825239265aaca484f6853954b9f"
+      },
+      "option_matrix_evidence": {
+        "report": "artifacts/copy-boot-fixture/verified-workbench-makelink-options-20260908.json",
+        "report_sha256": "368513bb151ff9aa760d303bf977e861337eb477f75d3075070389e99418cb8f",
+        "scope": "Nine original-DOS ReadArgs scenarios for positional/reordered/equals syntax, quoted spaces/escaped quote, HARD/FORCE on a regular file, repeated switch and rejected duplicate/unknown/missing arguments. Six hard-link calls succeed and five aliases have independent post-removal readback. No interactive help/EOF, Latin-1, empty names, all path forms or complete option/profile admission.",
+        "controls": "artifacts/copy-boot-fixture/controls-workbench-makelink-stack-options-20260908.json",
+        "controls_sha256": "80aff9a5d4631c896b9f387ab4431175d913f58649dfb3830bf03c4be852f735"
+      },
+      "real_dos_stack_observation": {
+        "report": "artifacts/copy-boot-fixture/verified-workbench-makelink-stack-20260908.json",
+        "report_sha256": "4e136b7843cc580fb752efeff65deebd1d6672f53f038af3fde9b6909bdd86af",
+        "scope": {
+          "SchemaVersion": 1,
+          "Sampling": "Post-instruction-retirement CPU state, first HUNK entry through its matching user-mode return; same-task callees included.",
+          "BoundsAuthority": "Published tc_SPLower/tc_SPUpper captured at HUNK entry and checked at each owner user-mode sample; RunCommand D2 is recorded, never converted into guessed bounds.",
+          "Exclusions": "RunCommand prelude/postlude, other tasks, supervisor/interrupt stacks, and samples outside or with changed entry task bounds are counted separately.",
+          "Limits": "Observed SP low-water marks are not a stack-write/canary proof, allocation ownership proof, universal minimum stack, or coverage of unsampled host gateway work and intra-instruction transients. Bounds mismatches remain explicit unknowns, not passing safety evidence.",
+          "MinimumStackQualified": false,
+          "ShippingOrPureApproval": false
+        },
+        "controls": "artifacts/copy-boot-fixture/controls-workbench-makelink-stack-options-20260908.json",
+        "controls_sha256": "80aff9a5d4631c896b9f387ab4431175d913f58649dfb3830bf03c4be852f735"
+      },
+      "help_eof_evidence": {
+        "report": "artifacts/copy-boot-fixture/verified-workbench-makelink-help-20260908.json",
+        "report_sha256": "9ff6ad3932df14400880aad15a2f8d3ddf1449d88970816103d60111440c5482",
+        "scope": "Two original-Kickstart-DOS invocations of the known '?' ReadArgs help trigger with real Shell redirected input/output: complete continuation arguments create a hard link; an independently verified empty input produces EOF. Exact independently read output bytes, final RunCommand primary and Process.Result2, parser/mutation decisions, candidate ownership and four input/content readbacks after resident removal. Fixed 68000 HUNK; no interactive console, break handling, full profile or PURE admission.",
+        "controls": "artifacts/copy-boot-fixture/workbench-makelink-help-20260908-controls.json",
+        "controls_sha256": "948906249a7e023ab1158a8720eaa5a27a5ad8673f998f3be17a88eee88f8bec",
+        "negative_control_count": 20,
+        "cases": [
+          {
+            "case": "help-continuation",
+            "primary": 0,
+            "final_ioerr": 205,
+            "rendered_hex": "46524f4d2f412c544f2f412c484152442f532c464f5243452f533a20"
+          },
+          {
+            "case": "help-eof",
+            "primary": 20,
+            "final_ioerr": 116,
+            "rendered_hex": "46524f4d2f412c544f2f412c484152442f532c464f5243452f533a20726571756972656420617267756d656e74206d697373696e670a"
+          }
+        ]
+      },
+      "native_copperstart_dos_evidence": {
+        "report": "artifacts/copperstart-makelink-native-integration/verified-final.json",
+        "report_sha256": "90782dbb243afa83d5141c04b1ae4d7b0e5d3f42c657d5453fdb911fd7b44372",
+        "scope": "Native candidate, installed production DOS RunCommand/ReadArgs/mutation/formatting/provider bridge; Exec and bounded backing packet handler are fixtures. No full-system, filesystem, pure/resident or shipping approval.",
+        "native_command_invocations": 5,
+        "terminal_tests": 6,
+        "command_stack_bytes": 16384,
+        "full_copperstart_boot_qualified": false,
+        "shipping_qualified": false,
+        "pure_admitted": false,
+        "result": "artifacts/copperstart-makelink-native-integration/final/result.json",
+        "result_sha256": "4b43f15de33462d063cdd10b5bddc75175bb24b0b9091eaddf8fd8db55fcf0b6",
+        "trx": "artifacts/copperstart-makelink-native-integration/final.trx",
+        "trx_sha256": "5f0cd67c4b5ed323a64fda2aae7f41efed6d5017579cd34f3595231f20baa470",
+        "primary_and_secondary_results": [
+          [
+            0,
+            0
+          ],
+          [
+            20,
+            203
+          ],
+          [
+            20,
+            205
+          ],
+          [
+            20,
+            116
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "shared_fixes": [
+          "ExecRawDoFmtCore carries string length directly instead of an unaligned word access to the numeric byte field; lengths above 255 remain intact.",
+          "DosErrorCore emits required argument missing for 116 and lowercase object already exists for 203."
+        ]
+      }
+    },
+    {
+      "id": "CC12.MakeLink.wb31.68020",
+      "profile": "wb31",
+      "cpu": "68020",
+      "entry": "CopperOS.Commands.AddBuffersNativeRoot.Workbench31MakeLinkEntry::Main",
+      "binary": "artifacts/workbench-makelink-startup-owned-qualified/makelink-68020.hunk",
+      "sha256": "485ea699b1ee3242dc48d105c8b32c08efc3f8cd9718eeccb057a54a9caee3a4",
+      "bytes": 3224,
+      "native_suite": "workbench-makelink-native-entry-vector-fixture",
+      "native_invocations": 20,
+      "native_report": "artifacts/workbench-makelink-startup-owned-qualified/makelink-68020.runtime.json",
+      "native_report_sha256": "aa1297069d14981536c88ce25fbb047b32c60873bc64ff3dfb8f88032f2c4e34",
+      "shipping": false,
+      "pure_admission": false,
+      "installation_path": null,
+      "remaining_gates": [
+        "complete profile contract and option/error matrix",
+        "original pure classification and installed flags",
+        "original runtime concurrency and full differential coverage",
+        "minimum stack and package image validation"
+      ]
+    },
+    {
+      "id": "CC12.MakeLink.wb31.68040",
+      "profile": "wb31",
+      "cpu": "68040",
+      "entry": "CopperOS.Commands.AddBuffersNativeRoot.Workbench31MakeLinkEntry::Main",
+      "binary": "artifacts/workbench-makelink-startup-owned-qualified/makelink-68040.hunk",
+      "sha256": "e0d9689ecf803ffee27b7dcc0739e0e4631993cc2e406c3f8337892dd214735f",
+      "bytes": 3180,
+      "native_suite": "workbench-makelink-native-entry-vector-fixture",
+      "native_invocations": 20,
+      "native_report": "artifacts/workbench-makelink-startup-owned-qualified/makelink-68040.runtime.json",
+      "native_report_sha256": "17ff76ef5f9a99a4f13250a43ddc6ab5df1ad990131c021d6497b82522c11ce2",
+      "shipping": false,
+      "pure_admission": false,
+      "installation_path": null,
+      "remaining_gates": [
+        "complete profile contract and option/error matrix",
+        "original pure classification and installed flags",
+        "original runtime concurrency and full differential coverage",
+        "minimum stack and package image validation"
+      ]
+    },
+    {
+      "id": "CC12.MakeLink.morphos320.68000",
+      "profile": "morphos320",
+      "cpu": "68000",
+      "entry": "CopperOS.Commands.AddBuffersNativeRoot.NativeMorphOSMakeLinkEntry::Main",
+      "binary": "artifacts/makelink-startup-qualified/makelink-68000.hunk",
+      "sha256": "98980b5064e52cfa1f39c29a20aafe35ebe4d6d5bd47f9759933e0dc220bc442",
+      "bytes": 2580,
+      "native_suite": "makelink-native-entry-vector-fixture",
+      "native_invocations": 18,
+      "native_report": "artifacts/makelink-startup-qualified/makelink-68000.hunk.runtime.json",
+      "native_report_sha256": "1911b47eaadb378b1128e98ad1cb4630e77df81098a3a2150a84a00d0ec81e8f",
+      "shipping": false,
+      "pure_admission": false,
+      "installation_path": null,
+      "remaining_gates": [
+        "complete profile contract and option/error matrix",
+        "original pure classification and installed flags",
+        "original runtime concurrency and full differential coverage",
+        "minimum stack and package image validation"
+      ]
+    },
+    {
+      "id": "CC12.MakeLink.morphos320.68020",
+      "profile": "morphos320",
+      "cpu": "68020",
+      "entry": "CopperOS.Commands.AddBuffersNativeRoot.NativeMorphOSMakeLinkEntry::Main",
+      "binary": "artifacts/makelink-startup-qualified/makelink-68020.hunk",
+      "sha256": "7104b59d21ae324ea5116ae77ba63158a2247ffb6ca04894a57040d97f23edf8",
+      "bytes": 2580,
+      "native_suite": "makelink-native-entry-vector-fixture",
+      "native_invocations": 18,
+      "native_report": "artifacts/makelink-startup-qualified/makelink-68020.hunk.runtime.json",
+      "native_report_sha256": "ae7ed4582acbcbb4d080010c349c95e9bbaf19b0b83b7f924ce4275805d51c1e",
+      "shipping": false,
+      "pure_admission": false,
+      "installation_path": null,
+      "remaining_gates": [
+        "complete profile contract and option/error matrix",
+        "original pure classification and installed flags",
+        "original runtime concurrency and full differential coverage",
+        "minimum stack and package image validation"
+      ]
+    },
+    {
+      "id": "CC12.MakeLink.morphos320.68040",
+      "profile": "morphos320",
+      "cpu": "68040",
+      "entry": "CopperOS.Commands.AddBuffersNativeRoot.NativeMorphOSMakeLinkEntry::Main",
+      "binary": "artifacts/makelink-startup-qualified/makelink-68040.hunk",
+      "sha256": "7104b59d21ae324ea5116ae77ba63158a2247ffb6ca04894a57040d97f23edf8",
+      "bytes": 2580,
+      "native_suite": "makelink-native-entry-vector-fixture",
+      "native_invocations": 18,
+      "native_report": "artifacts/makelink-startup-qualified/makelink-68040.hunk.runtime.json",
+      "native_report_sha256": "7d114bd06b74647ddf0207a87c5d9ad489944377319f2f03c34186a908688207",
+      "shipping": false,
+      "pure_admission": false,
+      "installation_path": null,
+      "remaining_gates": [
+        "complete profile contract and option/error matrix",
+        "original pure classification and installed flags",
+        "original runtime concurrency and full differential coverage",
+        "minimum stack and package image validation"
+      ]
+    }
+  ]
+}

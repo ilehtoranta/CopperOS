@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "command": "AddDataTypes",
+  "recorded": "2026-09-22",
+  "profiles": {
+    "wb31": {
+      "source_id": "wb31-workbench-m10-40.42",
+      "volume": "Workbench3.1",
+      "path": "C/AddDataTypes",
+      "bytes": 5880,
+      "sha256": "391da11b39bfc7c492c1b58aa9e442f1c1712bd507380903a88a4534d27c264d",
+      "file_format": "amiga-hunk",
+      "version": {
+        "name": "adddatatypes",
+        "version": 39,
+        "revision": 2,
+        "date_text": "27.7.92",
+        "evidence": "unexecuted-binary-ver-tag"
+      },
+      "template_candidate": {
+        "text": "FILES/M,QUIET/S,REFRESH/S",
+        "confidence": "syntax-only-candidate-not-runtime-or-source-verified"
+      },
+      "protection": {
+        "raw": 0,
+        "pure": false,
+        "evidence": "adf-file-header-byte-320-big-endian"
+      },
+      "bounded_observations": [
+        "The original Workbench startup invokes C:AddDataTypes before C:LoadResource and C:IPrefs in the captured boot-progress path.",
+        "A separate historical diagnostic observed a Software Failure requester reporting address error #80000003 while Initial CLI was running C:AddDataTypes; the current boot path no longer reproduces that exact command boundary.",
+        "The binary contains no source correspondence or executed command receipt."
+      ],
+      "static_disassembly": {
+        "capture_recorded": "2026-09-25",
+        "source_hunk_sha256": "391da11b39bfc7c492c1b58aa9e442f1c1712bd507380903a88a4534d27c264d",
+        "dependencies": [
+          {
+            "library": "dos.library",
+            "minimum_version": 39,
+            "open_order": 1,
+            "open_call_offset": "0x0068",
+            "library_name_reference_offset": "0x0062"
+          },
+          {
+            "library": "utility.library",
+            "minimum_version": 39,
+            "open_order": 2,
+            "open_call_offset": "0x0076",
+            "library_name_reference_offset": "0x0070"
+          },
+          {
+            "library": "intuition.library",
+            "minimum_version": 39,
+            "open_order": 3,
+            "open_call_offset": "0x0084",
+            "library_name_reference_offset": "0x007e"
+          },
+          {
+            "library": "iffparse.library",
+            "minimum_version": 37,
+            "open_order": 4,
+            "open_call_offset": "0x0092",
+            "library_name_reference_offset": "0x008c"
+          },
+          {
+            "library": "locale.library",
+            "minimum_version": 38,
+            "open_order": 5,
+            "open_call_offset": "0x00a4",
+            "library_name_reference_offset": "0x009e"
+          }
+        ],
+        "catalog": {
+          "path": "sys/c.catalog",
+          "open_after": "locale.library",
+          "failure_is_nonfatal_by_control_flow": true,
+          "code_offset": "0x00ba"
+        },
+        "options": {
+          "template": "FILES/M,QUIET/S,REFRESH/S",
+          "readargs_call_offset": "0x0158",
+          "refresh_result_slot_offset": "-0x6c",
+          "files_result_slot_offset": "-0x74"
+        },
+        "refresh": {
+          "date_scan_directory": "DEVS:DataTypes",
+          "scan_pattern": "DEVS:DataTypes/#?",
+          "date_scan_call_offset": "0x017c",
+          "conditional_scan_call_offset": "0x0190",
+          "behavior": "REFRESH performs the date scan first and passes the pattern to the common scanner only when the date scan requests a refresh; FILES patterns are scanned when REFRESH is absent."
+        },
+        "named_list_bootstrap": {
+          "lookup_name": "DataTypesList",
+          "lookup_code_offset": "0x0590",
+          "fallback": "When FindNamedObject returns null, the command calls Utility AllocNamedObjectA, initializes the object user space and datatype list, creates the four built-ins, then calls Utility AddNamedObject to publish it. The static TagItem payload is captured below; final tag-name mapping remains tied to the original 3.1 utility declarations.",
+          "evidence_limit": "Static control flow and raw tag values only; the public 3.1 tag-name mapping, meaningful user-space fields after offset 131, named-object reference lifetime and races remain open.",
+          "allocation_call_offset": "0x0568",
+          "tag_list_setup_offsets": [
+            "0x05aa",
+            "0x05ac",
+            "0x05b0",
+            "0x05b4",
+            "0x05b8",
+            "0x05bc",
+            "0x05c0"
+          ],
+          "tag_list_raw_pairs": [
+            {
+              "tag": "0x00000fa0",
+              "data": "0x00000001"
+            },
+            {
+              "tag": "0x00000fa1",
+              "data": "0x0000008c"
+            },
+            {
+              "tag": "0x00000fa3",
+              "data": "0x00000003"
+            },
+            {
+              "tag": "TAG_DONE",
+              "data": "0"
+            }
+          ],
+          "user_space_extent_candidate_bytes": 140,
+          "user_space_extent_evidence": "The second TagItem carries raw tag 0x00000fa1 and value 0x0000008c; Utility AllocNamedObjectA receives this stack TagItem array at code offset 0x0568. Treat 140 as the requested user-space extent candidate, not as proof that every trailing byte is a live structure field.",
+          "initialization_offsets": {
+            "init_semaphore": "0x05ea",
+            "initialize_sorted_list": "0x05fc",
+            "first_builtin": "0x0622",
+            "publish_named_object": "0x06a4"
+          }
+        }
+      }
+    },
+    "morphos320": {
+      "source_id": "morphos320-live-iso",
+      "volume": "MorphOS 3.20",
+      "path": "MorphOS/C/AddDataTypes",
+      "iso_extent": 175124,
+      "bytes": 7751,
+      "sha256": "afe23d74f3c3b18cd45f892189a6a26bf1bc8d42a426ec7db816e0c9995d11dd",
+      "file_format": "morphos-packed-native",
+      "version": {
+        "name": "AddDataTypes",
+        "version": 50,
+        "revision": 6,
+        "date_text": "27.11.04",
+        "evidence": "unexecuted-binary-ver-tag"
+      },
+      "source": {
+        "path": "artifacts/morphos320-c-source-extracted/c/adddatatypes/adddatatypes.c",
+        "bytes": 36575,
+        "sha256": "c1dba7617b92c738cf2d68c37a35fd8a261ef7c3a87eb51b7acebde7fc303cea",
+        "evidence": "released-source-behavior-only"
+      },
+      "template": {
+        "text": "FILES/M,QUIET/S,REFRESH/S,LIST/S",
+        "evidence": "released-source"
+      },
+      "required_libraries": [
+        {
+          "name": "dos.library",
+          "version": 37
+        },
+        {
+          "name": "utility.library",
+          "version": 37
+        },
+        {
+          "name": "iffparse.library",
+          "version": 37
+        },
+        {
+          "name": "locale.library",
+          "version": 37
+        },
+        {
+          "name": "datatypes.library",
+          "version": 44
+        }
+      ],
+      "public_operation_sequence": [
+        "FindNamedObject(DATATYPESLIST) and create the four built-in binary/ascii/iff/directory descriptors when absent",
+        "For Workbench startup, wait for WBStartup, switch to each WBArg lock, load one descriptor and reply after cleanup",
+        "For CLI startup, ReadArgs; REFRESH scans DEVS:DataTypes then MOSSYS:Devs/DataTypes with DateScan; FILES scans supplied patterns",
+        "ScanDirectory uses MatchFirst/MatchNext/MatchEnd, one directory descent, Ctrl-C handling and exclusion of .info/.backdrop",
+        "LoadDatatype opens and parses IFF DTYP/DTHD plus optional DTCD chunks, builds a resident datatype function through InternalLoadSeg, and replaces or inserts descriptors under dtl_Lock",
+        "LIST enumerates the sorted datatype list and prints base/name pairs; Ctrl-C flushes output and reports ERROR_BREAK"
+      ],
+      "ownership_and_cleanup": [
+        "Hold dtl_Lock for the command transaction",
+        "Free RDArgs, IFF handles, DOS locks/objects, descriptor buffers, parsed-pattern buffers and DTCD segments on every failure",
+        "Keep successfully initialized datatype function segments resident; unload only failed loads or deleted/replaced descriptors",
+        "Reply WBStartup only after releasing the datatype-list semaphore and closing libraries"
+      ],
+      "known_source_quirk": "The released source breaks after the first successful ParseIFF EOC because the source comment records a second-loop crash; preserve this as source evidence and do not silently broaden parsing without packed/guest comparison."
+    }
+  },
+  "evidence_limits": [
+    "Workbench static command analysis confirms five DataTypesList heads, a 140-byte user-space extent candidate, one refresh-date longword, and the listed candidate CompoundDatatype field offsets.",
+    "The longest-mask field, meaningful DataTypesList tail bytes, SignalSemaphore ownership, node ownership/lifetime, all descriptor-field semantics, sorting details and concurrency behavior are not fully established. The +54 size field, +14 secondary-node role, classic named-object tag names and the 140-byte tail interpretation retain provisional semantics.",
+    "No command execution on an authentic Workbench guest, output comparison or shipping/PURE/resident admission is claimed. The Workbench command observations do not close the MorphOS 3.20 library ABI.",
+    "Installed PURE/resident flags, same-segment reuse, concurrent descriptor replacement, package placement and differential guest parity remain open.",
+    "The audit does not authorize copying either original binary into a shipping image."
+  ]
+}

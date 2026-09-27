@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "captureDate": "2026-09-24",
+  "subject": "MorphOS TaskList ETask interior-range source and SDK layout",
+  "sdkArchive": {
+    "path": "D:/TestData/MorphOS/sdk-20260529.lha",
+    "bytes": 387356517,
+    "sha256": "310dfb888b995e32206c5c3aba409847334a5fee049d13aad27b4af0d518ec77",
+    "nestedSdkMember": "morphossdk/sdk.pack",
+    "header": "Development/gg/os-include/exec/tasks.h"
+  },
+  "sourceEvidence": {
+    "path": "artifacts/morphos320-c-source-extracted/c/tasklist/stackdump.c",
+    "function": "ShowPtr",
+    "lines": "312-317",
+    "behavior": "Checks Ptr > MyTask->tc_ETask and Ptr < MyTask->tc_ETask + sizeof(struct ETask), then prints the offset from tc_ETask."
+  },
+  "pinnedHeaderLayout": {
+    "packing": 2,
+    "taskBytes": 92,
+    "processBytes": 228,
+    "eTaskCompiledExtentBytes": 114,
+    "extentDerivation": "Compiled declaration extent through the final PPCTrapMessage field in the pinned exec/tasks.h under #pragma pack(2). This reproduces the source's sizeof(struct ETask) bound for this pinned header profile."
+  },
+  "candidateBehavior": {
+    "etaskPointerField": "tc_ETask at ExecLayout.Task.TrapAllocated offset 34",
+    "range": "Strict interior: address > tc_ETask and address - tc_ETask < 114",
+    "qualification": "Interior offset +5 is covered by register-check-etask-interior in artifacts/tasklist-morphos-native-regcheck-v1/qualification.json, with 54 supplied vectors on each of 68000, 68020, and 68040."
+  },
+  "limits": [
+    "The 114-byte extent is tied to the recorded MorphOS SDK archive and header declaration profile; it is not a claim that every tc_ETask allocation is exactly 114 bytes or that other MorphOS versions use this extent.",
+    "The supplied-vector fixture does not prove allocation safety or output parity on an original MorphOS 3.20 guest. Keep that guest comparison as an admission gate."
+  ]
+}

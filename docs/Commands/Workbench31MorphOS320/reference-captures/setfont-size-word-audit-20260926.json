@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "command": "SetFont",
+  "source_id": "wb31-workbench-m10-40.42",
+  "volume": "Workbench3.1",
+  "path": "C/SetFont",
+  "bytes": 1092,
+  "sha256": "c3e1e763b12fd4f710a414443facea49479aa723a94828828dbaee214fe4ad8c",
+  "file_format": "amiga-hunk",
+  "audit_kind": "bounded-static-disassembly",
+  "observations": [
+    {
+      "code_offset": "0x00A2",
+      "operation": "load the LONG value through the SIZE/N ReadArgs result pointer into D1"
+    },
+    {
+      "code_offset": "0x00A4",
+      "operation": "store D1.W into the TextAttr.ta_YSize word"
+    },
+    {
+      "code_offset": "0x00A8-0x00AC",
+      "operation": "compare D1.W with 4 using CMP.W and branch with BLS to the error path; the comparison is unsigned and ignores D1's high 16 bits"
+    }
+  ],
+  "derived_cases": [
+    {
+      "read_args_long": "0x00010000",
+      "text_attr_y_size": "0x0000",
+      "expected_result": "RETURN_FAIL",
+      "expected_ioerr": 115
+    },
+    {
+      "read_args_long": "0x00010004",
+      "text_attr_y_size": "0x0004",
+      "expected_result": "RETURN_FAIL",
+      "expected_ioerr": 115
+    },
+    {
+      "read_args_long": "0x00010005",
+      "text_attr_y_size": "0x0005",
+      "expected_result": "continue_to_OpenDiskFont"
+    },
+    {
+      "read_args_long": "0xFFFFFFFF",
+      "text_attr_y_size": "0xFFFF",
+      "expected_result": "continue_to_OpenDiskFont"
+    }
+  ],
+  "evidence_limits": [
+    "The low-word store and unsigned comparison are direct HUNK observations.",
+    "Derived cases exercise the candidate's supplied ReadArgs result boundary; exact text-to-LONG parsing and real diskfont acceptance still require original guest execution."
+  ]
+}

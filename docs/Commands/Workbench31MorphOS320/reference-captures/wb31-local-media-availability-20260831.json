@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "capture_id": "wb31-local-media-availability-20260831",
+  "kind": "local-reference-media-availability",
+  "directory": "D:/TestData/TestImages",
+  "selection": "regular files whose names contain Workbench or Install and 3.1",
+  "available_files": [
+    {
+      "name": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 1 of 6)(Install)[!].zip",
+      "bytes": 394356,
+      "role": "Install"
+    },
+    {
+      "name": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+      "bytes": 403062,
+      "role": "Workbench"
+    }
+  ],
+  "unavailable_required_media": [
+    "Selected Workbench 3.1 M10 distribution disks 3 through 6",
+    "Other Workbench 3.1 machine variants",
+    "A clean installed Workbench 3.1 system image"
+  ],
+  "consequence": "The current two-disk C: inventory is repeatable but cannot close CC00 distribution-media or installed-system reconciliation.",
+  "limits": [
+    "This is a local availability observation, not proof that no other copy exists elsewhere.",
+    "No media was modified or downloaded."
+  ]
+}

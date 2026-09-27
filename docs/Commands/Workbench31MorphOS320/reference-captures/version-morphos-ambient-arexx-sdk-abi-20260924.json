@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "captureDate": "2026-09-24",
+  "subject": "MorphOS Version Ambient ARexx ABI",
+  "officialSdk": {
+    "rexxMessage": {
+      "url": "https://morphos-team.net/sdk/includes/rexx/storage.html",
+      "header": "rexx/storage.h",
+      "packing": 2,
+      "fields": {
+        "rm_Action": 28,
+        "rm_Result1": 32,
+        "rm_Result2": 36,
+        "rm_Args": 40
+      },
+      "derivation": "RexxMsg begins with Exec Message (20 bytes), followed by rm_TaskBlock and rm_LibBase (4 bytes each); the listed fields follow in order as 32-bit values/pointers.",
+      "flags": {
+        "RXCOMM": "0x01000000",
+        "RXFF_RESULT": "0x00020000",
+        "combinedAction": "0x01020000"
+      }
+    },
+    "rexxsyslib": {
+      "url": "https://morphos-team.net/sdk/includes/ppcinline/rexxsyslib.html",
+      "vectors": {
+        "CreateArgstring": -126,
+        "DeleteArgstring": -132,
+        "LengthArgstring": -138,
+        "CreateRexxMsg": -144,
+        "DeleteRexxMsg": -150
+      },
+      "registers": {
+        "CreateArgstring": "A0=text, D0=length",
+        "DeleteArgstring": "A0=argstring",
+        "LengthArgstring": "A0=argstring",
+        "CreateRexxMsg": "A0=reply port, A1=extension, D0=host name",
+        "DeleteRexxMsg": "A0=message"
+      }
+    },
+    "callerProvidedBase": "Candidate calls rexxsyslib vectors with an invocation-local A6 base; it does not write an SDK static library-base field into shared resident image data."
+  },
+  "publicExecDosApis": [
+    "Exec.OpenLibrary/CloseLibrary",
+    "Exec.FindTask",
+    "Exec.CreateMsgPort/DeleteMsgPort",
+    "Exec.Forbid/Permit",
+    "Exec.FindPort/PutMsg/WaitPort/GetMsg",
+    "Exec.AllocVec/FreeVec",
+    "DOS.StrToLong",
+    "DOS.SetVar with GVF_LOCAL_ONLY"
+  ],
+  "sourceEvidence": {
+    "path": "artifacts/morphos320-c-source-extracted/c/version/version.c",
+    "sha256": "818f64fae8abf914633b4bc807d6b105eb0ccf30e1e48ac1527745d486c22490",
+    "functions": [
+      {
+        "name": "DoARexxCmd",
+        "lines": "1513-1586",
+        "behavior": "Open rexxsyslib.library V36, create a reply port and RexxMsg, put VERSION in rm_Args[0], send RXCOMM | RXFF_RESULT to the AMBIENT port under Forbid/Permit, wait for and consume the reply, copy a successful result into MEMF_ANY storage, and release owned resources."
+      },
+      {
+        "name": "makeambientversion",
+        "lines": "1599-1648",
+        "behavior": "Save pr_WindowPtr, set it to -1, query AMBIENT, parse major.revision with DOS StrToLong, set the local Ambient variable and print the Ambient component; if that fails, try ambient_path and the two built-in Ambient executable paths; restore pr_WindowPtr."
+      }
+    ]
+  },
+  "candidateEvidence": {
+    "path": "src/Commands/Native/NativeMorphOSVersionCommand.cs",
+    "behavior": "Implements the ARexx request, reply copy, major.revision parsing, local Ambient variable, source output/result behavior, and owned-resource cleanup. Uses explicit caller-provided A6 vector calls to preserve shared image state.",
+    "qualification": "artifacts/version-morphos-native-20260924-ambient-arexx-v1/qualification.json",
+    "vectorsPerCpu": 58,
+    "cpus": ["68000", "68020", "68040"],
+    "sharedImageWrites": 0
+  },
+  "limits": [
+    "The Ambient executable providers using ambient_path, MOSSYS:ambient/ambient, and SYS:System/ambient/ambient remain unimplemented.",
+    "Supplied-vector qualification does not replace execution against an original MorphOS guest or PURE/resident lifecycle, licensing, and package admission evidence."
+  ]
+}

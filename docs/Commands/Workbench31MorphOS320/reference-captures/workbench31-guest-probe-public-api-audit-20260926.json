@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "status": "primary-local-api-contract-audit-not-runtime-qualification",
+  "source": "D:\\TestData\\AmigaDeveloperCD.iso",
+  "members": [
+    {
+      "member": "NDK_3.1/Docs/doc/dos.doc",
+      "extent": 17730,
+      "bytes": 174666,
+      "sha256": "2e22d1d1b7c00fac5757eead0ef4d49a01c7666f0db5850735193c9597a7cee2",
+      "sections": [
+        {
+          "method": "SystemTagList",
+          "offset": 160432,
+          "bytes": 2895,
+          "sha256": "e35a36e40882e7982951b4243d09b9eb953d314764607be27fa13c047a749665"
+        },
+        {
+          "method": "RunCommand",
+          "offset": 134073,
+          "bytes": 1665,
+          "sha256": "2f21a4502d70c8abb59e2ccc1591c047b35d0d082957363fbc100416d20aafe2"
+        }
+      ]
+    },
+    {
+      "member": "NDK_3.1/Docs/doc/exec.doc",
+      "extent": 17816,
+      "bytes": 162487,
+      "sha256": "71df8eeab9f6b9873a38bea96bec34fd6e44b78aa2d67d8f1b28319c207dd2ad",
+      "sections": [
+        {
+          "method": "AddPort",
+          "offset": 11868,
+          "bytes": 1680,
+          "sha256": "2a3d1f0542fef44da65366271c2fdc74dcda8144d3715ea3daf54752ac72f4bb"
+        },
+        {
+          "method": "CreateMsgPort",
+          "offset": 57158,
+          "bytes": 885,
+          "sha256": "479eae9f3a5ab751826f10892c7e941f612910d7d2265889e6a0cbcd700774e8"
+        },
+        {
+          "method": "Wait",
+          "offset": 143607,
+          "bytes": 904,
+          "sha256": "5abc74977f0dd23c6b922e567ba850c6b67fa4930a8910800c9e72e39a25ab36"
+        }
+      ]
+    },
+    {
+      "member": "NDK_3.1/Includes&Libs/include_h/dos/dostags.h",
+      "extent": 21063,
+      "bytes": 5155,
+      "sha256": "db4f2d4512f802daa2531d7b007cc97ca179fd1ea123fde9cf1584701e986239",
+      "sections": []
+    }
+  ],
+  "facts": {
+    "SystemTagList": "V36 public API launches a native Shell, returns command return code or -1 for shell creation failure; normal shell parsing and inherited directory/path apply. Synchronous explicitly supplied input/output handles remain caller owned; asynchronous mode closes them.",
+    "SystemTagListSecondaryError": "The selected autodoc does not guarantee that caller IoErr after SystemTagList equals the child command pr_Result2. Record only postSystemIoErr until propagation is independently established.",
+    "RunCommand": "V36 public alternative runs a loaded segment in current Process/CLI. Argument bytes require final newline for ReadArgs. V37+ also sets input buffering and restores it. This alternative is audited but not used by the initial SystemTagList probe.",
+    "PortDiscovery": "CreateMsgPort allocates and initializes a port and signal. Set ln_Name and ln_Pri then AddPort for public discovery. RemPort must precede DeleteMsgPort if releasing it.",
+    "Lifetime": "The diagnostic probe keeps its Process, loaded HUNK, port, name record and output allocation alive while waiting. Host observations use saved passive RAM only. Retention until machine disposal is diagnostic behavior, not production cleanup or PURE evidence.",
+    "Wait": "Public Exec Wait suspends current task for selected signals and breaks Forbid/Disable. Probe must not depend on holding those across its terminal wait."
+  }
+}

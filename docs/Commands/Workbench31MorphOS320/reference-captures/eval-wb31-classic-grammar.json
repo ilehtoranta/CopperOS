@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "capture_id": "eval-wb31-classic-grammar-20260901",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Eval",
+    "command_sha256": "e320ba5d36b788e83719a09c7481d2c91d511396787b0b534e29c496240af962",
+    "version": "eval 37.3 (26.3.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/eval-wb31-classic-grammar-probe",
+    "source_sha256": "0ea2de4f3f15d7daece48b19edf3465f3b61919651170c601cb3efe2ad334b21",
+    "disposable_adf_before_run_sha256": "f78da0b3e5cc95315a7533e4b0654b59efc3897fdc54b7cc0cde79c556ae0712",
+    "disposable_adf_after_run_sha256": "79ec0d6b1bfba0dd6371e7f4b4e06bcacea197763cb595f8369a24fe08bd93b3",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "c20d4d3d98f2a3ef6314197cb74b5d725b20a28f55099c6d9d758173a23fe05e",
+    "capture_bytes": 34,
+    "capture_text": "BEGIN\n42\n13\nf=F\ns=0\nu=2A\nl=2A\nEND\n"
+  },
+  "observation": {
+    "invocations": [
+      "C:Eval 42",
+      "C:Eval 1+2*3+4",
+      "C:Eval 15 LFORMAT=\"f=%x\"",
+      "C:Eval 16 LFORMAT=\"s=%x\"",
+      "C:Eval 42 LFORMAT=\"u=%X2\"",
+      "C:Eval 42 LFORMAT=\"l=%x2\""
+    ],
+    "result": "The original command output 42 and 13 for the first two calls. It output F and 0 for the one-digit lowercase X conversions, and 2A for both uppercase and lowercase X conversions followed by 2."
+  },
+  "limits": [
+    "The startup sequence and capture target are authored probe content on a disposable ADF copy.",
+    "This establishes the selected decimal arithmetic and X/x LFORMAT cases only; it does not establish the full operator table, parentheses/unary behavior, numeric width/base rules, decimal/octal/character formatting, width ranges/padding, errors, return level, IoErr, TO behavior, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Eval bytes are copied into this repository."
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "command": "SetFont",
+  "source_id": "wb31-workbench-m10-40.42",
+  "volume": "Workbench3.1",
+  "path": "C/SetFont",
+  "bytes": 1092,
+  "sha256": "c3e1e763b12fd4f710a414443facea49479aa723a94828828dbaee214fe4ad8c",
+  "file_format": "amiga-hunk",
+  "audit_kind": "bounded-static-disassembly",
+  "observations": [
+    {
+      "code_offset": "0x017a-0x017e",
+      "operation": "test ReadArgs result slot 3 (PROP); when set, branch around the returned-font proportional check"
+    },
+    {
+      "code_offset": "0x0180-0x0186",
+      "operation": "when PROP is clear, test bit 5 at opened TextFont+0x17 (TextFont.Flags FPF_PROPORTIONAL); continue if clear"
+    },
+    {
+      "code_offset": "0x0188-0x0196",
+      "operation": "if the opened font is proportional and PROP is clear, call graphics.library/CloseFont, clear the font pointer and set IoErr to 212 (ERROR_OBJECT_WRONG_TYPE)",
+      "close_font_lvo": -78,
+      "io_error": 212
+    }
+  ],
+  "layout_evidence": {
+    "field": "TextFont.Flags",
+    "offset": 23,
+    "proportional_bit": 5,
+    "proportional_mask": "0x20",
+    "source": "CopperSharp SDK Graphics.TextFont field order and FontFlags enum; offsets agree with the HUNK access"
+  },
+  "conclusion": "PROP sets the TextAttr proportional request and also allows OpenDiskFont to return a proportional font; without PROP, a proportional result is closed and rejected with ERROR_OBJECT_WRONG_TYPE.",
+  "evidence_limits": [
+    "This is static HUNK evidence; original Workbench diskfont selection behavior and diagnostics still require guest comparison.",
+    "This audit does not establish PURE/resident lifecycle, licensing, package admission or shipping equivalence."
+  ]
+}

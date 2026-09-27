@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "profile": "morphos320",
+  "source_id": "morphos320-live-iso",
+  "command": "ShowConfig",
+  "path": "MorphOS/C/ShowConfig",
+  "iso_extent": 178220,
+  "bytes": 15811,
+  "sha256": "8bbc8f036854515ed3d9d919e0149208222290a89e92e92551bf24b86c67b711",
+  "version": {
+    "name": "ShowConfig",
+    "version": 50,
+    "revision": 17,
+    "date_text": "1.2.2015",
+    "byte_offset": 15760,
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template": {
+    "status": "unknown",
+    "candidates": [],
+    "evidence": "packed MorphOS member; no ReadArgs grammar is inferred from the printable scan"
+  },
+  "documented_behavior": {
+    "summary": "Shows system configuration information about software versions, hardware, and the registered user",
+    "evidence": "MorphOS Library Shell Commands index; exact providers, options and output remain unobserved"
+  },
+  "string_scan": {
+    "ascii_run_count": 177,
+    "meaningful_syntax_or_diagnostic_candidates": [],
+    "version_tag_observed": true,
+    "evidence": "packed-member printable scan; short random runs are not treated as strings"
+  },
+  "installer_event": {
+    "status": "not-observed",
+    "script": "hdinstall.fixc",
+    "evidence": "no literal protection event for MorphOS/C/ShowConfig was found in the selected installer script; installed flags remain unobserved"
+  },
+  "scope": "binary identity and documented purpose only; no raw binary is stored in the repository",
+  "open_gates": [
+    "exact command-tail grammar and help output",
+    "guest configuration providers and unavailable-field behavior",
+    "output, diagnostics, IoErr and Ctrl-C behavior",
+    "pure/resident classification, lifecycle and repeat/concurrent calls",
+    "installed AmigaDOS protection metadata",
+    "package/licensing and differential comparison"
+  ]
+}

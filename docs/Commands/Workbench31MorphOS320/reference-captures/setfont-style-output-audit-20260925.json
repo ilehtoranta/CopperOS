@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "command": "SetFont",
+  "source_id": "wb31-workbench-m10-40.42",
+  "volume": "Workbench3.1",
+  "path": "C/SetFont",
+  "bytes": 1092,
+  "sha256": "c3e1e763b12fd4f710a414443facea49479aa723a94828828dbaee214fe4ad8c",
+  "file_format": "amiga-hunk",
+  "audit_kind": "bounded-static-disassembly",
+  "font_layout_observation": {
+    "field": "TextFont.tf_Style",
+    "offset": "0x16",
+    "size": 1,
+    "style_bits": {
+      "underline": 0,
+      "bold": 1,
+      "italic": 2
+    },
+    "layout_evidence": "CopperSharp SDK Graphics.TextFont field order; HUNK reads the byte at font+0x16"
+  },
+  "escape_strings": [
+    { "code_data_offset": "0x0378", "meaning": "console reset", "bytes_hex": "1b 63", "text": "\\x1bc" },
+    { "code_data_offset": "0x037c", "meaning": "italic", "bytes_hex": "1b 5b 33 6d", "text": "\\x1b[3m" },
+    { "code_data_offset": "0x0382", "meaning": "bold", "bytes_hex": "1b 5b 31 6d", "text": "\\x1b[1m" },
+    { "code_data_offset": "0x0388", "meaning": "underline", "bytes_hex": "1b 5b 34 6d", "text": "\\x1b[4m" }
+  ],
+  "conditional_output": [
+    {
+      "code_offset": "0x021a",
+      "requested_slot": "ReadArgs result slot 4 (ITALIC)",
+      "tested_font_style_bit": 2,
+      "behavior": "Emit the italic escape only when requested and the opened font's tf_Style bit is clear."
+    },
+    {
+      "code_offset": "0x0234",
+      "requested_slot": "ReadArgs result slot 5 (BOLD)",
+      "tested_font_style_bit": 1,
+      "behavior": "Emit the bold escape only when requested and the opened font's tf_Style bit is clear."
+    },
+    {
+      "code_offset": "0x024e",
+      "requested_slot": "ReadArgs result slot 6 (UNDERLINE)",
+      "tested_font_style_bit": 0,
+      "behavior": "Emit the underline escape only when requested and the opened font's tf_Style bit is clear."
+    }
+  ],
+  "conclusion": "The binary writes the reset escape, flushes, conditionally writes requested styles absent from the opened font's style byte, and flushes again.",
+  "evidence_limits": [
+    "This is static HUNK evidence; it does not establish the guest console's rendered output or error/result behavior.",
+    "The audit does not establish packet semantics, installed font lifetime, PURE/resident lifecycle, licensing, package admission or shipping equivalence."
+  ]
+}

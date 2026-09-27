@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "command": "SetFont",
+  "source_id": "wb31-workbench-m10-40.42",
+  "volume": "Workbench3.1",
+  "path": "C/SetFont",
+  "bytes": 1092,
+  "sha256": "c3e1e763b12fd4f710a414443facea49479aa723a94828828dbaee214fe4ad8c",
+  "file_format": "amiga-hunk",
+  "audit_kind": "bounded-static-disassembly",
+  "observations": [
+    { "code_offset": "0x01d6", "operation": "Exec.Forbid", "lvo": -132 },
+    { "code_offset": "0x01e4", "operation": "graphics.library/SetFont", "lvo": -66 },
+    { "code_offset": "0x01f0", "operation": "graphics.library/CloseFont (conditional on old font being non-null)", "lvo": -78 },
+    { "code_offset": "0x01f4", "operation": "store replacement font at Window.Font (Window+0x80)" },
+    { "code_offset": "0x0216", "operation": "Exec.Permit", "lvo": -138 }
+  ],
+  "conclusion": "The captured binary brackets SetFont, optional old-font CloseFont, and publication of the replacement font pointer in Window.Font with Exec Forbid/Permit. The inspected interval has no observed failure branch between the calls.",
+  "evidence_limits": [
+    "Offsets are code-section-relative offsets in the captured HUNK.",
+    "This is static binary evidence only; it does not verify concurrent console-window behavior or guest output on Workbench 3.1.",
+    "The existing capture audit still governs parser, packet, layout, output and result-precedence uncertainties.",
+    "This audit does not establish PURE/resident lifecycle, licensing, package admission or shipping equivalence."
+  ]
+}

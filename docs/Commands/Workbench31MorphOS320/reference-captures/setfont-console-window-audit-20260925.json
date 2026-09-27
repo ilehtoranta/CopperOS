@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "command": "SetFont",
+  "source_id": "wb31-workbench-m10-40.42",
+  "volume": "Workbench3.1",
+  "path": "C/SetFont",
+  "bytes": 1092,
+  "sha256": "c3e1e763b12fd4f710a414443facea49479aa723a94828828dbaee214fe4ad8c",
+  "file_format": "amiga-hunk",
+  "audit_kind": "bounded-static-disassembly",
+  "reference": {
+    "title": "Amiga ROM Kernel Reference Manual: DOS, section 14.8.3",
+    "url": "https://developer.amigaos3.net/sites/default/files/downloads/2024-10/Amiga_ROM_Kernel_Reference_Manual_DOS.pdf",
+    "claims": [
+      "ACTION_DISK_INFO is action 25 and takes a BPTR to InfoData.",
+      "For a graphical console, InfoData.id_VolumeNode returns a pointer to the intuition Window; non-window consoles leave it NULL."
+    ]
+  },
+  "observations": [
+    {
+      "code_offset": "0x01b2-0x01c4",
+      "operation": "DoPkt on Process.ConsoleTask with ACTION_DISK_INFO (25); D3 is the stack InfoData address shifted right by two, and D4-D7 are zero.",
+      "lvo": -240
+    },
+    {
+      "code_offset": "0x01c8",
+      "operation": "load the raw long at InfoData+0x1c (id_VolumeNode) as the console Window pointer"
+    },
+    {
+      "code_offset": "0x01ce -> 0x0274",
+      "operation": "if id_VolumeNode is NULL, set success result and zero IoErr, then clean up without changing a font or writing output"
+    },
+    {
+      "code_offset": "0x01da-0x01e4",
+      "operation": "pass Window+0x32 (Window.RastPort) and the opened font to graphics.library/SetFont",
+      "lvo": -66
+    },
+    {
+      "code_offset": "0x01e8-0x01f4",
+      "operation": "read the prior font at Window+0x80, close it if non-null, then store the opened font at the same field",
+      "close_font_lvo": -78
+    }
+  ],
+  "layout_evidence": {
+    "InfoData.id_VolumeNode": 28,
+    "Intuition.Window.RastPort": 50,
+    "Intuition.Window.Font": 128,
+    "source": "DOS InfoData and Intuition Window public structure layouts in the CopperSharp SDK; offsets agree with the HUNK accesses"
+  },
+  "conclusion": "The original uses ACTION_DISK_INFO to obtain a graphical console Window, treats id_VolumeNode as a raw Window pointer, changes that Window's RastPort font, and updates Window.Font. A NULL Window is a successful no-op. The DoPkt D0 result is not tested.",
+  "evidence_limits": [
+    "Static binary and public documentation evidence do not establish behavior of the specific Workbench 3.1 console handler on a guest.",
+    "InfoData.id_VolumeNode is normally typed BPTR, while this command treats the console-specific returned value as a raw APTR; this is recorded from the binary and needs guest confirmation.",
+    "This audit does not establish console resource lifetime, PURE/resident lifecycle, licensing, package admission or shipping equivalence."
+  ]
+}

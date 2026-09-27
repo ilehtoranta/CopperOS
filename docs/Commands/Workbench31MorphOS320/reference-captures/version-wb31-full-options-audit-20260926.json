@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "capture_id": "version-wb31-full-options-audit-20260926",
+  "kind": "offline-hunk-code-audit-with-separate-original-guest-observations",
+  "profile": "wb31",
+  "command": "Version",
+  "source_id": "wb31-workbench-m10-40.42",
+  "source_adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+  "path": "C/Version",
+  "source_bytes": 4764,
+  "source_sha256": "dc2f55cd48b37bd1efecdbf07d38757463129dd9076ea6bf1b5d967f2189f224",
+  "hunk": {
+    "index": 0,
+    "kind": "CODE",
+    "file_offset": 32,
+    "bytes": 4728,
+    "sha256": "bb0ccab2faa02968a595a91ac99b5720825a79efa46e833656337e70b5da96d1"
+  },
+  "analysis_method": "Read-only original ADF through Inventory Adf; rehashed C/Version and disassembled selected CODE ranges with Capstone 5.0.7 M68000. Offsets below are CODE-relative. No reference binary exported. Main/parser audit also independently reviewed by implementation agents.",
+  "options": {
+    "template": "NAME,VERSION/N,REVISION/N,FILE/S,FULL/S,UNIT/N,INTERNAL/S,RES/S",
+    "search_flags": "0x006e D5=-1; 0x0070 tests FILE slot at -0x70(A5), 0x0076 sets D5=0x20. UNIT/INTERNAL/RES result slots have no main-path reads; they do not force a Resident-only provider. FULL slot at -0x6c(A5) is tested at 0x0164.",
+    "limits": "This audit does not complete FILE, later search providers, no-name system output or every mixed-option/error path."
+  },
+  "full_output": {
+    "order": "Normal string is already printed. Date and Extra follow before the common newline, cleanup and numeric minimum comparison.",
+    "date": "0x016a tests result flags bit5. 0x0172 sets DateTime format=4; day/time pointers NULL and flags0. 0x018e copies result+0x18 DateStamp. 0x01a6 calls DOS.DateToStr(-744), ignoring its return. 0x01b8 prints format \" (%s)\".",
+    "extra": "0x01c0 checks result+0x24; if nonzero 0x01d0 prints \"\\n%s\". Common DOS.PutStr newline at 0x01e2.",
+    "normal_format": "Canonical normal result uses \"%s %ld.%ld\", so absent revision=-1 is signed."
+  },
+  "date_parser": {
+    "prefix": "After version/revision parsing, scans to parenthesis or first NUL/LF/CR. Copies up to19 parenthetical characters plus NUL into the source-specific20-byte fallback buffer; this is not an arbitrary name limit.",
+    "numeric": "DOS.StrToLong at0x0712/0x073c/0x0762 reads day.month.year, requiring both dots. After year consumed, optional closing parenthesis and spaces are consumed and Extra start is updated at0x0786.",
+    "clock_data": "Seconds/minutes/hours=0. Day and month use low WORDs; year uses low WORD of parsed year+1900 (0x0788-0x07b0).",
+    "conversion": "0x07c0 calls Utility.Date2Amiga(-126), NOT CheckDate(-132). Nonzero result is interpreted as signed LONG by division helper0x11b4: DateStamp days=seconds/86400, minutes=(seconds%86400)/60, ticks=(seconds%60)*50 with signed quotient/remainder. Helper tests/negates negative dividend and restores quotient/remainder signs. Valid flag set0x0804; 0xffffffff seconds yields days0/minutes0/ticks-50.",
+    "fallback": "When date flag absent, zero26-byte DateTime, format0, date pointer to copied parenthetical text, DOS.StrToDate(-750) at0x083e; nonzero copies returned stamp and sets date flag. No replacement host date parser.",
+    "extra_start": "Original open-parenthesis position remains Extra start when numeric parsing does not finish. Successful fallback conversion can therefore still retain the parenthetical source text as Extra. Completed numeric parsing moves Extra past consumed date/spaces even if Date2Amiga returns0 and fallback follows.",
+    "extra_allocation": "0x08f6-0x0916 scans to NUL/LF/CR. If Extra start nonnegative and lineEnd-start nonzero, AllocVec(MEMF_CLEAR,length+1) at0x0936, exact copy at0x096c; allocation failure frees parsed result before returning failure."
+  },
+  "separate_guest_evidence": {
+    "qualification": "artifacts/workbench31-guest-command-captures-20260926-v2/qualification.json",
+    "qualification_sha256": "6aee7808522dfd2b203259a85fc020017ed1bc4c8d13000d5295d26bd7cf73c2",
+    "observations": [
+      {
+        "command": "C:Version dos.library FULL",
+        "return": 0,
+        "output": "dos.library 40.3 (04/01/93)\n"
+      },
+      {
+        "command": "C:Version DOS.LIBRARY",
+        "return": 0,
+        "output": "dos.library 40.3\n"
+      },
+      {
+        "command": "C:Version DOS.LIBRARY RES",
+        "return": 0,
+        "output": "dos.library 40.3\n"
+      },
+      {
+        "command": "C:Version dos.library REVISION 4",
+        "return": 5,
+        "output": "dos.library 40.3\n"
+      },
+      {
+        "command": "C:Version dos.library VERSION 39 REVISION 999",
+        "return": 0,
+        "output": "dos.library 40.3\n"
+      }
+    ],
+    "limits": "Original normal CLI observations, not proof of arbitrary dates, provider selection, replacement parity, child Result2 or whole-command completion."
+  },
+  "command_parity_claim": false
+}

@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "capture_id": "which-wb31-no-match-status-20260831",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Which",
+    "command_sha256": "35f7f3fee29dd2d56f482537af1c5f5a88b552080e6c26be14f455a3241b7157",
+    "version": "which 37.1 (12.1.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/which-wb31-no-match-status-startup-probe",
+    "source_sha256": "33686202584ab74545d8023338df501b02641c8b3fdb171653bd9d15cb1cc716",
+    "disposable_adf_before_run_sha256": "3e2d7ff2d7587ecbbdaccbe2d584a3a3355afcd57247192ff94d04fd005a450c",
+    "disposable_adf_after_run_sha256": "e38d772e56f4efdf6ba48d3bf6856f58f967bdeb5782f044bf383b3960e3fe58",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "99eb9e43c2438508dd97d758eaefe2b81018e37c25a978eeeb82c1aebef63457",
+    "capture_bytes": 61,
+    "capture_text": "BEGIN\nCD-NORES RC=5 RESULT2=205\nMISSING RC=5 RESULT2=205\nEND\n"
+  },
+  "observations": [
+    "C:Which CD NORES emits no captured line and leaves RC=5, Result2=205.",
+    "C:Which CopperOSMissingCommand emits no captured line and leaves RC=5, Result2=205."
+  ],
+  "limits": [
+    "The startup sequence and output target are authored probe content on a disposable ADF copy.",
+    "This establishes two classic no-match results, not RES-only no-match behavior, diagnostics on a separate error stream, cancellation, inaccessible paths, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Which bytes are copied into this repository."
+  ]
+}

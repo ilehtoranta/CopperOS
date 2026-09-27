@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "command": "SetFont",
+  "source_id": "wb31-workbench-m10-40.42",
+  "volume": "Workbench3.1",
+  "path": "C/SetFont",
+  "bytes": 1092,
+  "sha256": "c3e1e763b12fd4f710a414443facea49479aa723a94828828dbaee214fe4ad8c",
+  "file_format": "amiga-hunk",
+  "audit_kind": "bounded-static-disassembly",
+  "observations": [
+    {
+      "code_offset": "0x0170",
+      "operation": "retain the OpenDiskFont result in A2"
+    },
+    {
+      "code_offset": "0x0188-0x0196",
+      "operation": "only the proportional-font rejection path explicitly calls CloseFont on the newly opened font, then clears A2"
+    },
+    {
+      "code_offset": "0x01CC-0x01D0 -> 0x0274-0x027C",
+      "operation": "a NULL id_VolumeNode takes the success path, clears result and IoErr, and enters shared cleanup with A2 still holding the opened font"
+    },
+    {
+      "code_offset": "0x027C-0x02D8",
+      "operation": "shared cleanup frees temporary allocations and closes acquired libraries; it does not call CloseFont on A2. The only other CloseFont site closes the previous Window.Font at 0x01F0"
+    },
+    {
+      "code_offset": "0x0198-0x01AE -> 0x027C",
+      "operation": "post-open process/console lookup failures also reach shared cleanup with A2 non-NULL and do not call CloseFont"
+    }
+  ],
+  "candidate_behavior": {
+    "no_window_success": "retains the OpenDiskFont result without CloseFont, matching the captured HUNK path",
+    "pre_transfer_failure": "calls CloseFont to release the candidate font; this is a cleanup improvement over the static HUNK's post-open failure path"
+  },
+  "evidence_limits": [
+    "The HUNK's call sites establish the binary control flow; this audit does not measure the guest diskfont open count or prove real handler effects.",
+    "The candidate intentionally avoids the HUNK's post-open error-path font leak. Whether that internal ownership difference affects guest-visible compatibility still requires original Workbench execution."
+  ]
+}

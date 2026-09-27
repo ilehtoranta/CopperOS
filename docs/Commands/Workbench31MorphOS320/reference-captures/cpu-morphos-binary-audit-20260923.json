@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "profile": "morphos320",
+  "source_id": "morphos320-live-iso",
+  "command": "CPU",
+  "path": "MorphOS/C/CPU",
+  "iso_extent": 175236,
+  "bytes": 4123,
+  "sha256": "4b66c7a17085a932cbe4255b9a77d92e508de0c7106701fd8ac1da4a1dc9148a",
+  "version": {
+    "name": "CPU",
+    "version": 50,
+    "revision": 10,
+    "date_text": "28.11.2012",
+    "byte_offset": 4078,
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template": {
+    "status": "unknown",
+    "candidates": [],
+    "evidence": "packed MorphOS member; no ReadArgs grammar is inferred from the printable scan"
+  },
+  "documented_behavior": {
+    "summary": "Displays information about the CPU of the computer",
+    "evidence": "MorphOS Library Shell Commands index; exact options, control effects and output remain unobserved"
+  },
+  "string_scan": {
+    "ascii_run_count": 35,
+    "meaningful_syntax_or_diagnostic_candidates": [],
+    "version_tag_observed": true,
+    "evidence": "packed-member printable scan; short random runs are not treated as strings"
+  },
+  "installer_event": {
+    "script": "hdinstall.fixc",
+    "line": 10,
+    "operation": "file-protection-add",
+    "flag": "P",
+    "confidence": "literal-script-observed-not-installed-metadata"
+  },
+  "scope": "binary identity and documented purpose only; no raw binary is stored in the repository",
+  "open_gates": [
+    "exact command-tail grammar and help output",
+    "guest CPU/cache/control provider and unavailable-feature behavior",
+    "output, diagnostics, IoErr and Ctrl-C behavior",
+    "resident/PURE lifecycle and repeat/concurrent calls",
+    "installed AmigaDOS protection metadata",
+    "package/licensing and differential comparison"
+  ]
+}

@@ -1,0 +1,430 @@
+{
+  "schema_version": 1,
+  "capture_id": "loadresource-wb31-code-audit-20260925",
+  "kind": "offline-hunk-code-audit",
+  "profile": "wb31",
+  "command": "LoadResource",
+  "source_id": "wb31-workbench-m10-40.42",
+  "path": "C/LoadResource",
+  "source_bytes": 3972,
+  "source_sha256": "51c8d6da726d5d1429e84f36e323218eb94750ab60b650efe768fc2907d16f38",
+  "analysis_method": "Parsed HUNK boundaries and disassembled code offline; the reference program was not executed.",
+  "hunks": [
+    {
+      "index": 0,
+      "kind": "CODE",
+      "bytes": 704
+    },
+    {
+      "index": 1,
+      "kind": "DATA",
+      "bytes": 680
+    },
+    {
+      "index": 2,
+      "kind": "CODE",
+      "bytes": 2380
+    }
+  ],
+  "data_strings": [
+    {
+      "offset": "0x0000",
+      "text": "locale.library"
+    },
+    {
+      "offset": "0x0010",
+      "text": "dos.library"
+    },
+    {
+      "offset": "0x001c",
+      "text": "utility.library"
+    },
+    {
+      "offset": "0x002c",
+      "text": "graphics.library"
+    },
+    {
+      "offset": "0x003e",
+      "text": "NAME/M,LOCK/S,UNLOCK/S"
+    },
+    {
+      "offset": "0x0055",
+      "text": "$VER: loadresource 40.2 (17.3.93)"
+    },
+    {
+      "offset": "0x007a",
+      "text": "Library"
+    },
+    {
+      "offset": "0x0082",
+      "text": "Device"
+    },
+    {
+      "offset": "0x008a",
+      "text": "Font"
+    },
+    {
+      "offset": "0x0090",
+      "text": "Catalog"
+    },
+    {
+      "offset": "0x01fc",
+      "text": "sys/c.catalog"
+    },
+    {
+      "offset": "0x021e",
+      "text": ".font"
+    },
+    {
+      "offset": "0x0224",
+      "text": "diskfont.library"
+    }
+  ],
+  "startup_calls": [
+    {
+      "code_hunk": 0,
+      "code_offset": "0x002a",
+      "operation": "Exec OpenLibrary",
+      "exec_lvo": -552,
+      "name_data_offset": "0x0000",
+      "library": "locale.library",
+      "minimum_version": 38
+    },
+    {
+      "code_hunk": 0,
+      "code_offset": "0x0038",
+      "operation": "Exec OpenLibrary",
+      "exec_lvo": -552,
+      "name_data_offset": "0x0010",
+      "library": "dos.library",
+      "minimum_version": 39
+    },
+    {
+      "code_hunk": 0,
+      "code_offset": "0x0046",
+      "operation": "Exec OpenLibrary",
+      "exec_lvo": -552,
+      "name_data_offset": "0x001c",
+      "library": "utility.library",
+      "minimum_version": 39
+    },
+    {
+      "code_hunk": 0,
+      "code_offset": "0x0054",
+      "operation": "Exec OpenLibrary",
+      "exec_lvo": -552,
+      "name_data_offset": "0x002c",
+      "library": "graphics.library",
+      "minimum_version": 39
+    },
+    {
+      "code_hunk": 2,
+      "code_offset": "0x0254",
+      "operation": "Locale OpenCatalogA",
+      "locale_lvo": -150,
+      "name_data_offset": "0x01fc",
+      "catalog_name": "sys/c.catalog",
+      "tags": 0
+    }
+  ],
+  "startup_open_result_checks": [
+    {
+      "code_hunk": 0,
+      "code_offset": "0x005c",
+      "library": "dos.library",
+      "required": true
+    },
+    {
+      "code_hunk": 0,
+      "code_offset": "0x0064",
+      "library": "utility.library",
+      "required": true
+    },
+    {
+      "code_hunk": 0,
+      "code_offset": "0x006c",
+      "library": "graphics.library",
+      "required": true
+    }
+  ],
+  "optional_locale_behavior": {
+    "library": "locale.library",
+    "minimum_version": 38,
+    "checked_during_startup": false,
+    "call_when_available": "OpenCatalogA for sys/c.catalog; built-in catalog strings remain in the HUNK"
+  },
+  "startup_coordination_calls": [
+    {
+      "code_hunk": 0,
+      "code_offset": "0x009e",
+      "operation": "DOS Cli",
+      "dos_lvo": -492
+    },
+    {
+      "code_hunk": 0,
+      "code_offset": "0x00b4",
+      "operation": "Exec Forbid",
+      "exec_lvo": -132
+    },
+    {
+      "code_hunk": 0,
+      "code_offset": "0x00be",
+      "operation": "Exec FindPort",
+      "exec_lvo": -390
+    },
+    {
+      "code_hunk": 0,
+      "code_offset": "0x0128",
+      "operation": "DOS CreateNewProc",
+      "dos_lvo": -498
+    }
+  ],
+  "readargs_call": {
+    "code_hunk": 0,
+    "code_offset": "0x0092",
+    "dos_lvo": -798,
+    "template_data_offset": "0x003e",
+    "template": "NAME/M,LOCK/S,UNLOCK/S",
+    "rdargs_argument": 0,
+    "result_slots": 3
+  },
+  "catalog_string_table": {
+    "data_offset": "0x0184",
+    "entry_layout": "8 bytes: LONG catalog id at +0, relocated default-string pointer at +4; HUNK2 0x028a-0x029a indexes this layout",
+    "entries": [
+      {
+        "default_string_pointer_offset": "0x0078",
+        "catalog_id": "0x0000",
+        "default_string": ""
+      },
+      {
+        "default_string_pointer_offset": "0x007a",
+        "catalog_id": "0xc350",
+        "default_string": "Library"
+      },
+      {
+        "default_string_pointer_offset": "0x0082",
+        "catalog_id": "0xc351",
+        "default_string": "Device"
+      },
+      {
+        "default_string_pointer_offset": "0x008a",
+        "catalog_id": "0xc352",
+        "default_string": "Font"
+      },
+      {
+        "default_string_pointer_offset": "0x0090",
+        "catalog_id": "0xc353",
+        "default_string": "Catalog"
+      },
+      {
+        "default_string_pointer_offset": "0x0098",
+        "catalog_id": "0xc354",
+        "default_string": "TYPE"
+      },
+      {
+        "default_string_pointer_offset": "0x009e",
+        "catalog_id": "0xc355",
+        "default_string": "%-9s%s\n"
+      },
+      {
+        "default_string_pointer_offset": "0x00a6",
+        "catalog_id": "0xc356",
+        "default_string": "NAME\n"
+      },
+      {
+        "default_string_pointer_offset": "0x00ac",
+        "catalog_id": "0xc357",
+        "default_string": "No resources currently locked\n"
+      },
+      {
+        "default_string_pointer_offset": "0x00cc",
+        "catalog_id": "0xc358",
+        "default_string": "'%s' is already a locked resource\n"
+      },
+      {
+        "default_string_pointer_offset": "0x00f0",
+        "catalog_id": "0xc359",
+        "default_string": "Error while loading '%s' - "
+      },
+      {
+        "default_string_pointer_offset": "0x010e",
+        "catalog_id": "0xc35a",
+        "default_string": "Requires diskfont.library V37 - "
+      },
+      {
+        "default_string_pointer_offset": "0x0130",
+        "catalog_id": "0xc35b",
+        "default_string": "'%s' couldn't be loaded as a resource - "
+      },
+      {
+        "default_string_pointer_offset": "0x015a",
+        "catalog_id": "0xc35c",
+        "default_string": "'%s' is not a locked resource\n"
+      },
+      {
+        "default_string_pointer_offset": "0x017a",
+        "catalog_id": "0xc35d",
+        "default_string": "'%s' - "
+      }
+    ]
+  },
+  "resource_lock_registry_static_observations": [
+    {
+      "code_hunk": 2,
+      "function_offset": "0x009e",
+      "kind": "one-shot preloaded SegList cache insertion",
+      "record_bytes": 16,
+      "record_fields": [
+        {
+          "offset": 8,
+          "value": "DOS ACCESS_READ lock"
+        },
+        {
+          "offset": 12,
+          "value": "preloaded SegList BPTR"
+        }
+      ],
+      "list_data_offset": "0x0238",
+      "semaphore_data_offset": "0x0244",
+      "operations": [
+        {
+          "code_offset": "0x00ae",
+          "operation": "Exec AllocVec",
+          "lvo": -684
+        },
+        {
+          "code_offset": "0x00c0",
+          "operation": "DOS Lock",
+          "lvo": -84
+        },
+        {
+          "code_offset": "0x00d6",
+          "operation": "Exec ObtainSemaphore",
+          "lvo": -564
+        },
+        {
+          "code_offset": "0x00e0",
+          "operation": "Exec AddTail",
+          "lvo": -246
+        },
+        {
+          "code_offset": "0x00e8",
+          "operation": "Exec ReleaseSemaphore",
+          "lvo": -570
+        },
+        {
+          "code_offset": "0x00f6",
+          "operation": "Exec FreeVec on Lock failure",
+          "lvo": -690
+        }
+      ],
+      "interpretation_limit": "This cache is distinct from the opened-resource LOCK registry. The SegList is consumed once by the hooked LoadSeg path; see the later lifecycle audit."
+    },
+    {
+      "code_hunk": 2,
+      "function_offset": "0x0102",
+      "kind": "one-shot SegList cache removal by SegList identity",
+      "operations": [
+        {
+          "code_offset": "0x0110",
+          "operation": "Exec ObtainSemaphore",
+          "lvo": -564
+        },
+        {
+          "code_offset": "0x0128",
+          "operation": "Exec Remove",
+          "lvo": -252
+        },
+        {
+          "code_offset": "0x0134",
+          "operation": "DOS UnLock",
+          "lvo": -90
+        },
+        {
+          "code_offset": "0x013e",
+          "operation": "Exec FreeVec",
+          "lvo": -690
+        },
+        {
+          "code_offset": "0x0148",
+          "operation": "DOS UnLoadSeg",
+          "lvo": -156
+        },
+        {
+          "code_offset": "0x015c",
+          "operation": "Exec ReleaseSemaphore",
+          "lvo": -570
+        }
+      ],
+      "interpretation_limit": "No SameLock call occurs in this helper; SameLock occurs in the hooked LoadSeg entry at HUNK2 0x003a."
+    },
+    {
+      "code_hunk": 2,
+      "function_offset": "0x0384",
+      "kind": "opened-resource LOCK registry insertion",
+      "allocation_bytes": "strlen(name) + 19",
+      "list_data_offset": "0x029c",
+      "record_fields": [
+        {
+          "offset": 8,
+          "value": "UBYTE resource type: 0 library, 1 device label, 2 font, 3 catalog"
+        },
+        {
+          "offset": 10,
+          "value": "APTR to inline name at record+18"
+        },
+        {
+          "offset": 14,
+          "value": "opened resource handle"
+        },
+        {
+          "offset": 18,
+          "value": "NUL-terminated copied name"
+        }
+      ],
+      "operations": [
+        {
+          "code_offset": "0x03a6",
+          "operation": "Exec AllocVec",
+          "exec_lvo": -684
+        },
+        {
+          "code_offset": "0x03ce",
+          "operation": "Exec AddTail",
+          "exec_lvo": -246
+        }
+      ],
+      "interpretation_limit": "The worker serializes access to this separate list. Actual observed insertion call sites pass types 0, 2 and 3; the device path retains only a preloaded SegList cache entry. Original guest behavior remains unexecuted."
+    },
+    {
+      "data_offset": "0x0276",
+      "value": "active LoadSeg-hook operation count",
+      "interpretation_limit": "Increment/decrement sites are HUNK2 0x000c and 0x0092. This field is examined before vector restoration, but does not alone establish safe worker shutdown."
+    }
+  ],
+  "evidence_limits": [
+    "The listed dependency floors, order, ReadArgs template address and catalog argument are static HUNK observations, not guest behavior.",
+    "Resource-list selection, lock and unlock transitions, multiple-name result policy, diagnostics, IoErr precedence, and catalog/font behavior remain unverified against an original Workbench 3.1 guest.",
+    "Static control flow now identifies the singleton worker, one-shot SegList cache and separate opened-resource registry; their original guest scheduling and lifetime remain unexecuted. The worker-startup audit records the exact shutdown branches and their limits.",
+    "The media protection word has P clear; installed resident events and replacement PURE behavior are not established.",
+    "This capture neither authorizes copying the reference binary nor qualifies a replacement for shipping."
+  ],
+  "corrections_20260926": [
+    {
+      "field": "catalog_string_table.entries",
+      "previous_error": "Catalog ids were paired with the preceding pointer rather than the pointer following each id, shifting every mapping by one and inventing a C35E entry.",
+      "evidence": "HUNK2 0x028a-0x029a indexes DATA+0x184 as id/pointer pairs; DATA+0x184 contains id zero and DATA+0x188 points to the empty default string."
+    },
+    {
+      "field": "data_strings.sys/c.catalog",
+      "previous_error": "0x01fb included the final byte 0x7a of the preceding relocated string pointer and produced zsys/c.catalog.",
+      "evidence": "OpenCatalogA forms its name from DATA+0x01fc at HUNK2 0x0248."
+    },
+    {
+      "field": "resource_lock_registry_static_observations",
+      "previous_error": "Previous function offsets 0x037c/0x041a and associated vector-call offsets did not match this HUNK. The 16-byte SegList cache had also been described as an unclassified resource-type list.",
+      "evidence": "Fresh Capstone 5.0.7 disassembly of the unchanged SHA-256-bound binary shows service-name accessor at HUNK2 0x037c, opened-resource insertion at 0x0384, cache insertion at 0x009e, cache removal at 0x0102, and worker entry at 0x03ec."
+    }
+  ]
+}

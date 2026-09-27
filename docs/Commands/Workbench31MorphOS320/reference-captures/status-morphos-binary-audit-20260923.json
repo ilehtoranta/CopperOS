@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "profile": "morphos320",
+  "source_id": "morphos320-live-iso",
+  "command": "Status",
+  "path": "MorphOS/C/Status",
+  "iso_extent": 178472,
+  "bytes": 3679,
+  "sha256": "9d5c3aca0a9f21d91f9ad4b0565ba5ac2fa4a964af07c9540ee58e6b7d24a168",
+  "version": {
+    "name": "Status",
+    "version": 50,
+    "revision": 6,
+    "date_text": "12.08.19",
+    "byte_offset": 3643,
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template": {
+    "text": "PROCESS/N,FULL/S,TCB/S,CLI=ALL/S,COM=COMMAND/K",
+    "evidence": "released-source-and-packed-member-identity"
+  },
+  "source": {
+    "path": "artifacts/morphos320-c-source-extracted/c/status/status.c",
+    "bytes": 5709,
+    "sha256": "bb92acf52c915f3549c57cb8253a58d60ee6912e751aa509495ac5d04b12dc25",
+    "evidence": "released-source-behavior-only"
+  },
+  "startup_contract": {
+    "dos_library_minimum": 37,
+    "readargs_template": "PROCESS/N,FULL/S,TCB/S,CLI=ALL/S,COM=COMMAND/K",
+    "parser_failure": "RETURN_FAIL followed by PrintFault(IoErr(), NULL)",
+    "provider": "QueryCLIDataTags/FreeCLIData on DOS 51.51+, public Root.CliList fallback otherwise",
+    "ctrl_c": "SetSignal(0, SIGBREAKF_CTRL_C) before each CLI snapshot entry",
+    "result_policy": "unmatched COM returns RETURN_WARN; missing PROCESS prints a diagnostic and returns RETURN_FAIL"
+  },
+  "installer_event": {
+    "script": "hdinstall.fixc",
+    "line": 73,
+    "operation": "file-protection-add",
+    "flag": "P",
+    "confidence": "literal-script-observed-not-installed-metadata"
+  },
+  "open_gates": [
+    "exact packed output and diagnostic bytes",
+    "DOS 51.51 QueryCLIDataTags guest population and provider failures",
+    "original guest differential and installed metadata",
+    "resident/PURE lifecycle and repeat/concurrent calls",
+    "package/licensing and differential comparison"
+  ],
+  "scope": "hash-bound MorphOS 3.20 packed identity plus released-source contract; raw binary is not stored in the repository"
+}

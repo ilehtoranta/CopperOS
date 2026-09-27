@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "audit_id": "conclip-console-private-api-20260923",
+  "purpose": "Authoritative private console.device bindings required by the MorphOS ConClip source",
+  "source_media": {
+    "path": "D:/TestData/AmigaDeveloperCD.iso",
+    "label": "Amiga_Dev_CD_v1.1",
+    "sha256": "5d6bfcb213f1395d4c95584dc94d0e36265be355076dae1710bd36fb4dfdbff3",
+    "iso_path": "NDK_3.1/INCLUDES&LIBS/FD/CONSOLE_LIB.FD",
+    "extent": 20701,
+    "bytes": 287,
+    "sha256_file": "bfb9ffcdf890942bc450c4a7b616aa1e67237aa766c921b1eb616c8e48ca37aa"
+  },
+  "fd": {
+    "base": "_ConsoleDevice",
+    "bias": 42,
+    "public": [
+      {"name": "CDInputHandler", "lvo": -42},
+      {"name": "RawKeyConvert", "lvo": -48}
+    ],
+    "private": [
+      {"name": "GetConSnip", "lvo": -54, "registers": {}, "returns": "APTR"},
+      {"name": "SetConSnip", "lvo": -60, "registers": {"A0": "APTR data"}, "returns": "LONG"},
+      {"name": "AddConSnipHook", "lvo": -66, "registers": {"A0": "struct Hook *hook"}, "returns": "void"},
+      {"name": "RemConSnipHook", "lvo": -72, "registers": {"A0": "struct Hook *hook"}, "returns": "void"}
+    ]
+  },
+  "implementation_source": {
+    "repository": "https://github.com/aros-development-team/AROS",
+    "files": [
+      {"path": "rom/devs/console/getconsnip.c", "function": "GetConSnip", "index": 9},
+      {"path": "rom/devs/console/setconsnip.c", "function": "SetConSnip", "index": 10},
+      {"path": "rom/devs/console/addconsniphook.c", "function": "AddConSnipHook", "index": 11},
+      {"path": "rom/devs/console/remconsniphook.c", "function": "RemConSnipHook", "index": 12}
+    ],
+    "note": "The AROS implementation confirms the A0 hook/data ABI and return types; the NDK FD binds the corresponding AmigaOS 3.1 LVOs. It is an ABI reference, not a Workbench or MorphOS behavioral capture."
+  },
+  "qualification_boundary": {
+    "resolved": ["private vector identity", "A0 argument placement", "return types"],
+    "still_required": ["original Workbench guest call behavior", "MorphOS guest call behavior", "hook ordering and restoration", "console.device absence and failure paths", "resident/PURE/package qualification"]
+  }
+}

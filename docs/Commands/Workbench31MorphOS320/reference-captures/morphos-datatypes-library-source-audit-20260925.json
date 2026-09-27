@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "component": "datatypes.library private list ABI",
+  "profile": "morphos320",
+  "recorded": "2026-09-25",
+  "source_index": "https://morphos-team.net/sources",
+  "source_index_label": "MorphOS 3.20",
+  "package_url": "https://morphos-team.net/files/src/3.19//datatypes.library.tar.bz2",
+  "package_path_version_note": "The MorphOS 3.20 source index currently links to a package under the 3.19 path.",
+  "package_bytes": 56614,
+  "package_sha256": "16b11252baa7e2df2494a3597695640ed278e3b89d0c8744f7a8910c63b3e3a9",
+  "member": "datatypes.library/datatypes_intern.h",
+  "member_sha256": "85983dc836fff1c2ce12eae772bf1fc2d8b2cace4d21d0a7be014ed34fafa48c",
+  "observed_private_field_order": {
+    "DataTypesList": [
+      "SignalSemaphore dtl_Lock",
+      "List dtl_SortedList",
+      "List dtl_BinaryList",
+      "List dtl_ASCIIList",
+      "List dtl_IFFList",
+      "List dtl_MiscList",
+      "ULONG dtl_LongestMask",
+      "DateStamp dtl_DateStamp"
+    ],
+    "CompoundDatatype": [
+      "DataType DT",
+      "ULONG FlagLong",
+      "ULONG ParsePatSize",
+      "UBYTE *ParsePatMem",
+      "UBYTE *DTCDChunk",
+      "ULONG DTCDSize",
+      "BPTR SegList",
+      "BOOL (*Function)(DTHookContext *)",
+      "ULONG OpenCount",
+      "DataTypeHeader DTH"
+    ]
+  },
+  "evidence_limits": [
+    "The field order agrees with the MorphOS candidate's private-layout assumptions.",
+    "The linked archive path says 3.19 even though the current official source index places the entry under MorphOS 3.20; package-to-installed-library correspondence is not independently hash-bound.",
+    "This source archive does not establish the Workbench 3.1 datatypes.library ABI.",
+    "Source layout evidence does not establish guest-equivalent registration, concurrent replacement, or loaded-segment lifetime behavior."
+  ]
+}

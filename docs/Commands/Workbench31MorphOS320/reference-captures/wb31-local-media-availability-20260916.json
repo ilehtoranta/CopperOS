@@ -1,0 +1,30 @@
+{
+  "date": "2026-09-16",
+  "scope": "Known Workbench input directory, top-level matching filenames only; not a whole-machine media search or authenticity admission.",
+  "directory": "D:\\TestData\\TestImages",
+  "matching_files": [
+    {
+      "name": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 1 of 6)(Install)[!].zip",
+      "bytes": 394356,
+      "sha256": "e320dbbcb2b8e34da7d3e37a2953c623c26755191a74c2512169b2e6f81f2e78"
+    },
+    {
+      "name": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+      "bytes": 403062,
+      "sha256": "d93611887acf91f68f5608a5b7812f03eb16f743f40451b67c93067b04c967ed"
+    }
+  ],
+  "observed_roles": [
+    "Install",
+    "Workbench"
+  ],
+  "unavailable_roles": [
+    "Extras",
+    "Fonts",
+    "Locale",
+    "Storage"
+  ],
+  "closure_id": "WB31-DISKS-3-6",
+  "closure_status": "open",
+  "shipping_or_purity_admission": false
+}

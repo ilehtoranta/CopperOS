@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+  "capture_id": "loadresource-wb31-resource-actions-audit-20260926",
+  "kind": "offline-hunk-code-audit",
+  "profile": "wb31",
+  "command": "LoadResource",
+  "source_id": "wb31-workbench-m10-40.42",
+  "path": "C/LoadResource",
+  "source_bytes": 3972,
+  "source_sha256": "51c8d6da726d5d1429e84f36e323218eb94750ab60b650efe768fc2907d16f38",
+  "analysis_method": "Rehashed artifacts/loadresource-wb31-reference.bin, parsed its three HUNK records and disassembled function entry points using Capstone 5.0.7 in big-endian 68000 mode. Confirmed structure fields and constants from the local NDK 3.1 ISO. All code offsets below are relative to HUNK2; DATA means HUNK1. No original program execution occurred.",
+  "primary_abi_sources": [
+    { "container": "D:/TestData/AmigaDeveloperCD.iso", "member": "NDK_3.1/Includes&Libs/include_h/dos/dos.h", "block_2048": 21043, "bytes": 10860, "sha256": "7791a911cab18de7aa5b5e4a818d5e09439c8c16aa7b029ea18a12ada000b8c3", "facts": "103 ERROR_NO_FREE_STORE; 121 ERROR_FILE_NOT_OBJECT; 205 ERROR_OBJECT_NOT_FOUND; 212 ERROR_OBJECT_WRONG_TYPE; 232 ERROR_NO_MORE_ENTRIES." },
+    { "container": "D:/TestData/AmigaDeveloperCD.iso", "member": "NDK_3.1/Includes&Libs/include_h/exec/resident.h", "block_2048": 21115, "bytes": 1253, "sha256": "5c5d1bcbbd0e7f67c83ebc798bfd1fe3519f46e51a42a49062c7cc7198f6acd4", "facts": "RTC_MATCHWORD=0x4afc; rt_MatchTag at byte 2 points to the Resident; rt_Type at byte 12." },
+    { "container": "D:/TestData/AmigaDeveloperCD.iso", "member": "NDK_3.1/Includes&Libs/include_h/exec/nodes.h", "block_2048": 21113, "bytes": 1752, "sha256": "af03301aeafe756a2d700c335096075ebec67c65e0e7a3c7041f15aa43d62690", "facts": "NT_DEVICE=3, NT_LIBRARY=9, NT_FONT=12; Node.ln_Type at byte 8." },
+    { "container": "D:/TestData/AmigaDeveloperCD.iso", "member": "NDK_3.1/Includes&Libs/include_h/diskfont/diskfont.h", "block_2048": 21027, "bytes": 3405, "sha256": "21eca2963dd5a529e2b8f8577ef44387ae809144fea582a0aa12293393e76bdf", "facts": "DiskFontHeader follows a segment-link LONG and four-byte return stub; dfh_DF is a Node, dfh_FileID follows it at byte 14, DFH_ID=0x0f80." },
+    { "container": "D:/TestData/AmigaDeveloperCD.iso", "member": "NDK_3.1/Includes&Libs/include_h/graphics/text.h", "block_2048": 21183, "bytes": 6804, "sha256": "46f7926eba2cdb4943e13583662b9dcd5334bd74ebd9b798943623791546b7a0", "facts": "TextAttr is name pointer, UWORD YSize, UBYTE Style, UBYTE Flags; FS_NORMAL=0, FPF_DISKFONT=2." },
+    { "container": "D:/TestData/AmigaDeveloperCD.iso", "member": "NDK_3.1/Includes&Libs/include_h/libraries/locale.h", "block_2048": 21373, "bytes": 9218, "sha256": "9b719500192405307d06735d8cc878c23e4e13860de63bfa96300a70c36bcd80", "facts": "OC_BuiltInLanguage=TAG_USER+0x90001=0x80090001." }
+  ],
+  "opened_resource_registry": {
+    "list": "DATA+0x029c; initialized by worker at 0x03f2-0x03f6",
+    "insertion": {
+      "function": "0x0384",
+      "inputs": "A0 name, A1 opened handle, D0 resource kind",
+      "allocation": "Scans the name through its first NUL at 0x038e, computes strlen(name)+19, saves the handle, calls Exec AllocVec(D0=size,D1=0) at 0x03a6. No explicit length-overflow check or SetIoErr appears.",
+      "layout": [
+        { "offset": 0, "bytes": 4, "field": "successor" },
+        { "offset": 4, "bytes": 4, "field": "predecessor" },
+        { "offset": 8, "bytes": 1, "field": "resource kind: 0 library, 1 device label, 2 font, 3 catalog" },
+        { "offset": 9, "bytes": 1, "field": "padding; not initialized by this helper" },
+        { "offset": 10, "bytes": 4, "field": "name pointer to record+18" },
+        { "offset": 14, "bytes": 4, "field": "opened resource handle" },
+        { "offset": 18, "bytes": "strlen(name)+1", "field": "copied name including NUL" }
+      ],
+      "publication_order": "Set name pointer (0x03b4), kind byte (0x03b8), handle (0x03bc), copy bytes including NUL (0x03c2), then Exec AddTail(A0=list,A1=record), LVO -246 at 0x03ce.",
+      "return": "D0=1 on allocation success; D0=0 on allocation failure; callers test its low WORD. Original observed insertion sites use kinds 0, 2 and 3 only."
+    },
+    "find": {
+      "function": "0x02f8; registry-specific wrapper 0x03e0",
+      "operation": "Walk successor pointers from list.Head until node.Successor is zero; Utility Stricmp(A0=query,A1=node.Name), LVO -162 at 0x0316. The low WORD of the comparison is tested for zero. Return first matching record or zero. This is case-insensitive string identity, not DOS SameLock identity."
+    },
+    "unlock": {
+      "branch": "0x0492-0x04ec",
+      "priority": "UNLOCK is tested before the resource action helper; it wins if LOCK and UNLOCK are both set.",
+      "close_calls": [
+        { "kind": 0, "call_offset": "0x04c6", "operation": "Exec CloseLibrary", "lvo": -414, "inputs": "A1=record.Handle" },
+        { "kind": 2, "call_offset": "0x04d4", "operation": "Graphics CloseFont", "lvo": -78, "inputs": "A1=record.Handle" },
+        { "kind": 3, "call_offset": "0x04e2", "operation": "Locale CloseCatalog", "lvo": -36, "inputs": "A0=record.Handle" }
+      ],
+      "remove": "After the kind-specific close, helper 0x0678 calls Exec Remove(A1=record), LVO -252 at 0x0684, then Exec FreeVec(A1=record), LVO -690 at 0x068a. Kind 1 and unrecognized kinds skip close but still remove/free.",
+      "missing_record": "Print C35C with the expanded matched path at 0x04ee-0x04fc. This branch does not set Result or IoErr; matching continues."
+    }
+  },
+  "classification": {
+    "function": "0x01ec",
+    "input": "D0=preloaded SegList BPTR",
+    "return_values": [
+      { "value": 1, "meaning": "library: first valid Resident has rt_Type=9", "offsets": "0x01fc-0x0208" },
+      { "value": 2, "meaning": "device: first valid Resident has rt_Type=3", "offsets": "0x020a-0x0214" },
+      { "value": 3, "meaning": "disk font: no valid Resident, DiskFontHeader at BADDR(original SegList)+8 has Node.ln_Type=12", "offsets": "0x0216-0x022e" },
+      { "value": 0, "meaning": "other: any other Resident type, or no Resident and no font node", "offsets": "0x0230-0x0236" }
+    ],
+    "font_side_effect": "On the font path, writes WORD 0x0f80 to DiskFontHeader+14 (BADDR(first SegList)+22) at 0x0228 before returning 3. This mutates the loaded resource segment, not the command image.",
+    "resident_scanner": {
+      "function": "0x0332",
+      "segment_step": "At 0x033a-0x0348, cursor=BADDR(current BPTR), next BPTR=LONG(cursor), remaining=ULONG(cursor-4)>>1. It scans from the segment-link address itself, not from cursor+4.",
+      "match": "Read a WORD and advance cursor by two (0x034c). A word other than 0x4afc advances normally. On 0x4afc, subtract two from cursor (0x0358), and require LONG(cursor+2)==cursor (0x035a-0x0360). Return that Resident immediately when true.",
+      "exhaustion": "After a non-returning iteration, decrement remaining; repeat while its unsigned value is greater than zero. At zero, proceed to the saved next segment BPTR. Return zero when chain ends.",
+      "false_marker_quirk": "If a 0x4afc candidate has an incorrect self pointer, the cursor remains on that same candidate because the subtract-two operation is not undone. The same word is retested until the remaining counter exhausts, then scanning proceeds to the next segment. This is a static source behavior; do not silently claim a corrected scanner is exact parity.",
+      "limits": "No explicit validation of segment addresses, allocation lengths, Resident bounds or cycles appears. This audit describes the selected valid-image path and source quirks, not safe handling of arbitrary corrupt images."
+    }
+  },
+  "resource_action": {
+    "function": "0x0694-0x091e",
+    "inputs": "A0=expanded matched path, low WORD of D0=LOCK; dispatcher reads request LOCK LONG then EXT.L from its low WORD at 0x0500-0x0504",
+    "return": "D0 is an error number, initialized to zero; worker decides whether to store command Result/IoErr. The helper itself does not call SetIoErr.",
+    "already_locked": "Find name at 0x06a4. If present, print C358(name) at 0x0906-0x0912 and return zero, even when LOCK was not requested.",
+    "loadseg": "DOS LoadSeg(D1=name), LVO -150 at 0x06b4. Success proceeds to cache insertion; failure captures DOS IoErr at 0x06be into the preserved return register.",
+    "loadseg_failure": {
+      "catalog_fallback_errors": [121, 205, 212],
+      "tests": "0x06c4-0x06d8 compare exactly 121, 205 and 212.",
+      "other_errors": "Print C359(name) at 0x0742-0x074e and return the error captured before printing. No second IoErr read on this branch.",
+      "no_locale": "For the three fallback errors, Locale base zero at 0x06da-0x06de returns the initially captured LoadSeg error without a local diagnostic.",
+      "catalog": {
+        "call": "Locale OpenCatalogA, LVO -150 at 0x06f6; A0=0, A1=name, A2 points to {OC_BuiltInLanguage=0x80090001,0,TAG_DONE=0}.",
+        "success": "If LOCK low WORD is nonzero, TryAdd(name,kind=3,handle). When LOCK is zero or insertion returns false, CloseCatalog(A0=handle), LVO -36 at 0x071c. Return is explicitly zero at 0x0720 in every success case, including registry allocation failure.",
+        "failure": "Print C35B(name) at 0x0726-0x0732, then capture DOS IoErr at 0x0738 and return it. Diagnostic/catalog calls precede this error read."
+      }
+    },
+    "successful_loadseg_cache": {
+      "insert": "Call one-shot cache insertion helper 0x009e with D0=SegList,A0=name at 0x0758, before classification. This is separate from the opened-resource registry.",
+      "insert_failure": "Call DOS UnLoadSeg(D1=SegList), LVO -156 at 0x08fe, then return literal 103. This also maps a failure of the cache's DOS Lock to 103, regardless of its original IoErr.",
+      "remove_semantics": "Helper 0x0102 removes/unlocks/frees a matching cache entry and calls UnLoadSeg only if that entry still exists. If a LoadSeg hook consumer took the entry during a resource open, removal finds nothing and does not unload the now-owned SegList."
+    },
+    "library": {
+      "branch": "classification 1; 0x077a-0x07c6",
+      "open": "Exec OpenLibrary(A1=name,D0=0), LVO -552 at 0x0782.",
+      "success": "LOCK attempts TryAdd(name,kind=0,library). No LOCK or failed insertion calls Exec CloseLibrary(A1=library), LVO -414 at 0x07a2. Failed insertion is still returned as success (zero).",
+      "failure": "Print C359(name) at 0x07a8-0x07b4, then capture DOS IoErr at 0x07ba.",
+      "cleanup": "Call cache removal with SegList at 0x07c2 after either open outcome; return the saved error, initially zero."
+    },
+    "device": {
+      "branch": "classification 2; 0x076c-0x076e",
+      "behavior": "Return zero immediately, leaving the preloaded one-shot cache entry and its file lock. There is no OpenDevice, no opened-resource record, no LOCK effect and no immediate UnLoadSeg on this path."
+    },
+    "font": {
+      "branch": "classification 3; 0x07ca-0x08dc",
+      "descriptor_name": "Measure original name length L. Search backward from index L until '/' or ':' is found, or index reaches zero (0x07da-0x07ee). Allocate L+5 bytes with Exec AllocVec(flags=0) at 0x07fa. Copy the full name including NUL, replace the byte at that index with NUL, append '.font' using helper 0x0928. For 'FONTS:Topaz/8' this produces 'FONTS:Topaz.font'. A bare numeric name produces '.font'.",
+      "allocation_failure": "Set returned error to 103 at 0x08d4, then remove the preloaded cache entry. No local name diagnostic is printed.",
+      "dependency": "Exec OpenLibrary('diskfont.library',37), LVO -552 at 0x0826. Failure prints C35A at 0x08b4-0x08ba, then captures DOS IoErr at 0x08c2; free name buffer and remove cache.",
+      "text_attr": "DOS FilePart(D1=original name), LVO -870 at 0x083a; DOS StrToLong(D1=file part,D2=&local LONG), LVO -816 at 0x0846. Its return is ignored. TextAttr receives name=derived descriptor buffer, YSize=low WORD of the local LONG, Style=0, Flags=2 (FPF_DISKFONT).",
+      "uninitialized_size_quirk": "No instruction initializes the StrToLong output LONG at the resource helper's A7+0x2c before the call. Behavior when StrToLong does not write a result remains indeterminate from static code; deterministic initialization in a replacement must be identified as a divergence requiring original-guest review.",
+      "open": "diskfont.library OpenDiskFont(A0=&TextAttr), LVO -30 at 0x0864.",
+      "success": "LOCK attempts TryAdd(original name,kind=2,font). No LOCK or failed insertion calls Graphics CloseFont(A1=font), LVO -78 at 0x0888. Failed registry allocation is still returned as success.",
+      "failure": "Print C359 with the DERIVED '.font' descriptor name, not the original numeric-font path, at 0x088e-0x089a; then capture DOS IoErr at 0x08a0.",
+      "cleanup": "If diskfont opened, CloseLibrary(A1=diskfont base) at 0x08ae. FreeVec(A1=derived name) at 0x08ce. Remove cached SegList at 0x08d8. Return the saved error, initially zero."
+    },
+    "unknown": {
+      "branch": "classification 0; 0x08de-0x08f6",
+      "behavior": "First remove the cache entry at 0x08e0; then print C35B(original name) and return literal 212."
+    },
+    "error_precedence": "Successful catalog/library/font opens return zero even if TryAdd fails or close/cleanup changes process IoErr. Catalog fallback failure, OpenLibrary failure, OpenDiskFont failure and missing diskfont.library capture IoErr AFTER their diagnostic print helper has run; direct non-fallback LoadSeg failure captures it BEFORE printing. All captured/literal errors survive later cleanup in D7. None of these conclusions establishes the providers' actual runtime IoErr behavior."
+  },
+  "worker_result_policy": {
+    "request_initialization": "For RequestFlags==0, 0x041c-0x0422 clears request Result and IoErr; selects request CurrentDirectory, Input and Output and preserves previous values. A nonzero RequestFlags branches to 0x0614 and stores Result=20, IoErr=212, then ReplyMsg without those context changes or PrintFault.",
+    "pattern_setup": "Each original NAME/M element creates a fresh cleared 538-byte AnchorPath buffer at A7+6. Fields set before MatchFirst: BreakBits=0x1000 at offset 8, Flags=1 at offset 16, Strlen=256 at offset 18. Expanded path used for registry/action calls is A7+0x11e, AnchorPath+280.",
+    "matching": "DOS MatchFirst at 0x0488, MatchNext at 0x0522, MatchEnd at 0x055c. UNLOCK and load actions run only after a zero match result. Each successfully processed match proceeds to MatchNext. No explicit directory-descent request appears in this loop.",
+    "action_failure": "Nonzero resource action return becomes D4 and clears the local original-pattern-prefix flag at 0x0512, then enters the common match-error path. An action returning 232 is therefore treated as normal end-of-matches too.",
+    "error_storage": "D4==232 bypasses failure storage at 0x052c-0x0532. Any other nonzero match/action error stores Result=20 at request+22 and IoErr=D4 at request+26 (0x0534-0x053a). When the prefix flag remains set, print C35D with the ORIGINAL NAME/M pattern at 0x0544-0x0550; action failures suppress this prefix.",
+    "multiple_names": "MatchEnd runs before advancing the NAME/M pointer. Continue to another original name only while request.Result remains zero (0x0560-0x056e), so the first stored failure stops the remaining names. Missing UNLOCK records and duplicate LOCK records only print messages and permit continued matching.",
+    "final_fault": "At 0x05ea, if stored request.IoErr is nonzero, DOS PrintFault(D1=stored error,D2=0), LVO -474 at 0x05f8. Return value is ignored. Restore previous CurrentDir, SelectInput and SelectOutput, then Exec ReplyMsg at 0x0628. Restore-call IoErr changes do not replace the stored message error.",
+    "no_names": "A null NAME/M result pointer enters the locked-resource listing. A nonnull pointer to an empty zero-terminated array takes the empty-loop path and does not list. LOCK/UNLOCK values do not affect no-name listing."
+  },
+  "messages": {
+    "table_location": "DATA+0x0184; 15 pairs of LONG id then relocated default-string pointer: id 0 and C350-C35D, not C350-C35E",
+    "table": [
+      { "id": "0x0000", "default": "" },
+      { "id": "0xc350", "default": "Library" },
+      { "id": "0xc351", "default": "Device" },
+      { "id": "0xc352", "default": "Font" },
+      { "id": "0xc353", "default": "Catalog" },
+      { "id": "0xc354", "default": "TYPE" },
+      { "id": "0xc355", "default": "%-9s%s\n" },
+      { "id": "0xc356", "default": "NAME\n" },
+      { "id": "0xc357", "default": "No resources currently locked\n" },
+      { "id": "0xc358", "default": "'%s' is already a locked resource\n" },
+      { "id": "0xc359", "default": "Error while loading '%s' - " },
+      { "id": "0xc35a", "default": "Requires diskfont.library V37 - " },
+      { "id": "0xc35b", "default": "'%s' couldn't be loaded as a resource - " },
+      { "id": "0xc35c", "default": "'%s' is not a locked resource\n" },
+      { "id": "0xc35d", "default": "'%s' - " }
+    ],
+    "open_catalog_helper": "0x0238: if saved catalog DATA+0x027c is zero and locale base DATA+0x0288 is nonzero, call OpenCatalogA(A0=0,A1='sys/c.catalog',A2=0) at 0x0254 and save return.",
+    "get_helper": "0x0278: find requested ID in table by 8-byte stride, returning matching default if Locale is absent. If Locale exists, call GetCatalogStr(A0=saved catalog,D0=id,A1=default), LVO -72 at 0x02b4. No explicit table bound is tested; all observed callers use listed IDs.",
+    "print_helper": "0x02c2: open catalog helper, Get(id), DOS VPrintf(D1=format,D2=stack argument array), LVO -954 at 0x02de, then close catalog helper. Output failures do not set the command's explicit result/error fields. Wrapper 0x02ec supplies the empty-string pointer as one argument for messages with no placeholders.",
+    "close_catalog_helper": "0x0262: if saved catalog is nonzero, Locale CloseCatalog(A0=saved catalog) at 0x0270. The saved catalog pointer is NOT cleared afterward. Subsequent printing statically reuses this pointer; the runtime implications require original-guest verification.",
+    "listing": "List empty test compares TailPred with list address at 0x0576-0x0580. Empty prints C357. Nonempty prints C355 with localized C354 and C356, then insertion-order records using C355, Get(C350+record.Kind) and record.Name. The built-in C356 already ends with newline, and C355 adds another, so the default header contains a blank line after TYPE/NAME. An outer open/close helper pair surrounds listing, in addition to each Print's own open/close calls."
+  },
+  "dependencies": {
+    "startup_leases": "HUNK0 opens locale.library v38, dos.library v39, utility.library v39, graphics.library v39 in that order. Locale is optional; DOS, Utility and Graphics are checked. The earlier code audit contains their exact HUNK0 offsets.",
+    "per_font": "diskfont.library v37 opened and closed for each font action after descriptor-name allocation.",
+    "public_calls_used": "Exec AllocVec/FreeVec, AddTail/Remove, OpenLibrary/CloseLibrary; DOS LoadSeg/UnLoadSeg, IoErr, FilePart/StrToLong, MatchFirst/MatchNext/MatchEnd, PrintFault/VPrintf, CurrentDir/SelectInput/SelectOutput; Utility Stricmp; Locale OpenCatalogA/CloseCatalog/GetCatalogStr; Graphics CloseFont; Diskfont OpenDiskFont. Cache/hook public calls and lifecycle are recorded in the separate loadseg-lifecycle audit."
+  },
+  "evidence_limits": [
+    "This establishes static instructions, ABI register arguments and control-flow precedence, not original guest output, scheduling, library side effects, resident lifecycle or release qualification.",
+    "The original command file has PURE clear. This audit neither changes that metadata classification nor proves the replacement worker/hook can safely survive command return.",
+    "The retained device cache, font-segment mutation, false Resident marker scan, uncleared closed catalog pointer and uninitialized malformed font size are source observations. Any deliberate replacement behavior difference must remain explicit until the compatibility requirement is resolved.",
+    "The existing hook teardown audit independently records its unconditional success result despite conditional vector restoration. No resource-action result proves that the worker can unload safely.",
+    "Original provider behavior and exact malformed input/error effects require original Workbench guest capture; supplied-vector fixtures cannot establish that evidence."
+  ]
+}

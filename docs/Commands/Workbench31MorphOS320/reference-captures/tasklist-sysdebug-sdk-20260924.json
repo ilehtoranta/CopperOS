@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "captureDate": "2026-09-24",
+  "subject": "MorphOS TaskList sysdebug symbol-provider ABI",
+  "sdkArchive": {
+    "path": "D:/TestData/MorphOS/sdk-20260529.lha",
+    "bytes": 387356517,
+    "sha256": "310dfb888b995e32206c5c3aba409847334a5fee049d13aad27b4af0d518ec77",
+    "nestedSdkMember": "morphossdk/sdk.pack"
+  },
+  "observedEntries": [
+    "Development/gg/os-include/fd/sysdebug_lib.fd",
+    "Development/gg/os-include/clib/sysdebug_protos.h",
+    "Development/gg/os-include/proto/sysdebug.h",
+    "Development/gg/os-include/ppcinline/sysdebug.h",
+    "Development/gg/os-include/libraries/sysdebug.h",
+    "Development/HTML/includes/ppcinline/sysdebug.html",
+    "Development/gg/os-include/exec/tasks.h",
+    "Development/HTML/exec.html"
+  ],
+  "sysDebugFindSeg": {
+    "prototype": "STRPTR SysDebugFindSeg(ULONG Address, ULONG *SegNum, ULONG *Offset)",
+    "availability": "V52",
+    "fdBaseBias": 30,
+    "privateVectorsBeforePublicFunction": 2,
+    "ppcInlineVectorOffset": -40,
+    "callingConvention": "base,sysv"
+  },
+  "headerSelection": {
+    "ppc": "proto/sysdebug.h selects ppcinline/sysdebug.h",
+    "nonPpc": "proto/sysdebug.h refers to inline/sysdebug.h for GCC or inline/sysdebug_protos.h for VBCC",
+    "nonPpcInlineEntriesFoundInSdkArchive": false
+  },
+  "documentedLegacySegTracker": {
+    "header": "dos/segtracker.h",
+    "semaphoreName": "SegTracker",
+    "prototype": "STRPTR seg_Find(ULONG Address, ULONG *SegNum, ULONG *Offset)",
+    "m68kRegisterContract": "D0 result; A0 Address; A1 SegNum; A2 Offset",
+    "sdkNote": "MorphOS native code should use SysDebugFindSeg, which uses the same prototype with native calling convention and no semaphore locking"
+  },
+  "publicPpcStackHistory": {
+    "selector": "TASKINFOTYPE_PPC_STACKHISTORY",
+    "value": "0x34",
+    "availability": "Exec 51.54",
+    "entry": "NewGetTaskAttrsA",
+    "record": "TaskStackHistoryEntry { ULONG tshe_Type; IPTR tshe_Address; }",
+    "tags": {
+      "skipFrames": "TASKINFOTAG_STACKHISTORY_SKIPFRAMES (TASKINFOTAG_DUMMY + 0x3)"
+    },
+    "semantics": "Returns the number of bytes filled; divide by record size for the entry count. The documentation says the query is safe for the calling task; foreign-task results may be stale and require Forbid() while reading.",
+    "implementationLimit": "Provides PPC stack-history addresses but does not resolve segment names, Hunk and offset, classify internal ABOX frames, validate the source's exact stack-frame traversal, or replace REGCHECK pointer inspection."
+  },
+  "implementationImplication": "The available sysdebug wrapper is a PPC SysV call and has no packaged 68k inline entry. A resident 68k HUNK must not call it through a guessed classic vector. Public Exec stack-history metadata offers a possible PPC frame source, but symbol resolution and REGCHECK still need a qualified public SegTracker semaphore/function-pointer path or an explicit supported PPC call bridge. Keep symbol modes fail-closed until the required behavior is qualified."
+}

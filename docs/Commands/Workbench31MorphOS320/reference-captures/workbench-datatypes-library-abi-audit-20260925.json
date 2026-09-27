@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "component": "Workbench AddDataTypes DataTypesList layout cross-check",
+  "profile": "wb31",
+  "recorded": "2026-09-25",
+  "source_media": {
+    "archive": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_sha256": "d93611887acf91f68f5608a5b7812f03eb16f743f40451b67c93067b04c967ed",
+    "adf_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "volume": "Workbench3.1"
+  },
+  "library": {
+    "path": "Libs/DataTypes.library",
+    "bytes": 15592,
+    "sha256": "54ae9b75767b8c57f80528c50e60e040f0fe4f973620feb86c0abbd645e5bc53",
+    "file_format": "Amiga HUNK load file",
+    "resident_id": "DataTypes 40.6 (25.8.93)",
+    "resident_tag": {
+      "code_offset": 4,
+      "match_word": "0x4afc",
+      "end_skip": "0x350c",
+      "flags": "0x80",
+      "version": 40,
+      "node_type": 9,
+      "priority": 0,
+      "name_pointer_offset": 30,
+      "id_pointer_offset": 48,
+      "init_pointer_offset": 76
+    },
+    "hunks": [
+      {
+        "type": "HUNK_CODE",
+        "file_offset": 28,
+        "bytes": 14612
+      },
+      {
+        "type": "HUNK_ABSRELOC32",
+        "file_offset": 14648,
+        "groups": {
+          "0": 11,
+          "1": 4
+        }
+      },
+      {
+        "type": "HUNK_DATA",
+        "file_offset": 14736,
+        "bytes": 724
+      },
+      {
+        "type": "HUNK_ABSRELOC32",
+        "file_offset": 15468,
+        "groups": {
+          "0": 26
+        }
+      }
+    ],
+    "init_table": {
+      "library_base_bytes": 564,
+      "function_table_code_offset": 92,
+      "data_table_code_offset": 142,
+      "init_function_code_offset": 204
+    },
+    "contains_named_object_string": {
+      "text": "DataTypesList",
+      "code_offset": 458
+    }
+  },
+  "command_reference": {
+    "path": "C/AddDataTypes",
+    "bytes": 5880,
+    "sha256": "391da11b39bfc7c492c1b58aa9e442f1c1712bd507380903a88a4534d27c264d",
+    "version_id": "adddatatypes 39.2 (27.7.92)",
+    "code_facts": [
+      "The command looks up the Utility named object DataTypesList and dereferences the returned NamedObject's no_Object pointer at code offset 0x59c.",
+      "The built-in registration path computes list addresses from that object at byte offsets 0x2e, 0x3c, 0x4a, 0x58 and 0x66.",
+      "The four named built-ins binary, ascii, iff and directory are associated with offsets 0x3c, 0x4a, 0x58 and 0x66; the preceding 0x2e head is the global sorted-list head used by the registration path.",
+      "Directory registration reads and writes a longword at offset 0x78 from the shared-list pointer at code offsets 0xa26 and 0xa36. After saving a register, the same stack argument is used at 0xa48 to derive the sorted-list head at offset 0x2e, binding the 0x78 access to DataTypesList.",
+      "In the matched-descriptor registration helper, a3 is the candidate descriptor passed by the scanner; code stores the computed mask byte-count at descriptor offset 62 and the allocated mask pointer at offset 66 (code offsets 0x07d8 and 0x07e8).",
+      "The same descriptor helper stores the allocated DTCD bytes pointer and byte-count at offsets 70 and 74, the loader result and its function-entry pointer at offsets 78 and 82 (code offsets 0x0982, 0x099e, 0x09e6 and 0x09f4), and tests offset 86 before replacement (code offset 0x085a).",
+      "The DTHD parse path allocates the candidate with its embedded header at +90, stores that header address in the descriptor at +28, and stores a computed size value at +54 (code offsets 0x0db0, 0x0dcc, 0x0dd2 and 0x0e34). The built-in path allocates strlen(name)+123 bytes, starts its embedded 32-byte header at +90 and trailing name storage at +122 (code offsets 0x11b0, 0x11d0 and 0x11d8)."
+    ]
+  },
+  "observed_list_heads": [
+    {
+      "field": "sorted_list",
+      "offset": 46
+    },
+    {
+      "field": "binary_list",
+      "offset": 60
+    },
+    {
+      "field": "ascii_list",
+      "offset": 74
+    },
+    {
+      "field": "iff_list",
+      "offset": 88
+    },
+    {
+      "field": "misc_list",
+      "offset": 102
+    }
+  ],
+  "observed_shared_list_fields": [
+    {
+      "field": "refresh_date_stamp_first_longword",
+      "offset": 120,
+      "read_instruction_code_offset": "0x0a26",
+      "write_instruction_code_offset": "0x0a36",
+      "pointer_binding": "The same incoming shared-list pointer is used after one saved register to derive the confirmed sorted list at +0x2e."
+    }
+  ],
+  "evidence_limits": [
+    "Offsets are static observations from the hash-bound Workbench AddDataTypes command and companion library binary. They confirm five DataTypesList heads, one refresh-date longword, and the listed candidate CompoundDatatype field offsets in command code.",
+    "The longest-mask field, complete DataTypesList size, SignalSemaphore ownership, node ownership/lifetime, all descriptor-field semantics, sorting details and concurrency behavior are not fully established by this capture. The +54 size field and +14 secondary-node role retain provisional semantic labels.",
+    "No command execution on an authentic Workbench guest, output comparison or shipping/PURE/resident admission is claimed. The Workbench command observations do not close the MorphOS 3.20 library ABI."
+  ],
+  "observed_compound_descriptor_fields": [
+    {
+      "field": "node2_candidate",
+      "offset": 14,
+      "evidence": "The descriptor-based insertion path passes descriptor+14 to its list helper at code offset 0x122e; field role remains a static candidate."
+    },
+    {
+      "field": "header_pointer",
+      "offset": 28,
+      "evidence": "DTHD parse allocation stores base+90 at descriptor+28 at code offset 0x0dd2."
+    },
+    {
+      "field": "computed_size_value",
+      "offset": 54,
+      "evidence": "DTHD parse path stores the computed allocation/header size at code offset 0x0e34; semantic naming remains provisional."
+    },
+    {
+      "field": "parse_pattern_size",
+      "offset": 62,
+      "evidence": "Descriptor helper stores computed mask byte-count at code offset 0x07d8."
+    },
+    {
+      "field": "parse_pattern_pointer",
+      "offset": 66,
+      "evidence": "Descriptor helper stores allocated mask pointer at code offset 0x07e8."
+    },
+    {
+      "field": "dtcd_pointer",
+      "offset": 70,
+      "evidence": "Descriptor helper stores allocated DTCD bytes at code offset 0x0982."
+    },
+    {
+      "field": "dtcd_size",
+      "offset": 74,
+      "evidence": "Descriptor helper stores read DTCD byte-count at code offset 0x099e."
+    },
+    {
+      "field": "segment",
+      "offset": 78,
+      "evidence": "Descriptor helper stores the segment returned by the load path at code offset 0x09e6."
+    },
+    {
+      "field": "function",
+      "offset": 82,
+      "evidence": "Descriptor helper stores the derived function-entry pointer at code offset 0x09f4."
+    },
+    {
+      "field": "open_count",
+      "offset": 86,
+      "evidence": "Descriptor helper checks this longword before replacement at code offset 0x085a."
+    },
+    {
+      "field": "embedded_header",
+      "offset": 90,
+      "evidence": "DTHD parse and built-in paths both place the inline header at descriptor+90; code offsets 0x0dcc and 0x11d0."
+    },
+    {
+      "field": "trailing_builtin_name",
+      "offset": 122,
+      "evidence": "Built-in allocation uses strlen(name)+123 and points its trailing name area at descriptor+122; code offset 0x11d8."
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "profile": "morphos320",
+  "command": "LoadMonDrvs",
+  "recorded": "2026-09-22",
+  "source_id": "morphos320-live-iso",
+  "volume": "MorphOS 3.20",
+  "path": "MorphOS/C/LoadMonDrvs",
+  "iso_extent": 176144,
+  "bytes": 2279,
+  "sha256": "c33c5263f6edd1c1ff11738558492d5cbfe371e6117383459b4c319082dea384",
+  "file_format": "morphos-packed-native",
+  "version": {
+    "name": "LoadMonDrvs",
+    "version": 50,
+    "revision": 1,
+    "date_text": "14.7.03",
+    "byte_offset": 2229,
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template_candidate": {
+    "text": "FROM/K,EXCEPT",
+    "evidence": "AmigaDOS command-reference documentation; not recovered from packed plaintext"
+  },
+  "documented_behavior_candidate": [
+    "Default directory is DEVS:Monitors.",
+    "FROM/K selects an alternate monitor-driver directory.",
+    "EXCEPT excludes one driver file name from startup.",
+    "The command starts every discoverable monitor driver in the selected directory."
+  ],
+  "purity": {
+    "required_by_observed_design_evidence": true,
+    "event_id": "morphos320-live-iso:hdinstall.fixc:39",
+    "classification": "required-pure",
+    "installed_flags_observed": false
+  },
+  "evidence_limits": [
+    "The packed member has no plaintext template or diagnostic strings in the bounded inspection.",
+    "No original guest execution establishes directory matching, ordering, EXCEPT comparison, resident initialization, result/IoErr or diagnostics.",
+    "The command's monitor driver providers and lifecycle are not replaceable by a host directory or host loader.",
+    "Package placement, installed overlay and differential parity remain open."
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "capture_id": "execute-wb31-def-duplicate-20260901",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Execute",
+    "command_sha256": "27c2f578b63857ab5fbe03cdf621d553408cc670b9f07d9988ce224d22b57ecd",
+    "version": "execute 37.11 (14.5.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/execute-wb31-def-duplicate-startup-probe",
+    "source_sha256": "7c7d6d43715f9632c7e6fdb957a0fa290618cdf0500fd29f466d70ebf4bab43c",
+    "disposable_adf_after_run_sha256": "227389a5af554fd3b6b8879ac0ca963fa32558310c2311073f7ca7a807889f7c",
+    "capture_file": "S/Shell-Startup",
+    "capture_raw_sha256": "8d81c90ac9931f10e6688ffc88683ae07283dc437cda4ffe204b9a084fe802cf",
+    "capture_raw_bytes": 116,
+    "capture_text_before_nul_sha256": "b7d0b0600a8e3969128d14ba44e167c950dda8cc781805632d1ae3379386c538",
+    "capture_text_before_nul_bytes": 59,
+    "capture_text_before_nul": "BEGIN\nVALUE:first\nEXPANDED\nAFTER\nSTATUS RC=0 RESULT2=0\nEND\n"
+  },
+  "observation": {
+    "script_directives": [".KEY filename", ".DEF filename first", ".DEF filename second"],
+    "invocation": "C:Execute RAM:execute-probe",
+    "result": "The original command accepted duplicate defaults, retained the first value for <filename>, ran subsequent lines, and returned RC 0 and Result2 0."
+  },
+  "limits": [
+    "Copying the short guest capture over the running S/Shell-Startup leaves a NUL-padded 116-byte file. The authenticated observation is its prefix before the first NUL; both raw and prefix hashes are recorded.",
+    "This establishes duplicate behavior for one formal name and whitespace-form values only.",
+    "It does not establish duplicates with equals-form values, duplicate undeclared names, diagnostics, IoErr, streams, temporary-file internals, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Execute bytes are copied into this repository."
+  ]
+}

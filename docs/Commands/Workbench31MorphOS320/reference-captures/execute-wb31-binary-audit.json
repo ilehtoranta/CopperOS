@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "capture_id": "execute-wb31-binary-audit-20260831",
+  "kind": "read-only-static-binary-audit",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "image_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "file_path": "C/Execute",
+    "file_header_block": 244,
+    "first_data_block": 245,
+    "data_block_count": 9,
+    "file_length": 4432,
+    "file_sha256": "27c2f578b63857ab5fbe03cdf621d553408cc670b9f07d9988ce224d22b57ecd",
+    "version": "execute 37.11 (14.5.91)"
+  },
+  "method": [
+    "Read the archive member without modifying the archive or ADF.",
+    "Read the FFS file-header record at block 244 and take first-data block 245.",
+    "Concatenate blocks 245 through 253 in order, trim to the header's 4432-byte file length, and hash the result.",
+    "Search only printable embedded strings in the recovered bytes."
+  ],
+  "observations": {
+    "template": "FILE/A",
+    "directive_keyword_list": "KEY,K,DEFAULT,DEF,BRA,KET,DOLLAR,DOT",
+    "directive_diagnostics": [
+      "Invalid directive",
+      "More than one .KEY directive",
+      "Illegal KEY directive",
+      "Parameters unsuitable for key \"%S\"",
+      "Illegal key",
+      "Missing .KEY directive",
+      "Illegal data item",
+      "Key too long",
+      "Invalid directive argument"
+    ]
+  },
+  "limits": [
+    "Static strings do not define the directive grammar, accepted abbreviations, substitution order, output stream, return level, or IoErr.",
+    "This capture does not execute the original binary and is not a behavioral oracle.",
+    "The original binary itself is not copied into this repository."
+  ],
+  "next_fixture": "Execute the original command in a disposable reference guest with a controlled script and capture raw stdout, stderr, return level, IoErr and resource effects for each X2 case."
+}

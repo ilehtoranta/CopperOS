@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "capture_id": "execute-script-manual-semantics-20260831",
+  "kind": "documentation-semantics-lead",
+  "subject": "AmigaDOS Execute dot-command preprocessing",
+  "source": {
+    "title": "AmigaOS Manual: AmigaDOS Using Scripts",
+    "url": "https://wiki.amigaos.net/wiki/AmigaOS_Manual:_AmigaDOS_Using_Scripts",
+    "retrieved_utc": "2026-08-31",
+    "relevant_lines": [
+      124,
+      125,
+      126,
+      127,
+      128,
+      129,
+      132,
+      133,
+      145,
+      151,
+      152,
+      165
+    ]
+  },
+  "observations": [
+    "A script whose first line is a dot command is scanned for substitutions before dispatch and uses a temporary file in T:.",
+    "The documented delimiter example places .BRA and .KET after an earlier ECHO while explaining substitution using the changed delimiters.",
+    "KEY, DOT, BRA, KET, DOLLAR and DEF have the documented directive roles and the DOT/DOLLAR/BRA/KET arguments are one character."
+  ],
+  "implementation_consequence": "CopperOS must prepare an eligible script into runner-owned temporary input before executing any command line. The manual's delimiter example is not sufficient to infer retroactive delimiter behavior; the hash-bound Workbench fixture execute-wb31-late-brackets.json establishes source-ordered directive application.",
+  "limits": [
+    "This source is documentation evidence and is not a hash-bound execution of the original Workbench 3.1 binary.",
+    "Original WB 3.1 and MorphOS fixtures must still establish exact diagnostics, temporary-file names, cleanup, failure status and IoErr."
+  ]
+}

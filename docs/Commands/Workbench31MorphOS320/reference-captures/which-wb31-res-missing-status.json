@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "capture_id": "which-wb31-res-missing-status-20260831",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Which",
+    "command_sha256": "35f7f3fee29dd2d56f482537af1c5f5a88b552080e6c26be14f455a3241b7157",
+    "version": "which 37.1 (12.1.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/which-wb31-res-missing-status-startup-probe",
+    "source_sha256": "c285747055d332066bb439c49714f18574e00a05e6e99f02a0197d606cec2b59",
+    "disposable_adf_before_run_sha256": "5f570d7ed7bb10ee48474d768e9b4158237d202db563c3b5797fa9793e0a55f1",
+    "disposable_adf_after_run_sha256": "e3a825ae54b00682783d6c8b485965ebf69ad349fe46b62cd3a43931a179a3ab",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "8816abc7645c82f073ca6ce368b0acc6f462fcb2d6c1a2282a3cb5303207450d",
+    "capture_bytes": 39,
+    "capture_text": "BEGIN\nRES-MISSING RC=5 RESULT2=205\nEND\n"
+  },
+  "observations": [
+    "C:Which CopperOSMissingCommand RES emits no captured line and leaves RC=5, Result2=205."
+  ],
+  "limits": [
+    "The startup sequence and output target are authored probe content on a disposable ADF copy.",
+    "This establishes only a RES-only missing result, not diagnostics on a separate error stream, cancellation, inaccessible paths, option conflicts, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Which bytes are copied into this repository."
+  ]
+}

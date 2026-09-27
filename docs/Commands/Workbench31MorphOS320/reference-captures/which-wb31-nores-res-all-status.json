@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "capture_id": "which-wb31-nores-res-all-status-20260831",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Which",
+    "command_sha256": "35f7f3fee29dd2d56f482537af1c5f5a88b552080e6c26be14f455a3241b7157",
+    "version": "which 37.1 (12.1.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/which-wb31-nores-res-all-status-startup-probe",
+    "source_sha256": "b40abbe3f8868e0f3e128eccc543cea0cc3164d57f7353cbe273d2fc2bafdac6",
+    "disposable_adf_before_run_sha256": "63c19c61450173ecea8fb0dbb081eb7e3508244329c04110706b6012c951ef41",
+    "disposable_adf_after_run_sha256": "edced27e368455994aed590909c368051d78c6bfc16882ec0c9ed12d8ee414cd",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "78947527e74ff53a8e46e82ad4306a8a791c8db0e57ff99a75ff918607980cc5",
+    "capture_bytes": 39,
+    "capture_text": "BEGIN\nNORES-RES-ALL RC=5 RESULT2=0\nEND\n"
+  },
+  "observations": [
+    "C:Which CD NORES RES ALL emits no captured line and leaves RC=5, Result2=0."
+  ],
+  "limits": [
+    "The startup sequence and output target are authored probe content on a disposable ADF copy.",
+    "This establishes one internal-only conflict outcome, not disk/resident collision behavior, diagnostics, cancellation, inaccessible paths, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Which bytes are copied into this repository."
+  ]
+}

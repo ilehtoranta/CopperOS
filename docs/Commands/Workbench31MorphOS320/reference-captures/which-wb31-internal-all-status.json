@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "capture_id": "which-wb31-internal-all-status-20260831",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Which",
+    "command_sha256": "35f7f3fee29dd2d56f482537af1c5f5a88b552080e6c26be14f455a3241b7157",
+    "version": "which 37.1 (12.1.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/which-wb31-internal-all-status-startup-probe",
+    "source_sha256": "79ea8a4df5a2194e85f37a88d6af5d9016e8fb47a3d1da9272f3e0635d4969af",
+    "disposable_adf_before_run_sha256": "2002790498975a46ab340adb788200dd8fa091190e5006d6318a7cf9b5a50fbc",
+    "disposable_adf_after_run_sha256": "5985a0324dbe34e9af2ab96ff509a8cb709270ac4a2e70b8691363977a638cc7",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "68b52263efdcab96917ee22f1b7143105b7507ea590569e796f03b28eee6a7d3",
+    "capture_bytes": 82,
+    "capture_text": "FAILAT RC=0 RESULT2=0\nPATH RC=0 RESULT2=0\nINTERNAL CD\nALL-CD RC=5 RESULT2=205\nEND\n"
+  },
+  "observations": [
+    "FailAt 255 leaves RC=0 and Result2=0; the subsequent Path C: also leaves both values zero.",
+    "C:Which CD ALL emits INTERNAL CD and leaves RC=5, Result2=205 before the END marker."
+  ],
+  "limits": [
+    "The startup sequence and output target are authored probe content on a disposable ADF copy.",
+    "This establishes one internal-only ALL case, not default/RES/NORES internal results, missing-name behavior, diagnostics, cancellation, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Which bytes are copied into this repository."
+  ]
+}

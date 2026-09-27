@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "capture_id": "binddrivers-wb31-code-audit-20260925",
+  "kind": "offline-hunk-code-audit",
+  "profile": "wb31",
+  "command": "BindDrivers",
+  "source_id": "wb31-workbench-m10-40.42",
+  "path": "C/BindDrivers",
+  "source_bytes": 1420,
+  "source_sha256": "8bc40c2cb0bb3bcd927d2f8696713284f5c554c06d6f65842bf7e062e0f60503",
+  "analysis_method": "Extracted the hash-verified command from the selected Workbench disk in memory, parsed its HUNKs, and disassembled offline; the reference program was not executed.",
+  "hunks": [
+    { "index": 0, "kind": "CODE", "bytes": 1240, "payload_file_offset": "0x0024" },
+    { "index": 1, "kind": "DATA", "bytes": 44, "payload_file_offset": "0x055c" }
+  ],
+  "code_strings": [
+    { "offset": "0x023a", "text": "dos.library" },
+    { "offset": "0x0246", "text": "expansion.library" },
+    { "offset": "0x0258", "text": "icon.library" },
+    { "offset": "0x0266", "text": "SYS:Expansion" },
+    { "offset": "0x0274", "text": ".info" },
+    { "offset": "0x027a", "text": "PRODUCT" }
+  ],
+  "startup": {
+    "argument_parser": "none",
+    "entry_sequence": [
+      "Exec FindTask(0) at code offset 0x001c",
+      "If the process has no CLI handle, Exec WaitPort/GetMsg obtains the Workbench startup message",
+      "After cleanup, Exec Forbid/ReplyMsg returns an acquired Workbench startup message"
+    ],
+    "libraries": [
+      { "order": 1, "name": "dos.library", "minimum_version": 37, "open_call_offset": "0x004c" },
+      { "order": 2, "name": "expansion.library", "minimum_version": 37, "open_call_offset": "0x0060" },
+      { "order": 3, "name": "icon.library", "minimum_version": 37, "open_call_offset": "0x0074" }
+    ]
+  },
+  "directory_scan": {
+    "path": "SYS:Expansion",
+    "lock_mode": -2,
+    "sequence": [
+      "DOS Lock at code offset 0x0096",
+      "DOS Examine at code offset 0x00aa; continue only when the lock describes a directory",
+      "Expansion ObtainConfigBinding at code offset 0x00c4",
+      "DOS CurrentDir(directoryLock) at code offset 0x00d2",
+      "DOS ExNext at code offset 0x01cc until it returns zero",
+      "DOS CurrentDir(previousLock) at code offset 0x01de",
+      "Expansion ReleaseConfigBinding at code offset 0x01e8",
+      "DOS UnLock(directoryLock) at code offset 0x01f4"
+    ],
+    "entry_policy": "Each ExNext filename is tested for a case-insensitive .info suffix, which is removed in the FileInfoBlock filename buffer. No per-entry directory-type check precedes GetDiskObject; no recursive descent, wildcard matcher, NameFromLock, or AddPart call is present in this profile's code path."
+  },
+  "driver_flow": [
+    { "operation": "Icon GetDiskObject", "call_offset": "0x0114", "icon_lvo": -78 },
+    { "operation": "Icon FindToolType(PRODUCT)", "call_offset": "0x012c", "icon_lvo": -96 },
+    { "operation": "DOS LoadSeg(relative filename without .info)", "call_offset": "0x014e", "dos_lvo": -150 },
+    { "operation": "Expansion SetCurrentBinding", "call_offset": "0x018c", "expansion_lvo": -132, "binding_bytes": 16 },
+    { "operation": "Exec InitResident", "call_offset": "0x019a", "exec_lvo": -102 },
+    { "operation": "DOS UnLoadSeg when resident discovery or initialization fails", "call_offset": "0x01ac", "dos_lvo": -156 },
+    { "operation": "Icon FreeDiskObject", "call_offset": "0x01ba", "icon_lvo": -90 }
+  ],
+  "current_binding_fields": [
+    { "offset": 0, "field": "cb_ConfigDev" },
+    { "offset": 4, "field": "cb_FileName" },
+    { "offset": 8, "field": "cb_ProductString" },
+    { "offset": 12, "field": "cb_ToolTypes" }
+  ],
+  "product_parser": {
+    "helper_offsets": ["0x02c2", "0x0318"],
+    "split_character": "|",
+    "pair_syntax": "decimal manufacturer[/decimal product]",
+    "product_default": -1,
+    "numeric_rule": "Each parsed field is validated as non-empty ASCII decimal digits before DOS StrToLong; signs, whitespace, and numeric-prefix tails are rejected.",
+    "calls": [
+      { "operation": "DOS StrToLong", "dos_lvo": -816, "call_offsets": ["0x0364", "0x038e"] },
+      { "operation": "Expansion FindConfigDev", "expansion_lvo": -72, "call_offset": "0x0406" }
+    ],
+    "chain_rule": "Returned ConfigDev nodes are linked through cd_NextCD at offset 48; the helper checks the accumulated chain before adding a returned node."
+  },
+  "resident_search": {
+    "helper_offset": "0x0282",
+    "match_word": "0x4afc",
+    "match_rule": "The candidate Resident rt_MatchTag pointer must point back to the candidate record.",
+    "scope": "The helper derives its scan end from the current segment's declared longword count and does not follow a next-segment link in the inspected implementation."
+  },
+  "result_state": {
+    "initial": 20,
+    "after_required_library_opens": 5,
+    "after_directory_validation_and_config_binding_acquisition": 0,
+    "driver_entry_failures": "Missing icon, PRODUCT, ConfigDev, resident, failed LoadSeg, and failed InitResident do not change the command result; an initialized segment is retained, while a failed initialization is unloaded.",
+    "diagnostics": "No DOS PrintFault or output-formatting call is present in the statically disassembled command path."
+  },
+  "evidence_limits": [
+    "All call sites, string addresses, parser structure and result-state transitions are static HUNK observations; the reference program was not executed.",
+    "DOS provider effects, PRODUCT edge cases including overflow, IoErr publication, exact startup message behavior and Resident scanning boundaries require an original Workbench 3.1 guest comparison.",
+    "The selected media protection word has P clear; installed resident events and replacement package placement remain unresolved.",
+    "This audit neither authorizes source reuse nor qualifies a replacement for shipping."
+  ]
+}

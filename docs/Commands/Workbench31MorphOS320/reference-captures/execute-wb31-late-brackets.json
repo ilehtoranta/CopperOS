@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "capture_id": "execute-wb31-late-brackets-20260831",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Execute",
+    "command_sha256": "27c2f578b63857ab5fbe03cdf621d553408cc670b9f07d9988ce224d22b57ecd",
+    "version": "execute 37.11 (14.5.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/execute-wb31-late-brackets-startup-probe",
+    "source_sha256": "c4527e2308b34e764be8cef155992a885c0aff68cbfe0389cf442fa366eaa538",
+    "disposable_adf_before_run_sha256": "a12a839aeca7819e0cdd7679a2c55e934de5ad6c46ffc136cc1a6a25104e4915",
+    "disposable_adf_after_run_sha256": "b8e4b4b264bdb324524ece092dced14da084cf540a6d3e658e5b902386132fc5",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "9d83e5514f04ae2213dcc52f876c6a2e903f143c798be73bc7f2bed9a3ff89bc",
+    "capture_bytes": 21,
+    "capture_text": "BEGIN\n{filename}\nEND\n"
+  },
+  "observation": {
+    "script_template": ".KEY filename",
+    "invocation": "C:Execute RAM:execute-probe fallback",
+    "directive_order": ["Echo {filename}", ".BRA {", ".KET }"],
+    "result": "The earlier ECHO retained literal {filename}; later BRA/KET directives did not retroactively change its substitution delimiters. Execute returned to the caller, which appended END."
+  },
+  "limits": [
+    "The startup sequence, inner script and output target are authored probe content on a disposable ADF copy.",
+    "This establishes one directive-order case only. It does not establish temporary-file internals, diagnostics, return level, IoErr, streams, fault cleanup or MorphOS behavior.",
+    "Neither the original ADF nor its C/Execute bytes are copied into this repository."
+  ]
+}

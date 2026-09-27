@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "capture_id": "which-wb31-internal-options-20260831",
+  "kind": "disposable-reference-guest-observation",
+  "profile": "wb31",
+  "reference": {
+    "archive_path": "D:/TestData/TestImages/Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].zip",
+    "archive_member": "Workbench v3.1 rev 40.42 (1994)(Commodore)(M10)(Disk 2 of 6)(Workbench)[!].adf",
+    "adf_sha256": "a8f167bad2897e8c7f2cfe73de7a9f8dad10c7a5b1f78ca17f818ab17278b985",
+    "command_path": "C/Which",
+    "command_sha256": "35f7f3fee29dd2d56f482537af1c5f5a88b552080e6c26be14f455a3241b7157",
+    "version": "which 37.1 (12.1.91)"
+  },
+  "runtime": {
+    "emulator": "WinUAE 6.0.3.0",
+    "emulator_sha256": "f3e55700fd811cd543fdfebf6c3221cfaa3d385828f110c6d3eb534c64503123",
+    "rom_path": "D:/TestData/ROM/kickstart-3.1-a500.rom",
+    "rom_sha256": "8c8a0cf04f91b88eaf0c4f1126041987067e2286a8ee590bdbae447a8000c5ee",
+    "cpu_model": "68000",
+    "chip_memory_mib": 2
+  },
+  "probe": {
+    "source": "tests/Commands/fixtures/which-wb31-internal-options-startup-probe",
+    "source_sha256": "890617a221d863d4e47786fd70d96b8b66691c0fcfa4f4029f0ed7de1ab36fd4",
+    "disposable_adf_before_run_sha256": "29cac1dc4d2570466215331d81ee66f5202d1674679b27d130d79e7c9a47de63",
+    "disposable_adf_after_run_sha256": "1edf357dabcca08433846e057df889692f0ba655480a48477121bea332b56b82",
+    "capture_file": "S/Shell-Startup",
+    "capture_sha256": "11cfeb26d74c701dbf7287c2c2ab62a0c562819cabec08108601f134cc9644ac",
+    "capture_bytes": 64,
+    "capture_text": "BEGIN\nDEFAULT\nINTERNAL CD\nRES\nINTERNAL CD\nNORES\nALL\nINTERNAL CD\n"
+  },
+  "observations": [
+    "C:Which CD and C:Which CD RES each emit INTERNAL CD followed by LF.",
+    "C:Which CD NORES emits no line, and the following ALL marker is reached under FailAt 20.",
+    "C:Which CD ALL emits INTERNAL CD followed by LF, then the fixture stops before END under FailAt 20. This proves only an error-level result of 20 or higher for that invocation."
+  ],
+  "limits": [
+    "The startup sequence and output target are authored probe content on a disposable ADF copy.",
+    "This does not establish exact return levels, IoErr, diagnostics, disabled internal behavior, other switch combinations, parsing failures, cancellation, or MorphOS behavior.",
+    "Neither the original ADF nor its C/Which bytes are copied into this repository."
+  ]
+}

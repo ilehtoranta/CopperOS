@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "profile": "morphos320",
+  "source_id": "morphos320-live-iso",
+  "command": "ConClip",
+  "path": "MorphOS/C/ConClip",
+  "iso_extent": 175256,
+  "bytes": 5123,
+  "sha256": "5521f081d16b46800c3c46c78b2f53883fd26ff2fbeeb6e9dcdc3f42e6879b4d",
+  "version": "$VER: ConClip 50.4 (02.10.2025)",
+  "evidence": "hash-bound-unexecuted-packed-member",
+  "source_audit": "conclip-reference-audit-20260923.json"
+}

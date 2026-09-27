@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "command": "LoadResource",
+  "source_id": "wb31-workbench-m10-40.42",
+  "volume": "Workbench3.1",
+  "path": "C/LoadResource",
+  "bytes": 3972,
+  "sha256": "51c8d6da726d5d1429e84f36e323218eb94750ab60b650efe768fc2907d16f38",
+  "file_format": "amiga-hunk",
+  "version": {
+    "name": "loadresource",
+    "version": 40,
+    "revision": 2,
+    "date_text": "17.3.93",
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template": {
+    "text": "NAME/M,LOCK/S,UNLOCK/S",
+    "confidence": "syntax-only-candidate-not-runtime-or-source-verified"
+  },
+  "documentation_boundary": {
+    "source": "https://wiki.amigaos.net/wiki/AmigaOS_Manual:_AmigaDOS_Command_Reference",
+    "claims": [
+      "Libraries, devices, fonts and locale catalogs are named by path.",
+      "LOCK keeps libraries, fonts and catalogs resident; devices may be preloaded but cannot be locked.",
+      "UNLOCK permits a resource to be flushed.",
+      "No-name invocation lists locked resources."
+    ],
+    "evidence": "documentation-only; selected Workbench 3.1 guest behavior remains open"
+  },
+  "imports_observed": [
+    "exec.library",
+    "dos.library",
+    "locale.library",
+    "utility.library",
+    "graphics.library",
+    "diskfont.library"
+  ],
+  "bounded_code_observations": [
+    "Requests locale.library, dos.library, utility.library and graphics.library during startup, with version floors in the high thirties; a diskfont.library V37 message is embedded for the font catalog path.",
+    "Parses a multiple NAME argument and LOCK/UNLOCK switches through DOS ReadArgs.",
+    "Uses the current CLI/process context and DOS resource/file APIs to enumerate named resources, report already-locked or not-locked states, and manage resource locks.",
+    "Contains catalog-oriented strings for Library, Device, Font, Catalog and a LoadResource requester/title, plus formatted success and failure diagnostics.",
+    "Contains a font-catalog path that constructs a TextAttr and calls diskfont.library, graphics.library and utility.library helpers."
+  ],
+  "evidence_limits": [
+    "No original guest execution has established resource-list selection, lock/unlock state transitions, multiple-argument result precedence, diagnostics, catalog behavior or IoErr precedence.",
+    "The media protection word has P clear; runtime PURE/resident behavior remains unobserved.",
+    "This audit does not authorize copying the original binary or claiming shipping equivalence."
+  ]
+}

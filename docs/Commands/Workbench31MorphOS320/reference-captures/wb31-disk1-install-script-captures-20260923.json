@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "profile": "wb31",
+  "source_id": "wb31-install-m10-40.42",
+  "volume": "Install3.1",
+  "disk": "Disk 1 of 6 (Install)",
+  "source_zip_sha256": "e320dbbcb2b8e34da7d3e37a2953c623c26755191a74c2512169b2e6f81f2e78",
+  "adf_sha256": "8f54e735925d733719a321a0ddabd8fd6d1c1c3d3c0a516ed6b77dee89ac9e1e",
+  "scope": "Installer/startup script members captured as metadata/hash evidence; not installed-state or runtime evidence",
+  "scripts": [
+    {
+      "path": "Install/Install",
+      "bytes": 139083,
+      "sha256": "46b0602de5eb15709f098bf909859d8ae111e2648a66ebadb9c8014a09e9dddc",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository",
+      "execution_status": "metadata/hash only; not executed"
+    },
+    {
+      "path": "HDSetup/HDSetup",
+      "bytes": 58033,
+      "sha256": "ba74e25b8f4db10c24c09c2b1251bcdcafcd316125b9572b4e03afef1db2f4ac",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository",
+      "execution_status": "metadata/hash only; not executed"
+    },
+    {
+      "path": "Update/Startup-HardDrive",
+      "bytes": 1274,
+      "sha256": "53e571b725434dd2e5a875accf38407b079382ec9aeab376384dfeb017df3edf",
+      "evidence": "extracted from selected Workbench v3.1 M10 disk 1 outside repository",
+      "execution_status": "metadata/hash only; not executed"
+    }
+  ],
+  "open_gates": [
+    "remaining Workbench disks and machine variants",
+    "installed placement/protection metadata",
+    "guest execution and resident lifecycle",
+    "package/licensing and differential comparison"
+  ]
+}

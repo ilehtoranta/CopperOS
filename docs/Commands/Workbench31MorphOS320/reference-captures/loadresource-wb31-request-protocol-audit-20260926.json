@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "capture_id": "loadresource-wb31-request-protocol-audit-20260926",
+  "kind": "offline-hunk-code-audit",
+  "profile": "wb31",
+  "command": "LoadResource",
+  "source_id": "wb31-workbench-m10-40.42",
+  "path": "C/LoadResource",
+  "source_bytes": 3972,
+  "source_sha256": "51c8d6da726d5d1429e84f36e323218eb94750ab60b650efe768fc2907d16f38",
+  "analysis_method": "Re-read the checksum-verified selected M10 Workbench HUNK with the repository ADF reader, then disassembled HUNK0 and the HUNK2 worker with Capstone 5.0.7. This is offline static analysis, not guest execution.",
+  "client_message": {
+    "hunk": 0,
+    "message_pointer_instruction": "0x016e: LEA 0x2e(A7),A1 passed to Exec PutMsg at 0x0176",
+    "message_bytes_instruction": "0x0140: MOVE.W #0x36,0x40(A7); message starts at A7+0x2e, so length is 54 bytes",
+    "reply_port_instruction": "0x014a: MOVE.L A3,0x3c(A7); A3 was set to current Process+0x5c (pr_MsgPort)",
+    "wait_and_get_message_calls": [
+      { "code_offset": "0x017c", "operation": "Exec WaitPort", "exec_lvo": -384 },
+      { "code_offset": "0x0182", "operation": "Exec GetMsg", "exec_lvo": -372 }
+    ],
+    "readargs_results": {
+      "call_offset": "0x0092",
+      "template": "NAME/M,LOCK/S,UNLOCK/S",
+      "result_count": 3,
+      "result_array_stack_address": "A7+0x58",
+      "message_relative_address": 42,
+      "meaning": "The three LONG result slots occupy the request tail: NAME, LOCK, UNLOCK. The request remains synchronous while the worker reads these pointers."
+    }
+  },
+  "message_layout": [
+    { "offset": 0, "bytes": 14, "field": "Exec Node", "authority": "Public Exec Message/Node layout" },
+    { "offset": 14, "bytes": 4, "field": "ReplyPort", "evidence": "HUNK0 stores current Process+0x5c" },
+    { "offset": 18, "bytes": 2, "field": "Length", "evidence": "HUNK0 stores 0x36" },
+    { "offset": 20, "bytes": 2, "field": "RequestFlags", "evidence": "HUNK0 clears this word" },
+    { "offset": 22, "bytes": 4, "field": "Result", "evidence": "HUNK0 reads this LONG after GetMsg; HUNK2 writes it" },
+    { "offset": 26, "bytes": 4, "field": "IoErr", "evidence": "HUNK0 reads this LONG after GetMsg; HUNK2 writes it" },
+    { "offset": 30, "bytes": 4, "field": "CurrentDirectory", "evidence": "HUNK0 copies Process+0x98; SDK DOS Process.CurrentDirectory is offset 152 (0x98)" },
+    { "offset": 34, "bytes": 4, "field": "Input", "evidence": "HUNK0 stores DOS Input result; HUNK2 uses it with DOS SelectInput" },
+    { "offset": 38, "bytes": 4, "field": "Output", "evidence": "HUNK0 stores DOS Output result; HUNK2 uses it with DOS SelectOutput" },
+    { "offset": 42, "bytes": 4, "field": "NAME/M result slot", "evidence": "ReadArgs result vector begins at request offset 42; HUNK2 walks it as a pointer array" },
+    { "offset": 46, "bytes": 4, "field": "LOCK/S result slot", "evidence": "Second ReadArgs result slot; HUNK2 tests this LONG" },
+    { "offset": 50, "bytes": 4, "field": "UNLOCK/S result slot", "evidence": "Third ReadArgs result slot; HUNK2 tests this LONG" }
+  ],
+  "replacement": {
+    "source": "src/Commands/Native/NativeWorkbench31LoadResourceProtocol.cs",
+    "approach": "Send reserves fourteen LONGs (56 bytes) on the caller stack and uses explicit APTR byte/word/LONG writes at the captured offsets, transmitting mn_Length=54. It uses the caller process message port, waits and gets the reply, then reads Result/IoErr at offsets 22/26. The ReadArgs lease remains caller-owned across the wait.",
+    "correction": "The prior Pack=2 RequestMessage passed host Marshal layout checks but native execution placed ReplyPort at byte 20 rather than 14. The native failure is preserved in artifacts/workbench31-loadresource-protocol-runtime-20260926-v1. That unsupported aggregate layout and the misleading host-only check were replaced by explicit wire writes and actual HUNK transaction fixtures.",
+    "runtime_fixture": "LoadResourceProtocolRuntimeSuite executes nineteen supplied-vector client invocations per 68000/68020/68040 image, including two instruction-interleaved callers, stack message offsets, live parser pointers through GetMsg, result/error forwarding and cleanup. These fixtures supply worker replies and do not execute an original guest.",
+    "limits": "The production client does not yet locate/start the worker or dispatch resource actions. Supplied vectors do not verify real DOS scheduling, actual message queues, original text parsing or guest parity."
+  },
+  "evidence_limits": [
+    "This audit establishes HUNK offsets and field use, not runtime command results, error precedence, or message ownership under concurrent original Workbench tasks.",
+    "No original Workbench guest execution was performed."
+  ]
+}

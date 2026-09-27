@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "capture_id": "status-wb31-binary-audit-20260923",
+  "kind": "read-only-static-binary-audit",
+  "profile": "wb31",
+  "command": "Status",
+  "source_id": "wb31-workbench-m10-40.42",
+  "volume": "Workbench3.1",
+  "path": "C/Status",
+  "bytes": 828,
+  "sha256": "fd7b386f103bafba80add97523991389880f9b6987f4534280abb61b8193580c",
+  "file_format": "amiga-hunk",
+  "version": {
+    "name": "status",
+    "version": 37,
+    "revision": 2,
+    "date_text": "1.4.91",
+    "byte_offset": 615,
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template": {
+    "text": "PROCESS/N,FULL/S,TCB/S,CLI=ALL/S,COM=COMMAND/K",
+    "byte_offset": 568,
+    "confidence": "syntax-only-candidate-not-runtime-or-source-verified"
+  },
+  "reference_capture": "wb31-disk2-c-command-captures-20260923.json",
+  "protection": {
+    "raw": 0,
+    "pure": false,
+    "evidence": "adf-file-header-byte-320-big-endian"
+  },
+  "limits": [
+    "The candidate template and version are static observations, not an execution oracle.",
+    "The captured protection word is media metadata and does not establish installed placement or resident lifecycle.",
+    "Exact Workbench output, diagnostics, task population, guest parity, package admission and differential behavior remain open."
+  ]
+}

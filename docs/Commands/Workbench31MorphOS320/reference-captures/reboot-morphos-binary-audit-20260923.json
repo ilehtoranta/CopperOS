@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "profile": "morphos320",
+  "source_id": "morphos320-live-iso",
+  "command": "Reboot",
+  "path": "MorphOS/C/Reboot",
+  "iso_extent": 178088,
+  "bytes": 1206,
+  "sha256": "6173f32fed7ab0cff36fb0c0f5e87f907525877ae67469e001f511c822199024",
+  "version": {
+    "name": "Reboot",
+    "version": 50,
+    "revision": 3,
+    "date_text": "23.5.09",
+    "byte_offset": 1171,
+    "evidence": "unexecuted-binary-ver-tag"
+  },
+  "template": {
+    "status": "empty",
+    "text": "",
+    "evidence": "released-source-and-packed-member-identity; exact ReadArgs/diagnostic behavior remains a runtime gate"
+  },
+  "source": {
+    "path": "artifacts/morphos320-c-source-extracted/c/reboot/reboot.c",
+    "bytes": 955,
+    "sha256": "9e3cc8dd4f9fba123fb3507f86333c09164cf05e26b64ec237125d1c10990fc5",
+    "evidence": "released-source-behavior-only"
+  },
+  "startup_contract": {
+    "dos_library_minimum": 37,
+    "readargs_template": "",
+    "ctrl_c": "ERROR_BREAK via SetSignal(0,0) and PrintFault",
+    "parser_failure": "empty-template ReadArgs result is ignored; ColdReboot is still requested",
+    "normal_transition": "Exec ColdReboot",
+    "return_if_reboot_returns": 666,
+    "dos_open_failure": "RETURN_FAIL without command diagnostic",
+    "workbench_startup": "not supported by released source"
+  },
+  "installer_event": {
+    "script": "hdinstall.fixc",
+    "line": 60,
+    "operation": "file-protection-add",
+    "flag": "P",
+    "confidence": "literal-script-observed-not-installed-metadata"
+  },
+  "documented_behavior": {
+    "summary": "Reboots the machine",
+    "evidence": "released-source header and MorphOS Library Shell Commands index"
+  },
+  "scope": "binary identity and source-bound transition contract; raw binary is not stored in the repository",
+  "open_gates": [
+    "original guest reboot transition and terminal handoff",
+    "exact parser failure and diagnostic bytes",
+    "pending Ctrl-C and IoErr/result precedence",
+    "resident/PURE lifecycle and repeat/concurrent calls",
+    "installed AmigaDOS protection metadata",
+    "package/licensing and differential comparison"
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "command": "ConClip",
+  "recorded": "2026-09-23",
+  "profiles": {
+    "wb31": {
+      "source_id": "wb31-workbench-m10-40.42",
+      "volume": "Workbench3.1",
+      "path": "C/ConClip",
+      "header_block": 112,
+      "bytes": 2432,
+      "sha256": "770ccf4ab4c7ede61b327d86c45322fe966e107ae7ef806e04341786a2dd75cc",
+      "file_format": "amiga-hunk",
+      "version": {
+        "name": "conclip",
+        "version": 40,
+        "revision": 1,
+        "date_text": "9.2.93",
+        "byte_offset": 580,
+        "evidence": "unexecuted-binary-ver-tag"
+      },
+      "template_candidate": {
+        "text": "CLIPUNIT=UNIT/N,OFF/S",
+        "byte_offset": 558,
+        "confidence": "syntax-only-candidate-not-runtime-or-source-verified"
+      },
+      "protection": {
+        "raw": 0,
+        "pure": false,
+        "evidence": "adf-file-header-byte-320-big-endian"
+      },
+      "evidence_limits": [
+        "No original Workbench guest execution or persistent hook capture is available.",
+        "The binary has no admitted source correspondence; MorphOS source behavior must not be copied into this profile."
+      ]
+    },
+    "morphos320": {
+      "source_id": "morphos320-live-iso",
+      "volume": "MorphOS 3.20",
+      "path": "MorphOS/C/ConClip",
+      "iso_extent": 175256,
+      "bytes": 5123,
+      "sha256": "5521f081d16b46800c3c46c78b2f53883fd26ff2fbeeb6e9dcdc3f42e6879b4d",
+      "file_format": "morphos-packed-native",
+      "version": {
+        "name": "ConClip",
+        "version": 50,
+        "revision": 4,
+        "date_text": "02.10.2025",
+        "byte_offset": 5084,
+        "evidence": "unexecuted-binary-ver-tag"
+      },
+      "source": {
+        "path": "artifacts/morphos320-c-source-extracted/c/conclip/conclip.c",
+        "bytes": 16615,
+        "sha256": "fc41440ca9adbe6eb6bfcef020d80ed6f0d027d2fd4905429011d8915c4debf3",
+        "evidence": "released-source-behavior-only"
+      },
+      "startup_contract": {
+        "entry": "main(void)",
+        "template": "CLIPUNIT=UNIT/N,OFF/S",
+        "dos_library": 37,
+        "off": "Forbid, FindPort(ConClip.rendezvous), Signal(mp_SigTask, SIGBREAKF_CTRL_C), Permit",
+        "start": "CreateNewProcTags with ConClip handler entry, priority 0, no console, and no copied variables/current directory",
+        "worker_code_type": "MACHINE_PPC",
+        "duplicate_guard": "The handler's named rendezvous port rejects a second service instance",
+        "worker_name": "ConClip rendezvous task"
+      },
+      "persistent_services": [
+        "Open dos.library, iffparse.library, utility.library and intuition.library at version 37 in the worker",
+        "Create and delete the named message port ConClip.rendezvous",
+        "Install and restore the Intuition string-edit hook",
+        "Install and remove the console.device snip hook when console.device opens",
+        "Wait on SIGBREAKF_CTRL_C and the rendezvous port, dispatch copy/paste/snip messages, and reply each message",
+        "Write and read FORM FTXT/CHRS clipboard data through iffparse.library and clipboard.device",
+        "Restore the original CLI module segment and mark the worker segment list for process cleanup"
+      ],
+      "ownership_rules": [
+        "All message, reply-port, hook, clipboard, IFF, device and library leases are guest-owned and must be balanced on every failure path.",
+        "The worker must retain its rendezvous port and hooks only for the service lifetime, then restore the previous edit hook before deleting the port.",
+        "OFF is a control operation and must not allocate a second worker or invent a one-shot clipboard implementation.",
+        "The source's persistent process and global hook state are incompatible with a transient resident body; lifecycle evidence is required before implementation admission."
+      ],
+      "source_quirks": [
+        "The source uses SYSTEM_PRIVATE console AddSnipHook/RemSnipHook APIs.",
+        "The source's MorphOS version tag is newer than the selected released source tree; source-to-packed correspondence remains unproven."
+      ]
+    }
+  },
+  "evidence_limits": [
+    "Neither profile has an original guest execution receipt, exact output/clipboard byte comparison, or result/IoErr precedence capture.",
+    "The MorphOS source is behavior evidence only and is not copied into CopperOS.",
+    "Persistent process retirement, duplicate start/OFF races, hook restoration, clipboard/device failure behavior, installed protection, package placement and differential parity remain open.",
+    "No command body or shipping artifact is admitted by this audit."
+  ]
+}
